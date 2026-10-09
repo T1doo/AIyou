@@ -12,7 +12,8 @@ if [[ ! -x "$JAVA_HOME/bin/javac" ]]; then
     echo 'A complete JDK 17 is required. Set JAVA_HOME; see docs/BUILD.md.' >&2
     exit 2
 fi
-if ! "$JAVA_HOME/bin/javac" -version 2>&1 | rg -q '^javac 17\.'; then
+jdk_version=$("$JAVA_HOME/bin/javac" -version 2>&1)
+if [[ ! "$jdk_version" =~ (^|[[:space:]])javac[[:space:]]17\. ]]; then
     echo 'D00 requires JDK 17 for compilation and execution.' >&2
     exit 2
 fi

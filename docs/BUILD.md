@@ -20,7 +20,10 @@
 
 版本目录为 `gradle/libs.versions.toml`。未使用依赖不提前加入，包括 KSP、
 Room、SQLCipher、Hilt、AI 协议等，加入时另行复核。SDK 平台/构建工具固定在
-app 构建脚本，传递依赖通过 Gradle lockfile 记录实际解析版本。
+app 构建脚本，传递依赖通过 Gradle lockfile 记录实际解析版本。当前 app 已锁
+debug 编译/运行时依赖、Kotlin Build Tools API 与 debug compiler plugin 配置；
+SDK 获准后仍需从真实 assemble/lint 的 `--write-locks` 记录其余实际解析配置，
+现阶段不宣称 Android 完整构建依赖已全部验证或锁定。
 
 2026-10-09 复核官方资料：
 
