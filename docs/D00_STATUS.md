@@ -60,6 +60,7 @@ Build Tools 35.0.0；均引用 `android-sdk-license`。不需要预览、NDK 或
 | JDK / Gradle / Wrapper 校验 | PASS | 下载与生成的校验值匹配官方值，java/javac 均 17 |
 | `scripts/gradle.sh :core:domain:test --write-locks` | PASS | 3 tests，0 failures，0 errors，0 skipped；测试任务实际 executed |
 | `python3 scripts/verify-test-results.py` | PASS | 非零测试 XML；未以 NO-SOURCE 充当成功 |
+| 从已提交的干净源码快照重跑 `:core:domain:test` 及 XML 验证 | PASS | git archive 源码，无复制 build 输出；3 tests，0 failures/errors/skipped，6 个任务实际 executed；复用已校验工具与下载缓存 |
 | `scripts/gradle.sh :app:dependencies --configuration debugRuntimeClasspath --write-locks` | PASS | 解析成功，无 FAILED 依赖标记，生成 app lockfile；不代替 AAR metadata 检查 |
 | `python3 scripts/check-sdk.py` | FAIL | SDK 未安装，ANDROID_HOME 未设置，无接受记录 |
 | `scripts/gradle.sh :app:checkDebugAarMetadata` | FAIL | 实际任务失败于 SDK location not found |
@@ -67,7 +68,7 @@ Build Tools 35.0.0；均引用 `android-sdk-license`。不需要预览、NDK 或
 | `scripts/gradle.sh :app:lintDebug` | FAIL | 实际命令失败于 SDK location not found；没有 lint 通过证据 |
 | Shell 语法、XML 解析、workflow YAML 解析、`git diff --check` | PASS | 静态文件检查，不替代 Android lint 或 UI 验证 |
 | 干净源码复现 Android 构建 | NOT RUN | 同一 SDK 许可阻塞 |
-| GitHub Actions 执行 | NOT RUN | 推送后由远端执行；本地未声称通过 |
+| GitHub Actions 执行结果查询 | FAIL | `gh run list` 只读查询返回 Forbidden；远端执行结果未知，未声称通过，也未修改凭据/网络 |
 | 模拟器/真机启动、截图、TalkBack、200% 字体、320 dp/横屏 | NOT RUN | 无设备环境；未完成视觉验收 |
 | 真机性能、输入法/触感、OEM 通知与 16 KB 设备验证 | NOT RUN | 无设备，且相关功能尚未实现 |
 | 独立源码审查 | NOT RUN | D00 未达到完整验收门槛，交由独立审查者后续执行 |
@@ -96,6 +97,8 @@ AGP analytics 仍报告默认 home 的 settings 不可写，但纯 Kotlin 测试
 domain-test.log、domain-test-retry1/2/3.log、app-dependencies.log、aar-metadata.log、
 assemble-debug.log、lint-debug.log。工具下载与缓存位于 `/workspace/toolchains/`，
 不提交 Git。公开仓库只记录脱敏摘要与固定校验值。
+干净源码测试日志为 `clean-snapshot-test.log`，源码快照目录为
+`/workspace/d00-clean-248b873`；其中没有 SDK，也不是干净工具缓存构建。
 
 ## 下一步与交付边界
 
@@ -104,7 +107,10 @@ assemble-debug.log、lint-debug.log。工具下载与缓存位于 `/workspace/to
 metadata / assemble / test / lint，并从干净源码复现，填写 APK 及真实结果。
 随后冻结源码，独立审查通过后再进入 D01。
 
-本轮在 `codex/d00-native-bootstrap-20261009` 保存提交并正常推送；准确交付 SHA、
+源码快照提交 `248b8735b0019ac3566d24f6a2e68b3d8d165e19` 已正常推送，
+`git ls-remote` 核实远端分支 SHA 一致；显式 fetch 后 ahead/behind 为 `0/0`。
+后续本文件仅补充执行证据，不改变已测试源码。本轮在
+`codex/d00-native-bootstrap-20261009` 保存提交并正常推送；准确交付 SHA、
 远端核验与未提交/未推送差异以最终报告为准。未更改 main、强推、部署或上架。
 
 原始方案 SHA-256（用于复核未修改）：
