@@ -1,0 +1,59 @@
+name: D00 Android checks
+
+'on':
+  push:
+    branches: ['codex/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  d00:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Verify wrapper checksum
+        run: |
+          printf '%s  %s\n' \
+            81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f \
+            gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
+      - name: Run actual domain tests
+        run: scripts/gradle.sh :core:domain:test
+      - name: Require nonempty passing tests
+        run: python3 scripts/verify-test-results.py
+      - name: Verify already installed and licensed SDK
+        run: python3 scripts/check-sdk.py
+      - name: Verify Android dependency requirements
+        run: scripts/gradle.sh :app:checkDebugAarMetadata
+      - name: Build debug APK
+        run: scripts/gradle.sh :app:assembleDebug
+      - name: Run Android lint
+        run: scripts/gradle.sh :app:lintDebug
+      - name: Preserve test and lint reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d00-reports
+          path: |
+            core/domain/build/test-results/test/
+            core/domain/build/reports/tests/test/
+            app/build/reports/lint-results-debug.*
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Preserve debug APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: aiyou-d00-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
