@@ -1,7 +1,8 @@
 # D00 实际记录
 
 时间：2026-10-09 UTC。状态：**BLOCKED / 待 SDK 许可批准，D00 尚未完成**。
-D01 未开始；独立源码审查尚未执行，不能以本轮实现者检查替代独审。
+D01 未开始；独立只读源码审查已执行，发现两处构建配置缺陷并由唯一写入者
+修复。源码审查和 JVM 验证不替代尚被 SDK 许可阻塞的 Android 验收。
 
 ## 已核实的起点
 
@@ -63,15 +64,15 @@ Build Tools 35.0.0；均引用 `android-sdk-license`。不需要预览、NDK 或
 | 从已提交的干净源码快照重跑 `:core:domain:test` 及 XML 验证 | PASS | git archive 源码，无复制 build 输出；3 tests，0 failures/errors/skipped，6 个任务实际 executed；复用已校验工具与下载缓存 |
 | `scripts/gradle.sh :app:dependencies --configuration debugRuntimeClasspath --write-locks` | PASS | 解析成功，无 FAILED 依赖标记，生成 app lockfile；不代替 AAR metadata 检查 |
 | `python3 scripts/check-sdk.py` | FAIL | SDK 未安装，ANDROID_HOME 未设置，无接受记录 |
-| `scripts/gradle.sh :app:checkDebugAarMetadata` | FAIL | 实际任务失败于 SDK location not found |
-| `scripts/gradle.sh :app:assembleDebug` | FAIL | 实际命令失败于 SDK location not found |
-| `scripts/gradle.sh :app:lintDebug` | FAIL | 实际命令失败于 SDK location not found；没有 lint 通过证据 |
+| `scripts/gradle.sh :app:checkDebugAarMetadata` | FAIL（BLOCKED） | 实际任务失败于 SDK location not found |
+| `scripts/gradle.sh :app:assembleDebug` | FAIL（BLOCKED） | 实际命令失败于 SDK location not found |
+| `scripts/gradle.sh :app:lintDebug` | FAIL（BLOCKED） | 实际命令失败于 SDK location not found；没有 lint 通过证据 |
 | Shell 语法、XML 解析、workflow YAML 解析、`git diff --check` | PASS | 静态文件检查，不替代 Android lint 或 UI 验证 |
 | 干净源码复现 Android 构建 | NOT RUN | 同一 SDK 许可阻塞 |
 | GitHub Actions 执行结果查询 | FAIL | `gh run list` 只读查询返回 Forbidden；远端执行结果未知，未声称通过，也未修改凭据/网络 |
 | 模拟器/真机启动、截图、TalkBack、200% 字体、320 dp/横屏 | NOT RUN | 无设备环境；未完成视觉验收 |
 | 真机性能、输入法/触感、OEM 通知与 16 KB 设备验证 | NOT RUN | 无设备，且相关功能尚未实现 |
-| 独立源码审查 | NOT RUN | D00 未达到完整验收门槛，交由独立审查者后续执行 |
+| 独立只读源码审查与修复复核 | PASS（限定范围） | 起点 bf45623 的 P2/P3 已在固定修复 SHA bd3eead 上独立复核关闭；不代替 SDK/Android/设备门槛 |
 
 测试结果：`core/domain/build/test-results/test/TEST-com.t1doo.aiyou.domain.RemoteProcessingRuleTest.xml`。
 HTML 报告：`core/domain/build/reports/tests/test/index.html`。
@@ -100,6 +101,45 @@ assemble-debug.log、lint-debug.log。工具下载与缓存位于 `/workspace/to
 干净源码测试日志为 `clean-snapshot-test.log`，源码快照目录为
 `/workspace/d00-clean-248b873`；其中没有 SDK，也不是干净工具缓存构建。
 
+## 独立审查与修复
+
+按父任务要求，独立审查者只读审查固定提交
+`bf456231102d9b95fbbaf255392bdd10dfd38b74`，完整读取两方案、581 段 DOCX
+及关系链接、工作区规则、全部源码、构建/锁/Wrapper/CI/备份配置及可达 Git
+历史；产品只由实现者写入。审查证据隔离在
+`/workspace/d00-readonly-review-bf45623`，没有新增外围报告。
+
+- **P2：debug 编译依赖缺锁。** app 原锁文件只覆盖 debugRuntimeClasspath。
+  隔离严格模式验证明确报告 debugCompileClasspath 无 lock state。已实际解析
+  并补锁 debugCompileClasspath、kotlinBuildToolsApiClasspath 与
+  kotlinCompilerPluginClasspathDebug；严格模式的编译依赖验证转为 PASS。
+  SDK 获准后仍需从实际 assemble/lint 收集其余解析配置，未宣称全量 Android
+  构建锁或验证已经完成。
+- **P3：工具脚本依赖未声明的 rg。** 独审实际移除 PATH 中 rg，观察到返回 2
+  并误报 JDK 不符。已将版本检查改为 Bash 内置正则；保留标准 Unix 工具、
+  Python 和完整 JDK 17 的无 rg PATH 下，`scripts/gradle.sh --version` 转为 PASS。
+
+修复源码提交：`bd3eeadaf5cc5ea5b5d45b2a4d624352aa8adaf2`。相对审查起点仅
+修改 app 锁文件、工具脚本和构建说明；产品行为及原方案未改变。实现者修复后
+重跑 `:core:domain:test --rerun-tasks`，6 任务实际 executed；XML 为 3 tests、
+0 failures/errors/skipped。根验证证据位于 `/workspace/d00-root-evidence-bf45623`。
+
+独立审查者从该固定修复 SHA 再建全新源码快照，证据隔离在
+`/workspace/d00-readonly-review-bd3eead`。无 `--write-locks` 的严格模式下，上述
+三个配置均解析 PASS，无 FAILED 标记，原运行时锁版本未改变；无 rg 环境的
+脚本返回 0；JVM 单测再次有 6 个实际 executed 任务，3 testcase 且无失败、
+错误、跳过。三个修复文件与固定提交字节一致，两处原缺陷在当前范围内关闭。
+后续仅更新本状态记录，不改变已被独审验证的源码；D00 仍未完成。
+
+独审未发现 CI 中有 SDK 安装或许可接受步骤；AGP 自动下载关闭。Wrapper、
+Gradle 和 JDK 的固定值与官方校验文件一致；原方案与起点字节一致。
+`LOCAL_ONLY`、严格记录策略、同意判定、三入口、中性素材及备份排除符合
+当前 D00 范围；38 个 tracked 文件和 40 个可达历史 blob 的秘密模式扫描零
+匹配，不能将模式扫描声称为绝对无秘密。Android 平台上的备份行为、未来
+同意仓库和持久化记录的边界仍需对应阶段的真实验证。
+
+SDK 始终未安装、协议未接受；没有真实模型调用或网络/凭据/证书变更。
+
 ## 下一步与交付边界
 
 最小剩余批准动作：开发者阅读上面的具体 SDK 协议后，明确回复接受该协议，
@@ -109,7 +149,7 @@ metadata / assemble / test / lint，并从干净源码复现，填写 APK 及真
 
 源码快照提交 `248b8735b0019ac3566d24f6a2e68b3d8d165e19` 已正常推送，
 `git ls-remote` 核实远端分支 SHA 一致；显式 fetch 后 ahead/behind 为 `0/0`。
-后续本文件仅补充执行证据，不改变已测试源码。本轮在
+之后仅另行修复上述构建锁与工具脚本，并对固定修复提交独立复核。本轮在
 `codex/d00-native-bootstrap-20261009` 保存提交并正常推送；准确交付 SHA、
 远端核验与未提交/未推送差异以最终报告为准。未更改 main、强推、部署或上架。
 
