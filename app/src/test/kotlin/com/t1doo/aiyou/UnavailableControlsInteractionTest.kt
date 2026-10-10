@@ -8,11 +8,13 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -79,7 +81,8 @@ class UnavailableControlsInteractionTest {
         compose.onNodeWithText("保存").assertIsNotEnabled().performTouchInput { click() }
         compose.onNodeWithText("问一问").assertIsNotEnabled().performTouchInput { click() }
         compose.onNodeWithContentDescription("此刻，想记下什么").assertIsNotEnabled()
-            .performTouchInput { click() }.assertIsNotFocused()
+            .performTouchInput { click() }
+        compose.onAllNodes(isFocused(), useUnmergedTree = true).assertCountEquals(0)
         compose.runOnIdle { assertEquals(0, invoked) }
     }
 
@@ -88,7 +91,10 @@ class UnavailableControlsInteractionTest {
         val search = compose.onNodeWithContentDescription("搜索回忆，尚未开放")
         search.assertIsNotEnabled()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "尚未开放"))
-            .performTouchInput { click() }.assertIsNotFocused()
+            .performTouchInput { click() }
+        // Disabled text fields can omit Focused entirely; reject every actual
+        // focused node, including descendants, rather than require Focused=false.
+        compose.onAllNodes(isFocused(), useUnmergedTree = true).assertCountEquals(0)
         // Accessibility editing must be absent or actually reject the request;
         // testing only the disabled visual color would not protect this boundary.
         val edit = search.fetchSemanticsNode().config.getOrNull(SemanticsActions.SetText)?.action
@@ -108,7 +114,9 @@ class UnavailableControlsInteractionTest {
                     onDraftChange = { edited = it }, onSave = { saves++ })
             }
         }
-        compose.onNodeWithContentDescription("此刻，想记下什么").performTextReplacement("合成编辑后的草稿")
+        compose.onNodeWithContentDescription("此刻，想记下什么")
+            .performTouchInput { click() }.assertIsFocused()
+            .performTextReplacement("合成编辑后的草稿")
         compose.runOnIdle { assertEquals("合成编辑后的草稿", edited) }
         compose.onNodeWithText("保存").assertIsEnabled().performClick()
         compose.runOnIdle { assertEquals(1, saves) }

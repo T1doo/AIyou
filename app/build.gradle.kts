@@ -42,6 +42,7 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
+            it.testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
             it.dependsOn(prepareRobolectricSdk)
             // Gradle resolves the fixed, locked Maven SDK; the test runner gets
             // no independent downloader and installs no Android SDK package.

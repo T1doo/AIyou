@@ -106,9 +106,9 @@ Sources: [Android 16 KB checks](https://developer.android.com/guide/practices/pa
 [Bionic protection implementation](https://android.googlesource.com/platform/bionic/+/refs/heads/main/linker/linker_phdr.cpp),
 [publisher fixed build](https://github.com/sqlcipher/sqlcipher-android/tree/9a5d685404489cbff14d4c46da81555de1a38787).
 The publisher build uses NDK r25c with max-page-size 16384 but no common-page-size
-16384. Actual APK zip alignment, Android linker behavior on a real test device
-and complete encrypted Room acceptance remain unverified. Actual app and test
-APK ZIP alignment checks passed in the bounded attempt; they do not change the
+16384. Android linker behavior on a real test device and complete encrypted Room
+acceptance remain unverified. Actual app and test APK ZIP alignment checks
+passed in the bounded attempt; they do not change the
 literal ELF RELRO FAIL or prove 16 KB runtime. x86_64 simulated
 16 KB testing would not certify arm64 hardware.
 
@@ -140,8 +140,16 @@ Static filter words wrap as whole items so `图片` need not split across lines.
 Six actual Compose interaction/semantics regressions are added on a JVM Android
 simulation, covering disabled touch handling, accessibility editing, unavailable
 versus busy capability semantics, real supplied draft/save callbacks, the license
-route, and narrow large-font controls. Execution of this new revision is pending
-its own CI; writing tests is not a passing result. They do not open production
+route, and narrow large-font controls. The initial integrated revision
+`c5a9828b2eaad06072da23e7b940bd720eab7f40` in
+[CI 38045679941](https://github.com/T1doo/AIyou/actions/runs/38045679941)
+compiled and executed all six tests: four passed and two failed at the
+`assertIsNotFocused` checks. Its APK and 216 render checks passed; lint and the
+native test APK step were skipped after that failure. The corrected tests check
+the entire unmerged semantics tree for actual focused nodes and positively
+verify enabled input focus, rather than require a disabled node to expose
+`Focused=false`. Their new execution is pending its own CI; the original failure
+remains preserved. They do not open production
 databases or stand in for native tests. Test-only Robolectric 4.17 and its API35
 preinstrumented `15-robolectric-13954326-i7` Maven framework are fixed and Gradle
 locked; the runner uses that local artifact in offline mode, without its own
