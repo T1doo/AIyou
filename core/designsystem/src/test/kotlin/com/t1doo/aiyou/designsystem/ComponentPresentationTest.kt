@@ -32,7 +32,7 @@ class ComponentPresentationTest {
     @Test
     fun privacyCornerDoesNotGrowWithContentHeight() {
         val density = Density(2.625f)
-        val short = privacyContentShape.createOutline(Size(945f, 966f), LayoutDirection.Ltr, density) as Outline.Rounded
+        val short = privacyContentShape.createOutline(Size(945f, 48f), LayoutDirection.Ltr, density) as Outline.Rounded
         val tall = privacyContentShape.createOutline(Size(945f, 10500f), LayoutDirection.Ltr, density) as Outline.Rounded
         assertEquals(short.roundRect.topLeftCornerRadius, tall.roundRect.topLeftCornerRadius)
     }
