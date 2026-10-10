@@ -1,0 +1,19 @@
+package com.t1doo.aiyou.domain
+
+import com.t1doo.aiyou.model.OriginalRevision
+import com.t1doo.aiyou.model.StoredEntry
+import com.t1doo.aiyou.model.TextDraft
+
+/** Successful completion means a durable transaction, never an optimistic UI insert. */
+interface EntryRepository {
+    suspend fun readDraft(): TextDraft?
+    suspend fun updateDraft(text: String): TextDraft
+    suspend fun saveDraft(expected: TextDraft, capturedAtMillis: Long, captureTimeZone: String): StoredEntry
+    suspend fun entries(): List<StoredEntry>
+    suspend fun revisions(entryId: String): List<OriginalRevision>
+    suspend fun revise(entryId: String, expectedRevision: Int, text: String, createdAtMillis: Long): StoredEntry
+}
+
+class RecordConflict : IllegalStateException("Record version changed")
+class StorageKeyUnavailable : IllegalStateException("Local encryption key unavailable")
+class RecordIntegrityFailure : IllegalStateException("Local record integrity check failed")

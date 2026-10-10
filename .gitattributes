@@ -1,2 +1,4 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+# Preserve exact upstream license whitespace; scope excludes product source.
+app/src/main/assets/licenses/*.txt whitespace=-blank-at-eol,-blank-at-eof

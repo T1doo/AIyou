@@ -16,7 +16,7 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = 1
-        versionName = "0.0.2-d01"
+        versionName = "0.0.3-d02-text"
     }
 
     buildFeatures {
@@ -34,6 +34,10 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
+    implementation(project(":core:domain"))
+    implementation(project(":core:data"))
+    implementation(libs.coroutines.android)
+    implementation(libs.lifecycle.viewmodel.compose)
     implementation(project(":core:designsystem"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

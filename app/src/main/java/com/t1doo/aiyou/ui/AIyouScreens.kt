@@ -163,7 +163,7 @@ private fun CaptureSection(state: ComponentState, demo: Boolean) {
 }
 
 @Composable
-private fun SearchSection(demo: Boolean) {
+internal fun SearchSection(demo: Boolean) {
     var query by remember { mutableStateOf("") }
     Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         Surface(Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.medium) {

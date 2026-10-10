@@ -15,6 +15,9 @@ for manifest in sorted(root.glob("**/package.xml")) if root.is_dir() else []:
         licenses = [item.attrib.get("ref") for item in package if item.tag.split("}")[-1] == "uses-license"]
         packages.append({"package": package.attrib.get("path"), "license_refs": licenses})
 print(json.dumps({"kind": "read-only SDK inventory", "packages": packages,
+                  "accepted_license_hashes": {name: (root / "licenses" / name).read_text().split()
+                      for name in ("android-sdk-license", "android-sdk-preview-license", "android-sdk-arm-dbt-license")
+                      if (root / "licenses" / name).is_file()},
                   "kvm_read_write": os.access("/dev/kvm", os.R_OK | os.W_OK),
                   "adb_present": (root / "platform-tools/adb").is_file(),
                   "emulator_present": (root / "emulator/emulator").is_file()}, ensure_ascii=False))

@@ -40,7 +40,7 @@ jobs:
       - name: Inspect existing device test environment without installation
         run: python3 scripts/inspect-device-test-environment.py
       - name: Verify Android dependency requirements
-        run: scripts/gradle.sh :app:checkDebugAarMetadata :core:designsystem:checkDebugAarMetadata
+        run: scripts/gradle.sh :app:checkDebugAarMetadata :core:designsystem:checkDebugAarMetadata :core:data:checkDebugAarMetadata
       - name: Run actual component clipping and empty-state regression tests
         run: |
           scripts/gradle.sh :core:designsystem:testDebugUnitTest
@@ -50,8 +50,10 @@ jobs:
         run: |
           scripts/gradle.sh :app:assembleDebug
           sha256sum app/build/outputs/apk/debug/app-debug.apk
+      - name: Compile actual D02 native-storage instrumentation APK without claiming execution
+        run: scripts/gradle.sh :core:data:assembleDebugAndroidTest
       - name: Run Android lint
-        run: scripts/gradle.sh :app:lintDebug :core:designsystem:lintDebug
+        run: scripts/gradle.sh :app:lintDebug :core:designsystem:lintDebug :core:data:lintDebug
       - name: Generate initial Preview render smoke references
         id: preview_generate
         if: always() && steps.assemble.outcome == 'success'
@@ -142,7 +144,7 @@ jobs:
       - name: Print complete lint findings
         if: always()
         run: |
-          for module in app core/designsystem; do
+          for module in app core/designsystem core/data; do
             report=$module/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             if [ -f "$report" ]; then
               cat "$report"
@@ -150,6 +152,9 @@ jobs:
               echo "Lint text report unavailable for $module; see preceding task result."
             fi
           done
+      - name: Preserve exact generated D02 schema and lock bytes
+        if: always()
+        run: python3 scripts/export-d02-generated-state.py
       - name: Preserve test and lint reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -163,6 +168,8 @@ jobs:
             app/build/reports/lint-results-debug.*
             app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             core/designsystem/build/reports/lint-results-debug.*
+            core/data/build/reports/lint-results-debug.*
+            core/data/schemas/
             core/designsystem/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             app/build/reports/screenshotTest/
             app/build/test-results/validateDebugScreenshotTest/
@@ -176,6 +183,14 @@ jobs:
           name: aiyou-d01-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
+      - name: Preserve D02 instrumentation APK (compiled, execution NOT RUN)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d02-storage-test-apk
+          path: core/data/build/outputs/apk/androidTest/debug/*.apk
+          if-no-files-found: warn
           retention-days: 14
       - name: Preserve initial Preview render smoke images
         if: always()

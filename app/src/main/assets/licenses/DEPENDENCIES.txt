@@ -1,0 +1,24 @@
+AIyou D02 runtime attribution inventory
+
+Room runtime/common 2.8.5, AndroidX SQLite/framework 2.7.0,
+lifecycle-viewmodel-compose 2.9.4 and annotation-experimental 1.5.0:
+the full distributed AndroidX license appears in Apache-2.0.txt.
+The six checked Android runtime archives and their nested JARs contain no
+NOTICE member. This is an archive inventory, not a claim about every upstream
+source history or all earlier app dependencies.
+
+SQLCipher Android 4.19.0: sqlcipher-android-4.19.0.txt.
+Android source commit: 9a5d685404489cbff14d4c46da81555de1a38787.
+SQLCipher core gitlink: e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc;
+full license: sqlcipher-4.19.0.txt; underlying SQLite: SQLite-core.txt.
+Default LibTomCrypt gitlink: 476a9579ae94f32b9ea9e2747bfb04b302370259,
+version 1.18.2; full original alternative licenses: LibTomCrypt-1.18.2.txt.
+No LibTomMath dependency was identified in that default build.
+
+SQLCipher-source-attributions.txt preserves checked upstream copyright
+headers and source URLs. It is supplemental attribution, not an upstream NOTICE.
+JNIString.cpp refers to an ASF NOTICE; its original NOTICE ancestry remains
+unverified. No substitute NOTICE is fabricated here.
+
+KSP and Room compiler are build-time processors, not APK runtime dependencies.
+This bounded inventory does not claim a complete product legal certification.
