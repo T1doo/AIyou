@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.t1doo.aiyou.designsystem.AIyouColors
@@ -55,6 +56,7 @@ fun MainScreen(
 ) {
     BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.background)) {
         val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
+        val stackSummary = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
                 modifier = Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize(),
@@ -62,20 +64,25 @@ fun MainScreen(
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap),
             ) {
                 item("summary") {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                        if (stackSummary) {
                             Text(if (destination == Destination.NOW) "今天" else destination.label, style = MaterialTheme.typography.headlineMedium)
-                            Text(when (destination) {
-                                Destination.NOW -> if (demo) "10月10日 · 周六 · 示例" else "随手记下一点生活"
-                                Destination.MEMORIES -> if (demo) "${ScreenSamples.memories.size} 条虚构记录" else "你的本机原始记录"
-                                Destination.TASKS -> "建议与正式任务分别管理"
-                            }, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                        } else {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
+                                Text(if (destination == Destination.NOW) "今天" else destination.label, Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
+                                PrivacyChip(ProcessingPolicy.LOCAL_ONLY)
+                            }
                         }
-                        PrivacyChip(ProcessingPolicy.LOCAL_ONLY)
+                        Text(when (destination) {
+                            Destination.NOW -> if (demo) "10月10日 · 周六 · 示例" else "随手记下一点生活"
+                            Destination.MEMORIES -> if (demo) "${ScreenSamples.memories.size} 条虚构记录" else "你的本机原始记录"
+                            Destination.TASKS -> "建议与正式任务分别管理"
+                        }, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                        if (stackSummary) PrivacyChip(ProcessingPolicy.LOCAL_ONLY)
+                        if (demo) Text("虚构示例 · 不保存记录、不安排提醒", Modifier.padding(top = AIyouDimensions.spaceSm),
+                            style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                     }
-                    if (demo) Text("虚构示例 · 不保存记录、不安排提醒", Modifier.padding(top = AIyouDimensions.spaceSm),
-                        style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                 }
                 if (state == ComponentState.ERROR || state == ComponentState.LOADING || state == ComponentState.OFFLINE) {
                     item("state") {
@@ -168,11 +175,19 @@ private fun SearchSection(demo: Boolean) {
                     field()
                 } })
         }
-        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-            listOf("日期", "人物", "标签", "图片", "收藏").forEach { label ->
-                TextButton(onClick = {}, enabled = false) { Text(label, style = MaterialTheme.typography.bodySmall) }
+        Surface(Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.medium) {
+            Column(Modifier.padding(AIyouDimensions.spaceMd), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                Text("筛选", style = MaterialTheme.typography.labelLarge, color = AIyouColors.textSecondary)
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs),
+                    verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                    listOf("日期", "人物", "标签", "图片", "收藏").forEach { label ->
+                        Surface(color = AIyouColors.surface, shape = MaterialTheme.shapes.small) {
+                            TextButton(onClick = {}, enabled = false) { Text(label, style = MaterialTheme.typography.bodySmall) }
+                        }
+                    }
+                }
+                Text("搜索与筛选尚未开放；输入不会改变${if (demo) "示例" else "记录"}。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
             }
         }
-        Text("搜索与筛选尚未开放；输入不会改变${if (demo) "示例" else "记录"}。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
     }
 }

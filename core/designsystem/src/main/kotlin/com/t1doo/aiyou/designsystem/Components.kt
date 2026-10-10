@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
@@ -26,12 +27,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import com.t1doo.aiyou.model.ProcessingPolicy
 
 @Composable
@@ -153,12 +156,18 @@ fun CaptureComposer(
             Modifier.padding(AIyouDimensions.spaceLg),
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm),
         ) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                TextButton(onClick = { onModeChange(false) }, enabled = canEdit) {
-                    Text(if (!askMode) "记下来 · 已选" else "记下来", fontWeight = if (!askMode) FontWeight.SemiBold else FontWeight.Normal)
-                }
-                TextButton(onClick = { onModeChange(true) }, enabled = canEdit && askAvailable) {
-                    Text(if (askMode) "问一问 · 已选" else "问一问")
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val stackControls = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
+                if (stackControls) {
+                    Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                        ComposerMode("记下来", !askMode, canEdit, { onModeChange(false) }, Modifier.fillMaxWidth())
+                        ComposerMode("问一问", askMode, canEdit && askAvailable, { onModeChange(true) }, Modifier.fillMaxWidth())
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                        ComposerMode("记下来", !askMode, canEdit, { onModeChange(false) }, Modifier.weight(1f))
+                        ComposerMode("问一问", askMode, canEdit && askAvailable, { onModeChange(true) }, Modifier.weight(1f))
+                    }
                 }
             }
             BasicTextField(
@@ -180,19 +189,41 @@ fun CaptureComposer(
                     }
                 },
             )
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                    TextButton(onClick = { onImage?.invoke() }, enabled = canEdit && onImage != null) { Text("图片") }
-                    TextButton(onClick = { onAudio?.invoke() }, enabled = canEdit && onAudio != null) { Text("录音") }
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val stackControls = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
+                if (stackControls) {
+                    Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                            TextButton(onClick = { onImage?.invoke() }, enabled = canEdit && onImage != null, modifier = Modifier.weight(1f)) { Text("图片") }
+                            TextButton(onClick = { onAudio?.invoke() }, enabled = canEdit && onAudio != null, modifier = Modifier.weight(1f)) { Text("录音") }
+                        }
+                        Button(onClick = { onSubmit?.invoke() }, enabled = canEdit && text.isNotBlank() && onSubmit != null,
+                            modifier = Modifier.fillMaxWidth()) { Text(if (askMode) "提问" else "保存") }
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                        FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                            TextButton(onClick = { onImage?.invoke() }, enabled = canEdit && onImage != null) { Text("图片") }
+                            TextButton(onClick = { onAudio?.invoke() }, enabled = canEdit && onAudio != null) { Text("录音") }
+                        }
+                        Button(onClick = { onSubmit?.invoke() }, enabled = canEdit && text.isNotBlank() && onSubmit != null) { Text(if (askMode) "提问" else "保存") }
+                    }
                 }
-                Button(
-                    onClick = { onSubmit?.invoke() },
-                    enabled = canEdit && text.isNotBlank() && onSubmit != null,
-                ) { Text(if (askMode) "提问" else "保存") }
             }
             Text(availability, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
             if (askMode) Text("提问不会自动成为永久记忆", style = MaterialTheme.typography.bodySmall)
             StateFeedback(composerFeedbackState(state, text))
+        }
+    }
+}
+
+@Composable
+private fun ComposerMode(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
+    Surface(modifier, color = if (selected) AIyouColors.primaryContainer else AIyouColors.surface,
+        shape = MaterialTheme.shapes.small,
+        border = BorderStroke(AIyouDimensions.spaceXs / 4, if (selected) AIyouColors.primary else AIyouColors.outlineFunctional)) {
+        TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.semantics { this.selected = selected }) {
+            Text(label + if (selected) " · 已选" else "", fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
         }
     }
 }
