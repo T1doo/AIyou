@@ -1,0 +1,10 @@
+{
+  "request": "d02-fourth-diagnostic-20261010",
+  "baseline": "dbb48ed1feebe7491c14f7dd1bb3cf03fe230944",
+  "scope": "fiveAcknowledgedSavesSurviveSeparateDatabaseReopens",
+  "instrumentation_timeout_seconds": 240,
+  "whole_experiment_budget_seconds": 1320,
+  "attempts": 1,
+  "new_sdk_terms": false,
+  "full_suite": false
+}

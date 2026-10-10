@@ -52,6 +52,41 @@ ZIP alignment is distinct from ELF RELRO arithmetic and actual native load.
 The known literal RELRO FAIL remains documented; neither these tools nor a
 4 KB simulated device can certify 16 KB compatibility.
 
-Native execution for these new tools is pending their own CI run. Source
-review, metadata discovery, Java compilation and timeout-log retention do not
-turn that pending gate into PASS.
+The original b42597a experiment actually booted and installed both APKs. Its
+shared 240-second command ended after three passing cases and the fourth start;
+the other nine never started. The fourth did not receive 240 seconds alone.
+Cross-process,16KB and physical-device checks remain NOT RUN.
+
+The explicitly authorized follow-up isolates only
+`fiveAcknowledgedSavesSurviveSeparateDatabaseReopens`: five original save/reopen
+rounds, ten repository opens, ten explicit closes and ten original entry queries.
+`--targeted-fourth` retains the same 240-second instrumentation and 22-minute
+overall ceilings. It opts into test-only per-step monotonic wall and aggregate
+process-CPU timings, bounded own-process Java thread samples for slow steps,
+continuous filtered logcat and bounded host/device load/CPU-pressure snapshots.
+Observer failures and incomplete traces cannot be called complete diagnostics.
+Every slow snapshot has an explicit sequence, original operation Java-thread
+identity, declared thread count and capture-error field; missing/duplicate or
+failed snapshots are rejected. The original operation thread is prioritized
+within the 32-thread cap. Java thread IDs are not Linux TIDs; log emission TIDs
+are labeled separately. At least 75 seconds are reserved for the bounded owned
+observers, logcat, emulator and result footer. Archive reads have a tested own-
+process Linux timer capped by remaining budget and 240 seconds, restoring its
+handler and refusing to replace an existing timer. No other process is signaled.
+Job logs print only this new experiment's synthetic filtered trace, summary
+and health excerpts, capped at 512 KiB/1,024 lines per file. Oversize excerpts
+are explicitly TRUNCATED with original byte/line count and SHA256; the complete
+original logs remain in the artifact. A truncated excerpt is not a complete
+trace. Unfiltered device logcat and arbitrary files are not printed by this tool.
+Tracing adds observer overhead; wall minus aggregate CPU is not exact wait time.
+First-new-file, same-process reopen and new-process existing-file open labels
+describe file/process history, never measured OS cold/warm cache behavior.
+Ten repository opens are not proof of exactly ten native SQL connections.
+
+The exact reviewed request file `targeted-fourth-request-20261010.json` starts
+one push-triggered attempt on the existing development branch; ordinary later
+source pushes do not trigger this path. A manual run is also available but is
+not automatically repeated after failure. The original full runner remains
+available explicitly and is not the follow-up workflow's default. Before the
+request is pushed, this follow-up's device execution is NOT RUN. Host observer
+and parser tests do not substitute for SQLCipher native execution.

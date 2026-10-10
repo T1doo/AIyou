@@ -37,6 +37,10 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/tests -v
           python3 scripts/generate-tokens.py --check
+      - name: Test actual native diagnostic observer on host (no device claim)
+        run: |
+          scripts/gradle.sh --project-dir checks/native-trace test
+          python3 scripts/verify-test-results.py --trace
       - name: Require nonempty passing tests
         run: python3 scripts/verify-test-results.py
       - name: Verify already installed and licensed SDK
@@ -175,6 +179,8 @@ jobs:
             core/domain/build/reports/tests/test/
             checks/record-queue/build/test-results/test/
             checks/record-queue/build/reports/tests/test/
+            checks/native-trace/build/test-results/test/
+            checks/native-trace/build/reports/tests/test/
             core/designsystem/build/test-results/testDebugUnitTest/
             core/designsystem/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/

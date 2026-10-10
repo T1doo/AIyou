@@ -11,9 +11,12 @@ import socket
 import stat
 import subprocess
 import time
+import threading
 import urllib.request
 import uuid
 import zipfile
+from d02_native_trace import summarize
+from d02_deadline import archive_download_deadline
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "checks/sdk-device"
@@ -21,6 +24,7 @@ OUTPUT = ROOT / "app/build/reports/d02-device-experiment"
 SDK = Path(os.environ.get("ANDROID_HOME", os.environ.get("ANDROID_SDK_ROOT", "/nonexistent-sdk")))
 HASH = "24333f8a63b6825ea9c5514f83c2829b004d1fee"
 EXPERIMENT_DEADLINE = None
+CLEANUP_RESERVE_SECONDS = 75  # bounded observers + logcat + owned emulator + result footer
 PACKAGES = [
     {"path": "emulator", "revision": "37.2.12", "xml": "emulator-package.xml",
      "xml_sha256": "af0a044e5fc70a53f74dd4f2c528972e38b72a49b8e793f1249c903957e306ec",
@@ -39,7 +43,7 @@ def digest(path):
 
 def command(args, name, timeout=90, env=None, input_text=None, require=True, deadline_bound=True):
     if deadline_bound and EXPERIMENT_DEADLINE is not None:
-        remaining = EXPERIMENT_DEADLINE - time.monotonic() - 30
+        remaining = EXPERIMENT_DEADLINE - time.monotonic() - CLEANUP_RESERVE_SECONDS
         if remaining <= 0:
             (OUTPUT / (name + ".log")).write_text("NOT RUN: overall experiment deadline reached before command.\n")
             raise RuntimeError("Overall experiment deadline reached")
@@ -83,7 +87,7 @@ def compile_checker():
 
 
 def install_owned_package(item):
-    if EXPERIMENT_DEADLINE is not None and time.monotonic() >= EXPERIMENT_DEADLINE - 60:
+    if EXPERIMENT_DEADLINE is not None and time.monotonic() >= EXPERIMENT_DEADLINE - CLEANUP_RESERVE_SECONDS:
         raise RuntimeError("Overall experiment deadline reached before SDK download")
     target = SDK.joinpath(*item["path"].split(";"))
     if not target.resolve().is_relative_to(SDK.resolve()):
@@ -95,11 +99,15 @@ def install_owned_package(item):
     size = 0
     sha1, sha256 = hashlib.sha1(), hashlib.sha256()
     # One official URL/attempt only. No terms prompt, mirror, TLS bypass or retry.
-    with urllib.request.urlopen(item["url"], timeout=60) as response, archive.open("xb") as out:
+    available = min(240, EXPERIMENT_DEADLINE - time.monotonic() - CLEANUP_RESERVE_SECONDS) \
+        if EXPERIMENT_DEADLINE is not None else 240
+    # An own-process POSIX timer bounds even a blocking read at the deadline.
+    # Refuse an existing timer; restore its handler. Ubuntu runner only, no other PID signalled.
+    with archive_download_deadline(available), urllib.request.urlopen(item["url"], timeout=min(60, available)) as response, archive.open("xb") as out:
         while block := response.read(1024 * 1024):
             size += len(block)
             if size > item["bytes"] or time.monotonic() - started > 240 \
-                    or (EXPERIMENT_DEADLINE is not None and time.monotonic() >= EXPERIMENT_DEADLINE - 30):
+                    or (EXPERIMENT_DEADLINE is not None and time.monotonic() >= EXPERIMENT_DEADLINE - CLEANUP_RESERVE_SECONDS):
                 raise RuntimeError("Bounded SDK archive size/download deadline exceeded")
             sha1.update(block)
             sha256.update(block)
@@ -112,6 +120,8 @@ def install_owned_package(item):
     links, seen = [], set()
     with zipfile.ZipFile(archive) as zipped:
         for entry in zipped.infolist():
+            if EXPERIMENT_DEADLINE is not None and time.monotonic() >= EXPERIMENT_DEADLINE - CLEANUP_RESERVE_SECONDS:
+                raise RuntimeError("Overall deadline reached during owned package extraction; partial bytes retained")
             part = PurePosixPath(entry.filename)
             if part.is_absolute() or ".." in part.parts or "\\" in entry.filename or not part.parts:
                 raise RuntimeError("Unsafe archive path")
@@ -133,7 +143,10 @@ def install_owned_package(item):
             else:
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 with zipped.open(entry) as source, dest.open("xb") as out:
-                    shutil.copyfileobj(source, out)
+                    while block := source.read(1024 * 1024):
+                        if EXPERIMENT_DEADLINE is not None and time.monotonic() >= EXPERIMENT_DEADLINE - CLEANUP_RESERVE_SECONDS:
+                            raise RuntimeError("Overall deadline reached during owned member copy; partial bytes retained")
+                        out.write(block)
                 dest.chmod(mode & 0o777 if mode & 0o777 else 0o644)
     for dest, link in links:
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -144,6 +157,8 @@ def install_owned_package(item):
     if not (payload / "source.properties").is_file() or (payload / "package.xml").exists():
         raise RuntimeError("Unexpected SDK payload layout/metadata; preserve without overwrite")
     target.parent.mkdir(parents=True, exist_ok=True)
+    if EXPERIMENT_DEADLINE is not None and time.monotonic() >= EXPERIMENT_DEADLINE - CLEANUP_RESERVE_SECONDS:
+        raise RuntimeError("Overall deadline reached before owned SDK promotion")
     payload.rename(target)
     shutil.copyfile(SOURCE / item["xml"], target / "package.xml")
     print("PASS: verified fixed archive installed in previously absent path:", item["path"], sha256.hexdigest(), flush=True)
@@ -164,7 +179,67 @@ def instrumentation(adb, serial, component, class_name, count, name, env, extra=
     return {"phase": name, "tests": count, "terminal_status_codes": codes, "runner_result": -1}
 
 
-def run_device(report):
+def targeted_fourth(adb, serial, component, env, report):
+    """One exact case, unchanged 240s ceiling; continuously preserve bounded diagnostics."""
+    stop = threading.Event()
+    trace_file = OUTPUT / "targeted-fourth-trace.log"
+    health_file = OUTPUT / "targeted-fourth-health.log"
+    def health():
+        with health_file.open("w") as out:
+            for sequence in range(50):
+                if stop.is_set():
+                    break
+                snapshot = {"sample": sequence, "host_monotonic": time.monotonic(), "host": {}}
+                for name in ("loadavg", "stat", "pressure/cpu"):
+                    try:
+                        snapshot["host"][name] = (Path("/proc") / name).read_text()[:16384]
+                    except OSError as error:
+                        snapshot["host"][name] = "UNAVAILABLE: " + type(error).__name__
+                try:
+                    result = subprocess.run([str(adb), "-s", serial, "shell", "cat", "/proc/loadavg",
+                                             "/proc/stat", "/proc/pressure/cpu"], capture_output=True,
+                                            text=True, timeout=5, env=env)
+                    snapshot["device"] = {"returncode": result.returncode, "stdout": result.stdout[:16384],
+                                          "stderr": result.stderr[:2048]}
+                except subprocess.TimeoutExpired:
+                    snapshot["device"] = {"result": "TIMEOUT (5s); no process killed except owned adb command"}
+                except OSError as error:
+                    snapshot["device"] = {"result": "UNAVAILABLE: " + type(error).__name__}
+                out.write(json.dumps(snapshot) + "\n")
+                out.flush()
+                if stop.wait(5):
+                    break
+    with trace_file.open("w") as out:
+        logger = subprocess.Popen([str(adb), "-s", serial, "logcat", "-v", "brief", "AIyouD02Trace:I", "*:S"],
+                                  stdout=out, stderr=subprocess.STDOUT, env=env)
+        sampler = threading.Thread(target=health, name="owned-native-health-observer", daemon=True)
+        sampler.start()
+        try:
+            report["native_tests"] = [instrumentation(adb, serial, component,
+                "com.t1doo.aiyou.data.EncryptedRecordsIntegrationTest#fiveAcknowledgedSavesSurviveSeparateDatabaseReopens",
+                1, "targeted-fourth", env, ("-e", "aiyouNativeTrace", "1"))]
+        finally:
+            stop.set()
+            sampler.join(timeout=6)
+            report["health_sampler_stopped"] = not sampler.is_alive()
+            report["health_samples"] = len(health_file.read_text().splitlines()) if health_file.is_file() else 0
+            if logger.poll() is None:
+                logger.terminate()
+                try:
+                    logger.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    logger.kill()
+                    logger.wait(timeout=2)
+            out.flush()
+            diagnosis = summarize(trace_file)
+            (OUTPUT / "targeted-fourth-trace-summary.log").write_text(json.dumps(diagnosis, indent=2) + "\n")
+            report["trace"] = {key: value for key, value in diagnosis.items() if key != "operations"}
+    if not diagnosis["trace_complete"] or not report["health_sampler_stopped"] or not report["health_samples"]:
+        raise RuntimeError("Targeted case terminal result exists but diagnostic capture is incomplete; preserve evidence")
+    report["result"] = "PASS: one targeted native case and complete ten-open trace; remaining native suite, cross-process,16K,physical performance NOT RUN"
+
+
+def run_device(report, targeted=False):
     adb, emulator = SDK / "platform-tools/adb", SDK / "emulator/emulator"
     managers = sorted(SDK.glob("cmdline-tools/*/bin/avdmanager"))
     preferred = SDK / "cmdline-tools/latest/bin/avdmanager"
@@ -215,7 +290,7 @@ def run_device(report):
                                     "-memory", "2048", "-cores", "2"], stdout=log, stderr=subprocess.STDOUT, env=env)
         report["owned_emulator_pid"] = process.pid
         try:
-            deadline = min(time.monotonic() + 720, EXPERIMENT_DEADLINE - 30)
+            deadline = min(time.monotonic() + 720, EXPERIMENT_DEADLINE - CLEANUP_RESERVE_SECONDS)
             while time.monotonic() < deadline:
                 if process.poll() is not None:
                     raise RuntimeError("Owned experimental emulator exited before boot")
@@ -250,6 +325,9 @@ def run_device(report):
             inventory = command([adb, "-s", serial, "shell", "pm", "list", "instrumentation"], "actual-instrumentation", env=env).stdout
             if component not in inventory or "target=" + target not in inventory:
                 raise RuntimeError("Actual installed instrumentation does not match manifest")
+            if targeted:
+                targeted_fourth(adb, serial, component, env, report)
+                return
             report["native_tests"] = [instrumentation(adb, serial, component,
                 "com.t1doo.aiyou.data.EncryptedRecordsIntegrationTest", 13, "encrypted-storage-13", env)]
             token = str(uuid.uuid4())
@@ -284,11 +362,14 @@ def main():
     global EXPERIMENT_DEADLINE
     parser = argparse.ArgumentParser()
     parser.add_argument("--license-check-only", action="store_true")
+    parser.add_argument("--targeted-fourth", action="store_true", help="only the original ten-open fourth case, with bounded test-only diagnostics")
     args = parser.parse_args()
     OUTPUT.mkdir(parents=True, exist_ok=False)
     before = license_snapshot()
     report = {"result": "NOT RUN", "packages": PACKAGES, "license_hash": HASH,
-              "license_before": before, "physical_performance": "NOT RUN", "16k_execution": "NOT RUN"}
+              "license_before": before, "physical_performance": "NOT RUN", "16k_execution": "NOT RUN",
+              "scope": "one targeted fourth case" if args.targeted_fourth else "original full native experiment",
+              "native_tests": []}
     try:
         for item in PACKAGES:
             if digest(SOURCE / item["xml"]) != item["xml_sha256"]:
@@ -302,12 +383,13 @@ def main():
             raise RuntimeError("Existing licensed host SDK absent")
         EXPERIMENT_DEADLINE = time.monotonic() + 22 * 60
         report["whole_experiment_budget_seconds"] = 22 * 60
+        report["cleanup_reserve_seconds"] = CLEANUP_RESERVE_SECONDS
         if shutil.disk_usage(SDK).free < 7 * 1024 ** 3:
             raise RuntimeError("Insufficient free disk for bounded owned SDK experiment")
         for item in PACKAGES:
             install_owned_package(item)
         command(checker + ["discover"], "installed-fixed-package-discovery")
-        run_device(report)
+        run_device(report, targeted=args.targeted_fourth)
     except Exception as error:
         report["result"] = "FAIL: " + str(error) + "; native gate NOT RUN unless passing terminal results recorded"
         raise

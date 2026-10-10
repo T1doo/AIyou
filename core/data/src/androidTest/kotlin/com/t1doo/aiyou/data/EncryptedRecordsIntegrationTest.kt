@@ -29,19 +29,25 @@ class EncryptedRecordsIntegrationTest {
     private lateinit var secret: ByteArray
     private val stores = mutableListOf<EncryptedEntryRepository>()
     private val aliases = mutableListOf<String>()
+    private var trace: AndroidNativeTrace? = null
 
     @Before fun setUp() {
-        context = InstrumentationRegistry.getInstrumentation().targetContext
-        directory = File(context.noBackupFilesDir, "d02-test-${UUID.randomUUID()}").also { check(it.mkdirs()) }
-        secret = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        System.loadLibrary("sqlcipher")
+        trace = AndroidNativeTrace()
+        trace!!.step("setup_context") { context = InstrumentationRegistry.getInstrumentation().targetContext }
+        trace!!.step("setup_directory") {
+            directory = File(context.noBackupFilesDir, "d02-test-${UUID.randomUUID()}").also { check(it.mkdirs()) }
+        }
+        trace!!.step("setup_secret") { secret = ByteArray(32).also { SecureRandom().nextBytes(it) } }
+        trace!!.step("setup_load_library") { System.loadLibrary("sqlcipher") }
     }
 
     @After fun tearDown() {
-        stores.forEach { it.close() }
-        aliases.forEach { alias -> KeyStore.getInstance("AndroidKeyStore").apply { load(null); deleteEntry(alias) } }
-        secret.fill(0)
-        directory.deleteRecursively() // this test's unique owned directory only
+        try {
+            trace?.step("teardown_close") { stores.forEach { it.close() } }
+            aliases.forEach { alias -> KeyStore.getInstance("AndroidKeyStore").apply { load(null); deleteEntry(alias) } }
+            if (::secret.isInitialized) secret.fill(0)
+            if (::directory.isInitialized) directory.deleteRecursively() // unique owned directory only
+        } finally { trace?.close() }
     }
 
     private fun open(name: String = "records.db", key: ByteArray = secret) =
@@ -198,19 +204,21 @@ class EncryptedRecordsIntegrationTest {
     @Test fun encryptedVersionOneMigrationPreservesDraftAndOriginalAndAddsLocalJob() = runBlocking {
         createVersionOne("migration.db")
         val store = open("migration.db")
-        assertEquals("合成迁移原文", store.entries().single().originalText)
-        assertEquals("Asia/Shanghai", store.entries().single().captureTimeZone)
-        assertEquals(ProcessingPolicy.LOCAL_ONLY, store.entries().single().policy)
-        assertEquals("合成迁移草稿", store.readDraft()?.text)
-        assertEquals("合成迁移原文", store.revisions("synthetic-v1").single().originalText)
-        assertEquals(1L, count(store, "local_jobs"))
+        assertMigratedFixture(store)
+        fails<Exception> {
+            store.database.openHelper.writableDatabase.execSQL("UPDATE entry_revisions SET originalText='synthetic overwrite'")
+        }
+        assertMigratedFixture(store)
         store.close()
-        assertEquals(1, open("migration.db").entries().size)
+        assertMigratedFixture(open("migration.db"))
     }
 
     @Test fun invalidMigrationSchemaIsRejectedWithoutDestructiveFallback() = runBlocking {
         createVersionOne("invalid-migration.db", invalid = true)
+        val before = versionOneSnapshot("invalid-migration.db")
         fails<Exception> { open("invalid-migration.db") }
+        assertEquals("Rejected migration must preserve the complete logical schema and data", before,
+            versionOneSnapshot("invalid-migration.db"))
         SQLiteDatabase.openOrCreateDatabase(File(directory, "invalid-migration.db").absolutePath, secret, null, null).use { db ->
             assertEquals(1, db.version)
             db.rawQuery("SELECT originalText FROM entry_revisions", emptyArray()).use { cursor ->
@@ -223,16 +231,71 @@ class EncryptedRecordsIntegrationTest {
     }
 
     @Test fun fiveAcknowledgedSavesSurviveSeparateDatabaseReopens() = runBlocking {
+        val observer = checkNotNull(trace)
         for (n in 1..5) {
-            val store = open()
-            store.saveDraft(store.updateDraft("合成重启样本 $n 🌿"), n.toLong(), "Etc/UTC")
-            store.close()
-            val restarted = open()
-            assertEquals(n, restarted.entries().size)
-            assertEquals("合成重启样本 $n 🌿", restarted.entries().first().originalText)
-            restarted.close()
+            val store = observer.step("open", n,
+                if (n == 1) "FRESH_FILE_FIRST_OPEN" else "REOPEN_SAME_PROCESS") { open() }
+            val draft = observer.suspending("update_draft", n) { store.updateDraft("合成重启样本 $n 🌿") }
+            observer.suspending("save_draft", n) { store.saveDraft(draft, n.toLong(), "Etc/UTC") }
+            observer.step("close", n) { store.close() }
+            val restarted = observer.step("open", n, "REOPEN_SAME_PROCESS") { open() }
+            observer.suspending("query_count", n) { assertEquals(n, restarted.entries().size) }
+            observer.suspending("query_latest", n) {
+                assertEquals("合成重启样本 $n 🌿", restarted.entries().first().originalText)
+            }
+            observer.step("close", n) { restarted.close() }
         }
     }
+
+    private suspend fun assertMigratedFixture(store: EncryptedEntryRepository) {
+        val entry = store.entries().single()
+        assertEquals("synthetic-v1", entry.id)
+        assertEquals(1, entry.currentRevision)
+        assertEquals("合成迁移原文", entry.originalText)
+        assertEquals(1000L, entry.capturedAtMillis)
+        assertEquals("Asia/Shanghai", entry.captureTimeZone)
+        assertEquals(ProcessingPolicy.LOCAL_ONLY, entry.policy)
+        val revision = store.revisions(entry.id).single()
+        assertEquals(entry.id, revision.entryId)
+        assertEquals(1, revision.revision)
+        assertEquals(entry.originalText, revision.originalText)
+        assertEquals(contentHash(entry.originalText), revision.contentHash)
+        assertEquals(1000L, revision.createdAtMillis)
+        val draft = checkNotNull(store.readDraft())
+        assertEquals("synthetic-draft", draft.id)
+        assertEquals(3L, draft.version)
+        assertEquals("合成迁移草稿", draft.text)
+        val sql = store.database.openHelper.writableDatabase
+        assertEquals(2, sql.version)
+        sql.query("SELECT id,entryId,sourceRevision,operation,state FROM local_jobs").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("synthetic-v1:1:LOCAL_INDEX", cursor.getString(0))
+            assertEquals(entry.id, cursor.getString(1))
+            assertEquals(1, cursor.getInt(2))
+            assertEquals("LOCAL_INDEX", cursor.getString(3))
+            assertEquals("PENDING", cursor.getString(4))
+            assertFalse(cursor.moveToNext())
+        }
+        sql.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
+    }
+
+    /** Compare logical rows/schema, not ciphertext bytes that legitimate WAL recovery can change. */
+    private fun versionOneSnapshot(name: String): List<List<String?>> =
+        SQLiteDatabase.openOrCreateDatabase(File(directory, name).absolutePath, secret, null, null).use { db ->
+            buildList {
+                add(listOf("version", db.version.toString()))
+                for (query in listOf(
+                    "SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name",
+                    "SELECT * FROM entries ORDER BY id", "SELECT * FROM entry_revisions ORDER BY entryId,revision",
+                    "SELECT * FROM capture_draft ORDER BY slot",
+                )) {
+                    add(listOf(query))
+                    db.rawQuery(query, emptyArray()).use { cursor ->
+                        while (cursor.moveToNext()) add(List(cursor.columnCount) { cursor.getString(it) })
+                    }
+                }
+            }
+        }
 
     private fun count(store: EncryptedEntryRepository, table: String): Long =
         store.database.openHelper.writableDatabase.query("SELECT count(*) FROM $table").use { it.moveToFirst(); it.getLong(0) }

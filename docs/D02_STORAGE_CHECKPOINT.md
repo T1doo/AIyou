@@ -121,8 +121,9 @@ The separate [bounded device experiment](../checks/sdk-device/README.md) verifie
 existing installer-host acceptance using the official API before fixed payload
 installation. It explicitly uses the unsupported software-emulation path with
 strict deadlines; its 13-case command timed out as recorded above. It is now
-manual-only so normal UI integration cannot silently repeat the complete
-experiment. Actual packaged
+manual-only for the original full-suite mode so normal UI integration cannot
+silently repeat the complete experiment. The separately authorized single-case
+follow-up below uses its unique request-file trigger. Actual packaged
 license equality and APK ZIP checks are separate from runtime and RELRO gates.
 
 ## Accepted visual source integration and interaction checks
@@ -170,3 +171,56 @@ the [Robolectric setup](https://robolectric.org/getting-started/) and
 [Compose test setup](https://developer.android.com/develop/ui/compose/testing)
 describe the test runner and Compose rule infrastructure. The debug-only test
 manifest is kept out of the release configuration.
+
+At `dbb48ed1feebe7491c14f7dd1bb3cf03fe230944`,
+[CI 38047321570](https://github.com/T1doo/AIyou/actions/runs/38047321570) passed
+the actual 3 domain, 3 host queue, 7 component and 6 Compose tests, all three
+strict lint tasks, both APK builds, all seven packaged-license byte checks,
+both ZIP checks and 216 actual render cases. Exact schema and all four module
+locks matched. This is a verified engineering checkpoint, not full D02 native
+acceptance; the historical partial device result remains unchanged.
+
+## Targeted fourth-case diagnostic follow-up
+
+The new test-only observer preserves the fourth case's original five rounds,
+ten opens, ten explicit closes, ten entry queries and assertions. Opt-in logs
+locate setup, open, draft update, save, query and close wall/process-CPU time.
+Slow-step Java thread samples are limited to the instrumentation process and
+bounded in frequency/count/size. No keys, record bodies, SQL parameters or
+private production records enter the trace. Host regressions compile the
+actual observer source and verify failure preservation, bounded samples and
+suspended-operation timing. Parser regressions reject partial/truncated,
+duplicate or failed traces. These host checks do not run SQLCipher.
+The first independent follow-up review rejected a parser false-complete path
+for truncated or missing/failed thread snapshots and insufficient cleanup
+reserve. These failures are retained as regressions: tagged malformed lines
+fail, each bounded snapshot carries explicit identity/count/error information,
+and original operation threads are kept within the cap. The execution window
+now reserves 75 seconds for owned cleanup; blocking archive reads are bounded
+by a tested Linux process timer. Neither the 240-second instrumentation nor
+1,320-second overall budget is extended.
+
+The single-case follow-up retains the 240-second command deadline and 22-minute
+overall experiment budget, unchanged fixed emulator/image and installer-host
+existing-acceptance check. A unique reviewed request-file push starts this
+authorized attempt; normal source integration does not repeat it. Continuous
+trace and load/CPU-pressure evidence are preserved even on timeout. Before its
+actual CI result, execution remains NOT RUN; a passing targeted case cannot
+erase the original timeout or certify the nine previously unstarted cases.
+File/process history labels are not OS cold-cache/warm-cache measurements, and
+aggregate process CPU is not exact per-thread wait time or sole-cause proof.
+
+Encrypted migration assertions now verify all entry/revision metadata and hash,
+exact draft identity/version, local-job metadata/state, FK consistency,
+immutability and reopen. The rejected-migration case compares complete logical
+schema/rows before/after, avoiding false ciphertext-byte expectations under WAL
+recovery. Cross-process tests retain different-PID and externally separated
+phases, adding acknowledged entry/draft identities, time/revision/hash, local
+job and FK checks. Their new assertions remain native NOT RUN until executed.
+
+A fresh independent fixed-4.19 four-ABI recheck retains literal RELRO FAIL,
+zero checked rounded-page writable overlap, and 16KB runtime NOT RUN. Exact
+JNIString publisher/introduction bytes are verified. Official archived Harmony
+NOTICE texts are available as research references, but the exact adapted AOSP
+revision and its relevant distributed NOTICE remain UNKNOWN. No unrelated
+Harmony component notice is copied into the APK or claimed to close the gap.

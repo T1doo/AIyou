@@ -1,9 +1,11 @@
 name: D02 bounded native storage experiment
 
 'on':
-  # The authorized one-shot experiment already ran at b42597a. Future source
-  # integration must not silently repeat it; targeted diagnostics need an
-  # explicitly reviewed manual run. The normal Android workflow stays automatic.
+  # Only this explicitly reviewed, authorized request-file change starts a push
+  # experiment. Ordinary integration pushes never repeat the original full suite.
+  push:
+    branches: ['codex/d02-local-records-20261010']
+    paths: ['checks/sdk-device/targeted-fourth-request-20261010.json']
   workflow_dispatch:
 
 permissions:
@@ -26,6 +28,7 @@ jobs:
           check-latest: false
       - name: Verify wrapper and existing SDK, with no installer or acceptance
         run: |
+          python3 scripts/verify-d02-diagnostic-request.py
           printf '%s  %s\n' 3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
           python3 scripts/check-sdk.py
           python3 scripts/inspect-device-test-environment.py
@@ -33,8 +36,8 @@ jobs:
         run: scripts/gradle.sh :app:checkDebugAarMetadata :core:data:checkDebugAarMetadata :app:assembleDebug :core:data:assembleDebugAndroidTest
       - name: Check APK packaging independently of runtime
         run: python3 scripts/inspect-d02-apks.py
-      - name: One bounded unsupported software-emulation attempt, existing terms only
-        run: python3 scripts/run-d02-device-experiment.py
+      - name: One targeted fourth-case diagnostic attempt, unchanged budget and existing terms only
+        run: python3 scripts/run-d02-device-experiment.py --targeted-fourth
       - name: Print actual result, including failure and NOT RUN boundaries
         if: always()
         run: |
@@ -43,6 +46,7 @@ jobs:
           else
             echo 'Native gate NOT RUN; preceding build or environment check failed.'
           fi
+          python3 scripts/print-d02-targeted-diagnostics.py
       - name: Preserve experiment evidence; no SDK archives or payloads
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
