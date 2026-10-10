@@ -11,7 +11,7 @@ reports = list((root / "app/build/test-results/validateDebugScreenshotTest").rgl
 cases = []
 for report in reports:
     cases.extend(ET.parse(report).getroot().iter("testcase"))
-expected = 198  # 8 components x 7 states x 2 sizes + 3 pages x 7 x 4 sizes + 2 shells
+expected = 212  # Original198 + 7 complete LONG_TEXT components x 2 explicit heights.
 if len(cases) != expected:
     raise SystemExit(f"FAIL: expected {expected} actual Preview smoke tests, found {len(cases)}")
 if any(any(case.find(tag) is not None for tag in ("failure", "error", "skipped")) for case in cases):
@@ -29,6 +29,9 @@ for path in files:
         raise SystemExit(f"FAIL: invalid PNG {path.name}: {error}") from error
     manifest.append({"file": str(path.relative_to(references)), "width": width, "height": height,
                      "sha256": hashlib.sha256(data).hexdigest()})
+complete = [item for item in manifest if "CompleteRender_" in item["file"]]
+if len(complete) != 14 or any(item["height"] <= 2400 for item in complete):
+    raise SystemExit("FAIL: require 14 explicit-height complete-content PNGs taller than the automatic 2400px cap")
 target = root / "app/build/reports/d01-preview-manifest.json"
 target.parent.mkdir(parents=True, exist_ok=True)
 target.write_text(json.dumps({"kind": "initial render smoke, not approved goldens", "count": expected,

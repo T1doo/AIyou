@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -66,7 +65,7 @@ fun PrivacyChip(
     Surface(
         modifier = modifier,
         color = AIyouColors.surfaceMuted,
-        shape = CircleShape,
+        shape = privacyContentShape,
         border = BorderStroke(AIyouDimensions.spaceXs / 4, AIyouColors.outlineFunctional),
     ) {
         Column(Modifier.padding(horizontal = AIyouDimensions.spaceMd, vertical = AIyouDimensions.spaceSm)) {
@@ -95,6 +94,12 @@ fun MemoryCard(
     state: ComponentState = ComponentState.NORMAL,
 ) {
     ComponentCard(modifier) {
+        if (state == ComponentState.EMPTY) {
+            Text("还没有记录", style = MaterialTheme.typography.titleMedium)
+            Text("保存记录后，原文、附件和 AI 派生内容会分别显示。", style = MaterialTheme.typography.bodyMedium)
+            StateFeedback(state)
+            return@ComponentCard
+        }
         Text(capturedAt, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
         Text("原文", style = MaterialTheme.typography.labelLarge)
         Text(originalText, style = MaterialTheme.typography.bodyLarge)
@@ -159,7 +164,7 @@ fun CaptureComposer(
             }
             Text(availability, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
             if (askMode) Text("提问不会自动成为永久记忆", style = MaterialTheme.typography.bodySmall)
-            StateFeedback(state)
+            StateFeedback(composerFeedbackState(state, text))
         }
     }
 }
@@ -195,6 +200,12 @@ fun TaskProposalCard(
     state: ComponentState = ComponentState.NORMAL,
 ) {
     ComponentCard(modifier) {
+        if (state == ComponentState.EMPTY) {
+            Text("没有待确认建议", style = MaterialTheme.typography.titleMedium)
+            Text("建议经过用户确认后，才可成为正式任务。", style = MaterialTheme.typography.bodyMedium)
+            StateFeedback(state)
+            return@ComponentCard
+        }
         Text("待确认建议", style = MaterialTheme.typography.labelLarge, color = AIyouColors.primary)
         Text(title, style = MaterialTheme.typography.titleMedium)
         Text(temporalLabel, style = MaterialTheme.typography.bodyMedium)

@@ -19,6 +19,12 @@ class ComponentStates : PreviewParameterProvider<ComponentState> {
 @Preview(name = "窄屏大字体", widthDp = 320, fontScale = 2f, showBackground = true, locale = "zh-rCN")
 annotation class ComponentPreviews
 
+// Explicit heights avoid the automatic 2400px render cap for tall component content.
+// They are full-content static canvases, never device scroll/IME evidence.
+@Preview(name = "完整长文本常规", widthDp = 360, heightDp = 1600, showBackground = true, locale = "zh-rCN")
+@Preview(name = "完整长文本窄屏大字体", widthDp = 320, heightDp = 4000, fontScale = 2f, showBackground = true, locale = "zh-rCN")
+annotation class CompleteContentPreviews
+
 @Composable
 fun PreviewFrame(content: @Composable () -> Unit) {
     AIyouTheme {
@@ -28,20 +34,14 @@ fun PreviewFrame(content: @Composable () -> Unit) {
     }
 }
 
-fun previewText(state: ComponentState): String = if (state == ComponentState.LONG_TEXT) {
-    "这是虚构的长中文记录。散步时想到，可以把沿途的树叶颜色和旅行照片整理成一本小册子。".repeat(8)
-} else {
-    "今天散步时看见一片新叶子，想把这个小小的发现记下来。"
-}
-
 @ComponentPreviews
 @Composable
 fun MemoryCardPreview(@PreviewParameter(ComponentStates::class) state: ComponentState) {
+    val content = memoryPreviewContent(state)
     PreviewFrame {
         MemoryCard(
-            originalText = previewText(state), capturedAt = "示例 · 2026-10-10 16:20",
-            annotation = "示例派生摘要：散步中的小发现。",
-            attachmentLabel = "图片示例 · 中性占位，无真实附件", state = state,
+            originalText = content.original, capturedAt = content.capturedAt,
+            annotation = content.annotation, attachmentLabel = content.attachment, state = state,
         )
     }
 }
@@ -72,15 +72,18 @@ fun PrivacyChipPreview(@PreviewParameter(ComponentStates::class) state: Componen
 @Composable
 fun SourceCitationCardPreview(@PreviewParameter(ComponentStates::class) state: ComponentState) {
     PreviewFrame {
-        SourceCitationCard("2026-10-10", previewText(state), "示例来源 · 原文版本 1", onOpen = {}, state = state)
+        SourceCitationCard("2026-10-10", previewText(state), "示例来源 · 原文版本 1",
+            onOpen = if (state == ComponentState.EMPTY) null else ({}), state = state)
     }
 }
 
 @ComponentPreviews
 @Composable
 fun TaskProposalCardPreview(@PreviewParameter(ComponentStates::class) state: ComponentState) {
+    val content = proposalPreviewContent(state)
     PreviewFrame {
-        TaskProposalCard(previewText(state), "明天下午 · 时间待确认", "示例记录 · 版本 1", onReview = {}, state = state)
+        TaskProposalCard(content.title, content.time, content.source,
+            onReview = if (content.hasProposal) ({}) else null, state = state)
     }
 }
 

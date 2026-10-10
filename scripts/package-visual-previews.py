@@ -7,11 +7,15 @@ import re
 import zipfile
 
 GROUPS = {"now": ("此刻", 28), "memories": ("回忆", 28), "tasks": ("待办", 28),
-          "components": ("八种组件", 112), "shell": ("主导航", 2)}
+          "components": ("八种组件", 112), "shell": ("主导航", 2),
+          "complete": ("完整长文本", 14)}
 METHODS = {"NowRender": "now", "MemoriesRender": "memories", "TasksRender": "tasks",
            "ShellRender": "shell", **dict.fromkeys(
                ("MemoryRender", "ComposerRender", "PrivacyRender", "SourceRender",
-                "ProposalRender", "ProviderRender", "NoticeRender", "MascotRender"), "components")}
+                "ProposalRender", "ProviderRender", "NoticeRender", "MascotRender"), "components"),
+           **dict.fromkeys(("PrivacyCompleteRender", "MemoryCompleteRender", "NoticeCompleteRender",
+                            "ProposalCompleteRender", "SourceCompleteRender", "MascotCompleteRender",
+                            "ProviderCompleteRender"), "complete")}
 MAX_ZIP_BYTES = 17_000_000  # Decimal MB; allow margin for the download artifact's outer ZIP.
 
 
@@ -27,8 +31,9 @@ def package(root, max_zip_bytes=MAX_ZIP_BYTES):
     reference = root / "app/src/screenshotTestDebug/reference"
     report = root / "app/build/reports/d01-preview-manifest.json"
     source = json.loads(report.read_text())
-    if source.get("count") != 198 or len(source.get("pngs", [])) != 198:
-        raise ValueError("require the actual passing 198-image render manifest")
+    expected = sum(count for _, count in GROUPS.values())
+    if source.get("count") != expected or len(source.get("pngs", [])) != expected:
+        raise ValueError(f"require the actual passing {expected}-image render manifest")
     grouped = {group: [] for group in GROUPS}
     seen = set()
     for item in source["pngs"]:
@@ -63,6 +68,7 @@ def package(root, max_zip_bytes=MAX_ZIP_BYTES):
                   "七状态：正常、禁用、加载、错误、长文本、空、离线。\n"
                   "页面尺寸：360dp、320dp/fontScale2、800dp横屏、840dp大屏。\n"
                   "组件尺寸：360dp、320dp/fontScale2；主导航包仅两个尺寸。\n"
+                  "完整长文本包：七组件 × 常规1600dp高/窄屏大字体4000dp高，保留完整内容结束标记。\n"
                   "请核查 PNG 截断、重叠、可读性、原文/派生/提案/正式任务分区。\n"
                   "MANIFEST.json 列出精确原始文件名、尺寸、字节数和 SHA-256。\n"
                   "从 GitHub 正常下载；若外层 ZIP 内还有此 ZIP，可直接上传内层 ZIP。\n")

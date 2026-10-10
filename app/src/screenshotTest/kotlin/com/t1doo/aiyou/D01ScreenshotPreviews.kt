@@ -1,6 +1,10 @@
 package com.t1doo.aiyou
 
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.android.tools.screenshot.PreviewTest
@@ -68,3 +72,49 @@ fun TasksRender(@PreviewParameter(ComponentStates::class) state: ComponentState)
 @Preview(name = "主导航窄屏大字体", widthDp = 320, heightDp = 800, fontScale = 2f, locale = "zh-rCN")
 @Composable
 fun ShellRender() { AIyouTheme { AIyouApp() } }
+
+// Reuse unabridged actual component content at explicit heights; no parameter multiplication.
+@Composable
+private fun CompleteContentFrame(label: String, content: @Composable () -> Unit) {
+    AIyouTheme {
+        Column {
+            content()
+            Text("完整内容结束 · $label", Modifier.padding(AIyouDimensions.pageNarrow))
+        }
+    }
+}
+
+@PreviewTest
+@CompleteContentPreviews
+@Composable
+fun PrivacyCompleteRender() { CompleteContentFrame("隐私提示") { PrivacyChipPreview(ComponentState.LONG_TEXT) } }
+
+@PreviewTest
+@CompleteContentPreviews
+@Composable
+fun MemoryCompleteRender() { CompleteContentFrame("记忆卡片") { MemoryCardPreview(ComponentState.LONG_TEXT) } }
+
+@PreviewTest
+@CompleteContentPreviews
+@Composable
+fun NoticeCompleteRender() { CompleteContentFrame("状态说明") { StatusNoticePreview(ComponentState.LONG_TEXT) } }
+
+@PreviewTest
+@CompleteContentPreviews
+@Composable
+fun ProposalCompleteRender() { CompleteContentFrame("任务提案") { TaskProposalCardPreview(ComponentState.LONG_TEXT) } }
+
+@PreviewTest
+@CompleteContentPreviews
+@Composable
+fun SourceCompleteRender() { CompleteContentFrame("来源引用") { SourceCitationCardPreview(ComponentState.LONG_TEXT) } }
+
+@PreviewTest
+@CompleteContentPreviews
+@Composable
+fun MascotCompleteRender() { CompleteContentFrame("中性角色说明") { MascotBadgePreview(ComponentState.LONG_TEXT) } }
+
+@PreviewTest
+@CompleteContentPreviews
+@Composable
+fun ProviderCompleteRender() { CompleteContentFrame("服务连接") { ProviderConnectionCardPreview(ComponentState.LONG_TEXT) } }

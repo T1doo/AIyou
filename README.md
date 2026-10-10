@@ -15,4 +15,5 @@
 - 实际执行记录与阻塞：[docs/D00_STATUS.md](docs/D00_STATUS.md)
 - D01设计范围：[docs/D01_DESIGN.md](docs/D01_DESIGN.md)
 - D01实际测试及验收边界：[docs/D01_STATUS.md](docs/D01_STATUS.md)
+- D01已确认像素缺陷修复及完整长文本补证：[docs/D01_PIXEL_FIXES.md](docs/D01_PIXEL_FIXES.md)
 

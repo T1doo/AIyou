@@ -39,6 +39,10 @@ jobs:
         run: python3 scripts/check-sdk.py
       - name: Verify Android dependency requirements
         run: scripts/gradle.sh :app:checkDebugAarMetadata :core:designsystem:checkDebugAarMetadata
+      - name: Run actual component clipping and empty-state regression tests
+        run: |
+          scripts/gradle.sh :core:designsystem:testDebugUnitTest
+          python3 scripts/verify-test-results.py --component
       - name: Build debug APK
         id: assemble
         run: |
@@ -115,6 +119,15 @@ jobs:
           compression-level: 0
           if-no-files-found: error
           retention-days: 14
+      - name: Preserve visual review ZIP - 完整长文本
+        if: always() && steps.visual_packs.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d01-visual-complete
+          path: app/build/outputs/d01-visual-packs/d01-visual-complete.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 14
       - name: Print complete lint findings
         if: always()
         run: |
@@ -134,6 +147,8 @@ jobs:
           path: |
             core/domain/build/test-results/test/
             core/domain/build/reports/tests/test/
+            core/designsystem/build/test-results/testDebugUnitTest/
+            core/designsystem/build/reports/tests/testDebugUnitTest/
             app/build/reports/lint-results-debug.*
             app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             core/designsystem/build/reports/lint-results-debug.*
