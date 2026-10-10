@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import com.t1doo.aiyou.model.ProcessingPolicy
 
 @Composable
@@ -165,12 +166,12 @@ fun CaptureComposer(
                     if (stackControls) {
                         Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                             ComposerMode("记下来", !askMode, canEdit, { onModeChange(false) }, Modifier.fillMaxWidth())
-                            ComposerMode("问一问", askMode, canEdit && askAvailable, { onModeChange(true) }, Modifier.fillMaxWidth())
+                            ComposerMode(if (askAvailable) "问一问" else "问一问 · 未开放", askMode, canEdit && askAvailable, { onModeChange(true) }, Modifier.fillMaxWidth())
                         }
                     } else {
                         Row(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                             ComposerMode("记下来", !askMode, canEdit, { onModeChange(false) }, Modifier.weight(1f))
-                            ComposerMode("问一问", askMode, canEdit && askAvailable, { onModeChange(true) }, Modifier.weight(1f))
+                            ComposerMode(if (askAvailable) "问一问" else "问一问 · 未开放", askMode, canEdit && askAvailable, { onModeChange(true) }, Modifier.weight(1f))
                         }
                     }
                 }
@@ -234,11 +235,13 @@ fun CaptureComposer(
 @Composable
 private fun ComposerMode(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
     Surface(modifier, color = if (selected) AIyouColors.surface else AIyouColors.surfaceMuted,
-        shape = MaterialTheme.shapes.small,
-        border = if (selected) BorderStroke(AIyouDimensions.spaceXs / 4, AIyouColors.outlineFunctional) else null) {
+        shape = MaterialTheme.shapes.small) {
         TextButton(onClick = onClick, enabled = enabled,
             colors = ButtonDefaults.textButtonColors(disabledContentColor = AIyouColors.textSecondary),
-            modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget).semantics { this.selected = selected }) {
+            modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget).semantics {
+                this.selected = selected
+                if (!enabled) stateDescription = "当前不可用"
+            }) {
             Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
         }
     }
@@ -246,11 +249,12 @@ private fun ComposerMode(label: String, selected: Boolean, enabled: Boolean, onC
 
 @Composable
 private fun ComposerAttachment(audio: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    TextButton(onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = AIyouDimensions.minTouchTarget),
+    TextButton(onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = AIyouDimensions.minTouchTarget)
+        .semantics { if (!enabled) stateDescription = "当前不可用" },
         contentPadding = PaddingValues(horizontal = AIyouDimensions.spaceSm, vertical = AIyouDimensions.spaceSm),
         colors = ButtonDefaults.textButtonColors(disabledContentColor = AIyouColors.textSecondary)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-            AttachmentIcon(audio)
+            AttachmentIcon(audio, enabled)
             Text(if (audio) "录音" else "图片", style = MaterialTheme.typography.labelLarge)
         }
     }

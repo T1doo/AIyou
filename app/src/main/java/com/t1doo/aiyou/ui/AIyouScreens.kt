@@ -188,11 +188,12 @@ private fun SearchSection(demo: Boolean) {
         Surface(Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.medium) {
             Column(Modifier.padding(AIyouDimensions.spaceMd), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
                 Text("筛选", style = MaterialTheme.typography.labelLarge, color = AIyouColors.textSecondary)
-                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs),
-                    verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                FlowRow(Modifier.fillMaxWidth()) {
                     listOf("日期", "人物", "标签", "图片", "收藏").forEach { label ->
-                        Surface(color = AIyouColors.surface, shape = MaterialTheme.shapes.small) {
-                            TextButton(onClick = {}, enabled = false) { Text(label, style = MaterialTheme.typography.bodySmall) }
+                        TextButton(onClick = {}, enabled = false,
+                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(disabledContentColor = AIyouColors.textSecondary),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = AIyouDimensions.spaceSm)) {
+                            Text(label, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }

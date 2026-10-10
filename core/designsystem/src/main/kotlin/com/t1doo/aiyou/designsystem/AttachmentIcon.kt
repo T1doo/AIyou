@@ -12,8 +12,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 
 /** Decorative line icons; parent controls keep explicit text and enabled semantics. */
 @Composable
-internal fun AttachmentIcon(audio: Boolean) {
-    val color = LocalContentColor.current
+internal fun AttachmentIcon(audio: Boolean, enabled: Boolean) {
+    val color = if (enabled) LocalContentColor.current else AIyouColors.outlineFunctional
     Canvas(Modifier.size(AIyouDimensions.navigationIconSize)) {
         val w = size.width
         val h = size.height

@@ -53,3 +53,25 @@ must run in CI on this exact source commit before a visual verdict is made.
 Generating fresh reference images is render smoke, not an approved golden test.
 Independent source review and the parent's actual new-pixel review remain
 required. The cloud workspace has not claimed to view unmaterialized PNGs.
+
+## Bounded follow-up after actual pixel review
+
+CI 38040613367 at `fb0ef4702d39be0c805a0f56a93f63e005797f2a` passed compilation,
+strict lint and 216 real renders. The parent and its independent reviewer then
+actually viewed the four phone PNGs. They found no definite internal clipping,
+overlap or horizontal overflow and presented the revised regular homepage to
+the user for layout feedback. This is not final user aesthetic acceptance.
+
+Their bounded feedback retains the homepage structure, removes the selected
+mode's second strong outline, and restores one compact wrapping filter group
+without individual square surfaces. The outlined white input is retained.
+Asking already had `enabled = canEdit && askAvailable` with `askAvailable=false`
+on these pages; image/audio require non-null callbacks, which these fixtures
+do not provide. Material TextButton supplies disabled semantics and suppresses
+pointer activation. Disabled modes now also state their unavailable status;
+the visible ask label says “未开放”. Attachment line icons use the neutral
+functional outline color while their text stays readable. The full availability
+explanation remains. Controls have not become functional through this change.
+
+Local token equality and 13 design/PNG/package checks pass for this follow-up.
+Compilation, strict lint and fresh pixels are pending CI on the new commit.
