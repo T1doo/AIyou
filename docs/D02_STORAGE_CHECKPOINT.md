@@ -1,7 +1,8 @@
 # D02 encrypted text checkpoint
 
-This is the first storage slice, pending independent source review and real
-Android compilation. It is not a completed D02 acceptance or device verdict.
+This is the first storage slice. Independent source review and Android
+compilation have run; native execution is pending. It is not a completed D02
+acceptance or device verdict.
 The original master plan and architecture document remain unchanged.
 
 The app now wires a real Room repository with SQLCipher 4.19.0, persisted text
@@ -32,9 +33,30 @@ the upstream JNIString ASF NOTICE ancestry is still unverified.
   readback after commit. They passed with no failures/errors/skips; they do not
   certify Android lifecycle or native persistence. The unused domain coroutine
   dependency was removed to retain the pure model-only production boundary.
-- NOT RUN: Android/KSP compilation, generated Room schema validation, APK/lint
-  and native/Keystore instrumentation execution for this new source snapshot.
-  CI uses the already installed licensed SDK; no package installer is added.
+- PASS at `c4c124adeee4fb2cc42fcc0992d4587d29bd5765`: Android metadata checks,
+  KSP/Room generation, app debug APK and native-storage instrumentation APK
+  compilation in [CI 38041140287](https://github.com/T1doo/AIyou/actions/runs/38041140287).
+  The runner app APK SHA256 is `5ffa7e8fe52334f3f3687acb61c7839587f1ce4a4caf277f65edb19ba483d0fd`.
+  Schema 2 is the exact 7,873-byte KSP output, SHA256
+  `c00d55e4ca1aa3c730f9cebc6f40045435195cecb1880ec17d9aac4017c49e67`.
+  All four exported module locks match the checked-in bytes.
+- FAIL in that CI: lint emitted five available-new-version warnings for the
+  four intentionally fixed D02 dependency entries. No API/correctness finding
+  was emitted. The catalog now suppresses only `GradleDependency` for SQLite
+  2.7.0 / Lifecycle 2.9.4 and `NewerVersionAvailable` for SQLCipher 4.19.0 /
+  coroutines 1.9.0, directly at those four entries. Reproduction is pending.
+  SQLCipher is the independently inspected binary; an upgrade requires new
+  native/license evidence. The resolved runtime graph stays frozen for review.
+  `abortOnError` and `warningsAsErrors` remain enabled for all source checks;
+  no blanket disable, generated baseline or warning-policy downgrade is used.
+  This is a deliberate pin, not a claim that newer releases are unsafe or that
+  these pins have passed a security audit. The official lint
+  [GradleDependency documentation](https://googlesamples.github.io/android-custom-lint-rules/checks/GradleDependency.md.html)
+  permits deliberately retaining older versions; its TOML test example
+  demonstrates entry suppression. CI uses the already installed licensed SDK;
+  no package installer is added.
+- NOT RUN: native/Keystore instrumentation execution. Test APK compilation does
+  not certify encryption, migration, process restart or device behavior.
 - 13 actual encrypted integration test methods are written; writing or compiling
   them does not mean execution. The separate process-restart probe requires
   external write/read phases and a different process PID; reopening a database
