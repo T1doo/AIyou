@@ -1,3 +1,9 @@
+License Information
+===================
+
+SQLite Is Public Domain
+-----------------------
+
 The SQLite source code, including all of the files in the directories
 listed in the bullets below are 
 [Public Domain](https://sqlite.org/copyright.html).

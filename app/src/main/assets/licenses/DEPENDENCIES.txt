@@ -7,10 +7,13 @@ The six checked Android runtime archives and their nested JARs contain no
 NOTICE member. This is an archive inventory, not a claim about every upstream
 source history or all earlier app dependencies.
 
-SQLCipher Android 4.19.0: sqlcipher-android-4.19.0.txt.
-Android source commit: 9a5d685404489cbff14d4c46da81555de1a38787.
-SQLCipher core gitlink: e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc;
-full license: sqlcipher-4.19.0.txt; underlying SQLite: SQLite-core.txt.
+SQLCipher Android 4.19.1: sqlcipher-android-4.19.1.txt.
+Android source commit: 96e35d111605ff3b08309cd6be37729cf38a4155.
+SQLCipher core gitlink: c4b275a47932888216bade83aff2bbc73df0ff85;
+full license: sqlcipher-4.19.1.txt (named for the Android artifact).
+The inspected four-ABI artifact embeds SQLCipher core version 4.19.0.
+Underlying SQLite 3.53.4 public-domain source text: SQLite-core.txt.
+These source revisions identify upstream history, not a reproducible-build attestation.
 Default LibTomCrypt gitlink: 476a9579ae94f32b9ea9e2747bfb04b302370259,
 version 1.18.2; full original alternative licenses: LibTomCrypt-1.18.2.txt.
 No LibTomMath dependency was identified in that default build.

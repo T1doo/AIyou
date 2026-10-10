@@ -6,7 +6,7 @@ It is not a completed D02
 acceptance or device verdict.
 The original master plan and architecture document remain unchanged.
 
-The app now wires a real Room repository with SQLCipher 4.19.0, persisted text
+The app now wires a real Room repository with pinned SQLCipher Android 4.19.1, persisted text
 drafts and complete immutable original revisions. Save inserts the record,
 original revision and durable pending LOCAL_INDEX job and consumes the expected
 draft in one transaction. A job ledger is not an implemented background worker.
@@ -224,3 +224,43 @@ JNIString publisher/introduction bytes are verified. Official archived Harmony
 NOTICE texts are available as research references, but the exact adapted AOSP
 revision and its relevant distributed NOTICE remain UNKNOWN. No unrelated
 Harmony component notice is copied into the APK or claimed to close the gap.
+
+## SQLCipher Android 4.19.1 upgrade candidate
+
+The pinned Android artifact is now 4.19.1. Its actual Maven Central AAR SHA256 is
+`43fc10cae8f1f1059f0933e8942a1eb328989d13426378597cd4add1b34a34fd`.
+Real Gradle resolution of all twelve affected configurations regenerated only
+the two SQLCipher lock entries; other locked dependencies are unchanged.
+Actual AAR metadata requires compileSdk36; the existing app uses37. Android
+metadata, builds, tests, lint and APK checks still require this candidate's CI
+result; local resolution is not an Android build.
+
+The [official 4.19.1 release](https://github.com/sqlcipher/sqlcipher-android/releases/tag/v4.19.1)
+adds common-page-size16384 and corrects the AndroidX driver's column-type
+mapping. Actual old/new Java bytecode inspection confirms NULL maps to5,
+INTEGER1, FLOAT2, TEXT3 and BLOB4 in the new driver. The upstream Android
+comparison has nine commits and changes the SQLCipher core gitlink from
+e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc to
+c4b275a47932888216bade83aff2bbc73df0ff85. The separate core comparison has46
+commits, including SQLite3.53.4, crypto state/refcount/error handling, pager,
+rekey/migration/export and connection teardown changes. This is not a linker-only
+upgrade. The POM/source tags do not prove a reproducible source-to-AAR build.
+
+All four actual AAR native members match GNU readelf2.44 selected header fields;
+LOAD16K and the literal Android RELRO endpoint formula pass. These are static
+AAR checks. Actual APK ZIP alignment and fixed LLVM cross-checking are separate
+CI gates. The embedded SQLCipher version string remains4.19.0, so the original
+native assertion correctly remains4.19.0 despite Android artifact4.19.1.
+Neither these strings nor static alignment proves existing4.19.0 encrypted
+database readability, full13-case execution, cross-PID persistence or physical
+16KB runtime. Those remain NOT RUN for this candidate; earlier timeout failures
+are preserved and no new TCG attempt is triggered.
+
+The full Android/core BSD texts at the new fixed source revisions exactly match
+the prior texts. Seven packaged assets remain: versioned BSD filenames now name
+the Android artifact, SQLite's full3.53.4 public-domain text adds its original
+heading, and existing LibTomCrypt alternatives/copyright excerpts are preserved.
+JNIString at fixed Android96e35d111605ff3b08309cd6be37729cf38a4155 still has the
+same4704 bytes and SHA433aea7d34b888104499f45e72372579b8a9a65488ed90571b7050f2495df65f.
+Its exact adapted AOSP/Harmony ancestor and applicable complete publisher NOTICE
+remain UNKNOWN. No fabricated NOTICE, new SDK acceptance or maintainer message.

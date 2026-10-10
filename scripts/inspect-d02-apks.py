@@ -8,6 +8,17 @@ import subprocess
 import zipfile
 
 root = Path(__file__).resolve().parents[1]
+sqlcipher_sha256 = {
+    "arm64-v8a": "32d4c1bb89a90b59a3d6be950bbc36c133f8762f627b333a3512205c8037a48b",
+    "armeabi-v7a": "c2084efe2469e69ffafa09425800de4bf62fb34cb246b645ac7951294f3e28ba",
+    "x86": "d26f8ccde7bde6b743ab110874a322b7d8de29123b1675d0ec9508b931c9f7b1",
+    "x86_64": "81b98e79ea7176482daf40497f34fc7eb701c661d13c09dada66a1a51e8d9561",
+}
+license_names = {
+    "Apache-2.0.txt", "DEPENDENCIES.txt", "LibTomCrypt-1.18.2.txt",
+    "SQLite-core.txt", "SQLCipher-source-attributions.txt",
+    "sqlcipher-android-4.19.1.txt", "sqlcipher-4.19.1.txt",
+}
 sdk = Path(os.environ.get("ANDROID_HOME", os.environ.get("ANDROID_SDK_ROOT", "/nonexistent-sdk")))
 zipalign = sdk / "build-tools/36.0.0/zipalign"
 if not zipalign.is_file():
@@ -37,10 +48,18 @@ try:
             expected = {f"lib/{abi}/libsqlcipher.so" for abi in ("arm64-v8a", "armeabi-v7a", "x86", "x86_64")}
             if not expected.issubset(natives):
                 raise RuntimeError("Expected pinned SQLCipher native ABIs absent")
+            for abi, digest in sqlcipher_sha256.items():
+                member = f"lib/{abi}/libsqlcipher.so"
+                if hashlib.sha256(archive.read(member)).hexdigest() != digest:
+                    raise RuntimeError("SQLCipher 4.19.1 AAR bytes differ: " + member)
             if apk == app:
                 materials = sorted((root / "app/src/main/assets/licenses").glob("*.txt"))
-                if len(materials) != 7:
-                    raise RuntimeError("Expected seven bounded license materials")
+                if {material.name for material in materials} != license_names:
+                    raise RuntimeError("Expected seven pinned 4.19.1 license materials")
+                if {n for n in names if n.startswith("assets/licenses/")} != {
+                    "assets/licenses/" + name for name in license_names
+                }:
+                    raise RuntimeError("APK license inventory differs from pinned materials")
                 item["license_assets"] = []
                 for material in materials:
                     name = "assets/licenses/" + material.name

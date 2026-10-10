@@ -1,9 +1,9 @@
-SQLCipher Android 4.19.0 — source attribution excerpts (not an upstream NOTICE file).
-Fixed Android source commit: 9a5d685404489cbff14d4c46da81555de1a38787.
+SQLCipher Android 4.19.1 — source attribution excerpts (not an upstream NOTICE file).
+Fixed Android source commit: 96e35d111605ff3b08309cd6be37729cf38a4155.
 Copyright years and headers below are retained verbatim; no claim these constitute a publisher-supplied NOTICE.
 
 
-Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/src/main/jni/sqlcipher/CursorWindow.cpp
+Source: https://github.com/sqlcipher/sqlcipher-android/blob/96e35d111605ff3b08309cd6be37729cf38a4155/sqlcipher/src/main/jni/sqlcipher/CursorWindow.cpp
 /*
  * Copyright (C) 2006-2007 The Android Open Source Project
  *
@@ -50,7 +50,7 @@ Source: https://github.com/sqlcipher/libtomcrypt/blob/476a9579ae94f32b9ea9e2747b
 
 
 
-Source: https://github.com/sqlcipher/sqlcipher/blob/e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc/src/crypto_libtomcrypt.c
+Source: https://github.com/sqlcipher/sqlcipher/blob/c4b275a47932888216bade83aff2bbc73df0ff85/src/crypto_libtomcrypt.c
 /*
 ** SQLCipher
 ** http://sqlcipher.net
@@ -83,7 +83,7 @@ Source: https://github.com/sqlcipher/sqlcipher/blob/e2a6040f2ae5cfff2b3e08eb3320
 */
 
 
-Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/src/main/jni/sqlcipher/ALog-priv.h
+Source: https://github.com/sqlcipher/sqlcipher-android/blob/96e35d111605ff3b08309cd6be37729cf38a4155/sqlcipher/src/main/jni/sqlcipher/ALog-priv.h
 /*
  * Copyright 2013 The Android Open Source Project
  *
@@ -101,7 +101,7 @@ Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/sr
  */
 
 
-Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/src/main/jni/sqlcipher/CursorWindow.h
+Source: https://github.com/sqlcipher/sqlcipher-android/blob/96e35d111605ff3b08309cd6be37729cf38a4155/sqlcipher/src/main/jni/sqlcipher/CursorWindow.h
 /*
  * Copyright (C) 2006 The Android Open Source Project
  *
@@ -119,7 +119,7 @@ Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/sr
  */
 
 
-Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/src/main/jni/sqlcipher/Errors.h
+Source: https://github.com/sqlcipher/sqlcipher-android/blob/96e35d111605ff3b08309cd6be37729cf38a4155/sqlcipher/src/main/jni/sqlcipher/Errors.h
 /*
  * Copyright (C) 2007 The Android Open Source Project
  *
@@ -137,7 +137,7 @@ Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/sr
  */
 
 
-Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/src/main/jni/sqlcipher/JNIHelp.cpp
+Source: https://github.com/sqlcipher/sqlcipher-android/blob/96e35d111605ff3b08309cd6be37729cf38a4155/sqlcipher/src/main/jni/sqlcipher/JNIHelp.cpp
 /*
  * Copyright (C) 2006 The Android Open Source Project
  *
@@ -155,7 +155,7 @@ Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/sr
  */
 
 
-Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/src/main/jni/sqlcipher/JNIString.cpp
+Source: https://github.com/sqlcipher/sqlcipher-android/blob/96e35d111605ff3b08309cd6be37729cf38a4155/sqlcipher/src/main/jni/sqlcipher/JNIString.cpp
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
  *  contributor license agreements.  See the NOTICE file distributed with
@@ -174,7 +174,7 @@ Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/sr
  */
 
 
-Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/src/main/jni/sqlcipher/JniConstants.cpp
+Source: https://github.com/sqlcipher/sqlcipher-android/blob/96e35d111605ff3b08309cd6be37729cf38a4155/sqlcipher/src/main/jni/sqlcipher/JniConstants.cpp
 /*
  * Copyright (C) 2010 The Android Open Source Project
  *
@@ -192,7 +192,7 @@ Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/sr
  */
 
 
-Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/src/main/jni/sqlcipher/android_database_CursorWindow.cpp
+Source: https://github.com/sqlcipher/sqlcipher-android/blob/96e35d111605ff3b08309cd6be37729cf38a4155/sqlcipher/src/main/jni/sqlcipher/android_database_CursorWindow.cpp
 /*
  * Copyright (C) 2007 The Android Open Source Project
  *
@@ -210,7 +210,7 @@ Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/sr
  */
 
 
-Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/src/main/jni/sqlcipher/android_database_SQLiteCommon.cpp
+Source: https://github.com/sqlcipher/sqlcipher-android/blob/96e35d111605ff3b08309cd6be37729cf38a4155/sqlcipher/src/main/jni/sqlcipher/android_database_SQLiteCommon.cpp
 /*
  * Copyright (C) 2011 The Android Open Source Project
  *
@@ -228,7 +228,7 @@ Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/sr
  */
 
 
-Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/src/main/jni/sqlcipher/android_database_SQLiteCommon.h
+Source: https://github.com/sqlcipher/sqlcipher-android/blob/96e35d111605ff3b08309cd6be37729cf38a4155/sqlcipher/src/main/jni/sqlcipher/android_database_SQLiteCommon.h
 /*
  * Copyright (C) 2007 The Android Open Source Project
  *
@@ -246,7 +246,7 @@ Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/sr
  */
 
 
-Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/src/main/jni/sqlcipher/android_database_SQLiteConnection.cpp
+Source: https://github.com/sqlcipher/sqlcipher-android/blob/96e35d111605ff3b08309cd6be37729cf38a4155/sqlcipher/src/main/jni/sqlcipher/android_database_SQLiteConnection.cpp
 /*
  * Copyright (C) 2011 The Android Open Source Project
  *
@@ -264,7 +264,7 @@ Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/sr
  */
 
 
-Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/src/main/jni/sqlcipher/android_database_SQLiteDebug.cpp
+Source: https://github.com/sqlcipher/sqlcipher-android/blob/96e35d111605ff3b08309cd6be37729cf38a4155/sqlcipher/src/main/jni/sqlcipher/android_database_SQLiteDebug.cpp
 /*
  * Copyright (C) 2007 The Android Open Source Project
  *
@@ -282,7 +282,7 @@ Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/sr
  */
 
 
-Source: https://github.com/sqlcipher/sqlcipher-android/blob/v4.19.0/sqlcipher/src/main/jni/sqlcipher/android_database_SQLiteGlobal.cpp
+Source: https://github.com/sqlcipher/sqlcipher-android/blob/96e35d111605ff3b08309cd6be37729cf38a4155/sqlcipher/src/main/jni/sqlcipher/android_database_SQLiteGlobal.cpp
 /*
  * Copyright (C) 2011 The Android Open Source Project
  *

@@ -9,6 +9,11 @@ name: D02 actual APK ELF evidence and strict RELRO endpoint gate
       - 'scripts/d02_native_elf_audit.py'
       - 'scripts/tests/test_d02*elf*.py'
       - 'docs/D02_NATIVE_ELF_AUDIT.md'
+      - 'gradle/libs.versions.toml'
+      - 'app/gradle.lockfile'
+      - 'core/data/gradle.lockfile'
+      - 'app/src/main/assets/licenses/**'
+      - 'scripts/inspect-d02-apks.py'
   workflow_dispatch:
 
 permissions:
@@ -46,7 +51,7 @@ jobs:
             --sdk-root "$ANDROID_HOME" \
             --output app/build/reports/d02-native-elf \
             --apk-source-sha "$GITHUB_SHA"
-      - name: Enforce Android official RELRO endpoint formula; known failure stays failure
+      - name: Enforce Android official RELRO endpoint formula
         if: steps.elf_audit.outcome == 'success'
         run: python3 scripts/d02_native_elf_audit.py enforce-doc-endpoint --report app/build/reports/d02-native-elf/REPORT.json
       - name: Preserve actual static evidence even when RELRO endpoint gate fails

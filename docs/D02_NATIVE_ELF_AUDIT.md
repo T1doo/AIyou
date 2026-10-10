@@ -1,6 +1,6 @@
 # D02 actual APK native binary evidence
 
-This slice adds host ELF counterexamples and actual APK/LLVM cross-checking. No application behavior, dependency version, ELF byte, KDF, permission or native-device test budget changes. `LOCAL_ONLY` and the original plans are preserved. It does not close D02 runtime acceptance.
+The original audit slice adds host ELF counterexamples and actual APK/LLVM cross-checking. The later SQLCipher Android4.19.1 candidate changes the pinned dependency/native bytes and keeps the strict gates, KDF, permissions and native-device test budgets. `LOCAL_ONLY` and the original plans are preserved. It does not close D02 runtime acceptance.
 
 ## Four checks remain separate
 
@@ -25,9 +25,9 @@ python3 scripts/d02_native_elf_audit.py audit --apk APK_PATH --sdk-root EXISTING
 python3 scripts/d02_native_elf_audit.py enforce-doc-endpoint --report NEW_OWNED_DIRECTORY/REPORT.json
 ```
 
-The final command really exits nonzero for literal FAIL. The dedicated CI records/retains evidence and the actual APK even when this endpoint gate fails. No continue-on-error, changed dependency, binary patch or collision-based override makes it green. Ordinary engineering CI is distinct; successful audit generation/LLVM agreement is evidence validity, not16K compatibility. Actual device execution remains NOT RUN.
+The final command really exits nonzero for literal FAIL. The dedicated CI records/retains evidence and the actual APK even when this endpoint gate fails. No continue-on-error, binary patch or collision-based override makes it green. A changed dependency must pass the same literal formula on its actual new bytes. Ordinary engineering CI is distinct; successful audit generation/LLVM agreement is evidence validity, not16K runtime compatibility. Actual device execution remains NOT RUN.
 
-## Current evidence and historical access boundary
+## Historical 4.19.0 evidence and access boundary
 
 Root's59 Python methods passed (26 ELF parser,11 APK/gate/fault preservation,22 prior); cached fixed4.19.0 AAR four members independently match actual GNU readelf2.44 headers. All4 LOAD alignment PASS, Android literal RELRO endpoint FAIL, checked expanded non-RELRO LOAD/allocated-write collisions0. This is cached AAR evidence, not an APK/device claim. Raw RELRO page padding caused an initial over-strict prototype containment rejection, which was corrected and covered by a genuine regression; the zero-collision/literal-failure distinction remains. Independent source review also exposed lost partial stdout/stderr on zipalign timeout. The corrected path preserves both streams and a failed report; actual owned-child timeout regressions use explicit synthetic SDK boundaries, not fabricated LLVM/device evidence.
 
@@ -42,3 +42,22 @@ Publisher4.19 fixed9a5d685404489cbff14d4c46da81555de1a38787 and introduction49da
 A normal official-source read identifies a specifically matching decoder candidate at [AOSP libcore fa5b565a3f6c6d7cbd6106ee8d360304c3a939a3](https://android.googlesource.com/platform/libcore/+/fa5b565a3f6c6d7cbd6106ee8d360304c3a939a3). C++ type/control-flow adaptations correspond to that Java decoder, but source similarity does not prove which revision the publisher used. Full fixed history/NOTICE could not be normally read in this research and was not retrieved through alternative routes. Exact adapted revision, AOSP-to-Harmony ancestor and applicable complete NOTICE remain UNKNOWN.
 
 Previously obtained official Harmony root/classlib NOTICE at02970cb7227a335edd2c8457ebdde0195a735733 are reference material, not proof of that decoder's ancestry; that inspected String.java does not contain this decoder. No arbitrary Harmony component notices are substituted, no license asset replaced, no maintenance email/message sent. Known ASF/source headers and full Apache2 text remain packaged; no legal completeness claim.
+
+## 4.19.1 candidate before actual APK CI
+
+The actual pinned Maven AAR SHA256 is43fc10cae8f1f1059f0933e8942a1eb328989d13426378597cd4add1b34a34fd.
+Independent GNU readelf2.44 on all four new AAR members agrees with every selected
+raw program-header field. LOAD16K and strict RELRO endpoint checks pass; RELRO
+endpoints are arm64-v8a0x204000, armeabi-v7a0x104000, x860x228000 and x86_640x224000.
+This is AAR evidence, not an APK/LLVM/device result. The unchanged strict CI must
+build a distinct actual APK, record its exact source/SHA, compare fixed LLVM rows
+and run ZIP plus endpoint gates. The engineering packaging check pins all four
+actual4.19.1 native member hashes in both app and instrumentation APKs.
+
+All four native members differ from4.19.0. Upstream also changes the core gitlink
+and driver type mapping; see the upgrade section in D02_STORAGE_CHECKPOINT.md.
+The embedded core version remains4.19.0. Old encrypted database migration/readback,
+full13 original cases, external cross-PID, and physical16KB acceptance remain
+separate NOT RUN. JNIString's new publisher revision retains identical bytes;
+the complete applicable NOTICE remains UNKNOWN. Historical RELRO FAIL and device
+timeouts remain historical failures, rather than being relabeled by this upgrade.
