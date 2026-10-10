@@ -56,6 +56,8 @@ jobs:
           sha256sum app/build/outputs/apk/debug/app-debug.apk
       - name: Compile actual D02 native-storage instrumentation APK without claiming execution
         run: scripts/gradle.sh :core:data:assembleDebugAndroidTest
+      - name: Verify actual license assets and APK ZIP alignment (native execution NOT RUN)
+        run: python3 scripts/inspect-d02-apks.py
       - name: Run Android lint
         run: scripts/gradle.sh :app:lintDebug :core:designsystem:lintDebug :core:data:lintDebug
       - name: Generate initial Preview render smoke references
@@ -176,6 +178,9 @@ jobs:
             core/designsystem/build/reports/lint-results-debug.*
             core/data/build/reports/lint-results-debug.*
             core/data/schemas/
+            app/build/reports/d02-apk-audit.json
+            app/build/outputs/apk/debug/*.zipalign.txt
+            core/data/build/outputs/apk/androidTest/debug/*.zipalign.txt
             core/designsystem/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             app/build/reports/screenshotTest/
             app/build/test-results/validateDebugScreenshotTest/

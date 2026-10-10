@@ -44,7 +44,12 @@ the upstream JNIString ASF NOTICE ancestry is still unverified.
   four intentionally fixed D02 dependency entries. No API/correctness finding
   was emitted. The catalog now suppresses only `GradleDependency` for SQLite
   2.7.0 / Lifecycle 2.9.4 and `NewerVersionAvailable` for SQLCipher 4.19.0 /
-  coroutines 1.9.0, directly at those four entries. Reproduction is pending.
+  coroutines 1.9.0, directly at those four entries. Reproduction at
+  `09ec79f3ebcbc3a35ce4d829b647630b91dfa06e` in
+  [CI 38042082070](https://github.com/T1doo/AIyou/actions/runs/38042082070) passed:
+  all three modules report `No issues found`, with actual builds/tests/rendering
+  also passing. Its app APK SHA256 is
+  `299becb05700ca74ea0a8ccb8e0ae2c82a40b9ea8dc313a8e043d3f33740fae5`.
   SQLCipher is the independently inspected binary; an upgrade requires new
   native/license evidence. The resolved runtime graph stays frozen for review.
   `abortOnError` and `warningsAsErrors` remain enabled for all source checks;
@@ -93,3 +98,9 @@ No new SDK terms were accepted. The public metadata's matching canonical
 android-sdk-license hash is not acceptance on this local SDK-less machine;
 any future installer must verify the existing accepted record on its own host
 before installing pinned packages. Unaccepted arm DBT terms remain excluded.
+
+The separate [bounded device experiment](../checks/sdk-device/README.md) verifies
+existing installer-host acceptance using the official API before fixed payload
+installation. It explicitly uses the unsupported software-emulation path with
+strict deadlines; its native outcome is pending its own CI. Actual packaged
+license equality and APK ZIP checks are separate from runtime and RELRO gates.

@@ -1,0 +1,68 @@
+name: D02 bounded native storage experiment
+
+'on':
+  push:
+    branches: ['codex/d02-local-records-20261010']
+    paths:
+      - '.github/workflows/d02-native-experiment.yml'
+      - 'checks/sdk-device/**'
+      - 'scripts/run-d02-device-experiment.py'
+      - 'scripts/inspect-d02-apks.py'
+      - 'core/data/**'
+      - 'core/domain/**'
+      - 'core/model/**'
+      - 'gradle/**'
+      - 'app/src/main/**'
+      - 'app/build.gradle.kts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-storage-experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      GRADLE_USER_HOME: ${{ github.workspace }}/.toolchains/gradle-home
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Verify wrapper and existing SDK, with no installer or acceptance
+        run: |
+          printf '%s  %s\n' 3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
+          python3 scripts/check-sdk.py
+          python3 scripts/inspect-device-test-environment.py
+      - name: Compile the actual production and native test APKs
+        run: scripts/gradle.sh :app:checkDebugAarMetadata :core:data:checkDebugAarMetadata :app:assembleDebug :core:data:assembleDebugAndroidTest
+      - name: Check APK packaging independently of runtime
+        run: python3 scripts/inspect-d02-apks.py
+      - name: One bounded unsupported software-emulation attempt, existing terms only
+        run: python3 scripts/run-d02-device-experiment.py
+      - name: Print actual result, including failure and NOT RUN boundaries
+        if: always()
+        run: |
+          if [ -f app/build/reports/d02-device-experiment/RESULT.json ]; then
+            cat app/build/reports/d02-device-experiment/RESULT.json
+          else
+            echo 'Native gate NOT RUN; preceding build or environment check failed.'
+          fi
+      - name: Preserve experiment evidence; no SDK archives or payloads
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d02-native-experiment-evidence
+          path: |
+            app/build/reports/d02-device-experiment/*.log
+            app/build/reports/d02-device-experiment/RESULT.json
+            app/build/reports/d02-apk-audit.json
+            app/build/outputs/apk/debug/*.zipalign.txt
+            core/data/build/outputs/apk/androidTest/debug/*.zipalign.txt
+          if-no-files-found: warn
+          retention-days: 14

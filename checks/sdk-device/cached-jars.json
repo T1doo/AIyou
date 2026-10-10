@@ -1,0 +1,67 @@
+[
+  {
+    "sha256": "d0bbe0e03155a7bdd9bac03567b6b26797f81a778f55d5eadc3e71e7a0a27434",
+    "bytes": 1909475,
+    "cache_path": "com.android.tools/sdklib/32.4.1/16b34ddee0d33385dbce03577a83b1c1e09aff3a/sdklib-32.4.1.jar"
+  },
+  {
+    "sha256": "9fd419f3307be633aaf7b02b52832521c1300d4bf9058cee83bb11139990a7f9",
+    "bytes": 272256,
+    "cache_path": "com.android.tools/repository/32.4.1/8b46d4a01e62b854aaad0f32b09b04576652d97b/repository-32.4.1.jar"
+  },
+  {
+    "sha256": "6d1e9fe43d27fc1aa99e5792285905c7f8d081d96747aadb1e76cc08dffdb53d",
+    "bytes": 113753,
+    "cache_path": "com.android.tools.analytics-library/shared/32.4.1/429c17cd9d8efce819180878b2375d4a5c4ff2aa/shared-32.4.1.jar"
+  },
+  {
+    "sha256": "cace5b28f2342119fe1a2db5baa36f8bd3391a086788e04fb8326bb70d6c4989",
+    "bytes": 570281,
+    "cache_path": "com.android.tools/common/32.4.1/d44f9026734033a0adc804de483086d1d6ed8878/common-32.4.1.jar"
+  },
+  {
+    "sha256": "ad89c2892235e670f222d819cb3d81188143cb19a05b59df9889ae4269f5c70a",
+    "bytes": 1463587,
+    "cache_path": "org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.9.0/9beade4c1c1569e4f36cbd2c37e02e3e41502601/kotlinx-coroutines-core-jvm-1.9.0.jar"
+  },
+  {
+    "sha256": "bd8250210584cb659847dce9cda660f8e9906e5def7fbebcea93dc6dcb6a88a3",
+    "bytes": 1853315,
+    "cache_path": "org.jetbrains.kotlin/kotlin-stdlib/2.4.21/c343e135bd1e7dd94b7ed76b4159068d888d09db/kotlin-stdlib-2.4.21.jar"
+  },
+  {
+    "sha256": "e6e0a1e89fb6ff786279e6a0082d5cef52dc2ebe67053d041800737652b4fd1b",
+    "bytes": 1013367,
+    "cache_path": "org.glassfish.jaxb/jaxb-runtime/2.3.2/5528bc882ea499a09d720b42af11785c4fc6be2a/jaxb-runtime-2.3.2.jar"
+  },
+  {
+    "sha256": "b918c98a7e44dbe94ebd9fe3e40cddaadb5a93e6a78eb6008b42df237241e538",
+    "bytes": 3080298,
+    "cache_path": "com.google.guava/guava/33.4.0-jre/3fcc0a259f724c7de54a6a55ea7e26d3d5c0cac/guava-33.4.0-jre.jar"
+  },
+  {
+    "sha256": "69156304079bdeed9fc0ae3b39389f19b3cc4ba4443bc80508995394ead742ea",
+    "bytes": 115498,
+    "cache_path": "jakarta.xml.bind/jakarta.xml.bind-api/2.3.2/8d49996a4338670764d7ca4b85a1c4ccf7fe665d/jakarta.xml.bind-api-2.3.2.jar"
+  },
+  {
+    "sha256": "4ffabb06be454a05e4398e20c77fa2b6308d4b88dfbef7ca30a76b5b7d5505ef",
+    "bytes": 27156,
+    "cache_path": "com.sun.istack/istack-commons-runtime/3.0.8/d6a97364045aa6b99bf2d3c566a3f98599c2d296/istack-commons-runtime-3.0.8.jar"
+  },
+  {
+    "sha256": "8b0a0f52fa8b05c5431921a063ed866efaa41dadf2e3a7ee3e1961f2b0d9645b",
+    "bytes": 44399,
+    "cache_path": "jakarta.activation/jakarta.activation-api/1.2.1/562a587face36ec7eff2db7f2fc95425c6602bc1/jakarta.activation-api-1.2.1.jar"
+  },
+  {
+    "sha256": "54a932e1559e3b4a68dfd0d52f22bcf436802f063fef6cb32003f91c7dd43c60",
+    "bytes": 11660305,
+    "cache_path": "com.android.tools.analytics-library/protos/32.4.1/72ce19690099b238b9214e35e08d0641bd4e726d/protos-32.4.1.jar"
+  },
+  {
+    "sha256": "8540247fad9e06baefa8fb45eb313802d019f485f14300e0f9d6b556ed88e753",
+    "bytes": 1875414,
+    "cache_path": "com.google.protobuf/protobuf-java/3.25.5/5ae5c9ec39930ae9b5a61b32b93288818ec05ec1/protobuf-java-3.25.5.jar"
+  }
+]
