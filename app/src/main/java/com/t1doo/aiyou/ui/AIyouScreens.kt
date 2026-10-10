@@ -60,7 +60,7 @@ fun MainScreen(
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
                 modifier = Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize(),
-                contentPadding = PaddingValues(margin),
+                contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap),
             ) {
                 item("summary") {
@@ -71,16 +71,21 @@ fun MainScreen(
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
                                 Text(if (destination == Destination.NOW) "今天" else destination.label, Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
-                                PrivacyChip(ProcessingPolicy.LOCAL_ONLY)
+                                if (destination == Destination.NOW) {
+                                    Text("仅本机处理", style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
+                                } else PrivacyChip(ProcessingPolicy.LOCAL_ONLY)
                             }
                         }
                         Text(when (destination) {
-                            Destination.NOW -> if (demo) "10月10日 · 周六 · 示例" else "随手记下一点生活"
+                            Destination.NOW -> if (demo) "10月10日 · 周六" else "随手记下一点生活"
                             Destination.MEMORIES -> if (demo) "${ScreenSamples.memories.size} 条虚构记录" else "你的本机原始记录"
                             Destination.TASKS -> "建议与正式任务分别管理"
                         }, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-                        if (stackSummary) PrivacyChip(ProcessingPolicy.LOCAL_ONLY)
-                        if (demo) Text("虚构示例 · 不保存记录、不安排提醒", Modifier.padding(top = AIyouDimensions.spaceSm),
+                        if (stackSummary) {
+                            if (destination == Destination.NOW) Text("仅本机处理", style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
+                            else PrivacyChip(ProcessingPolicy.LOCAL_ONLY)
+                        }
+                        if (demo && destination != Destination.NOW) Text("虚构示例 · 不保存记录、不安排提醒", Modifier.padding(top = AIyouDimensions.spaceSm),
                             style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                     }
                 }
@@ -99,18 +104,23 @@ fun MainScreen(
                 when (destination) {
                     Destination.NOW -> {
                         item("composer") { CaptureSection(state, demo) }
-                        item("today") {
-                            Text("今日记录", style = MaterialTheme.typography.titleLarge)
-                        }
-                        if (demo && state != ComponentState.EMPTY) {
-                            items(ScreenSamples.memories.take(1), key = { it.id }) { sample ->
-                                MemoryCard(
-                                    if (state == ComponentState.LONG_TEXT) ScreenSamples.longText else sample.text,
-                                    "示例 · ${sample.date}", annotation = sample.annotation, state = state,
-                                )
+                        item("today-records") {
+                            Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("今日记录", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                                    Text(if (demo && state != ComponentState.EMPTY) "1 条示例" else "0 条", style = MaterialTheme.typography.bodySmall,
+                                        color = AIyouColors.textSecondary)
+                                }
+                                if (demo && state != ComponentState.EMPTY) {
+                                    val sample = ScreenSamples.memories.first()
+                                    MemoryCard(
+                                        if (state == ComponentState.LONG_TEXT) ScreenSamples.longText else sample.text,
+                                        "16:20 · 示例", annotation = sample.annotation, state = state,
+                                    )
+                                } else {
+                                    StatusNotice("从一句话开始", "随口说给爱忆，重要的事，慢慢记好。", state = ComponentState.EMPTY)
+                                }
                             }
-                        } else {
-                            item("empty") { StatusNotice("从一句话开始", "随口说给爱忆，重要的事，慢慢记好。", state = ComponentState.EMPTY) }
                         }
                     }
                     Destination.MEMORIES -> {
@@ -159,7 +169,7 @@ private fun CaptureSection(state: ComponentState, demo: Boolean) {
     // Deliberately memory-only: D02 owns encrypted persisted drafts. No success feedback.
     var text by remember { mutableStateOf("") }
     CaptureComposer(text = text, onTextChange = { text = it }, askAvailable = false, state = state,
-        availability = if (demo) "界面示例，不会保存。图片、录音与提问未开放。" else "保存尚未开放。图片、录音与提问未开放。")
+        availability = if (demo) "虚构示例，不保存记录、不安排提醒。\n提问、图片与录音尚未开放。" else "保存尚未开放，输入仅作界面示例。\n提问、图片与录音尚未开放。")
 }
 
 @Composable

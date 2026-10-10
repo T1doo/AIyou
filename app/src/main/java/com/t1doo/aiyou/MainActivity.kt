@@ -17,15 +17,11 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,7 +36,8 @@ import com.t1doo.aiyou.designsystem.ProviderConnectionCard
 import com.t1doo.aiyou.designsystem.StatusNotice
 import com.t1doo.aiyou.ui.Destination
 import com.t1doo.aiyou.ui.MainScreen
-import com.t1doo.aiyou.ui.DestinationIcon
+import com.t1doo.aiyou.ui.NotebookAppBar
+import com.t1doo.aiyou.ui.NotebookNavigation
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,7 +50,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AIyouApp(previewDestination: Destination = Destination.NOW, previewDemo: Boolean = false,
              previewState: ComponentState = ComponentState.NORMAL) {
@@ -68,23 +64,14 @@ fun AIyouApp(previewDestination: Destination = Destination.NOW, previewDemo: Boo
     Scaffold(
         modifier = Modifier.imePadding(),
         topBar = {
-            TopAppBar(
-                title = { Text(if (showSettings) "设置" else "爱忆 AIyou", style = MaterialTheme.typography.titleMedium) },
-                actions = {
-                    TextButton(onClick = { showSettings = !showSettings }) { Text(if (showSettings) "返回" else "设置") }
-                },
-            )
+            NotebookAppBar(if (showSettings) "设置" else "爱忆 AIyou", if (showSettings) "返回" else "设置") {
+                showSettings = !showSettings
+            }
         },
         bottomBar = {
             if (!imeVisible) {
-                NavigationBar {
-                    Destination.entries.forEach { destination ->
-                        NavigationBarItem(
-                            selected = destination == selected && !showSettings,
-                            onClick = { selectedName = destination.name; showSettings = false },
-                            icon = { DestinationIcon(destination) }, label = { Text(destination.label, style = MaterialTheme.typography.bodySmall) },
-                        )
-                    }
+                NotebookNavigation(if (showSettings) null else selected) { destination ->
+                    selectedName = destination.name; showSettings = false
                 }
             }
         },
