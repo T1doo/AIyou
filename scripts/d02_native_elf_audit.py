@@ -164,7 +164,8 @@ def audit(apk, sdk, output, apk_source_sha):
               "apk_source_association": "Caller-declared source SHA; CI supplies its actual checkout/build SHA. "
               "Historical input and rebuilt APK identities must not be conflated.",
               "interpretation": "ZIP, LOAD, Android doc endpoint and expanded writable ranges are independent. "
-              "Evidence agreement is not compatibility PASS. No dependency/ELF/KDF changes."}
+              "Evidence agreement is not compatibility PASS. Audit reads inputs and does not modify "
+              "dependency selection, ELF bytes or KDF configuration."}
     try:
         with tempfile.TemporaryDirectory(prefix="owned-elf-", dir=output) as temp:
             for abi, data, member in members:
