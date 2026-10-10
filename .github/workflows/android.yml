@@ -36,9 +36,19 @@ jobs:
       - name: Verify Android dependency requirements
         run: scripts/gradle.sh :app:checkDebugAarMetadata
       - name: Build debug APK
+        id: assemble
         run: scripts/gradle.sh :app:assembleDebug
       - name: Run Android lint
         run: scripts/gradle.sh :app:lintDebug
+      - name: Print complete lint findings
+        if: always()
+        run: |
+          report=app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+          if [ -f "$report" ]; then
+            cat "$report"
+          else
+            echo 'Lint text report unavailable; see preceding task result.'
+          fi
       - name: Preserve test and lint reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -48,9 +58,11 @@ jobs:
             core/domain/build/test-results/test/
             core/domain/build/reports/tests/test/
             app/build/reports/lint-results-debug.*
+            app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
           if-no-files-found: warn
           retention-days: 14
       - name: Preserve debug APK
+        if: always() && steps.assemble.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: aiyou-d00-debug
