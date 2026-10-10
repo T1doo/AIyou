@@ -148,8 +148,18 @@ compiled and executed all six tests: four passed and two failed at the
 native test APK step were skipped after that failure. The corrected tests check
 the entire unmerged semantics tree for actual focused nodes and positively
 verify enabled input focus, rather than require a disabled node to expose
-`Focused=false`. Their new execution is pending its own CI; the original failure
-remains preserved. They do not open production
+`Focused=false`. At `7977a7bc9d2b6f0e065f421cab1e5ca14f6323ae`,
+[CI 38046489263](https://github.com/T1doo/AIyou/actions/runs/38046489263)
+actually executed all six with zero failures, errors or skips. APK builds,
+seven packaged-license byte comparisons, both APK ZIP checks and 216 renders
+also passed. That run remained FAIL because lint model generation encountered
+an incomplete `debugAndroidTestCompileClasspath` lock for the fixed debug-only
+`ui-test-manifest:1.12.1`; no lint source diagnosis was reached. The resolver now
+explicitly resolves both app debug instrumentation classpaths, and the lock is
+generated from that real graph. Versions and existing production graphs are
+retained. Subsequent source verification requires its ordinary CI's actual
+test XML, lint and render results; source review alone is not a passing result.
+Both original failures remain preserved. These UI tests do not open production
 databases or stand in for native tests. Test-only Robolectric 4.17 and its API35
 preinstrumented `15-robolectric-13954326-i7` Maven framework are fixed and Gradle
 locked; the runner uses that local artifact in offline mode, without its own
