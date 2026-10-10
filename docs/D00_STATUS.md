@@ -1,6 +1,6 @@
 # D00 实际记录
 
-更新：2026-10-10 UTC。状态：**D00 lint 修复中，尚未完成；D01 未开始**。
+更新：2026-10-10 UTC。状态：**D00 工程、严格 CI 与独立源码审查通过，待验收；D01 未开始**。
 本云环境仍无 Android SDK 或许可批准，未安装 SDK、未接受协议。
 GitHub 托管 runner 的既有 SDK 已实际通过只读包版本/接受记录检查；其执行
 结果与本地许可阻塞分开记录，不再把远端结果写作未知。
@@ -54,11 +54,57 @@ BuildTools36；仍须实际只读预检，不假定文档等于安装或许可�
 该组合超出 Kotlin 完整支持表，具体官方依据和限制见 BUILD.md；不得声称
 矩阵全覆盖。实际纯 Kotlin 单测/编译及 debug 编译、运行时和编译器依赖解析
 PASS；XML 为3 tests零失败/错误/跳过，新Wrapper与分发均核官方SHA-256。
-升级后的 Android CI 和最终固定源码独审仍待填写；D00 尚未完成。
+升级后的 Android CI 与最终固定源码独审已完成，结果见下一节；设备验收未执行。
 
 本轮本地 `:core:domain:test --rerun-tasks` 再次 PASS：6 tasks executed，
 3 tests、0 failures/errors/skipped；资源 XML、workflow YAML 和 diff 检查 PASS。
 本地 Android 检查仍受 SDK 许可阻塞，未用托管结果冒充本地执行。
+
+## 升级后的实际验收证据
+
+固定源码：`def6db4828a64a8d2bef1236debf36c091455249`。
+[run 38018373718](https://github.com/T1doo/AIyou/actions/runs/38018373718)
+已完成且 conclusion=success；job114113672093 完整日志保存在
+`/workspace/d00-ci-lint-review-eaeaf36/job-def6db4.log`。
+
+| 检查 | 结果 | 实际证据与范围 |
+| --- | --- | --- |
+| Wrapper / JDK | PASS | 新 Wrapper 官方 SHA 匹配，Temurin17.0.17+10 |
+| `:core:domain:test` / XML | PASS | 6 tasks executed；3 tests，零 failures/errors/skipped |
+| 既有 SDK 包/许可只读预检 | PASS | Platform37.0 r2、BuildTools36.0.0、匹配 canonical 接受记录；未安装/接受 |
+| `:app:checkDebugAarMetadata` | PASS | 实际任务成功，12s |
+| `:app:assembleDebug` | PASS | 38 tasks、35 executed/3 up-to-date，48s；compileDebugKotlin 实际 executed |
+| `:app:lintDebug` | PASS | 29 tasks、10 executed/19 up-to-date，23s；No issues found；无 disable/baseline/降级 |
+| 报告及 APK 上传 | PASS | artifact11657556256 /11657481372 均未过期 |
+| 干净源码 Android 构建 | PASS（托管 CI 范围） | fresh checkout 固定 SHA，无复用 build 输出、无缓存恢复步骤；runner SDK 为既有安装 |
+| 本云环境 Android 构建 | NOT RUN（当前升级 SHA） | 无 SDK、未批准安装；2026-10-09 原版本的实际失败保留在历史表 |
+| 当前 APK 下载到本云环境 | FAIL | 新 artifact 文件引用下载仍 HTTP403；没有绕过、没有本地 APK |
+| 设备启动/UI/无障碍/16KB/性能 | NOT RUN | 没有设备证据；CI 编译不能代替 |
+
+交付 APK 为 [artifact11657481372](https://github.com/T1doo/AIyou/actions/runs/38018373718/artifacts/11657481372)，
+runner 内实际路径 `app/build/outputs/apk/debug/app-debug.apk`。
+APK SHA-256（直接对 APK 计算）：
+`ad23185c3da598202606f18691761441c9d430cf9e45e0a22241c85cc5990d5f`。
+上传 ZIP SHA-256（与 APK 哈希不同）：
+`3bf36953168e29ff6080d9c79618d26da81764a8dceb8d945ba15a3b83c0e1e9`。
+artifact 过期时间为 2026-10-24 UTC；没有向仓库提交 APK 或 debug 签名私钥。
+报告 ZIP SHA-256：`0cc4c30e123ed3a2b20d1797b34d58b64853214773ae332806535877f0afb496`。
+
+升级消除了原9项lint：1项API限定错误、8项版本建议。固定版本、内置Kotlin迁移、
+实际锁范围和超出Kotlin完整支持表的限制见 BUILD.md。通过这些 D00 检查不能
+声称所有工具功能、真机行为或后续持久化/AI功能兼容。SDK 许可未在本云环境
+接受，未扩大网络、配置凭据、调用真实模型或发布。
+
+固定 def6db4 的最终独立只读审查 PASS（限定范围）：全新 archive 实际 JVM
+6 tasks executed /3 tests，零失败、错误、跳过；四项配置无 write-locks 的
+严格锁解析 PASS、无 FAILED，锁文件验证后未变。Wrapper 官方校验、XML/YAML/
+Shell 配置与 canonical 许可哈希复核 PASS；独审重新核对上述精确 SHA 的
+CI 全量成功日志及 APK 哈希。此前 P2 锁遗漏、P3 隐含 rg、NewApi 已关闭，
+新源码/配置未发现新的高信度缺陷。证据
+`/workspace/d00-readonly-review-def6db4/REVIEW_RESULT.md`。
+独审指出的 P3 旧许可/工具链文档描述在本状态文档收尾时修订；仅此文档变化，
+其余源码与配置保持受审 def6db4 字节。最后记录提交的精确 SHA/远端状态以
+交付报告为准；审查不代替设备检查，也不证明所有变体锁与工具功能兼容。
 
 ## 已核实的起点
 
@@ -87,7 +133,7 @@ PASS；XML 为3 tests零失败/错误/跳过，新Wrapper与分发均核官方SH
   没有签名材料、真实密钥或个人记录进入新增文件。
 - 备份与设备迁移排除规则已显式配置；其 OEM 实际行为未验证。
 
-## 工具链与许可
+## 2026-10-09 工具链与许可（历史）
 
 实际安装并验证完整 Temurin JDK 17.0.17+10（java + javac）和 Gradle 8.13。
 AGP/Kotlin 插件已经成功解析并用于纯 Kotlin 编译；Android 工具链的全流程
@@ -157,7 +203,7 @@ assemble-debug.log、lint-debug.log。工具下载与缓存位于 `/workspace/to
 干净源码测试日志为 `clean-snapshot-test.log`，源码快照目录为
 `/workspace/d00-clean-248b873`；其中没有 SDK，也不是干净工具缓存构建。
 
-## 独立审查与修复
+## 2026-10-09 独立审查与修复（历史）
 
 按父任务要求，独立审查者只读审查固定提交
 `bf456231102d9b95fbbaf255392bdd10dfd38b74`，完整读取两方案、581 段 DOCX
@@ -196,12 +242,14 @@ Gradle 和 JDK 的固定值与官方校验文件一致；原方案与起点字�
 
 本云环境 SDK 始终未安装、协议未接受；没有真实模型调用或网络/凭据/证书变更。
 
-## 下一步与交付边界
+## 当前下一步与交付边界
 
-最小剩余批准动作：开发者阅读上面的具体 SDK 协议后，明确回复接受该协议，
-并授权安装上述三个 D00 必需包。获准后才安装，核验实际接受记录，重跑
-metadata / assemble / test / lint，并从干净源码复现，填写 APK 及真实结果。
-随后冻结源码，独立审查通过后再进入 D01。
+当前可先用托管 runner 的既有 SDK 做只读预检和完整构建；缺包或匹配记录就
+失败，不安装或接受。本云环境若要完整本地构建，最小批准动作是开发者阅读
+[具体 SDK 协议](https://developer.android.com/studio/terms)，明确接受并授权安装
+当前 Platform37.0 revision2 / BuildTools36.0.0；CLI 安装版本/校验仍须另核，
+历史的 CLI19/android36/35 三包候选不能当作当前批准。获准前仅执行不依赖
+本地 SDK 的工作。最终源码冻结并独审，记录实际 CI/APK/设备限制；D01 未开始。
 
 源码快照提交 `248b8735b0019ac3566d24f6a2e68b3d8d165e19` 已正常推送，
 `git ls-remote` 核实远端分支 SHA 一致；显式 fetch 后 ahead/behind 为 `0/0`。
