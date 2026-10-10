@@ -1,0 +1,70 @@
+name: D02 actual APK ELF evidence and strict RELRO endpoint gate
+
+'on':
+  push:
+    branches: ['codex/d02-local-records-20261010']
+    paths:
+      - '.github/workflows/d02-native-elf-audit.yml'
+      - 'scripts/d02_elf.py'
+      - 'scripts/d02_native_elf_audit.py'
+      - 'scripts/tests/test_d02*elf*.py'
+      - 'docs/D02_NATIVE_ELF_AUDIT.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actual-apk-native-elf:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GRADLE_USER_HOME: ${{ github.workspace }}/.toolchains/gradle-home
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Verify unchanged wrapper and existing accepted SDK, no installer
+        run: |
+          printf '%s  %s\n' 3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
+          python3 scripts/check-sdk.py
+          python3 scripts/inspect-device-test-environment.py
+      - name: Run actual host ELF counterexamples and APK/gate regressions
+        run: python3 -m unittest discover -s scripts/tests -p 'test_d02*elf*.py' -v
+      - name: Build actual APK without any device execution
+        run: scripts/gradle.sh :app:checkDebugAarMetadata :app:assembleDebug
+      - name: Record exact APK and all four raw headers; cross-check fixed existing LLVM
+        id: elf_audit
+        run: |
+          python3 scripts/d02_native_elf_audit.py audit \
+            --apk app/build/outputs/apk/debug/app-debug.apk \
+            --sdk-root "$ANDROID_HOME" \
+            --output app/build/reports/d02-native-elf \
+            --apk-source-sha "$GITHUB_SHA"
+      - name: Enforce Android official RELRO endpoint formula; known failure stays failure
+        if: steps.elf_audit.outcome == 'success'
+        run: python3 scripts/d02_native_elf_audit.py enforce-doc-endpoint --report app/build/reports/d02-native-elf/REPORT.json
+      - name: Preserve actual static evidence even when RELRO endpoint gate fails
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d02-actual-apk-native-elf-evidence
+          path: |
+            app/build/reports/d02-native-elf/REPORT.json
+            app/build/reports/d02-native-elf/*-llvm-readelf.txt
+            app/build/reports/d02-native-elf/apk-zipalign.txt
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Preserve exact APK audited by this job, distinct from earlier484 artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d02-native-elf-audited-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+          retention-days: 14
