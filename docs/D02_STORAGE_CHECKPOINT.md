@@ -23,6 +23,15 @@ the upstream JNIString ASF NOTICE ancestry is still unverified.
 
 - PASS: actual local `:core:domain:test` (3 tests, no failures/errors/skips),
   explicit pinned dependency graph resolution and genuine generated locks.
+- The first independent source review reproduced a prior Edit failure releasing
+  an already queued Save's busy state. Save now carries an immutable intent,
+  rejects stale command identities, preserves that intent and draft ID on retry,
+  and retains the busy state across earlier Edit failures. Three real host JVM
+  regressions compile the actual ViewModel against bounded lifecycle/repository
+  stand-ins and test that sequence, later input, genuine save failure and failed
+  readback after commit. They passed with no failures/errors/skips; they do not
+  certify Android lifecycle or native persistence. The unused domain coroutine
+  dependency was removed to retain the pure model-only production boundary.
 - NOT RUN: Android/KSP compilation, generated Room schema validation, APK/lint
   and native/Keystore instrumentation execution for this new source snapshot.
   CI uses the already installed licensed SDK; no package installer is added.

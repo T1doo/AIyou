@@ -10,6 +10,7 @@ import com.t1doo.aiyou.model.TextDraft
 import java.time.Clock
 import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -39,6 +40,7 @@ class LocalRecordsViewModel(application: Application) : AndroidViewModel(applica
     private var persistedDraft: TextDraft? = null
     private val editGeneration = AtomicLong()
     private var pendingCommit: TextDraft? = null
+    private val pendingIntent = AtomicReference<SaveIntent?>(null)
     private val clock = Clock.systemUTC()
 
     init {
@@ -54,22 +56,24 @@ class LocalRecordsViewModel(application: Application) : AndroidViewModel(applica
                                     it.copy(draftNotice = "草稿已保存在本机", error = null, saveNotice = null)
                                 }
                             }
-                            Command.Save -> {
+                            is Command.Save -> {
+                                if (pendingIntent.get() !== command.intent) continue
                                 val store = checkNotNull(repository)
-                                val draft = pendingCommit ?: persistedDraft?.takeIf { it.text == mutableState.value.text }
-                                    ?: store.updateDraft(mutableState.value.text)
+                                val draft = pendingCommit ?: persistedDraft?.takeIf { it.text == command.intent.text }
+                                    ?: store.updateDraft(command.intent.text)
                                 pendingCommit = draft
                                 store.saveDraft(draft, clock.millis(), ZoneId.systemDefault().id)
                                 val entries = store.entries()
                                 pendingCommit = null
                                 persistedDraft = null
+                                pendingIntent.compareAndSet(command.intent, null)
                                 // Success follows commit; the list is read from the database.
                                 mutableState.update { it.copy(text = "", saving = false, savePending = false, entries = entries, draftNotice = "没有未保存的草稿", saveNotice = "已保存在本机", error = null) }
                             }
                             Command.Retry -> open()
                         }
                     } catch (failure: CancellationException) { throw failure }
-                    catch (failure: Exception) { failed(failure) }
+                    catch (failure: Exception) { failed(failure, preserveQueuedSave = command is Command.Edit) }
                 }
             } finally {
                 repository?.close()
@@ -89,8 +93,9 @@ class LocalRecordsViewModel(application: Application) : AndroidViewModel(applica
     fun save() {
         val current = mutableState.value
         if (!current.ready || current.saving || current.text.isBlank()) return
+        val intent = pendingIntent.get() ?: SaveIntent(current.text, editGeneration.get()).also { pendingIntent.set(it) }
         mutableState.update { it.copy(saving = true, savePending = true, saveNotice = null, error = null) }
-        commands.trySend(Command.Save)
+        commands.trySend(Command.Save(intent))
     }
 
     fun retry() {
@@ -113,8 +118,8 @@ class LocalRecordsViewModel(application: Application) : AndroidViewModel(applica
         catch (_: LinkageError) { failed(IllegalStateException()) }
     }
 
-    private fun failed(failure: Exception) {
-        mutableState.update { it.copy(opening = false, saving = false,
+    private fun failed(failure: Exception, preserveQueuedSave: Boolean = false) {
+        mutableState.update { it.copy(opening = false, saving = if (preserveQueuedSave) it.saving else false,
             error = if (failure is StorageKeyUnavailable) "无法读取本机加密密钥。请保留原数据并先解锁设备重试。备份恢复尚未开放。"
             else "本机存储操作失败。输入与原数据已保留，可以重试。",
             draftNotice = if (it.ready) "草稿保存状态待确认" else "草稿尚未读取") }
@@ -122,9 +127,11 @@ class LocalRecordsViewModel(application: Application) : AndroidViewModel(applica
 
     override fun onCleared() { commands.close(); super.onCleared() }
 
+    private data class SaveIntent(val text: String, val generation: Long)
+
     private sealed interface Command {
         data class Edit(val text: String, val generation: Long) : Command
-        data object Save : Command
+        data class Save(val intent: SaveIntent) : Command
         data object Retry : Command
     }
 }

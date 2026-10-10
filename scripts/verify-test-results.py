@@ -7,10 +7,13 @@ import xml.etree.ElementTree as ET
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument("--component", action="store_true", help="also require actual component regression XML")
+parser.add_argument("--queue", action="store_true", help="also require actual host queue regression XML")
 args = parser.parse_args()
 targets = [("domain", "core/domain/build/test-results/test", 3)]
 if args.component:
     targets.append(("component", "core/designsystem/build/test-results/testDebugUnitTest", 7))
+if args.queue:
+    targets.append(("host queue", "checks/record-queue/build/test-results/test", 3))
 for label, folder, minimum in targets:
     reports = list((root / folder).glob("TEST-*.xml"))
     if not reports:

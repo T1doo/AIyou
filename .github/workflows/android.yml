@@ -29,6 +29,10 @@ jobs:
             gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
       - name: Run actual domain tests
         run: scripts/gradle.sh :core:domain:test
+      - name: Run actual ViewModel queue failure regressions (host boundary)
+        run: |
+          scripts/gradle.sh --project-dir checks/record-queue test
+          python3 scripts/verify-test-results.py --queue
       - name: Verify design contracts and generated tokens
         run: |
           python3 -m unittest discover -s scripts/tests -v
@@ -163,6 +167,8 @@ jobs:
           path: |
             core/domain/build/test-results/test/
             core/domain/build/reports/tests/test/
+            checks/record-queue/build/test-results/test/
+            checks/record-queue/build/reports/tests/test/
             core/designsystem/build/test-results/testDebugUnitTest/
             core/designsystem/build/reports/tests/testDebugUnitTest/
             app/build/reports/lint-results-debug.*
