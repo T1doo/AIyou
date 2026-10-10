@@ -1,0 +1,29 @@
+gradle.projectsEvaluated {
+    rootProject.tasks.register("d01ResolveLockedDependencies") {
+        doLast {
+            def targets = [":app", ":core:designsystem"]
+            targets.each { path ->
+                def p = rootProject.project(path)
+                def names = ["debugCompileClasspath", "debugRuntimeClasspath", "kotlinBuildToolsApiClasspath", "kotlinCompilerPluginClasspathDebug", "screenshotTestDebugCompileClasspath", "screenshotTestDebugRuntimeClasspath", "kotlinCompilerPluginClasspathScreenshotTestDebug", "screenshotTestDebugPreviewClasspath", "screenshotTestDebugValidationClasspath"]
+                names.each { name ->
+                    def c = p.configurations.findByName(name)
+                    if (c != null && c.canBeResolved) {
+                        println("Resolving " + path + ":" + name)
+                        def components = c.incoming.resolutionResult.allComponents
+                        def unresolved = c.incoming.resolutionResult.allDependencies.findAll { it instanceof org.gradle.api.artifacts.result.UnresolvedDependencyResult }
+                        if (!unresolved.empty) { throw new GradleException(unresolved.collect { it.failure.message }.join("\n")) }
+                        println("Resolved components: " + components.size())
+                    }
+                }
+                def remaining = p.configurations.toList().findAll { it.canBeResolved && (it.name.toLowerCase().contains("screenshot") || it.name.toLowerCase().contains("layoutlib")) }
+                remaining.each { c ->
+                    println("Resolving " + path + ":" + c.name)
+                    def components = c.incoming.resolutionResult.allComponents
+                        def unresolved = c.incoming.resolutionResult.allDependencies.findAll { it instanceof org.gradle.api.artifacts.result.UnresolvedDependencyResult }
+                        if (!unresolved.empty) { throw new GradleException(unresolved.collect { it.failure.message }.join("\n")) }
+                        println("Resolved components: " + components.size())
+                }
+            }
+        }
+    }
+}

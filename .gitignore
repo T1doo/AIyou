@@ -12,3 +12,6 @@ local.properties
 .env
 .env.*
 !.env.example
+# Initial D01 render smoke references are CI-generated, never approved goldens.
+app/src/screenshotTestDebug/reference/
+__pycache__/

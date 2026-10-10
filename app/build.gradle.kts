@@ -1,9 +1,11 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.screenshot)
 }
 
 android {
+    experimentalProperties["android.experimental.enableScreenshotTest"] = true
     namespace = "com.t1doo.aiyou"
     compileSdk = 37
     compileSdkMinor = 0
@@ -14,7 +16,7 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = 1
-        versionName = "0.0.1-d00"
+        versionName = "0.0.2-d01"
     }
 
     buildFeatures {
@@ -32,8 +34,14 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
+    implementation(project(":core:designsystem"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
     implementation(libs.activity.compose)
+    implementation(libs.compose.ui.tooling.preview)
+    debugImplementation(libs.compose.ui.tooling)
+    "screenshotTestImplementation"(platform(libs.compose.bom))
+    "screenshotTestImplementation"(libs.compose.ui.tooling)
+    "screenshotTestImplementation"(libs.screenshot.validation.api)
 }

@@ -1,4 +1,4 @@
-name: D00 Android checks
+name: D01 Android and Preview checks
 
 'on':
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  d00:
+  d01:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -29,19 +29,29 @@ jobs:
             gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
       - name: Run actual domain tests
         run: scripts/gradle.sh :core:domain:test
+      - name: Verify design contracts and generated tokens
+        run: |
+          python3 -m unittest discover -s scripts/tests -v
+          python3 scripts/generate-tokens.py --check
       - name: Require nonempty passing tests
         run: python3 scripts/verify-test-results.py
       - name: Verify already installed and licensed SDK
         run: python3 scripts/check-sdk.py
       - name: Verify Android dependency requirements
-        run: scripts/gradle.sh :app:checkDebugAarMetadata
+        run: scripts/gradle.sh :app:checkDebugAarMetadata :core:designsystem:checkDebugAarMetadata
       - name: Build debug APK
         id: assemble
         run: |
           scripts/gradle.sh :app:assembleDebug
           sha256sum app/build/outputs/apk/debug/app-debug.apk
       - name: Run Android lint
-        run: scripts/gradle.sh :app:lintDebug
+        run: scripts/gradle.sh :app:lintDebug :core:designsystem:lintDebug
+      - name: Generate initial Preview render smoke references
+        run: scripts/gradle.sh :app:updateDebugScreenshotTest
+      - name: Validate Preview render smoke
+        run: scripts/gradle.sh :app:validateDebugScreenshotTest
+      - name: Require actual complete Preview render results
+        run: python3 scripts/verify-preview-results.py
       - name: Print complete lint findings
         if: always()
         run: |
@@ -55,19 +65,33 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: d00-reports
+          name: d01-reports
           path: |
             core/domain/build/test-results/test/
             core/domain/build/reports/tests/test/
             app/build/reports/lint-results-debug.*
             app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            core/designsystem/build/reports/lint-results-debug.*
+            app/build/reports/screenshotTest/
+            app/build/test-results/validateDebugScreenshotTest/
+            app/build/reports/d01-preview-manifest.json
           if-no-files-found: warn
           retention-days: 14
       - name: Preserve debug APK
         if: always() && steps.assemble.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: aiyou-d00-debug
+          name: aiyou-d01-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
+      - name: Preserve initial Preview render smoke images
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d01-preview-render-smoke
+          path: |
+            app/src/screenshotTestDebug/reference/
+            app/build/outputs/screenshotTest-results/
+          if-no-files-found: warn
           retention-days: 14

@@ -1,0 +1,19 @@
+# D01 状态
+
+D00已经主对话验收；D01实现中，尚未宣称CI或视觉验收通过。D02未开始。
+
+实现范围和兼容记录见[D01_DESIGN.md](D01_DESIGN.md)。原方案文件保持原样。
+
+本地真实检查：
+
+- 5项Python Token/对比度契约测试：PASS。
+- core:domain:test --rerun-tasks：PASS，6任务执行，3测试0失败/错误/跳过。
+- app:resolvableConfigurations：FAIL，Gradle ConcurrentModificationException；
+  保留/workspace/d01-configurations.log，不将旧XML当本次测试证明。
+- 本地SDK预检：FAIL，SDK不存在；未安装/接受新协议。
+- 针对性依赖图解析与锁生成：PASS；直接resolve文件曾遇Android secondary
+  variant歧义，改为组件图解析，不把此步骤当作Android artifact构建验证。
+- 本地Android构建、lint、Preview渲染：NOT RUN，使用既有hosted CI路径验证。
+- 真机、性能、TalkBack、真实键盘与200%字体交互：NOT RUN。
+
+源码独审与当前SHA的CI结果待冻结后补充；不把Preview注解或编译当视觉通过。
