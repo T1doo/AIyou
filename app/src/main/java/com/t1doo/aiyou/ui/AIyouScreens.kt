@@ -43,8 +43,8 @@ enum class Destination(val label: String, val symbol: String) {
 fun MainScreen(
     destination: Destination,
     demo: Boolean,
-    state: ComponentState = ComponentState.NORMAL,
     modifier: Modifier = Modifier,
+    state: ComponentState = ComponentState.NORMAL,
 ) {
     BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.background)) {
         val margin = if (maxWidth < AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide

@@ -13,6 +13,11 @@ D00已经主对话验收；D01实现中，尚未宣称CI或视觉验收通过。
 - 本地SDK预检：FAIL，SDK不存在；未安装/接受新协议。
 - 针对性依赖图解析与锁生成：PASS；直接resolve文件曾遇Android secondary
   variant歧义，改为组件图解析，不把此步骤当作Android artifact构建验证。
+- 独审在96d48e5发现PNG结果guard可接受截断假文件；已修复完整结构/CRC/解压
+  检查，新增4项反例回归，本地共9项Python测试PASS。
+- 96d48e5 hosted CI run38020086747：3领域测试、5Token测试、SDK预检、两个
+  AAR metadata及assembleDebug PASS；严格lint FAIL（ModifierParameter）。
+  已修正MascotBadge/MainScreen可选参数顺序，未关闭检查；旧日志已保全。
 - 本地Android构建、lint、Preview渲染：NOT RUN，使用既有hosted CI路径验证。
 - 真机、性能、TalkBack、真实键盘与200%字体交互：NOT RUN。
 

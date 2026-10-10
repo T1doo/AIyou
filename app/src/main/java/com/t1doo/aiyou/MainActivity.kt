@@ -108,7 +108,10 @@ fun AIyouApp() {
                 }
             }
         } else {
-            MainScreen(selected, demo, if (demo) ComponentState.valueOf(stateName) else ComponentState.NORMAL, modifier)
+            MainScreen(
+                destination = selected, demo = demo, modifier = modifier,
+                state = if (demo) ComponentState.valueOf(stateName) else ComponentState.NORMAL,
+            )
         }
     }
 }

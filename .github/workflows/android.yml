@@ -55,12 +55,14 @@ jobs:
       - name: Print complete lint findings
         if: always()
         run: |
-          report=app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
-          if [ -f "$report" ]; then
-            cat "$report"
-          else
-            echo 'Lint text report unavailable; see preceding task result.'
-          fi
+          for module in app core/designsystem; do
+            report=$module/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            if [ -f "$report" ]; then
+              cat "$report"
+            else
+              echo "Lint text report unavailable for $module; see preceding task result."
+            fi
+          done
       - name: Preserve test and lint reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -72,6 +74,7 @@ jobs:
             app/build/reports/lint-results-debug.*
             app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             core/designsystem/build/reports/lint-results-debug.*
+            core/designsystem/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             app/build/reports/screenshotTest/
             app/build/test-results/validateDebugScreenshotTest/
             app/build/reports/d01-preview-manifest.json

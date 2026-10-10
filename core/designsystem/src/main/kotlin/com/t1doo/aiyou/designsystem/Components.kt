@@ -252,8 +252,8 @@ fun StatusNotice(
 
 @Composable
 fun MascotBadge(
-    mascotState: MascotState = MascotState.Idle,
     modifier: Modifier = Modifier,
+    mascotState: MascotState = MascotState.Idle,
     assets: MascotAssetProvider = NeutralMascotAssets,
     state: ComponentState = ComponentState.NORMAL,
 ) {

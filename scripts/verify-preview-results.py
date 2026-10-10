@@ -3,8 +3,8 @@
 import hashlib
 import json
 from pathlib import Path
-import struct
 import xml.etree.ElementTree as ET
+from png_integrity import verified_dimensions
 
 root = Path(__file__).resolve().parents[1]
 reports = list((root / "app/build/test-results/validateDebugScreenshotTest").rglob("*.xml"))
@@ -23,11 +23,10 @@ if len(files) != expected:
 manifest = []
 for path in files:
     data = path.read_bytes()
-    if data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR":
-        raise SystemExit(f"FAIL: invalid PNG {path.name}")
-    width, height = struct.unpack(">II", data[16:24])
-    if width <= 0 or height <= 0:
-        raise SystemExit(f"FAIL: empty PNG {path.name}")
+    try:
+        width, height = verified_dimensions(data)
+    except ValueError as error:
+        raise SystemExit(f"FAIL: invalid PNG {path.name}: {error}") from error
     manifest.append({"file": str(path.relative_to(references)), "width": width, "height": height,
                      "sha256": hashlib.sha256(data).hexdigest()})
 target = root / "app/build/reports/d01-preview-manifest.json"

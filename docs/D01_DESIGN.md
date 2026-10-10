@@ -60,6 +60,8 @@ secondary artifact variant；真正artifact/SDK/编译兼容仍由hosted构建�
 app/src/screenshotTest/kotlin；初始reference仅CI生成并忽略，不作为已批准golden。
 首次update再validate只能证明实际渲染、测试发现和结果一致性，不能证明外观正确。
 verify-preview-results要求198个实际无失败/跳过XML用例及198个有效PNG并记录哈希。
+PNG检查包含完整chunk/CRC、IDAT解压及scanline尺寸/过滤器、IEND；4项真实
+回归测试拒绝曾可误通过的24字节假PNG、CRC损坏、截断或错误压缩数据。
 不能为后续截图回归自动更新golden消除失败；需要独立人工看图后另行批准基线。
 
 ## 实际检查与待验收
