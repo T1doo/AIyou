@@ -8,12 +8,15 @@ root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument("--component", action="store_true", help="also require actual component regression XML")
 parser.add_argument("--queue", action="store_true", help="also require actual host queue regression XML")
+parser.add_argument("--ui", action="store_true", help="also require actual Compose interaction/semantics regression XML on the JVM simulator")
 args = parser.parse_args()
 targets = [("domain", "core/domain/build/test-results/test", 3)]
 if args.component:
     targets.append(("component", "core/designsystem/build/test-results/testDebugUnitTest", 7))
 if args.queue:
     targets.append(("host queue", "checks/record-queue/build/test-results/test", 3))
+if args.ui:
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 6))
 for label, folder, minimum in targets:
     reports = list((root / folder).glob("TEST-*.xml"))
     if not reports:

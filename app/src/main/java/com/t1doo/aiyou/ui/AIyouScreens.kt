@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,20 +28,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import com.t1doo.aiyou.designsystem.AIyouColors
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.CaptureComposer
 import com.t1doo.aiyou.designsystem.ComponentState
 import com.t1doo.aiyou.designsystem.MascotBadge
 import com.t1doo.aiyou.designsystem.MemoryCard
-import com.t1doo.aiyou.designsystem.PrivacyChip
 import com.t1doo.aiyou.designsystem.SourceCitationCard
 import com.t1doo.aiyou.designsystem.StatusNotice
 import com.t1doo.aiyou.designsystem.TaskProposalCard
-import com.t1doo.aiyou.model.ProcessingPolicy
 
 enum class Destination(val label: String, val symbol: String) {
     NOW("此刻", "○"), MEMORIES("回忆", "◇"), TASKS("待办", "□"),
@@ -54,13 +56,18 @@ fun MainScreen(
     modifier: Modifier = Modifier,
     state: ComponentState = ComponentState.NORMAL,
 ) {
-    BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.background)) {
+    BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.background).drawBehind {
+        drawRect(Brush.verticalGradient(
+            colors = listOf(AIyouColors.primaryContainer, AIyouColors.background),
+            endY = (AIyouDimensions.composerRadius * 16).toPx(),
+        ))
+    }) {
         val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
         val stackSummary = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
                 modifier = Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize(),
-                contentPadding = PaddingValues(margin),
+                contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap),
             ) {
                 item("summary") {
@@ -71,16 +78,18 @@ fun MainScreen(
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
                                 Text(if (destination == Destination.NOW) "今天" else destination.label, Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
-                                PrivacyChip(ProcessingPolicy.LOCAL_ONLY)
+                                LocalProcessingStatus()
                             }
                         }
                         Text(when (destination) {
-                            Destination.NOW -> if (demo) "10月10日 · 周六 · 示例" else "随手记下一点生活"
+                            Destination.NOW -> if (demo) "10月10日 · 周六" else "随手记下一点生活"
                             Destination.MEMORIES -> if (demo) "${ScreenSamples.memories.size} 条虚构记录" else "你的本机原始记录"
                             Destination.TASKS -> "建议与正式任务分别管理"
                         }, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-                        if (stackSummary) PrivacyChip(ProcessingPolicy.LOCAL_ONLY)
-                        if (demo) Text("虚构示例 · 不保存记录、不安排提醒", Modifier.padding(top = AIyouDimensions.spaceSm),
+                        if (stackSummary) {
+                            LocalProcessingStatus()
+                        }
+                        if (demo && destination != Destination.NOW) Text("虚构示例 · 不保存记录、不安排提醒", Modifier.padding(top = AIyouDimensions.spaceSm),
                             style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                     }
                 }
@@ -99,18 +108,23 @@ fun MainScreen(
                 when (destination) {
                     Destination.NOW -> {
                         item("composer") { CaptureSection(state, demo) }
-                        item("today") {
-                            Text("今日记录", style = MaterialTheme.typography.titleLarge)
-                        }
-                        if (demo && state != ComponentState.EMPTY) {
-                            items(ScreenSamples.memories.take(1), key = { it.id }) { sample ->
-                                MemoryCard(
-                                    if (state == ComponentState.LONG_TEXT) ScreenSamples.longText else sample.text,
-                                    "示例 · ${sample.date}", annotation = sample.annotation, state = state,
-                                )
+                        item("today-records") {
+                            Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("今日记录", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                                    Text(if (demo && state != ComponentState.EMPTY) "1 条示例" else "0 条", style = MaterialTheme.typography.bodySmall,
+                                        color = AIyouColors.textSecondary)
+                                }
+                                if (demo && state != ComponentState.EMPTY) {
+                                    val sample = ScreenSamples.memories.first()
+                                    MemoryCard(
+                                        if (state == ComponentState.LONG_TEXT) ScreenSamples.longText else sample.text,
+                                        "16:20 · 示例", annotation = sample.annotation, state = state,
+                                    )
+                                } else {
+                                    StatusNotice("从一句话开始", "随口说给爱忆，重要的事，慢慢记好。", state = ComponentState.EMPTY)
+                                }
                             }
-                        } else {
-                            item("empty") { StatusNotice("从一句话开始", "随口说给爱忆，重要的事，慢慢记好。", state = ComponentState.EMPTY) }
                         }
                     }
                     Destination.MEMORIES -> {
@@ -159,7 +173,13 @@ private fun CaptureSection(state: ComponentState, demo: Boolean) {
     // Deliberately memory-only: D02 owns encrypted persisted drafts. No success feedback.
     var text by remember { mutableStateOf("") }
     CaptureComposer(text = text, onTextChange = { text = it }, askAvailable = false, state = state,
-        availability = if (demo) "界面示例，不会保存。图片、录音与提问未开放。" else "保存尚未开放。图片、录音与提问未开放。")
+        availability = if (demo) "虚构示例，不保存记录、不安排提醒。\n提问、图片与录音尚未开放。" else "保存尚未开放，输入仅作界面示例。\n提问、图片与录音尚未开放。")
+}
+
+@Composable
+internal fun LocalProcessingStatus() {
+    Text("仅本机处理", Modifier.semantics { contentDescription = "处理策略：仅本机处理" },
+        style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
 }
 
 @Composable
@@ -168,25 +188,25 @@ internal fun SearchSection(demo: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         Surface(Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.medium) {
             BasicTextField(query, { query = it }, Modifier.fillMaxWidth().padding(AIyouDimensions.spaceLg)
-                .semantics { contentDescription = "搜索回忆，能力尚未开放" },
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = AIyouColors.textPrimary), singleLine = true,
+                .semantics { contentDescription = "搜索回忆，尚未开放"; stateDescription = "尚未开放" },
+                enabled = false, textStyle = MaterialTheme.typography.bodyLarge.copy(color = AIyouColors.textSecondary), singleLine = true,
                 decorationBox = { field -> Box {
-                    if (query.isEmpty()) Text("搜索原文、日期或关键词", style = MaterialTheme.typography.bodyLarge, color = AIyouColors.textSecondary)
+                    if (query.isEmpty()) Text("搜索回忆 · 尚未开放", style = MaterialTheme.typography.bodyLarge, color = AIyouColors.textSecondary)
                     field()
                 } })
         }
         Surface(Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.medium) {
             Column(Modifier.padding(AIyouDimensions.spaceMd), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                Text("筛选", style = MaterialTheme.typography.labelLarge, color = AIyouColors.textSecondary)
-                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs),
+                Text("筛选 · 尚未开放", style = MaterialTheme.typography.labelLarge, color = AIyouColors.textSecondary)
+                FlowRow(Modifier.fillMaxWidth().semantics {
+                    contentDescription = "日期、人物、标签、图片、收藏筛选尚未开放"; disabled()
+                }, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm),
                     verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
                     listOf("日期", "人物", "标签", "图片", "收藏").forEach { label ->
-                        Surface(color = AIyouColors.surface, shape = MaterialTheme.shapes.small) {
-                            TextButton(onClick = {}, enabled = false) { Text(label, style = MaterialTheme.typography.bodySmall) }
-                        }
+                        Text(label, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                     }
                 }
-                Text("搜索与筛选尚未开放；输入不会改变${if (demo) "示例" else "记录"}。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                Text("搜索与筛选尚未开放，不会改变${if (demo) "示例" else "记录"}。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
             }
         }
     }

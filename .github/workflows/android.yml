@@ -54,6 +54,10 @@ jobs:
         run: |
           scripts/gradle.sh :app:assembleDebug
           sha256sum app/build/outputs/apk/debug/app-debug.apk
+      - name: Run actual Compose disabled-control and storage-wiring regressions (JVM simulation)
+        run: |
+          scripts/gradle.sh :app:testDebugUnitTest
+          python3 scripts/verify-test-results.py --ui
       - name: Compile actual D02 native-storage instrumentation APK without claiming execution
         run: scripts/gradle.sh :core:data:assembleDebugAndroidTest
       - name: Verify actual license assets and APK ZIP alignment (native execution NOT RUN)
@@ -173,6 +177,8 @@ jobs:
             checks/record-queue/build/reports/tests/test/
             core/designsystem/build/test-results/testDebugUnitTest/
             core/designsystem/build/reports/tests/testDebugUnitTest/
+            app/build/test-results/testDebugUnitTest/
+            app/build/reports/tests/testDebugUnitTest/
             app/build/reports/lint-results-debug.*
             app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             core/designsystem/build/reports/lint-results-debug.*

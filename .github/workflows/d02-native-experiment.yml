@@ -1,19 +1,9 @@
 name: D02 bounded native storage experiment
 
 'on':
-  push:
-    branches: ['codex/d02-local-records-20261010']
-    paths:
-      - '.github/workflows/d02-native-experiment.yml'
-      - 'checks/sdk-device/**'
-      - 'scripts/run-d02-device-experiment.py'
-      - 'scripts/inspect-d02-apks.py'
-      - 'core/data/**'
-      - 'core/domain/**'
-      - 'core/model/**'
-      - 'gradle/**'
-      - 'app/src/main/**'
-      - 'app/build.gradle.kts'
+  # The authorized one-shot experiment already ran at b42597a. Future source
+  # integration must not silently repeat it; targeted diagnostics need an
+  # explicitly reviewed manual run. The normal Android workflow stays automatic.
   workflow_dispatch:
 
 permissions:

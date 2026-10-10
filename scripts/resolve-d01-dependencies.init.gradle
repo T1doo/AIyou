@@ -4,7 +4,7 @@ gradle.projectsEvaluated {
             def targets = [":app", ":core:designsystem"]
             targets.each { path ->
                 def p = rootProject.project(path)
-                def names = ["debugCompileClasspath", "debugRuntimeClasspath", "debugUnitTestCompileClasspath", "debugUnitTestRuntimeClasspath", "kotlinBuildToolsApiClasspath", "kotlinCompilerPluginClasspathDebug", "kotlinCompilerPluginClasspathDebugUnitTest", "screenshotTestDebugCompileClasspath", "screenshotTestDebugRuntimeClasspath", "kotlinCompilerPluginClasspathScreenshotTestDebug", "screenshotTestDebugPreviewClasspath", "screenshotTestDebugValidationClasspath"]
+                def names = ["debugCompileClasspath", "debugRuntimeClasspath", "debugUnitTestCompileClasspath", "debugUnitTestRuntimeClasspath", "kotlinBuildToolsApiClasspath", "kotlinCompilerPluginClasspathDebug", "kotlinCompilerPluginClasspathDebugUnitTest", "screenshotTestDebugCompileClasspath", "screenshotTestDebugRuntimeClasspath", "kotlinCompilerPluginClasspathScreenshotTestDebug", "screenshotTestDebugPreviewClasspath", "screenshotTestDebugValidationClasspath", "robolectricSdk"]
                 names.each { name ->
                     def c = p.configurations.findByName(name)
                     if (c != null && c.canBeResolved) {

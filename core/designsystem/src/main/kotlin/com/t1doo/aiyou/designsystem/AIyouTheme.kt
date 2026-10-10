@@ -8,6 +8,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 
 private val palette = lightColorScheme(
     primary = AIyouColors.primary,
@@ -52,11 +53,13 @@ private val title = TextStyle(
     fontFamily = FontFamily.Default,
     fontSize = AIyouTypeScale.titleSize,
     lineHeight = AIyouTypeScale.titleLineHeight,
+    fontWeight = FontWeight.SemiBold,
 )
 private val section = TextStyle(
     fontFamily = FontFamily.Default,
     fontSize = AIyouTypeScale.sectionSize,
     lineHeight = AIyouTypeScale.sectionLineHeight,
+    fontWeight = FontWeight.Medium,
 )
 private val body = TextStyle(
     fontFamily = FontFamily.Default,
@@ -79,7 +82,7 @@ fun AIyouTheme(content: @Composable () -> Unit) {
             headlineLarge = title, headlineMedium = title, headlineSmall = section,
             titleLarge = section, titleMedium = body, titleSmall = body,
             bodyLarge = body, bodyMedium = body, bodySmall = supporting,
-            labelLarge = body, labelMedium = supporting, labelSmall = supporting,
+            labelLarge = supporting.copy(fontWeight = FontWeight.Medium), labelMedium = supporting, labelSmall = supporting,
         ),
         shapes = Shapes(
             small = RoundedCornerShape(AIyouDimensions.spaceSm),

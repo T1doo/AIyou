@@ -13,15 +13,16 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import com.t1doo.aiyou.designsystem.AIyouColors
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.CaptureComposer
 import com.t1doo.aiyou.designsystem.ComponentState
 import com.t1doo.aiyou.designsystem.MemoryCard
-import com.t1doo.aiyou.designsystem.PrivacyChip
 import com.t1doo.aiyou.designsystem.StatusNotice
-import com.t1doo.aiyou.model.ProcessingPolicy
 import com.t1doo.aiyou.ui.Destination
+import com.t1doo.aiyou.ui.LocalProcessingStatus
 import com.t1doo.aiyou.ui.SearchSection
 import java.time.Instant
 import java.time.ZoneId
@@ -36,16 +37,21 @@ fun LocalRecordsScreen(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BoxWithConstraints(modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier.fillMaxSize().drawBehind {
+        drawRect(Brush.verticalGradient(
+            colors = listOf(AIyouColors.primaryContainer, AIyouColors.background),
+            endY = (AIyouDimensions.composerRadius * 16).toPx(),
+        ))
+    }) {
         val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(margin),
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
             item("summary") {
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
                     Text(destination.label, style = MaterialTheme.typography.headlineMedium)
                     Text(if (destination == Destination.MEMORIES) "${local.entries.size} 条本机记录" else "随手记下一点生活",
                         Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-                    PrivacyChip(ProcessingPolicy.LOCAL_ONLY)
+                    LocalProcessingStatus()
                 }
             }
             if (local.opening) item("loading") { StatusNotice("正在读取本机记录", "记录和草稿来自加密数据库。", state = ComponentState.LOADING) }
@@ -63,7 +69,7 @@ fun LocalRecordsScreen(
                         !local.ready || local.savePending -> ComponentState.DISABLED
                         local.error != null -> ComponentState.ERROR
                         else -> ComponentState.NORMAL },
-                    availability = "${local.draftNotice}。文字仅在本机保存；提问、图片和录音尚未开放。",
+                    availability = "${local.draftNotice}。文字仅在本机保存。\n提问、图片和录音尚未开放。",
                 )
             }
             if (destination == Destination.MEMORIES) item("search") { SearchSection(demo = false) }

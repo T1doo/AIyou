@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,6 +28,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -35,10 +40,11 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import com.t1doo.aiyou.model.ProcessingPolicy
 
 @Composable
-private fun ComponentCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+private fun ComponentCard(modifier: Modifier = Modifier, padding: Dp = AIyouDimensions.spaceLg, content: @Composable () -> Unit) {
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
@@ -46,7 +52,7 @@ private fun ComponentCard(modifier: Modifier = Modifier, content: @Composable ()
         border = BorderStroke(AIyouDimensions.spaceXs / 4, AIyouColors.outlineDecorative),
     ) {
         Column(
-            Modifier.padding(AIyouDimensions.spaceLg),
+            Modifier.padding(padding),
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm),
         ) { content() }
     }
@@ -106,7 +112,7 @@ fun MemoryCard(
     attachmentLabel: String? = null,
     state: ComponentState = ComponentState.NORMAL,
 ) {
-    ComponentCard(modifier) {
+    ComponentCard(modifier, padding = AIyouDimensions.spaceMd) {
         if (state == ComponentState.EMPTY) {
             Text("还没有记录", style = MaterialTheme.typography.titleMedium)
             Text("保存记录后，原文、附件和 AI 派生内容会分别显示。", style = MaterialTheme.typography.bodyMedium)
@@ -125,12 +131,10 @@ fun MemoryCard(
         }
         if (policy != ProcessingPolicy.LOCAL_ONLY) PrivacyChip(policy)
         annotation?.let {
-            Surface(color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.small) {
-                Column(Modifier.padding(AIyouDimensions.spaceMd), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                    Text("AI 派生内容", style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
-                    Text(it, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
+            Text("AI 派生 · $it", Modifier.fillMaxWidth().drawBehind {
+                drawLine(AIyouColors.accentDecorative, Offset.Zero, Offset(0f, size.height), AIyouDimensions.iconStroke.toPx())
+            }.padding(start = AIyouDimensions.spaceMd),
+                style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
         }
         StateFeedback(state)
     }
@@ -151,79 +155,108 @@ fun CaptureComposer(
     availability: String = "记录保存尚未开放；输入仅用于界面演示",
 ) {
     val canEdit = state != ComponentState.DISABLED && state != ComponentState.LOADING
-    Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = AIyouColors.surfaceMuted) {
-        Column(
-            Modifier.padding(AIyouDimensions.spaceLg),
-            verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm),
-        ) {
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val stackControls = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
-                if (stackControls) {
-                    Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                        ComposerMode("记下来", !askMode, canEdit, { onModeChange(false) }, Modifier.fillMaxWidth())
-                        ComposerMode("问一问", askMode, canEdit && askAvailable, { onModeChange(true) }, Modifier.fillMaxWidth())
-                    }
-                } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                        ComposerMode("记下来", !askMode, canEdit, { onModeChange(false) }, Modifier.weight(1f))
-                        ComposerMode("问一问", askMode, canEdit && askAvailable, { onModeChange(true) }, Modifier.weight(1f))
-                    }
-                }
-            }
-            BasicTextField(
-                value = text,
-                onValueChange = onTextChange,
-                modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.composerTextMinHeight)
-                    .semantics {
-                        contentDescription = if (askMode) "想问些什么" else "此刻，想记下什么"
-                        if (state == ComponentState.ERROR) error("输入需要处理，请检查后重试。")
-                    },
-                enabled = canEdit,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = AIyouColors.textPrimary),
-                minLines = 3,
-                maxLines = 6,
-                decorationBox = { field ->
-                    Box {
-                        if (text.isEmpty()) Text(if (askMode) "想问些什么？" else "今天有什么想记住的？", color = AIyouColors.textSecondary, style = MaterialTheme.typography.bodyLarge)
-                        field()
-                    }
-                },
-            )
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val stackControls = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
-                if (stackControls) {
-                    Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+        Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = AIyouColors.surfaceMuted) {
+            Column(
+                Modifier.padding(AIyouDimensions.spaceMd),
+                verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs),
+            ) {
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val stackControls = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
+                    if (stackControls) {
+                        Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                            ComposerMode("记下来", !askMode, canEdit, { onModeChange(false) }, Modifier.fillMaxWidth())
+                            ComposerMode(if (askAvailable) "问一问" else "问一问 · 未开放", askMode, canEdit && askAvailable, { onModeChange(true) }, Modifier.fillMaxWidth())
+                        }
+                    } else {
                         Row(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                            TextButton(onClick = { onImage?.invoke() }, enabled = canEdit && onImage != null, modifier = Modifier.weight(1f)) { Text("图片") }
-                            TextButton(onClick = { onAudio?.invoke() }, enabled = canEdit && onAudio != null, modifier = Modifier.weight(1f)) { Text("录音") }
+                            ComposerMode("记下来", !askMode, canEdit, { onModeChange(false) }, Modifier.weight(1f))
+                            ComposerMode(if (askAvailable) "问一问" else "问一问 · 未开放", askMode, canEdit && askAvailable, { onModeChange(true) }, Modifier.weight(1f))
                         }
-                        Button(onClick = { onSubmit?.invoke() }, enabled = canEdit && text.isNotBlank() && onSubmit != null,
-                            modifier = Modifier.fillMaxWidth()) { Text(if (askMode) "提问" else "保存") }
                     }
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                        FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                            TextButton(onClick = { onImage?.invoke() }, enabled = canEdit && onImage != null) { Text("图片") }
-                            TextButton(onClick = { onAudio?.invoke() }, enabled = canEdit && onAudio != null) { Text("录音") }
+                }
+                Surface(Modifier.fillMaxWidth(), color = AIyouColors.surface, shape = MaterialTheme.shapes.small,
+                    border = BorderStroke(AIyouDimensions.spaceXs / 4, AIyouColors.outlineFunctional)) {
+                    BasicTextField(
+                        value = text,
+                        onValueChange = onTextChange,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.composerTextMinHeight)
+                            .padding(AIyouDimensions.spaceSm)
+                            .semantics {
+                                contentDescription = if (askMode) "想问些什么" else "此刻，想记下什么"
+                                if (state == ComponentState.ERROR) error("输入需要处理，请检查后重试。")
+                            },
+                        enabled = canEdit,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = AIyouColors.textPrimary),
+                        minLines = 2,
+                        maxLines = 6,
+                        decorationBox = { field ->
+                            Box {
+                                if (text.isEmpty()) Text(if (askMode) "想问些什么？" else "今天有什么想记住的？", color = AIyouColors.textSecondary, style = MaterialTheme.typography.bodyLarge)
+                                field()
+                            }
+                        },
+                    )
+                }
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val stackControls = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
+                    if (stackControls) {
+                        Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                                ComposerAttachment(false, canEdit && onImage != null, onImage == null, { onImage?.invoke() }, Modifier.weight(1f))
+                                ComposerAttachment(true, canEdit && onAudio != null, onAudio == null, { onAudio?.invoke() }, Modifier.weight(1f))
+                            }
+                            Button(onClick = { onSubmit?.invoke() }, enabled = canEdit && text.isNotBlank() && onSubmit != null,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget),
+                                shape = MaterialTheme.shapes.small) { Text(if (askMode) "提问" else "保存", style = MaterialTheme.typography.labelLarge) }
                         }
-                        Button(onClick = { onSubmit?.invoke() }, enabled = canEdit && text.isNotBlank() && onSubmit != null) { Text(if (askMode) "提问" else "保存") }
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                            FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                                ComposerAttachment(false, canEdit && onImage != null, onImage == null, { onImage?.invoke() })
+                                ComposerAttachment(true, canEdit && onAudio != null, onAudio == null, { onAudio?.invoke() })
+                            }
+                            Button(onClick = { onSubmit?.invoke() }, enabled = canEdit && text.isNotBlank() && onSubmit != null,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget), shape = MaterialTheme.shapes.small,
+                                contentPadding = PaddingValues(horizontal = AIyouDimensions.spaceLg, vertical = AIyouDimensions.spaceSm)) {
+                                Text(if (askMode) "提问" else "保存", style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
                     }
                 }
             }
-            Text(availability, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-            if (askMode) Text("提问不会自动成为永久记忆", style = MaterialTheme.typography.bodySmall)
-            StateFeedback(composerFeedbackState(state, text))
         }
+        Text(availability, Modifier.padding(horizontal = AIyouDimensions.spaceXs), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+        if (askMode) Text("提问不会自动成为永久记忆", style = MaterialTheme.typography.bodySmall)
+        StateFeedback(composerFeedbackState(state, text))
     }
 }
 
 @Composable
 private fun ComposerMode(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
-    Surface(modifier, color = if (selected) AIyouColors.primaryContainer else AIyouColors.surface,
-        shape = MaterialTheme.shapes.small,
-        border = BorderStroke(AIyouDimensions.spaceXs / 4, if (selected) AIyouColors.primary else AIyouColors.outlineFunctional)) {
-        TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.semantics { this.selected = selected }) {
-            Text(label + if (selected) " · 已选" else "", fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+    Surface(modifier, color = if (selected) AIyouColors.surface else AIyouColors.surfaceMuted,
+        shape = MaterialTheme.shapes.small) {
+        TextButton(onClick = onClick, enabled = enabled,
+            colors = ButtonDefaults.textButtonColors(disabledContentColor = AIyouColors.textSecondary),
+            modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget).semantics {
+                this.selected = selected
+                if (!enabled) stateDescription = "当前不可用"
+            }) {
+            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        }
+    }
+}
+
+@Composable
+private fun ComposerAttachment(audio: Boolean, enabled: Boolean, unavailable: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    TextButton(onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = AIyouDimensions.minTouchTarget)
+        .semantics { if (!enabled) stateDescription = if (unavailable) "尚未开放" else "当前不可用" },
+        contentPadding = PaddingValues(horizontal = AIyouDimensions.spaceXs * 1.5f, vertical = AIyouDimensions.spaceSm),
+        colors = ButtonDefaults.textButtonColors(disabledContentColor = AIyouColors.textSecondary)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+            AttachmentIcon(audio, enabled)
+            val label = if (audio) "录音" else "图片"
+            Text(if (unavailable) "${label}未开放" else label, style = MaterialTheme.typography.labelLarge)
         }
     }
 }

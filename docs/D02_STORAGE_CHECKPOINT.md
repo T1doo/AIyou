@@ -1,7 +1,8 @@
 # D02 encrypted text checkpoint
 
 This is the first storage slice. Independent source review and Android
-compilation have run; native execution is pending. It is not a completed D02
+compilation have run; the bounded native attempt ended without a complete suite.
+It is not a completed D02
 acceptance or device verdict.
 The original master plan and architecture document remain unchanged.
 
@@ -60,13 +61,28 @@ the upstream JNIString ASF NOTICE ancestry is still unverified.
   permits deliberately retaining older versions; its TOML test example
   demonstrates entry suppression. CI uses the already installed licensed SDK;
   no package installer is added.
-- NOT RUN: native/Keystore instrumentation execution. Test APK compilation does
-  not certify encryption, migration, process restart or device behavior.
+- The actual bounded attempt at `b42597ad38014fc93ccdf0388e43fe1b9a043e6f`
+  in [CI 38043348456](https://github.com/T1doo/AIyou/actions/runs/38043348456)
+  booted an owned API35/x86_64/4 KB software emulator and installed the real app
+  and test APKs. The entire 13-case instrumentation command timed out after
+  240 seconds. Independent reading of its
+  [preserved evidence](https://github.com/T1doo/AIyou/actions/runs/38043348456/artifacts/11666961473)
+  found three passing case terminal statuses and the fourth
+  `fiveAcknowledgedSavesSurviveSeparateDatabaseReopens` starting before the
+  shared command deadline; the remaining nine did not start. The fourth did
+  not run alone for 240 seconds. This is a partial native result, not 13/13
+  acceptance or evidence that all Keystore/migration cases passed.
+  Software TCG warnings and system-service ANRs make environment starvation a
+  supported candidate, but the fourth case's exact wait still needs diagnosis;
+  neither a source deadlock nor a successful suite is inferred. Original failure
+  evidence is retained. No larger timeout, KDF change or blind rerun is used.
 - 13 actual encrypted integration test methods are written; writing or compiling
   them does not mean execution. The separate process-restart probe requires
   external write/read phases and a different process PID; reopening a database
   in one process is not claimed as a process restart.
-- NOT RUN: device UI, IME, TalkBack, performance, real 4 KB/16 KB SQLCipher load.
+- NOT RUN: separate cross-process write/read phases, production device UI,
+  IME, TalkBack, physical performance and 16 KB SQLCipher runtime. Device
+  PAGE_SIZE=4096 alone is not proof that SQLCipher loaded or every case passed.
 
 Room schema version 1 is a synthetic initial D02 fixture, never a shipped D01
 database; version 2 adds the transactional local job ledger. Migration tests
@@ -91,7 +107,9 @@ Sources: [Android 16 KB checks](https://developer.android.com/guide/practices/pa
 [publisher fixed build](https://github.com/sqlcipher/sqlcipher-android/tree/9a5d685404489cbff14d4c46da81555de1a38787).
 The publisher build uses NDK r25c with max-page-size 16384 but no common-page-size
 16384. Actual APK zip alignment, Android linker behavior on a real test device
-and successful encrypted Room operations remain NOT RUN. x86_64 simulated
+and complete encrypted Room acceptance remain unverified. Actual app and test
+APK ZIP alignment checks passed in the bounded attempt; they do not change the
+literal ELF RELRO FAIL or prove 16 KB runtime. x86_64 simulated
 16 KB testing would not certify arm64 hardware.
 
 No new SDK terms were accepted. The public metadata's matching canonical
@@ -102,5 +120,35 @@ before installing pinned packages. Unaccepted arm DBT terms remain excluded.
 The separate [bounded device experiment](../checks/sdk-device/README.md) verifies
 existing installer-host acceptance using the official API before fixed payload
 installation. It explicitly uses the unsupported software-emulation path with
-strict deadlines; its native outcome is pending its own CI. Actual packaged
+strict deadlines; its 13-case command timed out as recorded above. It is now
+manual-only so normal UI integration cannot silently repeat the complete
+experiment. Actual packaged
 license equality and APK ZIP checks are separate from runtime and RELRO gates.
+
+## Accepted visual source integration and interaction checks
+
+The exact `0c3c23ae4b4daa4bbfab8f29502cf9d51f79e0fd` visual source passed its
+independent source review and [actual CI](https://github.com/T1doo/AIyou/actions/runs/38043449879)
+with 216 real render results. Its four current PNGs were independently viewed
+and the static changes accepted: readable unopened attachment labels, genuinely
+disabled search, static unavailable filters, plain local-processing status and
+retained pale-blue hierarchy. This does not certify device disabled behavior or
+TalkBack. Integration preserves the actual ViewModel draft/save/retry callbacks,
+recent complete originals, internal search interface and offline-license route.
+Static filter words wrap as whole items so `图片` need not split across lines.
+
+Six actual Compose interaction/semantics regressions are added on a JVM Android
+simulation, covering disabled touch handling, accessibility editing, unavailable
+versus busy capability semantics, real supplied draft/save callbacks, the license
+route, and narrow large-font controls. Execution of this new revision is pending
+its own CI; writing tests is not a passing result. They do not open production
+databases or stand in for native tests. Test-only Robolectric 4.17 and its API35
+preinstrumented `15-robolectric-13954326-i7` Maven framework are fixed and Gradle
+locked; the runner uses that local artifact in offline mode, without its own
+downloader or SDK installer. API35's Java17 requirement and fixed framework
+coordinate follow the official
+[4.17 SDK provider](https://github.com/robolectric/robolectric/blob/robolectric-4.17/robolectric/src/main/java/org/robolectric/plugins/DefaultSdkProvider.java);
+the [Robolectric setup](https://robolectric.org/getting-started/) and
+[Compose test setup](https://developer.android.com/develop/ui/compose/testing)
+describe the test runner and Compose rule infrastructure. The debug-only test
+manifest is kept out of the release configuration.
