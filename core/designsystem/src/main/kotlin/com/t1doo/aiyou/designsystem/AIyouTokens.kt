@@ -6,9 +6,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 object AIyouColors {
-    val background = Color(0xFFFFFFFF)
+    val background = Color(0xFFF0F6FE)
     val surface = Color(0xFFFFFFFF)
-    val surfaceMuted = Color(0xFFF2F7FD)
+    val surfaceMuted = Color(0xFFE7F1FC)
     val textPrimary = Color(0xFF203247)
     val textSecondary = Color(0xFF526477)
     val primary = Color(0xFF245D9B)

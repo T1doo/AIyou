@@ -28,6 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -54,7 +56,12 @@ fun MainScreen(
     modifier: Modifier = Modifier,
     state: ComponentState = ComponentState.NORMAL,
 ) {
-    BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.background)) {
+    BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.background).drawBehind {
+        drawRect(Brush.verticalGradient(
+            colors = listOf(AIyouColors.primaryContainer, AIyouColors.background),
+            endY = (AIyouDimensions.composerRadius * 16).toPx(),
+        ))
+    }) {
         val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
         val stackSummary = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
