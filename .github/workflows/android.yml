@@ -47,10 +47,15 @@ jobs:
       - name: Run Android lint
         run: scripts/gradle.sh :app:lintDebug :core:designsystem:lintDebug
       - name: Generate initial Preview render smoke references
+        id: preview_generate
+        if: always() && steps.assemble.outcome == 'success'
         run: scripts/gradle.sh :app:updateDebugScreenshotTest
       - name: Validate Preview render smoke
+        id: preview_validate
+        if: always() && steps.preview_generate.outcome == 'success'
         run: scripts/gradle.sh :app:validateDebugScreenshotTest
       - name: Require actual complete Preview render results
+        if: always() && steps.preview_validate.outcome == 'success'
         run: python3 scripts/verify-preview-results.py
       - name: Print complete lint findings
         if: always()

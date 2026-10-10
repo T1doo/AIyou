@@ -18,6 +18,10 @@ D00已经主对话验收；D01实现中，尚未宣称CI或视觉验收通过。
 - 96d48e5 hosted CI run38020086747：3领域测试、5Token测试、SDK预检、两个
   AAR metadata及assembleDebug PASS；严格lint FAIL（ModifierParameter）。
   已修正MascotBadge/MainScreen可选参数顺序，未关闭检查；旧日志已保全。
+- d46f1ea独审定点PASS，原P3关闭；hosted run38020397448重复测试/SDK/
+  metadata/assemble PASS、designsystem lint无问题，app lint FAIL，10条
+  D00占位字符串已无调用。已移除这些失效资源，未抑制UnusedResources。
+  渲染步骤改为assemble成功后即执行并保全，即使lint失败仍保持job失败。
 - 本地Android构建、lint、Preview渲染：NOT RUN，使用既有hosted CI路径验证。
 - 真机、性能、TalkBack、真实键盘与200%字体交互：NOT RUN。
 

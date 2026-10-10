@@ -1,14 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">爱忆</string>
-    <string name="now">此刻</string>
-    <string name="memories">回忆</string>
-    <string name="tasks">待办</string>
-    <string name="settings">设置</string>
-    <string name="close">关闭</string>
-    <string name="local_only">仅本机 · 未连接模型</string>
-    <string name="now_placeholder">随口说给爱忆，重要的事，慢慢记好。\n记录功能正在准备中。</string>
-    <string name="memories_placeholder">从原始记录找回生活细节。\n本地记录与搜索功能正在准备中。</string>
-    <string name="tasks_placeholder">待确认建议与正式待办分开管理。\n任务与提醒功能正在准备中。</string>
-    <string name="settings_placeholder">当前默认仅在本机处理。\n模型连接与隐私设置正在准备中。</string>
 </resources>
