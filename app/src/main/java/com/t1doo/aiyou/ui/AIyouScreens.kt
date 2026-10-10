@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,18 +31,18 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import com.t1doo.aiyou.designsystem.AIyouColors
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.CaptureComposer
 import com.t1doo.aiyou.designsystem.ComponentState
 import com.t1doo.aiyou.designsystem.MascotBadge
 import com.t1doo.aiyou.designsystem.MemoryCard
-import com.t1doo.aiyou.designsystem.PrivacyChip
 import com.t1doo.aiyou.designsystem.SourceCitationCard
 import com.t1doo.aiyou.designsystem.StatusNotice
 import com.t1doo.aiyou.designsystem.TaskProposalCard
-import com.t1doo.aiyou.model.ProcessingPolicy
 
 enum class Destination(val label: String, val symbol: String) {
     NOW("此刻", "○"), MEMORIES("回忆", "◇"), TASKS("待办", "□"),
@@ -78,9 +77,7 @@ fun MainScreen(
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
                                 Text(if (destination == Destination.NOW) "今天" else destination.label, Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
-                                if (destination == Destination.NOW) {
-                                    Text("仅本机处理", style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
-                                } else PrivacyChip(ProcessingPolicy.LOCAL_ONLY)
+                                LocalProcessingStatus()
                             }
                         }
                         Text(when (destination) {
@@ -89,8 +86,7 @@ fun MainScreen(
                             Destination.TASKS -> "建议与正式任务分别管理"
                         }, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                         if (stackSummary) {
-                            if (destination == Destination.NOW) Text("仅本机处理", style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
-                            else PrivacyChip(ProcessingPolicy.LOCAL_ONLY)
+                            LocalProcessingStatus()
                         }
                         if (demo && destination != Destination.NOW) Text("虚构示例 · 不保存记录、不安排提醒", Modifier.padding(top = AIyouDimensions.spaceSm),
                             style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
@@ -180,31 +176,31 @@ private fun CaptureSection(state: ComponentState, demo: Boolean) {
 }
 
 @Composable
+private fun LocalProcessingStatus() {
+    Text("仅本机处理", Modifier.semantics { contentDescription = "处理策略：仅本机处理" },
+        style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
+}
+
+@Composable
 private fun SearchSection(demo: Boolean) {
     var query by remember { mutableStateOf("") }
     Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         Surface(Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.medium) {
             BasicTextField(query, { query = it }, Modifier.fillMaxWidth().padding(AIyouDimensions.spaceLg)
-                .semantics { contentDescription = "搜索回忆，能力尚未开放" },
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = AIyouColors.textPrimary), singleLine = true,
+                .semantics { contentDescription = "搜索回忆，尚未开放"; stateDescription = "尚未开放" },
+                enabled = false, textStyle = MaterialTheme.typography.bodyLarge.copy(color = AIyouColors.textSecondary), singleLine = true,
                 decorationBox = { field -> Box {
-                    if (query.isEmpty()) Text("搜索原文、日期或关键词", style = MaterialTheme.typography.bodyLarge, color = AIyouColors.textSecondary)
+                    if (query.isEmpty()) Text("搜索回忆 · 尚未开放", style = MaterialTheme.typography.bodyLarge, color = AIyouColors.textSecondary)
                     field()
                 } })
         }
         Surface(Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.medium) {
             Column(Modifier.padding(AIyouDimensions.spaceMd), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                Text("筛选", style = MaterialTheme.typography.labelLarge, color = AIyouColors.textSecondary)
-                FlowRow(Modifier.fillMaxWidth()) {
-                    listOf("日期", "人物", "标签", "图片", "收藏").forEach { label ->
-                        TextButton(onClick = {}, enabled = false,
-                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(disabledContentColor = AIyouColors.textSecondary),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = AIyouDimensions.spaceSm)) {
-                            Text(label, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-                Text("搜索与筛选尚未开放；输入不会改变${if (demo) "示例" else "记录"}。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                Text("筛选 · 尚未开放", style = MaterialTheme.typography.labelLarge, color = AIyouColors.textSecondary)
+                Text("日期 · 人物 · 标签 · 图片 · 收藏", Modifier.semantics {
+                    contentDescription = "日期、人物、标签、图片、收藏筛选尚未开放"; disabled()
+                }, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                Text("搜索与筛选尚未开放，不会改变${if (demo) "示例" else "记录"}。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
             }
         }
     }

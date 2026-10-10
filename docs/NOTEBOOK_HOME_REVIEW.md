@@ -75,3 +75,21 @@ explanation remains. Controls have not become functional through this change.
 
 Local token equality and 13 design/PNG/package checks pass for this follow-up.
 Compilation, strict lint and fresh pixels are pending CI on the new commit.
+
+## Unavailable-entry follow-up after pale-blue pixel review
+
+The parent actually inspected cc026's four phone PNGs after successful CI
+38042289517. The pale-blue layers improved the overly white page; no obvious
+horizontal overflow was found in the visible large-font region. This is not
+an actual scrolling, input, TalkBack or disabled-pointer test.
+
+The next small change labels unavailable attachments directly “图片未开放” /
+“录音未开放”, retaining readable text and disabled Material button semantics.
+It distinguishes absent capability callbacks from a temporarily busy enabled
+capability, so loading cannot incorrectly label an implemented control unopened.
+Search is now explicitly disabled and visibly labelled “尚未开放”. Filters use
+one clearly unavailable explanatory group with static wrapping labels, no fake
+button affordances or click handlers. The processing policy in each page header
+is the same plain status text, without a button-like outlined capsule.
+No screenshot is claimed as runtime input or accessibility acceptance. Fresh
+compilation, strict lint and phone pixels for this delta remain pending CI.

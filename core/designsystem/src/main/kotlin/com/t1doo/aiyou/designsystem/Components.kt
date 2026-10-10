@@ -203,8 +203,8 @@ fun CaptureComposer(
                     if (stackControls) {
                         Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                                ComposerAttachment(false, canEdit && onImage != null, { onImage?.invoke() }, Modifier.weight(1f))
-                                ComposerAttachment(true, canEdit && onAudio != null, { onAudio?.invoke() }, Modifier.weight(1f))
+                                ComposerAttachment(false, canEdit && onImage != null, onImage == null, { onImage?.invoke() }, Modifier.weight(1f))
+                                ComposerAttachment(true, canEdit && onAudio != null, onAudio == null, { onAudio?.invoke() }, Modifier.weight(1f))
                             }
                             Button(onClick = { onSubmit?.invoke() }, enabled = canEdit && text.isNotBlank() && onSubmit != null,
                                 modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget),
@@ -213,8 +213,8 @@ fun CaptureComposer(
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                             FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                                ComposerAttachment(false, canEdit && onImage != null, { onImage?.invoke() })
-                                ComposerAttachment(true, canEdit && onAudio != null, { onAudio?.invoke() })
+                                ComposerAttachment(false, canEdit && onImage != null, onImage == null, { onImage?.invoke() })
+                                ComposerAttachment(true, canEdit && onAudio != null, onAudio == null, { onAudio?.invoke() })
                             }
                             Button(onClick = { onSubmit?.invoke() }, enabled = canEdit && text.isNotBlank() && onSubmit != null,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget), shape = MaterialTheme.shapes.small,
@@ -248,14 +248,15 @@ private fun ComposerMode(label: String, selected: Boolean, enabled: Boolean, onC
 }
 
 @Composable
-private fun ComposerAttachment(audio: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun ComposerAttachment(audio: Boolean, enabled: Boolean, unavailable: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     TextButton(onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = AIyouDimensions.minTouchTarget)
-        .semantics { if (!enabled) stateDescription = "当前不可用" },
-        contentPadding = PaddingValues(horizontal = AIyouDimensions.spaceSm, vertical = AIyouDimensions.spaceSm),
+        .semantics { if (!enabled) stateDescription = if (unavailable) "尚未开放" else "当前不可用" },
+        contentPadding = PaddingValues(horizontal = AIyouDimensions.spaceXs * 1.5f, vertical = AIyouDimensions.spaceSm),
         colors = ButtonDefaults.textButtonColors(disabledContentColor = AIyouColors.textSecondary)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
             AttachmentIcon(audio, enabled)
-            Text(if (audio) "录音" else "图片", style = MaterialTheme.typography.labelLarge)
+            val label = if (audio) "录音" else "图片"
+            Text(if (unavailable) "${label}未开放" else label, style = MaterialTheme.typography.labelLarge)
         }
     }
 }
