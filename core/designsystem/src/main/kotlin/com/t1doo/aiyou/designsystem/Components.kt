@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -164,7 +165,10 @@ fun CaptureComposer(
                 value = text,
                 onValueChange = onTextChange,
                 modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.composerTextMinHeight)
-                    .semantics { contentDescription = if (askMode) "想问些什么" else "此刻，想记下什么" },
+                    .semantics {
+                        contentDescription = if (askMode) "想问些什么" else "此刻，想记下什么"
+                        if (state == ComponentState.ERROR) error("输入需要处理，请检查后重试。")
+                    },
                 enabled = canEdit,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = AIyouColors.textPrimary),
                 minLines = 3,
