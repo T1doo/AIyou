@@ -1,8 +1,64 @@
 # D00 实际记录
 
-时间：2026-10-09 UTC。状态：**BLOCKED / 待 SDK 许可批准，D00 尚未完成**。
-D01 未开始；独立只读源码审查已执行，发现两处构建配置缺陷并由唯一写入者
-修复。源码审查和 JVM 验证不替代尚被 SDK 许可阻塞的 Android 验收。
+更新：2026-10-10 UTC。状态：**D00 lint 修复中，尚未完成；D01 未开始**。
+本云环境仍无 Android SDK 或许可批准，未安装 SDK、未接受协议。
+GitHub 托管 runner 的既有 SDK 已实际通过只读包版本/接受记录检查；其执行
+结果与本地许可阻塞分开记录，不再把远端结果写作未知。
+
+## 2026-10-10 已核实的托管 CI
+
+通过既有 GitHub 只读连接取得 [run 37986477589](https://github.com/T1doo/AIyou/actions/runs/37986477589)
+的 job 114009616810 完整日志，head 为
+`eaeaf36d6483ce6610ec7fff19550077252d4277`：
+
+| 检查 | 结果 | 实际证据 |
+| --- | --- | --- |
+| Wrapper 校验、JDK 配置 | PASS | 固定 Wrapper 校验匹配，Temurin 17.0.17+10 |
+| `:core:domain:test` 与 XML 检查 | PASS | 6 个任务 executed；3 tests，0 failures/errors/skipped |
+| 既有 SDK 只读检查 | PASS | android-36 r2、Build Tools 35.0.0、既有接受记录；workflow 无安装/接受步骤 |
+| `:app:checkDebugAarMetadata` | PASS | 1 个任务 executed |
+| `:app:assembleDebug` | PASS | 39 tasks，36 executed、3 up-to-date |
+| `:app:lintDebug` | FAIL | 9 errors；原日志只展示首个 NewApi（API 27 属性处于 min26 通用样式） |
+| 测试/lint 报告上传 | PASS | artifact 11644045434；ZIP SHA-256 a8d00ff5aa68d41106ec6afab318e50037ad2652cc22acd5d3b7807243d6d205 |
+| APK 上传 | NOT RUN | 原 workflow 在 lint 失败后跳过；编译成功不等于已交付 APK |
+
+报告下载工具返回文件引用，但在默认网络下载 ZIP 时 HTTP 403；没有绕过拒绝。
+日志保存在 `/workspace/d00-ci-lint-review-eaeaf36/job.log`。首个已证实错误在
+`12cf836b233c263d0898a200259dbc60a0737d26` 修复：共用基础样式，API 27
+导航栏属性放入 values-v27，保留 min26 和严格 lint。CI 补充完整 lint 文本
+输出及报告保全，APK 仅在 assemble 成功时上传，即使后续 lint 失败也保全
+调试产物；lint 失败仍使 job 失败。
+
+[run 38017473944](https://github.com/T1doo/AIyou/actions/runs/38017473944)
+实测单测/XML/SDK/metadata/assemble 均 PASS；NewApi 已消失，lint 仍 FAIL，
+余下 8 项均为版本建议经 warningsAsErrors 提升：OldTargetApi（target36）、
+AndroidGradlePluginVersion（Gradle、AGP）、GradleDependency（BOM、Activity）
+及三处 Kotlin NewerVersionAvailable。完整日志保存在上述目录的
+`job-12cf836.log`。严格门槛未关闭或降级，未用 baseline 隐藏问题。
+
+APK 保全本次 PASS：[artifact 11655944929](https://github.com/T1doo/AIyou/actions/runs/38017473944/artifacts/11655944929)，
+runner 内路径 `app/build/outputs/apk/debug/app-debug.apk`；ZIP SHA-256 为
+`6eb7a30fac339249352eaade9e644139811f7096a25118814e59f54e8cedb829`。
+这是旧工具链的调试 APK，不是 lint 已通过的验收产物，本云环境尚未取得该文件。
+
+固定 12cf836 已由独审在 archive 隔离快照复核：资源继承/版本限定与 CI
+严格门槛静态 PASS；JVM 6 tasks executed、3 tests 且零失败/错误/跳过，
+原方案未变，三处差异未发现新的高信度缺陷；Android 构建由 CI 提供证据，
+独审本地未运行。证据 `/workspace/d00-readonly-review-12cf836`。
+
+随后按完整报告准备 AGP9.4.1/Gradle9.8.1/Kotlin2.4.21/BOM2026.09/Activity1.13
+固定升级，采用官方内置 Kotlin 路线，compile37.0/target37/BuildTools36。
+官方 SDK metadata 与该次固定 runner 镜像清单列有 Platform37.0 r2 和
+BuildTools36；仍须实际只读预检，不假定文档等于安装或许可状态。预检新增
+匹配 canonical 条款哈希，缺包/记录即失败，自动 SDK 下载仍关闭。
+该组合超出 Kotlin 完整支持表，具体官方依据和限制见 BUILD.md；不得声称
+矩阵全覆盖。实际纯 Kotlin 单测/编译及 debug 编译、运行时和编译器依赖解析
+PASS；XML 为3 tests零失败/错误/跳过，新Wrapper与分发均核官方SHA-256。
+升级后的 Android CI 和最终固定源码独审仍待填写；D00 尚未完成。
+
+本轮本地 `:core:domain:test --rerun-tasks` 再次 PASS：6 tasks executed，
+3 tests、0 failures/errors/skipped；资源 XML、workflow YAML 和 diff 检查 PASS。
+本地 Android 检查仍受 SDK 许可阻塞，未用托管结果冒充本地执行。
 
 ## 已核实的起点
 
@@ -51,7 +107,7 @@ Wrapper JAR SHA-256：
 待批准的最小包：command-line tools 19.0、Platform android-36 revision 2、
 Build Tools 35.0.0；均引用 `android-sdk-license`。不需要预览、NDK 或模拟器协议。
 
-## 实际执行结果
+## 2026-10-09 本地实际执行结果（保留历史）
 
 下表是本地实际结果，不能把 CI 配置文件存在当作 CI 已运行。
 
@@ -76,7 +132,7 @@ Build Tools 35.0.0；均引用 `android-sdk-license`。不需要预览、NDK 或
 
 测试结果：`core/domain/build/test-results/test/TEST-com.t1doo.aiyou.domain.RemoteProcessingRuleTest.xml`。
 HTML 报告：`core/domain/build/reports/tests/test/index.html`。
-APK 预期路径：`app/build/outputs/apk/debug/app-debug.apk`，**目前不存在**。
+本云环境 APK 预期路径：`app/build/outputs/apk/debug/app-debug.apk`，本地未构建。
 
 ## 故障与证据保全
 
@@ -138,7 +194,7 @@ Gradle 和 JDK 的固定值与官方校验文件一致；原方案与起点字�
 匹配，不能将模式扫描声称为绝对无秘密。Android 平台上的备份行为、未来
 同意仓库和持久化记录的边界仍需对应阶段的真实验证。
 
-SDK 始终未安装、协议未接受；没有真实模型调用或网络/凭据/证书变更。
+本云环境 SDK 始终未安装、协议未接受；没有真实模型调用或网络/凭据/证书变更。
 
 ## 下一步与交付边界
 

@@ -11,10 +11,16 @@ root = Path(sdk)
 license_file = root / "licenses/android-sdk-license"
 if not license_file.is_file() or not license_file.read_text().strip():
     raise SystemExit("No existing Android SDK acceptance record; see docs/BUILD.md.")
+# SDK repository metadata uses android-sdk-license for both pinned packages.
+# This is the SHA-1 after Android's TrimStringAdapter normalization, not a
+# hash of the raw XML text. Only read an existing record; never create one.
+expected_license_hash = "24333f8a63b6825ea9c5514f83c2829b004d1fee"
+if expected_license_hash not in license_file.read_text().splitlines():
+    raise SystemExit("No matching existing SDK terms acceptance; see docs/BUILD.md.")
 
 required = {
-    "platforms/android-36": "2",
-    "build-tools/35.0.0": "35.0.0",
+    "platforms/android-37.0": "2",
+    "build-tools/36.0.0": "36.0.0",
 }
 for relative, revision in required.items():
     path = root / relative / "source.properties"
@@ -28,4 +34,4 @@ for relative, revision in required.items():
     if actual != revision:
         raise SystemExit(f"{relative}: expected revision {revision}, found {actual}")
     print(f"PASS {relative} revision {actual}")
-print("Existing SDK acceptance record found; no new agreement was accepted by this check.")
+print("Matching existing SDK acceptance record found; no new agreement was accepted by this check.")

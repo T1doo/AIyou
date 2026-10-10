@@ -1,18 +1,18 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
 }
 
 android {
     namespace = "com.t1doo.aiyou"
-    compileSdk = 36
-    buildToolsVersion = "35.0.0"
+    compileSdk = 37
+    compileSdkMinor = 0
+    buildToolsVersion = "36.0.0"
 
     defaultConfig {
         applicationId = "com.t1doo.aiyou"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "0.0.1-d00"
     }
@@ -28,10 +28,6 @@ android {
         abortOnError = true
         warningsAsErrors = true
     }
-}
-
-kotlin {
-    jvmToolchain(17)
 }
 
 dependencies {

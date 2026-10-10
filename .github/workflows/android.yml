@@ -25,7 +25,7 @@ jobs:
       - name: Verify wrapper checksum
         run: |
           printf '%s  %s\n' \
-            81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f \
+            3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 \
             gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
       - name: Run actual domain tests
         run: scripts/gradle.sh :core:domain:test
@@ -37,7 +37,9 @@ jobs:
         run: scripts/gradle.sh :app:checkDebugAarMetadata
       - name: Build debug APK
         id: assemble
-        run: scripts/gradle.sh :app:assembleDebug
+        run: |
+          scripts/gradle.sh :app:assembleDebug
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
       - name: Run Android lint
         run: scripts/gradle.sh :app:lintDebug
       - name: Print complete lint findings

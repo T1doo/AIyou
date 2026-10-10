@@ -1,107 +1,69 @@
 # D00 构建与工具链
 
-本文件为本轮补建，原 Starter ZIP 未提供。两份原始方案未修改。
+本文件为补建说明，无 Starter ZIP；两份原始方案未修改。2026-10-10 根据真实
+lint 报告更新固定版本，保留严格门槛。原工具链与历史失败见 D00_STATUS.md。
 
 ## 固定版本
 
 | 项目 | 版本 |
 | --- | --- |
-| AGP | 8.13.2 |
-| Gradle Wrapper | 8.13 bin，SHA-256 校验开启 |
-| 完整 JDK | Eclipse Temurin 17.0.17+10，Linux x86_64 下载固定 SHA-256 |
-| Kotlin / Compose Compiler plugin | 2.3.21 / 2.3.21 |
-| Compose BOM | 2025.12.00（Google Maven POM：UI 1.10.0、Material3 1.4.0） |
-| Activity Compose | 1.12.2 |
-| minSdk / compileSdk / targetSdk | 26 / 36 / 36 |
-| Android Platform | android-36 revision 2 |
-| Build Tools | 35.0.0 |
-| Command-line tools（待批准安装） | 19.0，下载编号 13114758；支持 JDK 17 |
-| JUnit | 4.13.2 |
+| AGP | 9.4.1，内置 Kotlin；移除外部 kotlin-android |
+| Gradle Wrapper | 9.8.1 bin，下载 SHA-256 校验 |
+| 完整 JDK | Temurin 17.0.17+10 |
+| Kotlin / Compose Compiler | 2.4.21 / 2.4.21 |
+| Compose BOM | 2026.09.00（UI 1.12.1、Material3 1.4.0） |
+| Activity Compose / JUnit | 1.13.0 / 4.13.2 |
+| min / compile / target SDK | 26 / 37.0（minor 0）/ 37 |
+| Android Platform / Build Tools | android-37.0 revision 2 / 36.0.0 |
 
-版本目录为 `gradle/libs.versions.toml`。未使用依赖不提前加入，包括 KSP、
-Room、SQLCipher、Hilt、AI 协议等，加入时另行复核。SDK 平台/构建工具固定在
-app 构建脚本，传递依赖通过 Gradle lockfile 记录实际解析版本。当前 app 已锁
-debug 编译/运行时依赖、Kotlin Build Tools API 与 debug compiler plugin 配置；
-SDK 获准后仍需从真实 assemble/lint 的 `--write-locks` 记录其余实际解析配置，
-现阶段不宣称 Android 完整构建依赖已全部验证或锁定。
+版本目录 gradle/libs.versions.toml；lockfile 来自实际解析，普通构建不改锁。
+不宣称所有 Android 配置全量锁定。未使用的 KSP/Room/Hilt/AI 等不提前加入。
 
-2026-10-09 复核官方资料：
+## 官方依据及限制
 
-- [AGP 8.13 兼容表](https://developer.android.com/build/releases/agp-8-13-0-release-notes)：
-  Gradle 8.13、JDK 17、Build Tools 35.0.0；8.13.2 支持 Kotlin 2.3。
-- [Kotlin Gradle 兼容矩阵](https://kotlinlang.org/docs/gradle-configure-project.html)：
-  Kotlin 2.3.20–2.3.21 支持 Gradle 7.6.3–9.3.0、AGP 8.2.2–9.0.0。
-- [Compose Compiler 配置](https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler)：
-  Compose Compiler plugin 与 Kotlin 版本一致。
-- [固定 BOM 的官方 Maven POM](https://dl.google.com/dl/android/maven2/androidx/compose/compose-bom/2025.12.00/compose-bom-2025.12.00.pom)。
-- [官方 SDK 包元数据](https://dl.google.com/android/repository/repository2-3.xml)。
+- [AGP 9.4 兼容表](https://developer.android.com/build/releases/agp-9-4-0-release-notes)：Gradle 至少9.6.0、Build Tools36.0.0、JDK17，支持API37。
+- [内置 Kotlin 迁移](https://developer.android.com/build/migrate-to-built-in-kotlin)：移除 module/root/catalog 的 kotlin-android；内置 JVM target 默认来自 compileOptions，Java/Kotlin 均17。
+- [提升 KGP](https://developer.android.com/build/releases/agp-9-0-0-release-notes#upgrade-to-a-higher-kgp-version)：根项目固定 JVM/Compose plugins 使实际解析选择2.4.21，以编译和锁核验。
+- [Kotlin 矩阵](https://kotlinlang.org/docs/gradle-configure-project.html)：2.4.21完整支持到Gradle9.7.0/AGP9.3.1。官方允许更新版本但可能有弃用/功能限制；当前9.8.1/9.4.1超出完整支持表，不能称矩阵全覆盖，必须保留实测证据。
+- [固定 BOM POM](https://dl.google.com/dl/android/maven2/androidx/compose/compose-bom/2026.09.00/compose-bom-2026.09.00.pom)：实际UI1.12.1 AAR要求compile37、minor0、AGP>=9.1.0。
+- [SDK包元数据](https://dl.google.com/android/repository/repository2-3.xml)：稳定包为platforms;android-37.0 r2及build-tools;36.0.0，引用android-sdk-license。
 
-资料兼容结论不代替 `:app:checkDebugAarMetadata`；实际结果见 D00_STATUS。
+资料不代替 checkDebugAarMetadata/assemble/lint；Gradle9.8.1为核验时稳定版本。
 
-## JDK 与 Gradle
+## JDK 与 Wrapper
 
-Linux x86_64 无完整 JDK 时，在仓库执行：
-
-```bash
-scripts/setup-jdk.sh
-scripts/gradle.sh --version
-```
-
-自备 JDK 时设置 `JAVA_HOME`。默认工具目录为仓库 `.toolchains/`（忽略提交）。
-本次云环境使用外部目录 `/workspace/toolchains`，每次 shell 显式设置：
+本云环境既有工具在 /workspace/toolchains；每次 shell 显式设置：
 
 ```bash
 export AIYOU_TOOLCHAIN_ROOT=/workspace/toolchains
+scripts/gradle.sh --version
 ```
 
-`scripts/gradle.sh` 复用环境已有 HTTP 代理和已有系统 Java truststore；保留 TLS
-校验，不导入证书、不修改网络权限，不配置任何凭据。它要求完整 JDK 17，
-并显式设置 Gradle 缓存目录，不依赖前一 shell 的 export。
-Android 工具用户目录也放在工具链目录下，避免默认写入云环境的只读 home；
-自动生成的 debug 签名文件仅留在该忽略目录，禁止提交。
+Linux x86_64 缺完整 JDK 时执行 scripts/setup-jdk.sh，或设置 JAVA_HOME。
+默认目录为忽略的 .toolchains/。脚本只复用既有代理和系统 Java truststore，
+不导入 CA、关闭 TLS 或设置凭据。debug 签名材料只保存在忽略目录。
 
-JDK 官方下载及校验文件：
+| 文件 | SHA-256 |
+| --- | --- |
+| Temurin17.0.17+10 tarball | 992f96e7995075ac7636bb1a8de52b0c61d71ed3137fafc979ab96b4ab78dd75 |
+| Gradle9.8.1 bin | dce76f55f8e251a3a1f130eb120f30b3d271de2b76c9b0729d316b5a1b6dc01f |
+| Wrapper9.8.1 JAR | 3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 |
 
-- [Temurin 17.0.17+10](https://github.com/adoptium/temurin17-binaries/releases/tag/jdk-17.0.17%2B10)
-- [JDK SHA-256](https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.17%2B10/OpenJDK17U-jdk_x64_linux_hotspot_17.0.17_10.tar.gz.sha256.txt)
-- [Gradle 8.13 分发 SHA-256](https://services.gradle.org/distributions/gradle-8.13-bin.zip.sha256)
-- [Gradle Wrapper JAR SHA-256](https://services.gradle.org/distributions/gradle-8.13-wrapper.jar.sha256)
+[JDK release](https://github.com/adoptium/temurin17-binaries/releases/tag/jdk-17.0.17%2B10)、[Gradle校验](https://services.gradle.org/distributions/gradle-9.8.1-bin.zip.sha256)、[Wrapper校验](https://services.gradle.org/distributions/gradle-9.8.1-wrapper.jar.sha256)。
 
-## Android SDK 许可与安装
+## SDK 许可
 
-必须由开发者阅读并接受 [Android SDK License](https://developer.android.com/studio/terms)。
-本次初始环境未发现 SDK 或已有接受记录。许可状态与批准记录须以
-`docs/D00_STATUS.md` 和会话中的明确授权为准；不要把这份安装说明当作已批准。
+本云环境无 SDK，也未获准接受或安装。不要把本文当作批准。已有 SDK 时设置
+ANDROID_HOME/ANDROID_SDK_ROOT 并运行只读的 scripts/check-sdk.py，检查精确
+revision和当前条款既有接受哈希；不写记录、不安装。哈希匹配不是独立法律授权证明。
+条款 canonical SHA-1为24333f8a63b6825ea9c5514f83c2829b004d1fee：由官方XML按
+Android repository TrimStringAdapter规范化后计算，不是原始XML文本哈希。
 
-本 D00 仅需 command-line tools 19.0、Platform 36 r2、Build Tools 35.0.0；
-三者的官方 package metadata 均引用 `android-sdk-license`，不需要预览协议、
-NDK、模拟器镜像或 Google Play 服务协议。
+缺包或匹配记录就停止，开发者需先阅读[具体 SDK 协议](https://developer.android.com/studio/terms)，
+明确接受并批准Platform37.0 r2/Build Tools36.0.0；CLI安装方案还须单独核定版本
+与校验值。禁止yes、自动下载、默认批准。未批准时可继续纯Kotlin单测与只读分析。
 
-仅在开发者明确接受协议后下载 command-line tools：
-
-```bash
-export ANDROID_HOME="$PWD/.toolchains/android-sdk"
-mkdir -p "$ANDROID_HOME/cmdline-tools" .toolchains/downloads
-curl --fail --location --max-time 300 \
-  https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip \
-  --output .toolchains/downloads/cmdline-tools-19.zip
-printf '%s  %s\n' 5fdcc763663eefb86a5b8879697aa6088b041e70 \
-  .toolchains/downloads/cmdline-tools-19.zip | sha1sum --check -
-unzip -q .toolchains/downloads/cmdline-tools-19.zip -d "$ANDROID_HOME/cmdline-tools"
-mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/19.0"
-export JAVA_HOME="$PWD/.toolchains/jdk-17.0.17+10"
-"$ANDROID_HOME/cmdline-tools/19.0/bin/sdkmanager" \
-  --sdk_root="$ANDROID_HOME" 'platforms;android-36' 'build-tools;35.0.0'
-```
-
-在上述针对性安装的许可提示中由开发者手动确认；不要使用 `yes` 批量接受。
-如 sdkmanager 要求新协议或内容变更，停止并再次展示具体协议。已安装的 SDK
-无需重装；设置 `ANDROID_HOME` 后用 `python3 scripts/check-sdk.py` 检查平台
-revision、构建工具和接受记录。该检查不执行下载或许可接受，也不把文件存在
-当作独立的法律授权证明。本环境采用已有默认代理时，sdkmanager 也需指定
-`--proxy=http --proxy_host=proxy --proxy_port=8080`；不扩大网络规则。
-
-## 执行检查
+## 执行与产物
 
 ```bash
 scripts/gradle.sh :core:domain:test
@@ -112,19 +74,11 @@ scripts/gradle.sh :app:assembleDebug
 scripts/gradle.sh :app:lintDebug
 ```
 
-首次冻结/主动更新依赖时使用 `--write-locks`；通常构建不改 lockfile。
-单测位于 `core/domain/src/test/`，要求非零测试、无失败和无跳过；app 没有
-单测源时不把其 `testDebugUnitTest NO-SOURCE` 当作测试通过。
+APK：app/build/outputs/apk/debug/app-debug.apk（成功后才存在）。单测XML在
+core/domain/build/test-results/test/，必须非零、无失败/跳过；NO-SOURCE不是测试通过。
+Lint HTML/XML在app/build/reports/，完整文本也打印到CI日志。
 
-- APK：`app/build/outputs/apk/debug/app-debug.apk`（只有成功构建后存在）
-- 测试 XML：`core/domain/build/test-results/test/`
-- Lint：`app/build/reports/lint-results-debug.html` / `.xml`
-
-CI 使用固定 SHA 的官方 actions，ubuntu-24.04、完整 Temurin JDK 17；运行真实
-domain 单测、metadata、assembleDebug、lintDebug 并保存报告与 debug APK。
-SDK 检查依赖 runner 已安装且已有开发者接受记录的固定包；缺失时明确失败，
-不会替开发者接受新协议。GitHub runner 镜像会变，需保留实际运行日志，不把
-workflow 文件存在当作 CI 已通过。没有配置 release 签名或发布步骤。
-
-真机启动、TalkBack、200% 字体、输入法、性能、OEM 通知与 16 KB 设备验证
-均单列，不能由编译成功替代。
+CI固定actions SHA与JDK17，仅复用runner既有SDK。预检缺包/匹配记录即失败，
+SDK自动下载关闭，无安装/接受步骤。assemble成功后记录APK SHA-256并保全，
+即使后续lint失败也留调试产物；lint失败仍使job失败。无release签名/发布。
+设备启动、TalkBack、字体、性能、OEM通知、16KB设备验证为NOT RUN，编译不能替代。
