@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +18,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.t1doo.aiyou.designsystem.AIyouColors
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.CaptureComposer
@@ -47,17 +54,28 @@ fun MainScreen(
     state: ComponentState = ComponentState.NORMAL,
 ) {
     BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.background)) {
-        val margin = if (maxWidth < AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
+        val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
                 modifier = Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize(),
                 contentPadding = PaddingValues(margin),
-                verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceLg),
+                verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap),
             ) {
-                item("title") { Text(destination.label, style = MaterialTheme.typography.headlineMedium) }
-                item("privacy") { PrivacyChip(ProcessingPolicy.LOCAL_ONLY) }
-                if (demo) {
-                    item("demo") { StatusNotice("虚构示例", "以下记录、AI 内容与任务状态均为界面示例。没有保存记录或安排提醒。") }
+                item("summary") {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                            Text(if (destination == Destination.NOW) "今天" else destination.label, style = MaterialTheme.typography.headlineMedium)
+                            Text(when (destination) {
+                                Destination.NOW -> if (demo) "10月10日 · 周六 · 示例" else "随手记下一点生活"
+                                Destination.MEMORIES -> if (demo) "${ScreenSamples.memories.size} 条虚构记录" else "你的本机原始记录"
+                                Destination.TASKS -> "建议与正式任务分别管理"
+                            }, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                        }
+                        PrivacyChip(ProcessingPolicy.LOCAL_ONLY)
+                    }
+                    if (demo) Text("虚构示例 · 不保存记录、不安排提醒", Modifier.padding(top = AIyouDimensions.spaceSm),
+                        style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                 }
                 if (state == ComponentState.ERROR || state == ComponentState.LOADING || state == ComponentState.OFFLINE) {
                     item("state") {
@@ -73,9 +91,9 @@ fun MainScreen(
                 }
                 when (destination) {
                     Destination.NOW -> {
+                        item("composer") { CaptureSection(state, demo) }
                         item("today") {
-                            Text(if (demo) "今天 · 示例日期 2026-10-10" else "今天", style = MaterialTheme.typography.titleLarge)
-                            MascotBadge()
+                            Text("今日记录", style = MaterialTheme.typography.titleLarge)
                         }
                         if (demo && state != ComponentState.EMPTY) {
                             items(ScreenSamples.memories.take(1), key = { it.id }) { sample ->
@@ -87,7 +105,6 @@ fun MainScreen(
                         } else {
                             item("empty") { StatusNotice("从一句话开始", "随口说给爱忆，重要的事，慢慢记好。", state = ComponentState.EMPTY) }
                         }
-                        item("composer") { CaptureSection(state) }
                     }
                     Destination.MEMORIES -> {
                         item("search") { SearchSection(demo) }
@@ -131,26 +148,31 @@ fun MainScreen(
 }
 
 @Composable
-private fun CaptureSection(state: ComponentState) {
+private fun CaptureSection(state: ComponentState, demo: Boolean) {
     // Deliberately memory-only: D02 owns encrypted persisted drafts. No success feedback.
     var text by remember { mutableStateOf("") }
-    var askMode by remember { mutableStateOf(false) }
-    CaptureComposer(text = text, onTextChange = { text = it }, askMode = askMode, onModeChange = { askMode = it }, state = state)
+    CaptureComposer(text = text, onTextChange = { text = it }, askAvailable = false, state = state,
+        availability = if (demo) "界面示例，不会保存。图片、录音与提问未开放。" else "保存尚未开放。图片、录音与提问未开放。")
 }
 
 @Composable
 private fun SearchSection(demo: Boolean) {
     var query by remember { mutableStateOf("") }
     Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-        OutlinedTextField(
-            value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(),
-            label = { Text("搜索回忆") }, placeholder = { Text("上个月让我开心的事") },
-        )
-        Text("搜索尚未开放；输入不会改变下方${if (demo) "示例" else "空白"}内容。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+        Surface(Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.medium) {
+            BasicTextField(query, { query = it }, Modifier.fillMaxWidth().padding(AIyouDimensions.spaceLg)
+                .semantics { contentDescription = "搜索回忆，能力尚未开放" },
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = AIyouColors.textPrimary), singleLine = true,
+                decorationBox = { field -> Box {
+                    if (query.isEmpty()) Text("搜索原文、日期或关键词", style = MaterialTheme.typography.bodyLarge, color = AIyouColors.textSecondary)
+                    field()
+                } })
+        }
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
             listOf("日期", "人物", "标签", "图片", "收藏").forEach { label ->
-                OutlinedButton(onClick = {}, enabled = false) { Text(label) }
+                TextButton(onClick = {}, enabled = false) { Text(label, style = MaterialTheme.typography.bodySmall) }
             }
         }
+        Text("搜索与筛选尚未开放；输入不会改变${if (demo) "示例" else "记录"}。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
     }
 }

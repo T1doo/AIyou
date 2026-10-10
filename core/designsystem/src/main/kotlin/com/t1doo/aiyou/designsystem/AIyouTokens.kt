@@ -6,17 +6,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 object AIyouColors {
-    val background = Color(0xFFFCF9F4)
+    val background = Color(0xFFFFFFFF)
     val surface = Color(0xFFFFFFFF)
-    val surfaceMuted = Color(0xFFF5F0E8)
-    val textPrimary = Color(0xFF302B27)
-    val textSecondary = Color(0xFF70665C)
-    val primary = Color(0xFF8F481F)
+    val surfaceMuted = Color(0xFFF2F7FD)
+    val textPrimary = Color(0xFF203247)
+    val textSecondary = Color(0xFF526477)
+    val primary = Color(0xFF245D9B)
     val onPrimary = Color(0xFFFFFFFF)
-    val accentDecorative = Color(0xFFF6B35B)
-    val primaryContainer = Color(0xFFFFE8C7)
-    val outlineDecorative = Color(0xFFD8CDC1)
-    val outlineFunctional = Color(0xFF70665C)
+    val accentDecorative = Color(0xFFB6D8F5)
+    val primaryContainer = Color(0xFFE7F1FC)
+    val outlineDecorative = Color(0xFFD9E6F2)
+    val outlineFunctional = Color(0xFF64819D)
     val success = Color(0xFF476852)
     val error = Color(0xFFA64237)
 }
@@ -26,10 +26,14 @@ object AIyouDimensions {
     val spaceSm = 8.dp
     val spaceMd = 12.dp
     val spaceLg = 16.dp
-    val pageNarrow = 16.dp
+    val pageNarrow = 20.dp
     val pageWide = 24.dp
-    val cardRadius = 20.dp
-    val composerRadius = 24.dp
+    val cardRadius = 16.dp
+    val composerRadius = 20.dp
+    val sectionGap = 24.dp
+    val composerTextMinHeight = 80.dp
+    val navigationIconSize = 24.dp
+    val iconStroke = 2.dp
     val badgeSize = 48.dp
     val minTouchTarget = 48.dp
     val contentMaxWidth = 720.dp

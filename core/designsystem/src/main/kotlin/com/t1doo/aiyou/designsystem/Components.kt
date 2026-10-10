@@ -4,10 +4,15 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -20,6 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -31,6 +39,7 @@ private fun ComponentCard(modifier: Modifier = Modifier, content: @Composable ()
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = AIyouColors.surface),
+        border = BorderStroke(AIyouDimensions.spaceXs / 4, AIyouColors.outlineDecorative),
     ) {
         Column(
             Modifier.padding(AIyouDimensions.spaceLg),
@@ -100,18 +109,24 @@ fun MemoryCard(
             StateFeedback(state)
             return@ComponentCard
         }
-        Text(capturedAt, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-        Text("原文", style = MaterialTheme.typography.labelLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+            Text(capturedAt, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+            Text(if (policy == ProcessingPolicy.LOCAL_ONLY) "原文 · 仅本机" else "原文", style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
+        }
         Text(originalText, style = MaterialTheme.typography.bodyLarge)
         attachmentLabel?.let {
-            Surface(color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.small) {
+            Surface(modifier = Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.small) {
                 Text(it, Modifier.fillMaxWidth().padding(AIyouDimensions.spaceLg), style = MaterialTheme.typography.bodySmall)
             }
         }
-        PrivacyChip(policy)
+        if (policy != ProcessingPolicy.LOCAL_ONLY) PrivacyChip(policy)
         annotation?.let {
-            Text("AI 派生内容", style = MaterialTheme.typography.labelLarge)
-            Text(it, style = MaterialTheme.typography.bodyMedium)
+            Surface(color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.small) {
+                Column(Modifier.padding(AIyouDimensions.spaceMd), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                    Text("AI 派生内容", style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
+                    Text(it, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
         StateFeedback(state)
     }
@@ -124,6 +139,7 @@ fun CaptureComposer(
     modifier: Modifier = Modifier,
     askMode: Boolean = false,
     onModeChange: (Boolean) -> Unit = {},
+    askAvailable: Boolean = true,
     onSubmit: (() -> Unit)? = null,
     onImage: (() -> Unit)? = null,
     onAudio: (() -> Unit)? = null,
@@ -137,26 +153,34 @@ fun CaptureComposer(
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm),
         ) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                OutlinedButton(onClick = { onModeChange(false) }, enabled = canEdit) {
-                    Text(if (!askMode) "记下来 · 已选" else "记下来")
+                TextButton(onClick = { onModeChange(false) }, enabled = canEdit) {
+                    Text(if (!askMode) "记下来 · 已选" else "记下来", fontWeight = if (!askMode) FontWeight.SemiBold else FontWeight.Normal)
                 }
-                OutlinedButton(onClick = { onModeChange(true) }, enabled = canEdit) {
+                TextButton(onClick = { onModeChange(true) }, enabled = canEdit && askAvailable) {
                     Text(if (askMode) "问一问 · 已选" else "问一问")
                 }
             }
-            OutlinedTextField(
+            BasicTextField(
                 value = text,
                 onValueChange = onTextChange,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.composerTextMinHeight)
+                    .semantics { contentDescription = if (askMode) "想问些什么" else "此刻，想记下什么" },
                 enabled = canEdit,
-                label = { Text(if (askMode) "想问些什么" else "此刻，想记下什么") },
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = AIyouColors.textPrimary),
                 minLines = 3,
                 maxLines = 6,
-                isError = state == ComponentState.ERROR,
+                decorationBox = { field ->
+                    Box {
+                        if (text.isEmpty()) Text(if (askMode) "想问些什么？" else "今天有什么想记住的？", color = AIyouColors.textSecondary, style = MaterialTheme.typography.bodyLarge)
+                        field()
+                    }
+                },
             )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                OutlinedButton(onClick = { onImage?.invoke() }, enabled = canEdit && onImage != null) { Text("图片") }
-                OutlinedButton(onClick = { onAudio?.invoke() }, enabled = canEdit && onAudio != null) { Text("录音") }
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                    TextButton(onClick = { onImage?.invoke() }, enabled = canEdit && onImage != null) { Text("图片") }
+                    TextButton(onClick = { onAudio?.invoke() }, enabled = canEdit && onAudio != null) { Text("录音") }
+                }
                 Button(
                     onClick = { onSubmit?.invoke() },
                     enabled = canEdit && text.isNotBlank() && onSubmit != null,

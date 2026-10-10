@@ -8,14 +8,15 @@ import zipfile
 
 GROUPS = {"now": ("此刻", 28), "memories": ("回忆", 28), "tasks": ("待办", 28),
           "components": ("八种组件", 112), "shell": ("主导航", 2),
-          "complete": ("完整长文本", 14)}
+          "complete": ("完整长文本", 14), "review": ("白蓝两页手机壳改稿", 4)}
 METHODS = {"NowRender": "now", "MemoriesRender": "memories", "TasksRender": "tasks",
            "ShellRender": "shell", **dict.fromkeys(
                ("MemoryRender", "ComposerRender", "PrivacyRender", "SourceRender",
                 "ProposalRender", "ProviderRender", "NoticeRender", "MascotRender"), "components"),
            **dict.fromkeys(("PrivacyCompleteRender", "MemoryCompleteRender", "NoticeCompleteRender",
                             "ProposalCompleteRender", "SourceCompleteRender", "MascotCompleteRender",
-                            "ProviderCompleteRender"), "complete")}
+                            "ProviderCompleteRender"), "complete"),
+           "ReviewNowRender": "review", "ReviewMemoriesRender": "review"}
 MAX_ZIP_BYTES = 17_000_000  # Decimal MB; allow margin for the download artifact's outer ZIP.
 
 

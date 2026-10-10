@@ -73,6 +73,19 @@ fun TasksRender(@PreviewParameter(ComponentStates::class) state: ComponentState)
 @Composable
 fun ShellRender() { AIyouTheme { AIyouApp() } }
 
+// Review the whole phone page, including app bar, primary input and bottom navigation.
+@PreviewTest
+@Preview(name = "手机壳常规", widthDp = 360, heightDp = 800, showSystemUi = true, locale = "zh-rCN")
+@Preview(name = "手机壳窄屏大字体", widthDp = 320, heightDp = 1000, fontScale = 2f, showSystemUi = true, locale = "zh-rCN")
+@Composable
+fun ReviewNowRender() { AIyouTheme { AIyouApp(previewDestination = Destination.NOW, previewDemo = true) } }
+
+@PreviewTest
+@Preview(name = "手机壳常规", widthDp = 360, heightDp = 800, showSystemUi = true, locale = "zh-rCN")
+@Preview(name = "手机壳窄屏大字体", widthDp = 320, heightDp = 1000, fontScale = 2f, showSystemUi = true, locale = "zh-rCN")
+@Composable
+fun ReviewMemoriesRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES, previewDemo = true) } }
+
 // Reuse unabridged actual component content at explicit heights; no parameter multiplication.
 @Composable
 private fun CompleteContentFrame(label: String, content: @Composable () -> Unit) {

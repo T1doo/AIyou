@@ -40,6 +40,7 @@ import com.t1doo.aiyou.designsystem.ProviderConnectionCard
 import com.t1doo.aiyou.designsystem.StatusNotice
 import com.t1doo.aiyou.ui.Destination
 import com.t1doo.aiyou.ui.MainScreen
+import com.t1doo.aiyou.ui.DestinationIcon
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,11 +55,12 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AIyouApp() {
-    var selectedName by rememberSaveable { mutableStateOf(Destination.NOW.name) }
+fun AIyouApp(previewDestination: Destination = Destination.NOW, previewDemo: Boolean = false,
+             previewState: ComponentState = ComponentState.NORMAL) {
+    var selectedName by rememberSaveable { mutableStateOf(previewDestination.name) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
-    var demo by rememberSaveable { mutableStateOf(false) }
-    var stateName by rememberSaveable { mutableStateOf(ComponentState.NORMAL.name) }
+    var demo by rememberSaveable { mutableStateOf(previewDemo) }
+    var stateName by rememberSaveable { mutableStateOf(previewState.name) }
     val selected = Destination.valueOf(selectedName)
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     BackHandler(enabled = showSettings) { showSettings = false }
@@ -67,7 +69,7 @@ fun AIyouApp() {
         modifier = Modifier.imePadding(),
         topBar = {
             TopAppBar(
-                title = { Text(if (showSettings) "设置" else "爱忆") },
+                title = { Text(if (showSettings) "设置" else "爱忆 AIyou", style = MaterialTheme.typography.titleMedium) },
                 actions = {
                     TextButton(onClick = { showSettings = !showSettings }) { Text(if (showSettings) "返回" else "设置") }
                 },
@@ -80,7 +82,7 @@ fun AIyouApp() {
                         NavigationBarItem(
                             selected = destination == selected && !showSettings,
                             onClick = { selectedName = destination.name; showSettings = false },
-                            icon = { Text(destination.symbol) }, label = { Text(destination.label) },
+                            icon = { DestinationIcon(destination) }, label = { Text(destination.label, style = MaterialTheme.typography.bodySmall) },
                         )
                     }
                 }
