@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.WindowInsets
@@ -31,11 +32,13 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import com.t1doo.aiyou.designsystem.AIyouDimensions
@@ -120,13 +123,16 @@ fun AIyouApp(
     var selectedMemoriesId by rememberSaveable { mutableStateOf<String?>(null) }
     var discardEditSession by remember { mutableStateOf<Long?>(null) }
     var tailReturnRequest by remember { mutableStateOf<TailReturnRequest?>(null) }
+    var scaffoldHeightPx by remember { mutableIntStateOf(0) }
+    var navigationHeightPx by remember { mutableIntStateOf(0) }
     val nowList = rememberLazyListState()
     val memoriesList = rememberLazyListState()
     val currentLocal by rememberUpdatedState(local)
     val context = LocalContext.current
     val selected = Destination.valueOf(selectedName)
     val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS
-    val imeBottomPx = WindowInsets.ime.getBottom(LocalDensity.current)
+    val density = LocalDensity.current
+    val imeBottomPx = WindowInsets.ime.getBottom(density)
     val imeVisible = imeBottomPx > 0
     val origin = selected
     val readerId = detailEntryId
@@ -257,7 +263,7 @@ fun AIyouApp(
     BackHandler(enabled = reading, onBack = returnToList)
 
     Scaffold(
-        modifier = Modifier.imePadding(),
+        modifier = Modifier.imePadding().onSizeChanged { scaffoldHeightPx = it.height },
         topBar = {
             NotebookAppBar(
                 if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
@@ -274,7 +280,10 @@ fun AIyouApp(
         },
         bottomBar = {
             if (!imeVisible && !reading) {
-                NotebookNavigation(if (showSettings) null else selected, onSelect = selectDestination)
+                DisposableEffect(Unit) { onDispose { navigationHeightPx = 0 } }
+                Box(Modifier.onSizeChanged { navigationHeightPx = it.height }) {
+                    NotebookNavigation(if (showSettings) null else selected, onSelect = selectDestination)
+                }
             }
         },
     ) { contentPadding ->
@@ -311,10 +320,15 @@ fun AIyouApp(
                 onCopy = copy, canCopy = canCopy, modifier = modifier, onEdit = beginEdit, onHistory = beginHistory)
         } else if (!demo && local != null && selected != Destination.TASKS) {
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
+            val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
+            val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier,
                 listState = if (selected == Destination.NOW) nowList else memoriesList,
                 selectedEntryId = if (selected == Destination.NOW) selectedNowId else selectedMemoriesId,
                 onOpenEntry = openEntry, tailReturnEntryId = request?.entryId, tailReturnGeneration = request?.generation,
+                expectedReturnHeightPx = (scaffoldHeightPx - topPaddingPx - bottomPaddingPx).coerceAtLeast(0),
+                returnViewportReady = scaffoldHeightPx > 0 &&
+                    (imeVisible || (navigationHeightPx > 0 && bottomPaddingPx >= navigationHeightPx)),
                 ownsTailReturn = { ownsNavigation() && request != null && tailReturnRequest == request &&
                     detailEntryId == null && selectedName == request.destination.name && !showSettings && !demo },
                 onTailReturnHandled = { if (ownsNavigation() && request != null && tailReturnRequest == request) tailReturnRequest = null })

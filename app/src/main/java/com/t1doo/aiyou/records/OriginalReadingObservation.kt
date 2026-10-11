@@ -32,6 +32,8 @@ internal interface OriginalReadingObserver {
     fun onClipboard(clipboard: Clipboard)
     fun onSelection(selection: SelectionState)
     fun onRecordList(state: LazyListState, imeBottomPx: Int) = Unit
+    fun onListReturnStage(stage: String, generation: Long?, heightPx: Int, expectedHeightPx: Int?,
+        viewportReady: Boolean, state: LazyListState) = Unit
 }
 
 internal val LocalOriginalReadingObserver = staticCompositionLocalOf<OriginalReadingObserver?> { null }

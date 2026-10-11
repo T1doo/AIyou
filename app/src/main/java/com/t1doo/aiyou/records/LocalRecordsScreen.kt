@@ -59,6 +59,8 @@ fun LocalRecordsScreen(
     onOpenEntry: (String) -> Unit = {},
     tailReturnEntryId: String? = null,
     tailReturnGeneration: Long? = null,
+    expectedReturnHeightPx: Int? = null,
+    returnViewportReady: Boolean = true,
     ownsTailReturn: () -> Boolean = { false },
     onTailReturnHandled: () -> Unit = {},
 ) {
@@ -66,25 +68,43 @@ fun LocalRecordsScreen(
     var attachedViewport by remember { mutableStateOf(IntSize.Zero) }
     val currentLocal by rememberUpdatedState(local)
     val currentEntries by rememberUpdatedState(displayedEntries)
+    val returnObserver = LocalOriginalReadingObserver.current
     LaunchedEffect(destination, tailReturnEntryId, tailReturnGeneration, attachedViewport, displayedEntries,
-        local.ready, local.opening, local.error, local.saveNotice) {
+        expectedReturnHeightPx, returnViewportReady, local.ready, local.opening, local.error, local.saveNotice) {
         val target = tailReturnEntryId ?: return@LaunchedEffect
+        fun observe(stage: String) = returnObserver?.onListReturnStage(stage, tailReturnGeneration,
+            attachedViewport.height, expectedReturnHeightPx, returnViewportReady, listState)
         // Owner/ack closures belong to this immutable generation, including same-ID reopens.
         fun valid() = ownsTailReturn() && currentLocal.ready && !currentLocal.opening && currentLocal.error == null &&
             currentEntries.lastOrNull()?.id == target
-        if (!valid() || attachedViewport.height == 0) return@LaunchedEffect
+        observe("request")
+        if (!valid() || !returnViewportReady || attachedViewport.height == 0 ||
+            (expectedReturnHeightPx != null && attachedViewport.height != expectedReturnHeightPx)) return@LaunchedEffect
         // This attachment must have measured its actual viewport before using its item count.
         val measured = snapshotFlow { listState.layoutInfo }.first {
             it.viewportSize == attachedViewport && it.totalItemsCount > 0
         }
         if (!valid()) return@LaunchedEffect
+        observe("measured")
         listState.scrollToItem(measured.totalItemsCount - 1)
         if (!valid()) return@LaunchedEffect
-        val result = listState.layoutInfo
-        val last = result.visibleItemsInfo.lastOrNull() ?: return@LaunchedEffect
+        observe("last-item")
+        var result = listState.layoutInfo
+        var last = result.visibleItemsInfo.lastOrNull() ?: return@LaunchedEffect
+        if (last.key != target) return@LaunchedEffect
+        if (listState.canScrollForward) {
+            // A card can fit the raw viewport while its content paddings still need scrolling.
+            // Use this measured card size, then let the real end-of-content clamp align the tail.
+            listState.scrollToItem(last.index, last.size)
+            if (!valid()) return@LaunchedEffect
+            observe("tail-padding")
+            result = listState.layoutInfo
+            last = result.visibleItemsInfo.lastOrNull() ?: return@LaunchedEffect
+        }
         val fits = last.size <= result.viewportEndOffset - result.viewportStartOffset
         if (result.viewportSize == attachedViewport && last.key == target && !listState.canScrollForward &&
             (!fits || (last.offset >= result.viewportStartOffset && last.offset + last.size <= result.viewportEndOffset))) {
+            observe("complete")
             onTailReturnHandled()
         }
         // A changed dataset/viewport can re-evaluate a still-pending request; never busy-retry.

@@ -27,6 +27,23 @@
 首轮01647d8末项返回四边可见断言确实失败，a3e3275只加诊断同断言复跑通过，尚未定因。当前新增两个单变量真实App用例：显式360dp宽/640dp高下编辑保存将末卡预览增至三行；另在正文不变、无IO/编辑时返回列表的同一受控帧把根视口从640dp缩至360dp。记录真实生产LazyListState的index/offset/layoutInfo/可前滚和实际IMEbottom，同时检查根实际尺寸、严格四边/末端/选中/草稿合同。此测试是受控Compose布局诊断，不能当成真实IME或设备证据；未通过之前不声称滚动同步修复。原中段位置和旧四边断言继续保留。新版本源码/实际CI尚待执行，不将上一SHA的图像或XML当成本版本证据。
 ## Measured list return correction (pending exact-SHA CI)
 
+The first repair `ef09551f1873a1837c3f75ecbecd838456fda3e7`, run
+38127155749, compiled but actually failed two of 45 App tests. The growth case
+did not fail. The shrink case's card was fully visible at 68–273dp within
+56–275dp, but its measured 205px height exceeded the 195px area remaining after
+two 12px paddings, leaving 10px of forward scrolling. The original editor case
+still failed its full-card assertion; its precise request/layout sequence remains
+unknown. Lint and the native-test APK were skipped in this failed run.
+
+The next correction uses the measured target card size for one additional
+end-clamped scroll only when forward scrolling remains. It also matches the
+attached list height to the actual Scaffold height minus its current content
+paddings. When navigation is visible, the navigation bar must have a fresh
+measured height and the current bottom padding must cover it. This is a layout
+contract, not proof of the old failure's cause. A default-null, memory-only test
+observer records numeric request/measurement/scroll/completion stages without
+record text. All original full-card, at-end and middle-anchor assertions remain.
+
 The diagnostic-only `9ccf4518b1a23fd1ccb0307620121bbf7b001cc7` run
 38125457561 really failed the original strict editor return case. The selected
 card ended at 988dp while the measured list ended at 915dp; the recorded IME

@@ -82,6 +82,7 @@ class OriginalEditPresentationTest {
     private lateinit var back: OnBackPressedDispatcher
     private var observedImeBottomPx = 0
     private lateinit var measuredListState: LazyListState
+    private val returnStages = mutableListOf<String>()
     private val observer = object : OriginalReadingObserver {
         override fun onNavigation(callbacks: OriginalReadingCallbacks) { this@OriginalEditPresentationTest.callbacks = callbacks }
         override fun onClipboard(clipboard: Clipboard) = Unit
@@ -89,6 +90,14 @@ class OriginalEditPresentationTest {
         override fun onRecordList(state: LazyListState, imeBottomPx: Int) {
             measuredListState = state
             observedImeBottomPx = imeBottomPx
+        }
+        override fun onListReturnStage(stage: String, generation: Long?, heightPx: Int, expectedHeightPx: Int?,
+            viewportReady: Boolean, state: LazyListState) {
+            val info = state.layoutInfo
+            returnStages += "$stage generation=$generation attachedHeightPx=$heightPx expectedHeightPx=$expectedHeightPx " +
+                "ready=$viewportReady firstIndex=${state.firstVisibleItemIndex} firstOffsetPx=${state.firstVisibleItemScrollOffset} " +
+                "viewportStartPx=${info.viewportStartOffset} viewportEndPx=${info.viewportEndOffset} " +
+                "items=${info.visibleItemsInfo.map { Triple(it.index, it.offset, it.size) }} canForward=${state.canScrollForward}"
         }
     }
     @After fun close() { if (::vm.isInitialized) vm.viewModelScope.cancel() }
@@ -179,7 +188,7 @@ class OriginalEditPresentationTest {
         val after = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
         val geometry = "EDITOR_END_RETURN_GEOMETRY bounds=$bounds viewport=$viewport " +
             "beforeViewport=$beforeViewport beforeEstimate=$before afterEstimate=${after.value()} " +
-            "afterMax=${after.maxValue()} " + listTrace("RETURN")
+            "afterMax=${after.maxValue()} " + listTrace("RETURN") + " returnStages=$returnStages"
         println(geometry)
         assertTrue(geometry, bounds.left >= viewport.left && bounds.right <= viewport.right &&
             bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
