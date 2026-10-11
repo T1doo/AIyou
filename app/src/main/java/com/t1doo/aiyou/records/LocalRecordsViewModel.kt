@@ -54,6 +54,7 @@ class LocalRecordsViewModel internal constructor(
     private val pendingIntent = AtomicReference<SaveIntent?>(null)
     private val originalEditIds = AtomicLong()
     private val originalHistoryIds = AtomicLong()
+    private val historyReplacementIds = AtomicLong()
     // IO-queue owned. Once revise returned, a failed readback must never revise again.
     private var committedOriginal: Pair<Long, StoredEntry>? = null
 
@@ -92,7 +93,8 @@ class LocalRecordsViewModel internal constructor(
                                 mutableState.update { it.copy(opening = false, entries = entries, error = null,
                                     draftNotice = if (command.generation == editGeneration.get()) "草稿已保存在本机" else it.draftNotice,
                                     originalHistory = it.originalHistory?.let { history -> history.copy(
-                                        requestId = history.requestId + 1, loading = true, revisions = emptyList(), error = null, unavailable = false) }) }
+                                        requestId = history.requestId + 1, loading = true, revisions = emptyList(), error = null, unavailable = false,
+                                        replacement = null) }) }
                                 mutableState.value.originalHistory?.let { commands.trySend(Command.ReadHistory(it.sessionId, it.requestId)) }
                             }
                             is Command.Revise -> reviseOriginal(command)
@@ -210,12 +212,63 @@ class LocalRecordsViewModel internal constructor(
     fun backOriginalHistory(sessionId: Long) {
         val history = mutableState.value.originalHistory ?: return
         if (history.sessionId != sessionId) return
-        if (history.selectedRevision != null) requestHistory(history.copy(selectedRevision = null))
+        if (history.replacement != null) cancelHistoryReplacement(sessionId, history.requestId, history.replacement.id)
+        else if (history.selectedRevision != null) requestHistory(history.copy(selectedRevision = null))
         else mutableState.update { if (it.originalHistory?.sessionId == sessionId) it.copy(originalHistory = null) else it }
     }
 
+    fun editOriginalHistory(sessionId: Long, requestId: Long, revision: Int, expectedCurrentRevision: Int) {
+        mutableState.update { current ->
+            if (!canEditHistory(current, sessionId, requestId, revision, expectedCurrentRevision)) current
+            else if (current.originalEdit?.dirty == true) current.copy(originalHistory = current.originalHistory!!.copy(
+                replacement = current.originalHistory.replacement ?: OriginalHistoryReplacement(
+                    historyReplacementIds.incrementAndGet(), current.originalEdit.sessionId)))
+            else historyToEditor(current)
+        }
+    }
+
+    fun confirmHistoryReplacement(sessionId: Long, requestId: Long, replacementId: Long) {
+        mutableState.update { current ->
+            val history = current.originalHistory ?: return@update current
+            val pending = history.replacement ?: return@update current
+            if (pending.id != replacementId || current.originalEdit?.sessionId != pending.editSessionId ||
+                history.selectedRevision == null || history.currentRevision == null ||
+                !canEditHistory(current, sessionId, requestId, history.selectedRevision, history.currentRevision)) current
+            else historyToEditor(current)
+        }
+    }
+
+    fun cancelHistoryReplacement(sessionId: Long, requestId: Long, replacementId: Long) {
+        mutableState.update { current ->
+            val history = current.originalHistory
+            if (history?.sessionId != sessionId || history.requestId != requestId || history.replacement?.id != replacementId) current
+            else current.copy(originalHistory = history.copy(replacement = null))
+        }
+    }
+
+    private fun canEditHistory(current: LocalRecordUiState, sessionId: Long, requestId: Long,
+        revision: Int, expectedCurrentRevision: Int): Boolean {
+        val history = current.originalHistory ?: return false
+        return current.ready && !current.opening && current.error == null && !current.saving && !current.savePending &&
+            history.sessionId == sessionId && history.requestId == requestId && !history.loading &&
+            history.error == null && !history.unavailable && history.selectedRevision == revision &&
+            history.currentRevision == expectedCurrentRevision && history.revisions.any { it.revision == revision } &&
+            current.entries.any { it.id == history.entryId && it.currentRevision == expectedCurrentRevision } &&
+            (current.originalEdit == null || current.originalEdit.entryId == history.entryId && current.originalEdit.canCancel)
+    }
+
+    private fun historyToEditor(current: LocalRecordUiState): LocalRecordUiState {
+        val history = checkNotNull(current.originalHistory)
+        val entry = current.entries.single { it.id == history.entryId }
+        val source = history.revisions.single { it.revision == history.selectedRevision }
+        return current.copy(originalHistory = null, originalEditNotice = null,
+            originalEdit = OriginalEditUiState(originalEditIds.incrementAndGet(), entry.id,
+                entry.currentRevision, entry.originalText, text = source.originalText, sourceRevision = source.revision))
+    }
+
     private fun requestHistory(history: OriginalHistoryUiState) {
-        val next = history.copy(requestId = history.requestId + 1, loading = true, revisions = emptyList(), error = null, unavailable = false)
+        val next = history.copy(requestId = history.requestId + 1, loading = true, revisions = emptyList(), error = null, unavailable = false,
+            replacement = null)
         mutableState.update { if (it.originalHistory?.sessionId == history.sessionId) it.copy(originalHistory = next) else it }
         commands.trySend(Command.ReadHistory(next.sessionId, next.requestId))
     }

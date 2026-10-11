@@ -25,6 +25,9 @@ internal data class OriginalReadingCallbacks(
     val backHistory: (Long) -> Unit,
     val retryHistory: (Long) -> Unit,
     val copyHistory: (String, Int) -> Boolean,
+    val editHistory: () -> Unit = {},
+    val confirmHistoryReplacement: (Long) -> Unit = {},
+    val cancelHistoryReplacement: (Long) -> Unit = {},
 )
 
 internal interface OriginalReadingObserver {

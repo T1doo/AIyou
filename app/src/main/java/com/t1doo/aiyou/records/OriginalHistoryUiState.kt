@@ -13,4 +13,8 @@ data class OriginalHistoryUiState(
     val selectedRevision: Int? = null,
     val unavailable: Boolean = false,
     val error: String? = null,
+    val replacement: OriginalHistoryReplacement? = null,
 )
+
+/** A confirmation belongs to one history request and the editor it would replace. */
+data class OriginalHistoryReplacement(val id: Long, val editSessionId: Long)

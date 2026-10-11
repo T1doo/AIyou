@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
@@ -38,6 +39,9 @@ fun OriginalHistoryScreen(
     onCopy: (String, Int) -> Boolean,
     canCopy: (String, Int) -> Boolean,
     modifier: Modifier = Modifier,
+    onEdit: () -> Unit = {},
+    onConfirmReplacement: (Long) -> Unit = {},
+    onCancelReplacement: (Long) -> Unit = {},
 ) {
     val current = local.entries.firstOrNull { it.id == history.entryId }
     val storageUnavailable = !local.ready || local.opening || local.error != null
@@ -50,7 +54,17 @@ fun OriginalHistoryScreen(
             metadataText = originalMetadata(source).substringBefore(" · ") + " · " +
                 if (selected.revision == history.currentRevision) "当前版本 ${selected.revision} · 只读"
                 else "历史版本 ${selected.revision} · 当前版本 ${history.currentRevision} · 只读",
-            onHistory = { _, _ -> onBack(history.sessionId) }, historyActionLabel = "返回版本列表")
+            onHistory = { _, _ -> onBack(history.sessionId) }, historyActionLabel = "返回版本列表",
+            onEdit = { _, _ -> onEdit() }, editActionLabel = "用此版本编辑")
+        history.replacement?.let { pending ->
+            AlertDialog(onDismissRequest = { onCancelReplacement(pending.id) },
+                title = { Text("替换未保存的修改？") },
+                text = { Text("用版本 ${selected.revision} 开始编辑，将替换当前未保存的修改。此刻草稿不变，原文版本仍保留。") },
+                confirmButton = { TextButton(onClick = { onConfirmReplacement(pending.id) },
+                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("history-replace-confirm")) { Text("替换并编辑") } },
+                dismissButton = { TextButton(onClick = { onCancelReplacement(pending.id) },
+                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("history-replace-cancel")) { Text("保留修改") } })
+        }
         return
     }
     Box(modifier.fillMaxSize().testTag("history-viewport"), contentAlignment = Alignment.TopCenter) {

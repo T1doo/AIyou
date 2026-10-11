@@ -76,7 +76,10 @@ class MainActivity : ComponentActivity() {
                 onBeginOriginalEdit = records::beginOriginalEdit, onOriginalEditChange = records::changeOriginalEdit,
                 onOriginalEditSave = records::saveOriginalEdit, onOriginalEditCancel = records::cancelOriginalEdit,
                 onBeginOriginalHistory = records::beginOriginalHistory, onSelectOriginalRevision = records::selectOriginalRevision,
-                onBackOriginalHistory = records::backOriginalHistory, onRetryOriginalHistory = records::retryOriginalHistory) }
+                onBackOriginalHistory = records::backOriginalHistory, onRetryOriginalHistory = records::retryOriginalHistory,
+                onEditOriginalHistory = records::editOriginalHistory,
+                onConfirmHistoryReplacement = records::confirmHistoryReplacement,
+                onCancelHistoryReplacement = records::cancelHistoryReplacement) }
         }
     }
 }
@@ -108,6 +111,9 @@ fun AIyouApp(
     onSelectOriginalRevision: (Long, Int) -> Unit = { _, _ -> },
     onBackOriginalHistory: (Long) -> Unit = {},
     onRetryOriginalHistory: (Long) -> Unit = {},
+    onEditOriginalHistory: (Long, Long, Int, Int) -> Unit = { _, _, _, _ -> },
+    onConfirmHistoryReplacement: (Long, Long, Long) -> Unit = { _, _, _ -> },
+    onCancelHistoryReplacement: (Long, Long, Long) -> Unit = { _, _, _ -> },
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -239,6 +245,30 @@ fun AIyouApp(
             copyOriginal(context, it.originalText)
         } ?: false else false
     }
+    val editHistory: () -> Unit = {
+        val revision = history?.selectedRevision
+        val currentRevision = history?.currentRevision
+        val latest = currentLocal
+        if (history != null && revision != null && currentRevision != null && canCopyHistory(history.entryId, revision) &&
+            latest?.saving == false && !latest.savePending && latest.originalEdit?.canCancel != false) {
+            navigation.generation++
+            onEditOriginalHistory(history.sessionId, history.requestId, revision, currentRevision)
+        }
+    }
+    val confirmHistoryReplacement: (Long) -> Unit = { replacementId ->
+        if (history?.selectedRevision != null && canCopyHistory(history.entryId, history.selectedRevision) &&
+            currentLocal?.originalHistory?.replacement?.id == replacementId) {
+            navigation.generation++
+            onConfirmHistoryReplacement(history.sessionId, history.requestId, replacementId)
+        }
+    }
+    val cancelHistoryReplacement: (Long) -> Unit = { replacementId ->
+        if (history != null && ownsHistory(history.sessionId) &&
+            currentLocal?.originalHistory?.let { it.requestId == history.requestId && it.replacement?.id == replacementId } == true) {
+            navigation.generation++
+            onCancelHistoryReplacement(history.sessionId, history.requestId, replacementId)
+        }
+    }
     val retryReading: () -> Unit = {
         val latest = currentLocal
         if (readerId != null && ownsNavigation() && detailEntryId == readerId && selectedName == origin.name && !showSettings && !demo &&
@@ -251,7 +281,8 @@ fun AIyouApp(
     }
     LocalOriginalReadingObserver.current?.let { observer ->
         val callbacks = OriginalReadingCallbacks(openEntry, selectDestination, returnToList, retryReading, copy,
-            beginEdit, changeEdit, saveEdit, cancelEdit, discardEdit, beginHistory, selectHistory, backHistory, retryHistory, copyHistory)
+            beginEdit, changeEdit, saveEdit, cancelEdit, discardEdit, beginHistory, selectHistory, backHistory, retryHistory, copyHistory,
+            editHistory, confirmHistoryReplacement, cancelHistoryReplacement)
         SideEffect {
             observer.onNavigation(callbacks)
             if (selected != Destination.TASKS) observer.onRecordList(if (selected == Destination.NOW) nowList else memoriesList, imeBottomPx)
@@ -312,7 +343,7 @@ fun AIyouApp(
             }
         } else if (history != null && local != null) {
             OriginalHistoryScreen(history, local, historyList, selectHistory, backHistory, retryHistory,
-                retryReading, copyHistory, canCopyHistory, modifier)
+                retryReading, copyHistory, canCopyHistory, modifier, editHistory, confirmHistoryReplacement, cancelHistoryReplacement)
         } else if (editing != null && local != null) {
             OriginalEditScreen(editing, local, changeEdit, saveEdit, cancelEdit, modifier, onRetry = retryReading, onHistory = beginHistory)
         } else if (reading && local != null) {

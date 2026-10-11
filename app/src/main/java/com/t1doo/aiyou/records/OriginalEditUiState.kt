@@ -12,6 +12,7 @@ data class OriginalEditUiState(
     val conflict: Boolean = false,
     val error: String? = null,
     val inputNotice: String? = null,
+    val sourceRevision: Int = baseRevision,
 ) {
     val dirty: Boolean get() = text != originalText
     val canCancel: Boolean get() = !saving && !awaitingReadback

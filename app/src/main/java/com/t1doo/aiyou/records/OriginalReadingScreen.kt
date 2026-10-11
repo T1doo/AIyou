@@ -116,6 +116,7 @@ fun OriginalReadingScreen(
     onHistory: ((String, Int) -> Unit)? = null,
     metadataText: String? = null,
     historyActionLabel: String = "历史版本",
+    editActionLabel: String = "编辑原文",
 ) {
     // Resolve the current local source on every update; navigation never carries plaintext.
     val entry = local.entries.firstOrNull { it.id == entryId }
@@ -144,7 +145,7 @@ fun OriginalReadingScreen(
                         onEdit?.let { edit ->
                             TextButton(onClick = { edit(entry.id, entry.currentRevision) },
                                 enabled = !local.saving && !local.savePending,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("编辑原文") }
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-reading-edit")) { Text(editActionLabel) }
                         }
                         onHistory?.let { history ->
                             TextButton(onClick = { history(entry.id, entry.currentRevision) },

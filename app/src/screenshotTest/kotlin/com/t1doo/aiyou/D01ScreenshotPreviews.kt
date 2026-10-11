@@ -12,6 +12,7 @@ import com.t1doo.aiyou.designsystem.*
 import com.t1doo.aiyou.ui.*
 import com.t1doo.aiyou.records.LocalRecordUiState
 import com.t1doo.aiyou.records.OriginalHistoryUiState
+import com.t1doo.aiyou.records.OriginalHistoryReplacement
 import com.t1doo.aiyou.model.OriginalRevision
 import com.t1doo.aiyou.records.OriginalEditUiState
 import com.t1doo.aiyou.model.StoredEntry
@@ -248,3 +249,26 @@ fun LocalOriginalHistoryFailedRender() { AIyouTheme { AIyouApp(previewDestinatio
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalOriginalHistoryUnavailableRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
     local = historyLocal.copy(entries = emptyList(), originalHistory = historyLocal.originalHistory!!.copy(unavailable = true, revisions = emptyList())), previewEntryId = longOriginal.id) } }
+
+private val historyEditor = historyLocal.copy(originalHistory = null, originalEdit = OriginalEditUiState(
+    2L, historyCurrent.id, 2, historyCurrent.originalText,
+    text = "合成历史原文：记录沿途树叶的颜色，再补充今天的发现。", sourceRevision = 1))
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalHistoryEditorRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = historyEditor, previewEntryId = historyCurrent.id) } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalHistoryEditorFailedRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = historyEditor.copy(originalEdit = historyEditor.originalEdit!!.copy(error = "合成保存失败。你的修改与旧原文已保留，可以重试。")),
+    previewEntryId = historyCurrent.id) } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalHistoryEditorUnchangedRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = historyEditor.copy(originalEdit = historyEditor.originalEdit!!.copy(text = historyCurrent.originalText)),
+    previewEntryId = historyCurrent.id) } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalHistoryReplacementRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = historyLocal.copy(originalHistory = historyLocal.originalHistory!!.copy(selectedRevision = 1,
+        replacement = OriginalHistoryReplacement(1L, historyLocal.originalEdit!!.sessionId))), previewEntryId = historyCurrent.id) } }

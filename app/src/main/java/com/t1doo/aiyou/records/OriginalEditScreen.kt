@@ -46,10 +46,13 @@ fun OriginalEditScreen(
             Column(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize()
                 .verticalScroll(rememberScrollState()).padding(AIyouDimensions.pageNarrow),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                Text("基于原文版本 ${edit.baseRevision} · 仅本机", style = MaterialTheme.typography.bodySmall,
+                Text(if (edit.sourceRevision == edit.baseRevision) "基于原文版本 ${edit.baseRevision} · 仅本机"
+                    else "来源：历史版本 ${edit.sourceRevision} · 基于原文版本 ${edit.baseRevision} · 仅本机", style = MaterialTheme.typography.bodySmall,
                     color = AIyouColors.textSecondary)
                 Text("保存创建新版本，旧原文仍保留。", style = MaterialTheme.typography.bodySmall,
                     color = AIyouColors.textSecondary)
+                if (!edit.dirty && edit.sourceRevision != edit.baseRevision) Text("文本与当前原文相同，无需保存新版本。",
+                    style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                 OutlinedTextField(value = edit.text, onValueChange = { onChange(edit.sessionId, it) },
                     readOnly = edit.saving || edit.awaitingReadback,
                     modifier = Modifier.fillMaxWidth().testTag("original-edit-text"),
