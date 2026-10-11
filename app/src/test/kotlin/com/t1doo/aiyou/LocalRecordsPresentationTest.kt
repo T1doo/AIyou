@@ -3,6 +3,9 @@ package com.t1doo.aiyou
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -19,16 +22,15 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
@@ -171,7 +173,9 @@ class LocalRecordsPresentationTest {
         var readRetries = 0
         var saves = 0
         var edits = 0
+        lateinit var inputModeManager: InputModeManager
         compose.setContent {
+            inputModeManager = LocalInputModeManager.current
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
                 AIyouTheme { AIyouApp(local = state.value, onSave = { saves++ },
@@ -188,7 +192,9 @@ class LocalRecordsPresentationTest {
         }
         val field = compose.onNodeWithContentDescription("此刻，想记下什么")
         field.assertIsNotEnabled().performTouchInput { click() }
-        compose.onAllNodes(isFocused(), useUnmergedTree = true).assertCountEquals(0)
+        val fieldMatcher = hasContentDescription("此刻，想记下什么")
+        val focusedInput = isFocused() and (fieldMatcher or hasAnyAncestor(fieldMatcher))
+        compose.onAllNodes(focusedInput, useUnmergedTree = true).assertCountEquals(0)
         assertEquals(draft, field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         assertNull(field.fetchSemanticsNode().config.getOrNull(SemanticsProperties.Error))
         val retry = compose.onNodeWithText("重试")
@@ -205,6 +211,9 @@ class LocalRecordsPresentationTest {
         compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite)
             and hasAnyDescendant(hasText(message)))
             .assertIsDisplayed()
+        // Keyboard focus has an explicit platform input-mode prerequisite after touch injection.
+        compose.runOnIdle { assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard)) }
+        compose.runOnIdle { assertEquals(InputMode.Keyboard, inputModeManager.inputMode) }
         retry.performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
         retry.assertIsFocused().performTouchInput { click() }
         compose.runOnIdle {
@@ -221,7 +230,7 @@ class LocalRecordsPresentationTest {
         compose.onAllNodesWithText("重试").assertCountEquals(0)
         list.performScrollToNode(hasContentDescription("此刻，想记下什么"))
         field.assertIsDisplayed().assertIsNotEnabled()
-        compose.onAllNodes(isFocused(), useUnmergedTree = true).assertCountEquals(0)
+        compose.onAllNodes(focusedInput, useUnmergedTree = true).assertCountEquals(0)
         assertEquals(draft, field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         compose.onAllNodesWithText("已保存在本机").assertCountEquals(0)
     }

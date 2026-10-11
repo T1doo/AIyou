@@ -25,6 +25,7 @@ for label, folder, minimum in targets:
     if not reports:
         raise SystemExit(f"FAIL: no {label} test reports found")
     total = failures = errors = skipped = cases = 0
+    observed_cases = []
     child_failures = False
     for report in reports:
         suite = ET.parse(report).getroot()
@@ -33,8 +34,21 @@ for label, folder, minimum in targets:
         errors += int(suite.get("errors", 0))
         skipped += int(suite.get("skipped", 0))
         actual = list(suite.iter("testcase"))
+        observed_cases.extend(actual)
         cases += len(actual)
         child_failures |= any(any(case.find(tag) is not None for tag in ("failure", "error", "skipped")) for case in actual)
     if total < minimum or cases != total or failures or errors or skipped or child_failures:
         raise SystemExit(f"FAIL: {label} tests={total} actual={cases} failures={failures} errors={errors} skipped={skipped}")
     print(f"PASS: {label} tests={total} actual={cases} failures=0 errors=0 skipped=0")
+    if label == "Compose JVM interaction":
+        owner = "com.t1doo.aiyou.LocalRecordsPresentationTest"
+        required = (
+            "narrowLargeFontSaveFailureRetryScrollsIntoViewAndPreservesPendingDraft",
+            "narrowLargeFontReadFailureRetryScrollsIntoViewAndPreservesKnownDraft",
+        )
+        for name in required:
+            matches = [case for case in observed_cases if case.get("classname") == owner
+                       and case.get("name", "").split("[", 1)[0].strip().removesuffix("()") == name]
+            if len(matches) != 1:
+                raise SystemExit(f"FAIL: required Compose case={owner}.{name} actual={len(matches)}")
+            print(f"PASS: required Compose case={owner}.{name} actual=1 failures=0 errors=0 skipped=0")
