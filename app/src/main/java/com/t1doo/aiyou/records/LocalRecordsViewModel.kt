@@ -443,7 +443,10 @@ class LocalRecordsViewModel internal constructor(
             val source = revisions.singleOrNull { it.revision == snapshot.sourceRevision }
             val missing = current == null || base == null || source == null
             if (!missing && base.originalText != snapshot.originalText) throw com.t1doo.aiyou.domain.RecordIntegrityFailure()
-            val conflict = missing || before != entries || current.currentRevision != snapshot.baseRevision || current.policy != ProcessingPolicy.LOCAL_ONLY
+            val committed = if (restore) store.committedEdit(snapshot) else null
+            val conflict = missing || before != entries || current.policy != ProcessingPolicy.LOCAL_ONLY ||
+                committed == null && current.currentRevision != snapshot.baseRevision
+            if (committed != null && !conflict) committedOriginal = sessionId to committed
             originalDraft = DraftBinding(sessionId, snapshot, previous, restore)
             // Historical source selection itself creates a dirty input snapshot.
             if (command.replace && !restore && snapshot.text != snapshot.originalText && !conflict) persistDraftSnapshot(sessionId, snapshot.text)
@@ -451,7 +454,9 @@ class LocalRecordsViewModel internal constructor(
                 if (local.originalEdit?.sessionId != sessionId) local else local.copy(entries = entries,
                     originalEdit = command.edit.copy(baseRevision = snapshot.baseRevision, sourceRevision = snapshot.sourceRevision,
                         originalText = snapshot.originalText, text = snapshot.text, loadingDraft = false,
+                        awaitingReadback = committed != null && !conflict,
                         conflict = conflict, draftNotice = if (restore && command.replace) "已恢复已有的未保存修改；请先处理它，历史文本尚未替换此草稿。"
+                            else if (committed != null) "已核对这份编辑的加密事务回执。新版本已写入，请重试确认草稿收尾。"
                             else if (restore) "已恢复本机编辑草稿，正式原文尚未被这次恢复修改。"
                             else if (snapshot.text != snapshot.originalText) "编辑草稿已加密保存在本机"
                             else "修改会加密保存为独立的本机编辑草稿。",
@@ -565,7 +570,9 @@ class LocalRecordsViewModel internal constructor(
             val committed = committedOriginal?.takeIf { it.first == command.sessionId }?.second
                 ?: run {
                     if (store.editDrafts != null) persistDraftSnapshot(command.sessionId, command.text)
-                    store.revise(command.entryId, command.expectedRevision, command.text, clock.millis())
+                    val draft = originalDraft?.takeIf { it.sessionId == command.sessionId && it.persisted }?.snapshot
+                    if (draft == null) store.revise(command.entryId, command.expectedRevision, command.text, clock.millis())
+                    else store.reviseFromDraft(draft, clock.millis())
                 }.also { entry ->
                     committedOriginal = command.sessionId to entry
                     mutableState.update { current ->

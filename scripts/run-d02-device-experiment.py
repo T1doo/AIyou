@@ -16,6 +16,7 @@ import urllib.request
 import uuid
 import zipfile
 from d02_native_trace import summarize
+from d02_device_acceptance import parse_result, run_storage, collect_source
 from d02_deadline import archive_download_deadline
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -164,19 +165,16 @@ def install_owned_package(item):
     print("PASS: verified fixed archive installed in previously absent path:", item["path"], sha256.hexdigest(), flush=True)
 
 
-def instrumentation(adb, serial, component, class_name, count, name, env, extra=()):
+def instrumentation(adb, serial, component, class_name, count, name, env, extra=(), *, expected_methods=None, phase=None, token=None):
     args = [adb, "-s", serial, "shell", "am", "instrument", "-w", "-r", "-e", "class", class_name]
     args.extend(extra)
     args.append(component)
     result = command(args, name, timeout=240, env=env)
     text = result.stdout + result.stderr
-    codes = [int(x) for x in re.findall(r"^INSTRUMENTATION_STATUS_CODE:\s*(-?\d+)\s*$", text, re.M)]
-    if codes.count(1) != count or codes.count(0) != count or any(x not in (0, 1) for x in codes) \
-            or not re.search(r"^INSTRUMENTATION_CODE:\s*-1\s*$", text, re.M) \
-            or not re.search(r"OK \(" + str(count) + r" tests?\)", text):
-        raise RuntimeError(name + ": require actual expected passing cases, complete runner and zero skips/errors")
+    parsed = parse_result(text, count, expected_methods=expected_methods, phase=phase, token=token)
     print("PASS:", name, count, "actual native cases, no skips", flush=True)
-    return {"phase": name, "tests": count, "terminal_status_codes": codes, "runner_result": -1}
+    return {"phase": name, **parsed}
+
 
 
 def targeted_fourth(adb, serial, component, env, report):
@@ -328,20 +326,10 @@ def run_device(report, targeted=False):
             if targeted:
                 targeted_fourth(adb, serial, component, env, report)
                 return
-            report["native_tests"] = [instrumentation(adb, serial, component,
-                "com.t1doo.aiyou.data.EncryptedRecordsIntegrationTest", 13, "encrypted-storage-13", env)]
-            token = str(uuid.uuid4())
-            restart = "com.t1doo.aiyou.data.ProcessRestartPersistenceTest"
-            for phase in ("write", "read", "cleanup"):
-                if phase == "read":
-                    for p in sorted({package, target}):
-                        command([adb, "-s", serial, "shell", "am", "force-stop", p], "force-stop-" + p, env=env)
-                        alive = command([adb, "-s", serial, "shell", "pidof", p], "writer-stopped-" + p, env=env, require=False)
-                        if alive.stdout.strip():
-                            raise RuntimeError("Writer package still alive after owned force-stop")
-                report["native_tests"].append(instrumentation(adb, serial, component, restart, 1,
-                    "restart-" + phase, env, ("-e", "aiyouRestartPhase", phase, "-e", "aiyouRestartToken", token)))
-            report["result"] = "PASS: 13 native cases + distinct-process repository persistence; production UI restart/16K/physical performance NOT RUN"
+            collect_source(ROOT)
+            run_storage(command, instrumentation, adb, serial, component, (package, target), env, report, str(uuid.uuid4()))
+            report["result"] = "PASS: 19 native cases + distinct-process attachment/edit/capture persistence and confirmation; production Activity/16K/physical performance NOT RUN"
+
         finally:
             try:
                 command([adb, "-s", serial, "logcat", "-d"], "device-logcat", timeout=15,

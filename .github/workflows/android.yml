@@ -63,7 +63,9 @@ jobs:
           scripts/gradle.sh :app:testDebugUnitTest
           python3 scripts/verify-test-results.py --ui
       - name: Compile actual D02 native-storage instrumentation APK without claiming execution
-        run: scripts/gradle.sh :core:data:assembleDebugAndroidTest
+        run: scripts/gradle.sh :core:data:assembleDebugAndroidTest :app:assembleDebugAndroidTest
+      - name: Collect exact 19 methods and external probes from actual compiled APK DEX (device NOT RUN)
+        run: python3 scripts/inspect-d02-device-test-apks.py
       - name: Verify actual license assets and APK ZIP alignment (native execution NOT RUN)
         run: python3 scripts/inspect-d02-apks.py
       - name: Run Android lint
@@ -201,6 +203,7 @@ jobs:
             core/data/build/reports/lint-results-debug.*
             core/data/schemas/
             app/build/reports/d02-apk-audit.json
+            app/build/reports/device-apk-manifest.json
             app/build/outputs/apk/debug/*.zipalign.txt
             core/data/build/outputs/apk/androidTest/debug/*.zipalign.txt
             core/designsystem/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
@@ -223,6 +226,14 @@ jobs:
         with:
           name: d02-storage-test-apk
           path: core/data/build/outputs/apk/androidTest/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Preserve production Activity cold-start instrumentation APK (compiled, execution NOT RUN)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d02-production-test-apk
+          path: app/build/outputs/apk/androidTest/debug/*.apk
           if-no-files-found: warn
           retention-days: 14
       - name: Preserve initial Preview render smoke images

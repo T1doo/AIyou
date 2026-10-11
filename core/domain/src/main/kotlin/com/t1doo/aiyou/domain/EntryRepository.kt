@@ -3,6 +3,7 @@ package com.t1doo.aiyou.domain
 import com.t1doo.aiyou.model.OriginalRevision
 import com.t1doo.aiyou.model.StoredEntry
 import com.t1doo.aiyou.model.TextDraft
+import com.t1doo.aiyou.model.OriginalEditDraft
 
 /** Successful completion means a durable transaction, never an optimistic UI insert. */
 interface EntryRepository {
@@ -17,6 +18,11 @@ interface EntryRepository {
     suspend fun entries(): List<StoredEntry>
     suspend fun revisions(entryId: String): List<OriginalRevision>
     suspend fun revise(entryId: String, expectedRevision: Int, text: String, createdAtMillis: Long): StoredEntry
+    /** Production binds the exact acknowledged edit to its transaction for cold-start confirmation. */
+    suspend fun reviseFromDraft(draft: OriginalEditDraft, createdAtMillis: Long): StoredEntry =
+        revise(draft.entryId, draft.baseRevision, draft.text, createdAtMillis)
+    /** Null means no receipt for this exact identity/version/content; matching text is insufficient. */
+    suspend fun committedEdit(draft: OriginalEditDraft): StoredEntry? = null
 }
 
 class RecordConflict : IllegalStateException("Record version changed")

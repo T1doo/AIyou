@@ -18,6 +18,7 @@ internal interface RecordsDao {
     @Insert suspend fun insertEntry(entry: EntryEntity)
     @Insert suspend fun insertRevision(revision: RevisionEntity)
     @Insert suspend fun insertJob(job: LocalJobEntity)
+    @Query("SELECT * FROM local_jobs WHERE id=:id") suspend fun job(id: String): LocalJobEntity?
     @Query("UPDATE entries SET currentRevision = :next WHERE id = :id AND currentRevision = :expected")
     suspend fun advance(id: String, expected: Int, next: Int): Int
     @Query("SELECT e.*, r.originalText, r.contentHash FROM entries e JOIN entry_revisions r ON e.id=r.entryId AND e.currentRevision=r.revision ORDER BY e.capturedAtMillis DESC, e.id")

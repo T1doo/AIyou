@@ -26,6 +26,7 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.0.3-d02-text"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
@@ -80,6 +81,9 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.compose.ui.test.junit4)
     testImplementation(libs.robolectric.runtime)
+    androidTestImplementation(libs.android.test.runner)
+    androidTestImplementation(libs.android.test.junit)
+    androidTestImplementation(libs.junit)
     robolectricSdk(libs.robolectric.sdk)
     "screenshotTestImplementation"(platform(libs.compose.bom))
     "screenshotTestImplementation"(libs.compose.ui.tooling)

@@ -13,6 +13,10 @@ import com.t1doo.aiyou.model.OriginalRevision
 import com.t1doo.aiyou.model.ProcessingPolicy
 import com.t1doo.aiyou.model.StoredEntry
 import com.t1doo.aiyou.model.TextDraft
+import com.t1doo.aiyou.model.OriginalEditDraft
+import com.t1doo.aiyou.model.OriginalEditDraftState
+import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
 import java.io.File
 import java.security.MessageDigest
 import java.time.ZoneId
@@ -73,6 +77,30 @@ class EncryptedEntryRepository internal constructor(
         dao.insertJob(LocalJobEntity("$entryId:$next:LOCAL_INDEX", entryId, next))
         if (dao.advance(entryId, expectedRevision, next) != 1) throw RecordConflict()
         checkNotNull(dao.entry(entryId)).toModel()
+    }
+
+    override suspend fun reviseFromDraft(draft: OriginalEditDraft, createdAtMillis: Long): StoredEntry = database.withTransaction {
+        require(draft.state == OriginalEditDraftState.ACTIVE)
+        committedEdit(draft)?.let { return@withTransaction it }
+        // Require the full independently acknowledged encrypted snapshot, not only its text.
+        if (editDrafts.read(draft.entryId) != draft) throw com.t1doo.aiyou.domain.OriginalEditDraftConflict()
+        val saved = revise(draft.entryId, draft.baseRevision, draft.text, createdAtMillis)
+        // Completed receipt, never runnable work: same encrypted transaction as revision + LOCAL_INDEX.
+        dao.insertJob(LocalJobEntity(editReceiptId(draft), draft.entryId, saved.currentRevision,
+            "ORIGINAL_EDIT_COMMIT", "CONFIRMED"))
+        saved
+    }
+
+    override suspend fun committedEdit(draft: OriginalEditDraft): StoredEntry? = database.withTransaction {
+        val receipt = dao.job(editReceiptId(draft)) ?: return@withTransaction null
+        val next = Math.addExact(draft.baseRevision, 1)
+        if (receipt.entryId != draft.entryId || receipt.sourceRevision != next ||
+            receipt.operation != "ORIGINAL_EDIT_COMMIT" || receipt.state != "CONFIRMED") throw RecordIntegrityFailure()
+        val current = dao.entry(draft.entryId)?.toModel() ?: throw RecordIntegrityFailure()
+        val revision = dao.revisions(draft.entryId).singleOrNull { it.revision == next } ?: throw RecordIntegrityFailure()
+        if (revision.originalText != draft.text || revision.contentHash != contentHash(draft.text) ||
+            current.currentRevision < next) throw RecordIntegrityFailure()
+        current.copy(currentRevision = next, originalText = revision.originalText)
     }
 
     override fun close() {
@@ -158,3 +186,15 @@ private fun EntryRow.toModel(): StoredEntry {
 }
 internal fun contentHash(text: String): String = MessageDigest.getInstance("SHA-256")
     .digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+
+/** Only a digest enters the encrypted receipt ID; exact UTF-16 snapshot including unfinished IME units. */
+private fun editReceiptId(draft: OriginalEditDraft): String {
+    val bytes = ByteArrayOutputStream().also { buffer -> DataOutputStream(buffer).use { out ->
+        out.writeUTF("AIyou original edit receipt v1")
+        out.writeUTF(draft.id); out.writeUTF(draft.entryId)
+        out.writeInt(draft.baseRevision); out.writeInt(draft.sourceRevision); out.writeLong(draft.version)
+        for (text in listOf(draft.originalText, draft.text)) { out.writeInt(text.length); text.forEach { out.writeChar(it.code) } }
+    } }.toByteArray()
+    return try { "ORIGINAL_EDIT_COMMIT:" + MessageDigest.getInstance("SHA-256").digest(bytes)
+        .joinToString("") { "%02x".format(it) } } finally { bytes.fill(0) }
+}
