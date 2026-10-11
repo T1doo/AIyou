@@ -100,6 +100,7 @@ class HistoricalAttachmentPresentationTest {
         compose.onNodeWithText("查看图片").performScrollTo().performTouchInput { click() }
         compose.runOnIdle { f.drain() }
         compose.onNodeWithTag("attachment-picture").assertIsDisplayed()
+        compose.onNodeWithText("返回附件列表").performTouchInput { click() }
         compose.onNodeWithText("返回历史原文").performTouchInput { click() }
         compose.onNodeWithTag("original-text").assertTextEquals("合成旧版全文")
         compose.runOnIdle {

@@ -302,13 +302,17 @@ fun LocalAttachmentConfirmFailedRender() { AttachmentFrame(attachmentPanel.copy(
     attachmentIntent.id, phase = AttachmentImportPhase.FAILED, sourcePrepared = true), error = "合成保存确认失败。原文与图片已保留，可以重试确认。")) }
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalAttachmentReadyRender() {
-    val png = java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMQCqv4DwADPgHgZNJcPQAAAABJRU5ErkJggg==")
-    AttachmentFrame(attachmentPanel.copy(items = listOf(LocalAttachment(attachmentIntent, AttachmentState.READY)),
-        picture = PlatformPngDecoder.decode(png), notice = "图片已保存在本机 · 原文版本 1"))
+    val bytes = androidx.compose.runtime.remember { AttachmentUiImages.landscape() }
+    val picture = androidx.compose.runtime.remember { PlatformPngDecoder.decode(bytes) }
+    androidx.compose.runtime.DisposableEffect(picture) { onDispose { picture.releaseUnpublished() } }
+    val digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+    val intent = attachmentIntent.copy(sha256 = digest, byteSize = bytes.size.toLong())
+    AttachmentFrame(attachmentPanel.copy(items = listOf(LocalAttachment(intent, AttachmentState.READY)),
+        picture = picture, notice = "图片已保存在本机 · 原文版本 1"))
 }
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalAttachmentJpegReadyRender() {
-    val bytes = androidx.compose.runtime.remember { JpegPreviewFixture.bytes() }
+    val bytes = androidx.compose.runtime.remember { AttachmentUiImages.portrait() }
     val picture = androidx.compose.runtime.remember { com.t1doo.aiyou.records.PlatformImageDecoder.decode(bytes) }
     androidx.compose.runtime.DisposableEffect(picture) { onDispose { picture.releaseUnpublished() } }
     val digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
@@ -329,9 +333,13 @@ fun LocalAttachmentUnavailableRender() { AttachmentFrame(attachmentPanel.copy(un
 private val historicalAttachmentPanel = attachmentPanel.copy(historyOwner = AttachmentHistoryOwner(7L, 3L, 2))
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalHistoricalAttachmentReadyRender() {
-    val png = java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMQCqv4DwADPgHgZNJcPQAAAABJRU5ErkJggg==")
-    AttachmentFrame(historicalAttachmentPanel.copy(items = listOf(LocalAttachment(attachmentIntent, AttachmentState.READY)),
-        picture = PlatformPngDecoder.decode(png)))
+    val bytes = androidx.compose.runtime.remember { AttachmentUiImages.landscape() }
+    val picture = androidx.compose.runtime.remember { PlatformPngDecoder.decode(bytes) }
+    androidx.compose.runtime.DisposableEffect(picture) { onDispose { picture.releaseUnpublished() } }
+    val digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+    val intent = attachmentIntent.copy(sha256 = digest, byteSize = bytes.size.toLong())
+    AttachmentFrame(historicalAttachmentPanel.copy(items = listOf(LocalAttachment(intent, AttachmentState.READY)),
+        picture = picture))
 }
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalHistoricalAttachmentFailedRender() { AttachmentFrame(historicalAttachmentPanel.copy(

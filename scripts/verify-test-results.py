@@ -19,7 +19,7 @@ if args.component:
 if args.queue:
     targets.append(("host queue", "checks/record-queue/build/test-results/test", 84))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 73))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 75))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 for label, folder, minimum in targets:
@@ -102,6 +102,9 @@ for label, folder, minimum in targets:
             "launchedPickerKeepsActualRegistryOwnerAcrossGlobalRecordFailureAndRecovery",
             "restoredCompositionWithNewControllerCannotAdoptOldPickerResult",
             "jpegMetadataChoiceIsReachableAndFrozenByActualImagePickerRequest")
+        additional["com.t1doo.aiyou.AttachmentNavigationPresentationTest"] = (
+            "currentLongOriginalTailJpegViewerAndBackPreserveBothScrollPositions",
+            "historicalLongOriginalTailPngViewerAndBackPreserveBothInputsAndLimits")
         additional["com.t1doo.aiyou.HistoricalAttachmentPresentationTest"] = (
             "actualHistoricalRouteViewsOldNativePictureAndReturnsToSameOriginalAndBothInputs",
             "retainedHistoryActionRejectsChangedRequestAndNewVersionNeverShowsOldPicture",

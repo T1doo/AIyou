@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.SelectionState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -118,6 +119,7 @@ fun OriginalReadingScreen(
     historyActionLabel: String = "历史版本",
     editActionLabel: String = "编辑原文",
     onAttachments: ((String, Int) -> Unit)? = null,
+    originalScrollState: ScrollState? = null,
 ) {
     // Resolve the current local source on every update; navigation never carries plaintext.
     val entry = local.entries.firstOrNull { it.id == entryId }
@@ -175,7 +177,7 @@ fun OriginalReadingScreen(
                         LocalOriginalReadingObserver.current?.let { observer ->
                             SideEffect { observer.onClipboard(clipboard); observer.onSelection(selection) }
                         }
-                        val scroll = rememberScrollState()
+                        val scroll = originalScrollState ?: rememberScrollState()
                         CompositionLocalProvider(LocalClipboard provides clipboard) {
                             SelectionContainer(state = selection,
                                 modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(scroll).testTag("original-scroll")) {

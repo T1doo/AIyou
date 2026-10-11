@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyListState
@@ -58,6 +59,8 @@ import com.t1doo.aiyou.records.LocalAttachmentController
 import com.t1doo.aiyou.records.AttachmentHistoryOwner
 import com.t1doo.aiyou.records.hasRecordAccess
 import com.t1doo.aiyou.records.LocalAttachmentScreen
+import com.t1doo.aiyou.records.AttachmentUiState
+import com.t1doo.aiyou.records.PlatformAttachmentPicture
 import com.t1doo.aiyou.records.AttachmentPicker
 import com.t1doo.aiyou.records.OriginalEditScreen
 import com.t1doo.aiyou.records.OriginalHistoryScreen
@@ -152,6 +155,12 @@ fun AIyouApp(
     val editing = if (reading) local?.originalEdit?.takeIf { it.entryId == readerId } else null
     val history = if (reading) local?.originalHistory?.takeIf { it.entryId == readerId } else null
     val historyList = remember(history?.sessionId) { LazyListState() }
+    val originalScroll = remember(selected, readerId, local?.entries?.firstOrNull { it.id == readerId }?.currentRevision) { ScrollState(0) }
+    val historicalScroll = remember(readerId, history?.sessionId, history?.selectedRevision) { ScrollState(0) }
+    fun canShowPicture(panel: AttachmentUiState, source: LocalRecordUiState?) =
+        panel.picture is PlatformAttachmentPicture && !panel.unavailable && panel.error == null &&
+            source != null && source.ready && !source.opening && source.error == null && panel.hasRecordAccess(source)
+    val viewingPicture = attachmentPanel?.let { canShowPicture(it, local) } == true
     fun ownsEdit(sessionId: Long): Boolean = ownsNavigation() && reading && detailEntryId == readerId &&
         selectedName == origin.name && !showSettings && !demo &&
         currentLocal?.originalHistory == null && currentLocal?.originalEdit?.let { it.sessionId == sessionId && it.entryId == readerId } == true
@@ -194,7 +203,11 @@ fun AIyouApp(
             val activeHistory = currentLocal?.originalHistory?.takeIf { it.entryId == readerId }
             val activeAttachment = attachments?.state?.value
             if (activeAttachment != null) {
-                if (!activeAttachment.saving) { navigation.generation++; attachments?.close(activeAttachment.sessionId) }
+                if (!activeAttachment.saving) {
+                    navigation.generation++
+                    if (canShowPicture(activeAttachment, currentLocal)) attachments?.closePicture(activeAttachment.sessionId)
+                    else attachments?.close(activeAttachment.sessionId)
+                }
             } else if (activeHistory != null) backHistory(activeHistory.sessionId)
             else if (edit != null) cancelEdit(edit.sessionId) else {
                 navigation.generation++
@@ -321,8 +334,8 @@ fun AIyouApp(
         modifier = Modifier.imePadding().onSizeChanged { scaffoldHeightPx = it.height },
         topBar = {
             NotebookAppBar(
-                if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
-                if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
+                if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
+                if (viewingPicture) "返回附件列表" else if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
                 else if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
                 else if (editing != null) "取消编辑" else if (reading) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
                 actionEnabled = attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
@@ -379,17 +392,17 @@ fun AIyouApp(
                 onRetrySave = { attachments.retrySave(panel.sessionId) }, onView = { attachments.view(panel.sessionId, it) },
                 onClosePicture = { attachments.closePicture(panel.sessionId) }, modifier = modifier,
                 onRetryRecords = if (local.ready && local.error != null && !local.opening) retryReading else null,
-                onMetadataChoice = { attachments.setJpegMetadataChoice(panel.sessionId, it) })
+                onMetadataChoice = { attachments.setJpegMetadataChoice(panel.sessionId, it) }, showPictureClose = false)
         } else if (history != null && local != null) {
             OriginalHistoryScreen(history, local, historyList, selectHistory, backHistory, retryHistory,
                 retryReading, copyHistory, canCopyHistory, modifier, editHistory, confirmHistoryReplacement, cancelHistoryReplacement,
-                onAttachments = if (attachments != null) beginHistoricalAttachments else null)
+                onAttachments = if (attachments != null) beginHistoricalAttachments else null, originalScrollState = historicalScroll)
         } else if (editing != null && local != null) {
             OriginalEditScreen(editing, local, changeEdit, saveEdit, cancelEdit, modifier, onRetry = retryReading, onHistory = beginHistory)
         } else if (reading && local != null) {
             OriginalReadingScreen(checkNotNull(readerId), local, onRetry = retryReading,
                 onCopy = copy, canCopy = canCopy, modifier = modifier, onEdit = beginEdit, onHistory = beginHistory,
-                onAttachments = if (attachments != null) beginAttachments else null)
+                onAttachments = if (attachments != null) beginAttachments else null, originalScrollState = originalScroll)
         } else if (!demo && local != null && selected != Destination.TASKS) {
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
