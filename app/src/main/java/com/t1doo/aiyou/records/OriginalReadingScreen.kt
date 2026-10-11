@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.selection.SelectionState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -33,13 +33,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.platform.AndroidClipboard
+import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.ScrollAxisRange
-import androidx.compose.ui.semantics.verticalScrollAxisRange
+import androidx.compose.ui.text.AnnotatedString
 import com.t1doo.aiyou.designsystem.AIyouColors
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.ComponentState
@@ -87,11 +86,11 @@ private fun markSensitive(clip: ClipData) {
 
 /** The native selection menu follows the same current-record gate as explicit full copy. */
 private class ReadingClipboard(
-    private val platform: AndroidClipboard,
+    private val platform: Clipboard,
     private val isCurrent: () -> Boolean,
     private val onDenied: () -> Unit,
     private val onCopied: () -> Unit,
-) : AndroidClipboard by platform {
+) : Clipboard by platform {
     override suspend fun setClipEntry(clipEntry: ClipEntry?) {
         if (!isCurrent() || clipEntry == null) return
         markSensitive(clipEntry.clipData)
@@ -140,27 +139,27 @@ fun OriginalReadingScreen(
                     key(entry.id, entry.currentRevision) {
                         val id = entry.id
                         val revision = entry.currentRevision
-                        val platform = LocalClipboard.current as AndroidClipboard
+                        val platform = LocalClipboard.current
                         val currentGate by rememberUpdatedState(canCopy)
                         val clipboard = remember(platform, id, revision) {
                             ReadingClipboard(platform, isCurrent = { currentGate(id, revision) },
                                 onDenied = { copyDenied = true }, onCopied = { copyDenied = false })
                         }
+                        // SelectionState's Saver includes selected plaintext. Keep it memory-only.
+                        val selection = remember(entry.originalText) { SelectionState() }
                         LocalOriginalReadingObserver.current?.let { observer ->
-                            SideEffect { observer.onClipboard(clipboard) }
+                            SideEffect { observer.onClipboard(clipboard); observer.onSelection(selection) }
                         }
-                        // Plain remember intentionally avoids TextFieldState's plaintext Saver.
-                        val text = remember(entry.originalText) { TextFieldState(initialText = entry.originalText) }
                         val scroll = rememberScrollState()
                         CompositionLocalProvider(LocalClipboard provides clipboard) {
-                            BasicTextField(state = text, readOnly = true, scrollState = scroll,
-                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = AIyouColors.textPrimary),
-                                modifier = Modifier.fillMaxWidth().weight(1f).testTag("original-text")
-                                    .semantics {
-                                        contentDescription = "记录完整原文"
-                                        verticalScrollAxisRange = ScrollAxisRange(
-                                            value = { scroll.value.toFloat() }, maxValue = { scroll.maxValue.toFloat() })
-                                    })
+                            SelectionContainer(state = selection,
+                                modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(scroll).testTag("original-scroll")) {
+                                // One fully composed text supports selecting/copying the whole original.
+                                Text(AnnotatedString(entry.originalText), style = MaterialTheme.typography.bodyLarge,
+                                    color = AIyouColors.textPrimary,
+                                    modifier = Modifier.fillMaxWidth().testTag("original-text")
+                                        .semantics { contentDescription = "记录完整原文" })
+                            }
                         }
                     }
                 }

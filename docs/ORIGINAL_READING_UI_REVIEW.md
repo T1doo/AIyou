@@ -6,7 +6,7 @@
 
 此刻和回忆在 App 的稳定位置分别保留列表索引/偏移与选中 ID。阅读时提供“返回列表”和系统 Back；恢复保存状态只保存导航 ID 与滚动位置。界面内存中的会话 generation 在导航时失效，composition dispose 后也失效；旧返回/导航/打开/复制/阅读重试回调不能作用于不同记录，或关闭后重开的同一 ID。该会话不写数据库、不做 Saveable。原文不加入 `rememberSaveable`、SavedStateHandle、日志或导出文件。读取中、读取失败、未就绪和记录不存在均显示明确状态，不把其他相似内容当成旧记录。当前 Revision 改变会重新建立阅读选择/滚动状态。
 
-固定 Compose 1.12.1 的 state 版 BasicTextField 使用普通 remember 管理 TextFieldState，不使用会保存正文的 rememberTextFieldState。显式 ScrollState 提供真实滚动值/边界语义；只读文本保留选择与原生复制，另提供显式“复制全文”。两种复制均在写剪贴板之前校验当前目的地、阅读 ID、最新可用状态、记录存在与请求 Revision；失效回调不复制旧正文。系统 SecurityException 拒绝复制时保留原文，显示短失败说明；不报告复制成功。迟到阅读页重试也校验当前阅读 ID 和目的地。原生选择代理保持 AndroidClipboard 接口，兼容固定 Compose 的平台菜单查询。API33+ 设置系统敏感剪贴板标记，降低系统内容预览泄露；已成功复制的系统剪贴板不自动撤回。应用不自行读取剪贴板，也不在复制 label 放正文。
+固定 Compose 1.12.1 使用公开 SelectionContainer、一个完整组合的 Text 和普通 remember 管理的 SelectionState；不使用会保存所选正文的 rememberSelectionState/Saver。显式 ScrollState 提供真实滚动值/边界语义；原文支持原生选择菜单和键盘复制，另提供显式“复制全文”。选择路径通过公开 Clipboard 代理写入，不依赖仅供测试的 AndroidClipboard 接口。两种复制均在写剪贴板之前校验当前目的地、阅读 ID、最新可用状态、记录存在与请求 Revision；失效回调不复制旧正文。系统 SecurityException 拒绝复制时保留原文，显示短失败说明；不报告复制成功。迟到阅读页重试也校验当前阅读 ID 和目的地。API33+ 设置系统敏感剪贴板标记，降低系统内容预览泄露；已成功复制的系统剪贴板不自动撤回。应用不自行读取剪贴板，也不在复制 label 放正文。
 
 没有更改 schema、Repository、ViewModel 保存/草稿事务、处理策略、许可和网络授权；没有新依赖、真实模型调用、自建后台或品牌角色资产。既有输入/保存/失败重试组件和测试保留。
 
@@ -14,10 +14,12 @@
 
 增加十个真实 Compose/JVM 交互用例，覆盖代理对边界与 100000 UTF16 原文全量复制、ID/Revision/删除、两个列表位置与系统 Back、失效回调、原生选段/敏感标记、导航恢复、320×640dp/200% 字体/键盘焦点和密集换行全文末端，以及读取重试/草稿保留、迟到重试归属与系统复制拒绝。合成状态只验证生产界面，不证明本机数据库重启、跨 PID 或旧库迁移。
 
-e279084 的实际 CI 执行 23 项 App 用例，其中 4 项失败：测试保存的 Compose Modifier 节点语义动作在卸载后先由框架抛异常，尚未进入应用回调。修正使用 internal、默认 null、仅内存的 CompositionLocal observer，在 SideEffect 后观察同一份生产控件回调和实际 AndroidClipboard 代理；旧实例保留原会话，不复制或替换门禁逻辑。当前控件的实际点击、原生 SetSelection/CopyText、真实平台复制成功/拒绝断言仍保留；迟到选段写入调用先前代理及实际原生复制产生的 ClipEntry。此修正待新 SHA 的源码独审与 CI，不能凭框架卸载异常宣称门禁通过。
+e279084 的实际 CI 执行 23 项 App 用例，其中 4 项失败：测试保存的 Compose Modifier 节点语义动作在卸载后先由框架抛异常，尚未进入应用回调。修正使用 internal、默认 null、仅内存的 CompositionLocal observer，在 SideEffect 后观察同一份生产控件回调；旧实例保留原会话，不复制或替换门禁逻辑。2f035cf 的 23 项 App 交互、全部 47 项 JVM、12 个 XML 用例门槛、59 项 Python、264 个实际渲染和 APK 检查通过，但严格 lint 因生产代码使用 AndroidClipboard 的 7 个 VisibleForTests 错误失败，整次 CI 为 FAIL。
+
+当前修正改为观察同一个公开 Clipboard 代理及实际 SelectionState。当前控件的点击、公开 SelectionState.select/selectAll、真实 Ctrl+C 键输入、平台复制成功/拒绝断言均保留；静态 Text 使用标准 Text/GetTextLayoutResult 语义，不伪造 SetSelection/CopyText。迟到选段写入调用先前代理及实际原生复制产生的 ClipEntry。100000 UTF16/至少 25000 行的文本布局、末行进入真实滚动视口、全选与平台全文复制仍需实际通过，不能只凭文本长度判定长文可读。此修正待新 SHA 的源码独审与 CI；历史失败日志保留。
 
 新增四种正式生产组件渲染，每种四尺寸：长原文列表、全文阅读、记录不存在、原文读取失败。全套应为 264 个真实 render case/PNG，七包为 28/28/28/112/2/14/52；review 包含 52 张完整页面。所有 PNG 使用实际生产组件和合成内容，不等同真机验收或批准的 golden。
 
-初始源码阶段：Python 59 个测试 PASS；Android 构建、23 个 App JVM 用例、最大正文布局、lint 和本轮 264 个渲染均待实际 CI，不引用历史提交的 PASS。固定 Compose 1.12.1 官方源代码核验在工作区保全，并非本轮运行证据。本环境没有已配置 Android SDK，沿用已有 CI 的安装/许可核验，不安装 SDK 或接受新协议。
+当前源码修正阶段：Android 构建、23 个 App JVM 用例、最大正文布局、lint、59 项 Python 和本轮 264 个渲染均待新 SHA 的实际 CI，不引用历史提交的 PASS。固定 Compose 1.12.1 官方源代码核验在工作区保全，并非本轮运行证据。本环境没有已配置 Android SDK，沿用已有 CI 的安装/许可核验，不安装 SDK 或接受新协议。
 
 设备输入法、实际长按拖动选择、TalkBack、密集长文的设备性能、滚动后像素核查：NOT RUN。原 D02 原生数据库/迁移/跨 PID/16 KB/性能及 JNI String NOTICE 缺口继续保留。本轮不能称完整 D02 完成。

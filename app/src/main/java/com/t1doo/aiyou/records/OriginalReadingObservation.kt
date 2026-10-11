@@ -1,7 +1,8 @@
 package com.t1doo.aiyou.records
 
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.platform.AndroidClipboard
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.foundation.text.selection.SelectionState
 import com.t1doo.aiyou.ui.Destination
 
 /** Observe the actual app callbacks, never detached framework Modifier-node actions.
@@ -17,7 +18,8 @@ internal data class OriginalReadingCallbacks(
 
 internal interface OriginalReadingObserver {
     fun onNavigation(callbacks: OriginalReadingCallbacks)
-    fun onClipboard(clipboard: AndroidClipboard)
+    fun onClipboard(clipboard: Clipboard)
+    fun onSelection(selection: SelectionState)
 }
 
 internal val LocalOriginalReadingObserver = staticCompositionLocalOf<OriginalReadingObserver?> { null }

@@ -15,8 +15,11 @@ import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
-import androidx.compose.ui.platform.AndroidClipboard
+import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.foundation.text.selection.SelectionState
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -42,6 +45,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -77,10 +82,12 @@ import kotlinx.coroutines.runBlocking
 class OriginalReadingPresentationTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var callbacks: OriginalReadingCallbacks
-    private lateinit var readingClipboard: AndroidClipboard
+    private lateinit var readingClipboard: Clipboard
+    private lateinit var selection: SelectionState
     private val observer = object : OriginalReadingObserver {
         override fun onNavigation(callbacks: OriginalReadingCallbacks) { this@OriginalReadingPresentationTest.callbacks = callbacks }
-        override fun onClipboard(clipboard: AndroidClipboard) { readingClipboard = clipboard }
+        override fun onClipboard(clipboard: Clipboard) { readingClipboard = clipboard }
+        override fun onSelection(selection: SelectionState) { this@OriginalReadingPresentationTest.selection = selection }
     }
     private val clipboard get() = RuntimeEnvironment.getApplication().getSystemService(ClipboardManager::class.java)
     private fun entry(id: String = "record", text: String = "合成完整原文", revision: Int = 1) =
@@ -102,7 +109,12 @@ class OriginalReadingPresentationTest {
         SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab))
     private fun sentinel() = compose.runOnIdle { clipboard.setPrimaryClip(ClipData.newPlainText("合成", "哨兵")) }
     private fun copied() = clipboard.primaryClip!!.getItemAt(0).text.toString()
-    private fun fullText() = compose.onNodeWithTag("original-text").fetchSemanticsNode().config[SemanticsProperties.EditableText].text
+    private fun fullText() = compose.onNodeWithTag("original-text").fetchSemanticsNode().config[SemanticsProperties.Text].single().text
+    private fun select(start: Int, end: Int) = compose.runOnIdle { selection.select(TextRange(start, end)) }
+    private fun nativeCopy() {
+        compose.onNodeWithTag("original-text").performKeyInput { keyDown(Key.CtrlLeft); pressKey(Key.C); keyUp(Key.CtrlLeft) }
+        compose.waitForIdle()
+    }
 
     @Test fun boundedUnicodePreviewOpensAndCopiesEveryOriginalCharacter() {
         val text = "🌿".repeat(120) + "界".repeat(99_756) + "末端原文"
@@ -187,17 +199,12 @@ class OriginalReadingPresentationTest {
     @Test fun nativeSelectionCopiesOnlySelectedTextWithSensitiveFlagAndRejectsStaleCopy() {
         val state = state(entry(text = "合成选段与末尾"))
         content(state); open()
-        val field = compose.onNodeWithTag("original-text")
-        field.performSemanticsAction(SemanticsActions.SetSelection) { assertTrue(it(2, 4, false)) }
-        field.performSemanticsAction(SemanticsActions.CopyText) { assertTrue(it()) }
-        compose.waitForIdle()
+        select(2, 4); nativeCopy()
         compose.runOnIdle {
             assertEquals("选段", copied())
             assertTrue(clipboard.primaryClip!!.description.extras!!.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE))
         }
-        field.performSemanticsAction(SemanticsActions.SetSelection) { assertTrue(it(0, 2, false)) }
-        field.performSemanticsAction(SemanticsActions.CopyText) { assertTrue(it()) }
-        compose.waitForIdle()
+        select(0, 2); nativeCopy()
         val stale = readingClipboard
         val oldSelection = compose.runOnIdle { assertEquals("合成", copied()); ClipEntry(clipboard.primaryClip!!) }
         sentinel()
@@ -205,10 +212,8 @@ class OriginalReadingPresentationTest {
         compose.runOnIdle { runBlocking { stale.setClipEntry(oldSelection) } }
         compose.waitForIdle()
         compose.runOnIdle { assertEquals("哨兵", copied()) }
-        // Attached native selection stays operable; late writes use its actual production proxy.
-        field.performSemanticsAction(SemanticsActions.SetSelection) { assertTrue(it(2, 5, false)) }
-        field.performSemanticsAction(SemanticsActions.CopyText) { assertTrue(it()) }
-        compose.waitForIdle()
+        // Native selection and keyboard copy stay operable; late writes use its actual proxy.
+        select(2, 5); nativeCopy()
         val afterClose = readingClipboard
         val latestSelection = compose.runOnIdle { assertEquals("新原文", copied()); ClipEntry(clipboard.primaryClip!!) }
         sentinel()
@@ -271,7 +276,7 @@ class OriginalReadingPresentationTest {
         compose.setContent {
             input = LocalInputModeManager.current
             val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f), LocalOriginalReadingObserver provides observer) {
                 Box(Modifier.size(320.dp, 640.dp).testTag("reader-viewport")) {
                     AIyouTheme { AIyouApp(local = state.value, previewEntryId = "record", onSave = { saves++ }, onDraftChange = { edits++ }) }
                 }
@@ -284,18 +289,19 @@ class OriginalReadingPresentationTest {
         val layout = layouts.single()
         assertEquals(text.length, layout.getLineEnd(layout.lineCount - 1))
         assertTrue(layout.lineCount >= 25_000)
-        val scroll = field.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        val scrollNode = compose.onNodeWithTag("original-scroll")
+        val scroll = scrollNode.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
         val before = scroll.value()
         assertTrue(scroll.maxValue() > 0f)
-        field.performSemanticsAction(SemanticsActions.ScrollBy) { assertTrue(it(0f, scroll.maxValue())) }
+        scrollNode.performSemanticsAction(SemanticsActions.ScrollBy) { assertTrue(it(0f, scroll.maxValue())) }
         compose.waitForIdle()
-        val after = field.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        val after = scrollNode.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
         assertTrue(after.value() > before)
         assertEquals(after.maxValue(), after.value(), 1f)
         // Last-line geometry must reach the viewport, beyond full-string/selection assertions.
         val lastTop = layout.getLineTop(layout.lineCount - 1) - after.value()
         val lastBottom = layout.getLineBottom(layout.lineCount - 1) - after.value()
-        val fieldHeight = field.fetchSemanticsNode().boundsInRoot.height
+        val fieldHeight = scrollNode.fetchSemanticsNode().boundsInRoot.height
         assertTrue(lastTop >= -1f && lastBottom <= fieldHeight + 1f)
         val viewport = compose.onNodeWithTag("reader-viewport").getUnclippedBoundsInRoot()
         assertEquals(320.dp, viewport.width); assertEquals(640.dp, viewport.height)
@@ -314,6 +320,10 @@ class OriginalReadingPresentationTest {
         val edit = field.fetchSemanticsNode().config.getOrNull(SemanticsActions.SetText)?.action
         if (edit != null) compose.runOnIdle { assertFalse(edit(androidx.compose.ui.text.AnnotatedString("不得修改"))) }
         assertEquals(text, fullText())
+        sentinel()
+        compose.runOnIdle { selection.selectAll(); assertEquals(text, selection.selectedTexts.single().text) }
+        nativeCopy()
+        compose.runOnIdle { assertEquals(text, copied()) }
         compose.onNodeWithText("返回列表").assertIsDisplayed().performClick()
     }
 
@@ -347,14 +357,15 @@ class OriginalReadingPresentationTest {
         DenyClipboardShadow.denials = 0
         val state = state(entry())
         var saves = 0; var edits = 0
-        compose.setContent { AIyouTheme { AIyouApp(local = state.value, previewEntryId = "record",
-            onSave = { saves++ }, onDraftChange = { edits++ }) } }
+        compose.setContent {
+            CompositionLocalProvider(LocalOriginalReadingObserver provides observer) {
+                AIyouTheme { AIyouApp(local = state.value, previewEntryId = "record",
+                    onSave = { saves++ }, onDraftChange = { edits++ }) }
+            }
+        }
         compose.onNodeWithText("复制全文").performClick()
         compose.onNodeWithText("无法复制，原文已保留。").assertIsDisplayed()
-        val field = compose.onNodeWithTag("original-text")
-        field.performSemanticsAction(SemanticsActions.SetSelection) { assertTrue(it(0, 2, false)) }
-        field.performSemanticsAction(SemanticsActions.CopyText) { assertTrue(it()) }
-        compose.waitForIdle()
+        select(0, 2); nativeCopy()
         compose.runOnIdle {
             assertEquals(2, DenyClipboardShadow.denials)
             assertEquals("合成未保存草稿", state.value.text)
