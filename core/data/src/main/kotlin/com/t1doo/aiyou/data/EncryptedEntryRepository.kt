@@ -24,10 +24,12 @@ class EncryptedEntryRepository internal constructor(
     internal val database: RecordsDatabase,
     private val keyBytes: ByteArray,
     private val attachmentStorage: EncryptedAttachmentStore,
+    private val originalEditStorage: EncryptedOriginalEditStore,
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) : EntryRepository, AutoCloseable {
     private val dao get() = database.records()
     override val attachments: AttachmentStore get() = attachmentStorage
+    override val editDrafts: EncryptedOriginalEditStore get() = originalEditStorage
 
     override suspend fun prepare() { attachmentStorage.recover() }
 
@@ -74,7 +76,7 @@ class EncryptedEntryRepository internal constructor(
     }
 
     override fun close() {
-        try { database.close() } finally { attachmentStorage.close(); keyBytes.fill(0) }
+        try { database.close() } finally { attachmentStorage.close(); originalEditStorage.close(); keyBytes.fill(0) }
     }
 
     companion object {
@@ -85,7 +87,13 @@ class EncryptedEntryRepository internal constructor(
             val file = File(context.noBackupFilesDir, "records/records.db")
             val keyFile = File(context.noBackupFilesDir, "keys/database.key")
             val existing = file.exists() || File(file.path + "-wal").exists() || File(file.path + "-shm").exists()
-            return openWithKey(context, file, AndroidDatabaseKeyProvider(keyFile, DATABASE_KEY_ALIAS).load(existing)) { database ->
+            return openWithKey(context, file, AndroidDatabaseKeyProvider(keyFile, DATABASE_KEY_ALIAS).load(existing),
+                editKey = {
+                    val drafts = File(file.parentFile, file.name + ".original-edits")
+                    val existingDrafts = drafts.listFiles()?.any { it.name != ".store.lock" } == true
+                    AndroidDatabaseKeyProvider(File(context.noBackupFilesDir, "keys/original-edits.key"), DATABASE_KEY_ALIAS,
+                        "AIyou original edit key v1".toByteArray(Charsets.US_ASCII)).load(existingDrafts)
+                }) { database ->
                 val blobs = File(file.parentFile, file.name + ".attachments")
                 val existingBlobs = blobs.listFiles()?.any { it.name != ".store.lock" } == true
                 val existingRows = database.openHelper.writableDatabase.query("SELECT count(*) FROM attachments").use {
@@ -100,10 +108,14 @@ class EncryptedEntryRepository internal constructor(
 
         /** Tests supply synthetic keys; the production factory supplies an independently wrapped media key. */
         internal fun openWithKey(context: Context, file: File, key: ByteArray,
+            editKey: (RecordsDatabase) -> ByteArray = {
+                MessageDigest.getInstance("SHA-256").digest("AIyou synthetic edit test key v1".toByteArray(Charsets.US_ASCII) + key)
+            },
             attachmentKey: (RecordsDatabase) -> ByteArray = { key.copyOf() },
         ): EncryptedEntryRepository {
             var database: RecordsDatabase? = null
             var storage: EncryptedAttachmentStore? = null
+            var edits: EncryptedOriginalEditStore? = null
             var opened = false
             try {
                 require(key.size == 32)
@@ -124,10 +136,13 @@ class EncryptedEntryRepository internal constructor(
                     require(mediaKey.size == 32)
                     storage = EncryptedAttachmentStore(File(file.parentFile, file.name + ".attachments"), RoomAttachmentLedger(created), mediaKey)
                 } catch (failure: Exception) { mediaKey.fill(0); throw failure }
-                return EncryptedEntryRepository(created, key, checkNotNull(storage)).also { opened = true }
+                val draftKey = editKey(created)
+                try { edits = EncryptedOriginalEditStore(File(file.parentFile, file.name + ".original-edits"), draftKey) }
+                catch (failure: Exception) { draftKey.fill(0); throw failure }
+                return EncryptedEntryRepository(created, key, checkNotNull(storage), checkNotNull(edits)).also { opened = true }
             } finally {
                 if (!opened) {
-                    try { database?.close() } finally { storage?.close(); key.fill(0) }
+                    try { database?.close() } finally { storage?.close(); edits?.close(); key.fill(0) }
                 }
             }
         }

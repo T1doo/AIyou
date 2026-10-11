@@ -83,6 +83,7 @@ class MainActivity : ComponentActivity() {
             AIyouTheme { AIyouApp(local = local, onDraftChange = records::changeText, onSave = records::save, onRetry = records::retry,
                 onBeginOriginalEdit = records::beginOriginalEdit, onOriginalEditChange = records::changeOriginalEdit,
                 onOriginalEditSave = records::saveOriginalEdit, onOriginalEditCancel = records::cancelOriginalEdit,
+                onResumeOriginalEdit = records::resumeOriginalEdit,
                 onBeginOriginalHistory = records::beginOriginalHistory, onSelectOriginalRevision = records::selectOriginalRevision,
                 onBackOriginalHistory = records::backOriginalHistory, onRetryOriginalHistory = records::retryOriginalHistory,
                 onEditOriginalHistory = records::editOriginalHistory,
@@ -115,6 +116,7 @@ fun AIyouApp(
     onOriginalEditChange: (Long, String) -> Unit = { _, _ -> },
     onOriginalEditSave: (Long) -> Unit = {},
     onOriginalEditCancel: (Long) -> Unit = {},
+    onResumeOriginalEdit: (String, String) -> Unit = { _, _ -> },
     onBeginOriginalHistory: (String, Int) -> Unit = { _, _ -> },
     onSelectOriginalRevision: (Long, Int) -> Unit = { _, _ -> },
     onBackOriginalHistory: (Long) -> Unit = {},
@@ -416,7 +418,16 @@ fun AIyouApp(
                     (imeVisible || (navigationHeightPx > 0 && bottomPaddingPx >= navigationHeightPx)),
                 ownsTailReturn = { ownsNavigation() && request != null && tailReturnRequest == request &&
                     detailEntryId == null && selectedName == request.destination.name && !showSettings && !demo },
-                onTailReturnHandled = { if (ownsNavigation() && request != null && tailReturnRequest == request) tailReturnRequest = null })
+                onTailReturnHandled = { if (ownsNavigation() && request != null && tailReturnRequest == request) tailReturnRequest = null },
+                onResumeEdit = { id, draftId ->
+                    val latest = currentLocal
+                    if (ownsNavigation() && detailEntryId == null && !showSettings && !demo && latest != null &&
+                        latest.ready && !latest.opening && latest.error == null && !latest.saving && !latest.savePending &&
+                        latest.originalEdit == null && latest.originalHistory == null && attachments?.state?.value == null &&
+                        latest.pendingEdits.any { it.entryId == id && it.id == draftId }) {
+                        navigation.generation++; detailEntryId = id; onResumeOriginalEdit(id, draftId)
+                    }
+                })
         } else {
             MainScreen(
                 destination = selected, demo = demo, modifier = modifier,

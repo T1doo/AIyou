@@ -54,7 +54,7 @@ fun OriginalEditScreen(
                 if (!edit.dirty && edit.sourceRevision != edit.baseRevision) Text("文本与当前原文相同，无需保存新版本。",
                     style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                 OutlinedTextField(value = edit.text, onValueChange = { onChange(edit.sessionId, it) },
-                    readOnly = edit.saving || edit.awaitingReadback,
+                    readOnly = edit.saving || edit.awaitingReadback || edit.loadingDraft || edit.discarding,
                     modifier = Modifier.fillMaxWidth().testTag("original-edit-text"),
                     label = { Text("修改原文") }, textStyle = MaterialTheme.typography.bodyLarge,
                     minLines = 3, maxLines = 6, isError = edit.inputNotice != null)
@@ -77,7 +77,7 @@ fun OriginalEditScreen(
                     "保存完成前请稍候。", state = ComponentState.LOADING)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm),
                     verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                    Button(onClick = { onSave(edit.sessionId) }, enabled = !edit.saving && available &&
+                    Button(onClick = { onSave(edit.sessionId) }, enabled = !edit.saving && !edit.loadingDraft && !edit.discarding && available &&
                         (edit.awaitingReadback || !changed && edit.dirty && edit.text.isNotBlank()),
                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-edit-save")) {
                         Text(if (edit.awaitingReadback) "重试读取" else if (edit.error != null) "重试保存" else "保存新版本")
@@ -85,7 +85,9 @@ fun OriginalEditScreen(
                     TextButton(onClick = { onCancel(edit.sessionId) }, enabled = edit.canCancel,
                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-edit-cancel")) { Text("取消编辑") }
                 }
-                Text("未保存的修改仅在当前应用会话中保留。", style = MaterialTheme.typography.bodySmall,
+                if (edit.loadingDraft || edit.discarding) StatusNotice(if (edit.loadingDraft) "正在读取编辑草稿" else "正在丢弃修改",
+                    "完成前请稍候。", state = ComponentState.LOADING)
+                Text(edit.draftNotice, style = MaterialTheme.typography.bodySmall,
                     color = AIyouColors.textSecondary)
                 onHistory?.let { history ->
                     TextButton(onClick = { current?.let { history(it.id, it.currentRevision) } },

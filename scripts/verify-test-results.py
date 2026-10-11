@@ -17,9 +17,9 @@ targets = [("domain", "core/domain/build/test-results/test", 3)]
 if args.component:
     targets.append(("component", "core/designsystem/build/test-results/testDebugUnitTest", 7))
 if args.queue:
-    targets.append(("host queue", "checks/record-queue/build/test-results/test", 84))
+    targets.append(("host queue", "checks/record-queue/build/test-results/test", 109))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 75))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 78))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 for label, folder, minimum in targets:
@@ -338,3 +338,52 @@ for label, folder, minimum in targets:
             if len(matches) != 1:
                 raise SystemExit(f"FAIL: required Compose case={owner}.{name} actual={len(matches)}")
             print(f"PASS: required Compose case={owner}.{name} actual=1 failures=0 errors=0 skipped=0")
+
+    if label in ("host queue", "Compose JVM interaction"):
+        required_edit_cases = {
+            "host queue": {
+                "OriginalEditStorageTest": (
+                    "productionCipherColdReopenRestoresExactUnicodeAndContainsNoPlaintext",
+                    "discardTombstoneRejectsLateAutosaveBeforeAndAfterColdReopen",
+                    "concurrentStoresCompareAcknowledgedSnapshotsAndNeverOverwriteAnotherWriter",
+                    "beforeRenameWriteFailureKeepsAcknowledgedCipherAndEncryptedPartial",
+                    "lostPublicationAcknowledgementRetriesExactSnapshotWithoutReencrypting",
+                    "wrongKeyBitFlipAndFilenameSwapFailClosedAndPreserveOriginalBytes",
+                    "maximumExactUtf16DraftAndTerminalStatesStayBoundedAndClosedKeyIsZeroed",
+                    "existingDirectoryStillRequiresKnownParentConfirmationAndCreatesNoUnknownAncestors",
+                ),
+                "OriginalEditRecoveryTest": (
+                    "coldControllerRebuildRestoresEditIndependentlyThenSavesOneNewOriginal",
+                    "changedAndRemovedSourcesRestoreAsConflictsAndNeverBecomeReplacementRecords",
+                    "explicitDiscardQueuesAfterStartedWriteAndLateCallbacksCannotResurrectIt",
+                    "writeFailureKeepsInputsAndCorrectedRetryAcknowledgesOnlyCompleteSnapshot",
+                    "lostWriteAcknowledgementCanPersistCorrectedInputWithoutOverwritingCompetingWriter",
+                    "committedReadbackRetryAndColdReopenNeverAppendTheSameRevisionTwice",
+                    "interruptionBetweenFormalCommitAndDraftFinalizationRestoresConflictWithoutDuplicateWrite",
+                    "concurrentRestoredEditorsKeepCompetingCipherAndExplicitLocalDiscardCannotDeleteIt",
+                    "corruptEditCipherDoesNotReplaceOriginalCaptureDraftOrCipherEvidence",
+                    "lostFirstPublicationAcknowledgementThenDirectDiscardSurvivesColdReopen",
+                    "competingDraftAfterFormalCommitDoesNotBlockConfirmationOrRepeatRevision",
+                    "conflictCloseReleasesOldBindingBeforeHistoryRestoresCompetingDormantDraft",
+                    "staleRecoveryIdentityRefreshesIndexWithoutDeletingReplacementDraft",
+                    "publishedActiveRetryRequiresDurabilityConfirmationBeforeSavedNotice",
+                    "publishedDiscardRetryCannotCloseUntilDurabilityConfirmationSucceeds",
+                    "removedOrUnsupportedSourceRejectsLateAutosaveWithoutRestoringDeletedContent",
+                    "dormantRecoveredDraftIsNotReplacedByHistoryUntilExplicitDiscardConfirmation",
+                ),
+            },
+            "Compose JVM interaction": {
+                "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest": (
+                    "narrowLargeFontColdRecoveryCorrectionAndSaveKeepCaptureAndImmutableOriginals",
+                    "missingSourceRecoveryRetainsTextAndExplicitDiscardCannotResurrectIt",
+                    "actualCipherWriteFailureRemainsVisibleAndCorrectedRetryPreservesCompleteInput",
+                ),
+            },
+        }
+        for owner, names in required_edit_cases[label].items():
+            for name in names:
+                matches = [case for case in observed_cases if case.get("classname") == owner
+                           and case.get("name", "").split("[", 1)[0].strip().removesuffix("()") == name]
+                if len(matches) != 1:
+                    raise SystemExit(f"FAIL: required edit recovery case={owner}.{name} actual={len(matches)}")
+                print(f"PASS: required edit recovery case={owner}.{name} actual=1 failures=0 errors=0 skipped=0")

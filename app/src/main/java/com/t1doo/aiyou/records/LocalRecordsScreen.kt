@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -63,6 +65,7 @@ fun LocalRecordsScreen(
     returnViewportReady: Boolean = true,
     ownsTailReturn: () -> Boolean = { false },
     onTailReturnHandled: () -> Unit = {},
+    onResumeEdit: (String, String) -> Unit = { _, _ -> },
 ) {
     val displayedEntries = if (destination == Destination.NOW) local.entries.take(5) else local.entries
     var attachedViewport by remember { mutableStateOf(IntSize.Zero) }
@@ -153,6 +156,20 @@ fun LocalRecordsScreen(
                         actionLabel = "重试", onAction = onRetry)
                 } }
                 if (local.error == null) local.saveNotice?.let { message -> item("saved") { StatusNotice(message, "可以在回忆中查看原文；尚未执行 AI 整理。") } }
+                local.editDraftError?.let { message -> item("edit-draft-error") {
+                    StatusNotice("编辑草稿需要处理", message, state = ComponentState.ERROR, actionLabel = "重试读取", onAction = onRetry)
+                } }
+                items(local.pendingEdits, key = { "edit-draft-${it.id}" }) { draft ->
+                    Column(Modifier.fillMaxWidth()) {
+                        Text(if (local.entries.any { it.id == draft.entryId }) "有未保存的原文修改 · 基于版本 ${draft.baseRevision}"
+                            else "有未保存的修改 · 源记录已不可用", style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { onResumeEdit(draft.entryId, draft.id) },
+                            enabled = local.ready && !local.opening && local.error == null && !local.saving && !local.savePending,
+                            modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("resume-edit-${draft.entryId}")) {
+                            Text("恢复编辑草稿")
+                        }
+                    }
+                }
                 if (destination == Destination.MEMORIES) item("search") { SearchSection(demo = false) }
                 if (destination == Destination.NOW) item("recent") { Text("最近记录", style = MaterialTheme.typography.titleLarge) }
                 if (local.ready && local.entries.isEmpty()) item("empty") {

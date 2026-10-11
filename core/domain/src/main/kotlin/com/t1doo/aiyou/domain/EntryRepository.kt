@@ -6,6 +6,7 @@ import com.t1doo.aiyou.model.TextDraft
 
 /** Successful completion means a durable transaction, never an optimistic UI insert. */
 interface EntryRepository {
+    val editDrafts: OriginalEditDraftStore? get() = null
     /** Optional local attachment capability; supplied by the production encrypted repository. */
     val attachments: AttachmentStore? get() = null
     /** Finish local storage recovery before presenting restored records; no remote work. */

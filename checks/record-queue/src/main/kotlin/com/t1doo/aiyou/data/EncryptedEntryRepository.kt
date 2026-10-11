@@ -17,6 +17,7 @@ class EncryptedEntryRepository(
     private val failFirstRevision: Boolean = false,
     private val failRevisionReadback: Boolean = false,
     private val delayHistory: Boolean = false,
+    override val editDrafts: com.t1doo.aiyou.domain.OriginalEditDraftStore? = null,
 ) : EntryRepository, AutoCloseable {
     val firstEditStarted = CompletableDeferred<Unit>()
     val releaseFirstEdit = CompletableDeferred<Unit>()
