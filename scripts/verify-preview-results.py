@@ -11,7 +11,7 @@ reports = list((root / "app/build/test-results/validateDebugScreenshotTest").rgl
 cases = []
 for report in reports:
     cases.extend(ET.parse(report).getroot().iter("testcase"))
-expected = 216  # Original212 + two whole phone pages x regular/narrow large font.
+expected = 248  # Original216 + eight actual production states/routes x four sizes.
 if len(cases) != expected:
     raise SystemExit(f"FAIL: expected {expected} actual Preview smoke tests, found {len(cases)}")
 if any(any(case.find(tag) is not None for tag in ("failure", "error", "skipped")) for case in cases):
@@ -35,6 +35,12 @@ if len(complete) != 14 or any(item["height"] <= 2400 for item in complete):
 review = [item for item in manifest if "/ReviewNowRender_" in item["file"] or "/ReviewMemoriesRender_" in item["file"]]
 if len(review) != 4 or any(item["height"] < 2000 for item in review):
     raise SystemExit("FAIL: require four actual whole-phone-page renders")
+local_methods = ("LocalEmptyRender", "LocalRestoredRender", "LocalSavingRender", "LocalSaveFailedRender",
+                 "LocalReadFailedRender", "LocalSavedRender", "LocalRejectedInputRender", "LocalMemoriesRender")
+for method in local_methods:
+    production = [item for item in manifest if "/" + method + "_" in item["file"]]
+    if len(production) != 4:
+        raise SystemExit(f"FAIL: require all four actual production sizes for {method}, found {len(production)}")
 target = root / "app/build/reports/d01-preview-manifest.json"
 target.parent.mkdir(parents=True, exist_ok=True)
 target.write_text(json.dumps({"kind": "initial render smoke, not approved goldens", "count": expected,

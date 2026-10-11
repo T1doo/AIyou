@@ -29,6 +29,7 @@ data class LocalRecordUiState(
     val draftNotice: String = "正在读取本机草稿",
     val saveNotice: String? = null,
     val error: String? = null,
+    val inputNotice: String? = null,
 )
 
 /** All draft writes and saves share one queue, preserving edits around a save boundary. */
@@ -84,9 +85,16 @@ class LocalRecordsViewModel(application: Application) : AndroidViewModel(applica
 
     fun changeText(text: String) {
         val current = mutableState.value
-        if (!current.ready || current.saving || current.savePending || text.length > EncryptedEntryRepository.MAX_TEXT_LENGTH) return
+        if (!current.ready || current.saving || current.savePending) return
+        if (text.length > EncryptedEntryRepository.MAX_TEXT_LENGTH) {
+            mutableState.update { it.copy(
+                inputNotice = "文本过长，输入长度上限为 ${EncryptedEntryRepository.MAX_TEXT_LENGTH}。本次输入未替换原草稿，请缩短后重试。",
+                saveNotice = null,
+            ) }
+            return
+        }
         val generation = editGeneration.incrementAndGet()
-        mutableState.update { it.copy(text = text, draftNotice = "正在保存草稿", saveNotice = null) }
+        mutableState.update { it.copy(text = text, draftNotice = "正在保存草稿", saveNotice = null, inputNotice = null) }
         commands.trySend(Command.Edit(text, generation))
     }
 
@@ -94,7 +102,7 @@ class LocalRecordsViewModel(application: Application) : AndroidViewModel(applica
         val current = mutableState.value
         if (!current.ready || current.saving || current.text.isBlank()) return
         val intent = pendingIntent.get() ?: SaveIntent(current.text, editGeneration.get()).also { pendingIntent.set(it) }
-        mutableState.update { it.copy(saving = true, savePending = true, saveNotice = null, error = null) }
+        mutableState.update { it.copy(saving = true, savePending = true, saveNotice = null, error = null, inputNotice = null) }
         commands.trySend(Command.Save(intent))
     }
 

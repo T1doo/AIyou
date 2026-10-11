@@ -153,6 +153,9 @@ fun CaptureComposer(
     onAudio: (() -> Unit)? = null,
     state: ComponentState = ComponentState.NORMAL,
     availability: String = "记录保存尚未开放；输入仅用于界面演示",
+    showUnavailableControls: Boolean = true,
+    maxTextLength: Int? = null,
+    inputError: String? = null,
 ) {
     val canEdit = state != ComponentState.DISABLED && state != ComponentState.LOADING
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
@@ -161,7 +164,9 @@ fun CaptureComposer(
                 Modifier.padding(AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs),
             ) {
-                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (!showUnavailableControls && !askAvailable) {
+                    Text("记下一件小事", style = MaterialTheme.typography.titleMedium)
+                } else BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val stackControls = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
                     if (stackControls) {
                         Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
@@ -184,7 +189,8 @@ fun CaptureComposer(
                             .padding(AIyouDimensions.spaceSm)
                             .semantics {
                                 contentDescription = if (askMode) "想问些什么" else "此刻，想记下什么"
-                                if (state == ComponentState.ERROR) error("输入需要处理，请检查后重试。")
+                                if (inputError != null) error(inputError)
+                                else if (state == ComponentState.ERROR) error("输入需要处理，请检查后重试。")
                             },
                         enabled = canEdit,
                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = AIyouColors.textPrimary),
@@ -198,9 +204,23 @@ fun CaptureComposer(
                         },
                     )
                 }
+                maxTextLength?.let { limit ->
+                    Text("输入长度 ${text.length} / $limit", style = MaterialTheme.typography.bodySmall,
+                        color = AIyouColors.textSecondary)
+                }
+                inputError?.let { message ->
+                    Text(message, Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        style = MaterialTheme.typography.bodySmall, color = AIyouColors.error)
+                }
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val stackControls = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
-                    if (stackControls) {
+                    if (!showUnavailableControls && onImage == null && onAudio == null) {
+                        Button(onClick = { onSubmit?.invoke() }, enabled = canEdit && text.isNotBlank() && onSubmit != null,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget),
+                            shape = MaterialTheme.shapes.small) {
+                            Text(if (askMode) "提问" else "保存", style = MaterialTheme.typography.labelLarge)
+                        }
+                    } else if (stackControls) {
                         Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                                 ComposerAttachment(false, canEdit && onImage != null, onImage == null, { onImage?.invoke() }, Modifier.weight(1f))

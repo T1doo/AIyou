@@ -185,29 +185,19 @@ internal fun LocalProcessingStatus() {
 @Composable
 internal fun SearchSection(demo: Boolean) {
     var query by remember { mutableStateOf("") }
-    Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-        Surface(Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.medium) {
-            BasicTextField(query, { query = it }, Modifier.fillMaxWidth().padding(AIyouDimensions.spaceLg)
+    Surface(Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.medium) {
+        Column(Modifier.padding(AIyouDimensions.spaceMd), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+            BasicTextField(query, { query = it }, Modifier.fillMaxWidth()
                 .semantics { contentDescription = "搜索回忆，尚未开放"; stateDescription = "尚未开放" },
                 enabled = false, textStyle = MaterialTheme.typography.bodyLarge.copy(color = AIyouColors.textSecondary), singleLine = true,
                 decorationBox = { field -> Box {
                     if (query.isEmpty()) Text("搜索回忆 · 尚未开放", style = MaterialTheme.typography.bodyLarge, color = AIyouColors.textSecondary)
                     field()
                 } })
-        }
-        Surface(Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.medium) {
-            Column(Modifier.padding(AIyouDimensions.spaceMd), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                Text("筛选 · 尚未开放", style = MaterialTheme.typography.labelLarge, color = AIyouColors.textSecondary)
-                FlowRow(Modifier.fillMaxWidth().semantics {
+            Text("日期、人物、标签等筛选尚未开放，可向下浏览${if (demo) "示例" else "本机"}原文。",
+                Modifier.fillMaxWidth().semantics {
                     contentDescription = "日期、人物、标签、图片、收藏筛选尚未开放"; disabled()
-                }, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm),
-                    verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                    listOf("日期", "人物", "标签", "图片", "收藏").forEach { label ->
-                        Text(label, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-                    }
-                }
-                Text("搜索与筛选尚未开放，不会改变${if (demo) "示例" else "记录"}。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-            }
+                }, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
         }
     }
 }

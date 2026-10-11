@@ -153,7 +153,8 @@ class UnavailableControlsInteractionTest {
         }
         compose.onNodeWithText("图片未开放").assertIsDisplayed().assertIsNotEnabled()
         compose.onNodeWithText("录音未开放").assertIsDisplayed().assertIsNotEnabled()
-        compose.onNodeWithText("图片").assertIsDisplayed().assertHasNoClickAction()
+        compose.onNodeWithText("日期、人物、标签等筛选尚未开放，可向下浏览本机原文。")
+            .assertIsDisplayed().assertHasNoClickAction()
         compose.onNodeWithContentDescription("日期、人物、标签、图片、收藏筛选尚未开放")
             .assertIsNotEnabled().assertHasNoClickAction()
     }
