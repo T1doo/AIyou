@@ -2,6 +2,8 @@
 """Require real, successful test XML instead of treating NO-SOURCE as a pass."""
 from pathlib import Path
 import argparse
+import hashlib
+import json
 import xml.etree.ElementTree as ET
 
 root = Path(__file__).resolve().parents[1]
@@ -15,7 +17,7 @@ targets = [("domain", "core/domain/build/test-results/test", 3)]
 if args.component:
     targets.append(("component", "core/designsystem/build/test-results/testDebugUnitTest", 7))
 if args.queue:
-    targets.append(("host queue", "checks/record-queue/build/test-results/test", 45))
+    targets.append(("host queue", "checks/record-queue/build/test-results/test", 50))
 if args.ui:
     targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 53))
 if args.trace:
@@ -67,6 +69,108 @@ for label, folder, minimum in targets:
             if len(matches) != 1:
                 raise SystemExit(f"FAIL: required attachment case={owner}.{name} actual={len(matches)}")
             print(f"PASS: required attachment case={owner}.{name} actual=1 failures=0 errors=0 skipped=0")
+        owner = "com.t1doo.aiyou.data.AttachmentProcessTest"
+        process_methods = (
+            "distinctPidsRejectRecoveryAndImportWhileWriterOwnsLockThenRecoverOnce",
+            "terminatedWritingPidsNeedExplicitSameIntentSourceRetryEvenWithCompleteCiphertext",
+            "terminatedStagedAndPublishedPidsRecoverSameAuthenticatedFileWithoutRecopying",
+            "terminatedPidAfterDurableReadyBeforeLedgerAcknowledgementRecoversReadOnly",
+            "independentPidRecoveryRejectsChangedIdentitySourceHashKeyAndCiphertext",
+        )
+        for name in process_methods:
+            matches = [case for case in observed_cases if case.get("classname") == owner
+                       and case.get("name", "").split("[", 1)[0].strip().removesuffix("()") == name]
+            if len(matches) != 1:
+                raise SystemExit(f"FAIL: required attachment process case={owner}.{name} actual={len(matches)}")
+            print(f"PASS: required attachment process case={owner}.{name} actual=1 failures=0 errors=0 skipped=0")
+        process_suites = [ET.parse(report).getroot() for report in reports
+                          if ET.parse(report).getroot().get("name") == owner]
+        if len(process_suites) != 1:
+            raise SystemExit("FAIL: require one actual attachment process suite")
+        events = [json.loads(line.split("=", 1)[1])
+                  for line in process_suites[0].findtext("system-out", "").splitlines()
+                  if line.startswith("D02_ATTACHMENT_PROCESS_EVENT=")]
+        expected = {"lock", "intent", "writing", "encrypted", "staged", "published", "ledger-ack",
+                    "bad-identity", "bad-source", "bad-revision", "bad-digest", "bad-type", "bad-tag", "bad-key",
+                    "bad-source-bytes"}
+        if {event.get("scenario") for event in events} != expected:
+            raise SystemExit("FAIL: missing/unexpected actual child-process scenarios")
+        fixture_hash = hashlib.sha256(bytes((i * 31 + i // 251) % 256 for i in range(64 * 1024))).hexdigest()
+        starts = [e for e in events if e.get("event") == "started"]
+        if len(starts) != 31 or len({e.get("pid") for e in starts}) != 31:
+            raise SystemExit("FAIL: require 31 distinct actual owned child PIDs")
+        for scenario in expected:
+            group = [e for e in events if e["scenario"] == scenario]
+            roles = {"holder", "contender", "recoverer", "changed-intent"} if scenario == "lock" else (
+                {"bad-writer"} if scenario == "bad-source-bytes" else
+                {"writer", "rejector"} if scenario.startswith("bad-") else {"writer", "recoverer"})
+            started = [e for e in group if e["event"] == "started"]
+            if len(started) != len(roles) or {e["role"] for e in started} != roles:
+                raise SystemExit("FAIL: wrong independent process roles for " + scenario)
+            by_role = {e["role"]: e for e in started}
+            if any(e["pid"] not in {s["pid"] for s in started} for e in group):
+                raise SystemExit("FAIL: process evidence refers to an unstarted PID")
+            for start in started:
+                pid = start["pid"]
+                related = [e for e in group if e["pid"] == pid]
+                if type(pid) is not int or pid <= 0 or type(start["parent_pid"]) is not int or start["parent_pid"] <= 0 or pid == start["parent_pid"] \
+                        or any(e["parent_pid"] != start["parent_pid"] or e["role"] != start["role"] for e in related):
+                    raise SystemExit("FAIL: invalid independent PID/parent binding")
+                exits = [e for e in related if e["event"] == "exited"]
+                if len(exits) != 1 or exits[0]["alive"] is not False or type(exits[0]["exit"]) is not int:
+                    raise SystemExit("FAIL: missing bounded child exit confirmation")
+                kills = [e for e in related if e["event"] == "terminate-requested"]
+                if kills:
+                    reached = [e for e in related if e["event"] == "reached"]
+                    if len(kills) != 1 or len(reached) != 1 or kills[0]["stage"] != reached[0]["stage"] \
+                            or start["role"] not in {"holder", "writer"} or exits[0]["exit"] == 0 or exits[0]["result_written"] is not False:
+                        raise SystemExit("FAIL: termination lacks reached-stage/nonzero-exit/no-ack proof")
+                elif exits[0]["exit"] != 0 or exits[0]["result_written"] is not True:
+                    raise SystemExit("FAIL: unexpected normal child result/exit")
+            if scenario == "bad-source-bytes":
+                rejected = [e for e in group if e["event"] == "source-rejected"]
+                if len(rejected) != 1 or rejected[0]["state"] != "FAILED" or rejected[0]["source_calls"] != 1:
+                    raise SystemExit("FAIL: bad source bytes not rejected")
+                continue
+            writer = by_role["holder" if scenario == "lock" else "writer"]
+            if scenario == "lock":
+                for event, role, state in (("busy", "contender", "STAGED"), ("conflict", "changed-intent", "READY")):
+                    matches = [e for e in group if e["event"] == event]
+                    if len(matches) != 1 or matches[0]["pid"] != by_role[role]["pid"] \
+                            or matches[0]["state"] != state or matches[0]["source_calls"] != 0:
+                        raise SystemExit("FAIL: cross-process busy/conflict boundary differs")
+            reached = [e for e in group if e["event"] == "reached" and e["pid"] == writer["pid"]]
+            killed = [e for e in group if e["event"] == "terminate-requested" and e["pid"] == writer["pid"]]
+            phase = "staged" if scenario == "lock" or scenario.startswith("bad-") else scenario
+            if len(reached) != 1 or len(killed) != 1 or reached[0]["stage"] != phase:
+                raise SystemExit("FAIL: missing actual writer phase/termination")
+            required_state = "WRITING" if phase in {"intent", "writing", "encrypted"} else "READY" if phase == "ledger-ack" else "STAGED"
+            if reached[0]["ledger_state"] != required_state:
+                raise SystemExit("FAIL: phase differs from durable fixture ledger state")
+            size = reached[0]["cipher_bytes"]
+            if phase == "intent" and size != 0 or phase == "writing" and not 17 < size < 64 * 1024 + 33 \
+                    or phase not in {"intent", "writing"} and size != 64 * 1024 + 33:
+                raise SystemExit("FAIL: reached-stage ciphertext boundary differs")
+            if scenario.startswith("bad-"):
+                rejected = [e for e in group if e["event"] == "rejected"]
+                if len(rejected) != 1 or rejected[0]["pid"] != by_role["rejector"]["pid"] \
+                        or rejected[0]["writer_pid"] != writer["pid"] or rejected[0]["state"] != "CORRUPT" \
+                        or rejected[0]["source_calls"] != 0:
+                    raise SystemExit("FAIL: changed metadata/key/ciphertext not rejected in new PID")
+            else:
+                verified = [e for e in group if e["event"] == "verified"]
+                if len(verified) != 1 or verified[0]["pid"] != by_role["recoverer"]["pid"] \
+                        or verified[0]["writer_pid"] != writer["pid"] or verified[0]["state"] != "READY" \
+                        or verified[0]["read_sha256"] != fixture_hash \
+                        or verified[0]["source_calls"] != (1 if phase in {"intent", "writing", "encrypted"} else 0):
+                    raise SystemExit("FAIL: fresh PID authenticated read / source access boundary differs")
+                if phase not in {"intent", "writing", "encrypted"}:
+                    for field in ("cipher_sha256", "cipher_file_key", "cipher_bytes", "cipher_mtime_millis"):
+                        if reached[0][field] != verified[0][field]:
+                            raise SystemExit("FAIL: authenticated publication rewritten during recovery")
+        for event in events:
+            print("D02_ATTACHMENT_PROCESS_EVENT=" + json.dumps(event, separators=(",", ":"), sort_keys=True))
+        print("PASS: attachment independent-process evidence scenarios=15 child_pids=31 owned_terminations=14 confirmed_exits=31 authenticated_new_pid_reads=7 corruption_rejections=7")
     if label == "Compose JVM interaction":
         owner = "com.t1doo.aiyou.LocalRecordsPresentationTest"
         required = (

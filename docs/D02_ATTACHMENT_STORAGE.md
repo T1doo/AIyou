@@ -24,6 +24,8 @@ GCM 使用平台 Cipher，不指定非 Keystore provider；每次加密用 Secur
 
 四项 Python测试从真实Kotlin源提取迁移/DAO/trigger SQL，在真实主机 SQLite上执行；v2输入表来自既有实际 KSP schema2。覆盖旧四表不变、FK/重复ID拒绝、意图不变与state CAS、最终事务回滚。它们不是 Room/加密迁移验收。
 
+后续主机跨PID验证由`AttachmentProcessTest`监督独立Java子进程，运行同一真实生产文件实现。覆盖真实进程锁竞争、WRITING部分/完整密文但未STAGED、STAGED、文件已发布、合成账本READY已提交但确认未返回处的自有进程终止与新PID恢复。实际进程/阶段/退出及cipher hash/file-key/mtime证据须由每轮冻结独审/CI报告给出；不将进程终止扩大为物理断电、测试账本扩大为Room，或JVM进程扩大为Android进程。详见[D02_ATTACHMENT_PROCESS.md](D02_ATTACHMENT_PROCESS.md)。没有附件导入UI。
+
 四项 `AttachmentRecordsIntegrationTest` 需Android设备实际执行：真实加密附件固定版本重开/草稿作业不变、实际Room READY提交失败后启动恢复/篡改拒绝、合成加密v2→v3保全、Android包装媒体key用途隔离/丢失不替换。原13项加密记录测试及跨PID测试继续保留；v1迁移目标断言更新为真实v3，并增加空附件表断言，不删旧数据断言。CI只编译instrumentation APK，当前所有新增native执行为 NOT RUN。
 
 SOURCE冻结独审与实际CI结果由本轮交付报告给出；本文不提前宣称通过。schema3必须取实际KSP输出，禁止手写。默认LOCAL_ONLY、无INTERNET、无真实模型/新SDK协议/凭据、工具链锁与旧UI测试/渲染契约保持。

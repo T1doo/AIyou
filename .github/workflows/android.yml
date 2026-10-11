@@ -179,6 +179,7 @@ jobs:
             core/domain/build/reports/tests/test/
             checks/record-queue/build/test-results/test/
             checks/record-queue/build/reports/tests/test/
+            checks/record-queue/build/reports/attachment-process/
             checks/native-trace/build/test-results/test/
             checks/native-trace/build/reports/tests/test/
             core/designsystem/build/test-results/testDebugUnitTest/

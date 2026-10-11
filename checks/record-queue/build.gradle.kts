@@ -24,4 +24,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     testImplementation("junit:junit:4.13.2")
 }
-tasks.test { useJUnit() }
+tasks.test {
+    useJUnit()
+    // Child JVMs run the same compiled production Cipher/file implementation.
+    systemProperty("aiyou.attachment.process.classpath", sourceSets.test.get().runtimeClasspath.asPath)
+    systemProperty("aiyou.attachment.process.evidence", layout.buildDirectory.dir("reports/attachment-process").get().asFile.absolutePath)
+}
