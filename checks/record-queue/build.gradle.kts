@@ -11,6 +11,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalHistoryUiState.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalAttachmentController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/PngPayloadValidator.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/JpegPayloadValidator.kt")
     from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/LocalRecords.kt")
     from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/ProcessingPolicy.kt")
     from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/LocalAttachment.kt")
@@ -21,6 +22,14 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
 }
 kotlin.sourceSets.getByName("main").kotlin.srcDir(production)
 tasks.named("compileKotlin") { dependsOn(syncProduction) }
+
+val fixture = layout.buildDirectory.dir("jpeg-test-fixture")
+val syncJpegFixture = tasks.register<Sync>("syncJpegFixture") {
+    from("../../app/src/test/kotlin/com/t1doo/aiyou/JpegFixture.kt")
+    into(fixture)
+}
+kotlin.sourceSets.getByName("test").kotlin.srcDir(fixture)
+tasks.named("compileTestKotlin") { dependsOn(syncJpegFixture) }
 
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")

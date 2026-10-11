@@ -96,7 +96,7 @@ class HistoricalAttachmentPresentationTest {
     @Test fun actualHistoricalRouteViewsOldNativePictureAndReturnsToSameOriginalAndBothInputs() {
         val f = Fixture(); f.start(); f.open()
         compose.onNodeWithText("附件 · 原文版本 1 · 只读").assertIsDisplayed()
-        compose.onAllNodesWithText("选择 PNG 图片").assertCountEquals(0)
+        compose.onAllNodesWithText("选择图片").assertCountEquals(0)
         compose.onNodeWithText("查看图片").performScrollTo().performTouchInput { click() }
         compose.runOnIdle { f.drain() }
         compose.onNodeWithTag("attachment-picture").assertIsDisplayed()
@@ -157,7 +157,7 @@ class HistoricalAttachmentPresentationTest {
                 AIyouTheme { LocalAttachmentScreen(state.value, {}, { retries++ }, {}, {}, {}, {}) }
             }
         }
-        compose.onAllNodesWithText("选择 PNG 图片").assertCountEquals(0)
+        compose.onAllNodesWithText("选择图片").assertCountEquals(0)
         compose.onAllNodesWithText("重新选择同一图片").assertCountEquals(0)
         compose.onAllNodesWithText("重试保存确认").assertCountEquals(0)
         val retry = compose.onNodeWithText("重试读取附件").performScrollTo().assertIsEnabled()

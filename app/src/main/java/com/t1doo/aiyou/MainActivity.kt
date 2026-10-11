@@ -352,7 +352,7 @@ fun AIyouApp(
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceLg),
             ) {
                 StatusNotice("仅本机处理", if (attachments != null)
-                    "可保存文字、恢复草稿，并为已保存原文添加 PNG 附件；AI 连接、录音与系统提醒尚未开放。"
+                    "可保存文字、恢复草稿，并为已保存原文添加图片附件；AI 连接、录音与系统提醒尚未开放。"
                     else "可保存文字与恢复草稿；AI 连接、录音与系统提醒尚未开放。")
                 ProviderConnectionCard("我的模型 · 未配置", "视觉、转写和语义检索能力未检测")
                 TextButton(onClick = { if (ownsNavigation()) { navigation.generation++; showLicenses = true } }) { Text("开源许可与声明") }
@@ -378,7 +378,8 @@ fun AIyouApp(
                 onRefresh = { attachments.refresh(panel.sessionId) }, onCancel = { attachments.cancel(panel.sessionId) },
                 onRetrySave = { attachments.retrySave(panel.sessionId) }, onView = { attachments.view(panel.sessionId, it) },
                 onClosePicture = { attachments.closePicture(panel.sessionId) }, modifier = modifier,
-                onRetryRecords = if (local.ready && local.error != null && !local.opening) retryReading else null)
+                onRetryRecords = if (local.ready && local.error != null && !local.opening) retryReading else null,
+                onMetadataChoice = { attachments.setJpegMetadataChoice(panel.sessionId, it) })
         } else if (history != null && local != null) {
             OriginalHistoryScreen(history, local, historyList, selectHistory, backHistory, retryHistory,
                 retryReading, copyHistory, canCopyHistory, modifier, editHistory, confirmHistoryReplacement, cancelHistoryReplacement,

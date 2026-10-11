@@ -5,10 +5,12 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -20,6 +22,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Checkbox
+import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
@@ -33,6 +37,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import com.t1doo.aiyou.designsystem.AIyouColors
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.ComponentState
@@ -62,7 +67,8 @@ fun AttachmentPicker(controller: LocalAttachmentController, selection: Attachmen
         }
         LaunchedEffect(selection.pickerKey, canLaunch) {
             if (canLaunch && controller.claimPicker(requestId)) try {
-                checkNotNull(handle.launcher).launch(PickVisualMediaRequest(PickVisualMedia.SingleMimeType("image/png")))
+                val type = if (Build.VERSION.SDK_INT >= 28) PickVisualMedia.ImageOnly else PickVisualMedia.SingleMimeType("image/png")
+                checkNotNull(handle.launcher).launch(PickVisualMediaRequest(type))
             } catch (_: Exception) { controller.pickerFailed(requestId) }
         }
     }
@@ -79,6 +85,7 @@ fun LocalAttachmentScreen(
     onClosePicture: () -> Unit,
     modifier: Modifier = Modifier,
     onRetryRecords: (() -> Unit)? = null,
+    onMetadataChoice: (Boolean) -> Unit = {},
 ) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     Column(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize()
@@ -88,8 +95,21 @@ fun LocalAttachmentScreen(
         Text("仅保存在本机。图片关联此原文版本，编辑原文不会移动附件。",
             style = MaterialTheme.typography.bodyMedium, color = AIyouColors.textSecondary)
         Text(if (panel.readOnly) "历史阅读仅查看此版本已有附件，不能新增图片或重试添加。"
-            else "暂支持常规静态 PNG 原图：不超过 16 MiB，宽高各不超过 4096 像素。",
+            else if (Build.VERSION.SDK_INT >= 28) "支持 JPEG 与静态 PNG，每张不超过 16 MiB。JPEG 宽高各不超过 8192 像素、总计不超过 6400 万像素；PNG 宽高各不超过 4096 像素。"
+            else "此设备暂支持静态 PNG：每张不超过 16 MiB，宽高各不超过 4096 像素。JPEG 需要 Android 9 或更高版本。",
             style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+        if (!panel.readOnly && Build.VERSION.SDK_INT >= 28) {
+            Row(Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget)
+                .testTag("jpeg-metadata-choice").toggleable(value = panel.retainJpegMetadata,
+                    enabled = !panel.busy && panel.selection == null && panel.error == null && !panel.unavailable,
+                    role = Role.Checkbox, onValueChange = onMetadataChoice), verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(panel.retainJpegMetadata, onCheckedChange = null)
+                Text("保留 JPEG 原图拍摄资料", style = MaterialTheme.typography.bodyMedium)
+            }
+            Text(if (panel.retainJpegMetadata) "原图可能包含拍摄位置等资料，仅加密保存在本机。"
+                else "将移除拍摄资料与注释，保存字节会变化；保留画面方向和色彩资料。色彩资料仍可能包含说明。PNG 原图不变。",
+                style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+        }
         panel.notice?.let { Text(it, style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
         when {
@@ -112,7 +132,7 @@ fun LocalAttachmentScreen(
                     }
                 } else if (panel.selection == null) {
                     OutlinedButton(onClick = { onSelect(null) }, enabled = !panel.busy && panel.error == null,
-                        modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("选择 PNG 图片") }
+                        modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("选择图片") }
                     TextButton(onClick = onRefresh, enabled = !panel.busy,
                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("重试读取附件") }
                 }
@@ -133,7 +153,7 @@ fun LocalAttachmentScreen(
         }
         if (!panel.loading && panel.items.isEmpty() && panel.selection == null && panel.error == null) {
             StatusNotice("这个版本还没有附件", if (panel.readOnly) "此版本只读，当前版本的图片不会显示在这里。"
-                else "可以选择一张 PNG 图片，原文与草稿保持不变。", state = ComponentState.EMPTY)
+                else "选择支持格式的图片，原文与草稿保持不变。", state = ComponentState.EMPTY)
         }
         panel.items.forEachIndexed { index, item ->
             key(item.intent.id) {
@@ -148,10 +168,11 @@ fun LocalAttachmentScreen(
                             else "保存未完成，原文件已保留；重选时需同一图片。"
                         AttachmentState.CORRUPT -> "附件无法通过完整性校验，原文件已保留，不会显示或覆盖。"
                     }, style = MaterialTheme.typography.bodyMedium)
-                    if (item.state == AttachmentState.READY && item.intent.mediaType == "image/png") {
+                    if (item.state == AttachmentState.READY && item.intent.mediaType in LocalAttachmentController.IMAGE_TYPES &&
+                        (item.intent.mediaType != "image/jpeg" || Build.VERSION.SDK_INT >= 28)) {
                         TextButton(onClick = { onView(item.intent.id) }, enabled = !panel.busy && panel.selection == null && !panel.unavailable,
                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("查看图片") }
-                    } else if (!panel.readOnly && item.state == AttachmentState.FAILED && item.intent.mediaType == "image/png") {
+                    } else if (!panel.readOnly && item.state == AttachmentState.FAILED && item.intent.mediaType in LocalAttachmentController.IMAGE_TYPES) {
                         TextButton(onClick = { onSelect(item.intent.id) }, enabled = !panel.busy && panel.selection == null && !panel.unavailable && panel.error == null,
                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("重新选择同一图片") }
                     } else if (item.state == AttachmentState.READY) {

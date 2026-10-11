@@ -23,20 +23,20 @@ interface SelectedImageSource {
     fun open(): InputStream
 }
 
-interface AttachmentPicture { val width: Int; val height: Int }
+interface AttachmentPicture { val width: Int; val height: Int; fun releaseUnpublished() {} }
 /** Read permission comes from this exact history request, never from an import session. */
 data class AttachmentHistoryOwner(val sessionId: Long, val requestId: Long, val currentRevision: Int)
 enum class AttachmentImportPhase { PICKING, PREPARING, SAVING, FAILED }
 data class AttachmentSelection(val requestId: Long, val attachmentId: String,
     val expected: AttachmentIntent? = null, val phase: AttachmentImportPhase = AttachmentImportPhase.PICKING,
     val launched: Boolean = false, val sourcePrepared: Boolean = false, val retryable: Boolean = true,
-    val pickerKey: String = UUID.randomUUID().toString())
+    val pickerKey: String = UUID.randomUUID().toString(), val retainJpegMetadata: Boolean = true)
 data class AttachmentUiState(val sessionId: Long, val entryId: String, val revision: Int,
     val loading: Boolean = true, val items: List<LocalAttachment> = emptyList(),
     val selection: AttachmentSelection? = null, val readingId: String? = null,
     val picture: AttachmentPicture? = null, val error: String? = null,
     val notice: String? = null, val unavailable: Boolean = false,
-    val historyOwner: AttachmentHistoryOwner? = null) {
+    val historyOwner: AttachmentHistoryOwner? = null, val retainJpegMetadata: Boolean = true) {
     val readOnly get() = historyOwner != null
     val saving get() = selection?.phase == AttachmentImportPhase.SAVING
     val busy get() = loading || readingId != null || selection?.phase in
@@ -119,10 +119,17 @@ class LocalAttachmentController(
         val panel = mutable.value ?: return
         if (panel.readOnly || panel.sessionId != sessionId || panel.busy || panel.selection != null || panel.error != null || panel.unavailable) return
         val prior = failedId?.let { id -> panel.items.singleOrNull {
-            it.intent.id == id && it.state == AttachmentState.FAILED && it.intent.mediaType == "image/png"
+            it.intent.id == id && it.state == AttachmentState.FAILED && it.intent.mediaType in IMAGE_TYPES
         }?.intent ?: return }
         update(sessionId) { it.copy(picture = null, error = null, notice = null,
-            selection = AttachmentSelection(ids.incrementAndGet(), prior?.id ?: UUID.randomUUID().toString(), prior)) }
+            selection = AttachmentSelection(ids.incrementAndGet(), prior?.id ?: UUID.randomUUID().toString(), prior,
+                retainJpegMetadata = it.retainJpegMetadata)) }
+    }
+
+    fun setJpegMetadataChoice(sessionId: Long, retain: Boolean) {
+        val panel = mutable.value ?: return
+        if (panel.sessionId != sessionId || panel.readOnly || panel.busy || panel.selection != null || panel.error != null || panel.unavailable) return
+        update(sessionId) { it.copy(retainJpegMetadata = retain) }
     }
 
     fun claimPicker(requestId: Long): Boolean {
@@ -151,12 +158,19 @@ class LocalAttachmentController(
             if (!owns(panel.sessionId, requestId)) return@enqueue
             var bytes: ByteArray? = null
             try {
-                require(source.mediaType() == "image/png")
+                val mediaType = checkNotNull(source.mediaType())
+                require(mediaType in IMAGE_TYPES)
                 bytes = source.open().use { input -> bounded(input) { owns(panel.sessionId, requestId) } }
-                require(bytes.size >= 8 && bytes.copyOfRange(0, 8).contentEquals(PNG_HEADER))
-                decodePng(bytes) // Real platform decoder verifies bounded dimensions and actual decodability.
+                if (!owns(panel.sessionId, requestId)) return@enqueue
+                require(matchesHeader(bytes, checkNotNull(mediaType)))
+                if (mediaType == "image/jpeg") {
+                    val cleaned = JpegPayloadValidator.prepare(bytes, selected.retainJpegMetadata)
+                    if (cleaned !== bytes) { bytes.fill(0); bytes = cleaned }
+                }
+                if (!owns(panel.sessionId, requestId)) return@enqueue
+                decodePng(bytes).releaseUnpublished() // Actual bounded platform decode; never cache this validation bitmap.
                 val intent = AttachmentIntent(selected.attachmentId, panel.entryId, panel.revision,
-                    "image/png", hash(bytes), bytes.size.toLong())
+                    mediaType, hash(bytes), bytes.size.toLong())
                 require(selected.expected == null || selected.expected == intent)
                 if (!owns(panel.sessionId, requestId)) return@enqueue
                 discard(panel.sessionId)
@@ -167,7 +181,7 @@ class LocalAttachmentController(
             } catch (cancelled: CancellationException) {
                 if (owns(panel.sessionId, requestId)) throw cancelled
             } catch (failure: Exception) {
-                failed(panel.sessionId, failure, "图片未保存。请重新选择可读取的 PNG 图片；原文与原文件已保留。", requestId)
+                failed(panel.sessionId, failure, "图片未保存。请重新选择可读取的 JPEG 或 PNG 图片；原文与原文件已保留。", requestId)
             } finally { bytes?.fill(0) }
         }
     }
@@ -238,7 +252,7 @@ class LocalAttachmentController(
     fun view(sessionId: Long, id: String) {
         val panel = mutable.value ?: return
         if (panel.sessionId != sessionId || panel.busy || panel.selection != null || panel.unavailable) return
-        val item = panel.items.singleOrNull { it.intent.id == id && it.state == AttachmentState.READY && it.intent.mediaType == "image/png" } ?: return
+        val item = panel.items.singleOrNull { it.intent.id == id && it.state == AttachmentState.READY && it.intent.mediaType in IMAGE_TYPES } ?: return
         update(sessionId) { it.copy(readingId = id, picture = null, error = null) }
         enqueue { repository ->
             if (!live(sessionId)) return@enqueue
@@ -253,10 +267,20 @@ class LocalAttachmentController(
                 val picture = try {
                     current(repository, panel)
                     if (bytes.size.toLong() != item.intent.byteSize || hash(bytes) != item.intent.sha256) throw AttachmentIntegrityFailure()
+                    if (!matchesHeader(bytes, item.intent.mediaType)) throw AttachmentIntegrityFailure()
                     decodePng(bytes)
                 } finally { bytes.fill(0) }
-                current(repository, panel)
-                update(sessionId) { it.copy(readingId = null, picture = picture, error = null) }
+                var published = false
+                try {
+                    current(repository, panel)
+                    while (true) {
+                        val state = mutable.value
+                        if (state == null || disposed || state.sessionId != sessionId || state.readingId != id) break
+                        if (mutable.compareAndSet(state, state.copy(readingId = null, picture = picture, error = null))) {
+                            published = true; break
+                        }
+                    }
+                } finally { if (!published) picture.releaseUnpublished() }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) {
                 val rows = if (failure is RecordConflict || failure is LocalRecordUnavailable) null
@@ -308,7 +332,13 @@ class LocalAttachmentController(
 
     companion object {
         const val MAX_SOURCE_BYTES = 16 * 1024 * 1024
+        val IMAGE_TYPES = setOf("image/png", "image/jpeg")
         private val PNG_HEADER = byteArrayOf(-119, 80, 78, 71, 13, 10, 26, 10)
+        private fun matchesHeader(bytes: ByteArray, mediaType: String) = when (mediaType) {
+            "image/png" -> bytes.size >= 8 && bytes.copyOfRange(0, 8).contentEquals(PNG_HEADER)
+            "image/jpeg" -> bytes.size >= 3 && bytes[0] == (-1).toByte() && bytes[1] == 0xd8.toByte() && bytes[2] == (-1).toByte()
+            else -> false
+        }
         private fun hash(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
         private fun bounded(input: InputStream, active: () -> Boolean): ByteArray {
             val buffer = ByteArray(8192)

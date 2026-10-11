@@ -5,3 +5,7 @@ object PlatformPngDecoder {
     fun decode(@Suppress("UNUSED_PARAMETER") bytes: ByteArray): AttachmentPicture =
         error("Android image decoding is not available in this host check; inject a test boundary")
 }
+
+object PlatformImageDecoder {
+    fun decode(bytes: ByteArray): AttachmentPicture = error("Host requires an explicit platform decoder boundary")
+}

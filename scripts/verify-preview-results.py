@@ -11,7 +11,7 @@ reports = list((root / "app/build/test-results/validateDebugScreenshotTest").rgl
 cases = []
 for report in reports:
     cases.extend(ET.parse(report).getroot().iter("testcase"))
-expected = 372  # Preserve original352; five historical attachment states/routes x four sizes.
+expected = 380  # Preserve original372; two JPEG states x four sizes.
 if len(cases) != expected:
     raise SystemExit(f"FAIL: expected {expected} actual Preview smoke tests, found {len(cases)}")
 if any(any(case.find(tag) is not None for tag in ("failure", "error", "skipped")) for case in cases):
@@ -44,7 +44,7 @@ attachment_methods = ("LocalAttachmentEmptyRender", "LocalAttachmentLoadingRende
                       "LocalAttachmentCorruptRender", "LocalAttachmentUnavailableRender",
                       "LocalHistoricalAttachmentReadyRender", "LocalHistoricalAttachmentFailedRender",
                       "LocalHistoricalAttachmentCorruptRender", "LocalHistoricalAttachmentUnavailableRender",
-                      "LocalHistoricalAttachmentEntryRender")
+                      "LocalHistoricalAttachmentEntryRender", "LocalAttachmentJpegReadyRender", "LocalAttachmentJpegStrippedRender")
 for method in local_methods + attachment_methods:
     production = [item for item in manifest if "/" + method + "_" in item["file"]]
     if len(production) != 4:

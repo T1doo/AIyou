@@ -17,9 +17,9 @@ targets = [("domain", "core/domain/build/test-results/test", 3)]
 if args.component:
     targets.append(("component", "core/designsystem/build/test-results/testDebugUnitTest", 7))
 if args.queue:
-    targets.append(("host queue", "checks/record-queue/build/test-results/test", 75))
+    targets.append(("host queue", "checks/record-queue/build/test-results/test", 84))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 68))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 73))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 for label, folder, minimum in targets:
@@ -44,6 +44,13 @@ for label, folder, minimum in targets:
     print(f"PASS: {label} tests={total} actual={cases} failures=0 errors=0 skipped=0")
     additional = {}
     if label == "host queue":
+        additional["JpegPayloadValidationTest"] = (
+            "baselineProgressiveAndAllExifDirectionsPreserveOriginalByDefault",
+            "explicitStrippingKeepsDirectionAndEncodedScansWhileRemovingPrivateExtensions",
+            "embeddedThumbnailsUnknownAppsAndCommentsBetweenProgressiveScansAreRemoved",
+            "validatedMultipartColorProfileIsPreservedAndInvalidChunksRejected",
+            "invalidBoundsHeadersExifOffsetsDirectionsAndTrailingBytesAreRejected",
+            "earlyEoiContainerCannotBeUsedAsProofOfReadablePixels")
         additional["AttachmentControllerTest"] = (
             "actualEncryptedSaveReadbackAndReopenKeepOriginalRevisionAndCapture",
             "pickerCancelAndOldCallbackCannotWriteOrReplaceNewOwner",
@@ -57,7 +64,10 @@ for label, folder, minimum in targets:
             "unavailableRecordPreservesPreparedChoiceUntilRecoveryWithoutAnyStoreOperation",
             "committingDisablesCancelCloseAndKeepsActiveSourceUntilAuthentication",
             "disposingDuringEncryptionNeverErasesActiveSourceOrPublishesLateResult",
-            "actualViewModelRecoversLateCaptureFailureAndKeepsCaptureWhileImporting")
+            "actualViewModelRecoversLateCaptureFailureAndKeepsCaptureWhileImporting",
+            "jpegRetainedOriginalHasOneSourceReadAndColdHistoricalBinding",
+            "jpegExplicitStripRetriesConfirmationWithSameEncryptedBytesAndNoSourceReopen",
+            "jpegLateDecodedSelectionReleasesBitmapAndClearsPreparedCopyWithoutWriting")
         additional["PngPayloadValidationTest"] = (
             "validColorDepthPaletteAndAdam7PassesAreValidatedWithoutChangingSource",
             "crcCorrectCompleteIendCannotHideTruncatedZlibBadAdlerOrTrailingCompressedData",
@@ -73,6 +83,11 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.PlatformJpegPipelineTest"] = (
+            "nativeDecoderAppliesAllEightExifDirectionsOnceWithCorrectPixelsAndBothEndianHeaders",
+            "progressiveAndLargeJpegActuallyDecodeWithinDisplayBound",
+            "explicitMetadataRemovalHasNoGpsAndKeepsNativeOrientedPixelsWithoutRecompression",
+            "markerValidEarlyEoiAndTruncatedJpegAreRejectedByActualNativeDecoder")
         additional["com.t1doo.aiyou.PlatformPngPipelineTest"] = (
             "actualNativeDecoderReadsPixelsAndKeepsOriginalBytesUnchanged",
             "largePngIsActuallySampledAndDimensionsAboveBoundAreRejected",
@@ -85,7 +100,8 @@ for label, folder, minimum in targets:
             "actualPickerRegistryBindsOldResultToOldRequestAndRestorationDoesNotRelaunch",
             "globalRecordFailureHidesPictureAndShowsReachableActualRecovery",
             "launchedPickerKeepsActualRegistryOwnerAcrossGlobalRecordFailureAndRecovery",
-            "restoredCompositionWithNewControllerCannotAdoptOldPickerResult")
+            "restoredCompositionWithNewControllerCannotAdoptOldPickerResult",
+            "jpegMetadataChoiceIsReachableAndFrozenByActualImagePickerRequest")
         additional["com.t1doo.aiyou.HistoricalAttachmentPresentationTest"] = (
             "actualHistoricalRouteViewsOldNativePictureAndReturnsToSameOriginalAndBothInputs",
             "retainedHistoryActionRejectsChangedRequestAndNewVersionNeverShowsOldPicture",

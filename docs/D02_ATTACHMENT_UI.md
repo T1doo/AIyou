@@ -1,4 +1,4 @@
-# D02：已存原文版本的本地 PNG 附件界面
+# D02：已存原文版本的本地 JPEG / PNG 附件界面
 
 这是附件状态机的小范围实际连接：当前原文详情 → 查看附件 → 系统单选图片 → 有界验证 → 现有加密文件库 → 同一附件认证读回 → 查看。历史版本详情也提供“查看附件”，仅读取该固定版本已有附件，不能新增或重试添加。目标是已经保存的原文 ID 与打开页面时的 revision；不是新的图文混合记录、完整媒体输入、录音、OCR、缓存、删除、导出或联网功能。原始 Master Plan 与 DOCX 保留。完整 D02 仍未验收。
 
@@ -8,17 +8,21 @@
 
 每个页面与选择器有独立 session/request，实际 `ActivityResultRegistry` 注册直接使用本次选择的 VM 内存 UUID key，并捕获不可变 request；不恢复 rememberSaveable launcher key。迟到结果不能改挂新页面或重启后的新 controller，即使数字 request 计数相同。配置恢复保留当前 VM 时不重复 launch；进程重启不恢复旧来源权限或旧内存选择。持久状态由原生产库在 prepare/recover 中恢复。
 
-- 首次导入：同一来源只打开一次，最多16 MiB，真实 MIME/header/PNG CRC、完整 zlib/扫描行（含Adam7）与实际 bitmap 解码验证；原字节原样加密。两个尺寸各≤4096，查看 bitmap 采样后各≤1024。当前拒绝 APNG 与 eXIf 定向元数据。
+- 首次导入：同一来源只打开一次，最多16 MiB，MIME必须与文件头匹配。PNG 保留既有 CRC、完整 zlib/扫描行（含Adam7）与实际 bitmap 解码验证；原字节原样加密，两个源尺寸各≤4096，拒绝 APNG 与 eXIf 定向元数据。JPEG 接受8位灰度/RGB baseline或progressive，源尺寸各≤8192且≤6400万像素；有界检查段长度、SOF/SOS/EOI、IFD0方向、扫描与段数，拒绝尾随字节、多EXIF及异常方向。容器检查不等于熵解码完整性证明。
 - 确认成功：必须同一稳定 intent、READY、实际列表和完整认证 read；随后显示“图片已保存在本机 · 原文版本N”。文字保存成功不会代替附件成功。
 - 确认失败：保留原 ID 与验证过的内存来源；重试先 recover/list/read，已有 READY 不重读 URI、不重写密文、不建第二份。
-- 重启 FAILED：明确重新选择同一图片，原 ID/source/revision/MIME/hash/size 必须全部相同，名字或 URI 相同不足以证明同源。
+- 重启 FAILED：明确重新选择同一图片，原 ID/source/revision/MIME/最终保存字节hash/size 必须全部相同，名字或 URI 相同不足以证明同源。JPEG 的元数据选择影响保存字节，重启后须重新选回产生同一保存内容的方式；清理后被删除的元数据不参与最终hash，不能将此声称为原始完整来源字节相同。
 - CORRUPT：不显示、不覆盖、不提供重新选择覆盖动作，原文件证据保留。
 - 取消/退页：验证阶段立即撤销 owner，迟到结果丢弃；提交开始后禁用取消与返回，不承诺回滚。活动 Cipher 仍使用的 buffer 等操作结束后再清理。
 - 原文版本变化：不静默迁移附件，保留原版本归属；全局文字草稿失败通过已有恢复动作处理，不清空附件页面/已准备来源。
 
 历史查看使用不可变 history session/request、所选 record/revision 和读取列表时的当前 revision 授权。ViewModel与根界面共用权限门槛，实际IO前后另查已认证的原文/历史版本存在及精确归属；列表每行与read前再次查到的intent都必须同record/revision/ID，read bytes还需同hash/size。旧请求失效、换版本、缺失记录/历史或关闭重开，不发布迟到图片；新版本不会显示旧版本附件。当前导入仍要求准确当前revision，历史入口不能取得写权限；返回只关闭附件页，保留选中历史全文、编辑输入和此刻草稿。只读指用户不能新增/重试添加；既有recover/list/read仍可修复持久账本状态，不承诺内部零写。
 
-系统来源 provider 可自身使用网络；`LOCAL_ONLY` 描述本应用处理和保存不外发，并不保证外部 provider 的实现离线。采用 [Android Photo Picker](https://developer.android.com/training/data-storage/shared/photo-picker) 的 `PickVisualMedia.SingleMimeType("image/png")`，无 picker 时由该系统契约兼容回退。查看采用 [BitmapFactory](https://developer.android.com/reference/android/graphics/BitmapFactory.Options) 真实 bounds 后采样解码。
+系统来源 provider 可自身使用网络；`LOCAL_ONLY` 描述本应用处理和保存不外发，并不保证外部 provider 的实现离线。[Android Photo Picker](https://developer.android.com/training/data-storage/shared/photo-picker) 在API28+使用单选 `ImageOnly`，选回来的WebP/HEIC/GIF等在应用内拒绝，未增加格式承诺。API26/27明确只提供PNG筛选；JPEG需要Android9+，未用宽松解码偷偷兼容。没有picker时使用该系统契约的兼容回退，不取得广泛或持久图库授权。
+
+JPEG 每次导入显示明确的“保留 JPEG 原图拍摄资料”选择，默认勾选，保留时完整原字节原样加密；提示可能包含位置资料，仅在本机加密保存。取消勾选才移除EXIF/GPS/XMP/IPTC/COM、未知APP及内嵌缩略图；重建最小方向标记，保留有界结构验证的JFIF/ICC/Adobe色彩资料，不重压缩熵扫描。色彩资料可能仍带说明，不能宣称所有元数据清零。这是本地保存选择，并非上传清理或原图库修改。选择方式在picker请求创建时固定，活动请求、错误和历史只读页不能改写。没有原图/处理图明文临时文件。
+
+JPEG 使用API28新增的 [ImageDecoder](https://developer.android.com/reference/android/graphics/ImageDecoder) 从一次读取的内存ByteBuffer解码；头尺寸必须与IFD0方向后的预期相同，原生解码负责全部8种方向，不再二次旋转。软件/sRGB显示副本按2的幂采样，输出尺寸各≤1024、像素字节≤4MiB。明确拒绝平台报告的partial decode；此标志不证明平台识别全部恶意熵错误。验证用临时bitmap及迟到未发布bitmap回收，已发布图片按界面所有权使用。PNG 保留 [BitmapFactory](https://developer.android.com/reference/android/graphics/BitmapFactory.Options) 的既有实际bounds/采样路径。最终显示边界不等于progressive内部解码峰值内存或真机性能已验证。
 
 ## 实际检查的边界
 
@@ -28,6 +32,8 @@
 
 历史闭环新增8个实际控制器/VM/AES文件库的host测试（原文账本/解码为明确合成边界），覆盖先导入再实际编辑生成新版、冷会话读取旧附件、新版不串图、所有历史写入口拒绝、缺失/错误/重复身份、跨版本row、迟到请求及内存清理、损坏/失败保全；另加4个真实Compose根路由和NATIVE bitmap回归，涵盖历史进入/返回、保留两份输入、旧导航闭包拒绝、读取中换请求、新版隔离和320dp大字体只读恢复动作。
 
-常规 CI 保留原67 host、64 App、352 render及全部独立PID/严格lint/schema/锁守卫；增加到75 host、68 App、372 render。新5历史附件状态/入口各四尺寸，使用实际生产 Screen 与合成状态；Ready 状态以实际 decoder 读固定合成 PNG。附件包52图与原108图页面包分开，每包仍≤17,000,000B，保留原PNG字节。静态截图不验证点击、来源权限或进程死亡。检查数字是必须满足的合同，执行结果应以对应提交的真实XML、PNG、日志及独立审查报告为准。
+JPEG增加6个纯容器/元数据host用例、3个实际controller/AES文件库用例、4个API35 NATIVE ImageDecoder用例及1个真实Compose/registry选择用例；合成中性四角颜色、超宽固色和GPS数据不来自用户照片。覆盖两端序全部8方向、progressive、实际采样像素、GPS清理后的相同方向像素、marker合法的提前EOI负例、一次URI读取、固定选择、冷历史归属、认证重试无重写、迟到bitmap回收/字节清理。纯容器用例明确接受其中marker合法早EOI，不冒充实际像素可读。原生用例必须由真实CI执行并检查XML后才能报PASS。
 
-本轮当前主机核实无已装 SDK/adb/可授权设备，未接受新协议、安装设备组件或改变安全设置。同步 provider 读取/平台解码不保证被即时中断；取消保证 owner 失效及结果不发布，字节与解码资源有界，阻塞 provider 的设备行为尚未验证。17项原生测试、Android跨PID/Keystore/真实旧库升级/目录持久性/物理断电/16KB/性能/IME/TalkBack/UI进程重启与精确 JNIString NOTICE祖源继续保留各自 NOT RUN/UNKNOWN。此 PNG 界面不替代这些门槛，也不代表 D03 完整实施。
+常规 CI 保留原75 host、68 App、372 render场景及全部独立PID/严格lint/schema/锁守卫；合同增加到84 host、73 App、380 render。JPEG Ready与取消保留选择各四尺寸，Ready截图实际调用生产ImageDecoder；layoutlib失败时不能替换成假bitmap。附件包60图与原108图页面包分开，每包仍≤17,000,000B；打包保留本次实际渲染PNG字节。静态截图不验证点击、来源权限或进程死亡。合同数字不等于执行结果，应以对应提交的真实XML、PNG、日志及独立审查报告为准。
+
+本轮当前主机核实无已装 SDK/adb/可授权设备，未接受新协议、安装设备组件或改变安全设置。同步 provider 读取/平台解码不保证被即时中断；取消保证 owner 失效及结果不发布，输入/输出边界明确，阻塞 provider 的设备行为尚未验证。API26/27设备降级路径、17项原生测试、Android跨PID/Keystore/真实旧库升级/目录持久性/物理断电/16KB/性能/IME/TalkBack/UI进程重启与精确 JNIString NOTICE祖源继续保留各自 NOT RUN/UNKNOWN。此附件界面不替代这些门槛，也不代表 D03 完整实施。

@@ -307,6 +307,18 @@ fun LocalAttachmentReadyRender() {
         picture = PlatformPngDecoder.decode(png), notice = "图片已保存在本机 · 原文版本 1"))
 }
 @PreviewTest @LocalRecordPreviews @Composable
+fun LocalAttachmentJpegReadyRender() {
+    val bytes = androidx.compose.runtime.remember { JpegPreviewFixture.bytes() }
+    val picture = androidx.compose.runtime.remember { com.t1doo.aiyou.records.PlatformImageDecoder.decode(bytes) }
+    androidx.compose.runtime.DisposableEffect(picture) { onDispose { picture.releaseUnpublished() } }
+    val digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+    val intent = attachmentIntent.copy(mediaType = "image/jpeg", sha256 = digest, byteSize = bytes.size.toLong())
+    AttachmentFrame(attachmentPanel.copy(items = listOf(LocalAttachment(intent, AttachmentState.READY)),
+        picture = picture, notice = "图片已保存在本机 · 原文版本 1"))
+}
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalAttachmentJpegStrippedRender() { AttachmentFrame(attachmentPanel.copy(retainJpegMetadata = false)) }
+@PreviewTest @LocalRecordPreviews @Composable
 fun LocalAttachmentFailedRestartRender() { AttachmentFrame(attachmentPanel.copy(items = listOf(LocalAttachment(attachmentIntent, AttachmentState.FAILED)))) }
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalAttachmentCorruptRender() { AttachmentFrame(attachmentPanel.copy(items = listOf(LocalAttachment(attachmentIntent, AttachmentState.CORRUPT)))) }

@@ -5,6 +5,7 @@ import com.t1doo.aiyou.domain.AttachmentStore
 import com.t1doo.aiyou.domain.EntryRepository
 import com.t1doo.aiyou.model.*
 import com.t1doo.aiyou.records.*
+import com.t1doo.aiyou.JpegFixture
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
@@ -44,11 +45,12 @@ class AttachmentControllerTest {
         EncryptedAttachmentStore(directory, ledger, ByteArray(32) { (it + 1).toByte() }, checkpoint)
     private class Records(override val attachments: AttachmentStore, var original: StoredEntry) : EntryRepository {
         val draft = TextDraft("capture", 1, "合成此刻草稿")
+        var history = emptyList<OriginalRevision>()
         override suspend fun entries() = listOf(original)
         override suspend fun readDraft() = draft
         override suspend fun updateDraft(text: String): TextDraft = error("attachment must not edit capture")
         override suspend fun saveDraft(expected: TextDraft, capturedAtMillis: Long, captureTimeZone: String): StoredEntry = error("must not save capture")
-        override suspend fun revisions(entryId: String) = emptyList<OriginalRevision>()
+        override suspend fun revisions(entryId: String) = history
         override suspend fun revise(entryId: String, expectedRevision: Int, text: String, createdAtMillis: Long): StoredEntry = error("must not edit original")
     }
     private inner class Fixture(storage: AttachmentStore = store(), decode: (ByteArray) -> AttachmentPicture = { picture },
@@ -76,6 +78,69 @@ class AttachmentControllerTest {
     }
     private fun blob(id: String) = File(directory, "$id.aead")
     private fun hash(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    @Test fun jpegRetainedOriginalHasOneSourceReadAndColdHistoricalBinding() = runBlocking {
+        val bytes = JpegFixture.withMetadata(); val before = bytes.copyOf()
+        val f = Fixture(); f.open(); val request = f.select()
+        f.controller.setJpegMetadataChoice(f.controller.state.value!!.sessionId, false)
+        assertTrue(f.controller.state.value!!.selection!!.retainJpegMetadata)
+        val source = Source(bytes,"image/jpeg"); f.controller.selected(request,source); f.drain()
+        val row = f.controller.state.value!!.items.single()
+        assertEquals(AttachmentState.READY,row.state); assertEquals("image/jpeg",row.intent.mediaType)
+        assertEquals(hash(bytes),row.intent.sha256); assertEquals(bytes.size.toLong(),row.intent.byteSize)
+        assertEquals(1,source.opens); assertTrue(source.closed); assertArrayEquals(before,bytes)
+        assertArrayEquals(bytes,f.records.attachments.read(row.intent.id))
+        assertFalse(blob(row.intent.id).readBytes().contentEquals(bytes))
+        f.controller.close(f.controller.state.value!!.sessionId); f.drain()
+        val cold=Fixture(); cold.records.original=original.copy(currentRevision=2)
+        cold.records.history=listOf(OriginalRevision(original.id,1,original.originalText,"0".repeat(64),original.capturedAtMillis))
+        cold.controller.openHistorical(original.id,1,AttachmentHistoryOwner(7,8,2)); cold.drain()
+        cold.controller.view(cold.controller.state.value!!.sessionId,row.intent.id); cold.drain()
+        assertSame(picture,cold.controller.state.value!!.picture)
+        assertEquals(1,cold.controller.state.value!!.items.single().intent.revision)
+        cold.controller.setJpegMetadataChoice(cold.controller.state.value!!.sessionId,false)
+        cold.controller.select(cold.controller.state.value!!.sessionId)
+        assertNull(cold.controller.state.value!!.selection); assertTrue(cold.controller.state.value!!.retainJpegMetadata)
+        assertEquals("合成此刻草稿",cold.records.draft.text)
+        assertEquals(setOf(".store.lock","${row.intent.id}.aead"),directory.list()!!.toSet())
+    }
+
+    @Test fun jpegExplicitStripRetriesConfirmationWithSameEncryptedBytesAndNoSourceReopen() = runBlocking {
+        val bytes=JpegFixture.withMetadata(); val expected=JpegPayloadValidator.prepare(bytes,false)
+        val real=store(); var reads=0; var writes=0
+        val boundary=object:AttachmentStore by real {
+            override suspend fun save(intent:AttachmentIntent,source:()->InputStream):LocalAttachment { writes++; return real.save(intent,source) }
+            override suspend fun read(id:String):ByteArray { if(++reads==1) throw IOException("synthetic lost acknowledgement"); return real.read(id) }
+        }
+        var decoded:ByteArray?=null; var released=0
+        val f=Fixture(boundary, decode={ value -> decoded=value; object:AttachmentPicture {
+            override val width=64; override val height=96; override fun releaseUnpublished(){released++}
+        } }); f.open()
+        f.controller.setJpegMetadataChoice(f.controller.state.value!!.sessionId,false)
+        val source=Source(bytes,"image/jpeg"); f.controller.selected(f.select(),source); f.drain()
+        val failed=f.controller.state.value!!; val id=failed.selection!!.attachmentId
+        assertFalse(failed.selection.retainJpegMetadata); assertEquals(1,released)
+        assertEquals(hash(expected),failed.items.single().intent.sha256)
+        assertEquals(expected.size.toLong(),failed.items.single().intent.byteSize)
+        val cipher=blob(id).readBytes(); f.controller.retrySave(failed.sessionId); f.drain()
+        assertEquals(1,source.opens); assertEquals(1,writes); assertEquals(2,reads)
+        assertArrayEquals(cipher,blob(id).readBytes()); assertArrayEquals(expected,real.read(id))
+        assertTrue(decoded!!.all{it==0.toByte()}); assertArrayEquals(JpegFixture.withMetadata(),bytes)
+        assertNull(f.controller.state.value!!.selection); assertNotNull(f.controller.state.value!!.notice)
+    }
+
+    @Test fun jpegLateDecodedSelectionReleasesBitmapAndClearsPreparedCopyWithoutWriting() {
+        var decoded:ByteArray?=null; var released=0; lateinit var f:Fixture
+        f=Fixture(decode={ value -> decoded=value; f.controller.cancel(f.controller.state.value!!.sessionId)
+            object:AttachmentPicture { override val width=64; override val height=96
+                override fun releaseUnpublished(){released++} } })
+        f.open(); f.controller.setJpegMetadataChoice(f.controller.state.value!!.sessionId,false)
+        val bytes=JpegFixture.withMetadata(); val source=Source(bytes,"image/jpeg")
+        f.controller.selected(f.select(),source); f.drain()
+        assertTrue(ledger.rows.isEmpty()); assertEquals(1,released); assertEquals(1,source.opens)
+        assertTrue(decoded!!.all{it==0.toByte()}); assertArrayEquals(JpegFixture.withMetadata(),bytes)
+        assertNull(f.controller.state.value!!.picture); assertNull(f.controller.state.value!!.selection)
+    }
 
     @Test fun actualEncryptedSaveReadbackAndReopenKeepOriginalRevisionAndCapture() = runBlocking {
         val f = Fixture(); f.open()

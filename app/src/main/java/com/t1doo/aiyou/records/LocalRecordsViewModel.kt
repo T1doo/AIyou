@@ -42,7 +42,7 @@ class LocalRecordsViewModel internal constructor(
     application: Application,
     private val openStore: () -> EntryRepository,
     private val clock: Clock = Clock.systemUTC(),
-    private val decodePng: (ByteArray) -> AttachmentPicture = PlatformPngDecoder::decode,
+    private val decodePng: (ByteArray) -> AttachmentPicture = PlatformImageDecoder::decode,
 ) : AndroidViewModel(application) {
     constructor(application: Application) : this(application, { EncryptedEntryRepository.open(application) })
     private val mutableState = MutableStateFlow(LocalRecordUiState())

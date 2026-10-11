@@ -112,7 +112,7 @@ class AttachmentPresentationTest {
         compose.onNodeWithText("查看附件").assertIsDisplayed().performTouchInput { click() }
         compose.runOnIdle { f.drain() }
         compose.onNodeWithText("附件 · 原文版本 1").assertIsDisplayed()
-        compose.onNodeWithText("选择 PNG 图片").performScrollTo().assertIsEnabled()
+        compose.onNodeWithText("选择图片").performScrollTo().assertIsEnabled()
         compose.onNodeWithText("返回原文").performClick()
         compose.onNodeWithTag("original-text").assertIsDisplayed()
         compose.runOnIdle { assertNull(f.controller.state.value); assertEquals("合成此刻草稿", local.text); assertEquals(entry, local.entries.single()) }
@@ -158,7 +158,7 @@ class AttachmentPresentationTest {
         }
         compose.onNodeWithText("恢复本机读取").performScrollTo().assertIsEnabled().performClick()
         compose.runOnIdle { assertEquals(1, recovered) }
-        compose.onAllNodesWithText("选择 PNG 图片").assertCountEquals(0)
+        compose.onAllNodesWithText("选择图片").assertCountEquals(0)
         compose.onAllNodesWithTag("attachment-picture").assertCountEquals(0)
     }
 
@@ -216,5 +216,34 @@ class AttachmentPresentationTest {
             registry.dispatchResult(registry.codes.last(), null as Uri?); next.drain()
         }
         compose.runOnIdle { assertNull(next.controller.state.value!!.selection) }
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w320dp-h1000dp")
+    fun jpegMetadataChoiceIsReachableAndFrozenByActualImagePickerRequest() {
+        val f=Fixture(); f.open()
+        val registry=Registry(); val owner=object:ActivityResultRegistryOwner { override val activityResultRegistry=registry }
+        compose.setContent {
+            val state=f.controller.state.collectAsState().value!!; val density=LocalDensity.current
+            CompositionLocalProvider(LocalActivityResultRegistryOwner provides owner,LocalDensity provides Density(density.density,2f)) {
+                AIyouTheme { LocalAttachmentScreen(state,{ f.controller.select(state.sessionId,it) }, {},
+                    {f.controller.cancel(state.sessionId)},{},{},{},onMetadataChoice={f.controller.setJpegMetadataChoice(state.sessionId,it)}) }
+                AttachmentPicker(f.controller,state.selection)
+            }
+        }
+        val choice=compose.onNodeWithTag("jpeg-metadata-choice").performScrollTo().assertIsOn().assertIsEnabled()
+        assertTrue(choice.getUnclippedBoundsInRoot().height>=AIyouDimensions.minTouchTarget)
+        choice.performClick(); compose.onNodeWithTag("jpeg-metadata-choice").assertIsOff()
+        compose.onNodeWithText("选择图片").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertFalse(f.controller.state.value!!.selection!!.retainJpegMetadata)
+            assertEquals(1,registry.inputs.size)
+            assertEquals(ActivityResultContracts.PickVisualMedia.ImageOnly,
+                (registry.inputs.single() as androidx.activity.result.PickVisualMediaRequest).mediaType)
+        }
+        compose.onNodeWithTag("jpeg-metadata-choice").performScrollTo().assertIsNotEnabled().assertIsOff()
+        compose.runOnIdle { f.controller.setJpegMetadataChoice(f.controller.state.value!!.sessionId,true)
+            assertFalse(f.controller.state.value!!.selection!!.retainJpegMetadata)
+            registry.dispatchResult(registry.codes.single(),null as Uri?); f.drain() }
+        compose.onNodeWithTag("jpeg-metadata-choice").assertIsEnabled().assertIsOff()
     }
 }
