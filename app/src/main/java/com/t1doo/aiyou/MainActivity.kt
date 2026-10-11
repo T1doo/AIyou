@@ -55,6 +55,8 @@ import com.t1doo.aiyou.records.LocalRecordsViewModel
 import com.t1doo.aiyou.records.OpenSourceLicenses
 import com.t1doo.aiyou.records.OriginalReadingScreen
 import com.t1doo.aiyou.records.LocalAttachmentController
+import com.t1doo.aiyou.records.AttachmentHistoryOwner
+import com.t1doo.aiyou.records.hasRecordAccess
 import com.t1doo.aiyou.records.LocalAttachmentScreen
 import com.t1doo.aiyou.records.AttachmentPicker
 import com.t1doo.aiyou.records.OriginalEditScreen
@@ -153,7 +155,7 @@ fun AIyouApp(
     fun ownsEdit(sessionId: Long): Boolean = ownsNavigation() && reading && detailEntryId == readerId &&
         selectedName == origin.name && !showSettings && !demo &&
         currentLocal?.originalHistory == null && currentLocal?.originalEdit?.let { it.sessionId == sessionId && it.entryId == readerId } == true
-    fun ownsHistory(sessionId: Long) = ownsNavigation() && reading && detailEntryId == readerId &&
+    fun ownsHistory(sessionId: Long) = ownsNavigation() && attachments?.state?.value == null && reading && detailEntryId == readerId &&
         selectedName == origin.name && !showSettings && !demo &&
         currentLocal?.originalHistory?.let { it.sessionId == sessionId && it.entryId == readerId } == true
     val backHistory: (Long) -> Unit = { sessionId ->
@@ -250,8 +252,17 @@ fun AIyouApp(
         val live = latest?.originalHistory
         history != null && ownsHistory(history.sessionId) && latest != null && latest.ready && !latest.opening && latest.error == null &&
             live != null && live.requestId == history.requestId && !live.loading && live.error == null && !live.unavailable &&
-            live.entryId == id && live.selectedRevision == revision && live.revisions.any { it.revision == revision } &&
+            live.entryId == id && live.selectedRevision == revision && live.revisions.singleOrNull { it.revision == revision }?.entryId == id &&
             latest.entries.any { it.id == id && it.currentRevision == live.currentRevision }
+    }
+    val beginHistoricalAttachments: (String, Int) -> Unit = { id, revision ->
+        val latest = currentLocal
+        val live = latest?.originalHistory
+        if (attachments != null && canCopyHistory(id, revision) && latest?.saving == false && !latest.savePending &&
+            latest.originalEdit?.canCancel != false && live != null && live.replacement == null && live.currentRevision != null) {
+            navigation.generation++
+            attachments?.openHistorical(id, revision, AttachmentHistoryOwner(live.sessionId, live.requestId, live.currentRevision))
+        }
     }
     val copyHistory: (String, Int) -> Boolean = { id, revision ->
         if (canCopyHistory(id, revision)) currentLocal?.originalHistory?.revisions?.firstOrNull { it.revision == revision }?.let {
@@ -295,7 +306,7 @@ fun AIyouApp(
     LocalOriginalReadingObserver.current?.let { observer ->
         val callbacks = OriginalReadingCallbacks(openEntry, selectDestination, returnToList, retryReading, copy,
             beginEdit, changeEdit, saveEdit, cancelEdit, discardEdit, beginHistory, selectHistory, backHistory, retryHistory, copyHistory,
-            editHistory, confirmHistoryReplacement, cancelHistoryReplacement)
+            editHistory, confirmHistoryReplacement, cancelHistoryReplacement, beginHistoricalAttachments)
         SideEffect {
             observer.onNavigation(callbacks)
             if (selected != Destination.TASKS) observer.onRecordList(if (selected == Destination.NOW) nowList else memoriesList, imeBottomPx)
@@ -311,8 +322,9 @@ fun AIyouApp(
         topBar = {
             NotebookAppBar(
                 if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
-                if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
-                else if (attachmentPanel != null) "返回原文" else if (editing != null) "取消编辑" else if (reading) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
+                if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
+                else if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
+                else if (editing != null) "取消编辑" else if (reading) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
                 actionEnabled = attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
             ) {
                 if (reading) returnToList() else if (ownsNavigation()) {
@@ -358,7 +370,7 @@ fun AIyouApp(
             }
         } else if (attachmentPanel != null && attachments != null && reading && local != null) {
             val panel = if (!local.ready || local.opening || local.error != null ||
-                local.entries.none { it.id == attachmentPanel.entryId && it.currentRevision == attachmentPanel.revision })
+                !attachmentPanel.hasRecordAccess(local))
                 attachmentPanel.copy(picture = null, unavailable = true,
                     error = "当前原文暂不可读取或版本已变化。原文与附件已保留，请返回原文。") else attachmentPanel
             AttachmentPicker(attachments, attachmentPanel.selection, canLaunch = !panel.unavailable)
@@ -369,7 +381,8 @@ fun AIyouApp(
                 onRetryRecords = if (local.ready && local.error != null && !local.opening) retryReading else null)
         } else if (history != null && local != null) {
             OriginalHistoryScreen(history, local, historyList, selectHistory, backHistory, retryHistory,
-                retryReading, copyHistory, canCopyHistory, modifier, editHistory, confirmHistoryReplacement, cancelHistoryReplacement)
+                retryReading, copyHistory, canCopyHistory, modifier, editHistory, confirmHistoryReplacement, cancelHistoryReplacement,
+                onAttachments = if (attachments != null) beginHistoricalAttachments else null)
         } else if (editing != null && local != null) {
             OriginalEditScreen(editing, local, changeEdit, saveEdit, cancelEdit, modifier, onRetry = retryReading, onHistory = beginHistory)
         } else if (reading && local != null) {

@@ -25,6 +25,8 @@ import com.t1doo.aiyou.records.AttachmentSelection
 import com.t1doo.aiyou.records.AttachmentImportPhase
 import com.t1doo.aiyou.records.LocalAttachmentScreen
 import com.t1doo.aiyou.records.PlatformPngDecoder
+import com.t1doo.aiyou.records.AttachmentHistoryOwner
+import com.t1doo.aiyou.records.LocalAttachmentController
 
 // Initial render smoke, not regression against approved visual golden files.
 @PreviewTest
@@ -311,3 +313,28 @@ fun LocalAttachmentCorruptRender() { AttachmentFrame(attachmentPanel.copy(items 
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalAttachmentUnavailableRender() { AttachmentFrame(attachmentPanel.copy(unavailable = true,
     error = "合成原文已有新版本。附件保留在原版本，请返回原文。")) }
+
+private val historicalAttachmentPanel = attachmentPanel.copy(historyOwner = AttachmentHistoryOwner(7L, 3L, 2))
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalHistoricalAttachmentReadyRender() {
+    val png = java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMQCqv4DwADPgHgZNJcPQAAAABJRU5ErkJggg==")
+    AttachmentFrame(historicalAttachmentPanel.copy(items = listOf(LocalAttachment(attachmentIntent, AttachmentState.READY)),
+        picture = PlatformPngDecoder.decode(png)))
+}
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalHistoricalAttachmentFailedRender() { AttachmentFrame(historicalAttachmentPanel.copy(
+    items = listOf(LocalAttachment(attachmentIntent, AttachmentState.FAILED)))) }
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalHistoricalAttachmentCorruptRender() { AttachmentFrame(historicalAttachmentPanel.copy(
+    items = listOf(LocalAttachment(attachmentIntent, AttachmentState.CORRUPT)))) }
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalHistoricalAttachmentUnavailableRender() { AttachmentFrame(historicalAttachmentPanel.copy(
+    unavailable = true, error = "合成历史请求已变化。此版本附件已保留，请返回历史原文重新打开。")) }
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalHistoricalAttachmentEntryRender() {
+    // Capability exposes the actual historical button; no preview IO/picker/storage calls.
+    val capability = androidx.compose.runtime.remember { LocalAttachmentController({ false }, PlatformPngDecoder::decode) }
+    AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+        local = historyLocal.copy(originalHistory = historyLocal.originalHistory!!.copy(selectedRevision = 1)),
+        previewEntryId = longOriginal.id, attachments = capability) }
+}

@@ -51,7 +51,8 @@ class LocalRecordsViewModel internal constructor(
     val attachments = LocalAttachmentController(
         enqueue = { action -> commands.trySend(Command.Attachment(action)).isSuccess }, decodePng = decodePng,
         canUseRecord = { mutableState.value.let { it.ready && !it.opening && it.error == null &&
-            !it.saving && !it.savePending && it.originalEdit == null && it.originalHistory == null } })
+            !it.saving && !it.savePending } },
+        canUsePanel = { it.hasRecordAccess(mutableState.value) })
     private var repository: EntryRepository? = null
     private var persistedDraft: TextDraft? = null
     private val editGeneration = AtomicLong()
@@ -202,6 +203,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     fun selectOriginalRevision(sessionId: Long, revision: Int?) {
+        if (attachments.state.value != null) return
         val current = mutableState.value
         val history = current.originalHistory ?: return
         if (history.sessionId != sessionId || history.loading || history.error != null || history.unavailable ||
@@ -211,6 +213,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     fun retryOriginalHistory(sessionId: Long) {
+        if (attachments.state.value != null) return
         val current = mutableState.value
         val history = current.originalHistory ?: return
         if (history.sessionId != sessionId || history.loading || !current.ready || current.opening || current.error != null) return
@@ -218,6 +221,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     fun backOriginalHistory(sessionId: Long) {
+        if (attachments.state.value != null) return
         val history = mutableState.value.originalHistory ?: return
         if (history.sessionId != sessionId) return
         if (history.replacement != null) cancelHistoryReplacement(sessionId, history.requestId, history.replacement.id)
@@ -247,6 +251,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     fun cancelHistoryReplacement(sessionId: Long, requestId: Long, replacementId: Long) {
+        if (attachments.state.value != null) return
         mutableState.update { current ->
             val history = current.originalHistory
             if (history?.sessionId != sessionId || history.requestId != requestId || history.replacement?.id != replacementId) current
@@ -257,7 +262,7 @@ class LocalRecordsViewModel internal constructor(
     private fun canEditHistory(current: LocalRecordUiState, sessionId: Long, requestId: Long,
         revision: Int, expectedCurrentRevision: Int): Boolean {
         val history = current.originalHistory ?: return false
-        return current.ready && !current.opening && current.error == null && !current.saving && !current.savePending &&
+        return attachments.state.value == null && current.ready && !current.opening && current.error == null && !current.saving && !current.savePending &&
             history.sessionId == sessionId && history.requestId == requestId && !history.loading &&
             history.error == null && !history.unavailable && history.selectedRevision == revision &&
             history.currentRevision == expectedCurrentRevision && history.revisions.any { it.revision == revision } &&

@@ -84,10 +84,11 @@ fun LocalAttachmentScreen(
     Column(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize()
         .verticalScroll(rememberScrollState()).padding(AIyouDimensions.pageNarrow).testTag("attachment-scroll"),
         verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-        Text("附件 · 原文版本 ${panel.revision}", style = MaterialTheme.typography.titleLarge)
+        Text("附件 · 原文版本 ${panel.revision}" + if (panel.readOnly) " · 只读" else "", style = MaterialTheme.typography.titleLarge)
         Text("仅保存在本机。图片关联此原文版本，编辑原文不会移动附件。",
             style = MaterialTheme.typography.bodyMedium, color = AIyouColors.textSecondary)
-        Text("暂支持常规静态 PNG 原图：不超过 16 MiB，宽高各不超过 4096 像素。",
+        Text(if (panel.readOnly) "历史阅读仅查看此版本已有附件，不能新增图片或重试添加。"
+            else "暂支持常规静态 PNG 原图：不超过 16 MiB，宽高各不超过 4096 像素。",
             style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
         panel.notice?.let { Text(it, style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
@@ -104,7 +105,7 @@ fun LocalAttachmentScreen(
             if (onRetryRecords != null && !panel.saving) {
                 OutlinedButton(onClick = onRetryRecords, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("恢复本机读取") }
             }
-            if (!panel.unavailable) {
+            if (!panel.unavailable && !panel.readOnly) {
                 if (panel.selection?.phase == AttachmentImportPhase.FAILED && panel.selection.retryable) {
                     OutlinedButton(onClick = onRetrySave, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) {
                         Text(if (panel.selection.sourcePrepared) "重试保存确认" else "重新选择图片")
@@ -115,6 +116,10 @@ fun LocalAttachmentScreen(
                     TextButton(onClick = onRefresh, enabled = !panel.busy,
                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("重试读取附件") }
                 }
+            }
+            if (panel.readOnly) {
+                TextButton(onClick = onRefresh, enabled = !panel.busy,
+                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("重试读取附件") }
             }
             if (panel.selection != null && !panel.saving) {
                 TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("取消添加") }
@@ -127,7 +132,8 @@ fun LocalAttachmentScreen(
             TextButton(onClick = onClosePicture, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("收起图片") }
         }
         if (!panel.loading && panel.items.isEmpty() && panel.selection == null && panel.error == null) {
-            StatusNotice("这个版本还没有附件", "可以选择一张 PNG 图片，原文与草稿保持不变。", state = ComponentState.EMPTY)
+            StatusNotice("这个版本还没有附件", if (panel.readOnly) "此版本只读，当前版本的图片不会显示在这里。"
+                else "可以选择一张 PNG 图片，原文与草稿保持不变。", state = ComponentState.EMPTY)
         }
         panel.items.forEachIndexed { index, item ->
             key(item.intent.id) {
@@ -138,13 +144,14 @@ fun LocalAttachmentScreen(
                         AttachmentState.WRITING -> "保存已中断，尚未完成。请重试读取状态。"
                         AttachmentState.STAGED -> "文件已暂存，正在等待恢复确认。请重试读取状态。"
                         AttachmentState.READY -> "已保存在本机"
-                        AttachmentState.FAILED -> "保存未完成，原文件已保留；重选时需同一图片。"
+                        AttachmentState.FAILED -> if (panel.readOnly) "保存未完成，原文件已保留。此版本只读，不能重试添加。"
+                            else "保存未完成，原文件已保留；重选时需同一图片。"
                         AttachmentState.CORRUPT -> "附件无法通过完整性校验，原文件已保留，不会显示或覆盖。"
                     }, style = MaterialTheme.typography.bodyMedium)
                     if (item.state == AttachmentState.READY && item.intent.mediaType == "image/png") {
                         TextButton(onClick = { onView(item.intent.id) }, enabled = !panel.busy && panel.selection == null && !panel.unavailable,
                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("查看图片") }
-                    } else if (item.state == AttachmentState.FAILED && item.intent.mediaType == "image/png") {
+                    } else if (!panel.readOnly && item.state == AttachmentState.FAILED && item.intent.mediaType == "image/png") {
                         TextButton(onClick = { onSelect(item.intent.id) }, enabled = !panel.busy && panel.selection == null && !panel.unavailable && panel.error == null,
                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("重新选择同一图片") }
                     } else if (item.state == AttachmentState.READY) {

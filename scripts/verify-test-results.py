@@ -17,9 +17,9 @@ targets = [("domain", "core/domain/build/test-results/test", 3)]
 if args.component:
     targets.append(("component", "core/designsystem/build/test-results/testDebugUnitTest", 7))
 if args.queue:
-    targets.append(("host queue", "checks/record-queue/build/test-results/test", 67))
+    targets.append(("host queue", "checks/record-queue/build/test-results/test", 75))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 64))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 68))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 for label, folder, minimum in targets:
@@ -63,6 +63,15 @@ for label, folder, minimum in targets:
             "crcCorrectCompleteIendCannotHideTruncatedZlibBadAdlerOrTrailingCompressedData",
             "incompleteExcessRowsAndInvalidFiltersAreRejectedWithBoundedInflation",
             "invalidDimensionsDepthCriticalStructureAndUnsupportedMetadataAreRejected")
+        additional["HistoricalAttachmentTest"] = (
+            "encryptedAttachmentSurvivesEditAndColdHistoricalReadWithoutMigratingToNewVersion",
+            "historicalModeRejectsAllImportAndRetryEntrypointsEvenForFailedAttachment",
+            "missingWrongDuplicateRevisionOrMissingParentCannotAuthorizeAnyAttachmentOperation",
+            "crossRecordOrRevisionRowsAreRejectedBeforeCipherReadAndNeverDisplayed",
+            "oldDecodedReadCannotPublishAfterSameRecordChangesVersionAndReopensOldVersion",
+            "revokedHistoryRequestDuringAuthenticatedReadClearsBytesAndPublishesNoPicture",
+            "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
+            "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
         additional["com.t1doo.aiyou.PlatformPngPipelineTest"] = (
             "actualNativeDecoderReadsPixelsAndKeepsOriginalBytesUnchanged",
@@ -77,6 +86,11 @@ for label, folder, minimum in targets:
             "globalRecordFailureHidesPictureAndShowsReachableActualRecovery",
             "launchedPickerKeepsActualRegistryOwnerAcrossGlobalRecordFailureAndRecovery",
             "restoredCompositionWithNewControllerCannotAdoptOldPickerResult")
+        additional["com.t1doo.aiyou.HistoricalAttachmentPresentationTest"] = (
+            "actualHistoricalRouteViewsOldNativePictureAndReturnsToSameOriginalAndBothInputs",
+            "retainedHistoryActionRejectsChangedRequestAndNewVersionNeverShowsOldPicture",
+            "lateAuthenticatedReadAndGlobalFailureHideHistoricalPictureWithoutChangingOwnership",
+            "narrowLargeFontHistoricalFailureRecoveryHasNoImportOrOverwriteActions")
     for owner, names in additional.items():
         for name in names:
             matches = [case for case in observed_cases if case.get("classname") == owner

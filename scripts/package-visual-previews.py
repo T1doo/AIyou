@@ -9,7 +9,7 @@ import zipfile
 GROUPS = {"now": ("此刻", 28), "memories": ("回忆", 28), "tasks": ("待办", 28),
           "components": ("八种组件", 112), "shell": ("主导航", 2),
           "complete": ("完整长文本", 14), "review": ("白蓝手机页面与正式本机状态", 108),
-          "attachments": ("本机附件八种状态", 32)}
+          "attachments": ("本机附件与历史版本只读状态", 52)}
 METHODS = {"NowRender": "now", "MemoriesRender": "memories", "TasksRender": "tasks",
            "ShellRender": "shell", **dict.fromkeys(
                ("MemoryRender", "ComposerRender", "PrivacyRender", "SourceRender",
@@ -25,7 +25,10 @@ METHODS = {"NowRender": "now", "MemoriesRender": "memories", "TasksRender": "tas
 MAX_ZIP_BYTES = 17_000_000  # Decimal MB; allow margin for the download artifact's outer ZIP.
 METHODS.update(dict.fromkeys(("LocalAttachmentEmptyRender", "LocalAttachmentLoadingRender", "LocalAttachmentSavingRender",
                              "LocalAttachmentConfirmFailedRender", "LocalAttachmentReadyRender", "LocalAttachmentFailedRestartRender",
-                             "LocalAttachmentCorruptRender", "LocalAttachmentUnavailableRender"), "attachments"))
+                             "LocalAttachmentCorruptRender", "LocalAttachmentUnavailableRender",
+                             "LocalHistoricalAttachmentReadyRender", "LocalHistoricalAttachmentFailedRender",
+                             "LocalHistoricalAttachmentCorruptRender", "LocalHistoricalAttachmentUnavailableRender",
+                             "LocalHistoricalAttachmentEntryRender"), "attachments"))
 
 
 def group_for(file):
@@ -78,7 +81,7 @@ def package(root, max_zip_bytes=MAX_ZIP_BYTES):
                   "页面尺寸：360dp、320dp/fontScale2、800dp横屏、840dp大屏。\n"
                   "组件尺寸：360dp、320dp/fontScale2；主导航包仅两个尺寸。\n"
                   "完整长文本包：七组件 × 常规1600dp高/窄屏大字体4000dp高，保留完整内容结束标记。\n"
-                  "正式本机页面：二十六状态/路由；附件包：八状态，各有常规、320dp大字体、横屏、大屏；使用合成状态，无数据库/网络调用。\n"
+                  "正式本机页面：二十六状态/路由；附件包：十三状态/路由，各有常规、320dp大字体、横屏、大屏；使用合成状态，无数据库/网络调用。\n"
                   "请核查 PNG 截断、重叠、可读性、原文/派生/提案/正式任务分区。\n"
                   "MANIFEST.json 列出精确原始文件名、尺寸、字节数和 SHA-256。\n"
                   "从 GitHub 正常下载；若外层 ZIP 内还有此 ZIP，可直接上传内层 ZIP。\n")

@@ -42,6 +42,7 @@ fun OriginalHistoryScreen(
     onEdit: () -> Unit = {},
     onConfirmReplacement: (Long) -> Unit = {},
     onCancelReplacement: (Long) -> Unit = {},
+    onAttachments: ((String, Int) -> Unit)? = null,
 ) {
     val current = local.entries.firstOrNull { it.id == history.entryId }
     val storageUnavailable = !local.ready || local.opening || local.error != null
@@ -55,7 +56,7 @@ fun OriginalHistoryScreen(
                 if (selected.revision == history.currentRevision) "当前版本 ${selected.revision} · 只读"
                 else "历史版本 ${selected.revision} · 当前版本 ${history.currentRevision} · 只读",
             onHistory = { _, _ -> onBack(history.sessionId) }, historyActionLabel = "返回版本列表",
-            onEdit = { _, _ -> onEdit() }, editActionLabel = "用此版本编辑")
+            onEdit = { _, _ -> onEdit() }, editActionLabel = "用此版本编辑", onAttachments = onAttachments)
         history.replacement?.let { pending ->
             AlertDialog(onDismissRequest = { onCancelReplacement(pending.id) },
                 title = { Text("替换未保存的修改？") },

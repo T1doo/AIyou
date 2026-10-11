@@ -28,6 +28,7 @@ internal data class OriginalReadingCallbacks(
     val editHistory: () -> Unit = {},
     val confirmHistoryReplacement: (Long) -> Unit = {},
     val cancelHistoryReplacement: (Long) -> Unit = {},
+    val beginHistoricalAttachments: (String, Int) -> Unit = { _, _ -> },
 )
 
 internal interface OriginalReadingObserver {
