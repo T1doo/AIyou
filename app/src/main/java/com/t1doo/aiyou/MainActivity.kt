@@ -24,10 +24,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -65,6 +68,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** A callback belongs to one live navigation session, including repeated opens of the same ID. */
+private class NavigationOwner {
+    var generation by mutableStateOf(0L)
+    var active = true
+}
+
 @Composable
 fun AIyouApp(
     previewDestination: Destination = Destination.NOW,
@@ -76,6 +85,10 @@ fun AIyouApp(
     onRetry: () -> Unit = {},
     previewEntryId: String? = null,
 ) {
+    val navigation = remember { NavigationOwner() }
+    DisposableEffect(navigation) { onDispose { navigation.active = false } }
+    val generation = navigation.generation
+    fun ownsNavigation() = navigation.active && navigation.generation == generation
     var selectedName by rememberSaveable { mutableStateOf(previewDestination.name) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showLicenses by rememberSaveable { mutableStateOf(false) }
@@ -91,8 +104,12 @@ fun AIyouApp(
     val selected = Destination.valueOf(selectedName)
     val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-    BackHandler(enabled = showSettings) { if (showLicenses) showLicenses = false else showSettings = false }
-    BackHandler(enabled = reading) { detailEntryId = null }
+    BackHandler(enabled = showSettings) {
+        if (ownsNavigation()) { navigation.generation++; if (showLicenses) showLicenses = false else showSettings = false }
+    }
+    BackHandler(enabled = reading) {
+        if (ownsNavigation()) { navigation.generation++; detailEntryId = null }
+    }
 
     Scaffold(
         modifier = Modifier.imePadding(),
@@ -100,12 +117,20 @@ fun AIyouApp(
             NotebookAppBar(
                 if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
                 if (reading) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
-            ) { if (reading) detailEntryId = null else if (showLicenses) showLicenses = false else showSettings = !showSettings }
+            ) {
+                if (ownsNavigation()) {
+                    navigation.generation++
+                    if (reading) detailEntryId = null else if (showLicenses) showLicenses = false else showSettings = !showSettings
+                }
+            }
         },
         bottomBar = {
             if (!imeVisible && !reading) {
                 NotebookNavigation(if (showSettings) null else selected) { destination ->
-                    selectedName = destination.name; detailEntryId = null; showSettings = false; showLicenses = false
+                    if (ownsNavigation()) {
+                        navigation.generation++
+                        selectedName = destination.name; detailEntryId = null; showSettings = false; showLicenses = false
+                    }
                 }
             }
         },
@@ -120,13 +145,13 @@ fun AIyouApp(
             ) {
                 StatusNotice("仅本机处理", "可保存文字与恢复本机草稿；AI 连接、附件与系统提醒尚未开放。")
                 ProviderConnectionCard("我的模型 · 未配置", "视觉、转写和语义检索能力未检测")
-                TextButton(onClick = { showLicenses = true }) { Text("开源许可与声明") }
+                TextButton(onClick = { if (ownsNavigation()) { navigation.generation++; showLicenses = true } }) { Text("开源许可与声明") }
                 Text("界面示例", style = MaterialTheme.typography.titleLarge)
-                OutlinedButton(onClick = { demo = !demo }) { Text(if (demo) "退出虚构示例" else "查看虚构示例") }
+                OutlinedButton(onClick = { if (ownsNavigation()) { navigation.generation++; demo = !demo } }) { Text(if (demo) "退出虚构示例" else "查看虚构示例") }
                 if (demo) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                         ComponentState.entries.forEach { state ->
-                            OutlinedButton(onClick = { stateName = state.name }) {
+                            OutlinedButton(onClick = { if (ownsNavigation()) { navigation.generation++; stateName = state.name } }) {
                                 Text(state.description + if (stateName == state.name) " · 已选" else "")
                             }
                         }
@@ -138,13 +163,13 @@ fun AIyouApp(
             val readerId = checkNotNull(detailEntryId)
             val canCopy: (String, Int) -> Boolean = { id, revision ->
                 val latest = currentLocal
-                detailEntryId == id && selectedName == origin.name && !showSettings && !demo &&
+                ownsNavigation() && detailEntryId == id && selectedName == origin.name && !showSettings && !demo &&
                     latest != null && latest.ready && !latest.opening && latest.error == null &&
                     latest.entries.any { it.id == id && it.currentRevision == revision }
             }
             OriginalReadingScreen(readerId, local, onRetry = {
                 val latest = currentLocal
-                if (detailEntryId == readerId && selectedName == origin.name && !showSettings && !demo &&
+                if (ownsNavigation() && detailEntryId == readerId && selectedName == origin.name && !showSettings && !demo &&
                     latest != null && !latest.opening && latest.error != null) onRetry()
             }, onCopy = { id, revision ->
                 // Both copy paths reject retained callbacks after revisions, removal or navigation.
@@ -158,7 +183,8 @@ fun AIyouApp(
                 listState = if (selected == Destination.NOW) nowList else memoriesList,
                 selectedEntryId = if (selected == Destination.NOW) selectedNowId else selectedMemoriesId,
                 onOpenEntry = { id ->
-                    if (selectedName == origin.name && !showSettings && !demo && detailEntryId == null) {
+                    if (ownsNavigation() && selectedName == origin.name && !showSettings && !demo && detailEntryId == null) {
+                        navigation.generation++
                         if (origin == Destination.NOW) selectedNowId = id else selectedMemoriesId = id
                         detailEntryId = id
                     }

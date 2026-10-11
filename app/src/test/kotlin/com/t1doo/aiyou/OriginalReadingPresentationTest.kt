@@ -33,6 +33,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -192,6 +193,29 @@ class OriginalReadingPresentationTest {
         compose.runOnIdle { afterClose() }
         compose.waitForIdle()
         compose.runOnIdle { assertEquals("哨兵", copied()) }
+    }
+
+    @Test fun retainedNavigationCallbacksRejectOtherRecordAndReopenedSameId() {
+        val state = state(entry(), entry("other", "合成另一条原文"))
+        content(state)
+        val oldOpen = compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-record")))
+            .fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        val oldTab = tab("待办").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        open()
+        val oldClose = compose.onNodeWithText("返回列表").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        val oldCopy = compose.onNodeWithText("复制全文").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        compose.onNodeWithText("返回列表").performClick()
+        open("other"); sentinel()
+        compose.runOnIdle { oldClose(); oldCopy(); oldOpen(); oldTab() }
+        assertEquals("合成另一条原文", fullText())
+        compose.runOnIdle { assertEquals("哨兵", copied()) }
+        compose.onNodeWithText("返回列表").performClick(); open()
+        compose.runOnIdle { oldClose(); oldCopy(); oldOpen(); oldTab() }
+        assertEquals("合成完整原文", fullText())
+        compose.runOnIdle { assertEquals("哨兵", copied()) }
+        compose.onNodeWithText("复制全文").performClick()
+        compose.runOnIdle { assertEquals("合成完整原文", copied()) }
+        compose.onNodeWithText("返回列表").performClick()
     }
 
     @Test fun restoredNavigationResolvesLatestOriginalAndRestoresListAnchor() {
