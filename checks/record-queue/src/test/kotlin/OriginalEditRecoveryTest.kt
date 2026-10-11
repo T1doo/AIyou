@@ -334,6 +334,10 @@ class OriginalEditRecoveryTest {
         repo.releaseRevision.complete(Unit)
         lateinit var competing: com.t1doo.aiyou.model.OriginalEditDraft
         val wrapped = object : com.t1doo.aiyou.domain.EntryRepository by repo {
+            // Kotlin delegation forwards the new interface method directly to repo; keep this
+            // existing competing-writer injection on the actual edit submission entry point.
+            override suspend fun reviseFromDraft(draft: com.t1doo.aiyou.model.OriginalEditDraft, createdAtMillis: Long): StoredEntry =
+                revise(draft.entryId, draft.baseRevision, draft.text, createdAtMillis)
             override suspend fun revise(entryId: String, expectedRevision: Int, text: String, createdAtMillis: Long): StoredEntry {
                 val committed = repo.revise(entryId, expectedRevision, text, createdAtMillis)
                 val acknowledged = encrypted.read(entryId)!!
