@@ -10,8 +10,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
@@ -21,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -118,7 +121,16 @@ class OriginalEditRecoveryPresentationTest {
         compose.waitUntil(5000) { vm.state.value.ready }
     }
 
+    private fun scrollRecovery(entryId: String) {
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("resume-edit-$entryId"))
+    }
+
+    private fun scrollIndexText(text: String) {
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(text))
+    }
+
     private fun resume() {
+        scrollRecovery("original")
         val button = compose.onNodeWithTag("resume-edit-original").performScrollTo()
         button.assertIsDisplayed()
         assertTrue(button.getUnclippedBoundsInRoot().height >= 48.dp)
@@ -200,11 +212,15 @@ class OriginalEditRecoveryPresentationTest {
         val (target, bytes) = seedPartialIndex()
         cipher = EncryptedOriginalEditStore(root, key.copyOf()); val repo = FormalFixture(cipher, base)
         start(repo)
+        scrollIndexText("1 份编辑草稿无法读取")
         compose.onNodeWithText("1 份编辑草稿无法读取").performScrollTo().assertIsDisplayed()
-        compose.onAllNodesWithText("恢复编辑草稿").assertCountEquals(2)
+        assertEquals(2, vm.state.value.pendingEdits.size)
+        for (entryId in listOf("healthy-secondary", "original")) {
+            scrollRecovery(entryId)
+            compose.onNodeWithTag("resume-edit-$entryId").assertIsDisplayed().assertIsEnabled()
+        }
         compose.onNodeWithTag("resume-edit-damaged").assertDoesNotExist()
         compose.onNodeWithText("合成损坏私文不可泄露").assertDoesNotExist()
-        compose.onNodeWithTag("resume-edit-original").performScrollTo().assertIsEnabled()
         resume()
         compose.onNodeWithTag("original-edit-save").performScrollTo().performClick()
         compose.waitUntil(5000) { vm.state.value.originalEdit == null }
@@ -216,7 +232,9 @@ class OriginalEditRecoveryPresentationTest {
         val (target, bytes) = seedPartialIndex()
         cipher = EncryptedOriginalEditStore(root, ByteArray(32) { 12 }); val repo = FormalFixture(cipher, base)
         start(repo)
+        scrollIndexText("3 份编辑草稿无法读取")
         compose.onNodeWithText("3 份编辑草稿无法读取").performScrollTo().assertIsDisplayed()
+        scrollIndexText(vm.state.value.editDraftError!!)
         compose.onNodeWithText(vm.state.value.editDraftError!!).performScrollTo().assertIsDisplayed()
         assertTrue(vm.state.value.editDraftError!!.contains("密钥不匹配"))
         compose.onAllNodesWithText("恢复编辑草稿").assertCountEquals(0)
@@ -231,15 +249,21 @@ class OriginalEditRecoveryPresentationTest {
         cipher = EncryptedOriginalEditStore(root, key.copyOf()) { if (it == "listing" && fail.get()) throw java.io.IOException("synthetic private IO detail") }
         val repo = FormalFixture(cipher, base); start(repo)
         fail.set(true)
+        scrollIndexText("重试读取")
         compose.onNodeWithText("重试读取").performScrollTo().performClick()
         compose.waitUntil(5000) { !vm.state.value.editDraftIndexAvailable }
+        scrollIndexText("编辑草稿需要处理")
         compose.onNodeWithText("编辑草稿需要处理").performScrollTo().assertIsDisplayed()
+        scrollRecovery("original")
         compose.onNodeWithTag("resume-edit-original").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText("synthetic private IO detail").assertDoesNotExist()
         fail.set(false)
+        scrollIndexText("重试读取")
         compose.onNodeWithText("重试读取").performScrollTo().performClick()
         compose.waitUntil(5000) { vm.state.value.editDraftIndexAvailable }
+        scrollIndexText("1 份编辑草稿无法读取")
         compose.onNodeWithText("1 份编辑草稿无法读取").performScrollTo().assertIsDisplayed()
+        scrollRecovery("original")
         compose.onNodeWithTag("resume-edit-original").performScrollTo().assertIsEnabled()
         resume(); assertEquals(input, vm.state.value.originalEdit!!.text)
         assertArrayEquals(bytes, target.readBytes()); assertEquals(0, repo.writes)
