@@ -66,6 +66,8 @@ internal object JpegPayloadValidator {
         var position = 2; var width = 0; var height = 0; var frame = 0; var orientation = 1
         var exifSeen = false; var scans = 0; var segments = 0
         var componentIds = emptySet<Int>()
+        var sampling = emptyMap<Int, Pair<Int, Int>>()
+        val initialComponents = mutableSetOf<Int>()
         val observed = mutableListOf<Segment>()
         while (position < bytes.size) {
             require(++segments <= 1024)
@@ -75,7 +77,7 @@ internal object JpegPayloadValidator {
             require(position < bytes.size)
             val code = u(bytes, position++)
             if (code == 0xd9) {
-                require(scans > 0 && position == bytes.size)
+                require(scans > 0 && position == bytes.size && initialComponents == componentIds)
                 return Parsed(Image(width, height, orientation), observed)
             }
             require(code in setOf(0xc0, 0xc2, 0xc4, 0xdb, 0xdd, 0xda, 0xfe) || code in 0xe0..0xef)
@@ -91,11 +93,12 @@ internal object JpegPayloadValidator {
                     require(width in 1..MAX_DIMENSION && height in 1..MAX_DIMENSION && width.toLong() * height <= MAX_PIXELS)
                     val count = u(bytes, body + 5)
                     require(count in setOf(1, 3) && length == 8 + 3 * count)
-                    componentIds = (0 until count).map { index ->
+                    val components = (0 until count).map { index ->
                         val at = body + 6 + 3 * index; val factors = u(bytes, at + 1)
                         require(factors shr 4 in 1..4 && factors and 15 in 1..4 && u(bytes, at + 2) <= 3)
-                        u(bytes, at)
-                    }.toSet()
+                        u(bytes, at) to (factors shr 4 to (factors and 15))
+                    }
+                    sampling = components.toMap(); componentIds = sampling.keys
                     require(componentIds.size == count)
                 }
                 0xe1 -> if (starts(bytes, body, end, "Exif\u0000\u0000")) {
@@ -114,24 +117,47 @@ internal object JpegPayloadValidator {
                     require(first <= last && last <= 63 && approx shr 4 <= 13 && approx and 15 <= 13)
                     require(if (frame == 0xc0) first == 0 && last == 63 && approx == 0 else first != 0 || last == 0)
                     if (first > 0) require(count == 1)
+                    if (frame == 0xc0 || first == 0 && approx shr 4 == 0) {
+                        require(ids.none { it in initialComponents }); initialComponents += ids
+                    }
+                    // A necessary bit budget, not Huffman decoding. Baseline needs a DC code and
+                    // at least one AC symbol per block; progressive DC needs at least one bit.
+                    // Progressive AC has EOBRUN across blocks, so no such per-block bound applies.
+                    val minimumBits = if (frame == 0xc0 || first == 0)
+                        blocks(width, height, ids, sampling) * if (frame == 0xc0) 2 else 1 else 0L
                     position = end
                     val entropyStart = position
+                    var entropyBytes = 0L
                     while (position < bytes.size) {
-                        if (u(bytes, position) != 255) { position++; continue }
+                        if (u(bytes, position) != 255) { position++; entropyBytes++; continue }
                         val markerStart = position++
                         while (position < bytes.size && u(bytes, position) == 255) position++
                         require(position < bytes.size)
                         val next = u(bytes, position)
-                        if (next == 0 || next in 0xd0..0xd7) { position++; continue }
+                        if (next == 0 || next in 0xd0..0xd7) {
+                            if (next == 0) entropyBytes++ // FF00 carries one encoded byte; RST carries none.
+                            position++; continue
+                        }
                         position = markerStart; break
                     }
                     require(position > entropyStart && position < bytes.size)
+                    require(entropyBytes * 8 >= minimumBits) { "JPEG scan below necessary payload bound" }
                     continue
                 }
             }
             position = end
         }
         throw IllegalArgumentException("Incomplete JPEG container")
+    }
+
+    private fun blocks(width: Int, height: Int, ids: List<Int>, sampling: Map<Int, Pair<Int, Int>>): Long {
+        val maxH = sampling.values.maxOf { it.first }; val maxV = sampling.values.maxOf { it.second }
+        fun ceil(value: Long, divisor: Int) = (value + divisor - 1) / divisor
+        return if (ids.size == 1) {
+            val (h, v) = sampling.getValue(ids.single())
+            ceil(width.toLong() * h, 8 * maxH) * ceil(height.toLong() * v, 8 * maxV)
+        } else ceil(width.toLong(), 8 * maxH) * ceil(height.toLong(), 8 * maxV) *
+            ids.sumOf { id -> val (h, v) = sampling.getValue(id); h * v }
     }
 
     private fun exifOrientation(bytes: ByteArray, base: Int, end: Int): Int {

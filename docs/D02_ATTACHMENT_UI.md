@@ -8,7 +8,7 @@
 
 每个页面与选择器有独立 session/request，实际 `ActivityResultRegistry` 注册直接使用本次选择的 VM 内存 UUID key，并捕获不可变 request；不恢复 rememberSaveable launcher key。迟到结果不能改挂新页面或重启后的新 controller，即使数字 request 计数相同。配置恢复保留当前 VM 时不重复 launch；进程重启不恢复旧来源权限或旧内存选择。持久状态由原生产库在 prepare/recover 中恢复。
 
-- 首次导入：同一来源只打开一次，最多16 MiB，MIME必须与文件头匹配。PNG 保留既有 CRC、完整 zlib/扫描行（含Adam7）与实际 bitmap 解码验证；原字节原样加密，两个源尺寸各≤4096，拒绝 APNG 与 eXIf 定向元数据。JPEG 接受8位灰度/RGB baseline或progressive，源尺寸各≤8192且≤6400万像素；有界检查段长度、SOF/SOS/EOI、IFD0方向、扫描与段数，拒绝尾随字节、多EXIF及异常方向。容器检查不等于熵解码完整性证明。
+- 首次导入：同一来源只打开一次，最多16 MiB，MIME必须与文件头匹配。PNG 保留既有 CRC、完整 zlib/扫描行（含Adam7）与实际 bitmap 解码验证；原字节原样加密，两个源尺寸各≤4096，拒绝 APNG 与 eXIf 定向元数据。JPEG 接受8位灰度/RGB baseline或progressive，源尺寸各≤8192且≤6400万像素；有界检查段长度、SOF/SOS/EOI、IFD0方向、扫描与段数，拒绝尾随字节、多EXIF及异常方向。按SOF采样因子与SOS交织方式计算DCT块数，baseline要求每块至少2载荷bit，progressive DC至少1bit，FF00只计一个载荷字节，restart/fill不计；baseline/首次DC须覆盖所有frame component。只是必要的最小载荷边界，未解Huffman/AC系数，容器检查不等于熵解码完整性证明。
 - 确认成功：必须同一稳定 intent、READY、实际列表和完整认证 read；随后显示“图片已保存在本机 · 原文版本N”。文字保存成功不会代替附件成功。
 - 确认失败：保留原 ID 与验证过的内存来源；重试先 recover/list/read，已有 READY 不重读 URI、不重写密文、不建第二份。
 - 重启 FAILED：明确重新选择同一图片，原 ID/source/revision/MIME/最终保存字节hash/size 必须全部相同，名字或 URI 相同不足以证明同源。JPEG 的元数据选择影响保存字节，重启后须重新选回产生同一保存内容的方式；清理后被删除的元数据不参与最终hash，不能将此声称为原始完整来源字节相同。
@@ -24,6 +24,8 @@ JPEG 每次导入显示明确的“保留 JPEG 原图拍摄资料”选择，默
 
 JPEG 使用API28新增的 [ImageDecoder](https://developer.android.com/reference/android/graphics/ImageDecoder) 从一次读取的内存ByteBuffer解码；头尺寸必须与IFD0方向后的预期相同，原生解码负责全部8种方向，不再二次旋转。软件/sRGB显示副本按2的幂采样，输出尺寸各≤1024、像素字节≤4MiB。明确拒绝平台报告的partial decode；此标志不证明平台识别全部恶意熵错误。验证用临时bitmap及迟到未发布bitmap回收，已发布图片按界面所有权使用。PNG 保留 [BitmapFactory](https://developer.android.com/reference/android/graphics/BitmapFactory.Options) 的既有实际bounds/采样路径。最终显示边界不等于progressive内部解码峰值内存或真机性能已验证。
 
+首次同SHA CI实际发现此限制：[00d9f460](https://github.com/T1doo/AIyou/commit/00d9f460d65590dcf637784895d6bc6bdde33faa) 的 [run38150656004](https://github.com/T1doo/AIyou/actions/runs/38150656004) 中，73 App测试有1失败：固定API35 NATIVE ImageDecoder在拒绝partial设置下仍接受仅3字节扫描载荷的早EOI JPEG。不是测试应当视为PASS。保留原失败，后续回归直接调用该codec断言此已观察到的接受行为，并验证应用在保存之前由上述必要载荷边界拒绝它；明确不称为“原生熵解码拒绝”。[T.81](https://www.w3.org/Graphics/JPEG/itu-t81.pdf) Annex C/F的Huffman前缀和DC/AC过程支持此下界；progressive AC有跨块EOBRUN，不能套每块相同下界，也没有强制合法DC-only progressive必须有AC scan。更长的损坏熵载荷仍可能满足该下界并被平台宽容接受，此路径只提供有界格式检查与平台可解码范围，不提供任意JPEG熵流完整性证明。原文、原图库与来源字节不被修改。
+
 ## 实际检查的边界
 
 新增13个 host 控制器/VM回归编译真实生产源码并连接实际 AES/file store；记录与附件账本和平台解码是显式测试边界，不宣称 Room/Android。覆盖取消、关闭后同ID重开、迟到解码、固定版本、已READY读回失败只认证重试、FAILED同源恢复、损坏保留、权限/MIME/头/零读/超限、全局可读性与活动 buffer 生命周期。
@@ -32,7 +34,7 @@ JPEG 使用API28新增的 [ImageDecoder](https://developer.android.com/reference
 
 历史闭环新增8个实际控制器/VM/AES文件库的host测试（原文账本/解码为明确合成边界），覆盖先导入再实际编辑生成新版、冷会话读取旧附件、新版不串图、所有历史写入口拒绝、缺失/错误/重复身份、跨版本row、迟到请求及内存清理、损坏/失败保全；另加4个真实Compose根路由和NATIVE bitmap回归，涵盖历史进入/返回、保留两份输入、旧导航闭包拒绝、读取中换请求、新版隔离和320dp大字体只读恢复动作。
 
-JPEG增加6个纯容器/元数据host用例、3个实际controller/AES文件库用例、4个API35 NATIVE ImageDecoder用例及1个真实Compose/registry选择用例；合成中性四角颜色、超宽固色和GPS数据不来自用户照片。覆盖两端序全部8方向、progressive、实际采样像素、GPS清理后的相同方向像素、marker合法的提前EOI负例、一次URI读取、固定选择、冷历史归属、认证重试无重写、迟到bitmap回收/字节清理。纯容器用例明确接受其中marker合法早EOI，不冒充实际像素可读。原生用例必须由真实CI执行并检查XML后才能报PASS。
+JPEG增加6个纯容器/元数据host用例、3个实际controller/AES文件库用例、4个API35 NATIVE ImageDecoder用例及1个真实Compose/registry选择用例；合成中性四角颜色、超宽固色和GPS数据不来自用户照片。覆盖两端序全部8方向、progressive、实际采样像素、GPS清理后的相同方向像素、marker合法但不足必要载荷的提前EOI、一次URI读取、固定选择、冷历史归属、认证重试无重写、迟到bitmap回收/字节清理。纯容器与NATIVE用例区分应用前置拒绝和平台仍接受的行为；使用真实controller/平台decoder及明确合成store边界核坏来源不会触发save，不冒称SQLCipher/Keystore实测。原生用例必须由对应修正提交的真实CI执行并检查XML后才能报PASS。
 
 常规 CI 保留原75 host、68 App、372 render场景及全部独立PID/严格lint/schema/锁守卫；合同增加到84 host、73 App、380 render。JPEG Ready与取消保留选择各四尺寸，Ready截图实际调用生产ImageDecoder；layoutlib失败时不能替换成假bitmap。附件包60图与原108图页面包分开，每包仍≤17,000,000B；打包保留本次实际渲染PNG字节。静态截图不验证点击、来源权限或进程死亡。合同数字不等于执行结果，应以对应提交的真实XML、PNG、日志及独立审查报告为准。
 

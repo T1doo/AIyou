@@ -117,7 +117,7 @@ fun LocalAttachmentScreen(
             panel.selection?.phase == AttachmentImportPhase.PREPARING -> StatusNotice("正在检查图片",
                 "原文已保留，图片尚未确认保存。", state = ComponentState.LOADING)
             panel.saving -> StatusNotice("正在保存图片", "请等待保存与读取确认完成。", state = ComponentState.LOADING)
-            panel.readingId != null -> StatusNotice("正在读取图片", "完整验证后显示。", state = ComponentState.LOADING)
+            panel.readingId != null -> StatusNotice("正在读取图片", "认证与格式检查通过后显示。", state = ComponentState.LOADING)
         }
         panel.error?.let { StatusNotice("附件需要处理", it, state = ComponentState.ERROR,
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }

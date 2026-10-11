@@ -65,8 +65,38 @@ class JpegPayloadValidationTest {
             prefix(base,JpegFixture.exif(9)),prefix(base,JpegFixture.exif(1)+JpegFixture.exif(1)),
             prefix(base,JpegFixture.exif(1).apply{this[17]=(-1).toByte()})).forEach { rejected{JpegPayloadValidator.inspect(it)} }
     }
-    @Test fun earlyEoiContainerCannotBeUsedAsProofOfReadablePixels() {
-        // Intentional distinction: marker-valid but incomplete entropy reaches the actual Android decoder.
-        assertEquals(JpegPayloadValidator.Image(96,64,1),JpegPayloadValidator.inspect(JpegFixture.earlyEoi()))
+    @Test fun missingScanPayloadIsRejectedByNecessaryBoundWithoutClaimingEntropyCompleteness() {
+        // The real native codec accepted this original counterexample. Reject its insufficient payload.
+        rejected { JpegPayloadValidator.inspect(JpegFixture.earlyEoi()) }
+        // Deliberately structural probes, without Huffman tables or a claim of readable pixels.
+        fun frame(width:Int,height:Int,factors:List<Int>,progressive:Boolean=false):ByteArray =
+            byteArrayOf(-1,0xd8.toByte()) + JpegFixture.segment(if(progressive)0xc2 else 0xc0,
+                byteArrayOf(8,(height shr 8).toByte(),height.toByte(),(width shr 8).toByte(),width.toByte(),factors.size.toByte()) +
+                    factors.flatMapIndexed { i,f -> listOf((i+1).toByte(),f.toByte(),0.toByte()) }.toByteArray())
+        fun scan(ids:List<Int>,payload:ByteArray,first:Int=0,last:Int=63,approx:Int=0):ByteArray =
+            JpegFixture.segment(0xda,byteArrayOf(ids.size.toByte()) +
+                ids.flatMap { listOf(it.toByte(),0.toByte()) }.toByteArray() +
+                byteArrayOf(first.toByte(),last.toByte(),approx.toByte())) + payload
+        val eoi=byteArrayOf(-1,0xd9.toByte())
+        fun checked(bytes:ByteArray) { JpegPayloadValidator.inspect(bytes) }
+        // Grayscale optimized one-bit DC + AC prefix codes may exactly meet this bound.
+        checked(frame(64,64,listOf(0x11))+scan(listOf(1),ByteArray(16))+eoi)
+        rejected { checked(frame(64,64,listOf(0x11))+scan(listOf(1),ByteArray(15))+eoi) }
+        // Odd 4:2:0: interleaved has 24 padded blocks (6 bytes), Y alone only 9 (3 bytes).
+        val subsampled=frame(17,17,listOf(0x22,0x11,0x11))
+        checked(subsampled+scan(listOf(1,2,3),ByteArray(6))+eoi)
+        rejected { checked(subsampled+scan(listOf(1,2,3),ByteArray(5))+eoi) }
+        checked(subsampled+scan(listOf(1),ByteArray(3))+scan(listOf(2),ByteArray(1))+scan(listOf(3),ByteArray(1))+eoi)
+        rejected { checked(subsampled+scan(listOf(1),ByteArray(3))+scan(listOf(2),ByteArray(1))+eoi) }
+        // FF00 is one byte; marker fill and restart markers contribute no encoded bits.
+        checked(subsampled+scan(listOf(1,2,3),ByteArray(6).flatMap { listOf((-1).toByte(),0.toByte()) }.toByteArray())+eoi)
+        rejected { checked(subsampled+scan(listOf(1,2,3),ByteArray(3).flatMap { listOf((-1).toByte(),0.toByte()) }.toByteArray())+eoi) }
+        rejected { checked(subsampled+scan(listOf(1,2,3),ByteArray(5)+byteArrayOf(-1,-1,0xd0.toByte()))+eoi) }
+        // Legal DC-only progressive must remain possible; AC EOBRUN has no per-block bound.
+        val progressive=frame(64,64,listOf(0x11),true)
+        checked(progressive+scan(listOf(1),ByteArray(8),0,0)+eoi)
+        checked(progressive+scan(listOf(1),ByteArray(8),0,0)+scan(listOf(1),ByteArray(1),1,63)+eoi)
+        rejected { checked(progressive+scan(listOf(1),ByteArray(7),0,0)+eoi) }
+        rejected { checked(progressive+scan(listOf(1),ByteArray(8),0,0,0x10)+eoi) }
     }
 }

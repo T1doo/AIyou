@@ -50,7 +50,7 @@ for label, folder, minimum in targets:
             "embeddedThumbnailsUnknownAppsAndCommentsBetweenProgressiveScansAreRemoved",
             "validatedMultipartColorProfileIsPreservedAndInvalidChunksRejected",
             "invalidBoundsHeadersExifOffsetsDirectionsAndTrailingBytesAreRejected",
-            "earlyEoiContainerCannotBeUsedAsProofOfReadablePixels")
+            "missingScanPayloadIsRejectedByNecessaryBoundWithoutClaimingEntropyCompleteness")
         additional["AttachmentControllerTest"] = (
             "actualEncryptedSaveReadbackAndReopenKeepOriginalRevisionAndCapture",
             "pickerCancelAndOldCallbackCannotWriteOrReplaceNewOwner",
@@ -87,7 +87,7 @@ for label, folder, minimum in targets:
             "nativeDecoderAppliesAllEightExifDirectionsOnceWithCorrectPixelsAndBothEndianHeaders",
             "progressiveAndLargeJpegActuallyDecodeWithinDisplayBound",
             "explicitMetadataRemovalHasNoGpsAndKeepsNativeOrientedPixelsWithoutRecompression",
-            "markerValidEarlyEoiAndTruncatedJpegAreRejectedByActualNativeDecoder")
+            "nativeEarlyEoiAcceptanceIsRecordedWhileProductionRejectsInsufficientPayloadBeforeSave")
         additional["com.t1doo.aiyou.PlatformPngPipelineTest"] = (
             "actualNativeDecoderReadsPixelsAndKeepsOriginalBytesUnchanged",
             "largePngIsActuallySampledAndDimensionsAboveBoundAreRejected",

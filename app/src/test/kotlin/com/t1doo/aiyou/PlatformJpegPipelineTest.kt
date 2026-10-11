@@ -1,11 +1,21 @@
 package com.t1doo.aiyou
 
 import android.graphics.Color
+import android.graphics.ColorSpace
+import android.graphics.ImageDecoder
 import android.media.ExifInterface
 import com.t1doo.aiyou.records.JpegPayloadValidator
 import com.t1doo.aiyou.records.PlatformAttachmentPicture
 import com.t1doo.aiyou.records.PlatformImageDecoder
+import com.t1doo.aiyou.records.LocalAttachmentController
+import com.t1doo.aiyou.records.SelectedImageSource
+import com.t1doo.aiyou.domain.AttachmentStore
+import com.t1doo.aiyou.domain.EntryRepository
+import com.t1doo.aiyou.model.*
 import java.io.ByteArrayInputStream
+import java.io.InputStream
+import java.nio.ByteBuffer
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -69,15 +79,54 @@ class PlatformJpegPipelineTest {
         finally { a.releaseUnpublished(); b.releaseUnpublished() }
         assertArrayEquals(before,original)
     }
-    @Test fun markerValidEarlyEoiAndTruncatedJpegAreRejectedByActualNativeDecoder() {
+    @Test fun nativeEarlyEoiAcceptanceIsRecordedWhileProductionRejectsInsufficientPayloadBeforeSave() {
         val early=JpegFixture.earlyEoi()
-        assertEquals(JpegPayloadValidator.Image(96,64,1),JpegPayloadValidator.inspect(early))
+        var partialReports=0
+        // Preserve the real first-CI counterexample: this fixed codec accepts early EOI without
+        // reporting partial. Application rejection below comes from a necessary payload bound.
+        val native=ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(early))) { decoder,_,_ ->
+            decoder.allocator=ImageDecoder.ALLOCATOR_SOFTWARE
+            decoder.setTargetColorSpace(ColorSpace.get(ColorSpace.Named.SRGB))
+            decoder.setTargetSampleSize(1)
+            decoder.setOnPartialImageListener { partialReports++; false }
+        }
+        try { assertEquals(96,native.width); assertEquals(64,native.height); assertEquals(0,partialReports) }
+        finally { native.recycle() }
         for(bytes in listOf(early,JpegFixture.baseline().dropLast(4).toByteArray())) {
             val before=bytes.copyOf()
             try { val picture=PlatformImageDecoder.decode(bytes); picture.releaseUnpublished(); fail("Incomplete JPEG must not publish pixels") }
             catch (_: IllegalArgumentException) {}
-            catch (_: android.graphics.ImageDecoder.DecodeException) {}
             assertArrayEquals(before,bytes)
         }
+        var writes=0; var opens=0
+        val original=StoredEntry("synthetic-jpeg-record",1,"合成原文",1,"Etc/UTC",ProcessingPolicy.LOCAL_ONLY)
+        val repository=object:EntryRepository {
+            // Explicit synthetic storage boundary; the real controller must never reach save here.
+            override val attachments=object:AttachmentStore {
+                override suspend fun recover() {}
+                override suspend fun list(entryId:String,revision:Int)=emptyList<LocalAttachment>()
+                override suspend fun save(intent:AttachmentIntent,source:()->InputStream):LocalAttachment { writes++; error("invalid image reached save") }
+                override suspend fun read(id:String):ByteArray=error("no attachment was stored")
+            }
+            override suspend fun entries()=listOf(original)
+            override suspend fun readDraft():TextDraft?=null
+            override suspend fun updateDraft(text:String):TextDraft=error("must not change capture")
+            override suspend fun saveDraft(expected:TextDraft,capturedAtMillis:Long,captureTimeZone:String):StoredEntry=error("must not save capture")
+            override suspend fun revisions(entryId:String)=emptyList<OriginalRevision>()
+            override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry=error("must not change original")
+        }
+        val queue=ArrayDeque<suspend (EntryRepository)->Unit>()
+        fun drain()=runBlocking { while(queue.isNotEmpty()) queue.removeFirst()(repository) }
+        val controller=LocalAttachmentController({queue.addLast(it);true},PlatformImageDecoder::decode)
+        controller.open(original.id,1); drain(); controller.select(controller.state.value!!.sessionId)
+        val request=controller.state.value!!.selection!!.requestId
+        controller.selected(request,object:SelectedImageSource {
+            override fun mediaType()="image/jpeg"
+            override fun open():InputStream { opens++;return ByteArrayInputStream(early) }
+        });drain()
+        assertEquals(1,opens);assertEquals(0,writes);assertTrue(controller.state.value!!.items.isEmpty())
+        assertNotNull(controller.state.value!!.error);assertNull(controller.state.value!!.notice)
+        assertEquals(listOf(original),runBlocking{repository.entries()})
+        assertArrayEquals(JpegFixture.earlyEoi(),early)
     }
 }
