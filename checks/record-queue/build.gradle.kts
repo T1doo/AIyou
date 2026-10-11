@@ -11,7 +11,10 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalHistoryUiState.kt")
     from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/LocalRecords.kt")
     from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/ProcessingPolicy.kt")
+    from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/LocalAttachment.kt")
     from("../../core/domain/src/main/kotlin/com/t1doo/aiyou/domain/EntryRepository.kt")
+    from("../../core/domain/src/main/kotlin/com/t1doo/aiyou/domain/AttachmentStore.kt")
+    from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedAttachmentStore.kt")
     into(production)
 }
 kotlin.sourceSets.getByName("main").kotlin.srcDir(production)

@@ -355,6 +355,7 @@ class LocalRecordsViewModel internal constructor(
     private suspend fun open() {
         try {
             val store = repository ?: openStore().also { repository = it }
+            store.prepare()
             persistedDraft = store.readDraft()
             val entries = store.entries()
             mutableState.update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),

@@ -48,3 +48,17 @@ internal data class EntryRow(
     val captureTimeZone: String, val privacyPolicy: String,
     val originalText: String, val contentHash: String,
 )
+
+@Entity(tableName = "attachments", foreignKeys = [ForeignKey(
+    entity = RevisionEntity::class, parentColumns = ["entryId", "revision"],
+    childColumns = ["entryId", "revision"], deferred = true,
+)], indices = [Index(value = ["entryId", "revision"])])
+internal data class AttachmentEntity(
+    @PrimaryKey val id: String,
+    val entryId: String,
+    val revision: Int,
+    val mediaType: String,
+    val sha256: String,
+    val byteSize: Long,
+    val state: String,
+)

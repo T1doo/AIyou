@@ -26,15 +26,33 @@ internal interface RecordsDao {
     suspend fun entry(id: String): EntryRow?
     @Query("SELECT * FROM entry_revisions WHERE entryId=:id ORDER BY revision")
     suspend fun revisions(id: String): List<RevisionEntity>
+    @Query("SELECT * FROM attachments WHERE id=:id") suspend fun attachment(id: String): AttachmentEntity?
+    @Query("SELECT * FROM attachments ORDER BY id") suspend fun attachments(): List<AttachmentEntity>
+    @Insert suspend fun insertAttachment(value: AttachmentEntity)
+    @Query("UPDATE attachments SET state=:next WHERE id=:id AND state=:expected")
+    suspend fun advanceAttachment(id: String, expected: String, next: String): Int
 }
 
-@Database(entities = [EntryEntity::class, RevisionEntity::class, DraftEntity::class, LocalJobEntity::class], version = 2, exportSchema = true)
+@Database(entities = [EntryEntity::class, RevisionEntity::class, DraftEntity::class, LocalJobEntity::class, AttachmentEntity::class], version = 3, exportSchema = true)
 internal abstract class RecordsDatabase : RoomDatabase() {
     abstract fun records(): RecordsDao
 }
 
+/** Existing originals/drafts/jobs are untouched; media capture belongs to D03. */
+internal val recordsMigration2To3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE attachments (id TEXT NOT NULL PRIMARY KEY, entryId TEXT NOT NULL, revision INTEGER NOT NULL, mediaType TEXT NOT NULL, sha256 TEXT NOT NULL, byteSize INTEGER NOT NULL, state TEXT NOT NULL, FOREIGN KEY(entryId,revision) REFERENCES entry_revisions(entryId,revision) ON UPDATE NO ACTION ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED)")
+        db.execSQL("CREATE INDEX index_attachments_entryId_revision ON attachments(entryId,revision)")
+        installAttachmentGuard(db)
+    }
+}
+
 internal fun installRevisionGuard(db: SupportSQLiteDatabase) {
     db.execSQL("CREATE TRIGGER IF NOT EXISTS immutable_original_revision BEFORE UPDATE ON entry_revisions BEGIN SELECT RAISE(ABORT, 'immutable original revision'); END")
+}
+
+internal fun installAttachmentGuard(db: SupportSQLiteDatabase) {
+    db.execSQL("CREATE TRIGGER IF NOT EXISTS immutable_attachment_intent BEFORE UPDATE ON attachments WHEN OLD.id IS NOT NEW.id OR OLD.entryId IS NOT NEW.entryId OR OLD.revision IS NOT NEW.revision OR OLD.mediaType IS NOT NEW.mediaType OR OLD.sha256 IS NOT NEW.sha256 OR OLD.byteSize IS NOT NEW.byteSize BEGIN SELECT RAISE(ABORT, 'immutable attachment intent'); END")
 }
 
 /** v1 is the initial D02 text schema; v2 adds the durable local work ledger. */

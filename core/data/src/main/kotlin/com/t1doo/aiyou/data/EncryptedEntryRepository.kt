@@ -6,6 +6,7 @@ import androidx.room.RoomDatabase
 import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.t1doo.aiyou.domain.EntryRepository
+import com.t1doo.aiyou.domain.AttachmentStore
 import com.t1doo.aiyou.domain.RecordConflict
 import com.t1doo.aiyou.domain.RecordIntegrityFailure
 import com.t1doo.aiyou.model.OriginalRevision
@@ -22,9 +23,13 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 class EncryptedEntryRepository internal constructor(
     internal val database: RecordsDatabase,
     private val keyBytes: ByteArray,
+    private val attachmentStorage: EncryptedAttachmentStore,
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) : EntryRepository, AutoCloseable {
     private val dao get() = database.records()
+    val attachments: AttachmentStore get() = attachmentStorage
+
+    override suspend fun prepare() { attachmentStorage.recover() }
 
     override suspend fun readDraft(): TextDraft? = dao.draft()?.toModel()
 
@@ -69,7 +74,7 @@ class EncryptedEntryRepository internal constructor(
     }
 
     override fun close() {
-        try { database.close() } finally { keyBytes.fill(0) }
+        try { database.close() } finally { attachmentStorage.close(); keyBytes.fill(0) }
     }
 
     companion object {
@@ -80,13 +85,25 @@ class EncryptedEntryRepository internal constructor(
             val file = File(context.noBackupFilesDir, "records/records.db")
             val keyFile = File(context.noBackupFilesDir, "keys/database.key")
             val existing = file.exists() || File(file.path + "-wal").exists() || File(file.path + "-shm").exists()
-            return openWithKey(context, file, AndroidDatabaseKeyProvider(keyFile, DATABASE_KEY_ALIAS).load(existing))
+            return openWithKey(context, file, AndroidDatabaseKeyProvider(keyFile, DATABASE_KEY_ALIAS).load(existing)) { database ->
+                val blobs = File(file.parentFile, file.name + ".attachments")
+                val existingBlobs = blobs.listFiles()?.any { it.name != ".store.lock" } == true
+                val existingRows = database.openHelper.writableDatabase.query("SELECT count(*) FROM attachments").use {
+                    it.moveToFirst(); it.getLong(0) > 0
+                }
+                AndroidDatabaseKeyProvider(File(context.noBackupFilesDir, "keys/attachments.key"), DATABASE_KEY_ALIAS,
+                    "AIyou attachment key v1".toByteArray(Charsets.US_ASCII)).load(existingBlobs || existingRows)
+            }
         }
 
         internal const val DATABASE_KEY_ALIAS = "com.t1doo.aiyou.database.wrap.v1"
 
-        internal fun openWithKey(context: Context, file: File, key: ByteArray): EncryptedEntryRepository {
+        /** Tests supply synthetic keys; the production factory supplies an independently wrapped media key. */
+        internal fun openWithKey(context: Context, file: File, key: ByteArray,
+            attachmentKey: (RecordsDatabase) -> ByteArray = { key.copyOf() },
+        ): EncryptedEntryRepository {
             var database: RecordsDatabase? = null
+            var storage: EncryptedAttachmentStore? = null
             var opened = false
             try {
                 require(key.size == 32)
@@ -94,18 +111,23 @@ class EncryptedEntryRepository internal constructor(
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
                 val created = Room.databaseBuilder(context.applicationContext, RecordsDatabase::class.java, file.absolutePath)
                 .openHelperFactory(SupportOpenHelperFactory(key))
-                .addMigrations(recordsMigration1To2)
+                .addMigrations(recordsMigration1To2, recordsMigration2To3)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addCallback(object : RoomDatabase.Callback() {
-                    override fun onCreate(db: SupportSQLiteDatabase) { installRevisionGuard(db) }
-                    override fun onOpen(db: SupportSQLiteDatabase) { installRevisionGuard(db) }
+                    override fun onCreate(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db) }
+                    override fun onOpen(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db) }
                 }).build()
                 database = created
                 created.openHelper.writableDatabase // authenticate/schema validation before reporting ready
-                return EncryptedEntryRepository(created, key).also { opened = true }
+                val mediaKey = attachmentKey(created)
+                try {
+                    require(mediaKey.size == 32)
+                    storage = EncryptedAttachmentStore(File(file.parentFile, file.name + ".attachments"), RoomAttachmentLedger(created), mediaKey)
+                } catch (failure: Exception) { mediaKey.fill(0); throw failure }
+                return EncryptedEntryRepository(created, key, checkNotNull(storage)).also { opened = true }
             } finally {
                 if (!opened) {
-                    try { database?.close() } finally { key.fill(0) }
+                    try { database?.close() } finally { storage?.close(); key.fill(0) }
                 }
             }
         }

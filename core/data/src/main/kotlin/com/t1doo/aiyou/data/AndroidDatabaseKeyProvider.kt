@@ -13,7 +13,11 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /** Device-bound wrapping key; a lost key never causes a database reset or silent key replacement. */
-internal class AndroidDatabaseKeyProvider(private val file: File, private val alias: String) {
+internal class AndroidDatabaseKeyProvider(
+    private val file: File,
+    private val alias: String,
+    private val associatedData: ByteArray = "AIyou database key v1".toByteArray(Charsets.US_ASCII),
+) {
     fun load(databaseExists: Boolean): ByteArray = synchronized(lock) {
         try {
             val atomic = AtomicFile(file)
@@ -34,7 +38,7 @@ internal class AndroidDatabaseKeyProvider(private val file: File, private val al
                 if (wrapped.size != 65 || !wrapped.copyOfRange(0, 5).contentEquals(magic)) throw StorageKeyUnavailable()
                 val cipher = Cipher.getInstance("AES/GCM/NoPadding")
                 cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, wrapped.copyOfRange(5, 17)))
-                cipher.updateAAD(aad)
+                cipher.updateAAD(associatedData)
                 return@synchronized cipher.doFinal(wrapped, 17, wrapped.size - 17).also {
                     if (it.size != 32) { it.fill(0); throw StorageKeyUnavailable() }
                 }
@@ -50,7 +54,7 @@ internal class AndroidDatabaseKeyProvider(private val file: File, private val al
             try {
                 val cipher = Cipher.getInstance("AES/GCM/NoPadding")
                 cipher.init(Cipher.ENCRYPT_MODE, wrappingKey)
-                cipher.updateAAD(aad)
+                cipher.updateAAD(associatedData)
                 check(cipher.iv.size == 12)
                 val payload = magic + cipher.iv + cipher.doFinal(raw)
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
@@ -66,6 +70,5 @@ internal class AndroidDatabaseKeyProvider(private val file: File, private val al
     companion object {
         private val lock = Any()
         private val magic = "AIYK1".toByteArray(Charsets.US_ASCII)
-        private val aad = "AIyou database key v1".toByteArray(Charsets.US_ASCII)
     }
 }
