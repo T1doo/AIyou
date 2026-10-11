@@ -1,9 +1,13 @@
 package com.t1doo.aiyou
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -30,6 +34,7 @@ import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -150,13 +155,13 @@ class LocalRecordsPresentationTest {
     }
 
     @Test
-    @Config(sdk = [35], qualifiers = "w320dp-h1000dp")
+    @Config(sdk = [35], qualifiers = "w320dp-h640dp")
     fun narrowLargeFontSaveFailureRetryScrollsIntoViewAndPreservesPendingDraft() {
         verifyNarrowFailureRetry(saveFailure = true)
     }
 
     @Test
-    @Config(sdk = [35], qualifiers = "w320dp-h1000dp")
+    @Config(sdk = [35], qualifiers = "w320dp-h640dp")
     fun narrowLargeFontReadFailureRetryScrollsIntoViewAndPreservesKnownDraft() {
         verifyNarrowFailureRetry(saveFailure = false)
     }
@@ -178,7 +183,9 @@ class LocalRecordsPresentationTest {
             inputModeManager = LocalInputModeManager.current
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
-                AIyouTheme { AIyouApp(local = state.value, onSave = { saves++ },
+                // Explicit constraints make this a compact viewport, independent of host window sizing.
+                Box(Modifier.size(width = 320.dp, height = 640.dp).testTag("failure-viewport")) {
+                    AIyouTheme { AIyouApp(local = state.value, onSave = { saves++ },
                     onDraftChange = { edits++ }, onRetry = {
                         if (saveFailure) {
                             saveRetries++
@@ -188,8 +195,12 @@ class LocalRecordsPresentationTest {
                             state.value = state.value.copy(opening = true, error = null)
                         }
                     }) }
+                }
             }
         }
+        val phone = compose.onNodeWithTag("failure-viewport").getUnclippedBoundsInRoot()
+        assertEquals(320.dp, phone.width)
+        assertEquals(640.dp, phone.height)
         val field = compose.onNodeWithContentDescription("此刻，想记下什么")
         field.assertIsNotEnabled().performTouchInput { click() }
         val fieldMatcher = hasContentDescription("此刻，想记下什么")
@@ -200,7 +211,9 @@ class LocalRecordsPresentationTest {
         val retry = compose.onNodeWithText("重试")
         retry.assertIsNotDisplayed()
         val list = compose.onNode(hasScrollToIndexAction())
+        val scrollBefore = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
         list.performScrollToNode(hasText("重试"))
+        assertTrue(list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value() > scrollBefore)
         retry.assertIsDisplayed().assertIsEnabled()
         assertEquals(Role.Button, retry.fetchSemanticsNode().config[SemanticsProperties.Role])
         val bounds = retry.getUnclippedBoundsInRoot()
