@@ -37,6 +37,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -197,16 +198,17 @@ class OriginalEditPresentationTest {
         assertEquals(360f, initialRoot.width.value, 0.01f)
         assertEquals(640f, initialRoot.height.value, 0.01f)
         val list = compose.onNode(hasScrollToIndexAction())
-        list.performScrollToNode(hasTestTag("entry-original"))
+        list.performScrollToIndex(measuredListState.layoutInfo.totalItemsCount - 1)
         val before = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
-        assertEquals(before.maxValue(), before.value(), 0.01f)
+        assertEquals(listTrace("PREVIEW_GROWTH_INITIAL"), before.maxValue(), before.value(), 0.01f)
         val initialCard = compose.onNodeWithTag("entry-original").getUnclippedBoundsInRoot()
         val initialViewport = list.getUnclippedBoundsInRoot()
         assertTrue("CONTROLLED_TAIL_INITIAL bounds=$initialCard viewport=$initialViewport",
             initialCard.left >= initialViewport.left && initialCard.right <= initialViewport.right &&
                 initialCard.top >= initialViewport.top && initialCard.bottom <= initialViewport.bottom)
         println(listTrace("PREVIEW_GROWTH_BEFORE"))
-        open(); edit()
+        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-original"))).performClick()
+        edit()
         val text = "合成第一行改写\n合成第二行改写\n合成第三行改写"
         replace(text)
         save(); waitSaved(); assertEquals(text, original())
@@ -237,10 +239,11 @@ class OriginalEditPresentationTest {
         val root = compose.onNodeWithTag("edit-viewport").getUnclippedBoundsInRoot()
         assertEquals(360f, root.width.value, 0.01f); assertEquals(640f, root.height.value, 0.01f)
         val list = compose.onNode(hasScrollToIndexAction())
-        list.performScrollToNode(hasTestTag("entry-original"))
-        assertFalse(measuredListState.canScrollForward)
+        list.performScrollToIndex(measuredListState.layoutInfo.totalItemsCount - 1)
+        assertFalse(listTrace("VIEWPORT_SHRINK_INITIAL"), measuredListState.canScrollForward)
         println(listTrace("VIEWPORT_SHRINK_BEFORE"))
-        open(); assertEquals("合成原文", original())
+        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-original"))).performClick()
+        assertEquals("合成原文", original())
         // One measured layout change; no IO, revision, delay-until-visible or repeated retry.
         compose.runOnIdle { callbacks.returnToList(); height.value = 360.dp }
         compose.waitForIdle()
