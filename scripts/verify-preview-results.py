@@ -11,7 +11,7 @@ reports = list((root / "app/build/test-results/validateDebugScreenshotTest").rgl
 cases = []
 for report in reports:
     cases.extend(ET.parse(report).getroot().iter("testcase"))
-expected = 320  # Original216 + twenty-six production states/routes x four sizes.
+expected = 352  # Preserve original320; eight attachment states x four sizes.
 if len(cases) != expected:
     raise SystemExit(f"FAIL: expected {expected} actual Preview smoke tests, found {len(cases)}")
 if any(any(case.find(tag) is not None for tag in ("failure", "error", "skipped")) for case in cases):
@@ -39,7 +39,10 @@ local_methods = ("LocalEmptyRender", "LocalRestoredRender", "LocalSavingRender",
                  "LocalReadFailedRender", "LocalSavedRender", "LocalRejectedInputRender", "LocalMemoriesRender",
                  "LocalLongListRender", "LocalOriginalReadRender", "LocalMissingOriginalRender", "LocalOriginalReadFailureRender",
                  "LocalOriginalEditRender", "LocalOriginalEditSavingRender", "LocalOriginalEditFailedRender", "LocalOriginalEditConflictRender", "LocalOriginalEditStorageFailedRender", "LocalOriginalHistoryRender", "LocalOriginalHistoryReadRender", "LocalOriginalHistoryLoadingRender", "LocalOriginalHistoryFailedRender", "LocalOriginalHistoryUnavailableRender", "LocalHistoryEditorRender", "LocalHistoryEditorFailedRender", "LocalHistoryEditorUnchangedRender", "LocalHistoryReplacementRender")
-for method in local_methods:
+attachment_methods = ("LocalAttachmentEmptyRender", "LocalAttachmentLoadingRender", "LocalAttachmentSavingRender",
+                      "LocalAttachmentConfirmFailedRender", "LocalAttachmentReadyRender", "LocalAttachmentFailedRestartRender",
+                      "LocalAttachmentCorruptRender", "LocalAttachmentUnavailableRender")
+for method in local_methods + attachment_methods:
     production = [item for item in manifest if "/" + method + "_" in item["file"]]
     if len(production) != 4:
         raise SystemExit(f"FAIL: require all four actual production sizes for {method}, found {len(production)}")

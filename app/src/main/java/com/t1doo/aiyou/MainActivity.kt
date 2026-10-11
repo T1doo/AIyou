@@ -54,6 +54,9 @@ import com.t1doo.aiyou.records.LocalRecordsScreen
 import com.t1doo.aiyou.records.LocalRecordsViewModel
 import com.t1doo.aiyou.records.OpenSourceLicenses
 import com.t1doo.aiyou.records.OriginalReadingScreen
+import com.t1doo.aiyou.records.LocalAttachmentController
+import com.t1doo.aiyou.records.LocalAttachmentScreen
+import com.t1doo.aiyou.records.AttachmentPicker
 import com.t1doo.aiyou.records.OriginalEditScreen
 import com.t1doo.aiyou.records.OriginalHistoryScreen
 import com.t1doo.aiyou.records.LocalOriginalReadingObserver
@@ -79,7 +82,7 @@ class MainActivity : ComponentActivity() {
                 onBackOriginalHistory = records::backOriginalHistory, onRetryOriginalHistory = records::retryOriginalHistory,
                 onEditOriginalHistory = records::editOriginalHistory,
                 onConfirmHistoryReplacement = records::confirmHistoryReplacement,
-                onCancelHistoryReplacement = records::cancelHistoryReplacement) }
+                onCancelHistoryReplacement = records::cancelHistoryReplacement, attachments = records.attachments) }
         }
     }
 }
@@ -114,6 +117,7 @@ fun AIyouApp(
     onEditOriginalHistory: (Long, Long, Int, Int) -> Unit = { _, _, _, _ -> },
     onConfirmHistoryReplacement: (Long, Long, Long) -> Unit = { _, _, _ -> },
     onCancelHistoryReplacement: (Long, Long, Long) -> Unit = { _, _, _ -> },
+    attachments: LocalAttachmentController? = null,
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -142,6 +146,7 @@ fun AIyouApp(
     val imeVisible = imeBottomPx > 0
     val origin = selected
     val readerId = detailEntryId
+    val attachmentPanel = attachments?.state?.collectAsState()?.value
     val editing = if (reading) local?.originalEdit?.takeIf { it.entryId == readerId } else null
     val history = if (reading) local?.originalHistory?.takeIf { it.entryId == readerId } else null
     val historyList = remember(history?.sessionId) { LazyListState() }
@@ -185,7 +190,10 @@ fun AIyouApp(
         if (ownsNavigation() && reading) {
             val edit = currentLocal?.originalEdit?.takeIf { it.entryId == readerId }
             val activeHistory = currentLocal?.originalHistory?.takeIf { it.entryId == readerId }
-            if (activeHistory != null) backHistory(activeHistory.sessionId)
+            val activeAttachment = attachments?.state?.value
+            if (activeAttachment != null) {
+                if (!activeAttachment.saving) { navigation.generation++; attachments?.close(activeAttachment.sessionId) }
+            } else if (activeHistory != null) backHistory(activeHistory.sessionId)
             else if (edit != null) cancelEdit(edit.sessionId) else {
                 navigation.generation++
                 val latest = currentLocal
@@ -197,7 +205,7 @@ fun AIyouApp(
         }
     }
     val selectDestination: (Destination) -> Unit = { destination ->
-        if (ownsNavigation() && currentLocal?.originalEdit == null && currentLocal?.originalHistory == null) {
+        if (ownsNavigation() && currentLocal?.originalEdit == null && currentLocal?.originalHistory == null && attachments?.state?.value == null) {
             navigation.generation++
             tailReturnRequest = null
             selectedName = destination.name; detailEntryId = null; showSettings = false; showLicenses = false
@@ -215,7 +223,7 @@ fun AIyouApp(
         val latest = currentLocal
         ownsNavigation() && detailEntryId == id && selectedName == origin.name && !showSettings && !demo &&
             latest != null && latest.ready && !latest.opening && latest.error == null &&
-            latest.originalEdit == null && latest.originalHistory == null &&
+            latest.originalEdit == null && latest.originalHistory == null && attachments?.state?.value == null &&
             latest.entries.any { it.id == id && it.currentRevision == revision }
     }
     val beginEdit: (String, Int) -> Unit = { id, revision ->
@@ -223,11 +231,16 @@ fun AIyouApp(
             navigation.generation++; onBeginOriginalEdit(id, revision)
         }
     }
+    val beginAttachments: (String, Int) -> Unit = { id, revision ->
+        if (canCopy(id, revision) && currentLocal?.saving == false && currentLocal?.savePending == false) {
+            navigation.generation++; attachments?.open(id, revision)
+        }
+    }
     val beginHistory: (String, Int) -> Unit = { id, revision ->
         val latest = currentLocal
         if (ownsNavigation() && reading && detailEntryId == id && selectedName == origin.name && !showSettings && !demo &&
             latest != null && latest.ready && !latest.opening && latest.error == null && !latest.saving && !latest.savePending &&
-            latest.originalHistory == null && latest.originalEdit?.canCancel != false &&
+            latest.originalHistory == null && attachments?.state?.value == null && latest.originalEdit?.canCancel != false &&
             latest.entries.any { it.id == id && it.currentRevision == revision }) {
             navigation.generation++; onBeginOriginalHistory(id, revision)
         }
@@ -297,10 +310,10 @@ fun AIyouApp(
         modifier = Modifier.imePadding().onSizeChanged { scaffoldHeightPx = it.height },
         topBar = {
             NotebookAppBar(
-                if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
+                if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
                 if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
-                else if (editing != null) "取消编辑" else if (reading) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
-                actionEnabled = history != null || editing?.canCancel != false,
+                else if (attachmentPanel != null) "返回原文" else if (editing != null) "取消编辑" else if (reading) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
+                actionEnabled = attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
             ) {
                 if (reading) returnToList() else if (ownsNavigation()) {
                     navigation.generation++
@@ -326,7 +339,9 @@ fun AIyouApp(
                 modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(AIyouDimensions.pageNarrow),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceLg),
             ) {
-                StatusNotice("仅本机处理", "可保存文字与恢复本机草稿；AI 连接、附件与系统提醒尚未开放。")
+                StatusNotice("仅本机处理", if (attachments != null)
+                    "可保存文字、恢复草稿，并为已保存原文添加 PNG 附件；AI 连接、录音与系统提醒尚未开放。"
+                    else "可保存文字与恢复草稿；AI 连接、录音与系统提醒尚未开放。")
                 ProviderConnectionCard("我的模型 · 未配置", "视觉、转写和语义检索能力未检测")
                 TextButton(onClick = { if (ownsNavigation()) { navigation.generation++; showLicenses = true } }) { Text("开源许可与声明") }
                 Text("界面示例", style = MaterialTheme.typography.titleLarge)
@@ -341,6 +356,17 @@ fun AIyouApp(
                     }
                 }
             }
+        } else if (attachmentPanel != null && attachments != null && reading && local != null) {
+            val panel = if (!local.ready || local.opening || local.error != null ||
+                local.entries.none { it.id == attachmentPanel.entryId && it.currentRevision == attachmentPanel.revision })
+                attachmentPanel.copy(picture = null, unavailable = true,
+                    error = "当前原文暂不可读取或版本已变化。原文与附件已保留，请返回原文。") else attachmentPanel
+            AttachmentPicker(attachments, attachmentPanel.selection, canLaunch = !panel.unavailable)
+            LocalAttachmentScreen(panel, onSelect = { attachments.select(panel.sessionId, it) },
+                onRefresh = { attachments.refresh(panel.sessionId) }, onCancel = { attachments.cancel(panel.sessionId) },
+                onRetrySave = { attachments.retrySave(panel.sessionId) }, onView = { attachments.view(panel.sessionId, it) },
+                onClosePicture = { attachments.closePicture(panel.sessionId) }, modifier = modifier,
+                onRetryRecords = if (local.ready && local.error != null && !local.opening) retryReading else null)
         } else if (history != null && local != null) {
             OriginalHistoryScreen(history, local, historyList, selectHistory, backHistory, retryHistory,
                 retryReading, copyHistory, canCopyHistory, modifier, editHistory, confirmHistoryReplacement, cancelHistoryReplacement)
@@ -348,7 +374,8 @@ fun AIyouApp(
             OriginalEditScreen(editing, local, changeEdit, saveEdit, cancelEdit, modifier, onRetry = retryReading, onHistory = beginHistory)
         } else if (reading && local != null) {
             OriginalReadingScreen(checkNotNull(readerId), local, onRetry = retryReading,
-                onCopy = copy, canCopy = canCopy, modifier = modifier, onEdit = beginEdit, onHistory = beginHistory)
+                onCopy = copy, canCopy = canCopy, modifier = modifier, onEdit = beginEdit, onHistory = beginHistory,
+                onAttachments = if (attachments != null) beginAttachments else null)
         } else if (!demo && local != null && selected != Destination.TASKS) {
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }

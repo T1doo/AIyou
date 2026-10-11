@@ -42,11 +42,16 @@ class LocalRecordsViewModel internal constructor(
     application: Application,
     private val openStore: () -> EntryRepository,
     private val clock: Clock = Clock.systemUTC(),
+    private val decodePng: (ByteArray) -> AttachmentPicture = PlatformPngDecoder::decode,
 ) : AndroidViewModel(application) {
     constructor(application: Application) : this(application, { EncryptedEntryRepository.open(application) })
     private val mutableState = MutableStateFlow(LocalRecordUiState())
     val state = mutableState.asStateFlow()
     private val commands = Channel<Command>(Channel.UNLIMITED)
+    val attachments = LocalAttachmentController(
+        enqueue = { action -> commands.trySend(Command.Attachment(action)).isSuccess }, decodePng = decodePng,
+        canUseRecord = { mutableState.value.let { it.ready && !it.opening && it.error == null &&
+            !it.saving && !it.savePending && it.originalEdit == null && it.originalHistory == null } })
     private var repository: EntryRepository? = null
     private var persistedDraft: TextDraft? = null
     private val editGeneration = AtomicLong()
@@ -99,11 +104,14 @@ class LocalRecordsViewModel internal constructor(
                             }
                             is Command.Revise -> reviseOriginal(command)
                             is Command.ReadHistory -> readHistory(command)
+                            is Command.Attachment -> command.action(checkNotNull(repository))
                         }
                     } catch (failure: CancellationException) { throw failure }
                     catch (failure: Exception) { failed(failure, preserveQueuedSave = command is Command.Edit) }
                 }
             } finally {
+                attachments.markDisposed()
+                attachments.disposeOnIo()
                 (repository as? AutoCloseable)?.close()
                 repository = null
             }
@@ -112,7 +120,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun changeText(text: String) {
         val current = mutableState.value
-        if (!current.ready || current.saving || current.savePending || current.originalEdit != null || current.originalHistory != null) return
+        if (!current.ready || current.saving || current.savePending || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         if (text.length > EncryptedEntryRepository.MAX_TEXT_LENGTH) {
             mutableState.update { it.copy(
                 inputNotice = "文本过长，输入长度上限为 ${EncryptedEntryRepository.MAX_TEXT_LENGTH}。本次输入未替换原草稿，请缩短后重试。",
@@ -127,7 +135,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun save() {
         val current = mutableState.value
-        if (!current.ready || current.saving || current.text.isBlank() || current.originalEdit != null || current.originalHistory != null) return
+        if (!current.ready || current.saving || current.text.isBlank() || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         val intent = pendingIntent.get() ?: SaveIntent(current.text, editGeneration.get()).also { pendingIntent.set(it) }
         mutableState.update { it.copy(saving = true, savePending = true, saveNotice = null, error = null, inputNotice = null) }
         commands.trySend(Command.Save(intent))
@@ -135,7 +143,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun retry() {
         val current = mutableState.value
-        if (current.originalEdit != null || current.originalHistory != null) {
+        if (current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) {
             if (!current.ready || current.opening || current.error == null || current.originalEdit?.saving == true) return
             // Recover the prior capture write without replacing this editor or routing through changeText.
             mutableState.update { it.copy(opening = true) }
@@ -149,7 +157,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun beginOriginalEdit(entryId: String, expectedRevision: Int) {
         val current = mutableState.value
-        if (!current.ready || current.opening || current.error != null || current.saving || current.savePending || current.originalEdit != null || current.originalHistory != null) return
+        if (!current.ready || current.opening || current.error != null || current.saving || current.savePending || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         val entry = current.entries.firstOrNull { it.id == entryId && it.currentRevision == expectedRevision } ?: return
         mutableState.update { it.copy(originalEdit = OriginalEditUiState(originalEditIds.incrementAndGet(),
             entry.id, entry.currentRevision, entry.originalText), originalEditNotice = null) }
@@ -185,7 +193,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun beginOriginalHistory(entryId: String, expectedRevision: Int) {
         val current = mutableState.value
-        if (!current.ready || current.opening || current.error != null || current.saving || current.savePending || current.originalHistory != null) return
+        if (!current.ready || current.opening || current.error != null || current.saving || current.savePending || current.originalHistory != null || attachments.state.value != null) return
         if (current.originalEdit?.let { it.entryId != entryId || !it.canCancel } == true) return
         if (current.entries.none { it.id == entryId && it.currentRevision == expectedRevision }) return
         val history = OriginalHistoryUiState(originalHistoryIds.incrementAndGet(), entryId)
@@ -372,11 +380,12 @@ class LocalRecordsViewModel internal constructor(
             draftNotice = if (it.ready) "草稿保存状态待确认" else "草稿尚未读取") }
     }
 
-    override fun onCleared() { commands.close(); super.onCleared() }
+    override fun onCleared() { attachments.markDisposed(); commands.close(); super.onCleared() }
 
     private data class SaveIntent(val text: String, val generation: Long)
 
     private sealed interface Command {
+        data class Attachment(val action: suspend (EntryRepository) -> Unit) : Command
         data class Edit(val text: String, val generation: Long) : Command
         data class Save(val intent: SaveIntent) : Command
         data object Retry : Command

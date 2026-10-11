@@ -9,6 +9,8 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalRecordsViewModel.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalEditUiState.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalHistoryUiState.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/LocalAttachmentController.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/PngPayloadValidator.kt")
     from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/LocalRecords.kt")
     from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/ProcessingPolicy.kt")
     from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/LocalAttachment.kt")

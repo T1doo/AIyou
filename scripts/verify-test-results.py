@@ -17,9 +17,9 @@ targets = [("domain", "core/domain/build/test-results/test", 3)]
 if args.component:
     targets.append(("component", "core/designsystem/build/test-results/testDebugUnitTest", 7))
 if args.queue:
-    targets.append(("host queue", "checks/record-queue/build/test-results/test", 50))
+    targets.append(("host queue", "checks/record-queue/build/test-results/test", 67))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 53))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 64))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 for label, folder, minimum in targets:
@@ -42,6 +42,48 @@ for label, folder, minimum in targets:
     if total < minimum or cases != total or failures or errors or skipped or child_failures:
         raise SystemExit(f"FAIL: {label} tests={total} actual={cases} failures={failures} errors={errors} skipped={skipped}")
     print(f"PASS: {label} tests={total} actual={cases} failures=0 errors=0 skipped=0")
+    additional = {}
+    if label == "host queue":
+        additional["AttachmentControllerTest"] = (
+            "actualEncryptedSaveReadbackAndReopenKeepOriginalRevisionAndCapture",
+            "pickerCancelAndOldCallbackCannotWriteOrReplaceNewOwner",
+            "cancellationDuringSourceReadClosesStreamWithoutDurableIntent",
+            "lateDecodedPictureCannotAttachToReopenedSameRecord",
+            "revisionChangeBeforeCommitPreservesSourceAndNeverRebinds",
+            "readyReadbackFailureRetriesSameIdWithoutSourceOrCipherRewrite",
+            "restartingFailedImportRequiresSameBytesAndStableIntent",
+            "corruptCiphertextIsHiddenPreservedAndHasNoOverwriteRetry",
+            "invalidMimeHeaderPermissionZeroReadAndOversizeCreateNoIntent",
+            "unavailableRecordPreservesPreparedChoiceUntilRecoveryWithoutAnyStoreOperation",
+            "committingDisablesCancelCloseAndKeepsActiveSourceUntilAuthentication",
+            "disposingDuringEncryptionNeverErasesActiveSourceOrPublishesLateResult",
+            "actualViewModelRecoversLateCaptureFailureAndKeepsCaptureWhileImporting")
+        additional["PngPayloadValidationTest"] = (
+            "validColorDepthPaletteAndAdam7PassesAreValidatedWithoutChangingSource",
+            "crcCorrectCompleteIendCannotHideTruncatedZlibBadAdlerOrTrailingCompressedData",
+            "incompleteExcessRowsAndInvalidFiltersAreRejectedWithBoundedInflation",
+            "invalidDimensionsDepthCriticalStructureAndUnsupportedMetadataAreRejected")
+    if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.PlatformPngPipelineTest"] = (
+            "actualNativeDecoderReadsPixelsAndKeepsOriginalBytesUnchanged",
+            "largePngIsActuallySampledAndDimensionsAboveBoundAreRejected",
+            "malformedPixelsCrcTruncationAnimationOrientationAndTrailingBytesAreRejected",
+            "selectedContentSourceUsesRealResolverAndPreservesPermissionFailure")
+        additional["com.t1doo.aiyou.AttachmentPresentationTest"] = (
+            "narrowLargeFontFailedConfirmationAndCancelAreReachableWithTouchTargets",
+            "savingAndCorruptStatesOfferNoFalseCancelViewOrOverwriteAction",
+            "savedOriginalOpensRealAttachmentRouteAndReturnsWithoutReplacingCapture",
+            "actualPickerRegistryBindsOldResultToOldRequestAndRestorationDoesNotRelaunch",
+            "globalRecordFailureHidesPictureAndShowsReachableActualRecovery",
+            "launchedPickerKeepsActualRegistryOwnerAcrossGlobalRecordFailureAndRecovery",
+            "restoredCompositionWithNewControllerCannotAdoptOldPickerResult")
+    for owner, names in additional.items():
+        for name in names:
+            matches = [case for case in observed_cases if case.get("classname") == owner
+                       and case.get("name", "").split("[", 1)[0].strip().removesuffix("()") == name]
+            if len(matches) != 1:
+                raise SystemExit(f"FAIL: required attachment UI case={owner}.{name} actual={len(matches)}")
+            print(f"PASS: required attachment UI case={owner}.{name} actual=1 failures=0 errors=0 skipped=0")
     if label == "host queue":
         owner = "com.t1doo.aiyou.data.AttachmentStorageTest"
         required = (

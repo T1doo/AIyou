@@ -117,6 +117,7 @@ fun OriginalReadingScreen(
     metadataText: String? = null,
     historyActionLabel: String = "历史版本",
     editActionLabel: String = "编辑原文",
+    onAttachments: ((String, Int) -> Unit)? = null,
 ) {
     // Resolve the current local source on every update; navigation never carries plaintext.
     val entry = local.entries.firstOrNull { it.id == entryId }
@@ -151,6 +152,11 @@ fun OriginalReadingScreen(
                             TextButton(onClick = { history(entry.id, entry.currentRevision) },
                                 enabled = !local.saving && !local.savePending,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text(historyActionLabel) }
+                        }
+                        onAttachments?.let { attachments ->
+                            TextButton(onClick = { attachments(entry.id, entry.currentRevision) },
+                                enabled = !local.saving && !local.savePending,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("查看附件") }
                         }
                     }
                     if (copyDenied) Text("无法复制，原文已保留。", color = AIyouColors.error,

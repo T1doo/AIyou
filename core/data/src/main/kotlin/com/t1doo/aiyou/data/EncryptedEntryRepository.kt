@@ -27,7 +27,7 @@ class EncryptedEntryRepository internal constructor(
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) : EntryRepository, AutoCloseable {
     private val dao get() = database.records()
-    val attachments: AttachmentStore get() = attachmentStorage
+    override val attachments: AttachmentStore get() = attachmentStorage
 
     override suspend fun prepare() { attachmentStorage.recover() }
 

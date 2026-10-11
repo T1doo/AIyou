@@ -17,6 +17,14 @@ import com.t1doo.aiyou.model.OriginalRevision
 import com.t1doo.aiyou.records.OriginalEditUiState
 import com.t1doo.aiyou.model.StoredEntry
 import com.t1doo.aiyou.model.ProcessingPolicy
+import com.t1doo.aiyou.model.AttachmentIntent
+import com.t1doo.aiyou.model.AttachmentState
+import com.t1doo.aiyou.model.LocalAttachment
+import com.t1doo.aiyou.records.AttachmentUiState
+import com.t1doo.aiyou.records.AttachmentSelection
+import com.t1doo.aiyou.records.AttachmentImportPhase
+import com.t1doo.aiyou.records.LocalAttachmentScreen
+import com.t1doo.aiyou.records.PlatformPngDecoder
 
 // Initial render smoke, not regression against approved visual golden files.
 @PreviewTest
@@ -272,3 +280,34 @@ fun LocalHistoryEditorUnchangedRender() { AIyouTheme { AIyouApp(previewDestinati
 fun LocalHistoryReplacementRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
     local = historyLocal.copy(originalHistory = historyLocal.originalHistory!!.copy(selectedRevision = 1,
         replacement = OriginalHistoryReplacement(1L, historyLocal.originalEdit!!.sessionId))), previewEntryId = historyCurrent.id) } }
+
+// Actual attachment screen with synthetic display states; no picker, repository, permission or device claim.
+private val attachmentPanel = AttachmentUiState(1L, "synthetic-original", 1, loading = false)
+private val attachmentIntent = AttachmentIntent("synthetic-attachment", "synthetic-original", 1,
+    "image/png", "0".repeat(64), 70)
+@Composable private fun AttachmentFrame(panel: AttachmentUiState) {
+    AIyouTheme { androidx.compose.material3.Surface { LocalAttachmentScreen(panel, {}, {}, {}, {}, {}, {}) } }
+}
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalAttachmentEmptyRender() { AttachmentFrame(attachmentPanel) }
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalAttachmentLoadingRender() { AttachmentFrame(attachmentPanel.copy(loading = true)) }
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalAttachmentSavingRender() { AttachmentFrame(attachmentPanel.copy(selection = AttachmentSelection(2L,
+    attachmentIntent.id, phase = AttachmentImportPhase.SAVING, sourcePrepared = true))) }
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalAttachmentConfirmFailedRender() { AttachmentFrame(attachmentPanel.copy(selection = AttachmentSelection(2L,
+    attachmentIntent.id, phase = AttachmentImportPhase.FAILED, sourcePrepared = true), error = "合成保存确认失败。原文与图片已保留，可以重试确认。")) }
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalAttachmentReadyRender() {
+    val png = java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMQCqv4DwADPgHgZNJcPQAAAABJRU5ErkJggg==")
+    AttachmentFrame(attachmentPanel.copy(items = listOf(LocalAttachment(attachmentIntent, AttachmentState.READY)),
+        picture = PlatformPngDecoder.decode(png), notice = "图片已保存在本机 · 原文版本 1"))
+}
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalAttachmentFailedRestartRender() { AttachmentFrame(attachmentPanel.copy(items = listOf(LocalAttachment(attachmentIntent, AttachmentState.FAILED)))) }
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalAttachmentCorruptRender() { AttachmentFrame(attachmentPanel.copy(items = listOf(LocalAttachment(attachmentIntent, AttachmentState.CORRUPT)))) }
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalAttachmentUnavailableRender() { AttachmentFrame(attachmentPanel.copy(unavailable = true,
+    error = "合成原文已有新版本。附件保留在原版本，请返回原文。")) }

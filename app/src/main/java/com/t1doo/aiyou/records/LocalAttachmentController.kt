@@ -1,0 +1,272 @@
+package com.t1doo.aiyou.records
+
+import com.t1doo.aiyou.domain.AttachmentIntegrityFailure
+import com.t1doo.aiyou.domain.AttachmentStore
+import com.t1doo.aiyou.domain.EntryRepository
+import com.t1doo.aiyou.domain.RecordConflict
+import com.t1doo.aiyou.model.AttachmentIntent
+import com.t1doo.aiyou.model.AttachmentState
+import com.t1doo.aiyou.model.LocalAttachment
+import java.io.ByteArrayInputStream
+import java.io.InputStream
+import java.security.MessageDigest
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+
+/** Platform selection is short-lived. No URI, grant, name or plaintext enters saved state. */
+interface SelectedImageSource {
+    fun mediaType(): String?
+    fun open(): InputStream
+}
+
+interface AttachmentPicture { val width: Int; val height: Int }
+enum class AttachmentImportPhase { PICKING, PREPARING, SAVING, FAILED }
+data class AttachmentSelection(val requestId: Long, val attachmentId: String,
+    val expected: AttachmentIntent? = null, val phase: AttachmentImportPhase = AttachmentImportPhase.PICKING,
+    val launched: Boolean = false, val sourcePrepared: Boolean = false, val retryable: Boolean = true,
+    val pickerKey: String = UUID.randomUUID().toString())
+data class AttachmentUiState(val sessionId: Long, val entryId: String, val revision: Int,
+    val loading: Boolean = true, val items: List<LocalAttachment> = emptyList(),
+    val selection: AttachmentSelection? = null, val readingId: String? = null,
+    val picture: AttachmentPicture? = null, val error: String? = null,
+    val notice: String? = null, val unavailable: Boolean = false) {
+    val saving get() = selection?.phase == AttachmentImportPhase.SAVING
+    val busy get() = loading || readingId != null || selection?.phase in
+        setOf(AttachmentImportPhase.PICKING, AttachmentImportPhase.PREPARING, AttachmentImportPhase.SAVING)
+}
+
+/** Every operation runs on the record ViewModel's existing serial IO queue. */
+class LocalAttachmentController(
+    private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
+    private val decodePng: (ByteArray) -> AttachmentPicture,
+    private val canUseRecord: () -> Boolean = { true },
+) {
+    private val mutable = MutableStateFlow<AttachmentUiState?>(null)
+    val state = mutable.asStateFlow()
+    private val ids = AtomicLong()
+    @Volatile private var disposed = false
+    // IO queue owned. UI cancellation changes ownership; it never erases an active Cipher source.
+    private var prepared: Prepared? = null
+    private data class Prepared(val sessionId: Long, val requestId: Long,
+        val intent: AttachmentIntent, val bytes: ByteArray)
+
+    fun open(entryId: String, revision: Int) {
+        if (disposed || mutable.value != null || revision <= 0) return
+        val panel = AttachmentUiState(ids.incrementAndGet(), entryId, revision)
+        if (mutable.compareAndSet(null, panel)) refresh(panel.sessionId)
+    }
+
+    fun close(sessionId: Long) {
+        val panel = mutable.value ?: return
+        if (panel.sessionId != sessionId || panel.saving) return
+        if (mutable.compareAndSet(panel, null)) enqueue { discard(sessionId) }
+    }
+
+    fun refresh(sessionId: Long) {
+        val panel = mutable.value ?: return
+        if (panel.sessionId != sessionId || panel.saving || panel.selection != null || panel.readingId != null) return
+        update(sessionId) { it.copy(loading = true, error = null, picture = null) }
+        enqueue { repository ->
+            if (!live(sessionId)) return@enqueue
+            try {
+                current(repository, panel)
+                val store = access(repository)
+                store.recover()
+                val rows = store.list(panel.entryId, panel.revision)
+                current(repository, panel)
+                update(sessionId) { it.copy(loading = false, items = rows.toList(), error = null) }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { failed(sessionId, failure, "附件暂不可读取。原文与文件已保留，可以重试。") }
+        }
+    }
+
+    fun select(sessionId: Long, failedId: String? = null) {
+        val panel = mutable.value ?: return
+        if (panel.sessionId != sessionId || panel.busy || panel.selection != null || panel.error != null || panel.unavailable) return
+        val prior = failedId?.let { id -> panel.items.singleOrNull {
+            it.intent.id == id && it.state == AttachmentState.FAILED && it.intent.mediaType == "image/png"
+        }?.intent ?: return }
+        update(sessionId) { it.copy(picture = null, error = null, notice = null,
+            selection = AttachmentSelection(ids.incrementAndGet(), prior?.id ?: UUID.randomUUID().toString(), prior)) }
+    }
+
+    fun claimPicker(requestId: Long): Boolean {
+        val panel = mutable.value ?: return false
+        val selected = panel.selection ?: return false
+        if (selected.requestId != requestId || selected.phase != AttachmentImportPhase.PICKING || selected.launched) return false
+        return mutable.compareAndSet(panel, panel.copy(selection = selected.copy(launched = true)))
+    }
+
+    fun pickerFailed(requestId: Long) {
+        val panel = mutable.value ?: return
+        if (panel.selection?.requestId == requestId) failed(panel.sessionId, IllegalStateException(),
+            "无法打开图片选择器。原文与附件已保留，请重新选择。", requestId)
+    }
+
+    fun selected(requestId: Long, source: SelectedImageSource?) {
+        val panel = mutable.value ?: return
+        val selected = panel.selection ?: return
+        if (selected.requestId != requestId || selected.phase != AttachmentImportPhase.PICKING) return
+        if (source == null) { cancel(panel.sessionId); return }
+        if (!mutable.compareAndSet(panel, panel.copy(selection = selected.copy(phase = AttachmentImportPhase.PREPARING)))) return
+        enqueue { repository ->
+            if (!owns(panel.sessionId, requestId)) return@enqueue
+            var bytes: ByteArray? = null
+            try {
+                require(source.mediaType() == "image/png")
+                bytes = source.open().use { input -> bounded(input) { owns(panel.sessionId, requestId) } }
+                require(bytes.size >= 8 && bytes.copyOfRange(0, 8).contentEquals(PNG_HEADER))
+                decodePng(bytes) // Real platform decoder verifies bounded dimensions and actual decodability.
+                val intent = AttachmentIntent(selected.attachmentId, panel.entryId, panel.revision,
+                    "image/png", hash(bytes), bytes.size.toLong())
+                require(selected.expected == null || selected.expected == intent)
+                if (!owns(panel.sessionId, requestId)) return@enqueue
+                discard(panel.sessionId)
+                prepared = Prepared(panel.sessionId, requestId, intent, bytes)
+                bytes = null
+                update(panel.sessionId) { it.copy(selection = it.selection?.copy(sourcePrepared = true)) }
+                commit(repository, panel.sessionId, requestId)
+            } catch (cancelled: CancellationException) {
+                if (owns(panel.sessionId, requestId)) throw cancelled
+            } catch (failure: Exception) {
+                failed(panel.sessionId, failure, "图片未保存。请重新选择可读取的 PNG 图片；原文与原文件已保留。", requestId)
+            } finally { bytes?.fill(0) }
+        }
+    }
+
+    fun cancel(sessionId: Long) {
+        val panel = mutable.value ?: return
+        if (panel.sessionId != sessionId || panel.saving) return
+        update(sessionId) { it.copy(selection = null, error = null, notice = "未继续添加图片，原文与已有附件已保留。") }
+        enqueue { discard(sessionId) }
+        refresh(sessionId)
+    }
+
+    fun retrySave(sessionId: Long) {
+        val panel = mutable.value ?: return
+        val selected = panel.selection ?: return
+        if (panel.sessionId != sessionId || selected.phase != AttachmentImportPhase.FAILED || !selected.retryable || panel.unavailable) return
+        enqueue { repository ->
+            if (!owns(sessionId, selected.requestId)) return@enqueue
+            if (prepared?.requestId == selected.requestId) commit(repository, sessionId, selected.requestId)
+            else {
+                update(sessionId) { it.copy(selection = null, error = null) }
+                select(sessionId, selected.expected?.id)
+            }
+        }
+    }
+
+    private suspend fun commit(repository: EntryRepository, sessionId: Long, requestId: Long) {
+        val input = prepared?.takeIf { it.sessionId == sessionId && it.requestId == requestId } ?: return
+        val panel = mutable.value ?: return
+        val selected = panel.selection ?: return
+        if (!owns(sessionId, requestId)) return
+        try {
+            current(repository, panel)
+            val store = access(repository)
+            // Claim before any durable write: subsequent Cancel/Back cannot promise a rollback.
+            if (!mutable.compareAndSet(panel, panel.copy(selection = selected.copy(phase = AttachmentImportPhase.SAVING), error = null))) return
+            store.recover()
+            val existing = store.list(panel.entryId, panel.revision).singleOrNull { it.intent.id == input.intent.id }
+            if (existing != null && existing.intent != input.intent) throw AttachmentIntegrityFailure()
+            val result = existing?.takeIf { it.state == AttachmentState.READY }
+                ?: store.save(input.intent) { ByteArrayInputStream(input.bytes) }
+            check(result.intent == input.intent && result.state == AttachmentState.READY)
+            val rows = store.list(panel.entryId, panel.revision)
+            check(rows.single { it.intent.id == input.intent.id } == result)
+            val restored = store.read(input.intent.id)
+            try { check(restored.size.toLong() == input.intent.byteSize && hash(restored) == input.intent.sha256) }
+            finally { restored.fill(0) }
+            current(repository, panel)
+            update(sessionId) { it.copy(selection = null, items = rows.toList(), error = null,
+                notice = "图片已保存在本机 · 原文版本 ${panel.revision}") }
+            discard(sessionId)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            val rows = if (failure is LocalRecordUnavailable || failure is RecordConflict) null
+                else try { access(repository).list(panel.entryId, panel.revision) } catch (_: Exception) { null }
+            val corrupt = rows?.any { it.intent.id == input.intent.id && it.state == AttachmentState.CORRUPT } == true
+            update(sessionId) { it.copy(items = rows ?: it.items, selection = it.selection?.copy(retryable = !corrupt)) }
+            failed(sessionId, failure, "图片保存状态尚未确认。原文、原文件与本次图片已保留，请重试确认。", requestId)
+            if (corrupt) {
+                update(sessionId) { it.copy(error = "附件无法通过完整性校验。原文件已保留，不会显示或覆盖。") }
+                discard(sessionId)
+            }
+        }
+    }
+
+    fun view(sessionId: Long, id: String) {
+        val panel = mutable.value ?: return
+        if (panel.sessionId != sessionId || panel.busy || panel.selection != null || panel.unavailable) return
+        val item = panel.items.singleOrNull { it.intent.id == id && it.state == AttachmentState.READY && it.intent.mediaType == "image/png" } ?: return
+        update(sessionId) { it.copy(readingId = id, picture = null, error = null) }
+        enqueue { repository ->
+            if (!live(sessionId)) return@enqueue
+            try {
+                current(repository, panel)
+                val bytes = access(repository).read(item.intent.id)
+                val picture = try { decodePng(bytes) } finally { bytes.fill(0) }
+                current(repository, panel)
+                update(sessionId) { it.copy(readingId = null, picture = picture, error = null) }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                val rows = try { access(repository).list(panel.entryId, panel.revision) } catch (_: Exception) { null }
+                update(sessionId) { it.copy(items = rows ?: it.items, picture = null) }
+                failed(sessionId, failure, "图片暂不可查看，原文件已保留。请重试读取；损坏的附件不会显示。")
+            }
+        }
+    }
+
+    fun closePicture(sessionId: Long) = update(sessionId) { it.copy(picture = null) }
+    fun markDisposed() { disposed = true; mutable.value = null }
+    fun disposeOnIo() { prepared?.bytes?.fill(0); prepared = null }
+    private fun discard(sessionId: Long) { if (prepared?.sessionId == sessionId) disposeOnIo() }
+    private fun live(sessionId: Long) = !disposed && mutable.value?.sessionId == sessionId
+    private fun owns(sessionId: Long, requestId: Long) = live(sessionId) && mutable.value?.selection?.requestId == requestId
+    private inline fun update(sessionId: Long, transform: (AttachmentUiState) -> AttachmentUiState) {
+        mutable.update { if (it != null && !disposed && it.sessionId == sessionId) transform(it) else it }
+    }
+    private fun failed(sessionId: Long, failure: Exception, message: String, requestId: Long? = null) {
+        if (requestId != null && !owns(sessionId, requestId)) return
+        update(sessionId) { it.copy(loading = false, readingId = null, picture = null,
+            unavailable = failure is RecordConflict || it.unavailable,
+            error = when (failure) {
+                is RecordConflict -> "原文版本已变化或不可用。附件保留在原版本，请返回原文。"
+                is LocalRecordUnavailable -> "本机记录暂不可读取，请先恢复本机读取。图片选择与原文已保留。"
+                else -> message
+            },
+            selection = it.selection?.let { selected -> selected.copy(phase = AttachmentImportPhase.FAILED) }) }
+    }
+    private suspend fun current(repository: EntryRepository, panel: AttachmentUiState) {
+        if (!canUseRecord()) throw LocalRecordUnavailable()
+        if (repository.entries().none { it.id == panel.entryId && it.currentRevision == panel.revision }) throw RecordConflict()
+    }
+    private class LocalRecordUnavailable : IllegalStateException()
+    private fun access(repository: EntryRepository): AttachmentStore = checkNotNull(repository.attachments)
+
+    companion object {
+        const val MAX_SOURCE_BYTES = 16 * 1024 * 1024
+        private val PNG_HEADER = byteArrayOf(-119, 80, 78, 71, 13, 10, 26, 10)
+        private fun hash(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        private fun bounded(input: InputStream, active: () -> Boolean): ByteArray {
+            val buffer = ByteArray(8192)
+            val output = ByteArray(MAX_SOURCE_BYTES)
+            var total = 0
+            return try {
+                while (true) {
+                    if (!active()) throw CancellationException("Selection closed")
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    if (count == 0 || total.toLong() + count > MAX_SOURCE_BYTES) throw AttachmentIntegrityFailure()
+                    buffer.copyInto(output, total, 0, count)
+                    total += count
+                }
+                output.copyOf(total)
+            } finally { buffer.fill(0); output.fill(0) }
+        }
+    }
+}
