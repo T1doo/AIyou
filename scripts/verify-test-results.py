@@ -17,7 +17,7 @@ if args.component:
 if args.queue:
     targets.append(("host queue", "checks/record-queue/build/test-results/test", 6))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 11))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 13))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 for label, folder, minimum in targets:

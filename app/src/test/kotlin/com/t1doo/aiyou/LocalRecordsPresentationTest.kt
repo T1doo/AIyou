@@ -4,6 +4,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasNoClickAction
@@ -11,17 +14,32 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodes
+import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.width
+import androidx.compose.ui.unit.height
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.records.LocalRecordUiState
@@ -127,5 +145,84 @@ class LocalRecordsPresentationTest {
         compose.onAllNodesWithText("图片未开放").assertCountEquals(0)
         compose.onAllNodesWithText("录音未开放").assertCountEquals(0)
         compose.onAllNodesWithText("问一问 · 未开放").assertCountEquals(0)
+    }
+
+    @Test
+    @Config(sdk = [35], qualifiers = "w320dp-h1000dp")
+    fun narrowLargeFontSaveFailureRetryScrollsIntoViewAndPreservesPendingDraft() {
+        verifyNarrowFailureRetry(saveFailure = true)
+    }
+
+    @Test
+    @Config(sdk = [35], qualifiers = "w320dp-h1000dp")
+    fun narrowLargeFontReadFailureRetryScrollsIntoViewAndPreservesKnownDraft() {
+        verifyNarrowFailureRetry(saveFailure = false)
+    }
+
+    private fun verifyNarrowFailureRetry(saveFailure: Boolean) {
+        val draft = "合成保留草稿：把沿途的树叶颜色记下来。"
+        val message = if (saveFailure) "合成保存失败。输入与原数据已保留，可以重试。"
+            else "合成读取失败。请保留原数据并先解锁设备重试。"
+        // Synthetic known text tests presentation retention, not database read/retry behavior.
+        val state = mutableStateOf(LocalRecordUiState(ready = saveFailure, opening = false,
+            savePending = saveFailure, text = draft, error = message,
+            draftNotice = if (saveFailure) "草稿保存状态待确认" else "草稿尚未读取"))
+        var saveRetries = 0
+        var readRetries = 0
+        var saves = 0
+        var edits = 0
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+                AIyouTheme { AIyouApp(local = state.value, onSave = { saves++ },
+                    onDraftChange = { edits++ }, onRetry = {
+                        if (saveFailure) {
+                            saveRetries++
+                            state.value = state.value.copy(saving = true, error = null)
+                        } else {
+                            readRetries++
+                            state.value = state.value.copy(opening = true, error = null)
+                        }
+                    }) }
+            }
+        }
+        val field = compose.onNodeWithContentDescription("此刻，想记下什么")
+        field.assertIsNotEnabled().performTouchInput { click() }
+        compose.onAllNodes(isFocused(), useUnmergedTree = true).assertCountEquals(0)
+        assertEquals(draft, field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        assertNull(field.fetchSemanticsNode().config.getOrNull(SemanticsProperties.Error))
+        val retry = compose.onNodeWithText("重试")
+        retry.assertIsNotDisplayed()
+        val list = compose.onNode(hasScrollToIndexAction())
+        list.performScrollToNode(hasText("重试"))
+        retry.assertIsDisplayed().assertIsEnabled()
+        assertEquals(Role.Button, retry.fetchSemanticsNode().config[SemanticsProperties.Role])
+        val bounds = retry.getUnclippedBoundsInRoot()
+        val viewport = list.getUnclippedBoundsInRoot()
+        assertTrue(bounds.width > 0.dp && bounds.height >= AIyouDimensions.minTouchTarget)
+        assertTrue(bounds.left >= viewport.left && bounds.right <= viewport.right)
+        assertTrue(bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite)
+            and hasAnyDescendant(hasText(message)))
+            .assertIsDisplayed()
+        retry.performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
+        retry.assertIsFocused().performTouchInput { click() }
+        compose.runOnIdle {
+            assertEquals(if (saveFailure) 1 else 0, saveRetries)
+            assertEquals(if (saveFailure) 0 else 1, readRetries)
+            assertEquals(0, saves)
+            assertEquals(0, edits)
+            assertEquals(draft, state.value.text)
+            assertEquals(saveFailure, state.value.savePending)
+            assertEquals(saveFailure, state.value.saving)
+            assertEquals(!saveFailure, state.value.opening)
+            assertNull(state.value.saveNotice)
+        }
+        compose.onAllNodesWithText("重试").assertCountEquals(0)
+        list.performScrollToNode(hasContentDescription("此刻，想记下什么"))
+        field.assertIsDisplayed().assertIsNotEnabled()
+        compose.onAllNodes(isFocused(), useUnmergedTree = true).assertCountEquals(0)
+        assertEquals(draft, field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        compose.onAllNodesWithText("已保存在本机").assertCountEquals(0)
     }
 }
