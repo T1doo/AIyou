@@ -1,6 +1,7 @@
 package com.t1doo.aiyou.records
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,12 +12,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import com.t1doo.aiyou.designsystem.AIyouColors
@@ -29,9 +36,6 @@ import com.t1doo.aiyou.data.EncryptedEntryRepository
 import com.t1doo.aiyou.ui.Destination
 import com.t1doo.aiyou.ui.LocalProcessingStatus
 import com.t1doo.aiyou.ui.SearchSection
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 @Composable
 fun LocalRecordsScreen(
@@ -41,6 +45,9 @@ fun LocalRecordsScreen(
     onSave: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
+    selectedEntryId: String? = null,
+    onOpenEntry: (String) -> Unit = {},
 ) {
     BoxWithConstraints(modifier.fillMaxSize().drawBehind {
         drawRect(Brush.verticalGradient(
@@ -51,7 +58,8 @@ fun LocalRecordsScreen(
         val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
         val stackSummary = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            LazyColumn(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize(), contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
+            LazyColumn(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize(), state = listState,
+                contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
                 item("summary") {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
@@ -90,8 +98,12 @@ fun LocalRecordsScreen(
                     StatusNotice(if (destination == Destination.NOW) "从一句话开始" else "还没有回忆", "文字保存在本机，无需配置模型。", state = ComponentState.EMPTY)
                 }
                 items(if (destination == Destination.NOW) local.entries.take(5) else local.entries, key = { it.id }) { entry ->
-                    val date = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(Instant.ofEpochMilli(entry.capturedAtMillis).atZone(ZoneId.of(entry.captureTimeZone)))
-                    MemoryCard(entry.originalText, "$date · 原文版本 ${entry.currentRevision}", policy = entry.policy)
+                    val preview = remember(entry.originalText) { originalPreview(entry.originalText) }
+                    MemoryCard(preview, originalMetadata(entry), policy = entry.policy,
+                        modifier = Modifier.testTag("entry-${entry.id}").semantics { selected = entry.id == selectedEntryId }
+                            .then(if (entry.id == selectedEntryId) Modifier.border(AIyouDimensions.iconStroke,
+                                AIyouColors.primary, MaterialTheme.shapes.medium) else Modifier),
+                        onOpen = { onOpenEntry(entry.id) })
                 }
             }
         }

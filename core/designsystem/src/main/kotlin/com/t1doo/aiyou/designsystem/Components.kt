@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -111,6 +112,7 @@ fun MemoryCard(
     annotation: String? = null,
     attachmentLabel: String? = null,
     state: ComponentState = ComponentState.NORMAL,
+    onOpen: (() -> Unit)? = null,
 ) {
     ComponentCard(modifier, padding = AIyouDimensions.spaceMd) {
         if (state == ComponentState.EMPTY) {
@@ -123,7 +125,12 @@ fun MemoryCard(
             Text(capturedAt, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
             Text(if (policy == ProcessingPolicy.LOCAL_ONLY) "原文 · 仅本机" else "原文", style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
         }
-        Text(originalText, style = MaterialTheme.typography.bodyLarge)
+        if (onOpen != null) Text("原文预览", style = MaterialTheme.typography.labelMedium, color = AIyouColors.textSecondary)
+        Text(originalText, style = MaterialTheme.typography.bodyLarge,
+            maxLines = if (onOpen != null) 4 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
+        onOpen?.let { open ->
+            TextButton(onClick = open, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("阅读全文") }
+        }
         attachmentLabel?.let {
             Surface(modifier = Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.small) {
                 Text(it, Modifier.fillMaxWidth().padding(AIyouDimensions.spaceLg), style = MaterialTheme.typography.bodySmall)

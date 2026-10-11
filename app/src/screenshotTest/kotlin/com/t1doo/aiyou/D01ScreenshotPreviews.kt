@@ -128,6 +128,25 @@ fun LocalRejectedInputRender() { AIyouTheme { AIyouApp(local = restoredLocal.cop
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalMemoriesRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES, local = restoredLocal) } }
 
+private val longOriginal = syntheticEntries.single().copy(id = "synthetic-long-original",
+    originalText = "合成长原文：" + "散步时记录叶片的纹理与颜色。\n".repeat(90) + "合成全文末端。")
+private val readingLocal = restoredLocal.copy(entries = listOf(longOriginal))
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalLongListRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES, local = readingLocal) } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalOriginalReadRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = readingLocal, previewEntryId = longOriginal.id) } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalMissingOriginalRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = restoredLocal, previewEntryId = "synthetic-removed-id") } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalOriginalReadFailureRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = readingLocal.copy(error = "合成读取失败。请保留原数据，解锁设备后重试。"), previewEntryId = longOriginal.id) } }
+
 // Reuse unabridged actual component content at explicit heights; no parameter multiplication.
 @Composable
 private fun CompleteContentFrame(label: String, content: @Composable () -> Unit) {

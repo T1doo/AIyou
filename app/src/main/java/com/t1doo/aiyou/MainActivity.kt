@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -26,10 +27,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.designsystem.ComponentState
@@ -42,6 +45,8 @@ import com.t1doo.aiyou.records.LocalRecordUiState
 import com.t1doo.aiyou.records.LocalRecordsScreen
 import com.t1doo.aiyou.records.LocalRecordsViewModel
 import com.t1doo.aiyou.records.OpenSourceLicenses
+import com.t1doo.aiyou.records.OriginalReadingScreen
+import com.t1doo.aiyou.records.copyOriginal
 import com.t1doo.aiyou.ui.NotebookAppBar
 import com.t1doo.aiyou.ui.NotebookNavigation
 
@@ -69,28 +74,38 @@ fun AIyouApp(
     onDraftChange: (String) -> Unit = {},
     onSave: () -> Unit = {},
     onRetry: () -> Unit = {},
+    previewEntryId: String? = null,
 ) {
     var selectedName by rememberSaveable { mutableStateOf(previewDestination.name) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showLicenses by rememberSaveable { mutableStateOf(false) }
     var demo by rememberSaveable { mutableStateOf(previewDemo) }
     var stateName by rememberSaveable { mutableStateOf(previewState.name) }
+    var detailEntryId by rememberSaveable { mutableStateOf(previewEntryId) }
+    var selectedNowId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedMemoriesId by rememberSaveable { mutableStateOf<String?>(null) }
+    val nowList = rememberLazyListState()
+    val memoriesList = rememberLazyListState()
+    val currentLocal by rememberUpdatedState(local)
+    val context = LocalContext.current
     val selected = Destination.valueOf(selectedName)
+    val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     BackHandler(enabled = showSettings) { if (showLicenses) showLicenses = false else showSettings = false }
+    BackHandler(enabled = reading) { detailEntryId = null }
 
     Scaffold(
         modifier = Modifier.imePadding(),
         topBar = {
             NotebookAppBar(
-                if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
-                if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
-            ) { if (showLicenses) showLicenses = false else showSettings = !showSettings }
+                if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
+                if (reading) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
+            ) { if (reading) detailEntryId = null else if (showLicenses) showLicenses = false else showSettings = !showSettings }
         },
         bottomBar = {
-            if (!imeVisible) {
+            if (!imeVisible && !reading) {
                 NotebookNavigation(if (showSettings) null else selected) { destination ->
-                    selectedName = destination.name; showSettings = false; showLicenses = false
+                    selectedName = destination.name; detailEntryId = null; showSettings = false; showLicenses = false
                 }
             }
         },
@@ -118,8 +133,36 @@ fun AIyouApp(
                     }
                 }
             }
+        } else if (reading && local != null) {
+            val origin = selected
+            val readerId = checkNotNull(detailEntryId)
+            val canCopy: (String, Int) -> Boolean = { id, revision ->
+                val latest = currentLocal
+                detailEntryId == id && selectedName == origin.name && !showSettings && !demo &&
+                    latest != null && latest.ready && !latest.opening && latest.error == null &&
+                    latest.entries.any { it.id == id && it.currentRevision == revision }
+            }
+            OriginalReadingScreen(readerId, local, onRetry = {
+                val latest = currentLocal
+                if (detailEntryId == readerId && selectedName == origin.name && !showSettings && !demo &&
+                    latest != null && !latest.opening && latest.error != null) onRetry()
+            }, onCopy = { id, revision ->
+                // Both copy paths reject retained callbacks after revisions, removal or navigation.
+                if (canCopy(id, revision)) currentLocal?.entries?.firstOrNull { it.id == id }?.let {
+                    copyOriginal(context, it.originalText)
+                } ?: false else false
+            }, canCopy = canCopy, modifier = modifier)
         } else if (!demo && local != null && selected != Destination.TASKS) {
-            LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier)
+            val origin = selected
+            LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier,
+                listState = if (selected == Destination.NOW) nowList else memoriesList,
+                selectedEntryId = if (selected == Destination.NOW) selectedNowId else selectedMemoriesId,
+                onOpenEntry = { id ->
+                    if (selectedName == origin.name && !showSettings && !demo && detailEntryId == null) {
+                        if (origin == Destination.NOW) selectedNowId = id else selectedMemoriesId = id
+                        detailEntryId = id
+                    }
+                })
         } else {
             MainScreen(
                 destination = selected, demo = demo, modifier = modifier,
