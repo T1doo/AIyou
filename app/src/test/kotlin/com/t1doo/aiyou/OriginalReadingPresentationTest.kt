@@ -15,6 +15,8 @@ import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.AndroidClipboard
+import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -51,6 +53,9 @@ import com.t1doo.aiyou.model.ProcessingPolicy
 import com.t1doo.aiyou.model.StoredEntry
 import com.t1doo.aiyou.records.LocalRecordUiState
 import com.t1doo.aiyou.records.originalPreview
+import com.t1doo.aiyou.records.LocalOriginalReadingObserver
+import com.t1doo.aiyou.records.OriginalReadingCallbacks
+import com.t1doo.aiyou.records.OriginalReadingObserver
 import com.t1doo.aiyou.ui.Destination
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -64,19 +69,30 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
+import kotlinx.coroutines.runBlocking
 
 /** Actual production UI with synthetic state. Does not assert native storage or device acceptance. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w360dp-h1000dp")
 class OriginalReadingPresentationTest {
     @get:Rule val compose = createComposeRule()
+    private lateinit var callbacks: OriginalReadingCallbacks
+    private lateinit var readingClipboard: AndroidClipboard
+    private val observer = object : OriginalReadingObserver {
+        override fun onNavigation(callbacks: OriginalReadingCallbacks) { this@OriginalReadingPresentationTest.callbacks = callbacks }
+        override fun onClipboard(clipboard: AndroidClipboard) { readingClipboard = clipboard }
+    }
     private val clipboard get() = RuntimeEnvironment.getApplication().getSystemService(ClipboardManager::class.java)
     private fun entry(id: String = "record", text: String = "合成完整原文", revision: Int = 1) =
         StoredEntry(id, revision, text, 1_791_647_400_000, "Asia/Shanghai", ProcessingPolicy.LOCAL_ONLY)
     private fun state(vararg entries: StoredEntry) = mutableStateOf(LocalRecordUiState(
         ready = true, opening = false, text = "合成未保存草稿", entries = entries.toList()))
     private fun content(state: MutableState<LocalRecordUiState>, destination: Destination = Destination.MEMORIES) {
-        compose.setContent { AIyouTheme { AIyouApp(previewDestination = destination, local = state.value) } }
+        compose.setContent {
+            CompositionLocalProvider(LocalOriginalReadingObserver provides observer) {
+                AIyouTheme { AIyouApp(previewDestination = destination, local = state.value) }
+            }
+        }
     }
     private fun open(id: String = "record") {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))
@@ -150,22 +166,22 @@ class OriginalReadingPresentationTest {
     @Test fun retainedOpenAndFullCopyCallbacksRejectNavigationRevisionAndReadFailure() {
         val state = state(entry())
         content(state)
-        val oldOpen = compose.onNodeWithText("阅读全文").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        val oldOpen = callbacks.openEntry
         tab("待办").performClick()
-        compose.runOnIdle { oldOpen() }
+        compose.runOnIdle { oldOpen("record") }
         compose.onAllNodesWithText("记录原文").assertCountEquals(0)
         tab("回忆").performClick(); open()
-        val oldCopy = compose.onNodeWithText("复制全文").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        val oldCopy = callbacks.copy
         sentinel()
         compose.runOnIdle { state.value = state.value.copy(entries = listOf(entry(text = "合成新版", revision = 2))) }
-        compose.runOnIdle { oldCopy(); assertEquals("哨兵", copied()) }
-        val currentCopy = compose.onNodeWithText("复制全文").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        compose.runOnIdle { assertFalse(oldCopy("record", 1)); assertEquals("哨兵", copied()) }
+        val currentCopy = callbacks.copy
         compose.runOnIdle { state.value = state.value.copy(error = "合成读取失败") }
-        compose.runOnIdle { currentCopy(); assertEquals("哨兵", copied()) }
+        compose.runOnIdle { assertFalse(currentCopy("record", 2)); assertEquals("哨兵", copied()) }
         compose.onNodeWithText("原文暂不可读取").assertIsDisplayed()
         compose.runOnIdle { state.value = state.value.copy(error = null) }
         compose.onNodeWithText("返回列表").performClick(); tab("待办").performClick()
-        compose.runOnIdle { currentCopy(); assertEquals("哨兵", copied()) }
+        compose.runOnIdle { assertFalse(currentCopy("record", 2)); assertEquals("哨兵", copied()) }
     }
 
     @Test fun nativeSelectionCopiesOnlySelectedTextWithSensitiveFlagAndRejectsStaleCopy() {
@@ -180,37 +196,45 @@ class OriginalReadingPresentationTest {
             assertTrue(clipboard.primaryClip!!.description.extras!!.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE))
         }
         field.performSemanticsAction(SemanticsActions.SetSelection) { assertTrue(it(0, 2, false)) }
-        val stale = field.fetchSemanticsNode().config[SemanticsActions.CopyText].action!!
+        field.performSemanticsAction(SemanticsActions.CopyText) { assertTrue(it()) }
+        compose.waitForIdle()
+        val stale = readingClipboard
+        val oldSelection = compose.runOnIdle { assertEquals("合成", copied()); ClipEntry(clipboard.primaryClip!!) }
         sentinel()
         compose.runOnIdle { state.value = state.value.copy(entries = listOf(entry(text = "合成新原文", revision = 2))) }
-        compose.runOnIdle { stale() }
+        compose.runOnIdle { runBlocking { stale.setClipEntry(oldSelection) } }
         compose.waitForIdle()
         compose.runOnIdle { assertEquals("哨兵", copied()) }
-        // Current selection stays operable; navigating away invalidates even a retained current action.
+        // Attached native selection stays operable; late writes use its actual production proxy.
         field.performSemanticsAction(SemanticsActions.SetSelection) { assertTrue(it(2, 5, false)) }
-        val afterClose = field.fetchSemanticsNode().config[SemanticsActions.CopyText].action!!
+        field.performSemanticsAction(SemanticsActions.CopyText) { assertTrue(it()) }
+        compose.waitForIdle()
+        val afterClose = readingClipboard
+        val latestSelection = compose.runOnIdle { assertEquals("新原文", copied()); ClipEntry(clipboard.primaryClip!!) }
+        sentinel()
         compose.onNodeWithText("返回列表").performClick()
-        compose.runOnIdle { afterClose() }
+        compose.runOnIdle { runBlocking { afterClose.setClipEntry(latestSelection) } }
         compose.waitForIdle()
         compose.runOnIdle { assertEquals("哨兵", copied()) }
+        open()
+        compose.runOnIdle { runBlocking { afterClose.setClipEntry(latestSelection) }; assertEquals("哨兵", copied()) }
     }
 
     @Test fun retainedNavigationCallbacksRejectOtherRecordAndReopenedSameId() {
         val state = state(entry(), entry("other", "合成另一条原文"))
         content(state)
-        val oldOpen = compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-record")))
-            .fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
-        val oldTab = tab("待办").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        val oldOpen = callbacks.openEntry
+        val oldTab = callbacks.selectDestination
         open()
-        val oldClose = compose.onNodeWithText("返回列表").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
-        val oldCopy = compose.onNodeWithText("复制全文").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        val oldClose = callbacks.returnToList
+        val oldCopy = callbacks.copy
         compose.onNodeWithText("返回列表").performClick()
         open("other"); sentinel()
-        compose.runOnIdle { oldClose(); oldCopy(); oldOpen(); oldTab() }
+        compose.runOnIdle { oldClose(); assertFalse(oldCopy("record", 1)); oldOpen("record"); oldTab(Destination.TASKS) }
         assertEquals("合成另一条原文", fullText())
         compose.runOnIdle { assertEquals("哨兵", copied()) }
         compose.onNodeWithText("返回列表").performClick(); open()
-        compose.runOnIdle { oldClose(); oldCopy(); oldOpen(); oldTab() }
+        compose.runOnIdle { oldClose(); assertFalse(oldCopy("record", 1)); oldOpen("record"); oldTab(Destination.TASKS) }
         assertEquals("合成完整原文", fullText())
         compose.runOnIdle { assertEquals("哨兵", copied()) }
         compose.onNodeWithText("复制全文").performClick()
@@ -296,14 +320,18 @@ class OriginalReadingPresentationTest {
     @Test fun openingAndReadFailureHidePlaintextAndRetryPreservesDraft() {
         val state = state(entry())
         var retries = 0
-        compose.setContent { AIyouTheme { AIyouApp(local = state.value, previewEntryId = "record", onRetry = {
-            retries++; state.value = state.value.copy(opening = true, error = null)
-        }) } }
+        compose.setContent {
+            CompositionLocalProvider(LocalOriginalReadingObserver provides observer) {
+                AIyouTheme { AIyouApp(local = state.value, previewEntryId = "record", onRetry = {
+                    retries++; state.value = state.value.copy(opening = true, error = null)
+                }) }
+            }
+        }
         compose.runOnIdle { state.value = state.value.copy(opening = true) }
         compose.onNodeWithText("正在读取原文").assertIsDisplayed()
         compose.onAllNodes(hasTestTag("original-text")).assertCountEquals(0)
         compose.runOnIdle { state.value = state.value.copy(opening = false, error = "合成读取失败") }
-        val staleRetry = compose.onNodeWithText("重试").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        val staleRetry = callbacks.retry
         compose.onNodeWithText("返回列表").performClick()
         tab("待办").performClick()
         compose.runOnIdle { staleRetry(); assertEquals(0, retries) }

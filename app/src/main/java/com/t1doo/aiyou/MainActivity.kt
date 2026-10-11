@@ -25,12 +25,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -49,6 +49,8 @@ import com.t1doo.aiyou.records.LocalRecordsScreen
 import com.t1doo.aiyou.records.LocalRecordsViewModel
 import com.t1doo.aiyou.records.OpenSourceLicenses
 import com.t1doo.aiyou.records.OriginalReadingScreen
+import com.t1doo.aiyou.records.LocalOriginalReadingObserver
+import com.t1doo.aiyou.records.OriginalReadingCallbacks
 import com.t1doo.aiyou.records.copyOriginal
 import com.t1doo.aiyou.ui.NotebookAppBar
 import com.t1doo.aiyou.ui.NotebookNavigation
@@ -104,12 +106,48 @@ fun AIyouApp(
     val selected = Destination.valueOf(selectedName)
     val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val origin = selected
+    val readerId = detailEntryId
+    val returnToList: () -> Unit = {
+        if (ownsNavigation() && reading) { navigation.generation++; detailEntryId = null }
+    }
+    val selectDestination: (Destination) -> Unit = { destination ->
+        if (ownsNavigation()) {
+            navigation.generation++
+            selectedName = destination.name; detailEntryId = null; showSettings = false; showLicenses = false
+        }
+    }
+    val openEntry: (String) -> Unit = { id ->
+        if (ownsNavigation() && selectedName == origin.name && !showSettings && !demo && detailEntryId == null) {
+            navigation.generation++
+            if (origin == Destination.NOW) selectedNowId = id else selectedMemoriesId = id
+            detailEntryId = id
+        }
+    }
+    val canCopy: (String, Int) -> Boolean = { id, revision ->
+        val latest = currentLocal
+        ownsNavigation() && detailEntryId == id && selectedName == origin.name && !showSettings && !demo &&
+            latest != null && latest.ready && !latest.opening && latest.error == null &&
+            latest.entries.any { it.id == id && it.currentRevision == revision }
+    }
+    val retryReading: () -> Unit = {
+        val latest = currentLocal
+        if (readerId != null && ownsNavigation() && detailEntryId == readerId && selectedName == origin.name && !showSettings && !demo &&
+            latest != null && !latest.opening && latest.error != null) onRetry()
+    }
+    val copy: (String, Int) -> Boolean = { id, revision ->
+        if (canCopy(id, revision)) currentLocal?.entries?.firstOrNull { it.id == id }?.let {
+            copyOriginal(context, it.originalText)
+        } ?: false else false
+    }
+    LocalOriginalReadingObserver.current?.let { observer ->
+        val callbacks = OriginalReadingCallbacks(openEntry, selectDestination, returnToList, retryReading, copy)
+        SideEffect { observer.onNavigation(callbacks) }
+    }
     BackHandler(enabled = showSettings) {
         if (ownsNavigation()) { navigation.generation++; if (showLicenses) showLicenses = false else showSettings = false }
     }
-    BackHandler(enabled = reading) {
-        if (ownsNavigation()) { navigation.generation++; detailEntryId = null }
-    }
+    BackHandler(enabled = reading, onBack = returnToList)
 
     Scaffold(
         modifier = Modifier.imePadding(),
@@ -118,20 +156,15 @@ fun AIyouApp(
                 if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
                 if (reading) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
             ) {
-                if (ownsNavigation()) {
+                if (reading) returnToList() else if (ownsNavigation()) {
                     navigation.generation++
-                    if (reading) detailEntryId = null else if (showLicenses) showLicenses = false else showSettings = !showSettings
+                    if (showLicenses) showLicenses = false else showSettings = !showSettings
                 }
             }
         },
         bottomBar = {
             if (!imeVisible && !reading) {
-                NotebookNavigation(if (showSettings) null else selected) { destination ->
-                    if (ownsNavigation()) {
-                        navigation.generation++
-                        selectedName = destination.name; detailEntryId = null; showSettings = false; showLicenses = false
-                    }
-                }
+                NotebookNavigation(if (showSettings) null else selected, onSelect = selectDestination)
             }
         },
     ) { contentPadding ->
@@ -159,36 +192,13 @@ fun AIyouApp(
                 }
             }
         } else if (reading && local != null) {
-            val origin = selected
-            val readerId = checkNotNull(detailEntryId)
-            val canCopy: (String, Int) -> Boolean = { id, revision ->
-                val latest = currentLocal
-                ownsNavigation() && detailEntryId == id && selectedName == origin.name && !showSettings && !demo &&
-                    latest != null && latest.ready && !latest.opening && latest.error == null &&
-                    latest.entries.any { it.id == id && it.currentRevision == revision }
-            }
-            OriginalReadingScreen(readerId, local, onRetry = {
-                val latest = currentLocal
-                if (ownsNavigation() && detailEntryId == readerId && selectedName == origin.name && !showSettings && !demo &&
-                    latest != null && !latest.opening && latest.error != null) onRetry()
-            }, onCopy = { id, revision ->
-                // Both copy paths reject retained callbacks after revisions, removal or navigation.
-                if (canCopy(id, revision)) currentLocal?.entries?.firstOrNull { it.id == id }?.let {
-                    copyOriginal(context, it.originalText)
-                } ?: false else false
-            }, canCopy = canCopy, modifier = modifier)
+            OriginalReadingScreen(checkNotNull(readerId), local, onRetry = retryReading,
+                onCopy = copy, canCopy = canCopy, modifier = modifier)
         } else if (!demo && local != null && selected != Destination.TASKS) {
-            val origin = selected
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier,
                 listState = if (selected == Destination.NOW) nowList else memoriesList,
                 selectedEntryId = if (selected == Destination.NOW) selectedNowId else selectedMemoriesId,
-                onOpenEntry = { id ->
-                    if (ownsNavigation() && selectedName == origin.name && !showSettings && !demo && detailEntryId == null) {
-                        navigation.generation++
-                        if (origin == Destination.NOW) selectedNowId = id else selectedMemoriesId = id
-                        detailEntryId = id
-                    }
-                })
+                onOpenEntry = openEntry)
         } else {
             MainScreen(
                 destination = selected, demo = demo, modifier = modifier,

@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -144,6 +145,9 @@ fun OriginalReadingScreen(
                         val clipboard = remember(platform, id, revision) {
                             ReadingClipboard(platform, isCurrent = { currentGate(id, revision) },
                                 onDenied = { copyDenied = true }, onCopied = { copyDenied = false })
+                        }
+                        LocalOriginalReadingObserver.current?.let { observer ->
+                            SideEffect { observer.onClipboard(clipboard) }
                         }
                         // Plain remember intentionally avoids TextFieldState's plaintext Saver.
                         val text = remember(entry.originalText) { TextFieldState(initialText = entry.originalText) }
