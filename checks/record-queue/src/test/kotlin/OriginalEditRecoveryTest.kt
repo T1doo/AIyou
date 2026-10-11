@@ -116,7 +116,7 @@ class OriginalEditRecoveryTest {
             val tombstone = encrypted.read("original")!!
             assertEquals(OriginalEditDraftState.DISCARDED, tombstone.state)
             controller.changeOriginalEdit(id, "合成关闭后迟到输入"); controller.saveOriginalEdit(id)
-            assertTrue(encrypted.pending().isEmpty()); assertTrue(repo.revisionSubmissions.isEmpty())
+            assertTrue(encrypted.pending().drafts.isEmpty()); assertTrue(repo.revisionSubmissions.isEmpty())
             stop(controller)
             controller.changeOriginalEdit(id, "合成已卸载回调")
             assertEquals(tombstone, encrypted.read("original"))
@@ -221,6 +221,9 @@ class OriginalEditRecoveryTest {
             second.saveOriginalEdit(secondId); assertTrue(repo.revisionSubmissions.isEmpty())
             second.cancelOriginalEdit(secondId)
             assertNull(second.state.value.originalEdit)
+            // Closing publishes UI state before its queued index refresh finishes.
+            // Join both owned controller jobs before the independent disk assertion.
+            stop(first); stop(second)
             assertEquals("合成先保存草稿", secondStore.read("original")!!.text)
         } finally { stop(first); stop(second); firstStore.close(); secondStore.close() }
     } }
@@ -318,7 +321,7 @@ class OriginalEditRecoveryTest {
         stop(controller); encrypted.close()
         storage(root).use { cold ->
             assertEquals(OriginalEditDraftState.DISCARDED, cold.read("original")!!.state)
-            assertTrue(cold.pending().isEmpty())
+            assertTrue(cold.pending().drafts.isEmpty())
             try { cold.write(attempted, attempted.copy(version = 2, text = "合成旧写入")); fail("Expected conflict") }
             catch (_: OriginalEditDraftConflict) { }
         }
@@ -444,7 +447,7 @@ class OriginalEditRecoveryTest {
             failConfirmation.set(false)
             if (terminal) {
                 controller.cancelOriginalEdit(id); controller.state.first { it.originalEdit == null }
-                assertTrue(encrypted.pending().isEmpty())
+                assertTrue(encrypted.pending().drafts.isEmpty())
                 assertEquals(OriginalEditDraftState.DISCARDED, encrypted.read("original")!!.state)
             } else {
                 controller.changeOriginalEdit(id, input); saved(controller, input)

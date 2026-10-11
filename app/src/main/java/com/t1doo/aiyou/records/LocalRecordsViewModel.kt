@@ -10,6 +10,7 @@ import com.t1doo.aiyou.domain.EntryRepository
 import com.t1doo.aiyou.domain.OriginalEditDraftConflict
 import com.t1doo.aiyou.model.OriginalEditDraft
 import com.t1doo.aiyou.model.OriginalEditDraftRef
+import com.t1doo.aiyou.model.OriginalEditDraftIndex
 import com.t1doo.aiyou.model.OriginalEditDraftState
 import com.t1doo.aiyou.model.ProcessingPolicy
 import com.t1doo.aiyou.model.StoredEntry
@@ -44,6 +45,8 @@ data class LocalRecordUiState(
     val supportsEditDrafts: Boolean = false,
     val pendingEdits: List<OriginalEditDraftRef> = emptyList(),
     val editDraftError: String? = null,
+    val editDraftIssueCount: Int = 0,
+    val editDraftIndexAvailable: Boolean = true,
 )
 
 /** All draft writes and saves share one queue, preserving edits around a save boundary. */
@@ -195,7 +198,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun resumeOriginalEdit(entryId: String, draftId: String) {
         val current = mutableState.value
-        if (editsDisposed || !current.ready || current.opening || current.error != null || current.saving || current.savePending ||
+        if (editsDisposed || !current.ready || current.opening || current.error != null || !current.editDraftIndexAvailable || current.saving || current.savePending ||
             current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         val ref = current.pendingEdits.singleOrNull { it.entryId == entryId && it.id == draftId } ?: return
         val entry = current.entries.firstOrNull { it.id == entryId }
@@ -396,13 +399,18 @@ class LocalRecordsViewModel internal constructor(
             if (snapshot.state == OriginalEditDraftState.ACTIVE) listOf(OriginalEditDraftRef(snapshot.id, snapshot.entryId, snapshot.baseRevision)) else emptyList()) }
     }
 
+    private fun indexNotice(index: OriginalEditDraftIndex): String? = if (index.unreadableCount == 0) null else
+        "${index.unreadableCount} 份编辑草稿暂无法安全恢复。可能损坏、密钥不匹配或读取期间变化。加密数据已保留；" +
+            if (index.drafts.isEmpty()) "当前没有可安全恢复的编辑草稿，请保留数据并重试读取。" else "可先恢复下方已校验的草稿。"
+
     private suspend fun refreshPendingDrafts() {
         try {
-            val pending = repository?.editDrafts?.pending().orEmpty()
-            mutableState.update { it.copy(pendingEdits = pending, editDraftError = null) }
+            val pending = repository?.editDrafts?.pending() ?: OriginalEditDraftIndex(emptyList())
+            mutableState.update { it.copy(pendingEdits = pending.drafts, editDraftError = indexNotice(pending),
+                editDraftIssueCount = pending.unreadableCount, editDraftIndexAvailable = true) }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) {
-            mutableState.update { it.copy(editDraftError = "编辑草稿暂不可读取，已保留加密数据；请重试本机读取，未自动删除或替换。") }
+            mutableState.update { it.copy(editDraftIndexAvailable = false, editDraftError = "编辑草稿目录暂不可读取，恢复列表尚未确认。已保留加密数据；请重试本机读取，未自动删除或替换。") }
         }
     }
 
@@ -625,12 +633,13 @@ class LocalRecordsViewModel internal constructor(
             store.prepare()
             persistedDraft = store.readDraft()
             val entries = store.entries()
-            val pending = try { store.editDrafts?.pending().orEmpty() }
+            val pending = try { store.editDrafts?.pending() ?: OriginalEditDraftIndex(emptyList()) }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             mutableState.update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
                 entries = entries, draftNotice = if (persistedDraft == null) "没有未保存的草稿" else "已恢复本机草稿", error = null,
-                supportsEditDrafts = store.editDrafts != null, pendingEdits = pending.orEmpty(),
-                editDraftError = if (pending == null) "编辑草稿暂不可读取，已保留加密数据；请重试本机读取，未自动删除或替换。" else null) }
+                supportsEditDrafts = store.editDrafts != null, pendingEdits = pending?.drafts.orEmpty(),
+                editDraftIssueCount = pending?.unreadableCount ?: 0, editDraftIndexAvailable = pending != null,
+                editDraftError = if (pending == null) "编辑草稿目录暂不可读取，恢复列表尚未确认。已保留加密数据；请重试本机读取，未自动删除或替换。" else indexNotice(pending)) }
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) { failed(failure) }
         catch (_: LinkageError) { failed(IllegalStateException()) }

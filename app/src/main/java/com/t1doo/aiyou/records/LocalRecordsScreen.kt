@@ -157,14 +157,14 @@ fun LocalRecordsScreen(
                 } }
                 if (local.error == null) local.saveNotice?.let { message -> item("saved") { StatusNotice(message, "可以在回忆中查看原文；尚未执行 AI 整理。") } }
                 local.editDraftError?.let { message -> item("edit-draft-error") {
-                    StatusNotice("编辑草稿需要处理", message, state = ComponentState.ERROR, actionLabel = "重试读取", onAction = onRetry)
+                    StatusNotice(if (local.editDraftIndexAvailable && local.editDraftIssueCount > 0) "${local.editDraftIssueCount} 份编辑草稿无法读取" else "编辑草稿需要处理", message, state = ComponentState.ERROR, actionLabel = "重试读取", onAction = onRetry)
                 } }
                 items(local.pendingEdits, key = { "edit-draft-${it.id}" }) { draft ->
                     Column(Modifier.fillMaxWidth()) {
                         Text(if (local.entries.any { it.id == draft.entryId }) "有未保存的原文修改 · 基于版本 ${draft.baseRevision}"
                             else "有未保存的修改 · 源记录已不可用", style = MaterialTheme.typography.bodySmall)
                         TextButton(onClick = { onResumeEdit(draft.entryId, draft.id) },
-                            enabled = local.ready && !local.opening && local.error == null && !local.saving && !local.savePending,
+                            enabled = local.ready && !local.opening && local.error == null && local.editDraftIndexAvailable && !local.saving && !local.savePending,
                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("resume-edit-${draft.entryId}")) {
                             Text("恢复编辑草稿")
                         }

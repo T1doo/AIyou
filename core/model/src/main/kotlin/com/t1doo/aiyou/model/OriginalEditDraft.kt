@@ -15,3 +15,12 @@ data class OriginalEditDraft(
 )
 
 data class OriginalEditDraftRef(val id: String, val entryId: String, val baseRevision: Int)
+
+/** Only authenticated metadata is eligible for recovery; failures never mean an empty healthy store. */
+data class OriginalEditDraftIndex(
+    val drafts: List<OriginalEditDraftRef>,
+    val integrityFailureCount: Int = 0,
+    val changedDuringReadCount: Int = 0,
+) {
+    val unreadableCount: Int get() = integrityFailureCount + changedDuringReadCount
+}

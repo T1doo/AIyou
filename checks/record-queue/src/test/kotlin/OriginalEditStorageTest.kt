@@ -33,7 +33,7 @@ class OriginalEditStorageTest {
         val bytes = file.readBytes()
         assertFalse(String(bytes, Charsets.ISO_8859_1).contains(String(value.text.toByteArray(Charsets.UTF_16BE), Charsets.ISO_8859_1)))
         assertFalse(file.name.contains(value.entryId))
-        store(root).use { assertEquals(value, it.read(value.entryId)); assertEquals(value.id, it.pending().single().id) }
+        store(root).use { assertEquals(value, it.read(value.entryId)); assertEquals(value.id, it.pending().drafts.single().id) }
     } }
 
     @Test fun discardTombstoneRejectsLateAutosaveBeforeAndAfterColdReopen() = runBlocking { exercise { root ->
@@ -44,7 +44,7 @@ class OriginalEditStorageTest {
             fails<OriginalEditDraftConflict> { store.write(value, value.copy(version = 2, text = "合成迟到输入")) }
         }
         store(root).use { store ->
-            assertTrue(store.pending().isEmpty())
+            assertTrue(store.pending().drafts.isEmpty())
             fails<OriginalEditDraftConflict> { store.write(value, value.copy(version = 2, text = "合成重开后迟到输入")) }
             val tombstone = store.read(value.entryId)!!
             val newSession = draft("合成新的明确编辑")
@@ -124,7 +124,7 @@ class OriginalEditStorageTest {
         fails<IllegalArgumentException> { actual.write(value, value.copy(version = 2, text = value.text + "x")) }
         assertEquals(value, actual.read(value.entryId))
         actual.write(value, terminal(value, OriginalEditDraftState.COMMITTED))
-        assertTrue(actual.pending().isEmpty())
+        assertTrue(actual.pending().drafts.isEmpty())
         actual.close()
         assertTrue(ownKey.all { it == 0.toByte() })
         fails<IllegalStateException> { actual.read(value.entryId) }

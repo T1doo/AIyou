@@ -58,7 +58,7 @@ class OriginalEditRecordsIntegrationTest {
             store.close(); store = EncryptedEntryRepository.openWithKey(context, file, secret.copyOf())
             try { store.editDrafts.write(edit, edit.copy(version = 2, text = "合成迟到输入")); fail("Expected conflict") }
             catch (_: OriginalEditDraftConflict) { }
-            assertEquals(terminal, store.editDrafts.read(entry.id)); assertTrue(store.editDrafts.pending().isEmpty())
+            assertEquals(terminal, store.editDrafts.read(entry.id)); assertTrue(store.editDrafts.pending().drafts.isEmpty())
             assertEquals(listOf("合成旧原文", "合成新的正式原文"), store.revisions(entry.id).map { it.originalText })
         } finally { store?.close(); secret.fill(0); directory.deleteRecursively() }
     }

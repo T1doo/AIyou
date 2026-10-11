@@ -2,10 +2,12 @@ package com.t1doo.aiyou.data
 
 import com.t1doo.aiyou.domain.OriginalEditDraftBusy
 import com.t1doo.aiyou.domain.OriginalEditDraftConflict
+import com.t1doo.aiyou.domain.OriginalEditDraftChangedDuringRead
 import com.t1doo.aiyou.domain.OriginalEditDraftIntegrityFailure
 import com.t1doo.aiyou.domain.OriginalEditDraftStore
 import com.t1doo.aiyou.model.OriginalEditDraft
 import com.t1doo.aiyou.model.OriginalEditDraftRef
+import com.t1doo.aiyou.model.OriginalEditDraftIndex
 import com.t1doo.aiyou.model.OriginalEditDraftState
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -13,15 +15,21 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.FileInputStream
+import java.io.IOException
 import java.nio.channels.FileChannel
 import java.nio.channels.OverlappingFileLockException
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.NoSuchFileException
+import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.UUID
 import javax.crypto.Cipher
+import javax.crypto.BadPaddingException
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
@@ -39,13 +47,29 @@ class EncryptedOriginalEditStore(
 
     override suspend fun read(entryId: String): OriginalEditDraft? = locked { readLocked(entryId) }
 
-    override suspend fun pending(): List<OriginalEditDraftRef> = locked {
-        directory.listFiles().orEmpty().filter { it.name.matches(Regex("[0-9a-f]{64}\\.edit")) }
-            .sortedBy { it.name }.mapNotNull { file ->
-                val draft = authenticated(file)
+    override suspend fun pending(): OriginalEditDraftIndex = locked {
+        val rootBefore = Files.readAttributes(directory.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+        checkpoint("listing")
+        // A failed list/iterator is a global failure, never an empty successful index.
+        val targets = Files.newDirectoryStream(directory.toPath()).use { stream ->
+            stream.filter { it.fileName.toString().matches(Regex("[0-9a-f]{64}\\.edit")) }
+                .map { it.toFile() }.sortedBy { it.name }
+        }
+        checkpoint("listed")
+        val drafts = mutableListOf<OriginalEditDraftRef>()
+        var integrityFailures = 0
+        var changedReads = 0
+        for (target in targets) {
+            try {
+                val draft = authenticated(target)
                 if (draft.state == OriginalEditDraftState.ACTIVE)
-                    OriginalEditDraftRef(draft.id, draft.entryId, draft.baseRevision) else null
-            }
+                    drafts += OriginalEditDraftRef(draft.id, draft.entryId, draft.baseRevision)
+            } catch (_: OriginalEditDraftIntegrityFailure) { integrityFailures++ }
+            catch (_: OriginalEditDraftChangedDuringRead) { changedReads++ }
+        }
+        val rootAfter = Files.readAttributes(directory.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+        check(rootAfter.isDirectory && rootBefore.fileKey() == rootAfter.fileKey() && rootBefore.creationTime() == rootAfter.creationTime())
+        OriginalEditDraftIndex(drafts, integrityFailures, changedReads)
     }
 
     override suspend fun write(expected: OriginalEditDraft?, next: OriginalEditDraft): OriginalEditDraft = locked {
@@ -83,26 +107,51 @@ class EncryptedOriginalEditStore(
         }
     }
 
+    private fun observedFile(target: File): BasicFileAttributes = try {
+        Files.readAttributes(target.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+    } catch (_: NoSuchFileException) { throw OriginalEditDraftChangedDuringRead() }
+
     private fun authenticated(target: File): OriginalEditDraft {
+        val before = observedFile(target)
+        if (!before.isRegularFile || before.size() !in 30L..MAX_ENVELOPE_BYTES.toLong()) throw OriginalEditDraftIntegrityFailure()
+        checkpoint("before-read")
+        // File IO stays outside the authentication/format catches. Bound even a file that grows mid-read.
+        val envelope = FileInputStream(target).use { input ->
+            val bytes = ByteArrayOutputStream()
+            val buffer = ByteArray(4096)
+            while (true) {
+                val size = input.read(buffer)
+                if (size < 0) break
+                if (bytes.size() + size > MAX_ENVELOPE_BYTES) throw OriginalEditDraftIntegrityFailure()
+                bytes.write(buffer, 0, size)
+            }
+            bytes.toByteArray()
+        }
+        if (envelope.size !in 30..MAX_ENVELOPE_BYTES || envelope[0] != 1.toByte()) throw OriginalEditDraftIntegrityFailure()
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, "AES"), GCMParameterSpec(128, envelope.copyOfRange(1, 13)))
+        cipher.updateAAD(aad(target.name))
+        val plain = try { cipher.doFinal(envelope, 13, envelope.size - 13) }
+            catch (_: BadPaddingException) { throw OriginalEditDraftIntegrityFailure() }
         try {
-            if (target.length() !in 30L..MAX_ENVELOPE_BYTES.toLong()) throw OriginalEditDraftIntegrityFailure()
-            val envelope = target.readBytes()
-            if (envelope.size !in 30..MAX_ENVELOPE_BYTES || envelope[0] != 1.toByte()) throw OriginalEditDraftIntegrityFailure()
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, "AES"), GCMParameterSpec(128, envelope.copyOfRange(1, 13)))
-            cipher.updateAAD(aad(target.name))
-            val plain = cipher.doFinal(envelope, 13, envelope.size - 13)
-            try {
-                return DataInputStream(ByteArrayInputStream(plain)).use { input ->
-                    val value = OriginalEditDraft(input.readUTF(), input.readUTF(), input.readInt(), input.readInt(),
+            val value = try {
+                DataInputStream(ByteArrayInputStream(plain)).use { input ->
+                    val draft = OriginalEditDraft(input.readUTF(), input.readUTF(), input.readInt(), input.readInt(),
                         input.readLong(), readText(input), readText(input), OriginalEditDraftState.valueOf(input.readUTF()))
-                    if (input.available() != 0 || file(value.entryId).name != target.name) throw OriginalEditDraftIntegrityFailure()
-                    validate(value)
-                    value
+                    if (input.available() != 0 || file(draft.entryId).name != target.name) throw OriginalEditDraftIntegrityFailure()
+                    validate(draft)
+                    draft
                 }
-            } finally { plain.fill(0) }
-        } catch (failure: OriginalEditDraftIntegrityFailure) { throw failure }
-        catch (_: Exception) { throw OriginalEditDraftIntegrityFailure() }
+            } catch (failure: OriginalEditDraftIntegrityFailure) { throw failure }
+            catch (_: IOException) { throw OriginalEditDraftIntegrityFailure() } // In-memory envelope format only.
+            catch (_: IllegalArgumentException) { throw OriginalEditDraftIntegrityFailure() }
+            checkpoint("authenticated")
+            val after = observedFile(target)
+            if (!after.isRegularFile || before.fileKey() != after.fileKey() || before.size() != after.size() ||
+                before.lastModifiedTime() != after.lastModifiedTime() || before.creationTime() != after.creationTime())
+                throw OriginalEditDraftChangedDuringRead()
+            return value
+        } finally { plain.fill(0) }
     }
 
     private fun publish(value: OriginalEditDraft) {
