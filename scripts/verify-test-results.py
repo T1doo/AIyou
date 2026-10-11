@@ -17,7 +17,7 @@ if args.component:
 if args.queue:
     targets.append(("host queue", "checks/record-queue/build/test-results/test", 14))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 32))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 33))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 for label, folder, minimum in targets:
@@ -64,6 +64,7 @@ for label, folder, minimum in targets:
             "reopenedAndDisposedEditorRejectsRetainedSessionCallbacks",
             "narrowLargeFontBoundaryInputAndPrimaryActionsRemainReachable",
             "lateCaptureWriteFailureRetriesStorageWithoutLosingEitherInput",
+            "endOfListSaveReturnsToVisibleSelectedCurrentOriginal",
         )
         for name in required:
             matches = [case for case in observed_cases if case.get("classname") == owner

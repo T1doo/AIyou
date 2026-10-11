@@ -118,6 +118,7 @@ class OriginalEditPresentationTest {
         val list = compose.onNode(hasScrollToIndexAction())
         list.performScrollToNode(hasTestTag("entry-original"))
         val anchor = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        assertTrue(anchor > 0f)
         open(); edit(); replace("合成保存的新版本🌿"); save(); waitSaved()
         assertEquals("合成保存的新版本🌿", original())
         compose.onNodeWithText("新版本已保存在本机").assertIsDisplayed()
@@ -127,6 +128,35 @@ class OriginalEditPresentationTest {
         compose.onNodeWithText("返回列表").performClick()
         assertEquals(anchor, list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value(), 0.01f)
         assertTrue(compose.onNodeWithTag("entry-original").fetchSemanticsNode().config[SemanticsProperties.Selected])
+    }
+
+    @Test fun endOfListSaveReturnsToVisibleSelectedCurrentOriginal() {
+        val store = start(ControlledStore(originalAtEnd = true))
+        val list = compose.onNode(hasScrollToIndexAction())
+        list.performScrollToNode(hasTestTag("entry-original"))
+        val before = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        val beforeViewport = list.getUnclippedBoundsInRoot()
+        assertTrue(before > 0f)
+        open(); edit(); replace("合成保存的新版本🌿"); save(); waitSaved()
+        assertEquals("合成保存的新版本🌿", original())
+        compose.onNodeWithText("返回列表").performClick()
+        val target = compose.onNodeWithTag("entry-original").assertIsDisplayed()
+        assertTrue(target.fetchSemanticsNode().config[SemanticsProperties.Selected])
+        compose.onNodeWithText("合成保存的新版本🌿").assertIsDisplayed()
+        val bounds = target.getUnclippedBoundsInRoot()
+        val viewport = list.getUnclippedBoundsInRoot()
+        assertTrue(bounds.left >= viewport.left && bounds.right <= viewport.right &&
+            bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
+        val after = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        assertTrue(after.value() > 0f)
+        assertEquals(after.maxValue(), after.value(), 0.01f)
+        // Accessibility pseudo-offsets can change at the tail when item/viewport geometry changes.
+        println("EDITOR_END_RETURN_GEOMETRY beforeEstimate=$before afterEstimate=${after.value()} " +
+            "beforeHeight=${beforeViewport.height} afterHeight=${viewport.height} selectedFullyVisible=true atEnd=true")
+        assertEquals("合成此刻草稿", vm.state.value.text)
+        assertEquals("合成此刻草稿", store.draft.text)
+        assertEquals(listOf("合成原文", "合成保存的新版本🌿"), store.history.map { it.originalText })
+        assertEquals(1, store.reviseCalls)
     }
 
     @Test fun cancelAndSystemBackRequireDiscardAndKeepOriginalWithoutWrites() {
@@ -302,6 +332,7 @@ class OriginalEditPresentationTest {
         private val failRevision: Boolean = false,
         private val failReadback: Boolean = false,
         private val failPriorEdit: Boolean = false,
+        private val originalAtEnd: Boolean = false,
     ) : EntryRepository {
         @Volatile var current = StoredEntry("original", 1, "合成原文", 1_791_647_400_000, "Asia/Shanghai", ProcessingPolicy.LOCAL_ONLY)
         @Volatile var deleted = false
@@ -328,7 +359,8 @@ class OriginalEditPresentationTest {
             if (failReadback && reviseCalls > 0 && current.currentRevision > 1 && !readbackFailed) {
                 readbackFailed = true; error("synthetic readback failure")
             }
-            return others + if (deleted) emptyList() else listOf(current)
+            val original = if (deleted) emptyList() else listOf(current)
+            return if (originalAtEnd) others + original else others.take(15) + original + others.drop(15)
         }
         override suspend fun revisions(entryId: String) = history.toList()
         override suspend fun revise(entryId: String, expectedRevision: Int, text: String, createdAtMillis: Long): StoredEntry {
