@@ -11,7 +11,7 @@ reports = list((root / "app/build/test-results/validateDebugScreenshotTest").rgl
 cases = []
 for report in reports:
     cases.extend(ET.parse(report).getroot().iter("testcase"))
-expected = 284  # Original216 + seventeen actual production states/routes x four sizes.
+expected = 304  # Original216 + twenty-two production states/routes x four sizes.
 if len(cases) != expected:
     raise SystemExit(f"FAIL: expected {expected} actual Preview smoke tests, found {len(cases)}")
 if any(any(case.find(tag) is not None for tag in ("failure", "error", "skipped")) for case in cases):
@@ -38,7 +38,7 @@ if len(review) != 4 or any(item["height"] < 2000 for item in review):
 local_methods = ("LocalEmptyRender", "LocalRestoredRender", "LocalSavingRender", "LocalSaveFailedRender",
                  "LocalReadFailedRender", "LocalSavedRender", "LocalRejectedInputRender", "LocalMemoriesRender",
                  "LocalLongListRender", "LocalOriginalReadRender", "LocalMissingOriginalRender", "LocalOriginalReadFailureRender",
-                 "LocalOriginalEditRender", "LocalOriginalEditSavingRender", "LocalOriginalEditFailedRender", "LocalOriginalEditConflictRender", "LocalOriginalEditStorageFailedRender")
+                 "LocalOriginalEditRender", "LocalOriginalEditSavingRender", "LocalOriginalEditFailedRender", "LocalOriginalEditConflictRender", "LocalOriginalEditStorageFailedRender", "LocalOriginalHistoryRender", "LocalOriginalHistoryReadRender", "LocalOriginalHistoryLoadingRender", "LocalOriginalHistoryFailedRender", "LocalOriginalHistoryUnavailableRender")
 for method in local_methods:
     production = [item for item in manifest if "/" + method + "_" in item["file"]]
     if len(production) != 4:

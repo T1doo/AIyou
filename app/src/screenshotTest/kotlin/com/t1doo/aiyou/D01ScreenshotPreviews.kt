@@ -11,6 +11,8 @@ import com.android.tools.screenshot.PreviewTest
 import com.t1doo.aiyou.designsystem.*
 import com.t1doo.aiyou.ui.*
 import com.t1doo.aiyou.records.LocalRecordUiState
+import com.t1doo.aiyou.records.OriginalHistoryUiState
+import com.t1doo.aiyou.model.OriginalRevision
 import com.t1doo.aiyou.records.OriginalEditUiState
 import com.t1doo.aiyou.model.StoredEntry
 import com.t1doo.aiyou.model.ProcessingPolicy
@@ -219,3 +221,30 @@ fun MascotCompleteRender() { CompleteContentFrame("中性角色说明") { Mascot
 @CompleteContentPreviews
 @Composable
 fun ProviderCompleteRender() { CompleteContentFrame("服务连接") { ProviderConnectionCardPreview(ComponentState.LONG_TEXT) } }
+
+// Synthetic saved revisions of the actual production history route; no repository/network call.
+private val historyCurrent = longOriginal.copy(currentRevision = 2, originalText = "合成当前原文：散步时发现叶色变化。")
+private val historyLocal = editingLocal.copy(entries = listOf(historyCurrent), originalHistory = OriginalHistoryUiState(
+    1L, longOriginal.id, loading = false, currentRevision = 2,
+    revisions = listOf(OriginalRevision(longOriginal.id, 2, historyCurrent.originalText, "synthetic", historyCurrent.capturedAtMillis),
+        OriginalRevision(longOriginal.id, 1, longOriginal.originalText, "synthetic", longOriginal.capturedAtMillis))))
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalOriginalHistoryRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = historyLocal, previewEntryId = longOriginal.id) } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalOriginalHistoryReadRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = historyLocal.copy(originalHistory = historyLocal.originalHistory!!.copy(selectedRevision = 1)), previewEntryId = longOriginal.id) } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalOriginalHistoryLoadingRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = historyLocal.copy(originalHistory = historyLocal.originalHistory!!.copy(loading = true, revisions = emptyList())), previewEntryId = longOriginal.id) } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalOriginalHistoryFailedRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = historyLocal.copy(originalHistory = historyLocal.originalHistory!!.copy(error = "合成历史版本读取失败，正在编辑的修改仍保留。", revisions = emptyList())), previewEntryId = longOriginal.id) } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalOriginalHistoryUnavailableRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = historyLocal.copy(entries = emptyList(), originalHistory = historyLocal.originalHistory!!.copy(unavailable = true, revisions = emptyList())), previewEntryId = longOriginal.id) } }

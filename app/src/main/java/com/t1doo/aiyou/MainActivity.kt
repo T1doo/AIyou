@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.AlertDialog
@@ -51,6 +52,7 @@ import com.t1doo.aiyou.records.LocalRecordsViewModel
 import com.t1doo.aiyou.records.OpenSourceLicenses
 import com.t1doo.aiyou.records.OriginalReadingScreen
 import com.t1doo.aiyou.records.OriginalEditScreen
+import com.t1doo.aiyou.records.OriginalHistoryScreen
 import com.t1doo.aiyou.records.LocalOriginalReadingObserver
 import com.t1doo.aiyou.records.OriginalReadingCallbacks
 import com.t1doo.aiyou.records.copyOriginal
@@ -69,7 +71,9 @@ class MainActivity : ComponentActivity() {
             val local by records.state.collectAsState()
             AIyouTheme { AIyouApp(local = local, onDraftChange = records::changeText, onSave = records::save, onRetry = records::retry,
                 onBeginOriginalEdit = records::beginOriginalEdit, onOriginalEditChange = records::changeOriginalEdit,
-                onOriginalEditSave = records::saveOriginalEdit, onOriginalEditCancel = records::cancelOriginalEdit) }
+                onOriginalEditSave = records::saveOriginalEdit, onOriginalEditCancel = records::cancelOriginalEdit,
+                onBeginOriginalHistory = records::beginOriginalHistory, onSelectOriginalRevision = records::selectOriginalRevision,
+                onBackOriginalHistory = records::backOriginalHistory, onRetryOriginalHistory = records::retryOriginalHistory) }
         }
     }
 }
@@ -94,6 +98,10 @@ fun AIyouApp(
     onOriginalEditChange: (Long, String) -> Unit = { _, _ -> },
     onOriginalEditSave: (Long) -> Unit = {},
     onOriginalEditCancel: (Long) -> Unit = {},
+    onBeginOriginalHistory: (String, Int) -> Unit = { _, _ -> },
+    onSelectOriginalRevision: (Long, Int) -> Unit = { _, _ -> },
+    onBackOriginalHistory: (Long) -> Unit = {},
+    onRetryOriginalHistory: (Long) -> Unit = {},
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -118,9 +126,28 @@ fun AIyouApp(
     val origin = selected
     val readerId = detailEntryId
     val editing = if (reading) local?.originalEdit?.takeIf { it.entryId == readerId } else null
+    val history = if (reading) local?.originalHistory?.takeIf { it.entryId == readerId } else null
+    val historyList = remember(history?.sessionId) { LazyListState() }
     fun ownsEdit(sessionId: Long): Boolean = ownsNavigation() && reading && detailEntryId == readerId &&
         selectedName == origin.name && !showSettings && !demo &&
-        currentLocal?.originalEdit?.let { it.sessionId == sessionId && it.entryId == readerId } == true
+        currentLocal?.originalHistory == null && currentLocal?.originalEdit?.let { it.sessionId == sessionId && it.entryId == readerId } == true
+    fun ownsHistory(sessionId: Long) = ownsNavigation() && reading && detailEntryId == readerId &&
+        selectedName == origin.name && !showSettings && !demo &&
+        currentLocal?.originalHistory?.let { it.sessionId == sessionId && it.entryId == readerId } == true
+    val backHistory: (Long) -> Unit = { sessionId ->
+        if (ownsHistory(sessionId)) { navigation.generation++; onBackOriginalHistory(sessionId) }
+    }
+    val selectHistory: (Long, Int) -> Unit = { sessionId, revision ->
+        if (ownsHistory(sessionId) && currentLocal?.originalHistory?.let { !it.loading && it.error == null && !it.unavailable &&
+                it.revisions.any { r -> r.revision == revision } } == true) {
+            navigation.generation++; onSelectOriginalRevision(sessionId, revision)
+        }
+    }
+    val retryHistory: (Long) -> Unit = { sessionId ->
+        if (ownsHistory(sessionId) && currentLocal?.originalHistory?.loading == false) {
+            navigation.generation++; onRetryOriginalHistory(sessionId)
+        }
+    }
     val discardEdit: (Long) -> Unit = { sessionId ->
         if (ownsEdit(sessionId) && currentLocal?.originalEdit?.canCancel == true) {
             navigation.generation++; discardEditSession = null; onOriginalEditCancel(sessionId)
@@ -140,11 +167,13 @@ fun AIyouApp(
     val returnToList: () -> Unit = {
         if (ownsNavigation() && reading) {
             val edit = currentLocal?.originalEdit?.takeIf { it.entryId == readerId }
-            if (edit != null) cancelEdit(edit.sessionId) else { navigation.generation++; detailEntryId = null }
+            val activeHistory = currentLocal?.originalHistory?.takeIf { it.entryId == readerId }
+            if (activeHistory != null) backHistory(activeHistory.sessionId)
+            else if (edit != null) cancelEdit(edit.sessionId) else { navigation.generation++; detailEntryId = null }
         }
     }
     val selectDestination: (Destination) -> Unit = { destination ->
-        if (ownsNavigation() && currentLocal?.originalEdit == null) {
+        if (ownsNavigation() && currentLocal?.originalEdit == null && currentLocal?.originalHistory == null) {
             navigation.generation++
             selectedName = destination.name; detailEntryId = null; showSettings = false; showLicenses = false
         }
@@ -160,13 +189,35 @@ fun AIyouApp(
         val latest = currentLocal
         ownsNavigation() && detailEntryId == id && selectedName == origin.name && !showSettings && !demo &&
             latest != null && latest.ready && !latest.opening && latest.error == null &&
-            latest.originalEdit == null &&
+            latest.originalEdit == null && latest.originalHistory == null &&
             latest.entries.any { it.id == id && it.currentRevision == revision }
     }
     val beginEdit: (String, Int) -> Unit = { id, revision ->
         if (canCopy(id, revision) && currentLocal?.saving == false && currentLocal?.savePending == false) {
             navigation.generation++; onBeginOriginalEdit(id, revision)
         }
+    }
+    val beginHistory: (String, Int) -> Unit = { id, revision ->
+        val latest = currentLocal
+        if (ownsNavigation() && reading && detailEntryId == id && selectedName == origin.name && !showSettings && !demo &&
+            latest != null && latest.ready && !latest.opening && latest.error == null && !latest.saving && !latest.savePending &&
+            latest.originalHistory == null && latest.originalEdit?.canCancel != false &&
+            latest.entries.any { it.id == id && it.currentRevision == revision }) {
+            navigation.generation++; onBeginOriginalHistory(id, revision)
+        }
+    }
+    val canCopyHistory: (String, Int) -> Boolean = { id, revision ->
+        val latest = currentLocal
+        val live = latest?.originalHistory
+        history != null && ownsHistory(history.sessionId) && latest != null && latest.ready && !latest.opening && latest.error == null &&
+            live != null && live.requestId == history.requestId && !live.loading && live.error == null && !live.unavailable &&
+            live.entryId == id && live.selectedRevision == revision && live.revisions.any { it.revision == revision } &&
+            latest.entries.any { it.id == id && it.currentRevision == live.currentRevision }
+    }
+    val copyHistory: (String, Int) -> Boolean = { id, revision ->
+        if (canCopyHistory(id, revision)) currentLocal?.originalHistory?.revisions?.firstOrNull { it.revision == revision }?.let {
+            copyOriginal(context, it.originalText)
+        } ?: false else false
     }
     val retryReading: () -> Unit = {
         val latest = currentLocal
@@ -180,7 +231,7 @@ fun AIyouApp(
     }
     LocalOriginalReadingObserver.current?.let { observer ->
         val callbacks = OriginalReadingCallbacks(openEntry, selectDestination, returnToList, retryReading, copy,
-            beginEdit, changeEdit, saveEdit, cancelEdit, discardEdit)
+            beginEdit, changeEdit, saveEdit, cancelEdit, discardEdit, beginHistory, selectHistory, backHistory, retryHistory, copyHistory)
         SideEffect { observer.onNavigation(callbacks) }
     }
     BackHandler(enabled = showSettings) {
@@ -192,9 +243,10 @@ fun AIyouApp(
         modifier = Modifier.imePadding(),
         topBar = {
             NotebookAppBar(
-                if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
-                if (editing != null) "取消编辑" else if (reading) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
-                actionEnabled = editing?.canCancel != false,
+                if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
+                if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
+                else if (editing != null) "取消编辑" else if (reading) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
+                actionEnabled = history != null || editing?.canCancel != false,
             ) {
                 if (reading) returnToList() else if (ownsNavigation()) {
                     navigation.generation++
@@ -231,11 +283,14 @@ fun AIyouApp(
                     }
                 }
             }
+        } else if (history != null && local != null) {
+            OriginalHistoryScreen(history, local, historyList, selectHistory, backHistory, retryHistory,
+                retryReading, copyHistory, canCopyHistory, modifier)
         } else if (editing != null && local != null) {
-            OriginalEditScreen(editing, local, changeEdit, saveEdit, cancelEdit, modifier, onRetry = retryReading)
+            OriginalEditScreen(editing, local, changeEdit, saveEdit, cancelEdit, modifier, onRetry = retryReading, onHistory = beginHistory)
         } else if (reading && local != null) {
             OriginalReadingScreen(checkNotNull(readerId), local, onRetry = retryReading,
-                onCopy = copy, canCopy = canCopy, modifier = modifier, onEdit = beginEdit)
+                onCopy = copy, canCopy = canCopy, modifier = modifier, onEdit = beginEdit, onHistory = beginHistory)
         } else if (!demo && local != null && selected != Destination.TASKS) {
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier,
                 listState = if (selected == Destination.NOW) nowList else memoriesList,

@@ -16,6 +16,7 @@ class EncryptedEntryRepository(
     private val failFirstReadback: Boolean = false,
     private val failFirstRevision: Boolean = false,
     private val failRevisionReadback: Boolean = false,
+    private val delayHistory: Boolean = false,
 ) : EntryRepository, AutoCloseable {
     val firstEditStarted = CompletableDeferred<Unit>()
     val releaseFirstEdit = CompletableDeferred<Unit>()
@@ -24,6 +25,11 @@ class EncryptedEntryRepository(
     val submissions = mutableListOf<TextDraft>()
     val revisionStarted = CompletableDeferred<Unit>()
     val releaseRevision = CompletableDeferred<Unit>()
+    val historyStarted = CompletableDeferred<Unit>()
+    val releaseHistory = CompletableDeferred<Unit>()
+    var historyCalls = 0
+    var failHistory = false
+    var historyOverride: List<OriginalRevision>? = null
     data class RevisionSubmission(val entryId: String, val revision: Int, val text: String)
     val revisionSubmissions = mutableListOf<RevisionSubmission>()
     private val history = mutableMapOf<String, MutableList<OriginalRevision>>()
@@ -39,6 +45,7 @@ class EncryptedEntryRepository(
             entry.originalText, "synthetic hash", entry.capturedAtMillis))
     }
     fun remove(entryId: String) { saved.remove(entryId) }
+    fun removeRevision(entryId: String, revision: Int) { history[entryId]?.removeAll { it.revision == revision } }
 
     override suspend fun readDraft(): TextDraft? = draft
     override suspend fun updateDraft(text: String): TextDraft {
@@ -82,7 +89,11 @@ class EncryptedEntryRepository(
         saved[entryId] = next
         return next
     }
-    override suspend fun revisions(entryId: String): List<OriginalRevision> = history[entryId].orEmpty().toList()
+    override suspend fun revisions(entryId: String): List<OriginalRevision> {
+        if (++historyCalls == 1) { historyStarted.complete(Unit); if (delayHistory) releaseHistory.await() }
+        if (failHistory) error("synthetic history read failure")
+        return historyOverride ?: history[entryId].orEmpty().toList()
+    }
     override fun close() {}
     companion object {
         const val MAX_TEXT_LENGTH = 100_000

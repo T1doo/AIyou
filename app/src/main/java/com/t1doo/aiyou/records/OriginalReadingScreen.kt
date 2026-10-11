@@ -113,6 +113,9 @@ fun OriginalReadingScreen(
     canCopy: (String, Int) -> Boolean,
     modifier: Modifier = Modifier,
     onEdit: ((String, Int) -> Unit)? = null,
+    onHistory: ((String, Int) -> Unit)? = null,
+    metadataText: String? = null,
+    historyActionLabel: String = "历史版本",
 ) {
     // Resolve the current local source on every update; navigation never carries plaintext.
     val entry = local.entries.firstOrNull { it.id == entryId }
@@ -129,7 +132,7 @@ fun OriginalReadingScreen(
                 entry == null -> StatusNotice("这条记录已不可用", "它可能已被移除。返回列表查看当前记录。", state = ComponentState.EMPTY,
                     modifier = Modifier.verticalScroll(rememberScrollState()))
                 else -> {
-                    Text(originalMetadata(entry), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                    Text(metadataText ?: originalMetadata(entry), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                     PrivacyChip(entry.policy)
                     Text("长按选择文字，或复制全文。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                     local.originalEditNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = AIyouColors.success) }
@@ -142,6 +145,11 @@ fun OriginalReadingScreen(
                             TextButton(onClick = { edit(entry.id, entry.currentRevision) },
                                 enabled = !local.saving && !local.savePending,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("编辑原文") }
+                        }
+                        onHistory?.let { history ->
+                            TextButton(onClick = { history(entry.id, entry.currentRevision) },
+                                enabled = !local.saving && !local.savePending,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text(historyActionLabel) }
                         }
                     }
                     if (copyDenied) Text("无法复制，原文已保留。", color = AIyouColors.error,

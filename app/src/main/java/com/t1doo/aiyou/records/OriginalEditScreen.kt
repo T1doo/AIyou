@@ -36,6 +36,7 @@ fun OriginalEditScreen(
     onCancel: (Long) -> Unit,
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
+    onHistory: ((String, Int) -> Unit)? = null,
 ) {
     val current = local.entries.firstOrNull { it.id == edit.entryId }
     val changed = edit.conflict || current == null || current.currentRevision != edit.baseRevision && !edit.awaitingReadback
@@ -83,6 +84,11 @@ fun OriginalEditScreen(
                 }
                 Text("未保存的修改仅在当前应用会话中保留。", style = MaterialTheme.typography.bodySmall,
                     color = AIyouColors.textSecondary)
+                onHistory?.let { history ->
+                    TextButton(onClick = { current?.let { history(it.id, it.currentRevision) } },
+                        enabled = edit.canCancel && available && current != null,
+                        modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-edit-history")) { Text("查看已保存的历史版本") }
+                }
             }
         }
     }

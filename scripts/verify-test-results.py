@@ -15,9 +15,9 @@ targets = [("domain", "core/domain/build/test-results/test", 3)]
 if args.component:
     targets.append(("component", "core/designsystem/build/test-results/testDebugUnitTest", 7))
 if args.queue:
-    targets.append(("host queue", "checks/record-queue/build/test-results/test", 14))
+    targets.append(("host queue", "checks/record-queue/build/test-results/test", 21))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 33))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 42))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 for label, folder, minimum in targets:
@@ -45,6 +45,25 @@ for label, folder, minimum in targets:
         required = (
             "narrowLargeFontSaveFailureRetryScrollsIntoViewAndPreservesPendingDraft",
             "narrowLargeFontReadFailureRetryScrollsIntoViewAndPreservesKnownDraft",
+        )
+        for name in required:
+            matches = [case for case in observed_cases if case.get("classname") == owner
+                       and case.get("name", "").split("[", 1)[0].strip().removesuffix("()") == name]
+            if len(matches) != 1:
+                raise SystemExit(f"FAIL: required Compose case={owner}.{name} actual={len(matches)}")
+            print(f"PASS: required Compose case={owner}.{name} actual=1 failures=0 errors=0 skipped=0")
+
+        owner = "com.t1doo.aiyou.OriginalHistoryPresentationTest"
+        required = (
+            "currentAndOldVersionsOpenFullUnicodeAndNativeCopyOnlySelectedHistory",
+            "historyReturnPreservesEditorInputCaptureDraftAndRecordListAnchorThenSaveShowsVersions",
+            "failedListAndSelectedOriginalReadsHidePlaintextAndRetryWithoutDiscardingEdits",
+            "versionChangeAndDeletionDuringReadsNeverReplaceUserInputOrShowStaleHistory",
+            "closedReopenedAndDisposedHistoryRejectsRetainedReadsCopiesAndNavigation",
+            "knownVersionChangeReturningWithoutRetryShowsCurrentAndRejectsOldCopy",
+            "narrowLargeFontHistoryListReturnsToAnchorAndFullMultilineOriginalReachesEnd",
+            "lateCaptureFailureCanRecoverWhileViewingHistoryWithoutLosingEitherInput",
+            "missingSelectedRevisionAndBusySaveNeverOfferWrongOriginalOrHistory",
         )
         for name in required:
             matches = [case for case in observed_cases if case.get("classname") == owner
