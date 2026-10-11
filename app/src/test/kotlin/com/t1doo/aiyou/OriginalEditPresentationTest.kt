@@ -8,8 +8,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -30,13 +33,16 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import com.t1doo.aiyou.designsystem.AIyouDimensions
@@ -74,15 +80,20 @@ class OriginalEditPresentationTest {
     private lateinit var callbacks: OriginalReadingCallbacks
     private lateinit var back: OnBackPressedDispatcher
     private var observedImeBottomPx = 0
+    private lateinit var measuredListState: LazyListState
     private val observer = object : OriginalReadingObserver {
         override fun onNavigation(callbacks: OriginalReadingCallbacks) { this@OriginalEditPresentationTest.callbacks = callbacks }
         override fun onClipboard(clipboard: Clipboard) = Unit
         override fun onSelection(selection: SelectionState) = Unit
+        override fun onRecordList(state: LazyListState, imeBottomPx: Int) {
+            measuredListState = state
+            observedImeBottomPx = imeBottomPx
+        }
     }
     @After fun close() { if (::vm.isInitialized) vm.viewModelScope.cancel() }
 
     private fun start(store: ControlledStore = ControlledStore(), narrow: Boolean = false, restoration: StateRestorationTester? = null,
-        destination: Destination = Destination.MEMORIES): ControlledStore {
+        destination: Destination = Destination.MEMORIES, viewportHeight: MutableState<Dp>? = null): ControlledStore {
         vm = LocalRecordsViewModel(ApplicationProvider.getApplicationContext<Application>(), { store },
             Clock.fixed(Instant.ofEpochMilli(1_791_647_400_000), ZoneOffset.UTC))
         val content: @androidx.compose.runtime.Composable () -> Unit = {
@@ -93,7 +104,8 @@ class OriginalEditPresentationTest {
             SideEffect { observedImeBottomPx = imeBottomPx }
             CompositionLocalProvider(LocalOriginalReadingObserver provides observer,
                 LocalDensity provides if (narrow) Density(density.density, 2f) else density) {
-                Box(if (narrow) Modifier.size(320.dp, 640.dp).testTag("edit-viewport") else Modifier) {
+                Box(if (narrow) Modifier.size(320.dp, 640.dp).testTag("edit-viewport")
+                    else if (viewportHeight != null) Modifier.size(360.dp, viewportHeight.value).testTag("edit-viewport") else Modifier) {
                     AIyouTheme { AIyouApp(previewDestination = destination, local = local,
                         onDraftChange = vm::changeText, onSave = vm::save, onRetry = vm::retry,
                         onBeginOriginalEdit = vm::beginOriginalEdit, onOriginalEditChange = vm::changeOriginalEdit,
@@ -118,6 +130,14 @@ class OriginalEditPresentationTest {
     private fun original() = compose.onNodeWithTag("original-text").fetchSemanticsNode().config[SemanticsProperties.Text].single().text
     private fun waitFailure() { compose.waitUntil(5000) { vm.state.value.originalEdit?.error != null }; compose.waitForIdle() }
     private fun waitSaved() { compose.waitUntil(5000) { vm.state.value.originalEdit == null && vm.state.value.originalEditNotice != null }; compose.waitForIdle() }
+    private fun listTrace(stage: String): String {
+        val state = measuredListState
+        val info = state.layoutInfo
+        return "$stage firstIndex=${state.firstVisibleItemIndex} firstOffsetPx=${state.firstVisibleItemScrollOffset} " +
+            "viewportStartPx=${info.viewportStartOffset} viewportEndPx=${info.viewportEndOffset} " +
+            "items=${info.visibleItemsInfo.map { Triple(it.index, it.offset, it.size) }} " +
+            "canForward=${state.canScrollForward} canBackward=${state.canScrollBackward} imeBottomPx=$observedImeBottomPx"
+    }
 
     @Test fun readingEditSaveReturnsToNewOriginalAndPreservesCaptureDraftAndListAnchor() {
         val store = start()
@@ -154,7 +174,7 @@ class OriginalEditPresentationTest {
         val after = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
         val geometry = "EDITOR_END_RETURN_GEOMETRY bounds=$bounds viewport=$viewport " +
             "beforeViewport=$beforeViewport beforeEstimate=$before afterEstimate=${after.value()} " +
-            "afterMax=${after.maxValue()} imeBottomPx=$observedImeBottomPx"
+            "afterMax=${after.maxValue()} " + listTrace("RETURN")
         println(geometry)
         assertTrue(geometry, bounds.left >= viewport.left && bounds.right <= viewport.right &&
             bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
@@ -167,6 +187,77 @@ class OriginalEditPresentationTest {
         assertEquals("合成此刻草稿", store.draft.text)
         assertEquals(listOf("合成原文", "合成保存的新版本🌿"), store.history.map { it.originalText })
         assertEquals(1, store.reviseCalls)
+    }
+
+    @Test fun tailReturnKeepsExpandedSavedPreviewFullyVisible() {
+        // Real production navigation/measurement with controlled root constraints, not device IME evidence.
+        val height = mutableStateOf(640.dp)
+        val store = start(ControlledStore(originalAtEnd = true), viewportHeight = height)
+        val initialRoot = compose.onNodeWithTag("edit-viewport").getUnclippedBoundsInRoot()
+        assertEquals(360f, initialRoot.width.value, 0.01f)
+        assertEquals(640f, initialRoot.height.value, 0.01f)
+        val list = compose.onNode(hasScrollToIndexAction())
+        list.performScrollToNode(hasTestTag("entry-original"))
+        val before = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        assertEquals(before.maxValue(), before.value(), 0.01f)
+        val initialCard = compose.onNodeWithTag("entry-original").getUnclippedBoundsInRoot()
+        val initialViewport = list.getUnclippedBoundsInRoot()
+        assertTrue("CONTROLLED_TAIL_INITIAL bounds=$initialCard viewport=$initialViewport",
+            initialCard.left >= initialViewport.left && initialCard.right <= initialViewport.right &&
+                initialCard.top >= initialViewport.top && initialCard.bottom <= initialViewport.bottom)
+        println(listTrace("PREVIEW_GROWTH_BEFORE"))
+        open(); edit()
+        val text = "合成第一行改写\n合成第二行改写\n合成第三行改写"
+        replace(text)
+        save(); waitSaved(); assertEquals(text, original())
+        compose.runOnIdle { callbacks.returnToList() }
+        compose.waitForIdle()
+        assertEquals(640f, compose.onNodeWithTag("edit-viewport").getUnclippedBoundsInRoot().height.value, 0.01f)
+        val trace = listTrace("PREVIEW_GROWTH_RETURN")
+        println(trace)
+        assertEquals(trace, 1, compose.onAllNodesWithTag("entry-original").fetchSemanticsNodes().size)
+        val target = compose.onNodeWithTag("entry-original").assertIsDisplayed()
+        val bounds = target.getUnclippedBoundsInRoot()
+        val viewport = list.getUnclippedBoundsInRoot()
+        val after = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        val geometry = "CONTROLLED_TAIL_RETURN bounds=$bounds viewport=$viewport " +
+            "scroll=${after.value()} max=${after.maxValue()} " + trace
+        println(geometry)
+        assertTrue(geometry, bounds.left >= viewport.left && bounds.right <= viewport.right &&
+            bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
+        assertEquals(geometry, after.maxValue(), after.value(), 0.01f)
+        assertTrue(target.fetchSemanticsNode().config[SemanticsProperties.Selected])
+        assertEquals(text, store.current.originalText); assertEquals(1, store.reviseCalls)
+        assertEquals("合成此刻草稿", vm.state.value.text); assertEquals("合成此刻草稿", store.draft.text)
+    }
+
+    @Test fun tailReturnKeepsSelectedOriginalVisibleAfterControlledViewportShrink() {
+        val height = mutableStateOf(640.dp)
+        val store = start(ControlledStore(originalAtEnd = true), viewportHeight = height)
+        val root = compose.onNodeWithTag("edit-viewport").getUnclippedBoundsInRoot()
+        assertEquals(360f, root.width.value, 0.01f); assertEquals(640f, root.height.value, 0.01f)
+        val list = compose.onNode(hasScrollToIndexAction())
+        list.performScrollToNode(hasTestTag("entry-original"))
+        assertFalse(measuredListState.canScrollForward)
+        println(listTrace("VIEWPORT_SHRINK_BEFORE"))
+        open(); assertEquals("合成原文", original())
+        // One measured layout change; no IO, revision, delay-until-visible or repeated retry.
+        compose.runOnIdle { callbacks.returnToList(); height.value = 360.dp }
+        compose.waitForIdle()
+        assertEquals(360f, compose.onNodeWithTag("edit-viewport").getUnclippedBoundsInRoot().height.value, 0.01f)
+        val trace = listTrace("VIEWPORT_SHRINK_RETURN")
+        println(trace)
+        val nodes = compose.onAllNodesWithTag("entry-original").fetchSemanticsNodes()
+        assertEquals(trace, 1, nodes.size)
+        val target = compose.onNodeWithTag("entry-original").assertIsDisplayed()
+        val bounds = target.getUnclippedBoundsInRoot(); val viewport = list.getUnclippedBoundsInRoot()
+        val geometry = "$trace bounds=$bounds viewport=$viewport"
+        assertTrue(geometry, bounds.left >= viewport.left && bounds.right <= viewport.right &&
+            bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
+        assertFalse(geometry, measuredListState.canScrollForward)
+        assertTrue(target.fetchSemanticsNode().config[SemanticsProperties.Selected])
+        assertEquals(0, store.reviseCalls); assertEquals(1, store.current.currentRevision)
+        assertEquals("合成此刻草稿", vm.state.value.text); assertEquals("合成此刻草稿", store.draft.text)
     }
 
     @Test fun cancelAndSystemBackRequireDiscardAndKeepOriginalWithoutWrites() {

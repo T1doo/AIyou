@@ -122,7 +122,8 @@ fun AIyouApp(
     val context = LocalContext.current
     val selected = Destination.valueOf(selectedName)
     val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS
-    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val imeBottomPx = WindowInsets.ime.getBottom(LocalDensity.current)
+    val imeVisible = imeBottomPx > 0
     val origin = selected
     val readerId = detailEntryId
     val editing = if (reading) local?.originalEdit?.takeIf { it.entryId == readerId } else null
@@ -232,7 +233,10 @@ fun AIyouApp(
     LocalOriginalReadingObserver.current?.let { observer ->
         val callbacks = OriginalReadingCallbacks(openEntry, selectDestination, returnToList, retryReading, copy,
             beginEdit, changeEdit, saveEdit, cancelEdit, discardEdit, beginHistory, selectHistory, backHistory, retryHistory, copyHistory)
-        SideEffect { observer.onNavigation(callbacks) }
+        SideEffect {
+            observer.onNavigation(callbacks)
+            if (selected != Destination.TASKS) observer.onRecordList(if (selected == Destination.NOW) nowList else memoriesList, imeBottomPx)
+        }
     }
     BackHandler(enabled = showSettings) {
         if (ownsNavigation()) { navigation.generation++; if (showLicenses) showLicenses = false else showSettings = false }

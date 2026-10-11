@@ -17,7 +17,7 @@ if args.component:
 if args.queue:
     targets.append(("host queue", "checks/record-queue/build/test-results/test", 21))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 42))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 45))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 for label, folder, minimum in targets:
@@ -64,6 +64,7 @@ for label, folder, minimum in targets:
             "narrowLargeFontHistoryListReturnsToAnchorAndFullMultilineOriginalReachesEnd",
             "lateCaptureFailureCanRecoverWhileViewingHistoryWithoutLosingEitherInput",
             "missingSelectedRevisionAndBusySaveNeverOfferWrongOriginalOrHistory",
+            "wideHistoryListAndReadFailureKeepCenteredMaximumContentWidth",
         )
         for name in required:
             matches = [case for case in observed_cases if case.get("classname") == owner
@@ -84,6 +85,8 @@ for label, folder, minimum in targets:
             "narrowLargeFontBoundaryInputAndPrimaryActionsRemainReachable",
             "lateCaptureWriteFailureRetriesStorageWithoutLosingEitherInput",
             "endOfListSaveReturnsToVisibleSelectedCurrentOriginal",
+            "tailReturnKeepsExpandedSavedPreviewFullyVisible",
+            "tailReturnKeepsSelectedOriginalVisibleAfterControlledViewportShrink",
         )
         for name in required:
             matches = [case for case in observed_cases if case.get("classname") == owner

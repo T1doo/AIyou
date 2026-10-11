@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasTestTag
@@ -43,9 +44,12 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.width
+import androidx.compose.ui.unit.height
 import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import com.t1doo.aiyou.designsystem.AIyouTheme
+import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.domain.EntryRepository
 import com.t1doo.aiyou.domain.RecordConflict
 import com.t1doo.aiyou.model.OriginalRevision
@@ -86,7 +90,7 @@ class OriginalHistoryPresentationTest {
     }
     @After fun close() { if (::vm.isInitialized) vm.viewModelScope.cancel() }
     private fun start(store: Store = Store(), narrow: Boolean = false, restoration: StateRestorationTester? = null,
-        destination: Destination = Destination.MEMORIES): Store {
+        destination: Destination = Destination.MEMORIES, wide: Boolean = false): Store {
         vm = LocalRecordsViewModel(ApplicationProvider.getApplicationContext<Application>(), { store })
         val content: @androidx.compose.runtime.Composable () -> Unit = {
             val local by vm.state.collectAsState()
@@ -94,7 +98,7 @@ class OriginalHistoryPresentationTest {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalOriginalReadingObserver provides observer,
                 LocalDensity provides if (narrow) Density(density.density, 2f) else density) {
-                Box(if (narrow) Modifier.size(320.dp, 640.dp) else Modifier) {
+                Box(if (narrow) Modifier.size(320.dp, 640.dp) else if (wide) Modifier.size(840.dp, 1000.dp) else Modifier) {
                     AIyouTheme { AIyouApp(previewDestination = destination, local = local, onDraftChange = vm::changeText,
                         onSave = vm::save, onRetry = vm::retry, onBeginOriginalEdit = vm::beginOriginalEdit,
                         onOriginalEditChange = vm::changeOriginalEdit, onOriginalEditSave = vm::saveOriginalEdit,
@@ -123,6 +127,38 @@ class OriginalHistoryPresentationTest {
     private fun sentinel() = compose.runOnIdle { clipboard.setPrimaryClip(ClipData.newPlainText("合成", "哨兵")) }
     private fun copied() = clipboard.primaryClip!!.getItemAt(0).text.toString()
     private fun editHistory() { compose.onNodeWithTag("original-edit-history").performScrollTo().performClick(); loaded() }
+
+    private fun assertCenteredHistory(contentTag: String, expectedViewportWidth: Float) {
+        val viewport = compose.onNodeWithTag("history-viewport").getUnclippedBoundsInRoot()
+        val panel = compose.onNodeWithTag("history-content").getUnclippedBoundsInRoot()
+        val content = compose.onNodeWithTag(contentTag).getUnclippedBoundsInRoot()
+        val width = minOf(viewport.width.value, AIyouDimensions.contentMaxWidth.value)
+        assertEquals(expectedViewportWidth, viewport.width.value, 0.01f)
+        assertEquals(width, panel.width.value, 0.01f)
+        assertEquals((viewport.left.value + viewport.right.value) / 2f,
+            (panel.left.value + panel.right.value) / 2f, 0.01f)
+        assertEquals(panel.left.value + AIyouDimensions.pageNarrow.value, content.left.value, 0.01f)
+        assertEquals(panel.right.value - AIyouDimensions.pageNarrow.value, content.right.value, 0.01f)
+        assertTrue(content.height.value > 0f)
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w840dp-h1000dp")
+    fun wideHistoryListAndReadFailureKeepCenteredMaximumContentWidth() {
+        val store = start(wide = true); open(); history()
+        assertCenteredHistory("history-list", 840f)
+        assertEquals(0, store.reviseCalls)
+        store.failHistory = true
+        compose.onNodeWithText("阅读版本 1").performClick(); loaded()
+        assertCenteredHistory("history-status", 840f)
+        compose.onAllNodesWithTag("history-list").assertCountEquals(0)
+        compose.onAllNodesWithTag("original-text").assertCountEquals(0)
+        store.failHistory = false
+        compose.onNodeWithTag("history-retry").performClick(); loaded()
+        assertEquals("合成旧原文🌿", full())
+        compose.runOnIdle { back.onBackPressed() }; loaded()
+        assertCenteredHistory("history-list", 840f)
+        assertEquals(0, store.reviseCalls); assertEquals("合成此刻草稿", store.draft.text)
+    }
 
     @Test fun currentAndOldVersionsOpenFullUnicodeAndNativeCopyOnlySelectedHistory() {
         val text = "🌿".repeat(120) + "界".repeat(99_756) + "末端原文"
@@ -246,6 +282,7 @@ class OriginalHistoryPresentationTest {
         val text = "界🌿\n".repeat(24_999) + "尾🌿终"
         assertEquals(100_000, text.length)
         val store = start(Store(oldText = text, count = 30), narrow = true); open(); history()
+        assertCenteredHistory("history-list", 320f)
         val list = compose.onNodeWithTag("history-list")
         list.performScrollToNode(hasText("阅读版本 15"))
         val anchor = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value(); assertTrue(anchor > 0f)
@@ -268,6 +305,13 @@ class OriginalHistoryPresentationTest {
         val viewportHeight = scroll.fetchSemanticsNode().boundsInRoot.height
         assertTrue(lastTop >= -1f && lastBottom <= viewportHeight + 1f)
         compose.onNodeWithText("复制全文").performClick(); assertEquals(text, copied())
+        store.failHistory = true
+        compose.runOnIdle { back.onBackPressed() }; loaded()
+        assertCenteredHistory("history-status", 320f)
+        compose.onNodeWithTag("history-retry").performScrollTo().assertIsDisplayed()
+        store.failHistory = false
+        compose.onNodeWithTag("history-retry").performClick(); loaded()
+        assertCenteredHistory("history-list", 320f)
         assertEquals(0, store.reviseCalls)
     }
 
