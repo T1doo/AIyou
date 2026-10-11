@@ -4,9 +4,12 @@ import android.app.Application
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionState
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -70,6 +73,7 @@ class OriginalEditPresentationTest {
     private lateinit var vm: LocalRecordsViewModel
     private lateinit var callbacks: OriginalReadingCallbacks
     private lateinit var back: OnBackPressedDispatcher
+    private var observedImeBottomPx = 0
     private val observer = object : OriginalReadingObserver {
         override fun onNavigation(callbacks: OriginalReadingCallbacks) { this@OriginalEditPresentationTest.callbacks = callbacks }
         override fun onClipboard(clipboard: Clipboard) = Unit
@@ -85,6 +89,8 @@ class OriginalEditPresentationTest {
             val local by vm.state.collectAsState()
             back = checkNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
             val density = LocalDensity.current
+            val imeBottomPx = WindowInsets.ime.getBottom(density)
+            SideEffect { observedImeBottomPx = imeBottomPx }
             CompositionLocalProvider(LocalOriginalReadingObserver provides observer,
                 LocalDensity provides if (narrow) Density(density.density, 2f) else density) {
                 Box(if (narrow) Modifier.size(320.dp, 640.dp).testTag("edit-viewport") else Modifier) {
@@ -145,9 +151,13 @@ class OriginalEditPresentationTest {
         compose.onNodeWithText("合成保存的新版本🌿").assertIsDisplayed()
         val bounds = target.getUnclippedBoundsInRoot()
         val viewport = list.getUnclippedBoundsInRoot()
-        assertTrue(bounds.left >= viewport.left && bounds.right <= viewport.right &&
-            bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
         val after = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        val geometry = "EDITOR_END_RETURN_GEOMETRY bounds=$bounds viewport=$viewport " +
+            "beforeViewport=$beforeViewport beforeEstimate=$before afterEstimate=${after.value()} " +
+            "afterMax=${after.maxValue()} imeBottomPx=$observedImeBottomPx"
+        println(geometry)
+        assertTrue(geometry, bounds.left >= viewport.left && bounds.right <= viewport.right &&
+            bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
         assertTrue(after.value() > 0f)
         assertEquals(after.maxValue(), after.value(), 0.01f)
         // Accessibility pseudo-offsets can change at the tail when item/viewport geometry changes.
