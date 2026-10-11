@@ -365,9 +365,11 @@ class OriginalReadingPresentationTest {
         }
         compose.onNodeWithText("复制全文").performClick()
         compose.onNodeWithText("无法复制，原文已保留。").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(1, DenyClipboardShadow.denials) }
         select(0, 2); nativeCopy()
         compose.runOnIdle {
-            assertEquals(2, DenyClipboardShadow.denials)
+            // Fixed 1.12.1 static selection maps both Ctrl+C down and up to COPY.
+            assertEquals(3, DenyClipboardShadow.denials)
             assertEquals("合成未保存草稿", state.value.text)
             assertEquals(0, saves); assertEquals(0, edits)
         }
