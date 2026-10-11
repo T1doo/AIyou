@@ -17,11 +17,19 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.draw.drawBehind
@@ -36,6 +44,7 @@ import com.t1doo.aiyou.data.EncryptedEntryRepository
 import com.t1doo.aiyou.ui.Destination
 import com.t1doo.aiyou.ui.LocalProcessingStatus
 import com.t1doo.aiyou.ui.SearchSection
+import kotlinx.coroutines.flow.first
 
 @Composable
 fun LocalRecordsScreen(
@@ -48,7 +57,38 @@ fun LocalRecordsScreen(
     listState: LazyListState = rememberLazyListState(),
     selectedEntryId: String? = null,
     onOpenEntry: (String) -> Unit = {},
+    tailReturnEntryId: String? = null,
+    tailReturnGeneration: Long? = null,
+    ownsTailReturn: () -> Boolean = { false },
+    onTailReturnHandled: () -> Unit = {},
 ) {
+    val displayedEntries = if (destination == Destination.NOW) local.entries.take(5) else local.entries
+    var attachedViewport by remember { mutableStateOf(IntSize.Zero) }
+    val currentLocal by rememberUpdatedState(local)
+    val currentEntries by rememberUpdatedState(displayedEntries)
+    LaunchedEffect(destination, tailReturnEntryId, tailReturnGeneration, attachedViewport, displayedEntries,
+        local.ready, local.opening, local.error, local.saveNotice) {
+        val target = tailReturnEntryId ?: return@LaunchedEffect
+        // Owner/ack closures belong to this immutable generation, including same-ID reopens.
+        fun valid() = ownsTailReturn() && currentLocal.ready && !currentLocal.opening && currentLocal.error == null &&
+            currentEntries.lastOrNull()?.id == target
+        if (!valid() || attachedViewport.height == 0) return@LaunchedEffect
+        // This attachment must have measured its actual viewport before using its item count.
+        val measured = snapshotFlow { listState.layoutInfo }.first {
+            it.viewportSize == attachedViewport && it.totalItemsCount > 0
+        }
+        if (!valid()) return@LaunchedEffect
+        listState.scrollToItem(measured.totalItemsCount - 1)
+        if (!valid()) return@LaunchedEffect
+        val result = listState.layoutInfo
+        val last = result.visibleItemsInfo.lastOrNull() ?: return@LaunchedEffect
+        val fits = last.size <= result.viewportEndOffset - result.viewportStartOffset
+        if (result.viewportSize == attachedViewport && last.key == target && !listState.canScrollForward &&
+            (!fits || (last.offset >= result.viewportStartOffset && last.offset + last.size <= result.viewportEndOffset))) {
+            onTailReturnHandled()
+        }
+        // A changed dataset/viewport can re-evaluate a still-pending request; never busy-retry.
+    }
     BoxWithConstraints(modifier.fillMaxSize().drawBehind {
         drawRect(Brush.verticalGradient(
             colors = listOf(AIyouColors.primaryContainer, AIyouColors.background),
@@ -58,7 +98,8 @@ fun LocalRecordsScreen(
         val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
         val stackSummary = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            LazyColumn(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize(), state = listState,
+            LazyColumn(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize()
+                .onSizeChanged { attachedViewport = it }, state = listState,
                 contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
                 item("summary") {
@@ -97,7 +138,7 @@ fun LocalRecordsScreen(
                 if (local.ready && local.entries.isEmpty()) item("empty") {
                     StatusNotice(if (destination == Destination.NOW) "从一句话开始" else "还没有回忆", "文字保存在本机，无需配置模型。", state = ComponentState.EMPTY)
                 }
-                items(if (destination == Destination.NOW) local.entries.take(5) else local.entries, key = { it.id }) { entry ->
+                items(displayedEntries, key = { it.id }) { entry ->
                     val preview = remember(entry.originalText) { originalPreview(entry.originalText) }
                     MemoryCard(preview, originalMetadata(entry), policy = entry.policy,
                         modifier = Modifier.testTag("entry-${entry.id}").semantics { selected = entry.id == selectedEntryId }

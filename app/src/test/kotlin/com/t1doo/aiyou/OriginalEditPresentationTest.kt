@@ -146,6 +146,8 @@ class OriginalEditPresentationTest {
         list.performScrollToNode(hasTestTag("entry-original"))
         val anchor = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
         assertTrue(anchor > 0f)
+        val firstIndex = measuredListState.firstVisibleItemIndex
+        val firstOffsetPx = measuredListState.firstVisibleItemScrollOffset
         open(); edit(); replace("合成保存的新版本🌿"); save(); waitSaved()
         assertEquals("合成保存的新版本🌿", original())
         compose.onNodeWithText("新版本已保存在本机").assertIsDisplayed()
@@ -154,6 +156,8 @@ class OriginalEditPresentationTest {
         assertEquals("合成此刻草稿", store.draft.text)
         compose.onNodeWithText("返回列表").performClick()
         assertEquals(anchor, list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value(), 0.01f)
+        assertEquals(firstIndex, measuredListState.firstVisibleItemIndex)
+        assertEquals(firstOffsetPx, measuredListState.firstVisibleItemScrollOffset)
         assertTrue(compose.onNodeWithTag("entry-original").fetchSemanticsNode().config[SemanticsProperties.Selected])
     }
 

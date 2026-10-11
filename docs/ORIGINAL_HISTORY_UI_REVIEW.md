@@ -25,3 +25,36 @@
 父实际下载 a3e3275 原 XML/PNG 后核验81 JVM/304 renders，并指出历史列表和错误分支840dp贴左且铺满。通用历史页现复用正式阅读/编辑的 Box TopCenter + widthIn(contentMaxWidth=720dp)，不改变版本读取或存储合同。新实际App用例覆盖840dp列表与失败页的720dp最大宽度、居中及20dp内边距；既有320dp/font2用例补列表与错误页的对应约束和可达重试。
 
 首轮01647d8末项返回四边可见断言确实失败，a3e3275只加诊断同断言复跑通过，尚未定因。当前新增两个单变量真实App用例：显式360dp宽/640dp高下编辑保存将末卡预览增至三行；另在正文不变、无IO/编辑时返回列表的同一受控帧把根视口从640dp缩至360dp。记录真实生产LazyListState的index/offset/layoutInfo/可前滚和实际IMEbottom，同时检查根实际尺寸、严格四边/末端/选中/草稿合同。此测试是受控Compose布局诊断，不能当成真实IME或设备证据；未通过之前不声称滚动同步修复。原中段位置和旧四边断言继续保留。新版本源码/实际CI尚待执行，不将上一SHA的图像或XML当成本版本证据。
+## Measured list return correction (pending exact-SHA CI)
+
+The diagnostic-only `9ccf4518b1a23fd1ccb0307620121bbf7b001cc7` run
+38125457561 really failed the original strict editor return case. The selected
+card ended at 988dp while the measured list ended at 915dp; the recorded IME
+bottom was zero. Both new controlled cases stopped at their initial tail setup,
+so they did not yet demonstrate a return failure. The accessibility range's
+100 increment indicates further scrolling; it is not a physical pixel distance.
+
+`466f7958a3c0732184c1a3e045b180de3644b83f` run 38126365867 corrected only
+the two controlled fixtures using the actual last-item scroll action and a direct
+open action. Both initial tail checks passed. At an unchanged 360x640dp root,
+the saved three-line preview ended at 628dp beyond the actual list's 555dp end.
+With only the root height changed from 640dp to 360dp, the selected last record
+was absent from the composed visible items. Both recorded IME zero and further
+scrolling remained possible. The original strict case failed again. All three
+failures and full logs are retained; no assertion was removed or weakened.
+
+The correction creates one memory-only request on a real reader-to-list return
+only when that stable record ID remains the last displayed record. The request
+belongs to its destination and navigation generation. A newly attached list
+waits for its actual viewport measurement, uses the measured total item count,
+then immediately scrolls to its last item. It acknowledges only a current owner
+and an actual last-item key with no forward scrolling; if the card fits the
+viewport, its full measured vertical bounds must fit too. A later dataset or
+viewport change may re-evaluate a pending request, without a timer or busy retry.
+Middle-record returns do not create this request; their existing anchor check
+now also verifies the real first-visible index and pixel offset exactly.
+
+This is a repair for the measured controlled return failures. The missing
+before-measurement evidence for the first `01647d8` failure remains unknown, and
+actual device IME timing and performance remain NOT RUN. Source review and the
+next exact-SHA CI must pass before this correction is delivered as verified.

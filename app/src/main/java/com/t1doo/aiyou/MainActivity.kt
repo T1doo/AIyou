@@ -84,6 +84,9 @@ private class NavigationOwner {
     var active = true
 }
 
+/** One real reader return; a later navigation cannot complete this request. */
+private data class TailReturnRequest(val destination: Destination, val entryId: String, val generation: Long)
+
 @Composable
 fun AIyouApp(
     previewDestination: Destination = Destination.NOW,
@@ -116,6 +119,7 @@ fun AIyouApp(
     var selectedNowId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedMemoriesId by rememberSaveable { mutableStateOf<String?>(null) }
     var discardEditSession by remember { mutableStateOf<Long?>(null) }
+    var tailReturnRequest by remember { mutableStateOf<TailReturnRequest?>(null) }
     val nowList = rememberLazyListState()
     val memoriesList = rememberLazyListState()
     val currentLocal by rememberUpdatedState(local)
@@ -170,18 +174,27 @@ fun AIyouApp(
             val edit = currentLocal?.originalEdit?.takeIf { it.entryId == readerId }
             val activeHistory = currentLocal?.originalHistory?.takeIf { it.entryId == readerId }
             if (activeHistory != null) backHistory(activeHistory.sessionId)
-            else if (edit != null) cancelEdit(edit.sessionId) else { navigation.generation++; detailEntryId = null }
+            else if (edit != null) cancelEdit(edit.sessionId) else {
+                navigation.generation++
+                val latest = currentLocal
+                val last = if (origin == Destination.NOW) latest?.entries?.take(5)?.lastOrNull() else latest?.entries?.lastOrNull()
+                tailReturnRequest = if (latest?.ready == true && !latest.opening && latest.error == null && last?.id == readerId)
+                    TailReturnRequest(origin, checkNotNull(readerId), navigation.generation) else null
+                detailEntryId = null
+            }
         }
     }
     val selectDestination: (Destination) -> Unit = { destination ->
         if (ownsNavigation() && currentLocal?.originalEdit == null && currentLocal?.originalHistory == null) {
             navigation.generation++
+            tailReturnRequest = null
             selectedName = destination.name; detailEntryId = null; showSettings = false; showLicenses = false
         }
     }
     val openEntry: (String) -> Unit = { id ->
         if (ownsNavigation() && selectedName == origin.name && !showSettings && !demo && detailEntryId == null) {
             navigation.generation++
+            tailReturnRequest = null
             if (origin == Destination.NOW) selectedNowId = id else selectedMemoriesId = id
             detailEntryId = id
         }
@@ -254,6 +267,7 @@ fun AIyouApp(
             ) {
                 if (reading) returnToList() else if (ownsNavigation()) {
                     navigation.generation++
+                    tailReturnRequest = null
                     if (showLicenses) showLicenses = false else showSettings = !showSettings
                 }
             }
@@ -296,10 +310,14 @@ fun AIyouApp(
             OriginalReadingScreen(checkNotNull(readerId), local, onRetry = retryReading,
                 onCopy = copy, canCopy = canCopy, modifier = modifier, onEdit = beginEdit, onHistory = beginHistory)
         } else if (!demo && local != null && selected != Destination.TASKS) {
+            val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier,
                 listState = if (selected == Destination.NOW) nowList else memoriesList,
                 selectedEntryId = if (selected == Destination.NOW) selectedNowId else selectedMemoriesId,
-                onOpenEntry = openEntry)
+                onOpenEntry = openEntry, tailReturnEntryId = request?.entryId, tailReturnGeneration = request?.generation,
+                ownsTailReturn = { ownsNavigation() && request != null && tailReturnRequest == request &&
+                    detailEntryId == null && selectedName == request.destination.name && !showSettings && !demo },
+                onTailReturnHandled = { if (ownsNavigation() && request != null && tailReturnRequest == request) tailReturnRequest = null })
         } else {
             MainScreen(
                 destination = selected, demo = demo, modifier = modifier,
