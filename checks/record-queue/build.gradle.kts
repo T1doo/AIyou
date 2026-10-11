@@ -7,6 +7,7 @@ dependencyLocking { lockAllConfigurations() }
 val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalRecordsViewModel.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalEditUiState.kt")
     from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/LocalRecords.kt")
     from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/ProcessingPolicy.kt")
     from("../../core/domain/src/main/kotlin/com/t1doo/aiyou/domain/EntryRepository.kt")

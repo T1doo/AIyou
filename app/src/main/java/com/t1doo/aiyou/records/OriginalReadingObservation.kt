@@ -14,6 +14,11 @@ internal data class OriginalReadingCallbacks(
     val returnToList: () -> Unit,
     val retry: () -> Unit,
     val copy: (String, Int) -> Boolean,
+    val beginEdit: (String, Int) -> Unit,
+    val changeEdit: (Long, String) -> Unit,
+    val saveEdit: (Long) -> Unit,
+    val cancelEdit: (Long) -> Unit,
+    val discardEdit: (Long) -> Unit,
 )
 
 internal interface OriginalReadingObserver {

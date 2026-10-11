@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -49,6 +50,7 @@ import com.t1doo.aiyou.records.LocalRecordsScreen
 import com.t1doo.aiyou.records.LocalRecordsViewModel
 import com.t1doo.aiyou.records.OpenSourceLicenses
 import com.t1doo.aiyou.records.OriginalReadingScreen
+import com.t1doo.aiyou.records.OriginalEditScreen
 import com.t1doo.aiyou.records.LocalOriginalReadingObserver
 import com.t1doo.aiyou.records.OriginalReadingCallbacks
 import com.t1doo.aiyou.records.copyOriginal
@@ -65,7 +67,9 @@ class MainActivity : ComponentActivity() {
         val records = ViewModelProvider(this)[LocalRecordsViewModel::class.java]
         setContent {
             val local by records.state.collectAsState()
-            AIyouTheme { AIyouApp(local = local, onDraftChange = records::changeText, onSave = records::save, onRetry = records::retry) }
+            AIyouTheme { AIyouApp(local = local, onDraftChange = records::changeText, onSave = records::save, onRetry = records::retry,
+                onBeginOriginalEdit = records::beginOriginalEdit, onOriginalEditChange = records::changeOriginalEdit,
+                onOriginalEditSave = records::saveOriginalEdit, onOriginalEditCancel = records::cancelOriginalEdit) }
         }
     }
 }
@@ -86,6 +90,10 @@ fun AIyouApp(
     onSave: () -> Unit = {},
     onRetry: () -> Unit = {},
     previewEntryId: String? = null,
+    onBeginOriginalEdit: (String, Int) -> Unit = { _, _ -> },
+    onOriginalEditChange: (Long, String) -> Unit = { _, _ -> },
+    onOriginalEditSave: (Long) -> Unit = {},
+    onOriginalEditCancel: (Long) -> Unit = {},
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -99,6 +107,7 @@ fun AIyouApp(
     var detailEntryId by rememberSaveable { mutableStateOf(previewEntryId) }
     var selectedNowId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedMemoriesId by rememberSaveable { mutableStateOf<String?>(null) }
+    var discardEditSession by remember { mutableStateOf<Long?>(null) }
     val nowList = rememberLazyListState()
     val memoriesList = rememberLazyListState()
     val currentLocal by rememberUpdatedState(local)
@@ -108,11 +117,34 @@ fun AIyouApp(
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val origin = selected
     val readerId = detailEntryId
+    val editing = if (reading) local?.originalEdit?.takeIf { it.entryId == readerId } else null
+    fun ownsEdit(sessionId: Long): Boolean = ownsNavigation() && reading && detailEntryId == readerId &&
+        selectedName == origin.name && !showSettings && !demo &&
+        currentLocal?.originalEdit?.let { it.sessionId == sessionId && it.entryId == readerId } == true
+    val discardEdit: (Long) -> Unit = { sessionId ->
+        if (ownsEdit(sessionId) && currentLocal?.originalEdit?.canCancel == true) {
+            navigation.generation++; discardEditSession = null; onOriginalEditCancel(sessionId)
+        }
+    }
+    val cancelEdit: (Long) -> Unit = { sessionId ->
+        if (ownsEdit(sessionId) && currentLocal?.originalEdit?.canCancel == true) {
+            if (currentLocal?.originalEdit?.dirty == true) discardEditSession = sessionId else discardEdit(sessionId)
+        }
+    }
+    val changeEdit: (Long, String) -> Unit = { sessionId, text ->
+        if (ownsEdit(sessionId) && currentLocal?.originalEdit?.canCancel == true) onOriginalEditChange(sessionId, text)
+    }
+    val saveEdit: (Long) -> Unit = { sessionId ->
+        if (ownsEdit(sessionId) && currentLocal?.originalEdit?.saving == false) onOriginalEditSave(sessionId)
+    }
     val returnToList: () -> Unit = {
-        if (ownsNavigation() && reading) { navigation.generation++; detailEntryId = null }
+        if (ownsNavigation() && reading) {
+            val edit = currentLocal?.originalEdit?.takeIf { it.entryId == readerId }
+            if (edit != null) cancelEdit(edit.sessionId) else { navigation.generation++; detailEntryId = null }
+        }
     }
     val selectDestination: (Destination) -> Unit = { destination ->
-        if (ownsNavigation()) {
+        if (ownsNavigation() && currentLocal?.originalEdit == null) {
             navigation.generation++
             selectedName = destination.name; detailEntryId = null; showSettings = false; showLicenses = false
         }
@@ -128,7 +160,13 @@ fun AIyouApp(
         val latest = currentLocal
         ownsNavigation() && detailEntryId == id && selectedName == origin.name && !showSettings && !demo &&
             latest != null && latest.ready && !latest.opening && latest.error == null &&
+            latest.originalEdit == null &&
             latest.entries.any { it.id == id && it.currentRevision == revision }
+    }
+    val beginEdit: (String, Int) -> Unit = { id, revision ->
+        if (canCopy(id, revision) && currentLocal?.saving == false && currentLocal?.savePending == false) {
+            navigation.generation++; onBeginOriginalEdit(id, revision)
+        }
     }
     val retryReading: () -> Unit = {
         val latest = currentLocal
@@ -141,7 +179,8 @@ fun AIyouApp(
         } ?: false else false
     }
     LocalOriginalReadingObserver.current?.let { observer ->
-        val callbacks = OriginalReadingCallbacks(openEntry, selectDestination, returnToList, retryReading, copy)
+        val callbacks = OriginalReadingCallbacks(openEntry, selectDestination, returnToList, retryReading, copy,
+            beginEdit, changeEdit, saveEdit, cancelEdit, discardEdit)
         SideEffect { observer.onNavigation(callbacks) }
     }
     BackHandler(enabled = showSettings) {
@@ -153,8 +192,9 @@ fun AIyouApp(
         modifier = Modifier.imePadding(),
         topBar = {
             NotebookAppBar(
-                if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
-                if (reading) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
+                if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
+                if (editing != null) "取消编辑" else if (reading) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
+                actionEnabled = editing?.canCancel != false,
             ) {
                 if (reading) returnToList() else if (ownsNavigation()) {
                     navigation.generation++
@@ -191,9 +231,11 @@ fun AIyouApp(
                     }
                 }
             }
+        } else if (editing != null && local != null) {
+            OriginalEditScreen(editing, local, changeEdit, saveEdit, cancelEdit, modifier, onRetry = retryReading)
         } else if (reading && local != null) {
             OriginalReadingScreen(checkNotNull(readerId), local, onRetry = retryReading,
-                onCopy = copy, canCopy = canCopy, modifier = modifier)
+                onCopy = copy, canCopy = canCopy, modifier = modifier, onEdit = beginEdit)
         } else if (!demo && local != null && selected != Destination.TASKS) {
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier,
                 listState = if (selected == Destination.NOW) nowList else memoriesList,
@@ -204,6 +246,15 @@ fun AIyouApp(
                 destination = selected, demo = demo, modifier = modifier,
                 state = if (demo) ComponentState.valueOf(stateName) else ComponentState.NORMAL,
             )
+        }
+    }
+    discardEditSession?.let { sessionId ->
+        if (editing?.sessionId == sessionId && editing.canCancel) {
+            AlertDialog(onDismissRequest = { if (ownsEdit(sessionId)) discardEditSession = null },
+                title = { Text("放弃这次修改？") },
+                text = { Text("本次未保存的修改将被丢弃，原文与此刻的草稿保持不变。") },
+                confirmButton = { TextButton(onClick = { discardEdit(sessionId) }) { Text("放弃修改") } },
+                dismissButton = { TextButton(onClick = { if (ownsEdit(sessionId)) discardEditSession = null }) { Text("继续编辑") } })
         }
     }
 }

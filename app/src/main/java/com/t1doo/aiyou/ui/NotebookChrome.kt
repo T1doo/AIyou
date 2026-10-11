@@ -28,14 +28,14 @@ import com.t1doo.aiyou.designsystem.AIyouDimensions
 
 /** Natural height at large font scales; system insets remain part of the chrome. */
 @Composable
-fun NotebookAppBar(title: String, actionLabel: String, onAction: () -> Unit) {
+fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = true, onAction: () -> Unit) {
     Surface(color = AIyouColors.surface) {
         Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars)
             .heightIn(min = 56.dp).padding(horizontal = AIyouDimensions.pageNarrow),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
             Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-            TextButton(onClick = onAction, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) {
+            TextButton(onClick = onAction, enabled = actionEnabled, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) {
                 Text(actionLabel, style = MaterialTheme.typography.labelLarge)
             }
         }

@@ -11,6 +11,7 @@ import com.android.tools.screenshot.PreviewTest
 import com.t1doo.aiyou.designsystem.*
 import com.t1doo.aiyou.ui.*
 import com.t1doo.aiyou.records.LocalRecordUiState
+import com.t1doo.aiyou.records.OriginalEditUiState
 import com.t1doo.aiyou.model.StoredEntry
 import com.t1doo.aiyou.model.ProcessingPolicy
 
@@ -146,6 +147,32 @@ fun LocalMissingOriginalRender() { AIyouTheme { AIyouApp(previewDestination = De
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalOriginalReadFailureRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
     local = readingLocal.copy(error = "合成读取失败。请保留原数据，解锁设备后重试。"), previewEntryId = longOriginal.id) } }
+
+private val editingLocal = readingLocal.copy(originalEdit = OriginalEditUiState(1L, longOriginal.id, 1,
+    longOriginal.originalText, "合成修改：补上叶片颜色与散步路线。\n".repeat(8)))
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalOriginalEditRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = editingLocal, previewEntryId = longOriginal.id) } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalOriginalEditSavingRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = editingLocal.copy(originalEdit = editingLocal.originalEdit!!.copy(saving = true)), previewEntryId = longOriginal.id) } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalOriginalEditFailedRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = editingLocal.copy(originalEdit = editingLocal.originalEdit!!.copy(error = "合成保存失败。你的修改与原文已保留，可以重试。")),
+    previewEntryId = longOriginal.id) } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalOriginalEditConflictRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = editingLocal.copy(entries = listOf(longOriginal.copy(currentRevision = 2)),
+        originalEdit = editingLocal.originalEdit!!.copy(conflict = true, error = "合成原文已有新版本，你的修改已保留。")), previewEntryId = longOriginal.id) } }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalOriginalEditStorageFailedRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+    local = editingLocal.copy(error = "合成先前此刻草稿写入失败。输入与原数据仍保留，可以重试。"),
+    previewEntryId = longOriginal.id) } }
 
 // Reuse unabridged actual component content at explicit heights; no parameter multiplication.
 @Composable

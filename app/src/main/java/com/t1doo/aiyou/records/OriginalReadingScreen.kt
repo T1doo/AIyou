@@ -9,6 +9,7 @@ import android.os.PersistableBundle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -111,6 +112,7 @@ fun OriginalReadingScreen(
     onCopy: (String, Int) -> Boolean,
     canCopy: (String, Int) -> Boolean,
     modifier: Modifier = Modifier,
+    onEdit: ((String, Int) -> Unit)? = null,
 ) {
     // Resolve the current local source on every update; navigation never carries plaintext.
     val entry = local.entries.firstOrNull { it.id == entryId }
@@ -130,10 +132,18 @@ fun OriginalReadingScreen(
                     Text(originalMetadata(entry), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                     PrivacyChip(entry.policy)
                     Text("长按选择文字，或复制全文。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-                    TextButton(onClick = {
-                        if (canCopy(entry.id, entry.currentRevision)) copyDenied = !onCopy(entry.id, entry.currentRevision)
-                    },
-                        modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("复制全文") }
+                    local.originalEditNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = AIyouColors.success) }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                        TextButton(onClick = {
+                            if (canCopy(entry.id, entry.currentRevision)) copyDenied = !onCopy(entry.id, entry.currentRevision)
+                        },
+                            modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("复制全文") }
+                        onEdit?.let { edit ->
+                            TextButton(onClick = { edit(entry.id, entry.currentRevision) },
+                                enabled = !local.saving && !local.savePending,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("编辑原文") }
+                        }
+                    }
                     if (copyDenied) Text("无法复制，原文已保留。", color = AIyouColors.error,
                         style = MaterialTheme.typography.bodySmall)
                     key(entry.id, entry.currentRevision) {
