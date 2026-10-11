@@ -109,7 +109,7 @@ class AttachmentPresentationTest {
         val local = LocalRecordUiState(ready = true, opening = false, text = "合成此刻草稿", entries = listOf(entry))
         compose.setContent { AIyouTheme { AIyouApp(local = local, previewDestination = Destination.MEMORIES,
             previewEntryId = entry.id, attachments = f.controller) } }
-        compose.onNodeWithText("查看附件").performScrollTo().performClick()
+        compose.onNodeWithText("查看附件").assertIsDisplayed().performTouchInput { click() }
         compose.runOnIdle { f.drain() }
         compose.onNodeWithText("附件 · 原文版本 1").assertIsDisplayed()
         compose.onNodeWithText("选择 PNG 图片").performScrollTo().assertIsEnabled()

@@ -39,7 +39,7 @@ class VisualDeliveryTests(unittest.TestCase):
             reference, _, _ = self.fixture(root)
             index = delivery.package(root)
             self.assertEqual(352, sum(p["count"] for p in index["packs"]))
-            self.assertEqual([28, 28, 28, 112, 2, 14, 140], [p["count"] for p in index["packs"]])
+            self.assertEqual([28, 28, 28, 112, 2, 14, 108, 32], [p["count"] for p in index["packs"]])
             for pack in index["packs"]:
                 target = root / "app/build/outputs/d01-visual-packs" / pack["file"]
                 self.assertEqual(pack["bytes"], target.stat().st_size)

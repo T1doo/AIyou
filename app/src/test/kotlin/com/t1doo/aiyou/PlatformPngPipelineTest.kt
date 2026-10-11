@@ -2,6 +2,7 @@ package com.t1doo.aiyou
 
 import android.content.ContentProvider
 import android.content.ContentValues
+import android.content.pm.ProviderInfo
 import android.database.Cursor
 import android.net.Uri
 import android.os.ParcelFileDescriptor
@@ -58,6 +59,7 @@ class PlatformPngPipelineTest {
         val bytes = png(2, 3)
         val file = File(app.cacheDir, "synthetic-test-provider.png").apply { writeBytes(bytes) }
         val provider = TestProvider(file)
+        provider.attachInfo(app, ProviderInfo().apply { authority = "aiyou.synthetic" })
         ShadowContentResolver.registerProviderInternal("aiyou.synthetic", provider)
         val source = PlatformPngSource(app.contentResolver, Uri.parse("content://aiyou.synthetic/image"))
         assertEquals("image/png", source.mediaType())
