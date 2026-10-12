@@ -27,6 +27,8 @@ internal interface RecordsDao {
     suspend fun entry(id: String): EntryRow?
     @Query("SELECT * FROM entry_revisions WHERE entryId=:id ORDER BY revision")
     suspend fun revisions(id: String): List<RevisionEntity>
+    @Query("SELECT EXISTS(SELECT 1 FROM entry_revisions WHERE entryId=:entryId AND revision=:revision)")
+    suspend fun revisionExists(entryId: String, revision: Int): Boolean
     @Query("SELECT * FROM attachments WHERE id=:id") suspend fun attachment(id: String): AttachmentEntity?
     @Query("SELECT * FROM attachments ORDER BY id") suspend fun attachments(): List<AttachmentEntity>
     @Insert suspend fun insertAttachment(value: AttachmentEntity)

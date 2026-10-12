@@ -1,6 +1,6 @@
 # D02 加速模拟器单次验收
 
-本切片只新增受控设备 CI，不新增产品阶段。用户已明确批准固定模拟器/镜像安装及本次临时 CI 用户必要的 KVM ACL。原两方案、产品代码、依赖版本和 b13cdb9 既有 app instrumentation 锁保持本切片输入；该锁此前确实变化，不声称全部锁一直未变。
+前四轮切片只新增受控设备 CI，不新增产品阶段。用户已明确批准固定模拟器/镜像安装及本次临时 CI 用户必要的 KVM ACL。原两方案、依赖版本和 b13cdb9 既有 app instrumentation 锁保持输入；该锁此前确实变化，不声称全部锁一直未变。第四轮真实附件事务失败后，父级另明确批准最小生产修复及一次后续有界验证，范围如下；不启动D03。
 
 标准公开 `ubuntu-24.04`、固定 Temurin17.0.17+10、既有 Platform37.0 r2 / BuildTools36.0.0。运行时严格核既有 SDK 接受记录和官方 License API；固定 emulator37.2.12、API35 default x86_64 r2 的归档由既有 metadata/URL/size/SHA1核验，另记录实际SHA256；不升级其它SDK，不接受新协议，不用第三方自动yes installer。新条款/缺现有记录即停止：[完整SDK条款](https://developer.android.com/studio/terms)。
 
@@ -21,6 +21,14 @@ attempt3只将adb **监听**spec改为 `-L tcp:<port>`，客户端仍明确 `tcp
 第三轮 [CI38246408935](https://github.com/T1doo/AIyou/actions/runs/38246408935) 绑定 `2ec715cb2396022691de7d74dfbf31baa5e383e0`，build、非空domain测试、lint及模拟器归档核验成功，随后API35镜像归档固定size/SHA1校验失败，未安装镜像或执行adb新门禁/boot/19+6。完整日志121686 bytes、SHA256 `edac245385858c656735598e3aceeed9bcfb3ebb7ba474c7547f8e1ea9989e6c`，69份文本校验保全；17项自有清理成功、ACL恢复、协议不变。既有installer未记录该失败文件的实际size/hash，无法从日志断言是短读、完整性损坏或上游内容变化。
 
 attempt4绑定第三轮证据，只对**同一官方URL、同一固定size/SHA1**作最后一次独立有界重试；每归档仍仅一次请求，没有内部重试、镜像、cache-bypass、TLS/权限变化、元数据升级或新协议接受。driver增加成功/失败finally诊断：本次自有归档实际bytes/SHA1/SHA256及ZIP头布尔值，以完整文本frame保全，禁止导出归档内容；hash计算也受原总截止与cleanup reserve约束。诊断hash只是记录，不能替代installer的固定核验，更不能让错误归档继续解包。再次异常即停止并报告最小阻塞，三轮FAIL保留，19+6状态以实际执行为准。
+
+第四轮 [CI38247555249](https://github.com/T1doo/AIyou/actions/runs/38247555249) 绑定 `ff6c345b0b28a18b3ca0e2ecf2d045251a1d7a70`。完整日志313224 bytes、SHA256 `b68d5dabb4a7f08453646a23ff66cee810f8b388d92708117109975a490abfae`，154份文本独审通过。两固定归档本轮完整匹配、headless/KVM/独立localhost adb/AVD真实boot成功，API35/x86_64/4096。原19方法实际17starts、16paired通过、1附件SQLite错误、2未执行：首13整组严格PASS，附件4组3通过1失败，原文2组与storage4/production2均NOT RUN。旧失败方法 `encryptedAttachmentIsRevisionBoundAndReopensWithoutChangingTextDraftOrJobs` 的 `cannot start a transaction within a transaction` 完整堆栈继续保全；原因不能仅由错误文本定为显式嵌套事务。
+
+源码与固定SQLCipher4.19.1 classes字节码支持高价值候选：附件deferred FK到COMMIT才检查，失败COMMIT保持底层事务而该JavaendTransaction异常路径无额外rollback。[SQLite官方说明](https://www.sqlite.org/foreignkeys.html#fk_deferred)支持此语义，但旧用例无分步trace，旧根因仍不硬定。最小修复在原Room ledger事务内先查精确entryId/revision存在，不存在即抛既有AttachmentConflict、避免写入，保留数据库外键、v3 schema、加密/Room依赖。原方法加强到精确domain异常、源流未消费、无非法ledger行/文件、同一未重开数据库的下一真实事务仍能工作；19方法名/三组13+4+2、六外部阶段、真实加密和原断言均保留。
+
+父级新许可只允许**一次**后续验证：attempt5以ff6作baseline，绑定上述run/log hash，精确允许两生产文件、一原失败native文件和CI保护/文档修正；没有SDK/lock/schema/原方案变化。先冻结独审再正常提交推送这一请求。同job真实build/domain/lint/DEX清单和原13+4+2、storage4、production2按原strict解析执行；失败停止保全，不继续自动重试。新协议/权限条件停止。APK若无正常二进制渠道仍报告CI路径/hash及未交付，不把日志编码当二进制交付。
+
+第四轮权限清理观察到user1001条目已被外部移除而mask仍rw，与before/after均不完全相同；改变者UNKNOWN，原代码拒绝覆盖、整体FAIL，33自有过程清理通过。按新父级约束，attempt5清理**仅**撤销可归因于本轮新增的UID条目：pre-existing UID条目不修改，节点身份/全ACL与本轮grant吻合才撤UID，mask及所有其他主体不写；前/自加/观察/撤UID后均记录。外部ACL变化停止任何权限动作并报告，不能强写原快照。正常限定撤UID成功仅表示scoped cleanup，`kvm_acl_restored`另按完整snapshot equality报告，mask结构差异不能冒称整份ACL还原；其他主体有效权限必须与原始相同。完整D02签收仍看独立设备与权限边界，不以CI green替代全部门槛。
 
 workflow总40min，driver35min含120s自有进程/ACL cleanup；单命令/阶段沿用既有240s ceiling，compile最多900s，boot最多240s，poll和sleep严格夹在boot硬截止内。剩余预算只能收紧，不能增加；实际未结束步骤NOT RUN。失败保全完整文本/partial，不擦未知数据、SDK目录、锁或进程。自有Linux subreaper保持归属，即使命令leader先退出/后代另建session，也只通过pidfd绑定身份终止自有后代并要求清理证明，不杀未知/复用PID或PGID。先实际验证pidfd系统调用、通信可写与READY；父绑定哨兵并确认后才允许command启动。状态发布失败也先清理自有后代，缺完整通信证明仍FAIL。新AVD合成目录/SDK归档留在临时VM用于诊断，不上传密钥、数据库、签名或SDK。
 

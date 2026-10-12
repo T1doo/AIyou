@@ -13,6 +13,10 @@ internal class RoomAttachmentLedger(private val database: RecordsDatabase) : Att
     override suspend fun insert(value: LocalAttachment) = database.withTransaction {
         val intent = value.intent
         if (value.state != AttachmentState.WRITING) throw AttachmentConflict()
+        // Reject a missing immutable source inside this transaction, before any
+        // insert/file work. A deferred FK failure at COMMIT can leave the native
+        // SQLCipher connection in a transaction after its Java stack is popped.
+        if (!dao.revisionExists(intent.entryId, intent.revision)) throw AttachmentConflict()
         dao.insertAttachment(AttachmentEntity(intent.id, intent.entryId, intent.revision,
             intent.mediaType, intent.sha256, intent.byteSize, value.state.name))
     }

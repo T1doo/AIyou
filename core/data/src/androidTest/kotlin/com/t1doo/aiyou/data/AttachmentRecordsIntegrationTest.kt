@@ -1,7 +1,9 @@
 package com.t1doo.aiyou.data
 
+import androidx.room.withTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.t1doo.aiyou.domain.AttachmentConflict
 import com.t1doo.aiyou.domain.AttachmentIntegrityFailure
 import com.t1doo.aiyou.domain.StorageKeyUnavailable
 import com.t1doo.aiyou.model.AttachmentIntent
@@ -60,7 +62,25 @@ class AttachmentRecordsIntegrationTest {
         assertArrayEquals(data, store.attachments.read(request.id))
         store.database.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
         store.database.openHelper.writableDatabase.query("SELECT count(*) FROM local_jobs").use { it.moveToFirst(); assertEquals(2L, it.getLong(0)) }
-        fails<Exception> { store.attachments.save(intent(original.id, 99)) { error("invalid revision cannot consume source") } }
+        val invalid = intent(original.id, 99)
+        var sourceOpened = false
+        try {
+            store.attachments.save(invalid) { sourceOpened = true; error("invalid revision cannot consume source") }
+            fail("missing source revision must produce AttachmentConflict")
+        } catch (_: AttachmentConflict) {
+            // Catch only the exact domain error; any SQLCipher exception retains
+            // its original stack in instrumentation output.
+        }
+        assertFalse("missing revision must not consume source", sourceOpened)
+        assertNull("missing revision must not leave a ledger row", store.database.records().attachment(invalid.id))
+        assertFalse(File(directory, "records.db.attachments/${invalid.id}.tmp").exists())
+        assertFalse(File(directory, "records.db.attachments/${invalid.id}.aead").exists())
+        // Exercise another real transaction on the same open database. Reopening
+        // would hide a poisoned native connection and is deliberately avoided.
+        store.database.withTransaction {
+            assertEquals(independent, store.readDraft())
+            store.database.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
+        }
         assertEquals(1, store.attachments.list(original.id, 1).size)
         fails<Exception> { store.database.openHelper.writableDatabase.execSQL("UPDATE attachments SET revision=2") }
         assertEquals(request, store.attachments.list(original.id, 1).single().intent)

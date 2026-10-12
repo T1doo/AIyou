@@ -19,14 +19,15 @@ from d02_kvm_acl import OwnedKvmAcl
 from d02_owned_process import OwnedProcess, identity, send_bound
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = "b13cdb9995797d3d245f86c39c4d86e0c2c40637"
+BASE = "ff6c345b0b28a18b3ca0e2ecf2d045251a1d7a70"
 RESERVE = 120
 ALLOWED_CHANGES = {
-    ".github/workflows/d02-kvm-acceptance.yml", "scripts/run-d02-kvm-ci.py",
-    "scripts/d02_ci_evidence.py", "scripts/d02_kvm_acl.py", "scripts/run-d02-device-acceptance.py",
-    "scripts/d02_owned_process.py",
+    "scripts/run-d02-kvm-ci.py", "scripts/d02_kvm_acl.py",
     "scripts/tests/test_d02_ci_supervision.py", "checks/sdk-device/kvm-request-20261012.json",
     "docs/D02_KVM_CI.md",
+    "core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordsDatabase.kt",
+    "core/data/src/main/kotlin/com/t1doo/aiyou/data/RoomAttachmentLedger.kt",
+    "core/data/src/androidTest/kotlin/com/t1doo/aiyou/data/AttachmentRecordsIntegrationTest.kt",
 }
 spec = importlib.util.spec_from_file_location("fixed_sdk", ROOT / "scripts/run-d02-device-experiment.py")
 fixed = importlib.util.module_from_spec(spec)
@@ -226,13 +227,13 @@ def main():
                 os.uname().machine != "x86_64":
             raise RuntimeError("Only authorized standard public GitHub Ubuntu x86_64 job")
         request = json.loads((ROOT / "checks/sdk-device/kvm-request-20261012.json").read_text())
-        expected = {"base_sha": BASE, "mode": "KVM_ONLY", "attempt": 4, "max_seconds": 2100,
+        expected = {"base_sha": BASE, "mode": "KVM_ONLY", "attempt": 5, "max_seconds": 2100,
                     "native_methods": 19, "external_phases": 6, "artifact_upload": False,
                     "new_terms_acceptance": False, "kvm_acl": "CURRENT_JOB_UID_ONLY",
-                    "correction": "ARCHIVE_DIAGNOSTIC_FINAL_RETRY",
-                    "previous_source_sha": "2ec715cb2396022691de7d74dfbf31baa5e383e0",
-                    "previous_run_id": 38246408935,
-                    "previous_job_log_sha256": "edac245385858c656735598e3aceeed9bcfb3ebb7ba474c7547f8e1ea9989e6c"}
+                    "correction": "MISSING_ATTACHMENT_REVISION_REJECTION",
+                    "previous_source_sha": BASE,
+                    "previous_run_id": 38247555249,
+                    "previous_job_log_sha256": "b68d5dabb4a7f08453646a23ff66cee810f8b388d92708117109975a490abfae"}
         if request != expected:
             raise RuntimeError("Explicit one-attempt authorization request differs")
         if run(["git", "rev-parse", "HEAD"], "source-sha").stdout.strip() != args.expected_sha or \
@@ -240,7 +241,7 @@ def main():
             raise RuntimeError("Require exact clean reviewed checkout")
         changed = set(run(["git", "diff", "--name-only", BASE, "HEAD"], "baseline-diff").stdout.splitlines())
         if not changed or not changed <= ALLOWED_CHANGES:
-            raise RuntimeError("Production/source drift outside reviewed CI-only change")
+            raise RuntimeError("Source drift outside reviewed attachment correction and CI safeguards")
         run([sys.executable, ROOT / "scripts/check-sdk.py"], "existing-sdk")
         run([sys.executable, ROOT / "scripts/inspect-device-test-environment.py"], "existing-device-inventory")
         for item in fixed.PACKAGES:
@@ -495,6 +496,8 @@ def main():
                 out.write("D02 accelerated Android: " + report["result"] + "\n\n")
                 out.write("Source: " + args.expected_sha + "; complete hash-framed text evidence in job log.\n")
                 out.write("19 native/6 phases: " + str(report["native_tests"]) + "/" + str(report["external_phases"]) + ". APK distribution,16KB/physical gates separate.\n")
+                out.write("KVM scoped cleanup: " + str(report.get("kvm_scoped_cleanup", "NOT COMPLETE/NOT NEEDED")) +
+                          "; exact ACL snapshot restored: " + str(report.get("kvm_acl_restored", "NOT PROVEN")) + ".\n")
         if failure is not None or cleanup or export_errors or report.get("evidence_errors"):
             raise SystemExit(1)
 

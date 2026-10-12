@@ -66,6 +66,7 @@ class OwnedKvmAcl:
         if not stat.S_ISCHR(node.st_mode):
             raise RuntimeError("KVM path is not a character device")
         self.identity = (node.st_dev, node.st_ino, node.st_rdev, node.st_uid, node.st_gid)
+        self.report["kvm_node_identity"] = list(self.identity)
         self.report["kvm_initial_read_write"] = os.access(self.path, os.R_OK | os.W_OK)
         if self.report["kvm_initial_read_write"]:
             self.report["kvm_acl_changed"] = False
@@ -73,6 +74,8 @@ class OwnedKvmAcl:
         if node.st_uid == self.uid:
             raise RuntimeError("Current UID owns inaccessible KVM; named ACL cannot override owner")
         self.before = self.read("kvm-acl-before")
+        if "user:" + str(self.uid) in self.before:
+            raise RuntimeError("Existing current-UID ACL entry cannot be attributed to this job; no permission change")
         self.after = proposed_acl(self.before, self.uid)
         self.report["kvm_acl_before"] = self.before
         # Mark before mutating: even a post-command validation failure must restore.
@@ -93,26 +96,27 @@ class OwnedKvmAcl:
         if self.identity != (node.st_dev, node.st_ino, node.st_rdev, node.st_uid, node.st_gid):
             raise RuntimeError("KVM identity changed; cannot modify unknown replacement")
         current = self.read("kvm-acl-before-restore", cleanup=True)
+        self.report["kvm_acl_observed_at_cleanup"] = current
+        self.report["kvm_other_effective_access_unchanged"] = effective_others(current, self.uid) == effective_others(self.before, self.uid)
+        self.report["kvm_cleanup_scope"] = "ONLY_NEW_CURRENT_UID_ENTRY; MASK_UNTOUCHED"
         if current == self.before:
             self.report["kvm_acl_restored"] = True
             return
         if current != self.after:
+            self.report["kvm_acl_restored"] = False
+            self.report["kvm_owned_uid_present_at_cleanup"] = "user:" + str(self.uid) in current
             raise RuntimeError("KVM ACL changed externally; refuse whole-ACL overwrite")
         key = "user:" + str(self.uid)
         if key in self.before:
-            self.command(["sudo", "-n", "setfacl", "--no-mask", "-m",
-                          "u:" + str(self.uid) + ":" + render(self.before[key]), self.path],
-                         "kvm-restore-current-uid", deadline_bound=False, timeout=15)
-        else:
-            self.command(["sudo", "-n", "setfacl", "--no-mask", "-x", "u:" + str(self.uid), self.path],
-                         "kvm-remove-owned-uid", deadline_bound=False, timeout=15)
-        if "mask:" in self.before:
-            self.command(["sudo", "-n", "setfacl", "--no-mask", "-m",
-                          "m::" + render(self.before["mask:"]), self.path],
-                         "kvm-restore-mask", deadline_bound=False, timeout=15)
-        else:
-            self.command(["sudo", "-n", "setfacl", "--no-mask", "-x", "m", self.path],
-                         "kvm-remove-owned-mask", deadline_bound=False, timeout=15)
-        if self.read("kvm-acl-restored", cleanup=True) != self.before:
-            raise RuntimeError("KVM ACL restore differs from original")
-        self.report["kvm_acl_restored"] = True
+            raise RuntimeError("Current-UID ACL predates job; cannot withdraw it")
+        self.command(["sudo", "-n", "setfacl", "--no-mask", "-x", "u:" + str(self.uid), self.path],
+                     "kvm-remove-owned-uid", deadline_bound=False, timeout=15)
+        actual = self.read("kvm-acl-after-owned-uid-withdrawal", cleanup=True)
+        expected = {k: v for k, v in current.items() if k != key}
+        self.report["kvm_acl_after_cleanup"] = actual
+        self.report["kvm_acl_restored"] = actual == self.before
+        self.report["kvm_owned_uid_removed"] = key not in actual
+        self.report["kvm_other_effective_access_unchanged"] = effective_others(actual, self.uid) == effective_others(self.before, self.uid)
+        if actual != expected or not self.report["kvm_other_effective_access_unchanged"]:
+            raise RuntimeError("ACL changed during owned-UID withdrawal; no further permission action")
+        self.report["kvm_scoped_cleanup"] = "PASS: only job-added UID removed; remaining ACL/mask untouched"

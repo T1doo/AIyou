@@ -17,7 +17,7 @@ from unittest import mock
 SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 from d02_ci_evidence import decode_files, emit_file
-from d02_kvm_acl import effective_others, parse_acl, proposed_acl
+from d02_kvm_acl import OwnedKvmAcl, effective_others, parse_acl, proposed_acl
 
 spec = importlib.util.spec_from_file_location("owned_ci_driver", SCRIPTS / "run-d02-kvm-ci.py")
 driver = importlib.util.module_from_spec(spec)
@@ -86,6 +86,46 @@ class CiSupervisionGuards(unittest.TestCase):
             proposed_acl(restricted, 1001)
         with self.assertRaises(ValueError):
             parse_acl("user::rw-\ngroup::rw-\nother::---\nuser::r--\n")
+
+    def test_cleanup_withdraws_only_job_added_uid_and_keeps_mask_and_other_entries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "owned-acl-fixture"; path.touch()
+            node = path.stat()
+            before = parse_acl("user::rw-\ngroup::rw-\nother::---\n")
+            after = proposed_acl(before, 1001)
+            retained = {k: v for k, v in after.items() if k != "user:1001"}
+            acl = OwnedKvmAcl(lambda *_: None, {})
+            acl.path, acl.uid, acl.before, acl.after, acl.changed = path, 1001, before, after, True
+            acl.identity = (node.st_dev, node.st_ino, node.st_rdev, node.st_uid, node.st_gid)
+            calls = []
+            acl.command = lambda argv, *_args, **_kwargs: calls.append([str(x) for x in argv])
+            acl.read = mock.Mock(side_effect=[after, retained])
+            acl.restore()
+            self.assertEqual(calls, [["sudo", "-n", "setfacl", "--no-mask", "-x", "u:1001", str(path)]])
+            self.assertTrue(acl.report["kvm_owned_uid_removed"])
+            self.assertTrue(acl.report["kvm_other_effective_access_unchanged"])
+            self.assertFalse(acl.report["kvm_acl_restored"])
+            self.assertEqual(acl.report["kvm_acl_after_cleanup"], retained)
+
+    def test_external_acl_change_stops_all_permission_actions_and_records_observed_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "owned-acl-fixture"; path.touch()
+            node = path.stat()
+            before = parse_acl("user::rw-\ngroup::rw-\nother::---\n")
+            after = proposed_acl(before, 1001)
+            for current in ({k: v for k, v in after.items() if k != "user:1001"},
+                            {**after, "user:1002": 4}, {**after, "group:": 4}):
+                acl = OwnedKvmAcl(lambda *_: None, {})
+                acl.path, acl.uid, acl.before, acl.after, acl.changed = path, 1001, before, after, True
+                acl.identity = (node.st_dev, node.st_ino, node.st_rdev, node.st_uid, node.st_gid)
+                calls = []
+                acl.command = lambda argv, *_args, **_kwargs: calls.append(argv)
+                acl.read = mock.Mock(return_value=current)
+                with self.assertRaises(RuntimeError):
+                    acl.restore()
+                self.assertEqual(calls, [])
+                self.assertEqual(acl.report["kvm_acl_observed_at_cleanup"], current)
+                self.assertFalse(acl.report["kvm_acl_restored"])
 
     def test_actual_child_exit_and_stderr_are_retained_with_exact_frames(self):
         with tempfile.TemporaryDirectory() as directory:

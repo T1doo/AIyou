@@ -1,15 +1,15 @@
 {
-  "base_sha": "b13cdb9995797d3d245f86c39c4d86e0c2c40637",
+  "base_sha": "ff6c345b0b28a18b3ca0e2ecf2d045251a1d7a70",
   "mode": "KVM_ONLY",
-  "attempt": 4,
+  "attempt": 5,
   "max_seconds": 2100,
   "native_methods": 19,
   "external_phases": 6,
   "artifact_upload": false,
   "new_terms_acceptance": false,
   "kvm_acl": "CURRENT_JOB_UID_ONLY",
-  "correction": "ARCHIVE_DIAGNOSTIC_FINAL_RETRY",
-  "previous_source_sha": "2ec715cb2396022691de7d74dfbf31baa5e383e0",
-  "previous_run_id": 38246408935,
-  "previous_job_log_sha256": "edac245385858c656735598e3aceeed9bcfb3ebb7ba474c7547f8e1ea9989e6c"
+  "correction": "MISSING_ATTACHMENT_REVISION_REJECTION",
+  "previous_source_sha": "ff6c345b0b28a18b3ca0e2ecf2d045251a1d7a70",
+  "previous_run_id": 38247555249,
+  "previous_job_log_sha256": "b68d5dabb4a7f08453646a23ff66cee810f8b388d92708117109975a490abfae"
 }
