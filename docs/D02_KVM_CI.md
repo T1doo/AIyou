@@ -18,6 +18,10 @@
 
 attempt3只将adb **监听**spec改为 `-L tcp:<port>`，客户端仍明确 `tcp:127.0.0.1:<port>`。[官方AOSP监听实现](https://github.com/aosp-mirror/platform_system_core/blob/android-10.0.0_r47/adb/socket_spec.cpp) 区分监听和连接grammar；未开 `-a` 的无hostname spec调用loopback server，不安装/升级/配置服务或防火墙。历史源码仅作修正依据，实际执行另以既有iproute2 `ss -H -lntp` 核唯一监听地址确为127.0.0.1、PID是本次自有前台adb；检查前后复用原观察的starttime/pidfd绑定，核ppid为自有哨兵、非僵尸、signal0仍活及identity不变，再允许模拟器启动，不能用状态文件exit_code代替内核活性。缺证据/wildcard/别的PID停止。新请求绑定第二轮SHA/run/log hash；新冻结独审后只执行这次有界纠错，两轮FAIL继续保留。
 
+第三轮 [CI38246408935](https://github.com/T1doo/AIyou/actions/runs/38246408935) 绑定 `2ec715cb2396022691de7d74dfbf31baa5e383e0`，build、非空domain测试、lint及模拟器归档核验成功，随后API35镜像归档固定size/SHA1校验失败，未安装镜像或执行adb新门禁/boot/19+6。完整日志121686 bytes、SHA256 `edac245385858c656735598e3aceeed9bcfb3ebb7ba474c7547f8e1ea9989e6c`，69份文本校验保全；17项自有清理成功、ACL恢复、协议不变。既有installer未记录该失败文件的实际size/hash，无法从日志断言是短读、完整性损坏或上游内容变化。
+
+attempt4绑定第三轮证据，只对**同一官方URL、同一固定size/SHA1**作最后一次独立有界重试；每归档仍仅一次请求，没有内部重试、镜像、cache-bypass、TLS/权限变化、元数据升级或新协议接受。driver增加成功/失败finally诊断：本次自有归档实际bytes/SHA1/SHA256及ZIP头布尔值，以完整文本frame保全，禁止导出归档内容；hash计算也受原总截止与cleanup reserve约束。诊断hash只是记录，不能替代installer的固定核验，更不能让错误归档继续解包。再次异常即停止并报告最小阻塞，三轮FAIL保留，19+6状态以实际执行为准。
+
 workflow总40min，driver35min含120s自有进程/ACL cleanup；单命令/阶段沿用既有240s ceiling，compile最多900s，boot最多240s，poll和sleep严格夹在boot硬截止内。剩余预算只能收紧，不能增加；实际未结束步骤NOT RUN。失败保全完整文本/partial，不擦未知数据、SDK目录、锁或进程。自有Linux subreaper保持归属，即使命令leader先退出/后代另建session，也只通过pidfd绑定身份终止自有后代并要求清理证明，不杀未知/复用PID或PGID。先实际验证pidfd系统调用、通信可写与READY；父绑定哨兵并确认后才允许command启动。状态发布失败也先清理自有后代，缺完整通信证明仍FAIL。新AVD合成目录/SDK归档留在临时VM用于诊断，不上传密钥、数据库、签名或SDK。
 
 artifact额度已满，不使用artifact/cache上传。每条真实命令记录argv、退出码、时间和stdout/stderr；每阶段文本日志及RESULT使用 `D02_CI_FILE/CHUNK/END` bytes/SHA256/base64边界输出到完整job日志，摘要仅索引/状态。`d02_ci_evidence.decode_files` 拒绝丢块、乱序、重名、未闭合、错误hash；日志不完整不能签PASS。APK只在job内验证/安装，不塞日志；**二进制交付另需正常可用渠道**。

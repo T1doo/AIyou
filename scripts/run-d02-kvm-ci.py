@@ -166,6 +166,40 @@ def verify_live_owned_command(process):
     return {"pid": pid, "start": start, "ppid": process.pid}
 
 
+def retain_archive_diagnostic(item, output, report, deadline, installation_error):
+    """Retain integrity metadata for the owned download, never export/accept archive bytes."""
+    archive = output / (item["xml"] + ".zip")
+    info = {"package": item["path"], "official_url": item["url"],
+            "expected_bytes": item["bytes"], "expected_sha1": item["sha1"],
+            "installation_error": installation_error, "hash_status": "NOT RUN"}
+    if archive.is_symlink():
+        raise RuntimeError("Owned archive diagnostic refuses symlink")
+    if archive.is_file():
+        info["actual_bytes"] = archive.stat().st_size
+        sha1, sha256 = hashlib.sha1(), hashlib.sha256()
+        with archive.open("rb") as source:
+            info["zip_local_header"] = source.read(4) == b"PK\x03\x04"
+            source.seek(0)
+            while True:
+                if time.monotonic() >= deadline - RESERVE:
+                    info["hash_status"] = "NOT RUN: diagnostic deadline reached"
+                    break
+                block = source.read(1024 * 1024)
+                if not block:
+                    info.update(hash_status="PASS: full owned byte hash measured",
+                                actual_sha1=sha1.hexdigest(), actual_sha256=sha256.hexdigest())
+                    info["matches_fixed_archive"] = info["actual_bytes"] == item["bytes"] and \
+                        info["actual_sha1"] == item["sha1"]
+                    break
+                sha1.update(block); sha256.update(block)
+    else:
+        info["hash_status"] = "NOT RUN: no owned archive file"
+    report.setdefault("archive_diagnostics", []).append(info)
+    path = output / (item["xml"] + ".download.json")
+    path.write_text(json.dumps(info, indent=2) + "\n")
+    emit_file(path, "host/" + path.name)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--expected-sha", required=True)
@@ -192,13 +226,13 @@ def main():
                 os.uname().machine != "x86_64":
             raise RuntimeError("Only authorized standard public GitHub Ubuntu x86_64 job")
         request = json.loads((ROOT / "checks/sdk-device/kvm-request-20261012.json").read_text())
-        expected = {"base_sha": BASE, "mode": "KVM_ONLY", "attempt": 3, "max_seconds": 2100,
+        expected = {"base_sha": BASE, "mode": "KVM_ONLY", "attempt": 4, "max_seconds": 2100,
                     "native_methods": 19, "external_phases": 6, "artifact_upload": False,
                     "new_terms_acceptance": False, "kvm_acl": "CURRENT_JOB_UID_ONLY",
-                    "correction": "ADB_LOOPBACK_LISTEN_SPEC",
-                    "previous_source_sha": "081288232680a77ee120bf0be987d1cb46ad2d8a",
-                    "previous_run_id": 38244244711,
-                    "previous_job_log_sha256": "de9e14a99c2443ede72fe51c1eb13f25f722a0f0e9eb7f27db81609c8796dcbb"}
+                    "correction": "ARCHIVE_DIAGNOSTIC_FINAL_RETRY",
+                    "previous_source_sha": "2ec715cb2396022691de7d74dfbf31baa5e383e0",
+                    "previous_run_id": 38246408935,
+                    "previous_job_log_sha256": "edac245385858c656735598e3aceeed9bcfb3ebb7ba474c7547f8e1ea9989e6c"}
         if request != expected:
             raise RuntimeError("Explicit one-attempt authorization request differs")
         if run(["git", "rev-parse", "HEAD"], "source-sha").stdout.strip() != args.expected_sha or \
@@ -240,7 +274,22 @@ def main():
                         fixed.digest(target / "package.xml") != item["xml_sha256"]:
                     raise RuntimeError("Existing emulator/image differs; do not overwrite")
             else:
-                fixed.install_owned_package(item)
+                installation_error = None
+                try:
+                    fixed.install_owned_package(item)  # unchanged single official URL/attempt and strict checksum
+                except BaseException as error:
+                    installation_error = type(error).__name__ + ": " + str(error)
+                    raise
+                finally:
+                    try:
+                        retain_archive_diagnostic(item, output, report, supervisor.deadline, installation_error)
+                    except BaseException as error:
+                        report.setdefault("evidence_errors", []).append(
+                            item["path"] + " archive diagnostic: " + type(error).__name__ + ": " + str(error))
+                        if installation_error is None:
+                            raise
+                        # Preserve a pending integrity/download exception; the missing
+                        # diagnostic still makes the parent outcome strictly FAIL.
         run([*checker, "discover"], "installed-fixed-sdk-discovery")
         for item in fixed.PACKAGES:
             properties = dict(line.split("=", 1) for line in
