@@ -16,7 +16,7 @@ import uuid
 
 from d02_ci_evidence import MAX_FILE_BYTES, decode_files, emit_file
 from d02_kvm_acl import OwnedKvmAcl
-from d02_owned_process import OwnedProcess
+from d02_owned_process import OwnedProcess, identity, send_bound
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = "b13cdb9995797d3d245f86c39c4d86e0c2c40637"
@@ -142,6 +142,30 @@ def free_ports():
             sock.close()
 
 
+def verify_loopback_listener(text, port, command_pid):
+    """Require ss to attest the sole TCP listener is the live owned adb on IPv4 loopback."""
+    lines = text.splitlines()
+    if len(lines) != 1:
+        raise RuntimeError("Require exactly one owned adb listener")
+    columns = lines[0].split()
+    if len(columns) < 6 or columns[0] != "LISTEN" or columns[3] != "127.0.0.1:" + str(port) or \
+            set(re.findall(r"\bpid=(\d+),", lines[0])) != {str(command_pid)}:
+        raise RuntimeError("Actual adb listener address/PID differs; never permit wildcard or remote listening")
+
+
+def verify_live_owned_command(process):
+    """Require the original observed child identity and its bound kernel pidfd to remain live."""
+    bindings = [(key, fd) for key, fd in process.bound.items() if key[0] == process.command_pid]
+    if len(bindings) != 1:
+        raise RuntimeError("Missing/ambiguous bound adb command identity")
+    (pid, start), fd = bindings[0]
+    current = identity(pid)
+    if current is None or current["start"] != start or current["ppid"] != process.pid or \
+            current["state"] in ("Z", "X") or not send_bound(fd, 0):
+        raise RuntimeError("Bound owned adb command is no longer the same live child")
+    return {"pid": pid, "start": start, "ppid": process.pid}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--expected-sha", required=True)
@@ -168,13 +192,13 @@ def main():
                 os.uname().machine != "x86_64":
             raise RuntimeError("Only authorized standard public GitHub Ubuntu x86_64 job")
         request = json.loads((ROOT / "checks/sdk-device/kvm-request-20261012.json").read_text())
-        expected = {"base_sha": BASE, "mode": "KVM_ONLY", "attempt": 2, "max_seconds": 2100,
+        expected = {"base_sha": BASE, "mode": "KVM_ONLY", "attempt": 3, "max_seconds": 2100,
                     "native_methods": 19, "external_phases": 6, "artifact_upload": False,
                     "new_terms_acceptance": False, "kvm_acl": "CURRENT_JOB_UID_ONLY",
-                    "correction": "HEADLESS_PREFLIGHT",
-                    "previous_source_sha": "83f6334dfa74b75dd86b86c1d5e4b2f3cbba364b",
-                    "previous_run_id": 38242307025,
-                    "previous_job_log_sha256": "9a2431ba6b1f130a24c59d4fbb62a378382e2e0a8a02b6b7bfbbf3dbb9742aa5"}
+                    "correction": "ADB_LOOPBACK_LISTEN_SPEC",
+                    "previous_source_sha": "081288232680a77ee120bf0be987d1cb46ad2d8a",
+                    "previous_run_id": 38244244711,
+                    "previous_job_log_sha256": "de9e14a99c2443ede72fe51c1eb13f25f722a0f0e9eb7f27db81609c8796dcbb"}
         if request != expected:
             raise RuntimeError("Explicit one-attempt authorization request differs")
         if run(["git", "rev-parse", "HEAD"], "source-sha").stdout.strip() != args.expected_sha or \
@@ -263,7 +287,9 @@ def main():
         env["ANDROID_ADB_SERVER_PORT"] = str(server_port)
         env["ADB_SERVER_SOCKET"] = "tcp:127.0.0.1:" + str(server_port)
         for label, argv in (
-            ("owned-adb-server", [adb, "-L", env["ADB_SERVER_SOCKET"], "nodaemon", "server"]),
+            # adb's listener grammar differs from its client address grammar.
+            # Without -a, tcp:<port> binds loopback; attest actual address/PID below.
+            ("owned-adb-server", [adb, "-L", "tcp:" + str(server_port), "nodaemon", "server"]),
             ("owned-emulator", [emulator, "-avd", name, "-port", str(port), "-no-window", "-no-audio",
              "-no-boot-anim", "-no-snapshot", "-accel", "on", "-gpu", "swiftshader",
              "-memory", "2048", "-cores", "2"]),
@@ -285,6 +311,15 @@ def main():
                         time.sleep(0.5)
                 else:
                     raise RuntimeError("Owned adb server did not listen within10s; no duplicate server started")
+                bound_identity = verify_live_owned_command(process)
+                listener = run(["ss", "-H", "-lntp", "sport = :" + str(server_port)],
+                               "actual-owned-adb-listener", env=env)
+                verify_loopback_listener(listener.stdout, server_port, process.command_pid)
+                if verify_live_owned_command(process) != bound_identity:
+                    raise RuntimeError("Owned adb kernel identity changed during listener attestation")
+                report["adb_listener"] = {"address": "127.0.0.1", "port": server_port,
+                                          "command_pid": process.command_pid,
+                                          "kernel_identity": bound_identity, "attested": True}
         report.update(serial=serial, acceleration="KVM_ONLY", adb_server_port=server_port)
         boot_end = min(supervisor.deadline - RESERVE, time.monotonic() + 240)
         for index in range(49):

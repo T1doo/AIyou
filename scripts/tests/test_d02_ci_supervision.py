@@ -3,10 +3,14 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
+import socket
+import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -21,6 +25,40 @@ spec.loader.exec_module(driver)
 
 
 class CiSupervisionGuards(unittest.TestCase):
+    def test_actual_loopback_listener_is_bound_to_owned_pid_and_rejects_wildcard(self):
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0)); listener.listen()
+            port = listener.getsockname()[1]
+            actual = subprocess.run(["ss", "-H", "-lntp", "sport = :" + str(port)],
+                                    capture_output=True, text=True, timeout=5, check=True).stdout
+            driver.verify_loopback_listener(actual, port, os.getpid())
+            invalid = (actual.replace("127.0.0.1:", "0.0.0.0:"),
+                       actual.replace("127.0.0.1:", "[::]:"),
+                       actual.replace("pid=" + str(os.getpid()) + ",", "pid=0,"), actual + actual, "")
+            for text in invalid:
+                with self.assertRaises(RuntimeError):
+                    driver.verify_loopback_listener(text, port, os.getpid())
+
+    def test_live_command_requires_real_kernel_identity_and_bound_pidfd(self):
+        current = driver.identity(os.getpid())
+        fd = os.pidfd_open(os.getpid())
+        process = SimpleNamespace(command_pid=os.getpid(), pid=current["ppid"],
+                                  bound={(os.getpid(), current["start"]): fd})
+        try:
+            actual = driver.verify_live_owned_command(process)
+            self.assertEqual(actual, {"pid": os.getpid(), "start": current["start"], "ppid": current["ppid"]})
+            process.bound = {(os.getpid(), current["start"] + 1): fd}
+            with self.assertRaises(RuntimeError):
+                driver.verify_live_owned_command(process)
+            process.bound = {(os.getpid(), current["start"]): fd}; process.pid = -1
+            with self.assertRaises(RuntimeError):
+                driver.verify_live_owned_command(process)
+            process.pid = current["ppid"]; process.bound = {}
+            with self.assertRaises(RuntimeError):
+                driver.verify_live_owned_command(process)
+        finally:
+            os.close(fd)
+
     def test_frames_preserve_utf8_and_reject_lost_reordered_duplicate_or_corrupt_bytes(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "synthetic.log"

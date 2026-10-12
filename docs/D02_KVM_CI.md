@@ -14,6 +14,10 @@
 
 本次请求attempt2仅修三项preflight加 `-no-window`，与既有boot参数一致；[官方launcher源码](https://android.googlesource.com/platform/external/qemu/+/emu-master-dev/android/emulator/main-emulator.cpp) 的 `isHeadless` 与 `qemu-system-%s-headless` 分支提供修正依据，仍以固定37.2.12实际执行为准，不把上游源码当运行通过。请求绑定首轮SHA/run/log hash，经新冻结独审后至多一次有界重跑；不安装系统音频库，不改变SDK/协议、ACL权限范围或产品代码。首轮FAIL保留，后续未运行门槛不改为PASS。
 
+第二轮 [CI38244244711](https://github.com/T1doo/AIyou/actions/runs/38244244711) 绑定 `081288232680a77ee120bf0be987d1cb46ad2d8a`：实际headless37.2.12、KVM12 usable、AVDcreate/GPUhelp已PASS；前台adb `-L tcp:127.0.0.1:<port>` 却报告hostname监听不支持，exit-6，尚未启动模拟器或19+6。完整日志166150 bytes、SHA256 `de9e14a99c2443ede72fe51c1eb13f25f722a0f0e9eb7f27db81609c8796dcbb`，95份文本校验保全；24项自有清理成功、ACL恢复、协议不变。
+
+attempt3只将adb **监听**spec改为 `-L tcp:<port>`，客户端仍明确 `tcp:127.0.0.1:<port>`。[官方AOSP监听实现](https://github.com/aosp-mirror/platform_system_core/blob/android-10.0.0_r47/adb/socket_spec.cpp) 区分监听和连接grammar；未开 `-a` 的无hostname spec调用loopback server，不安装/升级/配置服务或防火墙。历史源码仅作修正依据，实际执行另以既有iproute2 `ss -H -lntp` 核唯一监听地址确为127.0.0.1、PID是本次自有前台adb；检查前后复用原观察的starttime/pidfd绑定，核ppid为自有哨兵、非僵尸、signal0仍活及identity不变，再允许模拟器启动，不能用状态文件exit_code代替内核活性。缺证据/wildcard/别的PID停止。新请求绑定第二轮SHA/run/log hash；新冻结独审后只执行这次有界纠错，两轮FAIL继续保留。
+
 workflow总40min，driver35min含120s自有进程/ACL cleanup；单命令/阶段沿用既有240s ceiling，compile最多900s，boot最多240s，poll和sleep严格夹在boot硬截止内。剩余预算只能收紧，不能增加；实际未结束步骤NOT RUN。失败保全完整文本/partial，不擦未知数据、SDK目录、锁或进程。自有Linux subreaper保持归属，即使命令leader先退出/后代另建session，也只通过pidfd绑定身份终止自有后代并要求清理证明，不杀未知/复用PID或PGID。先实际验证pidfd系统调用、通信可写与READY；父绑定哨兵并确认后才允许command启动。状态发布失败也先清理自有后代，缺完整通信证明仍FAIL。新AVD合成目录/SDK归档留在临时VM用于诊断，不上传密钥、数据库、签名或SDK。
 
 artifact额度已满，不使用artifact/cache上传。每条真实命令记录argv、退出码、时间和stdout/stderr；每阶段文本日志及RESULT使用 `D02_CI_FILE/CHUNK/END` bytes/SHA256/base64边界输出到完整job日志，摘要仅索引/状态。`d02_ci_evidence.decode_files` 拒绝丢块、乱序、重名、未闭合、错误hash；日志不完整不能签PASS。APK只在job内验证/安装，不塞日志；**二进制交付另需正常可用渠道**。
