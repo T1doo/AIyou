@@ -25,7 +25,12 @@ def main():
     parser.add_argument("--expected-sha")
     parser.add_argument("--apk-manifest", type=Path, help="actual CI generated device-apk-manifest.json, exact SHA/hashes")
     parser.add_argument("--output", type=Path, help="new owned evidence directory, must not exist")
+    parser.add_argument("--budget-seconds", type=int, default=35 * 60,
+                        help="overall budget including cleanup reserve; may only reduce the existing ceiling")
+    parser.add_argument("--emit-ci-evidence", action="store_true", help="emit bounded, hash-framed text logs")
     args = parser.parse_args()
+    if not 90 <= args.budget_seconds <= 35 * 60:
+        parser.error("budget must be 90..2100 seconds; cannot extend existing ceiling")
     inventory = collect_source(ROOT)
     if args.collect_source:
         print(json.dumps({"result": "PASS: 19 source methods collected; APK/device collection NOT RUN", "native_cases": inventory}, indent=2))
@@ -36,7 +41,20 @@ def main():
         parser.error("invalid explicit serial/SHA")
     args.output.mkdir(parents=True, exist_ok=False)
     experiment.OUTPUT = args.output.resolve()
-    experiment.EXPERIMENT_DEADLINE = time.monotonic() + 35 * 60
+    experiment.EXPERIMENT_DEADLINE = time.monotonic() + args.budget_seconds
+    if args.emit_ci_evidence:
+        from d02_ci_evidence import emit_file
+        original_command = experiment.command
+
+        def observed_command(argv, name, **kwargs):
+            try:
+                return original_command(argv, name, **kwargs)
+            finally:
+                path = experiment.OUTPUT / (name + ".log")
+                if path.is_file():
+                    emit_file(path, "device/" + path.name)
+
+        experiment.command = observed_command
     command, instrument = experiment.command, experiment.instrumentation
     env = os.environ.copy()
     sdk = experiment.SDK
@@ -126,6 +144,8 @@ def main():
         report["license_after"] = experiment.license_snapshot()
         report["acceptance_records_unchanged"] = before == report["license_after"]
         (args.output / "RESULT.json").write_text(json.dumps(report, indent=2) + "\n")
+        if args.emit_ci_evidence:
+            emit_file(args.output / "RESULT.json", "device/RESULT.json")
         print(json.dumps(report, indent=2))
         if not report["acceptance_records_unchanged"]:
             raise RuntimeError("SDK acceptance records unexpectedly changed")

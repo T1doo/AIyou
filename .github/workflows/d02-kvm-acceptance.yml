@@ -1,0 +1,39 @@
+name: D02 accelerated Android 19 methods and 6 process phases
+
+'on':
+  push:
+    branches: ['device/d02-kvm-acceptance-20261012']
+    paths: ['checks/sdk-device/kvm-request-20261012.json']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aiyou-d02-owned-kvm-acceptance
+  cancel-in-progress: false
+
+jobs:
+  android-device:
+    if: github.repository == 'T1doo/AIyou' && github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      GRADLE_USER_HOME: ${{ github.workspace }}/.toolchains/gradle-home
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: One fixed-SDK KVM Android acceptance; complete text evidence in job log
+        run: |
+          python3 -m unittest discover -s scripts/tests -p test_d02_ci_supervision.py -v
+          python3 scripts/run-d02-kvm-ci.py \
+            --expected-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/aiyou-d02-kvm-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+      # Artifact quota is full: no upload-artifact/cache, APK-in-log, release or deployment.

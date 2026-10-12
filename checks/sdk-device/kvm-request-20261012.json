@@ -1,0 +1,11 @@
+{
+  "base_sha": "b13cdb9995797d3d245f86c39c4d86e0c2c40637",
+  "mode": "KVM_ONLY",
+  "attempt": 1,
+  "max_seconds": 2100,
+  "native_methods": 19,
+  "external_phases": 6,
+  "artifact_upload": false,
+  "new_terms_acceptance": false,
+  "kvm_acl": "CURRENT_JOB_UID_ONLY"
+}
