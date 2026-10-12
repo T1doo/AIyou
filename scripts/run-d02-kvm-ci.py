@@ -168,9 +168,13 @@ def main():
                 os.uname().machine != "x86_64":
             raise RuntimeError("Only authorized standard public GitHub Ubuntu x86_64 job")
         request = json.loads((ROOT / "checks/sdk-device/kvm-request-20261012.json").read_text())
-        expected = {"base_sha": BASE, "mode": "KVM_ONLY", "attempt": 1, "max_seconds": 2100,
+        expected = {"base_sha": BASE, "mode": "KVM_ONLY", "attempt": 2, "max_seconds": 2100,
                     "native_methods": 19, "external_phases": 6, "artifact_upload": False,
-                    "new_terms_acceptance": False, "kvm_acl": "CURRENT_JOB_UID_ONLY"}
+                    "new_terms_acceptance": False, "kvm_acl": "CURRENT_JOB_UID_ONLY",
+                    "correction": "HEADLESS_PREFLIGHT",
+                    "previous_source_sha": "83f6334dfa74b75dd86b86c1d5e4b2f3cbba364b",
+                    "previous_run_id": 38242307025,
+                    "previous_job_log_sha256": "9a2431ba6b1f130a24c59d4fbb62a378382e2e0a8a02b6b7bfbbf3dbb9742aa5"}
         if request != expected:
             raise RuntimeError("Explicit one-attempt authorization request differs")
         if run(["git", "rev-parse", "HEAD"], "source-sha").stdout.strip() != args.expected_sha or \
@@ -224,10 +228,12 @@ def main():
         if fixed.license_snapshot() != before:
             raise RuntimeError("SDK acceptance records changed")
         emulator, adb = sdk / "emulator/emulator", sdk / "platform-tools/adb"
-        version = run([emulator, "-version"], "fixed-emulator-version")
+        # Match the already-authorized headless boot route. The default launcher
+        # selects the GUI engine even for -version, requiring absent libpulse.
+        version = run([emulator, "-no-window", "-version"], "fixed-emulator-version")
         if not re.search(r"\b37\.2\.12(?:\.0)?\b", version.stdout + version.stderr):
             raise RuntimeError("Actual fixed emulator version differs")
-        acceleration = run([emulator, "-accel-check"], "actual-kvm-acceleration")
+        acceleration = run([emulator, "-no-window", "-accel-check"], "actual-kvm-acceleration")
         if not re.search(r"KVM.*(?:installed|usable)", acceleration.stdout + acceleration.stderr, re.I):
             raise RuntimeError("Actual emulator acceleration check did not confirm KVM")
         env = {**os.environ, "PYTHONUNBUFFERED": "1"}
@@ -249,7 +255,7 @@ def main():
         if image is None or image.resolve() != sdk.joinpath(*fixed.PACKAGES[1]["path"].split(";")).resolve() or \
                 not avd.resolve().is_relative_to(output):
             raise RuntimeError("Owned AVD layout incomplete")
-        gpu = run([emulator, "-help-gpu"], "fixed-gpu-help", env=env)
+        gpu = run([emulator, "-no-window", "-help-gpu"], "fixed-gpu-help", env=env)
         if not re.search(r"\bswiftshader\b", gpu.stdout + gpu.stderr):
             raise RuntimeError("Fixed software GPU unavailable")
         port, _, server_port = free_ports()

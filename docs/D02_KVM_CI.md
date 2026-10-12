@@ -10,6 +10,10 @@
 
 新任务只监听专用 `device/d02-kvm-acceptance-20261012` 分支的显式请求文件变更，避免旧所有codex push的工程job顺带上传已满artifact。`contents:read`，无main修改/强推/release。源码冻结独审后正常推送一次；普通实现修正不自动重跑，需明确有界故障依据和新请求。并发单实例，不取消未知旧任务。
 
+首轮真实 [CI38242307025](https://github.com/T1doo/AIyou/actions/runs/38242307025) 绑定 `83f6334dfa74b75dd86b86c1d5e4b2f3cbba364b`：实际build/非空domain单测/lint、两固定SDK归档安装和已有协议核验通过；当前UID最小KVM ACL已恢复、协议文件hash不变。`emulator -version` 却选择GUI `qemu-system-x86_64`，动态加载缺 `libpulse.so.0`，exit127；未启动AVD，19+6 **NOT RUN**。完整job日志140076 bytes、SHA256 `9a2431ba6b1f130a24c59d4fbb62a378382e2e0a8a02b6b7bfbbf3dbb9742aa5`，77份文本边界/hash验证已保全。
+
+本次请求attempt2仅修三项preflight加 `-no-window`，与既有boot参数一致；[官方launcher源码](https://android.googlesource.com/platform/external/qemu/+/emu-master-dev/android/emulator/main-emulator.cpp) 的 `isHeadless` 与 `qemu-system-%s-headless` 分支提供修正依据，仍以固定37.2.12实际执行为准，不把上游源码当运行通过。请求绑定首轮SHA/run/log hash，经新冻结独审后至多一次有界重跑；不安装系统音频库，不改变SDK/协议、ACL权限范围或产品代码。首轮FAIL保留，后续未运行门槛不改为PASS。
+
 workflow总40min，driver35min含120s自有进程/ACL cleanup；单命令/阶段沿用既有240s ceiling，compile最多900s，boot最多240s，poll和sleep严格夹在boot硬截止内。剩余预算只能收紧，不能增加；实际未结束步骤NOT RUN。失败保全完整文本/partial，不擦未知数据、SDK目录、锁或进程。自有Linux subreaper保持归属，即使命令leader先退出/后代另建session，也只通过pidfd绑定身份终止自有后代并要求清理证明，不杀未知/复用PID或PGID。先实际验证pidfd系统调用、通信可写与READY；父绑定哨兵并确认后才允许command启动。状态发布失败也先清理自有后代，缺完整通信证明仍FAIL。新AVD合成目录/SDK归档留在临时VM用于诊断，不上传密钥、数据库、签名或SDK。
 
 artifact额度已满，不使用artifact/cache上传。每条真实命令记录argv、退出码、时间和stdout/stderr；每阶段文本日志及RESULT使用 `D02_CI_FILE/CHUNK/END` bytes/SHA256/base64边界输出到完整job日志，摘要仅索引/状态。`d02_ci_evidence.decode_files` 拒绝丢块、乱序、重名、未闭合、错误hash；日志不完整不能签PASS。APK只在job内验证/安装，不塞日志；**二进制交付另需正常可用渠道**。

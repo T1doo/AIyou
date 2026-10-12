@@ -1,11 +1,15 @@
 {
   "base_sha": "b13cdb9995797d3d245f86c39c4d86e0c2c40637",
   "mode": "KVM_ONLY",
-  "attempt": 1,
+  "attempt": 2,
   "max_seconds": 2100,
   "native_methods": 19,
   "external_phases": 6,
   "artifact_upload": false,
   "new_terms_acceptance": false,
-  "kvm_acl": "CURRENT_JOB_UID_ONLY"
+  "kvm_acl": "CURRENT_JOB_UID_ONLY",
+  "correction": "HEADLESS_PREFLIGHT",
+  "previous_source_sha": "83f6334dfa74b75dd86b86c1d5e4b2f3cbba364b",
+  "previous_run_id": 38242307025,
+  "previous_job_log_sha256": "9a2431ba6b1f130a24c59d4fbb62a378382e2e0a8a02b6b7bfbbf3dbb9742aa5"
 }
