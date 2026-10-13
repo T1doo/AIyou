@@ -1,8 +1,18 @@
 package com.t1doo.aiyou.ai
 
+import com.t1doo.aiyou.domain.CurrentSendAuthority
+import com.t1doo.aiyou.domain.QueuedSendStamp
+import com.t1doo.aiyou.domain.ResultAdmission
+import com.t1doo.aiyou.domain.SendAdmission
+import com.t1doo.aiyou.domain.SendDenial
+import com.t1doo.aiyou.domain.SendPermit
+import com.t1doo.aiyou.model.ChatBudgetField
+import com.t1doo.aiyou.model.ConnectionProtocol
+import com.t1doo.aiyou.model.RemoteSendIntent
 import java.io.IOException
 import java.io.InterruptedIOException
 import java.time.Instant
+import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeUnit
 import okhttp3.Authenticator
 import okhttp3.Call
@@ -19,7 +29,7 @@ import okhttp3.Response
 import okio.Buffer
 
 /**
- * Credential-free, one-request HTTP transport. Production callers can configure bounds only.
+ * One-request HTTP transport. Authentication requires the guarded, current-consent entry point.
  * HTTPS and the platform's trust/hostname checks are mandatory; no replay or provider fallback
  * occurs here. An exchange owns its call and its body, never an injected client's other calls.
  */
@@ -30,7 +40,7 @@ class OkHttpStreamingTransport private constructor(
     constructor(bounds: HttpBounds = HttpBounds()) : this(bounds, OkHttpClient())
 
     private val ownerLock = Any()
-    private val exchanges = mutableSetOf<Exchange>()
+    private val exchanges = mutableSetOf<OwnedExchange>()
     private var closed = false
 
     // Only the private constructor retains application interceptors. A source-test fixture
@@ -76,6 +86,55 @@ class OkHttpStreamingTransport private constructor(
             check(!closed) { "HTTP transport is closed" }
             Exchange(protocol, streamLimits, wireRequest).also { exchanges.add(it) }
         }
+    }
+
+    /** Queues a version-bound request; it does not resolve a secret or admit a network send. */
+    fun newGuardedExchange(
+        authority: CurrentSendAuthority,
+        intent: RemoteSendIntent,
+        request: TextRequest,
+        secrets: SecretResolver,
+        clock: () -> Instant = { Instant.now() },
+        streamLimits: StreamLimits = StreamLimits(),
+    ): GuardedStreamingExchange {
+        var stamp: QueuedSendStamp? = null
+        var snapshot: TextRequest? = null
+        var initialDenial: SendDenial? = null
+        var initiallyCancelled = false
+        try {
+            stamp = authority.queue(intent)
+        } catch (failure: Throwable) {
+            rethrowFatal(failure)
+            if (failure is CancellationException) initiallyCancelled = true
+            else initialDenial = SendDenial.STATE_UNAVAILABLE
+        }
+        if (!initiallyCancelled && initialDenial == null) {
+            try {
+                snapshot = snapshotRequest(request)
+            } catch (failure: Throwable) {
+                rethrowFatal(failure)
+                if (failure is CancellationException) initiallyCancelled = true
+                else initialDenial = SendDenial.CONFIGURATION_INVALID
+            }
+        }
+        return synchronized(ownerLock) {
+            check(!closed) { "HTTP transport is closed" }
+            GuardedExchange(authority, stamp, snapshot, secrets, clock, streamLimits,
+                initialDenial, initiallyCancelled).also { exchanges.add(it) }
+        }
+    }
+
+    private fun snapshotRequest(request: TextRequest): TextRequest {
+        val count = request.messages.size
+        require(count in 1..256) { "Invalid queued input bounds" }
+        val messages = (0 until count).map { index ->
+            request.messages[index].let { TextMessage(it.role, it.text) }
+        }
+        val frozen = TextRequest(request.modelId, messages, request.system, request.maxOutputTokens,
+            request.chatTokenBudget, request.chatUsageSupported)
+        // Reuse the established size/Unicode/request validation with a synthetic operation root.
+        ProtocolRequests.prepare("https://queue.invalid", Protocol.CHAT_COMPLETIONS, frozen)
+        return frozen
     }
 
     override fun close() {
@@ -127,6 +186,7 @@ class OkHttpStreamingTransport private constructor(
     /** Reject before OkHttp's RetryAndFollowUpInterceptor can replay 503/421 responses. */
     private inner class RejectHttpFollowUps : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
+            chain.request().tag(GuardContext::class.java)?.admit(chain.call())
             val response = chain.proceed(chain.request())
             if (response.code in 200..299) return response
             val values = response.headers("Retry-After")
@@ -159,18 +219,226 @@ class OkHttpStreamingTransport private constructor(
         }
     }
 
+    private interface OwnedExchange { fun cancel() }
+
+    /** The request tag contains authorization metadata only, never a resolved credential. */
+    private class GuardContext(
+        val authority: CurrentSendAuthority,
+        val stamp: QueuedSendStamp,
+        val clock: () -> Instant,
+    ) {
+        @Volatile var permit: SendPermit? = null
+            private set
+        @Volatile var denial: SendDenial? = null
+            private set
+        @Volatile var cancellationRequested: Boolean = false
+            private set
+        @Volatile private var onInvalidated: (() -> Unit)? = null
+
+        fun bindInvalidation(cancellation: () -> Unit) {
+            check(onInvalidated == null) { "Owned invalidation cancellation is already bound" }
+            onInvalidated = cancellation
+        }
+
+        fun admit(ownedCall: Call) {
+            try {
+                when (val admission = authority.claim(stamp, clock) {
+                    try { onInvalidated?.invoke() } finally { ownedCall.cancel() }
+                }) {
+                    is SendAdmission.Denied -> reject(admission.reason, ownedCall)
+                    is SendAdmission.Granted -> {
+                        permit = admission.permit
+                        if (admission.permit.invalidated) reject(SendDenial.QUEUE_INVALIDATED, ownedCall)
+                    }
+                }
+            } catch (failure: GateRejected) {
+                throw failure
+            } catch (failure: Throwable) {
+                rethrowFatal(failure)
+                ownedCall.cancel()
+                if (failure is CancellationException) {
+                    cancellationRequested = true
+                    throw GuardCancelled()
+                }
+                reject(SendDenial.STATE_UNAVAILABLE, ownedCall)
+            }
+        }
+
+        private fun reject(reason: SendDenial, ownedCall: Call): Nothing {
+            denial = reason
+            ownedCall.cancel()
+            throw GateRejected(reason)
+        }
+    }
+
+    private inner class GuardedExchange(
+        private val authority: CurrentSendAuthority,
+        private val stamp: QueuedSendStamp?,
+        private val request: TextRequest?,
+        private val secrets: SecretResolver,
+        private val clock: () -> Instant,
+        private val limits: StreamLimits,
+        private val initialDenial: SendDenial?,
+        initiallyCancelled: Boolean,
+    ) : GuardedStreamingExchange, OwnedExchange {
+        private val guardLock = Any()
+        private var executed = false
+        private var cancelled = initiallyCancelled
+        private var finished = false
+        private var wire: Exchange? = null
+
+        override fun cancel() {
+            val owned = synchronized(guardLock) {
+                if (finished || wire?.terminalForGuard() != null) return
+                cancelled = true
+                wire
+            }
+            owned?.cancel()
+            synchronized(ownerLock) { exchanges.remove(this) }
+        }
+
+        override fun execute(onEvent: (StreamEvent) -> Unit): GuardedSendOutcome {
+            synchronized(guardLock) {
+                check(!executed) { "Guarded exchange can execute only once" }
+                executed = true
+            }
+            var resolved: ResolvedSecret? = null
+            var context: GuardContext? = null
+            var wireOutcome: HttpOutcome? = null
+            var exceptionDenial = SendDenial.STATE_UNAVAILABLE
+            try {
+                if (isCancelled()) return preOutcome(StreamEvent.Cancelled, null, onEvent)
+                initialDenial?.let { return preDenied(it, onEvent) }
+                val ticket = checkNotNull(stamp)
+                val frozenRequest = checkNotNull(request)
+                authority.check(ticket, clock())?.let { return preDenied(it, onEvent) }
+                val connection = checkNotNull(ticket.connection)
+                val protocol = when (connection.protocol) {
+                    ConnectionProtocol.CHAT_COMPLETIONS -> Protocol.CHAT_COMPLETIONS
+                    ConnectionProtocol.ANTHROPIC_MESSAGES -> Protocol.ANTHROPIC_MESSAGES
+                }
+                val budget = when (connection.chatBudgetField) {
+                    ChatBudgetField.MAX_TOKENS -> ChatTokenBudget.MAX_TOKENS
+                    ChatBudgetField.MAX_COMPLETION_TOKENS -> ChatTokenBudget.MAX_COMPLETION_TOKENS
+                }
+                if (frozenRequest.modelId != connection.modelId || frozenRequest.chatTokenBudget != budget ||
+                    frozenRequest.chatUsageSupported != connection.chatUsageSupported) {
+                    return preDenied(SendDenial.CONFIGURATION_INVALID, onEvent)
+                }
+                if (isCancelled()) return preOutcome(StreamEvent.Cancelled, null, onEvent)
+                exceptionDenial = SendDenial.SECRET_UNAVAILABLE
+                resolved = secrets.resolve(connection.secretRef)
+                if (isCancelled()) return preOutcome(StreamEvent.Cancelled, null, onEvent)
+                if (resolved == null) return preDenied(SendDenial.SECRET_UNAVAILABLE, onEvent)
+                exceptionDenial = SendDenial.STATE_UNAVAILABLE
+                authority.check(ticket, clock())?.let { return preDenied(it, onEvent) }
+                if (isCancelled()) return preOutcome(StreamEvent.Cancelled, null, onEvent)
+
+                exceptionDenial = SendDenial.CONFIGURATION_INVALID
+                val prepared = ProtocolRequests.prepare(connection.apiRoot, protocol,
+                    TextRequest(connection.modelId, frozenRequest.messages, frozenRequest.system,
+                        frozenRequest.maxOutputTokens, budget, connection.chatUsageSupported))
+                val base = validateRequest(protocol, prepared)
+                exceptionDenial = SendDenial.SECRET_UNAVAILABLE
+                val value = resolved.headerValue() ?: return preDenied(SendDenial.SECRET_UNAVAILABLE, onEvent)
+                context = GuardContext(authority, ticket, clock)
+                val authenticated = base.newBuilder().tag(GuardContext::class.java, context).apply {
+                    when (prepared.authentication) {
+                        AuthenticationKind.BEARER -> header("Authorization", "Bearer $value")
+                        AuthenticationKind.ANTHROPIC_API_KEY -> header("x-api-key", value)
+                    }
+                }.build()
+                // The mutable resolved value can be wiped now. OkHttp's immutable header String
+                // remains until the owned request/call become unreachable; it cannot be zeroed.
+                resolved.close()
+                resolved = null
+                exceptionDenial = SendDenial.STATE_UNAVAILABLE
+                val delegate = Exchange(protocol, limits, authenticated)
+                context.bindInvalidation(delegate::cancel)
+                val cancelledBeforeExecute = synchronized(guardLock) {
+                    wire = delegate
+                    cancelled
+                }
+                if (cancelledBeforeExecute) delegate.cancel()
+                wireOutcome = delegate.execute(onEvent)
+                val admitted = context.permit
+                if (admitted == null) {
+                    val rejection = context.denial
+                    return when {
+                        rejection != null -> done(GuardedSendOutcome(
+                            StreamEvent.Failed(FailureKind.SEND_DENIED), denial = rejection,
+                        ))
+                        wireOutcome.terminal == StreamEvent.Cancelled -> done(GuardedSendOutcome(StreamEvent.Cancelled))
+                        else -> done(GuardedSendOutcome(wireOutcome.terminal, wireOutcome))
+                    }
+                }
+                return when (val result = authority.finish(admitted, clock)) {
+                    is ResultAdmission.Denied -> done(GuardedSendOutcome(
+                        StreamEvent.Failed(FailureKind.SEND_DENIED), wireOutcome,
+                        resultDenial = result.reason,
+                    ))
+                    is ResultAdmission.Granted -> done(GuardedSendOutcome(
+                        wireOutcome.terminal, wireOutcome,
+                        receipt = result.receipt.takeIf { wireOutcome.terminal == StreamEvent.Completed },
+                    ))
+                }
+            } catch (failure: Throwable) {
+                rethrowFatal(failure)
+                if (failure is CancellationException) {
+                    cancel()
+                    return if (wireOutcome == null) preOutcome(StreamEvent.Cancelled, null, onEvent)
+                    else done(GuardedSendOutcome(StreamEvent.Cancelled, wireOutcome))
+                }
+                if (context?.permit != null) {
+                    return done(GuardedSendOutcome(StreamEvent.Failed(FailureKind.SEND_DENIED), wireOutcome,
+                        resultDenial = SendDenial.STATE_UNAVAILABLE))
+                }
+                return preDenied(exceptionDenial, onEvent)
+            } finally {
+                resolved?.close()
+                context?.permit?.let { authority.release(it) }
+                synchronized(guardLock) { wire = null; finished = true }
+                synchronized(ownerLock) { exchanges.remove(this) }
+            }
+        }
+
+        private fun isCancelled(): Boolean = synchronized(guardLock) { cancelled }
+
+        private fun preDenied(reason: SendDenial, onEvent: (StreamEvent) -> Unit): GuardedSendOutcome =
+            if (isCancelled()) preOutcome(StreamEvent.Cancelled, null, onEvent)
+            else preOutcome(StreamEvent.Failed(FailureKind.SEND_DENIED), reason, onEvent)
+
+        private fun preOutcome(
+            terminal: StreamEvent,
+            reason: SendDenial?,
+            onEvent: (StreamEvent) -> Unit,
+        ): GuardedSendOutcome {
+            val result = done(GuardedSendOutcome(terminal, denial = reason))
+            try { onEvent(terminal) } catch (failure: Throwable) { rethrowFatal(failure) }
+            return result
+        }
+
+        private fun done(outcome: GuardedSendOutcome): GuardedSendOutcome {
+            synchronized(guardLock) { finished = true }
+            return outcome
+        }
+    }
+
     private inner class Exchange(
         protocol: Protocol,
         limits: StreamLimits,
-        private val request: Request,
-    ) : StreamingHttpExchange {
+        request: Request,
+    ) : StreamingHttpExchange, OwnedExchange {
         private val stateLock = Any()
         private val stream = ProtocolStream(protocol, limits)
+        private var queuedRequest: Request? = request
+        private val gate = request.tag(GuardContext::class.java)
         private var executed = false
         private var userCancelled = false
         private var terminal: StreamEvent? = null
         private var call: Call? = null
         private var response: Response? = null
+        private var readingBody = false
         private var status: Int? = null
         private var retry: RetryDecision? = null
         private var errorBytes = 0
@@ -185,7 +453,15 @@ class OkHttpStreamingTransport private constructor(
                 if (terminal != null) return
                 userCancelled = true
                 terminal = StreamEvent.Cancelled
-                call to response
+                val owned = call to response.takeUnless { readingBody }
+                queuedRequest = null
+                if (!readingBody) {
+                    call = null
+                    response = null
+                }
+                // A concurrent read must retain its body/call for owner-thread cleanup. Closing
+                // here could make OkHttp's body.close() drain/read this same source a second time.
+                owned
             }
             owned.first?.cancel()
             owned.second?.let(::quietClose)
@@ -201,9 +477,12 @@ class OkHttpStreamingTransport private constructor(
             }
             try {
                 if (selectedTerminal() != null) return finishOutcome(onEvent)
-                val ownedCall = client.newCall(request)
+                val pending = synchronized(stateLock) { queuedRequest }
+                if (pending == null) return finishOutcome(onEvent)
+                val ownedCall = client.newCall(pending)
                 val shouldExecute = synchronized(stateLock) {
                     call = ownedCall
+                    queuedRequest = null
                     terminal == null
                 }
                 if (!shouldExecute) {
@@ -216,7 +495,10 @@ class OkHttpStreamingTransport private constructor(
                     status = ownedResponse.code
                     terminal == null
                 }
-                if (!shouldRead) return finishOutcome(onEvent)
+                if (!shouldRead) {
+                    ownedCall.cancel()
+                    return finishOutcome(onEvent)
+                }
                 val type = ownedResponse.body.contentType()
                 if (type?.type != "text" || type.subtype != "event-stream") {
                     dispatch(acceptFailure(FailureKind.MALFORMED_RESPONSE), onEvent)
@@ -224,7 +506,18 @@ class OkHttpStreamingTransport private constructor(
                 }
                 val buffer = ByteArray(bounds.readBufferBytes)
                 while (selectedTerminal() == null) {
-                    val read = ownedResponse.body.source().read(buffer)
+                    val mayRead = synchronized(stateLock) {
+                        if (terminal != null) false else {
+                            readingBody = true
+                            true
+                        }
+                    }
+                    if (!mayRead) break
+                    val read = try {
+                        ownedResponse.body.source().read(buffer)
+                    } finally {
+                        synchronized(stateLock) { readingBody = false }
+                    }
                     if (selectedTerminal() != null) break
                     if (read < 0) {
                         val events = stream.finish()
@@ -241,6 +534,10 @@ class OkHttpStreamingTransport private constructor(
                         }
                     }
                 }
+            } catch (_: GateRejected) {
+                dispatch(acceptFailure(FailureKind.SEND_DENIED), onEvent)
+            } catch (_: GuardCancelled) {
+                cancel()
             } catch (failure: HttpRejected) {
                 val recommendation = if (failure.status in 100..599)
                     FailurePolicy().http(failure.status, 1, hadPreview, failure.retryAfter, Instant.now())
@@ -253,7 +550,9 @@ class OkHttpStreamingTransport private constructor(
                 }
                 dispatch(acceptFailure(failure.readFailure ?: recommendation.kind), onEvent)
             } catch (failure: IOException) {
-                val kind = ioKind(failure)
+                if (gate?.cancellationRequested == true) cancel()
+                val kind = if (gate?.denial != null || gate?.permit?.invalidated == true)
+                    FailureKind.SEND_DENIED else ioKind(failure)
                 synchronized(stateLock) {
                     if (terminal == null && kind == FailureKind.NETWORK) {
                         retry = FailurePolicy().network(1, hadPreview)
@@ -273,7 +572,7 @@ class OkHttpStreamingTransport private constructor(
         private fun acceptFailure(kind: FailureKind): List<StreamEvent> = synchronized(stateLock) {
             if (terminal == null) terminal = stream.terminalEvent
             if (terminal != null) emptyList() else {
-                // Only explicit user cancellation selects Cancelled; cleanup and call timeouts do not.
+                // Only explicit exchange cancellation selects Cancelled; cleanup/timeouts do not.
                 val events = if (userCancelled) stream.cancel() else stream.transportFailure(kind)
                 events.also { terminal = it.lastOrNull() }
             }
@@ -319,6 +618,8 @@ class OkHttpStreamingTransport private constructor(
 
         private fun selectedTerminal(): StreamEvent? = synchronized(stateLock) { terminal }
 
+        fun terminalForGuard(): StreamEvent? = selectedTerminal() ?: stream.terminalEvent
+
         private fun synchronizeWireTerminal() {
             synchronized(stateLock) {
                 if (terminal == null) terminal = stream.terminalEvent
@@ -327,7 +628,7 @@ class OkHttpStreamingTransport private constructor(
 
         private fun releaseOwned() {
             val owned = synchronized(stateLock) {
-                (call to response).also { response = null }
+                (call to response).also { call = null; response = null; queuedRequest = null }
             }
             owned.first?.cancel()
             owned.second?.let(::quietClose)
@@ -343,7 +644,13 @@ class OkHttpStreamingTransport private constructor(
         val readFailure: FailureKind?,
     ) : IOException("HTTP response rejected")
 
+    private class GateRejected(val reason: SendDenial) : IOException("Send admission rejected")
+    private class GuardCancelled : IOException("Guarded operation cancelled")
+
     private companion object {
+        fun rethrowFatal(failure: Throwable) {
+            if (failure is VirtualMachineError || failure is ThreadDeath || failure is LinkageError) throw failure
+        }
         fun ioKind(failure: IOException): FailureKind =
             if (failure is InterruptedIOException) FailureKind.TIMEOUT else FailureKind.NETWORK
 
@@ -351,7 +658,10 @@ class OkHttpStreamingTransport private constructor(
             event == StreamEvent.Cancelled || event is StreamEvent.Failed
 
         fun quietClose(response: Response) {
-            try { response.close() } catch (_: Exception) { /* Owned cleanup cannot change a terminal. */ }
+            try { response.close() } catch (failure: Throwable) {
+                rethrowFatal(failure)
+                // Nonfatal owned cleanup failures cannot change an already selected terminal.
+            }
         }
     }
 }

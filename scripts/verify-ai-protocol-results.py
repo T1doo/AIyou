@@ -89,7 +89,7 @@ for module in ("ai", "domain"):
     results.append({"module": "core:" + module, "tests": len(actual), "failures": 0, "errors": 0, "skipped": 0,
                     "methods": [list(key) for key in sorted(actual)], "xml": evidence})
 
-report = {"status": "PASS", "scope": "pure JVM protocol, real loopback HTTP and domain contracts; no provider/device/App integration",
+report = {"status": "PASS", "scope": "pure JVM protocol, current-consent gate, real loopback HTTP and domain contracts; no live provider/device/App integration",
           "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
           "source_sha256": source_sha256, "results": results,
           "d02_native_acceptance": "NOT RUN", "full_d04_acceptance": "OPEN"}

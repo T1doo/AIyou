@@ -1,4 +1,4 @@
-# JVM text protocols and bounded HTTP transport
+# JVM text protocols, HTTP and current-consent gate
 
 `ProtocolRequests` builds a validated HTTPS operation URI, protocol headers and
 JSON request description. It does not open a connection or accept a secret.
@@ -45,7 +45,8 @@ Failure diagnostics and request/event `toString()` exclude payload contents.
 `OkHttpStreamingTransport` runs one synchronous owned exchange through OkHttp.
 Its production constructor accepts finite bounds only and validates HTTPS,
 platform TLS, operation paths and exact nonsecret protocol headers again.
-It sends no credentials, follows no redirects and performs no replay or provider
+The credential-free `newExchange` sends no credentials. The transport follows
+no redirects and performs no replay or provider
 switch. A network interceptor rejects every non-2xx response before OkHttp's
 503/421 follow-up logic; `FailurePolicy` remains recommendation-only.
 
@@ -59,6 +60,11 @@ does not depend on network read boundaries. Terminal selection immediately
 cancels the owned call and closes its body; cleanup cannot revoke completion.
 Callbacks execute on the calling thread and should return promptly; HTTP
 deadlines bound network operations, not arbitrary caller callback execution.
+Cancellation closes the owned socket immediately. If a body read is active,
+its owner closes the retained response after the read exits; external cancellation
+cannot concurrently drain/close the same source. Read admission and response
+ownership changes share the state lock, which is never held across network reads
+or event callbacks. Nonfatal cleanup errors cannot change a selected terminal.
 Nonfatal consumer throwables become `CONSUMER_ERROR` before a protocol terminal;
 a validated terminal remains selected. VM errors, thread death and linkage
 errors propagate after owned cleanup.
@@ -70,10 +76,48 @@ constructor, HTTP mode or TLS setting. Real wire tests inspect both
 protocols and verify exactly one request, chunk partition equivalence, timeouts,
 EOF, errors, cancellation, callback failures and owned resource closure.
 
-API key management, current-consent enforcement, App wiring, persistence,
-model probing, multimodal and structured extraction integration remain separate
+`newGuardedExchange` is the higher-level sending boundary. Queue metadata binds
+the source revision, purpose, complete connection and grant, plus an authority
+generation. `CurrentSendAuthority` rejects restrictive policies, deleted/stale
+sources, revoked/expired/mismatched consent, configuration drift (even at the
+same claimed version) and a switch-away/switch-back. Its private identity ledgers
+control ticket consumption and receipt issuance; Kotlin `internal` visibility is
+not trusted to prevent JVM metadata forgery.
+
+Execution checks before resolving a secret, checks again after resolution, then
+atomically rechecks and registers a one-use permit in the network interceptor.
+The trusted nonblocking clock is read under the authority lock at final admission
+and result validation. Resolver, network and event callbacks run outside that
+lock. Pre-admission denial or resolution failure produces zero HTTP operations,
+no fallback and no receipt. The interceptor runs after connect, so this does not
+promise zero sockets or TLS handshakes. An admission followed by revocation
+marks the permit invalid before cancelling the owned call; sent bytes cannot
+be recalled.
+
+`SecretResolver` only receives the frozen `SecretReference`. `ResolvedSecret`
+owns a transferred character array, validates 1–8,192 visible ASCII characters,
+redacts its diagnostics and wipes the array before HTTP execution or on exit.
+Callers must not mutate/reuse an array after transfer. Only the fixed protocol
+authentication header is injected inside the private engine. OkHttp requires
+immutable header strings, which cannot be zeroed; owned call/request references
+are cleared on cleanup. No secret goes into configuration, body, exception cause,
+result or logs. No real secret-store implementation is included.
+
+Wire events are previews. A high-level result invalidation sets `resultDenial`,
+omits the receipt and returns `SEND_DENIED`; `wireOutcome` retains the protocol
+fact, including a completed stream. Pre-admission failures use `denial` and have
+no wire outcome. Only actual wire completion plus a current final authorization
+check yields a receipt. A receipt is a version-bound authorization witness, not
+permanent permission, HTTP-success proof by itself or a database transaction.
+Future App/persistence code must filter supplied source content and atomically
+recheck its current source/configuration/consent before committing a result.
+The existing credential-free `newExchange` remains the low-level wire API; it
+accepts no authentication headers and does not itself enforce record consent.
+
+Real Keystore/secret-store integration, persistent configuration/grants/queues,
+App wiring, model probing, multimodal and structured extraction remain separate
 D04/D05 gates. `LOCAL_ONLY` is unchanged; D02 device acceptance is NOT RUN and
-full D04 remains OPEN. A synthetic server pass is not a provider connection.
+full D04 remains OPEN. Synthetic loopback success is not a provider connection.
 
 Libraries are pinned kotlinx.serialization JSON/core 1.9.0, OkHttp/MockWebServer
 5.5.0 and resolved Okio 3.18.1 (Apache-2.0), from Maven Central with generated
