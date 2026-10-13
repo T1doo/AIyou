@@ -17,3 +17,5 @@
 新增8个实际生产 matcher／controller JVM 契约和5个实际 `AIyouApp` Compose 契约；门禁要求这些明确方法各出现一次且失败、错误、跳过均为0。验证包括 Unicode 摘录回算、精确空白、捕捉时区／DST、错误日期、旧计算不响应取消、源快照更新、同帧 ABA、读取失败、内存查询恢复边界、大字窄屏可达性，以及确实制造内边距与首可见索引不一致后的完整原文打开和两种返回。具体执行数字、输入指纹、提交 SHA 与同 SHA CI 见交付回执，未执行不记 PASS。
 
 本地使用既有固定 JDK17 和校验过的 JVM Wrapper；未安装 SDK、接受新许可、运行 ADB／模拟器、生成认证密钥或更改拒绝目录。Android 构建、Compose JVM 模拟与 lint 使用既有免费 CI；这些不代替 D02 生产重启、真实设备 UI／可访问性或性能验收。最小后续是合法现有 SDK 与已授权设备条件具备后继续 D02 原生验收；当前仍 **NOT RUN**。
+
+首轮 [CI38485383837](https://github.com/T1doo/AIyou/actions/runs/38485383837) 在提交 `d151ec270d78fa6a3a3a5da01c9e5f89f8556691` 的 Android 编译停止：固定 Foundation 版本对三处直接 `undoState` 调用要求实验性标记。已移除多余调用，继续清空旧字段并替换全新 `TextFieldState`／Undo 实例；不新增实验性 Foundation 使用或依赖。实际 Ctrl+Z 与保存注册表负载测试保留，须由修正提交的同 SHA CI 裁定。首轮没有生成本任务 APK，也没有运行新 Compose 用例；失败日志保留。

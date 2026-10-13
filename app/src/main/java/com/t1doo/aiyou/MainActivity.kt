@@ -207,9 +207,6 @@ fun AIyouApp(
         searchQuery.edit { replace(0, length, "") }
         searchFrom.edit { replace(0, length, "") }
         searchThrough.edit { replace(0, length, "") }
-        searchQuery.undoState.clearHistory()
-        searchFrom.undoState.clearHistory()
-        searchThrough.undoState.clearHistory()
         searchQuery = TextFieldState()
         searchFrom = TextFieldState()
         searchThrough = TextFieldState()
