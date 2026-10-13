@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "AIyou"
-include(":app", ":core:model", ":core:domain", ":core:designsystem", ":core:data")
+include(":app", ":core:model", ":core:domain", ":core:designsystem", ":core:data", ":core:ai")

@@ -13,6 +13,7 @@ sqlcipher = "4.19.1"
 sqlite = "2.7.0"
 #noinspection NewerVersionAvailable
 coroutines = "1.9.0"
+serialization = "1.9.0"
 #noinspection GradleDependency
 lifecycle = "2.9.4"
 android-test-runner = "1.7.0"
@@ -35,6 +36,7 @@ room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 sqlcipher = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher" }
 sqlite = { module = "androidx.sqlite:sqlite", version.ref = "sqlite" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 android-test-runner = { module = "androidx.test:runner", version.ref = "android-test-runner" }
