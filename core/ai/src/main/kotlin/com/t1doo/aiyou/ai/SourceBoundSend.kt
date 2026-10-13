@@ -13,7 +13,13 @@ data class SourceBoundSendOutcome(
 )
 
 interface SourceBoundStreamingExchange {
-    /** Call on an IO worker. Events are previews; consume the returned persisted annotation as the final result. */
+    /**
+     * Call on an IO worker. Every preview, including wire Completed, first checks persisted
+     * authority and passes an owned cancellation gate. An already admitted callback may
+     * finish during concurrent withdrawal; later previews are suppressed. No consumer runs
+     * inside a database transaction or owner lock. A terminal callback is not guaranteed
+     * after cancellation. Only the returned persisted annotation is an accepted result.
+     */
     fun execute(onEvent: (StreamEvent) -> Unit = {}): SourceBoundSendOutcome
     fun cancel()
 }

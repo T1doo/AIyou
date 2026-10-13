@@ -2,6 +2,7 @@ package com.t1doo.aiyou.data
 
 import com.t1doo.aiyou.domain.SendDenial
 import com.t1doo.aiyou.domain.SourceBoundTextRepository
+import com.t1doo.aiyou.domain.SourceBoundTextSubscription
 import com.t1doo.aiyou.model.*
 import java.time.Instant
 import java.time.ZoneId
@@ -69,6 +70,10 @@ class RemoteTextTransactions(
     override fun check(job: SourceBoundTextJob, clock: () -> Instant): SendDenial? = safe(SendDenial.STATE_UNAVAILABLE) {
         database.transaction { db -> validateJob(db,job,clock)?.toSendDenial() }
     }
+
+    override fun subscribe(job: SourceBoundTextJob, clock: () -> Instant,
+                           onInvalidated: (SendDenial) -> Unit): SourceBoundTextSubscription =
+        PersistentSourceBoundTextSubscription.open({ check(job, clock) }, onInvalidated)
 
     override fun admit(job: SourceBoundTextJob, clock: () -> Instant): SendDenial? = safe(SendDenial.STATE_UNAVAILABLE) {
         database.transaction { db ->

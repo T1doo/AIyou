@@ -3,6 +3,7 @@ package com.t1doo.aiyou.data
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.t1doo.aiyou.domain.SourceBoundTextRepository
+import com.t1doo.aiyou.domain.SendDenial
 import com.t1doo.aiyou.model.*
 import java.time.Instant
 import java.util.concurrent.Callable
@@ -12,6 +13,8 @@ class RoomSourceBoundTextRepository internal constructor(database: RecordsDataba
     private val storage = RemoteTextTransactions(RoomRecordsSqlDatabase(database))
     override fun queue(intent:RemoteSendIntent,promptVersion:String,clock:()->Instant)=storage.queue(intent,promptVersion,clock)
     override fun check(job:SourceBoundTextJob,clock:()->Instant)=storage.check(job,clock)
+    override fun subscribe(job:SourceBoundTextJob,clock:()->Instant,onInvalidated:(SendDenial)->Unit)=
+        storage.subscribe(job,clock,onInvalidated)
     override fun admit(job:SourceBoundTextJob,clock:()->Instant)=storage.admit(job,clock)
     override fun commit(job:SourceBoundTextJob,candidate:DerivedTextCandidate,clock:()->Instant)=storage.commit(job,candidate,clock)
     override fun cancel(job:SourceBoundTextJob)=storage.cancel(job)

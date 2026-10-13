@@ -90,7 +90,8 @@ internal class RemoteTextFixture(
     }
 
     fun second(): PythonSqliteDatabase = open(false)
-    fun generation(): Long = (db.read("SELECT generation FROM remote_source_access WHERE entryId=?", source.sourceId)
+    fun generation(source: SourceVersion = this.source, connection: PythonSqliteDatabase = db): Long =
+        (connection.read("SELECT generation FROM remote_source_access WHERE entryId=?", source.sourceId)
         .singleOrNull()?.firstOrNull() as? Long) ?: 0L
 
     fun approve(policy: ProcessingPolicy = ProcessingPolicy.REMOTE_ALLOWED,
@@ -118,8 +119,8 @@ internal class RemoteTextFixture(
     fun originals(): List<List<Any?>> = listOf("entries", "entry_revisions", "capture_draft", "local_jobs", "attachments")
         .flatMap { table -> db.read("SELECT * FROM $table ORDER BY 1,2").map { listOf(table) + it } }
 
-    fun revise() {
-        db.transaction { sql ->
+    fun revise(connection: PythonSqliteDatabase = db) {
+        connection.transaction { sql ->
             val next = source.revision + 1
             val text = "synthetic-private-new-original🙂"
             sql.execute("INSERT INTO entry_revisions(entryId,revision,originalText,contentHash,createdAtMillis) VALUES(?,?,?,?,?)",

@@ -6,6 +6,7 @@ kotlin { jvmToolchain(17) }
 val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RemoteTextTransactions.kt")
+    from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/PersistentSourceBoundTextSubscription.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RemoteTextCodec.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RemoteTextSqlSchema.kt")
     into(production)

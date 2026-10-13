@@ -7,6 +7,7 @@ import com.t1doo.aiyou.domain.SendAdmission
 import com.t1doo.aiyou.domain.SendDenial
 import com.t1doo.aiyou.domain.SendPermit
 import com.t1doo.aiyou.domain.SourceBoundTextRepository
+import com.t1doo.aiyou.domain.SourceBoundTextSubscription
 import com.t1doo.aiyou.model.ChatBudgetField
 import com.t1doo.aiyou.model.ConnectionProtocol
 import com.t1doo.aiyou.model.RemoteSendIntent
@@ -293,6 +294,8 @@ class OkHttpStreamingTransport private constructor(
         val request = TextRequest(connection.modelId,
             listOf(TextMessage(MessageRole.USER, job.originalText)), system, maxOutputTokens,
             budget, connection.chatUsageSupported)
+        // The metadata-only synthetic bridge cannot substitute a caller-controlled gate:
+        // this helper always checks and admits through the supplied durable repository.
         val gate = object : PersistentSendGate {
             override fun check() = repository.check(job, clock)
             override fun admit() = repository.admit(job, clock)
@@ -315,14 +318,11 @@ class OkHttpStreamingTransport private constructor(
         private var cancelled = initiallyCancelled
         private var finished = false
         private var delegate: GuardedStreamingExchange? = null
+        private var subscription: SourceBoundTextSubscription? = null
+        private var persistentInvalidation: SendDenial? = null
 
         override fun cancel() {
-            val owned = synchronized(lock) {
-                if (finished) return
-                cancelled = true
-                delegate
-            }
-            owned?.cancel()
+            if (!cancelHttpOnly()) return
             cancelOwnedJob()
             synchronized(ownerLock) { exchanges.remove(this) }
         }
@@ -340,20 +340,48 @@ class OkHttpStreamingTransport private constructor(
                     is SourceQueueOutcome.AlreadyCommitted -> return when (val recovered = repository.commit(
                         snapshot.job, snapshot.annotation.candidate, clock)) {
                         is SourceCommitOutcome.Denied -> denied(recovered.reason, null)
-                        is SourceCommitOutcome.Committed -> SourceBoundSendOutcome(StreamEvent.Completed,
-                            annotation = recovered.annotation, alreadyCommitted = true)
+                        is SourceCommitOutcome.Committed -> accepted(SourceBoundSendOutcome(StreamEvent.Completed,
+                            annotation = recovered.annotation, alreadyCommitted = true))
                     }
                     is SourceQueueOutcome.Queued -> {
                         val job = snapshot.job
+                        // Subscribe before any credential resolution or connection. The initial
+                        // invalidation may be synchronous, before the handle can be installed.
+                        val watch = repository.subscribe(job, clock, ::invalidatePersistent)
+                        val closeImmediately = synchronized(lock) {
+                            subscription = watch
+                            cancelled || finished || persistentInvalidation != null
+                        }
+                        if (closeImmediately) closeSubscription()
+                        if (isCancelled()) return SourceBoundSendOutcome(StreamEvent.Cancelled)
+                        selectedInvalidation()?.let { return denied(it.toStorageDenial(), null) }
                         val owned = newSourceGuardedExchange(repository, job, maxOutputTokens, secrets, clock, limits)
-                        val stopped = synchronized(lock) { delegate = owned; cancelled }
+                        val stopped = synchronized(lock) {
+                            delegate = owned
+                            cancelled || finished || persistentInvalidation != null
+                        }
                         if (stopped) owned.cancel()
                         val text = StringBuilder()
-                        wire = owned.execute { event ->
+                        wire = owned.execute preview@{ event ->
+                            val rejection = try { checkSubscription(watch) } catch (_: CancellationException) {
+                                cancelHttpOnly()
+                                return@preview
+                            }
+                            if (rejection != null) return@preview
+                            // The fresh database read completes before this owned cancellation
+                            // gate. Once admitted, the callback may finish even if another thread
+                            // withdraws permission; no SQL/owner lock encloses the consumer.
+                            val deliver = synchronized(lock) {
+                                !cancelled && !finished && persistentInvalidation == null
+                            }
+                            if (!deliver) return@preview
+                            if (isTerminal(event)) closeSubscription()
                             if (event is StreamEvent.TextDelta) text.append(event.text)
                             onEvent(event)
                         }
+                        closeSubscription()
                         if (isCancelled()) return SourceBoundSendOutcome(StreamEvent.Cancelled, wire)
+                        selectedInvalidation()?.let { return denied(it.toStorageDenial(), wire) }
                         if (wire.terminal != StreamEvent.Completed) {
                             return SourceBoundSendOutcome(wire.terminal, wire)
                         }
@@ -364,10 +392,10 @@ class OkHttpStreamingTransport private constructor(
                         return when (val committed = repository.commit(job,
                             DerivedTextCandidate(text.toString(), listOf(reference)), clock)) {
                             is SourceCommitOutcome.Denied -> denied(committed.reason, wire)
-                            is SourceCommitOutcome.Committed -> SourceBoundSendOutcome(
+                            is SourceCommitOutcome.Committed -> accepted(SourceBoundSendOutcome(
                                 StreamEvent.Completed, wire, committed.annotation,
                                 alreadyCommitted = committed.alreadyCommitted,
-                            )
+                            ))
                         }
                     }
                 }
@@ -376,15 +404,85 @@ class OkHttpStreamingTransport private constructor(
                 return if (failure is CancellationException) SourceBoundSendOutcome(StreamEvent.Cancelled, wire)
                 else denied(SourceCommitDenial.STORAGE_UNAVAILABLE, wire)
             } finally {
-                cancelOwnedJob() // A committed row is immutable; this only cleans unfinished owned work.
                 synchronized(lock) { delegate = null; finished = true }
+                closeSubscription()
+                cancelOwnedJob() // A committed row is immutable; this only cleans unfinished owned work.
                 synchronized(ownerLock) { exchanges.remove(this) }
             }
         }
 
         private fun isCancelled() = synchronized(lock) { cancelled }
+        private fun selectedInvalidation() = synchronized(lock) { persistentInvalidation }
         private fun denied(reason: SourceCommitDenial, wire: GuardedSendOutcome?) =
             SourceBoundSendOutcome(StreamEvent.Failed(FailureKind.SEND_DENIED), wire, storageDenial = reason)
+
+        private fun accepted(outcome: SourceBoundSendOutcome): SourceBoundSendOutcome {
+            synchronized(lock) { finished = true }
+            return outcome
+        }
+
+        /** SQL has already ended before a subscription may invoke this callback. */
+        private fun invalidatePersistent(reason: SendDenial) {
+            if (reason == SendDenial.EXECUTION_CANCELLED) {
+                cancelHttpOnly()
+                return
+            }
+            val owned = synchronized(lock) {
+                if (finished) return
+                if (persistentInvalidation == null) persistentInvalidation = reason
+                (delegate to subscription).also { subscription = null }
+            }
+            // Never write/cancel the durable job on the watch's observation thread. Only the
+            // execution owner performs that cleanup; cancellation owns this HTTP exchange.
+            try { owned.first?.cancel() } finally { closeSubscription(owned.second) }
+        }
+
+        private fun cancelHttpOnly(): Boolean {
+            val owned = synchronized(lock) {
+                if (finished) return false
+                cancelled = true
+                (delegate to subscription).also { subscription = null }
+            }
+            try { owned.first?.cancel() } finally { closeSubscription(owned.second) }
+            return true
+        }
+
+        private fun checkSubscription(watch: SourceBoundTextSubscription): SendDenial? {
+            if (isCancelled()) throw CancellationException()
+            selectedInvalidation()?.let { return it }
+            val reason = try { watch.check() } catch (failure: Throwable) {
+                rethrowFatal(failure)
+                if (failure is CancellationException) throw failure
+                SendDenial.STATE_UNAVAILABLE
+            }
+            if (reason == SendDenial.EXECUTION_CANCELLED) {
+                cancelHttpOnly()
+                throw CancellationException()
+            }
+            if (reason != null) invalidatePersistent(reason)
+            return selectedInvalidation() ?: reason
+        }
+
+        private fun closeSubscription() {
+            val owned = synchronized(lock) { subscription.also { subscription = null } }
+            closeSubscription(owned)
+        }
+
+        private fun closeSubscription(owned: SourceBoundTextSubscription?) {
+            try { owned?.close() } catch (failure: Throwable) { rethrowFatal(failure) }
+        }
+
+        private fun SendDenial.toStorageDenial(): SourceCommitDenial = when (this) {
+            SendDenial.POLICY_BLOCKED -> SourceCommitDenial.POLICY_BLOCKED
+            SendDenial.SOURCE_CHANGED -> SourceCommitDenial.SOURCE_CHANGED
+            SendDenial.SOURCE_DELETED -> SourceCommitDenial.SOURCE_DELETED
+            SendDenial.CONSENT_REVOKED, SendDenial.CONSENT_EXPIRED, SendDenial.CONSENT_NOT_CURRENT ->
+                SourceCommitDenial.CONSENT_NOT_CURRENT
+            SendDenial.STATE_UNAVAILABLE -> SourceCommitDenial.STORAGE_UNAVAILABLE
+            SendDenial.EXECUTION_CANCELLED -> SourceCommitDenial.JOB_INVALID // Control signal never becomes a denial.
+            SendDenial.ALREADY_SENT -> SourceCommitDenial.JOB_INVALID
+            else -> SourceCommitDenial.AUTHORIZATION_CHANGED
+        }
 
         private fun cancelOwnedJob() {
             val job = (queued as? SourceQueueOutcome.Queued)?.job ?: return

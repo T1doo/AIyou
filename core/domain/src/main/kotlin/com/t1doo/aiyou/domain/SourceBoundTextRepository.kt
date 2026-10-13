@@ -12,10 +12,26 @@ interface SourceBoundTextRepository {
     /** Reads only the requested current, explicitly remote-approved original; no caller payload. */
     fun queue(intent: RemoteSendIntent, promptVersion: String, clock: () -> Instant): SourceQueueOutcome
     fun check(job: SourceBoundTextJob, clock: () -> Instant): SendDenial?
+    /**
+     * Checks persisted authority immediately, then watches it while an exchange is active.
+     * The one-shot invalidation callback runs outside SQL and must only signal owned,
+     * nonblocking cancellation. It may run before this method returns.
+     * EXECUTION_CANCELLED is an observer control signal for a cancelled trusted clock.
+     */
+    fun subscribe(job: SourceBoundTextJob, clock: () -> Instant,
+                  onInvalidated: (SendDenial) -> Unit): SourceBoundTextSubscription
     /** Atomically rechecks persisted versions/permission and consumes the queued job before sending. */
     fun admit(job: SourceBoundTextJob, clock: () -> Instant): SendDenial?
     /** Validates original references, current permission and duplicate result inside the same write transaction. */
     fun commit(job: SourceBoundTextJob, candidate: DerivedTextCandidate, clock: () -> Instant): SourceCommitOutcome
     /** Marks only this unfinished job cancelled; cannot remove a committed result. */
     fun cancel(job: SourceBoundTextJob)
+}
+
+/** A subscription never grants authority from a cached snapshot. */
+interface SourceBoundTextSubscription : AutoCloseable {
+    /** Fresh persisted check; a rejection/control signal is sticky and notified once. Blocking IO. */
+    fun check(): SendDenial?
+    /** Stops future observations without waiting for an in-flight SQL read or notification. */
+    override fun close()
 }

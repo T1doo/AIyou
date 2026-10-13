@@ -63,10 +63,11 @@ behavior. Tests use only fake references and synthetic secrets.
 
 Database admission and the remote HTTP operation cannot be one distributed
 transaction. Revocation that wins before admission prevents an HTTP request;
-revocation after admission can leave already sent bytes and later previews.
-This slice does not implement cross-connection active-call notifications. Explicit
-exchange cancellation stops its owned call. The final database transaction
-prevents a revoked or stale result from becoming a saved annotation.
+revocation after admission can leave already sent bytes. The later active-call
+slice observes the same persisted authority across connections and cancels its
+owned HTTP call; its exact detection and preview boundaries are documented in
+[D04_ACTIVE_HTTP_REVOCATION.md](D04_ACTIVE_HTTP_REVOCATION.md). The final database
+transaction still prevents a revoked or stale result from becoming a saved annotation.
 
 ## Atomic result boundary
 

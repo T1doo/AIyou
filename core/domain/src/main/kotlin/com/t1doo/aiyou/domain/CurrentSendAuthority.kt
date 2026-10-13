@@ -9,6 +9,8 @@ enum class SendDenial {
     CONFIGURATION_CHANGED, CONSENT_MISSING, CONSENT_REVOKED, CONSENT_EXPIRED,
     CONSENT_NOT_CURRENT, CONSENT_CHANGED, SCOPE_MISMATCH, QUEUE_INVALIDATED,
     ALREADY_SENT, SECRET_UNAVAILABLE, CONFIGURATION_INVALID, STATE_UNAVAILABLE,
+    /** Observer control signal: a trusted clock cancelled execution, not an authorization grant/denial. */
+    EXECUTION_CANCELLED,
 }
 
 /** Metadata-only queue ticket. The HTTP guard creates it when the exchange is queued. */

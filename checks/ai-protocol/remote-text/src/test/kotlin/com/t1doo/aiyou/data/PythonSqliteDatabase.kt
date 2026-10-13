@@ -23,9 +23,10 @@ internal class PythonSqliteDatabase(
     private val writer: java.io.BufferedWriter
     val pid: Long
     val sqliteVersion: String
-    var beforeSql: ((String) -> Unit)? = null
-    var afterSql: ((String) -> Unit)? = null
-    var beforeCommit: (() -> Unit)? = null
+    @Volatile var beforeSql: ((String) -> Unit)? = null
+    @Volatile var afterSql: ((String) -> Unit)? = null
+    @Volatile var beforeCommit: (() -> Unit)? = null
+    private var transactionDepth = 0
     private var ended = false
 
     init {
@@ -70,15 +71,25 @@ internal class PythonSqliteDatabase(
     override fun <T> transaction(block: (RecordsSqlConnection) -> T): T = synchronized(monitor) {
         check(!ended)
         val connection = Connection()
-        connection.execute("BEGIN IMMEDIATE")
+        // Nested product calls use real SQLite savepoints inside the owned outer transaction.
+        // This is transaction plumbing; authorization still runs only in product Kotlin/SQL.
+        val outermost = transactionDepth == 0
+        val savepoint = "owned_nested_${sequence.incrementAndGet()}"
+        connection.execute(if (outermost) "BEGIN IMMEDIATE" else "SAVEPOINT $savepoint")
+        transactionDepth++
         try {
             val result = block(connection)
-            beforeCommit?.invoke()
-            connection.execute("COMMIT")
+            if (outermost) beforeCommit?.invoke()
+            connection.execute(if (outermost) "COMMIT" else "RELEASE SAVEPOINT $savepoint")
             result
         } catch (failure: Throwable) {
-            try { connection.execute("ROLLBACK") } catch (rollback: Throwable) { failure.addSuppressed(rollback) }
+            try {
+                connection.execute(if (outermost) "ROLLBACK" else "ROLLBACK TO SAVEPOINT $savepoint")
+                if (!outermost) connection.execute("RELEASE SAVEPOINT $savepoint")
+            } catch (rollback: Throwable) { failure.addSuppressed(rollback) }
             throw failure
+        } finally {
+            transactionDepth--
         }
     }
 
