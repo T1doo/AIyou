@@ -124,9 +124,9 @@ class AttachmentRecordsIntegrationTest {
                 db.execSQL("INSERT INTO entry_revisions VALUES(?,?,?,?,?)",
                     arrayOf(revision.entryId, revision.revision, revision.originalText, revision.contentHash, revision.createdAtMillis))
                 db.execSQL("INSERT INTO local_jobs VALUES(?,?,?,'LOCAL_INDEX','PENDING')",
-                    arrayOf("$id:${revision.revision}:LOCAL_INDEX", id, revision.revision))
+                    arrayOf<Any?>("$id:${revision.revision}:LOCAL_INDEX", id, revision.revision))
             }
-            db.execSQL("INSERT INTO capture_draft VALUES(1,?,?,?)", arrayOf(draft.id, draft.version, draft.text))
+            db.execSQL("INSERT INTO capture_draft VALUES(1,?,?,?)", arrayOf<Any?>(draft.id, draft.version, draft.text))
         }
         val migrated = open(); migrated.prepare()
         assertEquals(listOf(updated), migrated.entries()); assertEquals(revisions, migrated.revisions(id))

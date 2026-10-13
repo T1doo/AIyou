@@ -41,6 +41,8 @@
 
 新增测试的实际 Android 编译/DEX 结果仅以本次正常 push 后的同 SHA CI 为准，不复用 a8 的旧19项产物。没有受支持本地 Android classpath，因此本地 Android 编译 **NOT RUN**。交付记录应明确该新 CI 的实际状态，不将队列/编译成功表述为原生执行。
 
+首次提交 `554f11282fd1027ef9ba2054f6f2370bafdf6329` 的 [CI 38418211606](https://github.com/T1doo/AIyou/actions/runs/38418211606)、job `115368228894` 实际 **FAIL** 于 `:core:data:compileDebugAndroidTestKotlin`。编译器报告3处混合 `String`/整数 SQL 参数的 `arrayOf` 推断出不可安全 reify 的 intersection 类型；静态审查未识别此错误。修正只在这3处显式写 `arrayOf<Any?>`，保持 SQL 参数值、测试方法和业务断言不变，不更新编译器/依赖。旧失败原始日志、首次404 BlobNotFound响应与最终job状态保存在 `.local-evidence/d04/room-native-first/`。job结束后原始日志正常可读；没有权限变更、备用访问路径或 CI rerun。修正通过正常开发分支提交后产生新 CI，结果另存且不得改写这次失败。
+
 ## 当前环境与最小恢复动作
 
 2026-10-13 本地只读实查：无 SDK 包、既有 SDK 接受记录、adb、emulator 或 `/dev/kvm`；没有可见的已授权设备 serial。已锁定 JDK17/Gradle 的 JVM 能力可用。现有 CI 是构建服务，不是持续连接的设备服务。

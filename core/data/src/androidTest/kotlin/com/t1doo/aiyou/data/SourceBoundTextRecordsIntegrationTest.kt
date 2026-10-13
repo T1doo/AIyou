@@ -375,7 +375,7 @@ class SourceBoundTextRecordsIntegrationTest {
         store.database.openHelper.writableDatabase.query(
             "SELECT r.originalText,r.contentHash,e.capturedAtMillis,e.captureTimeZone " +
                 "FROM entry_revisions r JOIN entries e ON e.id=r.entryId WHERE r.entryId=? AND r.revision=?",
-            arrayOf(source.sourceId, source.revision)
+            arrayOf<Any?>(source.sourceId, source.revision)
         ).use { cursor ->
             assertTrue(cursor.moveToFirst())
             assertEquals(cursor.getString(0), job.originalText)
