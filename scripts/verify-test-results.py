@@ -20,7 +20,7 @@ if args.component:
 if args.queue:
     targets.append(("host queue", "checks/record-queue/build/test-results/test", 119))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 92))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 95))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 if args.evidence:
@@ -86,6 +86,10 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.ProductionTasksPresentationTest"] = (
+            "localRecordsNeverBecomeTasksAndUnopenedCompletionIsExplicit",
+            "shortNarrowDoubleFontTasksScrollAndSettingsReturnWithoutChangingDraft",
+            "shortLandscapeKeepsTaskStatusNavigationAndSettingsReachable")
         additional["com.t1doo.aiyou.UiPreferencesTest"] = (
             "bothDisplayChoicesSurviveNewStorageAndViewModelInstances",
             "failedWriteKeepsConfirmedValuesAndRetryPersistsTheRequestedChoice",

@@ -146,7 +146,8 @@ fun MainScreen(
                             item("pending-empty") { StatusNotice("没有待确认建议", "建议经过确认后才可成为正式任务。", state = ComponentState.EMPTY) }
                         }
                         item("today-tasks") { Text("今天 · 正式任务 0", style = MaterialTheme.typography.titleLarge) }
-                        item("today-empty") { Text("尚未创建正式任务或安排提醒。", style = MaterialTheme.typography.bodyLarge) }
+                        item("today-empty") { Text(if (demo) "尚未创建正式任务或安排提醒。" else "手工创建与完成待办尚未开放。",
+                            style = MaterialTheme.typography.bodyLarge) }
                         item("reminders") { StatusNotice("提醒功能尚未开放", "以后会分别显示任务确认、系统调度和通知权限状态。") }
                     }
                 }
