@@ -62,3 +62,48 @@ internal data class AttachmentEntity(
     val byteSize: Long,
     val state: String,
 )
+
+@Entity(tableName = "remote_source_access", foreignKeys = [ForeignKey(
+    entity = EntryEntity::class, parentColumns = ["id"], childColumns = ["entryId"], deferred = true,
+)])
+internal data class RemoteSourceAccessEntity(
+    @PrimaryKey val entryId: String,
+    val generation: Long,
+    val deleted: Boolean,
+    val connection: ByteArray?,
+    val consent: ByteArray?,
+)
+
+@Entity(tableName = "remote_text_jobs", foreignKeys = [ForeignKey(
+    entity = RevisionEntity::class, parentColumns = ["entryId", "revision"],
+    childColumns = ["entryId", "sourceRevision"], deferred = true,
+)], indices = [Index(value = ["bindingKey"], unique = true), Index(value = ["entryId", "sourceRevision"])])
+internal data class RemoteTextJobEntity(
+    @PrimaryKey val id: String,
+    val bindingKey: String,
+    val entryId: String,
+    val sourceRevision: Int,
+    val generation: Long,
+    val purpose: String,
+    val promptVersion: String,
+    val connection: ByteArray,
+    val consent: ByteArray,
+    val state: String,
+    val sourceHash: String,
+)
+
+@Entity(tableName = "text_annotations", foreignKeys = [ForeignKey(
+    entity = RemoteTextJobEntity::class, parentColumns = ["id"], childColumns = ["jobId"], deferred = true,
+), ForeignKey(
+    entity = RevisionEntity::class, parentColumns = ["entryId", "revision"],
+    childColumns = ["entryId", "sourceRevision"], deferred = true,
+)], indices = [Index(value = ["entryId", "sourceRevision"])])
+internal data class TextAnnotationEntity(
+    @PrimaryKey val jobId: String,
+    val entryId: String,
+    val sourceRevision: Int,
+    val generation: Long,
+    val candidate: ByteArray,
+    val resultHash: String,
+    val createdAtMillis: Long,
+)

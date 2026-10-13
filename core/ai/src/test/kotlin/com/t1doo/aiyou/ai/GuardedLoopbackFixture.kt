@@ -4,6 +4,7 @@ import com.t1doo.aiyou.domain.CurrentSendAuthority
 import com.t1doo.aiyou.model.*
 import java.io.Closeable
 import java.io.IOException
+import java.lang.reflect.InvocationTargetException
 import java.net.InetAddress
 import java.net.Proxy
 import java.time.Instant
@@ -21,6 +22,26 @@ import okhttp3.OkHttpClient
 import okio.Buffer
 import okio.BufferedSink
 import org.junit.Assert.*
+
+/** Historical guard contracts exercise the private entry only through test-source reflection. */
+private fun OkHttpStreamingTransport.newGuardedExchange(
+    authority: CurrentSendAuthority,
+    intent: RemoteSendIntent,
+    request: TextRequest,
+    secrets: SecretResolver,
+    clock: () -> Instant,
+    streamLimits: StreamLimits = StreamLimits(),
+): GuardedStreamingExchange {
+    val method = OkHttpStreamingTransport::class.java.declaredMethods.single {
+        it.name == "newGuardedExchange" && it.parameterCount == 7 &&
+            it.parameterTypes.first() == CurrentSendAuthority::class.java
+    }.apply { isAccessible = true }
+    return try {
+        method.invoke(this, authority, intent, request, secrets, clock, streamLimits, null) as GuardedStreamingExchange
+    } catch (failure: InvocationTargetException) {
+        throw failure.cause ?: failure
+    }
+}
 
 /** Owned dual-loopback fixture. All references, authentication values and records are synthetic. */
 internal class GuardedLoopbackFixture(protocol: ConnectionProtocol, selectedB: Boolean = false,

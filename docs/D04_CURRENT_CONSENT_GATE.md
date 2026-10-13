@@ -1,5 +1,11 @@
 # D04 current-consent sending gate
 
+This records the limited acceptance at
+`36a2b911542249af2b0a6d80237c9b442ecd57e4`. The subsequent source-bound storage
+slice replaces its public arbitrary-text authenticated entry with a repository
+entry and implements the persistence boundary described below; see
+`D04_SOURCE_BOUND_STORAGE.md` for that slice's separate evidence and limitations.
+
 This independent slice builds on bounded HTTP commit
 `d8cc0ff377e6154991a90943f9b402dd01646636` on
 `codex/d04-jvm-protocol-sse-20261013`. It adds pure configuration/consent versions

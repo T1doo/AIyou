@@ -34,6 +34,8 @@ class EncryptedEntryRepository internal constructor(
     private val dao get() = database.records()
     override val attachments: AttachmentStore get() = attachmentStorage
     override val editDrafts: EncryptedOriginalEditStore get() = originalEditStorage
+    /** Blocking IO; shares the existing encrypted database and never enables remote processing. */
+    val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(database)
 
     override suspend fun prepare() { attachmentStorage.recover() }
 
@@ -188,11 +190,11 @@ class EncryptedEntryRepository internal constructor(
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
                 val created = Room.databaseBuilder(context.applicationContext, RecordsDatabase::class.java, file.absolutePath)
                 .openHelperFactory(SupportOpenHelperFactory(key))
-                .addMigrations(recordsMigration1To2, recordsMigration2To3)
+                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addCallback(object : RoomDatabase.Callback() {
-                    override fun onCreate(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db) }
-                    override fun onOpen(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db) }
+                    override fun onCreate(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db) }
+                    override fun onOpen(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db) }
                 }).build()
                 database = created
                 created.openHelper.writableDatabase // authenticate/schema validation before reporting ready
@@ -216,10 +218,11 @@ class EncryptedEntryRepository internal constructor(
 
 private fun DraftEntity.toModel() = TextDraft(id, version, text)
 private fun EntryRow.toModel(): StoredEntry {
-    if (contentHash != contentHash(originalText) || privacyPolicy != ProcessingPolicy.LOCAL_ONLY.name) throw RecordIntegrityFailure()
+    if (contentHash != contentHash(originalText)) throw RecordIntegrityFailure()
+    val policy = try { ProcessingPolicy.valueOf(privacyPolicy) } catch (_: IllegalArgumentException) { throw RecordIntegrityFailure() }
     try { ZoneId.of(captureTimeZone) } catch (_: Exception) { throw RecordIntegrityFailure() }
     if (currentRevision < 1) throw RecordIntegrityFailure()
-    return StoredEntry(id, currentRevision, originalText, capturedAtMillis, captureTimeZone, ProcessingPolicy.LOCAL_ONLY)
+    return StoredEntry(id, currentRevision, originalText, capturedAtMillis, captureTimeZone, policy)
 }
 internal fun contentHash(text: String): String = MessageDigest.getInstance("SHA-256")
     .digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }

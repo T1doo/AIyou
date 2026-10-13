@@ -1,4 +1,4 @@
-# JVM text protocols, HTTP and current-consent gate
+# JVM text protocols, source-bound sending and current-consent gate
 
 `ProtocolRequests` builds a validated HTTPS operation URI, protocol headers and
 JSON request description. It does not open a connection or accept a secret.
@@ -76,7 +76,17 @@ constructor, HTTP mode or TLS setting. Real wire tests inspect both
 protocols and verify exactly one request, chunk partition equivalence, timeouts,
 EOF, errors, cancellation, callback failures and owned resource closure.
 
-`newGuardedExchange` is the higher-level sending boundary. Queue metadata binds
+`newSourceBoundExchange` is the public authenticated sending boundary. It accepts
+a source/version/purpose, numerical output bounds and a trusted records repository;
+it accepts no caller text, messages, system prompt or model. The repository reads
+only the current original with explicit remote permission. Fixed versioned prompts
+and that original form the request; attachments, other records and historical
+revisions are excluded. Dependency injection is trusted application code, not a
+security sandbox for malicious replacement repositories.
+
+The former arbitrary-`TextRequest` `newGuardedExchange` is now private. Its
+test-source reflection fixture verifies the internal engine without exposing
+that authenticated entry in production. Queue metadata binds
 the source revision, purpose, complete connection and grant, plus an authority
 generation. `CurrentSendAuthority` rejects restrictive policies, deleted/stale
 sources, revoked/expired/mismatched consent, configuration drift (even at the
@@ -84,15 +94,19 @@ same claimed version) and a switch-away/switch-back. Its private identity ledger
 control ticket consumption and receipt issuance; Kotlin `internal` visibility is
 not trusted to prevent JVM metadata forgery.
 
-Execution checks before resolving a secret, checks again after resolution, then
+Execution checks persisted state before resolving a secret, checks again after
+resolution, then atomically consumes the persisted job in the final network
+interceptor. Database operations finish before resolver/network/event callbacks;
+no external callback runs inside a database transaction. The internal engine also
 atomically rechecks and registers a one-use permit in the network interceptor.
 The trusted nonblocking clock is read under the authority lock at final admission
 and result validation. Resolver, network and event callbacks run outside that
 lock. Pre-admission denial or resolution failure produces zero HTTP operations,
 no fallback and no receipt. The interceptor runs after connect, so this does not
-promise zero sockets or TLS handshakes. An admission followed by revocation
-marks the permit invalid before cancelling the owned call; sent bytes cannot
-be recalled.
+promise zero sockets or TLS handshakes. An internal
+`CurrentSendAuthority.replaceState` invalidates its permit before cancelling the
+owned call; this is distinct from persisted changes through another connection.
+Sent bytes cannot be recalled.
 
 `SecretResolver` only receives the frozen `SecretReference`. `ResolvedSecret`
 owns a transferred character array, validates 1–8,192 visible ASCII characters,
@@ -109,12 +123,34 @@ fact, including a completed stream. Pre-admission failures use `denial` and have
 no wire outcome. Only actual wire completion plus a current final authorization
 check yields a receipt. A receipt is a version-bound authorization witness, not
 permanent permission, HTTP-success proof by itself or a database transaction.
-Future App/persistence code must filter supplied source content and atomically
-recheck its current source/configuration/consent before committing a result.
+The source-bound layer buffers previews and submits an annotation candidate only
+after completed wire output with that receipt. The product records transaction
+independently checks the current original, full configuration/grant, policy,
+generation, deletion and expiry, validates code-point references, inserts the
+annotation and marks the job complete atomically. `SourceBoundSendOutcome.Completed`
+therefore requires a persisted annotation. A duplicate of an already committed
+binding returns the stored annotation without a new HTTP call; an unfinished
+binding is never signed out to a second exchange. Local result idempotency does
+not promise that a provider can never charge twice.
+
+The database admission is a linearization point before sending; it is not a
+transaction with the remote server. Persisted revocation after admission can
+leave already sent bytes and later wire previews. This slice rechecks and rejects
+their result in the database; it does not implement cross-connection active-call
+notifications. `cancel()` explicitly stops its owned call and cancels unfinished
+owned work. Returned outcomes retain wire facts separately from storage denial.
+The stored annotation is a rebuildable candidate view with an exact original
+reference, not a validated stable fact, confirmed task or proof of semantic
+support. Full structured extraction and App presentation remain separate.
 The existing credential-free `newExchange` remains the low-level wire API; it
 accepts no authentication headers and does not itself enforce record consent.
 
-Real Keystore/secret-store integration, persistent configuration/grants/queues,
+The production Room/SQLCipher records repository supplies the new transaction
+adapter, migration and persistent configuration/grant/job/annotation tables.
+Host tests compile the actual product transaction/codec/schema and execute them
+through independent Python SQLite connections on synthetic files. This proves
+product SQL logic, not Android Room/KSP generation or SQLCipher runtime behavior.
+Real Keystore/secret-store integration, persistent worker lease/crash recovery,
 App wiring, model probing, multimodal and structured extraction remain separate
 D04/D05 gates. `LOCAL_ONLY` is unchanged; D02 device acceptance is NOT RUN and
 full D04 remains OPEN. Synthetic loopback success is not a provider connection.
@@ -129,7 +165,7 @@ Kotlin, JDK17, Gradle and JUnit versions reuse the existing project pins.
 Run actual modules without configuring Android projects:
 
 ```sh
-python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test --offline --rerun-tasks
+python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test :remote-text:test --offline --rerun-tasks
 python3 scripts/verify-ai-http-dependencies.py
 python3 scripts/verify-ai-protocol-results.py
 ```

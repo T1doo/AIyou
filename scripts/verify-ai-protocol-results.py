@@ -13,7 +13,7 @@ root = Path(__file__).resolve().parent.parent
 
 def input_fingerprint():
     inputs = []
-    for base in ("core/ai", "core/model", "core/domain", "checks/ai-protocol"):
+    for base in ("core/ai", "core/model", "core/domain", "core/data", "checks/ai-protocol"):
         for path in (root / base).rglob("*"):
             relative = path.relative_to(root)
             if any(part in ("build", ".gradle", ".kotlin") for part in relative.parts):
@@ -30,22 +30,25 @@ def input_fingerprint():
     return fingerprint.hexdigest()
 
 
+modules = {"ai": root / "core/ai", "domain": root / "core/domain",
+           "remote-text": root / "checks/ai-protocol/remote-text"}
 source_sha256 = input_fingerprint()
-if len(sys.argv) == 3 and sys.argv[1] == "--capture" and sys.argv[2] in ("ai", "domain"):
-    output = root / "core" / sys.argv[2] / "build/reports/inputs-at-test.json"
+if len(sys.argv) == 3 and sys.argv[1] == "--capture" and sys.argv[2] in modules:
+    output = modules[sys.argv[2]] / "build/reports/inputs-at-test.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps({"source_sha256": source_sha256}) + "\n")
-    print(f"Captured inputs before core:{sys.argv[2]}:test")
+    task = "core:" + sys.argv[2] if sys.argv[2] != "remote-text" else "remote-text"
+    print(f"Captured inputs before {task}:test")
     raise SystemExit(0)
 if len(sys.argv) != 1:
-    raise SystemExit("Usage: verify-ai-protocol-results.py [--capture ai|domain]")
+    raise SystemExit("Usage: verify-ai-protocol-results.py [--capture ai|domain|remote-text]")
 
 results = []
-for module in ("ai", "domain"):
-    directory = root / "core" / module
+for module, directory in modules.items():
+    task = "core:" + module if module != "remote-text" else "remote-text"
     capture = directory / "build/reports/inputs-at-test.json"
     if not capture.is_file() or json.loads(capture.read_text()).get("source_sha256") != source_sha256:
-        raise SystemExit(f"Missing or stale execution inputs for core:{module}; rerun actual tests")
+        raise SystemExit(f"Missing or stale execution inputs for {task}; rerun actual tests")
     expected = set()
     for source in (directory / "src/test/kotlin").rglob("*.kt"):
         text = source.read_text()
@@ -60,12 +63,12 @@ for module in ("ai", "domain"):
                 raise SystemExit("Duplicate source test method")
             expected.add(key)
     if not expected:
-        raise SystemExit(f"No expected tests in core:{module}")
+        raise SystemExit(f"No expected tests in {task}")
     actual = set()
     evidence = []
     xmls = sorted((directory / "build/test-results/test").glob("TEST-*.xml"))
     if not xmls:
-        raise SystemExit(f"Missing actual XML for core:{module}; NO-SOURCE is not PASS")
+        raise SystemExit(f"Missing actual XML for {task}; NO-SOURCE is not PASS")
     for xml in xmls:
         if xml.stat().st_mtime_ns < capture.stat().st_mtime_ns:
             raise SystemExit(f"Stale XML predates execution inputs: {xml.name}")
@@ -85,11 +88,11 @@ for module in ("ai", "domain"):
         evidence.append({"path": str(xml.relative_to(root)), "sha256": hashlib.sha256(xml.read_bytes()).hexdigest(),
                          "tests": len(cases)})
     if actual != expected:
-        raise SystemExit(f"Method inventory mismatch for core:{module}: missing={sorted(expected-actual)}, extra={sorted(actual-expected)}")
-    results.append({"module": "core:" + module, "tests": len(actual), "failures": 0, "errors": 0, "skipped": 0,
+        raise SystemExit(f"Method inventory mismatch for {task}: missing={sorted(expected-actual)}, extra={sorted(actual-expected)}")
+    results.append({"module": task, "tests": len(actual), "failures": 0, "errors": 0, "skipped": 0,
                     "methods": [list(key) for key in sorted(actual)], "xml": evidence})
 
-report = {"status": "PASS", "scope": "pure JVM protocol, current-consent gate, real loopback HTTP and domain contracts; no live provider/device/App integration",
+report = {"status": "PASS", "scope": "pure JVM protocol, source-bound sending, product SQL transactions on host SQLite, loopback HTTP and domain; no Android/SQLCipher/live provider/device/App acceptance",
           "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
           "source_sha256": source_sha256, "results": results,
           "d02_native_acceptance": "NOT RUN", "full_d04_acceptance": "OPEN"}

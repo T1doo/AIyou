@@ -292,8 +292,11 @@ class EncryptedRecordsIntegrationTest {
         assertEquals(3L, draft.version)
         assertEquals("合成迁移草稿", draft.text)
         val sql = store.database.openHelper.writableDatabase
-        assertEquals(3, sql.version)
+        assertEquals(4, sql.version)
         assertEquals(0L, count(store, "attachments"))
+        assertEquals(0L, count(store, "remote_source_access"))
+        assertEquals(0L, count(store, "remote_text_jobs"))
+        assertEquals(0L, count(store, "text_annotations"))
         sql.query("SELECT id,entryId,sourceRevision,operation,state FROM local_jobs").use { cursor ->
             assertTrue(cursor.moveToFirst())
             assertEquals("synthetic-v1:1:LOCAL_INDEX", cursor.getString(0))

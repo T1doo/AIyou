@@ -21,13 +21,13 @@ internal interface RecordsDao {
     @Query("SELECT * FROM local_jobs WHERE id=:id") suspend fun job(id: String): LocalJobEntity?
     @Query("UPDATE entries SET currentRevision = :next WHERE id = :id AND currentRevision = :expected")
     suspend fun advance(id: String, expected: Int, next: Int): Int
-    @Query("SELECT e.*, r.originalText, r.contentHash FROM entries e JOIN entry_revisions r ON e.id=r.entryId AND e.currentRevision=r.revision ORDER BY e.capturedAtMillis DESC, e.id")
+    @Query("SELECT e.*, r.originalText, r.contentHash FROM entries e JOIN entry_revisions r ON e.id=r.entryId AND e.currentRevision=r.revision WHERE NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=e.id AND a.deleted=1) ORDER BY e.capturedAtMillis DESC, e.id")
     suspend fun entries(): List<EntryRow>
-    @Query("SELECT e.*, r.originalText, r.contentHash FROM entries e JOIN entry_revisions r ON e.id=r.entryId AND e.currentRevision=r.revision WHERE e.id=:id")
+    @Query("SELECT e.*, r.originalText, r.contentHash FROM entries e JOIN entry_revisions r ON e.id=r.entryId AND e.currentRevision=r.revision WHERE e.id=:id AND NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=e.id AND a.deleted=1)")
     suspend fun entry(id: String): EntryRow?
-    @Query("SELECT * FROM entry_revisions WHERE entryId=:id ORDER BY revision")
+    @Query("SELECT * FROM entry_revisions WHERE entryId=:id AND NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=:id AND a.deleted=1) ORDER BY revision")
     suspend fun revisions(id: String): List<RevisionEntity>
-    @Query("SELECT EXISTS(SELECT 1 FROM entry_revisions WHERE entryId=:entryId AND revision=:revision)")
+    @Query("SELECT EXISTS(SELECT 1 FROM entry_revisions r JOIN entries e ON e.id=r.entryId WHERE r.entryId=:entryId AND r.revision=:revision AND NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=e.id AND a.deleted=1))")
     suspend fun revisionExists(entryId: String, revision: Int): Boolean
     @Query("SELECT * FROM attachments WHERE id=:id") suspend fun attachment(id: String): AttachmentEntity?
     @Query("SELECT * FROM attachments ORDER BY id") suspend fun attachments(): List<AttachmentEntity>
@@ -36,7 +36,8 @@ internal interface RecordsDao {
     suspend fun advanceAttachment(id: String, expected: String, next: String): Int
 }
 
-@Database(entities = [EntryEntity::class, RevisionEntity::class, DraftEntity::class, LocalJobEntity::class, AttachmentEntity::class], version = 3, exportSchema = true)
+@Database(entities = [EntryEntity::class, RevisionEntity::class, DraftEntity::class, LocalJobEntity::class,
+    AttachmentEntity::class, RemoteSourceAccessEntity::class, RemoteTextJobEntity::class, TextAnnotationEntity::class], version = 4, exportSchema = true)
 internal abstract class RecordsDatabase : RoomDatabase() {
     abstract fun records(): RecordsDao
 }
@@ -51,8 +52,16 @@ internal val recordsMigration2To3 = object : Migration(2, 3) {
 }
 
 internal fun installRevisionGuard(db: SupportSQLiteDatabase) {
-    db.execSQL("CREATE TRIGGER IF NOT EXISTS immutable_original_revision BEFORE UPDATE ON entry_revisions BEGIN SELECT RAISE(ABORT, 'immutable original revision'); END")
+    db.execSQL(RemoteTextSqlSchema.originalRevisionGuard)
 }
+
+internal val recordsMigration3To4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        RemoteTextSqlSchema.migration3To4.forEach(db::execSQL)
+        installRemoteTextGuards(db)
+    }
+}
+internal fun installRemoteTextGuards(db: SupportSQLiteDatabase) { RemoteTextSqlSchema.guards.forEach(db::execSQL) }
 
 internal fun installAttachmentGuard(db: SupportSQLiteDatabase) {
     db.execSQL("CREATE TRIGGER IF NOT EXISTS immutable_attachment_intent BEFORE UPDATE ON attachments WHEN OLD.id IS NOT NEW.id OR OLD.entryId IS NOT NEW.entryId OR OLD.revision IS NOT NEW.revision OR OLD.mediaType IS NOT NEW.mediaType OR OLD.sha256 IS NOT NEW.sha256 OR OLD.byteSize IS NOT NEW.byteSize BEGIN SELECT RAISE(ABORT, 'immutable attachment intent'); END")

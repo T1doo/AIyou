@@ -29,7 +29,7 @@ jobs:
             gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
       - name: Run actual domain and D04 JVM wire contracts
         run: |
-          python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test
+          python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test :remote-text:test
           python3 scripts/verify-ai-http-dependencies.py
           python3 scripts/verify-ai-protocol-results.py
       - name: Run actual ViewModel queue failure regressions (host boundary)
@@ -202,6 +202,8 @@ jobs:
             core/ai/build/reports/tests/test/
             core/ai/build/reports/inputs-at-test.json
             checks/ai-protocol/build/reports/verified-contracts.json
+            checks/ai-protocol/remote-text/build/test-results/test/
+            checks/ai-protocol/remote-text/build/reports/tests/test/
             checks/record-queue/build/test-results/test/
             checks/record-queue/build/reports/tests/test/
             checks/record-queue/build/reports/attachment-process/

@@ -2,6 +2,7 @@ pluginManagement { repositories { mavenCentral(); gradlePluginPortal() } }
 dependencyResolutionManagement { repositories { mavenCentral() } }
 rootProject.name = "aiyou-ai-protocol-contracts"
 include(":core:model", ":core:domain", ":core:ai")
+include(":remote-text")
 project(":core").projectDir = file("../../core")
 project(":core:model").projectDir = file("../../core/model")
 project(":core:domain").projectDir = file("../../core/domain")
