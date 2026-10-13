@@ -17,6 +17,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -33,6 +36,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import com.t1doo.aiyou.designsystem.AIyouColors
@@ -66,7 +71,30 @@ fun LocalRecordsScreen(
     onTailReturnHandled: () -> Unit = {},
     onResumeEdit: (String, String) -> Unit = { _, _ -> },
     companion: (@Composable () -> Unit)? = null,
+    onRequestCaptureDiscard: () -> Unit = {},
+    onConfirmCaptureDiscard: (Long) -> Unit = {},
+    onCancelCaptureDiscard: (Long) -> Unit = {},
 ) {
+    if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
+        AlertDialog(
+            onDismissRequest = { if (!discard.busy) onCancelCaptureDiscard(discard.requestId) },
+            title = { Text("清空这份未保存的草稿？") },
+            text = { Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text("清空后无法恢复这份草稿。已保存的记录不会删除。")
+                if (discard.busy) Text("正在确认本机清空结果…")
+                discard.error?.let { Text(it, color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+            } },
+            confirmButton = { TextButton(enabled = !discard.busy && !discard.conflict,
+                onClick = { onConfirmCaptureDiscard(discard.requestId) }) {
+                Text(if (discard.error == null) "确认清空" else "重试确认")
+            } },
+            dismissButton = { TextButton(enabled = !discard.busy,
+                onClick = { onCancelCaptureDiscard(discard.requestId) }) {
+                Text(if (discard.error == null) "保留草稿" else "返回编辑")
+            } },
+        )
+    }
     val displayedEntries = if (destination == Destination.NOW) local.entries.take(5) else local.entries
     var attachedViewport by remember { mutableStateOf(IntSize.Zero) }
     val currentLocal by rememberUpdatedState(local)
@@ -133,16 +161,19 @@ fun LocalRecordsScreen(
                 if (destination == Destination.NOW) item("composer") {
                     CaptureComposer(
                         text = local.text, onTextChange = onDraftChange,
-                        onSubmit = if (local.ready && !local.saving) onSave else null,
+                        onSubmit = if (local.ready && !local.saving && local.captureDiscard == null) onSave else null,
                         askAvailable = false,
                         state = when { local.opening || local.saving -> ComponentState.LOADING
-                            !local.ready || local.savePending -> ComponentState.DISABLED
+                            !local.ready || local.savePending || local.captureDiscard?.busy == true -> ComponentState.DISABLED
                             else -> ComponentState.NORMAL },
                         availability = "${local.draftNotice} · 仅本机保存\n提问、图片和录音尚未开放。",
                         showUnavailableControls = false,
                         maxTextLength = EncryptedEntryRepository.MAX_TEXT_LENGTH,
                         inputError = local.inputNotice,
                     )
+                    if (local.text.isNotEmpty()) TextButton(onClick = onRequestCaptureDiscard,
+                        enabled = local.ready && !local.opening && !local.saving && !local.savePending && local.captureDiscard == null,
+                        modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("清空草稿") }
                 }
                 if (local.opening) item("loading") { StatusNotice("正在读取本机记录", "记录和草稿来自加密数据库。", state = ComponentState.LOADING) }
                 local.error?.let { message -> item("error") {

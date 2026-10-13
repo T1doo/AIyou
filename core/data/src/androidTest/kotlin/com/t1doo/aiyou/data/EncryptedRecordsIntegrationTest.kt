@@ -85,6 +85,23 @@ class EncryptedRecordsIntegrationTest {
         assertEquals(listOf(saved), store.entries())
         assertEquals(text, store.revisions(saved.id).single().originalText)
         assertEquals(contentHash(text), store.revisions(saved.id).single().contentHash)
+        val discarded = store.updateDraft("合成明确放弃的草稿")
+        // The real encrypted transaction must not delete a changed version, even with identical text.
+        val newer = store.updateDraft(discarded.text)
+        fails<com.t1doo.aiyou.domain.RecordConflict> { store.discardDraft(discarded) }
+        assertEquals(newer, store.readDraft())
+        store.discardDraft(newer)
+        store.discardDraft(newer) // Idempotent acknowledgement retry after a committed delete.
+        store.close()
+        store = open()
+        assertNull(store.readDraft())
+        assertEquals(listOf(saved), store.entries())
+        assertEquals(1L, count(store, "local_jobs"))
+        assertEquals(1, store.revisions(saved.id).size)
+        val nextDraft = store.updateDraft("合成清空后的新草稿")
+        assertNotEquals(newer.id, nextDraft.id)
+        fails<com.t1doo.aiyou.domain.RecordConflict> { store.discardDraft(newer) }
+        assertEquals(nextDraft, store.readDraft())
     }
 
     @Test fun actualJobInsertFailureRollsBackEntryRevisionAndDraftConsumption() = runBlocking {

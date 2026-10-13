@@ -28,6 +28,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+data class CaptureDiscardUiState(val requestId: Long, val busy: Boolean = false, val error: String? = null,
+    val conflict: Boolean = false)
+
 data class LocalRecordUiState(
     val ready: Boolean = false,
     val opening: Boolean = true,
@@ -40,6 +43,7 @@ data class LocalRecordUiState(
     val saveFeedbackId: Long = 0L,
     val error: String? = null,
     val inputNotice: String? = null,
+    val captureDiscard: CaptureDiscardUiState? = null,
     val originalEdit: OriginalEditUiState? = null,
     val originalEditNotice: String? = null,
     val originalHistory: OriginalHistoryUiState? = null,
@@ -64,13 +68,16 @@ class LocalRecordsViewModel internal constructor(
     val attachments = LocalAttachmentController(
         enqueue = { action -> commands.trySend(Command.Attachment(action)).isSuccess }, decodePng = decodePng,
         canUseRecord = { mutableState.value.let { it.ready && !it.opening && it.error == null &&
-            !it.saving && !it.savePending } },
+            !it.saving && !it.savePending && it.captureDiscard == null } },
         canUsePanel = { it.hasRecordAccess(mutableState.value) })
     private var repository: EntryRepository? = null
     private var persistedDraft: TextDraft? = null
+    private var captureDraftMayBeConsumed = false // IO queue only; an unacknowledged delete invalidates save reuse.
     private val editGeneration = AtomicLong()
     private var pendingCommit: TextDraft? = null
     private val pendingIntent = AtomicReference<SaveIntent?>(null)
+    private val discardIds = AtomicLong()
+    private var discardIntent: DiscardIntent? = null // UI thread owns identity; IO queue owns expected snapshot.
     private val originalEditIds = AtomicLong()
     private val originalHistoryIds = AtomicLong()
     private val historyReplacementIds = AtomicLong()
@@ -90,6 +97,7 @@ class LocalRecordsViewModel internal constructor(
                         when (command) {
                             is Command.Edit -> {
                                 persistedDraft = checkNotNull(repository).updateDraft(command.text)
+                                captureDraftMayBeConsumed = false
                                 if (command.generation == editGeneration.get()) mutableState.update {
                                     it.copy(draftNotice = "草稿已保存在本机", error = null, saveNotice = null)
                                 }
@@ -97,21 +105,24 @@ class LocalRecordsViewModel internal constructor(
                             is Command.Save -> {
                                 if (pendingIntent.get() !== command.intent) continue
                                 val store = checkNotNull(repository)
-                                val draft = pendingCommit ?: persistedDraft?.takeIf { it.text == command.intent.text }
+                                val draft = pendingCommit ?: persistedDraft?.takeIf { !captureDraftMayBeConsumed && it.text == command.intent.text }
                                     ?: store.updateDraft(command.intent.text)
                                 pendingCommit = draft
                                 store.saveDraft(draft, clock.millis(), ZoneId.systemDefault().id)
                                 val entries = store.entries()
                                 pendingCommit = null
                                 persistedDraft = null
+                                captureDraftMayBeConsumed = false
                                 pendingIntent.compareAndSet(command.intent, null)
                                 // Success follows commit; the list is read from the database.
                                 mutableState.update { it.copy(text = "", saving = false, savePending = false, entries = entries, draftNotice = "没有未保存的草稿", saveNotice = "已保存在本机", saveFeedbackId = it.saveFeedbackId + 1, error = null) }
                             }
+                            is Command.DiscardCapture -> discardCapture(command.intent)
                             Command.Retry -> open()
                             is Command.RecoverDraft -> {
                                 val store = checkNotNull(repository)
                                 persistedDraft = store.updateDraft(command.text)
+                                captureDraftMayBeConsumed = false
                                 val entries = store.entries()
                                 mutableState.update { it.copy(opening = false, entries = entries, error = null,
                                     draftNotice = if (command.generation == editGeneration.get()) "草稿已保存在本机" else it.draftNotice,
@@ -147,7 +158,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun changeText(text: String) {
         val current = mutableState.value
-        if (!current.ready || current.saving || current.savePending || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
+        if (editsDisposed || !current.ready || current.opening || current.saving || current.savePending || current.captureDiscard?.busy == true || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         if (text.length > EncryptedEntryRepository.MAX_TEXT_LENGTH) {
             mutableState.update { it.copy(
                 inputNotice = "文本过长，输入长度上限为 ${EncryptedEntryRepository.MAX_TEXT_LENGTH}。本次输入未替换原草稿，请缩短后重试。",
@@ -156,13 +167,14 @@ class LocalRecordsViewModel internal constructor(
             return
         }
         val generation = editGeneration.incrementAndGet()
-        mutableState.update { it.copy(text = text, draftNotice = "正在保存草稿", saveNotice = null, inputNotice = null) }
+        discardIntent = null
+        mutableState.update { it.copy(text = text, draftNotice = "正在保存草稿", saveNotice = null, inputNotice = null, captureDiscard = null) }
         commands.trySend(Command.Edit(text, generation))
     }
 
     fun save() {
         val current = mutableState.value
-        if (!current.ready || current.saving || current.text.isBlank() || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
+        if (editsDisposed || !current.ready || current.captureDiscard != null || current.saving || current.text.isBlank() || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         val intent = pendingIntent.get() ?: SaveIntent(current.text, editGeneration.get()).also { pendingIntent.set(it) }
         mutableState.update { it.copy(saving = true, savePending = true, saveNotice = null, error = null, inputNotice = null) }
         commands.trySend(Command.Save(intent))
@@ -170,6 +182,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun retry() {
         val current = mutableState.value
+        if (current.captureDiscard != null) return
         if (current.editDraftError != null && current.ready) {
             commands.trySend(Command.RefreshEditDrafts)
             if (current.error == null) return
@@ -186,9 +199,70 @@ class LocalRecordsViewModel internal constructor(
         else if (mutableState.value.ready) changeText(mutableState.value.text)
     }
 
+    fun requestCaptureDiscard() {
+        val current = mutableState.value
+        if (editsDisposed || !current.ready || current.opening || current.saving || current.savePending ||
+            current.text.isEmpty() || current.captureDiscard != null || current.originalEdit != null ||
+            current.originalHistory != null || attachments.state.value != null) return
+        val intent = DiscardIntent(discardIds.incrementAndGet(), current.text, editGeneration.get())
+        discardIntent = intent
+        mutableState.update { it.copy(captureDiscard = CaptureDiscardUiState(intent.id)) }
+    }
+
+    fun cancelCaptureDiscard(requestId: Long) {
+        val active = mutableState.value.captureDiscard ?: return
+        if (active.requestId != requestId || active.busy) return
+        discardIntent = null
+        mutableState.update { it.copy(captureDiscard = null) }
+    }
+
+    fun confirmCaptureDiscard(requestId: Long) {
+        val current = mutableState.value
+        val active = current.captureDiscard ?: return
+        val intent = discardIntent ?: return
+        if (editsDisposed || active.requestId != requestId || active.busy || active.conflict || intent.id != requestId ||
+            intent.generation != editGeneration.get() || intent.text != current.text) return
+        mutableState.update { it.copy(captureDiscard = active.copy(busy = true, error = null)) }
+        commands.trySend(Command.DiscardCapture(intent))
+    }
+
+    private suspend fun discardCapture(intent: DiscardIntent) {
+        try {
+            val store = checkNotNull(repository)
+            // Prior autosaves finish first. Never replace a failed autosave merely to delete it.
+            if (!intent.bound) {
+                val actual = store.readDraft()
+                if (actual != persistedDraft || actual?.text != intent.text) throw RecordConflict()
+                intent.expected = actual
+                intent.bound = true
+            }
+            // A failed acknowledgement may follow a committed delete. Never reuse this cache to save.
+            captureDraftMayBeConsumed = true
+            store.discardDraft(checkNotNull(intent.expected))
+            if (store.readDraft() != null) throw RecordConflict()
+            persistedDraft = null
+            captureDraftMayBeConsumed = false
+            mutableState.update { current ->
+                if (current.captureDiscard?.requestId != intent.id || editGeneration.get() != intent.generation) current
+                else current.copy(text = "", captureDiscard = null, draftNotice = "没有未保存的草稿",
+                    saveNotice = null, inputNotice = null, error = null)
+            }
+        } catch (failure: CancellationException) { throw failure }
+        catch (failure: Exception) {
+            mutableState.update { current ->
+                if (current.captureDiscard?.requestId != intent.id) current
+                else current.copy(captureDiscard = current.captureDiscard.copy(busy = false,
+                    conflict = failure is RecordConflict,
+                    error = if (failure is RecordConflict) "本机草稿已变化，本次清空已停止。当前输入已保留，请返回编辑。"
+                        else "清空尚未确认，当前输入已保留。可以重试确认或返回编辑。"))
+            }
+        }
+    }
+
     fun beginOriginalEdit(entryId: String, expectedRevision: Int) {
         if (editsDisposed) return
         val current = mutableState.value
+        if (current.captureDiscard != null) return
         if (!current.ready || current.opening || current.error != null || current.saving || current.savePending || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         val entry = current.entries.firstOrNull { it.id == entryId && it.currentRevision == expectedRevision } ?: return
         val edit = OriginalEditUiState(originalEditIds.incrementAndGet(), entry.id, entry.currentRevision, entry.originalText,
@@ -199,6 +273,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun resumeOriginalEdit(entryId: String, draftId: String) {
         val current = mutableState.value
+        if (current.captureDiscard != null) return
         if (editsDisposed || !current.ready || current.opening || current.error != null || !current.editDraftIndexAvailable || current.saving || current.savePending ||
             current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         val ref = current.pendingEdits.singleOrNull { it.entryId == entryId && it.id == draftId } ?: return
@@ -257,6 +332,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun beginOriginalHistory(entryId: String, expectedRevision: Int) {
         val current = mutableState.value
+        if (current.captureDiscard != null) return
         if (!current.ready || current.opening || current.error != null || current.saving || current.savePending || current.originalHistory != null || attachments.state.value != null) return
         if (current.originalEdit?.let { it.entryId != entryId || !it.canCancel } == true) return
         if (current.entries.none { it.id == entryId && it.currentRevision == expectedRevision }) return
@@ -640,6 +716,7 @@ class LocalRecordsViewModel internal constructor(
             val store = repository ?: openStore().also { repository = it }
             store.prepare()
             persistedDraft = store.readDraft()
+            captureDraftMayBeConsumed = false
             val entries = store.entries()
             val pending = try { store.editDrafts?.pending() ?: OriginalEditDraftIndex(emptyList()) }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
@@ -663,6 +740,8 @@ class LocalRecordsViewModel internal constructor(
     override fun onCleared() { editsDisposed = true; attachments.markDisposed(); commands.close(); super.onCleared() }
 
     private data class SaveIntent(val text: String, val generation: Long)
+    private class DiscardIntent(val id: Long, val text: String, val generation: Long,
+        var expected: TextDraft? = null, var bound: Boolean = false)
 
     private sealed interface Command {
         data object RefreshEditDrafts : Command
@@ -673,6 +752,7 @@ class LocalRecordsViewModel internal constructor(
         data class Attachment(val action: suspend (EntryRepository) -> Unit) : Command
         data class Edit(val text: String, val generation: Long) : Command
         data class Save(val intent: SaveIntent) : Command
+        data class DiscardCapture(val intent: DiscardIntent) : Command
         data object Retry : Command
         data class RecoverDraft(val text: String, val generation: Long) : Command
         data class Revise(val sessionId: Long, val entryId: String, val expectedRevision: Int, val text: String) : Command

@@ -14,6 +14,8 @@ interface EntryRepository {
     suspend fun prepare() {}
     suspend fun readDraft(): TextDraft?
     suspend fun updateDraft(text: String): TextDraft
+    /** Delete only this exact acknowledged snapshot. Missing is idempotent; a different draft conflicts. */
+    suspend fun discardDraft(expected: TextDraft) { throw UnsupportedOperationException("Draft discard unavailable") }
     suspend fun saveDraft(expected: TextDraft, capturedAtMillis: Long, captureTimeZone: String): StoredEntry
     suspend fun entries(): List<StoredEntry>
     suspend fun revisions(entryId: String): List<OriginalRevision>

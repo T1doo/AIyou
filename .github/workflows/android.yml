@@ -157,7 +157,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: aiyou-white-blue-pages
-          path: app/build/outputs/d01-visual-packs/d01-visual-review.zip
+          path: |
+            app/build/outputs/d01-visual-packs/d01-visual-review.zip
+            app/build/outputs/d01-visual-packs/d01-visual-drafts.zip
           compression-level: 0
           if-no-files-found: error
           retention-days: 14
