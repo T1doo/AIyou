@@ -32,7 +32,7 @@ class OriginalEditRecoveryTest {
     }
     private suspend fun stop(vm: LocalRecordsViewModel) { vm.scope.cancel(); vm.scope.coroutineContext[Job]!!.join() }
     private suspend fun edit(vm: LocalRecordsViewModel): Long {
-        vm.beginOriginalEdit("original", vm.state.value.entries.single().currentRevision)
+        vm.beginOriginalEdit("original", vm.state.value.entries.single { it.id == "original" }.currentRevision)
         return vm.state.first { it.originalEdit?.loadingDraft == false }.originalEdit!!.sessionId
     }
     private suspend fun saved(vm: LocalRecordsViewModel, text: String) = vm.state.first {
@@ -43,6 +43,137 @@ class OriginalEditRecoveryTest {
         try { withTimeout(10000) { block(root) } } finally { root.deleteRecursively() }
     }
     private fun storage(root: File, hook: (String) -> Unit = {}) = EncryptedOriginalEditStore(root, key.copyOf(), hook)
+
+    @Test fun explicitKeepColdReopensExactDraftAndResumedSessionCreatesOnlyOneRevision() = runBlocking { exercise { root ->
+        val encrypted = storage(root)
+        val repo = EncryptedEntryRepository(editDrafts = encrypted).also {
+            it.seed(original()); it.seed(original().copy(id = "other", originalText = "合成另一条原文"))
+        }
+        val first = vm(repo)
+        first.changeText("合成独立输入"); first.state.first { it.draftNotice == "草稿已保存在本机" }
+        val capture = repo.draft
+        val id = edit(first)
+        val text = "合成保留修改\n🌿\uD83C"
+        first.changeOriginalEdit(id, text)
+        first.keepOriginalEdit(id)
+        first.state.first { it.originalEdit == null }
+        val acknowledged = encrypted.read("original")!!
+        assertEquals(text, acknowledged.text); assertEquals(OriginalEditDraftState.ACTIVE, acknowledged.state)
+        assertEquals("编辑草稿已保留，可稍后恢复。", first.state.value.originalEditNotice)
+        assertTrue(repo.revisionSubmissions.isEmpty()); assertEquals(capture, repo.draft)
+        first.beginOriginalEdit("other", 1)
+        val otherId = first.state.first { it.originalEdit?.loadingDraft == false }.originalEdit!!.sessionId
+        first.changeOriginalEdit(otherId, "合成另一条编辑草稿"); first.keepOriginalEdit(otherId)
+        first.state.first { it.originalEdit == null }
+        assertEquals(acknowledged, encrypted.read("original"))
+        assertEquals(setOf("original", "other"), first.state.value.pendingEdits.map { it.entryId }.toSet())
+        stop(first); encrypted.close()
+        val reopened = storage(root)
+        val wrapper = object : com.t1doo.aiyou.domain.EntryRepository by repo { override val editDrafts = reopened }
+        val second = LocalRecordsViewModel(Application(), { wrapper })
+        try {
+            val ref = second.state.first { it.ready }.pendingEdits.single { it.entryId == "original" }
+            assertEquals(acknowledged, reopened.read("original"))
+            second.resumeOriginalEdit(ref.entryId, ref.id)
+            val restored = second.state.first { it.originalEdit?.loadingDraft == false }.originalEdit!!
+            assertEquals(text, restored.text)
+            second.saveOriginalEdit(restored.sessionId)
+            second.state.first { it.originalEdit == null }
+            assertEquals(1, repo.revisionSubmissions.size); assertEquals(text, repo.revisionSubmissions.single().text)
+            assertEquals(capture, repo.draft)
+        } finally { stop(second); reopened.close() }
+    } }
+
+    @Test fun keepDrainsLatestAcceptedAutosaveAndBusyOrOldSessionCallbacksCannotDiscardIt() = runBlocking { exercise { root ->
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        val pause = AtomicBoolean(true)
+        val encrypted = storage(root) { if (it == "encrypted" && pause.getAndSet(false)) {
+            entered.countDown(); check(release.await(3, TimeUnit.SECONDS))
+        } }
+        val repo = EncryptedEntryRepository(editDrafts = encrypted).also { it.seed(original()) }
+        val controller = vm(repo)
+        try {
+            val id = edit(controller)
+            controller.changeOriginalEdit(id, "合成第一稿"); assertTrue(entered.await(3, TimeUnit.SECONDS))
+            controller.changeOriginalEdit(id, "合成最终稿"); controller.keepOriginalEdit(id)
+            assertTrue(controller.state.value.originalEdit!!.keeping)
+            controller.changeOriginalEdit(id, "合成忙碌迟到输入")
+            controller.cancelOriginalEdit(id); controller.saveOriginalEdit(id); controller.keepOriginalEdit(id)
+            release.countDown(); controller.state.first { it.originalEdit == null }
+            val draft = encrypted.read("original")!!
+            assertEquals("合成最终稿", draft.text); assertEquals(2L, draft.version)
+            val ref = controller.state.value.pendingEdits.single()
+            controller.resumeOriginalEdit(ref.entryId, ref.id)
+            val resumed = controller.state.first { it.originalEdit?.loadingDraft == false }.originalEdit!!
+            assertNotEquals(id, resumed.sessionId)
+            controller.changeOriginalEdit(id, "合成关闭会话输入"); controller.cancelOriginalEdit(id)
+            controller.saveOriginalEdit(id); controller.keepOriginalEdit(id)
+            assertEquals(resumed, controller.state.value.originalEdit)
+            assertEquals(draft, encrypted.read("original")); assertTrue(repo.revisionSubmissions.isEmpty())
+        } finally { release.countDown(); stop(controller); encrypted.close() }
+    } }
+
+    @Test fun keepReconcilesPublicationFailureAndConfirmationFailuresRetainEditorUntilRetry() = runBlocking {
+        for (phase in listOf("encrypted", "published", "confirm", "readback")) exercise { root ->
+            val armed = AtomicBoolean(phase == "encrypted" || phase == "published")
+            val readback = AtomicBoolean(false)
+            val encrypted = storage(root) { if (it == phase && armed.getAndSet(false)) error("synthetic $phase failure") }
+            val drafts = object : com.t1doo.aiyou.domain.OriginalEditDraftStore by encrypted {
+                override suspend fun write(expected: com.t1doo.aiyou.model.OriginalEditDraft?, next: com.t1doo.aiyou.model.OriginalEditDraft): com.t1doo.aiyou.model.OriginalEditDraft {
+                    if (expected == next && phase == "confirm" && armed.getAndSet(false)) error("synthetic confirmation failure")
+                    val result = encrypted.write(expected, next)
+                    if (expected == next && phase == "readback" && armed.getAndSet(false)) readback.set(true)
+                    return result
+                }
+                override suspend fun read(entryId: String): com.t1doo.aiyou.model.OriginalEditDraft? {
+                    if (readback.getAndSet(false)) error("synthetic readback failure")
+                    return encrypted.read(entryId)
+                }
+            }
+            val repo = EncryptedEntryRepository(editDrafts = drafts).also { it.seed(original()) }
+            val controller = vm(repo)
+            try {
+                val id = edit(controller); val text = "合成完整保留输入 $phase"
+                controller.changeOriginalEdit(id, text)
+                if (phase == "encrypted" || phase == "published") controller.state.first { it.originalEdit?.error != null }
+                else { saved(controller, text); armed.set(true) }
+                controller.keepOriginalEdit(id)
+                if (phase == "confirm" || phase == "readback") {
+                    val failed = controller.state.first { it.originalEdit?.let { e -> !e.keeping && e.error != null } == true }.originalEdit!!
+                    assertEquals(text, failed.text); assertTrue(failed.draftNotice.contains("尚未确认"))
+                    assertTrue(failed.error!!.contains("退出应用可能丢失")); assertTrue(failed.canCancel)
+                    controller.keepOriginalEdit(id)
+                }
+                controller.state.first { it.originalEdit == null }
+                val draft = encrypted.read("original")!!
+                assertEquals(text, draft.text); assertEquals(1L, draft.version)
+                assertTrue(repo.revisionSubmissions.isEmpty())
+                stop(controller); encrypted.close()
+                storage(root).use { assertEquals(draft, it.read("original")) }
+            } finally { stop(controller); encrypted.close() }
+        }
+    }
+
+    @Test fun keepRejectsCompetingIdentityOrMissingSourceWithoutClosingOrRecreatingRecords() = runBlocking {
+        for (missing in listOf(false, true)) exercise { root ->
+            val encrypted = storage(root)
+            val repo = EncryptedEntryRepository(editDrafts = encrypted).also { it.seed(original()) }
+            val controller = vm(repo)
+            try {
+                val id = edit(controller); controller.changeOriginalEdit(id, "合成自己的输入"); saved(controller, "合成自己的输入")
+                val old = encrypted.read("original")!!
+                val other = old.copy(id = java.util.UUID.randomUUID().toString(), version = 1)
+                if (missing) repo.remove("original") else storage(root).use { it.write(old, other) }
+                controller.keepOriginalEdit(id)
+                val failure = controller.state.first { it.originalEdit?.let { e -> !e.keeping && e.error != null } == true }.originalEdit!!
+                assertEquals("合成自己的输入", failure.text)
+                assertEquals(!missing, failure.draftConflict)
+                assertEquals(if (missing) old else other, encrypted.read("original"))
+                assertTrue(repo.revisionSubmissions.isEmpty()); assertTrue(repo.submissions.isEmpty())
+                if (missing) assertTrue(repo.entries().isEmpty())
+            } finally { stop(controller); encrypted.close() }
+        }
+    }
 
     @Test fun coldControllerRebuildRestoresEditIndependentlyThenSavesOneNewOriginal() = runBlocking { exercise { root ->
         var encrypted = storage(root)

@@ -37,6 +37,7 @@ fun OriginalEditScreen(
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
     onHistory: ((String, Int) -> Unit)? = null,
+    onKeep: (Long) -> Unit = {},
 ) {
     val current = local.entries.firstOrNull { it.id == edit.entryId }
     val changed = edit.conflict || current == null || current.currentRevision != edit.baseRevision && !edit.awaitingReadback
@@ -54,7 +55,7 @@ fun OriginalEditScreen(
                 if (!edit.dirty && edit.sourceRevision != edit.baseRevision) Text("文本与当前原文相同，无需保存新版本。",
                     style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                 OutlinedTextField(value = edit.text, onValueChange = { onChange(edit.sessionId, it) },
-                    readOnly = edit.saving || edit.awaitingReadback || edit.loadingDraft || edit.discarding,
+                    readOnly = !edit.canCancel,
                     modifier = Modifier.fillMaxWidth().testTag("original-edit-text"),
                     label = { Text("修改原文") }, textStyle = MaterialTheme.typography.bodyLarge,
                     minLines = 3, maxLines = 6, isError = edit.inputNotice != null)
@@ -77,14 +78,21 @@ fun OriginalEditScreen(
                     "保存完成前请稍候。", state = ComponentState.LOADING)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm),
                     verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                    Button(onClick = { onSave(edit.sessionId) }, enabled = !edit.saving && !edit.loadingDraft && !edit.discarding && available &&
+                    Button(onClick = { onSave(edit.sessionId) }, enabled = !edit.saving && !edit.keeping && !edit.loadingDraft && !edit.discarding && available &&
                         (edit.awaitingReadback || !changed && edit.dirty && edit.text.isNotBlank()),
                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-edit-save")) {
                         Text(if (edit.awaitingReadback) "重试读取" else if (edit.error != null) "重试保存" else "保存新版本")
                     }
+                    if (local.supportsEditDrafts) TextButton(onClick = { onKeep(edit.sessionId) },
+                        enabled = edit.canCancel && edit.dirty && !edit.draftConflict && available,
+                        modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-edit-keep")) {
+                        Text(if (edit.keeping) "正在保留草稿" else "保留草稿并返回原文")
+                    }
                     TextButton(onClick = { onCancel(edit.sessionId) }, enabled = edit.canCancel,
                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-edit-cancel")) { Text("取消编辑") }
                 }
+                if (edit.keeping) StatusNotice("正在确认编辑草稿", "本机保存确认后返回原文，正式原文保持当前版本。",
+                    state = ComponentState.LOADING)
                 if (edit.loadingDraft || edit.discarding) StatusNotice(if (edit.loadingDraft) "正在读取编辑草稿" else "正在丢弃修改",
                     "完成前请稍候。", state = ComponentState.LOADING)
                 Text(edit.draftNotice, style = MaterialTheme.typography.bodySmall,

@@ -173,8 +173,9 @@ fun LocalMissingOriginalRender() { AIyouTheme { AIyouApp(previewDestination = De
 fun LocalOriginalReadFailureRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
     local = readingLocal.copy(error = "合成读取失败。请保留原数据，解锁设备后重试。"), previewEntryId = longOriginal.id) } }
 
-private val editingLocal = readingLocal.copy(originalEdit = OriginalEditUiState(1L, longOriginal.id, 1,
-    longOriginal.originalText, "合成修改：补上叶片颜色与散步路线。\n".repeat(8)))
+private val editingLocal = readingLocal.copy(supportsEditDrafts = true, originalEdit = OriginalEditUiState(1L, longOriginal.id, 1,
+    longOriginal.originalText, "合成修改：补上叶片颜色与散步路线。\n".repeat(8),
+    draftNotice = "编辑草稿已加密保存在本机"))
 
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalOriginalEditRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,

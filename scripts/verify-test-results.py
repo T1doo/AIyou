@@ -18,9 +18,9 @@ targets = [("domain", "core/domain/build/test-results/test", 3)]
 if args.component:
     targets.append(("component", "core/designsystem/build/test-results/testDebugUnitTest", 7))
 if args.queue:
-    targets.append(("host queue", "checks/record-queue/build/test-results/test", 134))
+    targets.append(("host queue", "checks/record-queue/build/test-results/test", 138))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 100))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 102))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 if args.evidence:
@@ -385,6 +385,10 @@ for label, folder, minimum in targets:
                     "fileReplacementDuringRecoveryCannotDisplayOldInputOrOverwriteNewIdentity",
                 ),
                 "OriginalEditRecoveryTest": (
+                    "explicitKeepColdReopensExactDraftAndResumedSessionCreatesOnlyOneRevision",
+                    "keepDrainsLatestAcceptedAutosaveAndBusyOrOldSessionCallbacksCannotDiscardIt",
+                    "keepReconcilesPublicationFailureAndConfirmationFailuresRetainEditorUntilRetry",
+                    "keepRejectsCompetingIdentityOrMissingSourceWithoutClosingOrRecreatingRecords",
                     "coldControllerRebuildRestoresEditIndependentlyThenSavesOneNewOriginal",
                     "changedAndRemovedSourcesRestoreAsConflictsAndNeverBecomeReplacementRecords",
                     "explicitDiscardQueuesAfterStartedWriteAndLateCallbacksCannotResurrectIt",
@@ -406,6 +410,8 @@ for label, folder, minimum in targets:
             },
             "Compose JVM interaction": {
                 "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest": (
+                    "narrowLargeFontExplicitKeepReturnsToOriginalAndResumesWithoutFormalWrite",
+                    "explicitKeepConfirmationFailureStaysInEditorAndVisibleRetryThenReturns",
                     "narrowLargeFontColdRecoveryCorrectionAndSaveKeepCaptureAndImmutableOriginals",
                     "missingSourceRecoveryRetainsTextAndExplicitDiscardCannotResurrectIt",
                     "actualCipherWriteFailureRemainsVisibleAndCorrectedRetryPreservesCompleteInput",

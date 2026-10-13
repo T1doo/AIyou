@@ -87,6 +87,7 @@ class MainActivity : ComponentActivity() {
             AIyouTheme { AIyouApp(local = local, display = display, onDisplayChange = preferences::change, onRetryDisplay = preferences::retry, onDraftChange = records::changeText, onSave = records::save, onRetry = records::retry,
                 onBeginOriginalEdit = records::beginOriginalEdit, onOriginalEditChange = records::changeOriginalEdit,
                 onOriginalEditSave = records::saveOriginalEdit, onOriginalEditCancel = records::cancelOriginalEdit,
+                onOriginalEditKeep = records::keepOriginalEdit,
                 onResumeOriginalEdit = records::resumeOriginalEdit,
                 onRequestCaptureDiscard = records::requestCaptureDiscard,
                 onConfirmCaptureDiscard = records::confirmCaptureDiscard,
@@ -126,6 +127,7 @@ fun AIyouApp(
     onOriginalEditChange: (Long, String) -> Unit = { _, _ -> },
     onOriginalEditSave: (Long) -> Unit = {},
     onOriginalEditCancel: (Long) -> Unit = {},
+    onOriginalEditKeep: (Long) -> Unit = {},
     onResumeOriginalEdit: (String, String) -> Unit = { _, _ -> },
     onBeginOriginalHistory: (String, Int) -> Unit = { _, _ -> },
     onSelectOriginalRevision: (Long, Int) -> Unit = { _, _ -> },
@@ -236,6 +238,10 @@ fun AIyouApp(
     }
     val saveEdit: (Long) -> Unit = { sessionId ->
         if (ownsEdit(sessionId) && currentLocal?.originalEdit?.saving == false) onOriginalEditSave(sessionId)
+    }
+    val keepEdit: (Long) -> Unit = { sessionId ->
+        if (ownsEdit(sessionId) && currentLocal?.originalEdit?.canCancel == true && discardEditSession == null)
+            onOriginalEditKeep(sessionId)
     }
     val returnToList: () -> Unit = {
         if (ownsNavigation() && reading) {
@@ -423,7 +429,7 @@ fun AIyouApp(
                 retryReading, copyHistory, canCopyHistory, modifier, editHistory, confirmHistoryReplacement, cancelHistoryReplacement,
                 onAttachments = if (attachments != null) beginHistoricalAttachments else null, originalScrollState = historicalScroll)
         } else if (editing != null && local != null) {
-            OriginalEditScreen(editing, local, changeEdit, saveEdit, cancelEdit, modifier, onRetry = retryReading, onHistory = beginHistory)
+            OriginalEditScreen(editing, local, changeEdit, saveEdit, cancelEdit, modifier, onRetry = retryReading, onHistory = beginHistory, onKeep = keepEdit)
         } else if (reading && local != null) {
             OriginalReadingScreen(checkNotNull(readerId), local, onRetry = retryReading,
                 onCopy = copy, canCopy = canCopy, modifier = modifier, onEdit = beginEdit, onHistory = beginHistory,

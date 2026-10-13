@@ -13,24 +13,28 @@ mode = parser.add_mutually_exclusive_group()
 mode.add_argument("--production-tasks-only", action="store_true",
                     help="verify only the four actual production task renders; never claim a full-suite pass")
 mode.add_argument("--capture-discard-only", action="store_true", help="verify only four capture recovery renders; never claim a full-suite pass")
+mode.add_argument("--original-edit-only", action="store_true", help="verify only 32 affected original/history editor renders; never claim a full-suite pass")
 args = parser.parse_args()
 target_method = "LocalCaptureDiscardRender" if args.capture_discard_only else "LocalTasksRender" if args.production_tasks_only else None
-targeted = target_method is not None
+target_methods = ("LocalOriginalEditRender", "LocalOriginalEditSavingRender", "LocalOriginalEditFailedRender",
+                  "LocalOriginalEditConflictRender", "LocalOriginalEditStorageFailedRender", "LocalHistoryEditorRender",
+                  "LocalHistoryEditorFailedRender", "LocalHistoryEditorUnchangedRender") if args.original_edit_only else ((target_method,) if target_method else ())
+targeted = bool(target_methods)
 reports = list((root / "app/build/test-results/validateDebugScreenshotTest").rglob("*.xml"))
 cases = []
 for report in reports:
     cases.extend(ET.parse(report).getroot().iter("testcase"))
-expected = 4 if targeted else 394  # Includes four production capture-discard confirmation renders.
+expected = 4 * len(target_methods) if targeted else 394  # Includes four production capture-discard confirmation renders.
 if len(cases) != expected:
     raise SystemExit(f"FAIL: expected {expected} actual Preview smoke tests, found {len(cases)}")
 if any(any(case.find(tag) is not None for tag in ("failure", "error", "skipped")) for case in cases):
     raise SystemExit("FAIL: Preview smoke contains failing/error/skipped cases")
-if targeted and any(not case.get("name", "").startswith(target_method + "_") for case in cases):
+if targeted and any(not case.get("name", "").startswith(tuple(method + "_" for method in target_methods)) for case in cases):
     raise SystemExit("FAIL: targeted render proof includes a different render method")
 references = root / "app/src/screenshotTestDebug/reference"
 files = sorted(references.rglob("*.png"))
 if targeted:
-    files = [path for path in files if path.name.startswith(target_method + "_")]
+    files = [path for path in files if path.name.startswith(tuple(method + "_" for method in target_methods))]
 if len(files) != expected:
     raise SystemExit(f"FAIL: expected {expected} rendered PNGs, found {len(files)}")
 manifest = []
@@ -58,11 +62,11 @@ attachment_methods = ("LocalAttachmentEmptyRender", "LocalAttachmentLoadingRende
                       "LocalHistoricalAttachmentReadyRender", "LocalHistoricalAttachmentFailedRender",
                       "LocalHistoricalAttachmentCorruptRender", "LocalHistoricalAttachmentUnavailableRender",
                       "LocalHistoricalAttachmentEntryRender", "LocalAttachmentJpegReadyRender", "LocalAttachmentJpegStrippedRender")
-for method in ((target_method,) if targeted else local_methods + attachment_methods):
+for method in (target_methods if targeted else local_methods + attachment_methods):
     production = [item for item in manifest if "/" + method + "_" in item["file"]]
     if len(production) != 4:
         raise SystemExit(f"FAIL: require all four actual production sizes for {method}, found {len(production)}")
-target = root / ("app/build/reports/d02-capture-recovery-preview-manifest.json" if args.capture_discard_only else "app/build/reports/d02-production-tasks-preview-manifest.json" if args.production_tasks_only
+target = root / ("app/build/reports/d02-original-edit-preview-manifest.json" if args.original_edit_only else "app/build/reports/d02-capture-recovery-preview-manifest.json" if args.capture_discard_only else "app/build/reports/d02-production-tasks-preview-manifest.json" if args.production_tasks_only
                  else "app/build/reports/d01-preview-manifest.json")
 target.parent.mkdir(parents=True, exist_ok=True)
 target.write_text(json.dumps({"kind": "targeted production render smoke, not full-suite evidence" if targeted

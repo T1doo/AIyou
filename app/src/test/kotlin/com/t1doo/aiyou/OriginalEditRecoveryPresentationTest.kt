@@ -114,6 +114,7 @@ class OriginalEditRecoveryPresentationTest {
                         onDraftChange = vm::changeText, onSave = vm::save, onRetry = vm::retry,
                         onBeginOriginalEdit = vm::beginOriginalEdit, onOriginalEditChange = vm::changeOriginalEdit,
                         onOriginalEditSave = vm::saveOriginalEdit, onOriginalEditCancel = vm::cancelOriginalEdit,
+                        onOriginalEditKeep = vm::keepOriginalEdit,
                         onResumeOriginalEdit = vm::resumeOriginalEdit)
                 } }
             }
@@ -137,6 +138,47 @@ class OriginalEditRecoveryPresentationTest {
         button.performClick()
         compose.waitUntil(5000) { vm.state.value.originalEdit?.loadingDraft == false }
         compose.onNodeWithTag("original-edit-text").assertTextContains(input)
+    }
+
+    @Test fun narrowLargeFontExplicitKeepReturnsToOriginalAndResumesWithoutFormalWrite() {
+        seed(); cipher = EncryptedOriginalEditStore(root, key.copyOf())
+        val repo = FormalFixture(cipher, base)
+        val capture = repo.capture
+        start(repo); resume()
+        val keep = compose.onNodeWithTag("original-edit-keep").performScrollTo()
+        keep.assertIsDisplayed().assertIsEnabled()
+        assertTrue(keep.getUnclippedBoundsInRoot().height >= 48.dp)
+        keep.performClick()
+        compose.waitUntil(5000) { vm.state.value.originalEdit == null }
+        assertEquals(0, repo.writes); assertEquals(base, repo.record!!.originalText)
+        assertEquals(capture, repo.capture)
+        assertEquals(OriginalEditDraftState.ACTIVE, runBlocking { cipher.read("original") }!!.state)
+        compose.onNodeWithText("返回列表").performClick()
+        resume()
+        compose.onNodeWithTag("original-edit-text").assertTextContains(input)
+        compose.onNodeWithTag("original-edit-save").performScrollTo().performClick()
+        compose.waitUntil(5000) { vm.state.value.originalEdit == null }
+        assertEquals(1, repo.writes)
+        assertEquals(listOf(base, input), repo.history.map { it.originalText })
+        assertEquals(capture, repo.capture)
+    }
+
+    @Test fun explicitKeepConfirmationFailureStaysInEditorAndVisibleRetryThenReturns() {
+        seed()
+        val fail = AtomicBoolean(false)
+        cipher = EncryptedOriginalEditStore(root, key.copyOf()) { if (it == "authenticated" && fail.getAndSet(false))
+            error("synthetic keep confirmation read failure") }
+        val repo = FormalFixture(cipher, base)
+        start(repo); resume()
+        fail.set(true)
+        compose.onNodeWithTag("original-edit-keep").performScrollTo().performClick()
+        compose.waitUntil(5000) { vm.state.value.originalEdit?.let { !it.keeping && it.error != null } == true }
+        assertEquals(input, vm.state.value.originalEdit!!.text)
+        compose.onNodeWithText("保留草稿尚未确认，当前输入仍在编辑中。").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("original-edit-keep").performScrollTo().assertIsEnabled().performClick()
+        compose.waitUntil(5000) { vm.state.value.originalEdit == null }
+        assertEquals(0, repo.writes)
+        assertEquals(input, runBlocking { cipher.read("original") }!!.text)
     }
 
     @Test fun narrowLargeFontColdRecoveryCorrectionAndSaveKeepCaptureAndImmutableOriginals() {

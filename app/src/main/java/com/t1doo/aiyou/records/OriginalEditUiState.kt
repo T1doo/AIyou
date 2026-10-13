@@ -15,9 +15,10 @@ data class OriginalEditUiState(
     val sourceRevision: Int = baseRevision,
     val loadingDraft: Boolean = false,
     val discarding: Boolean = false,
+    val keeping: Boolean = false,
     val draftConflict: Boolean = false,
     val draftNotice: String = "未保存的修改仅在当前应用会话中保留。",
 ) {
     val dirty: Boolean get() = text != originalText
-    val canCancel: Boolean get() = !saving && !awaitingReadback && !loadingDraft && !discarding
+    val canCancel: Boolean get() = !saving && !awaitingReadback && !loadingDraft && !discarding && !keeping
 }

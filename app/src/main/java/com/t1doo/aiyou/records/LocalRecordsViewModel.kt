@@ -136,6 +136,7 @@ class LocalRecordsViewModel internal constructor(
                             is Command.Revise -> reviseOriginal(command)
                             is Command.OpenEdit -> openOriginalDraft(command)
                             is Command.PersistEdit -> persistOriginalDraft(command)
+                            is Command.KeepEdit -> keepOriginalDraft(command)
                             is Command.DiscardEdit -> discardOriginalDraft(command.sessionId)
                             is Command.ReleaseEdit -> {
                                 if (originalDraft?.sessionId == command.sessionId) originalDraft = null
@@ -332,7 +333,7 @@ class LocalRecordsViewModel internal constructor(
         var accepted = false
         mutableState.update { current ->
             val edit = current.originalEdit
-            if (edit == null || edit.sessionId != sessionId || edit.saving || edit.awaitingReadback || edit.loadingDraft || edit.discarding || current.originalHistory != null) current
+            if (edit == null || edit.sessionId != sessionId || !edit.canCancel || current.originalHistory != null) current
             else if (text.length > EncryptedEntryRepository.MAX_TEXT_LENGTH) current.copy(originalEdit = edit.copy(
                 inputNotice = "文本过长，本次输入未替换你的修改。长度上限为 ${EncryptedEntryRepository.MAX_TEXT_LENGTH}。"))
             else {
@@ -343,6 +344,19 @@ class LocalRecordsViewModel internal constructor(
             }
         }
         if (accepted && mutableState.value.supportsEditDrafts) commands.trySend(Command.PersistEdit(sessionId, text))
+    }
+
+    fun keepOriginalEdit(sessionId: Long) {
+        if (editsDisposed) return
+        val current = mutableState.value
+        val edit = current.originalEdit ?: return
+        if (edit.sessionId != sessionId || !edit.canCancel || !edit.dirty || edit.draftConflict ||
+            !current.supportsEditDrafts || !current.ready || current.opening || current.error != null ||
+            current.originalHistory != null || attachments.state.value != null) return
+        mutableState.update { if (it.originalEdit != edit) it else it.copy(
+            originalEdit = edit.copy(keeping = true, error = null, draftNotice = "正在确认本机编辑草稿")) }
+        if (mutableState.value.originalEdit?.let { it.sessionId == sessionId && it.keeping } == true)
+            commands.trySend(Command.KeepEdit(sessionId, edit.text))
     }
 
     fun cancelOriginalEdit(sessionId: Long) {
@@ -367,7 +381,7 @@ class LocalRecordsViewModel internal constructor(
         if (editsDisposed) return
         val current = mutableState.value
         val edit = current.originalEdit ?: return
-        if (edit.sessionId != sessionId || edit.saving || edit.conflict || edit.loadingDraft || edit.discarding || !current.ready || current.opening || current.error != null || current.originalHistory != null) return
+        if (edit.sessionId != sessionId || edit.saving || edit.keeping || edit.conflict || edit.loadingDraft || edit.discarding || !current.ready || current.opening || current.error != null || current.originalHistory != null) return
         if (!edit.awaitingReadback && (edit.text.isBlank() || !edit.dirty || edit.text.length > EncryptedEntryRepository.MAX_TEXT_LENGTH)) return
         mutableState.update { it.copy(originalEdit = edit.copy(saving = true, error = null, inputNotice = null)) }
         commands.trySend(Command.Revise(sessionId, edit.entryId, edit.baseRevision, edit.text))
@@ -652,6 +666,38 @@ class LocalRecordsViewModel internal constructor(
         }
     }
 
+    private suspend fun keepOriginalDraft(command: Command.KeepEdit) {
+        fun owns(local: LocalRecordUiState) = local.originalEdit?.let {
+            it.sessionId == command.sessionId && it.keeping && it.text == command.text
+        } == true
+        if (!owns(mutableState.value)) return
+        try {
+            // Queue ordering drains accepted autosaves first; reconcile any lost acknowledgement.
+            persistDraftSnapshot(command.sessionId, command.text)
+            val binding = originalDraft?.takeIf { it.sessionId == command.sessionId }
+                ?: throw OriginalEditDraftConflict()
+            val snapshot = binding.snapshot
+            check(binding.persisted && snapshot.state == OriginalEditDraftState.ACTIVE && snapshot.text == command.text)
+            val drafts = checkNotNull(repository?.editDrafts)
+            // Even an already acknowledged autosave must still be ours and durably confirmed now.
+            if (drafts.write(snapshot, snapshot) != snapshot || drafts.read(snapshot.entryId) != snapshot)
+                throw OriginalEditDraftConflict()
+            updatePendingDraft(snapshot)
+            originalDraft = null
+            mutableState.update { if (!owns(it)) it else it.copy(originalEdit = null,
+                originalEditNotice = "编辑草稿已保留，可稍后恢复。") }
+        } catch (failure: CancellationException) { throw failure }
+        catch (failure: Exception) {
+            mutableState.update { if (!owns(it)) it else it.copy(originalEdit = it.originalEdit!!.copy(
+                keeping = false, draftConflict = failure is OriginalEditDraftConflict,
+                conflict = it.originalEdit.conflict || failure is OriginalEditDraftConflict || failure is RecordConflict,
+                draftNotice = "保留草稿尚未确认，当前输入仍在编辑中。",
+                error = if (failure is OriginalEditDraftConflict) "本机草稿已变化，未覆盖另一会话的修改。请复制当前输入或明确放弃后恢复。"
+                    else if (failure is RecordConflict) "源记录不可用，未重新创建记录。当前输入仍保留，请复制输入或明确放弃。"
+                    else "保留草稿未确认，尚未关闭编辑。退出应用可能丢失当前修改，请重试保留或自行复制输入。")) }
+        }
+    }
+
     private suspend fun discardOriginalDraft(sessionId: Long) {
         if (mutableState.value.originalEdit?.let { it.sessionId == sessionId && it.discarding } != true) return
         try {
@@ -792,6 +838,7 @@ class LocalRecordsViewModel internal constructor(
         data object RefreshEditDrafts : Command
         data class OpenEdit(val edit: OriginalEditUiState, val replace: Boolean, val expectedDraftId: String? = null) : Command
         data class PersistEdit(val sessionId: Long, val text: String) : Command
+        data class KeepEdit(val sessionId: Long, val text: String) : Command
         data class DiscardEdit(val sessionId: Long) : Command
         data class ReleaseEdit(val sessionId: Long) : Command
         data class Attachment(val action: suspend (EntryRepository) -> Unit) : Command
