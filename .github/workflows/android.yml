@@ -52,7 +52,6 @@ jobs:
         run: python3 scripts/inspect-device-test-environment.py
       - name: Verify Android dependency requirements
         run: |
-          scripts/gradle.sh :app:dependencies --write-locks
           scripts/gradle.sh :app:checkDebugAarMetadata :core:designsystem:checkDebugAarMetadata :core:data:checkDebugAarMetadata
       - name: Run actual component clipping and empty-state regression tests
         run: |

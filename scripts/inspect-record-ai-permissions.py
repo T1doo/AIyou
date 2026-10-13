@@ -18,7 +18,9 @@ if not aapt.is_file() or not apk.is_file():
     raise SystemExit("Existing pinned aapt2 or actual app APK is absent; permission inspection NOT RUN")
 manifest = ET.parse(root / "app/src/main/AndroidManifest.xml").getroot()
 android_name = "{http://schemas.android.com/apk/res/android}name"
-source_permissions = [node.get(android_name) for node in manifest if node.tag.startswith("uses-permission")]
+tools_node = "{http://schemas.android.com/tools}node"
+source_permissions = [node.get(android_name) for node in manifest
+                      if node.tag.startswith("uses-permission") and node.get(tools_node) != "remove"]
 if "android.permission.INTERNET" in source_permissions:
     raise SystemExit("This slice must not add INTERNET permission")
 # Official syntax: https://developer.android.com/tools/aapt2#dump
@@ -32,7 +34,10 @@ if "android.permission.INTERNET" in actual:
 report = {"status": "PASS", "source_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
           "app_apk": str(apk.relative_to(root)), "bytes": apk.stat().st_size,
           "sha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "permissions": permissions,
-          "internet_permission": False, "aapt2": str(aapt), "scope": "compiled APK manifest only; device execution NOT RUN"}
+          "internet_permission": False,
+          "source_internet_remove_marker": any(node.get(android_name) == "android.permission.INTERNET" and
+              node.get(tools_node) == "remove" for node in manifest),
+          "aapt2": str(aapt), "scope": "compiled APK manifest only; device execution NOT RUN"}
 output = root / "app/build/reports/record-ai-permissions.json"
 output.parent.mkdir(parents=True, exist_ok=True)
 output.write_text(json.dumps(report, indent=2) + "\n")

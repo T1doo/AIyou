@@ -25,9 +25,15 @@ ViewModel 清理先撤销 AI 身份，在独立 IO 上关闭 transport，等待�
 
 本地使用既有 JDK／校验过的 JVM Gradle Wrapper；未安装 SDK、接受新协议、运行 ADB／模拟器或生成认证密钥。已有依赖缺少缓存时，通过正常 Maven 网络解析固定版本，不更换镜像、不绕过被拒路径或权限。
 
-本地唯一写者完成实际 `--offline --rerun-tasks` 全量重跑：262 个唯一方法（AI 178、domain 13、remote／实际 VM 71），15 份新 XML，失败／错误／跳过均为0；另有旧记录队列138方法通过。首次新增 VM target 的12方法也独立通过。输入指纹 `2cca488461e7005620e5d9cd05a05cf92ee3821851ab0b6993c644f5c000db65` 绑定121项上游源码与构建输入；全量日志 SHA256 为 `f4f0cf895ba2aa18ea7e03eeb36da1d3e68211b6e4f3e1612dc473822bc46431`。独立只读复核未发现剩余 P0/P1，并逐项比对冻结输入与实际 XML。重复执行不计作新增方法。
+权限修正后，本地唯一写者完成新的实际 `--offline --rerun-tasks` 全量重跑：262 个唯一方法（AI 178、domain 13、remote／实际 VM 71），15 份新 XML，失败／错误／跳过均为0；另有旧记录队列138方法通过。最终输入指纹 `3dd0da52b08b0eacebbe94560ab594a2f685b00d5b8da2b7c9d7c4d96b076a38` 绑定121项上游源码与构建输入；该轮日志 SHA256 为 `8b5fc9c2912ee5f78abf6cfc48be506da8c232deb830a50aff4b1228592b0b4c`。独立只读复核未发现剩余 P0/P1。首次新增 VM target 的12方法和最初完整262方法也独立通过，旧指纹 `2cca488461e7005620e5d9cd05a05cf92ee3821851ab0b6993c644f5c000db65`、旧全量日志 `f4f0cf895ba2aa18ea7e03eeb36da1d3e68211b6e4f3e1612dc473822bc46431` 仅属修正前轮次；重复执行不计作新增方法。
 
 首次 offline 编译因未缓存既有 coroutines 1.9.0 停止，没有开始 JUnit；随后通过普通 Maven 网络解析同一固定版本，编译及上述测试通过。失败日志仍保留，没有安装 SDK 或改变安全配置。Android 依赖新增 App→core:ai 后，App 锁由既有许可 CI 环境实际生成、正常入库，再移除临时写锁步骤并验证锁定构建；不猜写 Android 依赖图。
+
+首轮正常 push `f7cae574882d0c8efb6346f2be8adbe9157cf2ee` 的 [CI38458941492](https://github.com/T1doo/AIyou/actions/runs/38458941492) 实际 **FAIL**：APK编译通过，但 `20:06:16.1000317Z` 的实际 APK 门禁报告 `Actual merged APK unexpectedly requests INTERNET permission`；后续 Compose、native 编译／清单与 lint 五步被跳过。该轮38/44步骤成功不等于全套通过，原始日志 SHA256 `1b307c3b5877b78412c73e891393f3738bef80bfe2fa5e2927d81a45d92860bf` 保留。
+
+实际 Android 图选择 `okhttp-android:5.5.0`；[官方版本 manifest](https://raw.githubusercontent.com/square/okhttp/parent-5.5.0/okhttp/src/androidMain/AndroidManifest.xml) 含 INTERNET 声明，仅检查 App 源码未请求该权限不足以保证合并产物无权限。修正按 [Android 官方合并规则](https://developer.android.com/build/manage-manifests#node_markers) 在 App manifest 使用无 selector 的 `tools:node="remove"`，明确删除库导入的 INTERNET。源码检查按 XML 区分移除标记和请求；实际 aapt2 原始输出门禁仍拒绝任何残留 INTERNET，不以标记代替 APK 验证。本任务没有安装或运行首轮 APK。
+
+App锁取自上述实际CI生成字节：82985 bytes，SHA256 `8c8b721cc8efb05708211a868fb1599a1f80dbd6e08c5b4c38a017dc162a094b`；其他六份 schema／lock 逐字节未变。临时 `--write-locks` 已移除，最终正常 push 的同 SHA CI 才用于锁定构建及实际无 INTERNET APK 证据。
 
 具体测试 XML、提交、同 SHA CI 与 APK 摘要在交付回执中核对。此前 transport 首回调 barrier 未到达的失败日志仍保留，原因未知；本切片不把后续通过解释为该历史原因已解决。
 

@@ -5,7 +5,8 @@ import com.t1doo.aiyou.ai.*
 import com.t1doo.aiyou.data.*
 import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
-import java.nio.file.Files
+import javax.xml.parsers.DocumentBuilderFactory
+import org.w3c.dom.Element
 import java.time.Clock
 import java.time.ZoneOffset
 import java.util.concurrent.CopyOnWriteArrayList
@@ -28,8 +29,15 @@ import org.junit.Test
  */
 class LocalRecordsAiContractTest {
     @Test(timeout = 10_000) fun defaultsNoneAndUnavailableCapabilityNeverBindResolveOrSend() {
-        val manifest = Files.readString(PythonSqliteDatabase.repositoryRoot().resolve("app/src/main/AndroidManifest.xml"))
-        assertFalse(manifest.contains("android.permission.INTERNET"))
+        val manifest = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+            .newDocumentBuilder().parse(PythonSqliteDatabase.repositoryRoot().resolve("app/src/main/AndroidManifest.xml").toFile())
+        val nodes = manifest.getElementsByTagName("*")
+        val network = (0 until nodes.length).map { nodes.item(it) as Element }.filter {
+            it.tagName.startsWith("uses-permission") &&
+                it.getAttributeNS("http://schemas.android.com/apk/res/android", "name") == "android.permission.INTERNET"
+        }
+        assertTrue("Source manifest must not request INTERNET; removal markers deny imported permissions",
+            network.all { it.getAttributeNS("http://schemas.android.com/tools", "node") == "remove" })
         protocols { protocol -> repeat(3) { variant ->
             SourceBoundLoopbackFixture(protocol, initiallyApproved = variant == 2).use { f ->
                 if (variant == 1) f.records.approve(ProcessingPolicy.AI_NONE)
