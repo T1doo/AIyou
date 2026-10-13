@@ -111,24 +111,46 @@ class EncryptedEntryRepository internal constructor(
         const val MAX_TEXT_LENGTH = 100_000
 
         /** Call on an IO dispatcher after device unlock; an unavailable key is recoverable UI failure. */
-        fun open(context: Context): EncryptedEntryRepository {
-            val file = File(context.noBackupFilesDir, "records/records.db")
-            val keyFile = File(context.noBackupFilesDir, "keys/database.key")
-            val existing = file.exists() || File(file.path + "-wal").exists() || File(file.path + "-shm").exists()
-            return openWithKey(context, file, AndroidDatabaseKeyProvider(keyFile, DATABASE_KEY_ALIAS).load(existing),
-                editKey = {
-                    val drafts = File(file.parentFile, file.name + ".original-edits")
-                    val existingDrafts = drafts.listFiles()?.any { it.name != ".store.lock" } == true
-                    AndroidDatabaseKeyProvider(File(context.noBackupFilesDir, "keys/original-edits.key"), DATABASE_KEY_ALIAS,
-                        "AIyou original edit key v1".toByteArray(Charsets.US_ASCII)).load(existingDrafts)
-                }) { database ->
-                val blobs = File(file.parentFile, file.name + ".attachments")
-                val existingBlobs = blobs.listFiles()?.any { it.name != ".store.lock" } == true
+        fun open(context: Context): EncryptedEntryRepository = openProtected(
+            context.noBackupFilesDir,
+            loadKey = { purpose, existing ->
+                AndroidDatabaseKeyProvider(File(context.noBackupFilesDir, "keys/${purpose.fileName}"),
+                    DATABASE_KEY_ALIAS, purpose.associatedData).load(existing)
+            },
+        ) { file, key, editKey, attachmentKey ->
+            openWithKey(context, file, key, editKey = { editKey() }) { database ->
                 val existingRows = database.openHelper.writableDatabase.query("SELECT count(*) FROM attachments").use {
-                    it.moveToFirst(); it.getLong(0) > 0
+                    check(it.moveToFirst())
+                    it.getLong(0) > 0
                 }
-                AndroidDatabaseKeyProvider(File(context.noBackupFilesDir, "keys/attachments.key"), DATABASE_KEY_ALIAS,
-                    "AIyou attachment key v1".toByteArray(Charsets.US_ASCII)).load(existingBlobs || existingRows)
+                attachmentKey(existingRows)
+            }
+        }
+
+        /** Production opening sequence; JVM tests inject only IO/key/native-DB boundaries. */
+        internal fun <T> openProtected(
+            root: File,
+            listFiles: (File) -> Array<File>? = { it.listFiles() },
+            evidence: CiphertextEvidence = CiphertextEvidence(listFiles),
+            loadKey: (RepositoryKeyPurpose, Boolean) -> ByteArray,
+            openDatabase: (File, ByteArray, () -> ByteArray, (Boolean) -> ByteArray) -> T,
+        ): T {
+            val file = File(root, "records/records.db")
+            val before = evidence.inspect(root)
+            var checkpoint = before
+            val key = loadKey(RepositoryKeyPurpose.DATABASE, checkNotNull(before.required[RepositoryKeyPurpose.DATABASE]))
+            try {
+                return openDatabase(file, key, {
+                    val current = evidence.inspect(root, checkpoint).also { checkpoint = it }
+                    loadKey(RepositoryKeyPurpose.EDITS, checkNotNull(current.required[RepositoryKeyPurpose.EDITS]))
+                }, { existingRows ->
+                    val current = evidence.inspect(root, checkpoint).also { checkpoint = it }
+                    loadKey(RepositoryKeyPurpose.ATTACHMENTS,
+                        checkNotNull(current.required[RepositoryKeyPurpose.ATTACHMENTS]) || existingRows)
+                })
+            } catch (failure: Throwable) {
+                key.fill(0)
+                throw failure
             }
         }
 
@@ -197,4 +219,11 @@ private fun editReceiptId(draft: OriginalEditDraft): String {
     } }.toByteArray()
     return try { "ORIGINAL_EDIT_COMMIT:" + MessageDigest.getInstance("SHA-256").digest(bytes)
         .joinToString("") { "%02x".format(it) } } finally { bytes.fill(0) }
+}
+
+internal enum class RepositoryKeyPurpose(val fileName: String, private val purpose: String) {
+    DATABASE("database.key", "AIyou database key v1"),
+    EDITS("original-edits.key", "AIyou original edit key v1"),
+    ATTACHMENTS("attachments.key", "AIyou attachment key v1");
+    val associatedData: ByteArray get() = purpose.toByteArray(Charsets.US_ASCII)
 }
