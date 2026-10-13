@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -74,6 +75,17 @@ fun LocalRecordsScreen(
     onRequestCaptureDiscard: () -> Unit = {},
     onConfirmCaptureDiscard: (Long) -> Unit = {},
     onCancelCaptureDiscard: (Long) -> Unit = {},
+    searchState: OriginalSearchState? = null,
+    searchQuery: TextFieldState? = null,
+    searchFrom: TextFieldState? = null,
+    searchThrough: TextFieldState? = null,
+    searchMode: OriginalSearchMode = OriginalSearchMode.KEYWORDS,
+    onSearchMode: () -> Unit = {},
+    onClearSearch: () -> Unit = {},
+    onOpenSearchResult: (OriginalSearchHit) -> Unit = {},
+    searchReturnAnchor: OriginalSearchReturnAnchor? = null,
+    ownsSearchReturn: () -> Boolean = { false },
+    onSearchReturnHandled: () -> Unit = {},
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -96,11 +108,38 @@ fun LocalRecordsScreen(
             } },
         )
     }
-    val displayedEntries = if (destination == Destination.NOW) local.entries.take(5) else local.entries
+    val filtered = destination == Destination.MEMORIES && searchState != null && searchState.stage != OriginalSearchStage.BROWSE
+    val searchHits = remember(searchState) { searchState?.hits?.associateBy { it.entry.id }.orEmpty() }
+    val displayedEntries = if (destination == Destination.NOW) local.entries.take(5)
+        else if (filtered) searchState?.hits?.map { it.entry }.orEmpty() else local.entries
     var attachedViewport by remember { mutableStateOf(IntSize.Zero) }
     val currentLocal by rememberUpdatedState(local)
     val currentEntries by rememberUpdatedState(displayedEntries)
     val returnObserver = LocalOriginalReadingObserver.current
+    val contentKeys = buildList {
+        add("summary")
+        if (destination == Destination.NOW) add("composer")
+        if (local.opening) add("loading")
+        if (local.error != null) add("error")
+        if (local.error == null && local.saveNotice != null) add("saved")
+        if (local.editDraftError != null) add("edit-draft-error")
+        addAll(local.pendingEdits.map { "edit-draft-${it.id}" })
+        if (destination == Destination.MEMORIES) add("search")
+        if (filtered) add("search-status")
+        if (destination == Destination.NOW) add("recent")
+        if (local.ready && local.entries.isEmpty()) add("empty")
+        addAll(displayedEntries.map { it.id })
+    }
+    LaunchedEffect(searchReturnAnchor, searchState, attachedViewport, contentKeys) {
+        val anchor = searchReturnAnchor ?: return@LaunchedEffect
+        if (destination != Destination.MEMORIES || searchState?.stage != OriginalSearchStage.READY ||
+            !ownsSearchReturn() || attachedViewport.height == 0) return@LaunchedEffect
+        snapshotFlow { listState.layoutInfo }.first { it.viewportSize == attachedViewport && it.totalItemsCount == contentKeys.size }
+        if (!ownsSearchReturn()) return@LaunchedEffect
+        val index = contentKeys.indexOf(anchor.key).takeIf { it >= 0 } ?: anchor.index.coerceIn(0, contentKeys.lastIndex)
+        listState.scrollToItem(index, anchor.offset)
+        if (ownsSearchReturn()) onSearchReturnHandled()
+    }
     LaunchedEffect(destination, tailReturnEntryId, tailReturnGeneration, attachedViewport, displayedEntries,
         expectedReturnHeightPx, returnViewportReady, local.ready, local.opening, local.error, local.saveNotice) {
         val target = tailReturnEntryId ?: return@LaunchedEffect
@@ -196,18 +235,35 @@ fun LocalRecordsScreen(
                         }
                     }
                 }
-                if (destination == Destination.MEMORIES) item("search") { SearchSection(demo = false) }
+                if (destination == Destination.MEMORIES) item("search") {
+                    if (searchState != null && searchQuery != null && searchFrom != null && searchThrough != null)
+                        LocalOriginalSearchSection(searchQuery, searchFrom, searchThrough, searchMode,
+                            local.ready && !local.opening && local.error == null, onSearchMode, onClearSearch)
+                    else SearchSection(demo = false)
+                }
+                if (filtered) item("search-status") {
+                    when (searchState?.stage) {
+                        OriginalSearchStage.RUNNING -> StatusNotice("正在查找本机原文", "查找在后台进行。", state = ComponentState.LOADING)
+                        OriginalSearchStage.READY -> StatusNotice(if (displayedEntries.isEmpty()) "没有匹配的原文" else "找到 ${displayedEntries.size} 条原文",
+                            if (displayedEntries.isEmpty()) "试试更短的关键词或调整日期。" else "摘录来自当前版本，可以打开全文。",
+                            state = if (displayedEntries.isEmpty()) ComponentState.EMPTY else ComponentState.NORMAL)
+                        OriginalSearchStage.INVALID -> StatusNotice("请检查查找条件", searchState.message.orEmpty(), state = ComponentState.ERROR)
+                        OriginalSearchStage.FAILED -> StatusNotice("本机查找需要处理", searchState.message.orEmpty(), state = ComponentState.ERROR)
+                        else -> StatusNotice("等待本机原文", "原文可读取后再显示查找结果。", state = ComponentState.LOADING)
+                    }
+                }
                 if (destination == Destination.NOW) item("recent") { Text("最近记录", style = MaterialTheme.typography.titleLarge) }
                 if (local.ready && local.entries.isEmpty()) item("empty") {
                     StatusNotice(if (destination == Destination.NOW) "从一句话开始" else "还没有回忆", "文字保存在本机，无需配置模型。", state = ComponentState.EMPTY)
                 }
                 items(displayedEntries, key = { it.id }) { entry ->
-                    val preview = remember(entry.originalText) { originalPreview(entry.originalText) }
+                    val hit = if (filtered) searchHits[entry.id] else null
+                    val preview = remember(entry.originalText, hit) { hit?.excerpt ?: originalPreview(entry.originalText) }
                     MemoryCard(preview, originalMetadata(entry), policy = entry.policy,
                         modifier = Modifier.testTag("entry-${entry.id}").semantics { selected = entry.id == selectedEntryId }
                             .then(if (entry.id == selectedEntryId) Modifier.border(AIyouDimensions.iconStroke,
                                 AIyouColors.primary, MaterialTheme.shapes.medium) else Modifier),
-                        onOpen = { onOpenEntry(entry.id) })
+                        onOpen = { if (hit != null) onOpenSearchResult(hit) else onOpenEntry(entry.id) })
                 }
             }
         }

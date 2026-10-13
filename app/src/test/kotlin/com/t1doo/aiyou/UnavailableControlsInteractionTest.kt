@@ -19,6 +19,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
@@ -135,7 +136,7 @@ class UnavailableControlsInteractionTest {
         compose.onNodeWithText("返回设置").performClick()
         compose.onNodeWithText("回忆").performClick()
         compose.onNodeWithText("0 条本机记录").assertIsDisplayed()
-        compose.onNodeWithContentDescription("搜索回忆，尚未开放").assertIsNotEnabled()
+        compose.onNodeWithTag("original-search-query").assertIsEnabled()
     }
 
     @Test

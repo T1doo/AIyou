@@ -8,6 +8,8 @@ val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalRecordsViewModel.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalRecordAiController.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchMatcher.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/RecordAiCapability.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/RecordAiUiState.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalEditUiState.kt")

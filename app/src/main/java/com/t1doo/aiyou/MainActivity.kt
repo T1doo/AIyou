@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
@@ -54,6 +55,13 @@ import com.t1doo.aiyou.ui.MainScreen
 import androidx.lifecycle.ViewModelProvider
 import com.t1doo.aiyou.records.LocalRecordUiState
 import com.t1doo.aiyou.records.LocalRecordsScreen
+import com.t1doo.aiyou.records.LocalOriginalSearchController
+import com.t1doo.aiyou.records.OriginalSearchInput
+import com.t1doo.aiyou.records.OriginalSearchInputOwnership
+import com.t1doo.aiyou.records.OriginalSearchMode
+import com.t1doo.aiyou.records.OriginalSearchStage
+import com.t1doo.aiyou.records.OriginalSearchReturnAnchor
+import com.t1doo.aiyou.records.LocalOriginalSearchObserver
 import com.t1doo.aiyou.records.LocalRecordsViewModel
 import com.t1doo.aiyou.records.OpenSourceLicenses
 import com.t1doo.aiyou.records.OriginalReadingScreen
@@ -99,7 +107,8 @@ class MainActivity : ComponentActivity() {
                 onCancelHistoryReplacement = records::cancelHistoryReplacement, attachments = records.attachments,
                 onOpenAiSession = { id, revision -> records.openAiSession(id, revision) },
                 onStartAiSession = records::startAiSession, onStopAiSession = records::stopAiSession,
-                onCloseAiSession = records::closeAiSession) }
+                onCloseAiSession = records::closeAiSession,
+                currentRecords = { records.state.value }) }
         }
     }
 }
@@ -148,6 +157,7 @@ fun AIyouApp(
     onStartAiSession: (Long) -> Unit = {},
     onStopAiSession: (Long) -> Unit = {},
     onCloseAiSession: (Long) -> Unit = {},
+    currentRecords: (() -> LocalRecordUiState?)? = null,
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -168,9 +178,59 @@ fun AIyouApp(
     val nowList = rememberLazyListState()
     val memoriesList = rememberLazyListState()
     val currentLocal by rememberUpdatedState(local)
+    val currentRecordsProvider by rememberUpdatedState(currentRecords)
+    // Construct directly: rememberTextFieldState has a Saver and would put the query in Bundle.
+    var searchQuery by remember { mutableStateOf(TextFieldState()) }
+    var searchFrom by remember { mutableStateOf(TextFieldState()) }
+    var searchThrough by remember { mutableStateOf(TextFieldState()) }
+    var searchMode by remember { mutableStateOf(OriginalSearchMode.KEYWORDS) }
+    var searchModeGeneration by remember { mutableLongStateOf(0L) }
+    fun searchInput() = OriginalSearchInput(searchQuery.text.toString(), searchFrom.text.toString(),
+        searchThrough.text.toString(), searchMode, OriginalSearchInputOwnership(searchQuery.text, searchFrom.text,
+            searchThrough.text, searchModeGeneration))
+    fun searchSource() = if (currentRecordsProvider != null) currentRecordsProvider?.invoke() else currentLocal
+    val search = remember {
+        LocalOriginalSearchController(
+            currentSource = { searchSource() },
+            currentInput = { searchInput() })
+    }
+    DisposableEffect(search) { onDispose { search.close() } }
+    val searchEmission by search.state.collectAsState()
+    val renderedSearchInput = searchInput()
+    val searchState = searchEmission.let { search.visible(local, renderedSearchInput) }
+    var searchReturnAnchor by remember { mutableStateOf<OriginalSearchReturnAnchor?>(null) }
+    var searchReturnInput by remember { mutableStateOf<OriginalSearchInput?>(null) }
+    var searchReturnSource by remember { mutableStateOf<List<com.t1doo.aiyou.model.StoredEntry>?>(null) }
+    var readerFromSearch by remember { mutableStateOf(false) }
+    fun clearSearch() {
+        search.clear()
+        searchQuery.edit { replace(0, length, "") }
+        searchFrom.edit { replace(0, length, "") }
+        searchThrough.edit { replace(0, length, "") }
+        searchQuery.undoState.clearHistory()
+        searchFrom.undoState.clearHistory()
+        searchThrough.undoState.clearHistory()
+        searchQuery = TextFieldState()
+        searchFrom = TextFieldState()
+        searchThrough = TextFieldState()
+        searchMode = OriginalSearchMode.KEYWORDS
+        searchModeGeneration++
+        searchReturnAnchor = null
+        searchReturnInput = null
+        searchReturnSource = null
+        readerFromSearch = false
+    }
     val context = LocalContext.current
     val selected = Destination.valueOf(selectedName)
     val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS
+    SideEffect {
+        search.sync(selected == Destination.MEMORIES && !reading && !showSettings && !demo &&
+            local != null && local.originalEdit == null && local.originalHistory == null)
+        if (!reading && searchReturnAnchor != null &&
+            (renderedSearchInput != searchReturnInput || searchSource()?.entries !== searchReturnSource)) {
+            searchReturnAnchor = null; searchReturnInput = null; searchReturnSource = null
+        }
+    }
     var companionPanel by rememberSaveable { mutableStateOf(false) }
     val companionVisible = display.ready && display.preferences.showCompanion && !showSettings && !reading && !demo
     val motionAllowed = companionMotionAllowed(!display.ready || display.preferences.reduceMotion)
@@ -272,14 +332,19 @@ fun AIyouApp(
                 navigation.generation++
                 val latest = currentLocal
                 val last = if (origin == Destination.NOW) latest?.entries?.take(5)?.lastOrNull() else latest?.entries?.lastOrNull()
-                tailReturnRequest = if (latest?.ready == true && !latest.opening && latest.error == null && last?.id == readerId)
+                tailReturnRequest = if (!readerFromSearch && latest?.ready == true && !latest.opening && latest.error == null && last?.id == readerId)
                     TailReturnRequest(origin, checkNotNull(readerId), navigation.generation) else null
                 detailEntryId = null
+                if (readerFromSearch && origin == Destination.MEMORIES) {
+                    search.sync(true)
+                    searchReturnSource = search.state.value.entries
+                }
             }
         }
     }
     val selectDestination: (Destination) -> Unit = { destination ->
         if (ownsNavigation() && currentLocal?.originalEdit == null && currentLocal?.originalHistory == null && attachments?.state?.value == null) {
+            clearSearch()
             navigation.generation++
             tailReturnRequest = null
             selectedName = destination.name; detailEntryId = null; showSettings = false; showLicenses = false
@@ -287,11 +352,27 @@ fun AIyouApp(
     }
     val openEntry: (String) -> Unit = { id ->
         if (ownsNavigation() && selectedName == origin.name && !showSettings && !demo && detailEntryId == null) {
+            readerFromSearch = origin == Destination.MEMORIES && searchState.stage == OriginalSearchStage.READY
+            search.pause()
             navigation.generation++
             tailReturnRequest = null
             if (origin == Destination.NOW) selectedNowId = id else selectedMemoriesId = id
             detailEntryId = id
         }
+    }
+    val openSearchResult: (com.t1doo.aiyou.records.OriginalSearchHit) -> Unit = { hit ->
+        if (ownsNavigation() && selected == Destination.MEMORIES && !reading && !showSettings && !demo &&
+            search.canOpen(searchState, hit)) {
+            val index = memoriesList.firstVisibleItemIndex
+            searchReturnAnchor = OriginalSearchReturnAnchor(memoriesList.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.key as? String,
+                index, memoriesList.firstVisibleItemScrollOffset)
+            searchReturnInput = searchState.input
+            searchReturnSource = searchState.entries
+            openEntry(hit.entry.id)
+        }
+    }
+    LocalOriginalSearchObserver.current?.let { observer ->
+        SideEffect { observer.onResults(searchState, openSearchResult) }
     }
     val canCopy: (String, Int) -> Boolean = { id, revision ->
         val latest = currentLocal
@@ -400,6 +481,7 @@ fun AIyouApp(
                 actionEnabled = attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
             ) {
                 if (reading) returnToList() else if (ownsNavigation()) {
+                    clearSearch()
                     navigation.generation++
                     tailReturnRequest = null
                     if (showLicenses) showLicenses = false else showSettings = !showSettings
@@ -422,7 +504,7 @@ fun AIyouApp(
             SettingsScreen(display, onDisplayChange, onRetryDisplay, attachments != null,
                 demo, ComponentState.valueOf(stateName),
                 onLicenses = { if (ownsNavigation()) { navigation.generation++; showLicenses = true } },
-                onDemo = { if (ownsNavigation()) { navigation.generation++; demo = !demo } },
+                onDemo = { if (ownsNavigation()) { clearSearch(); navigation.generation++; demo = !demo } },
                 onDemoState = { if (ownsNavigation()) { navigation.generation++; stateName = it.name } },
                 modifier = modifier)
         } else if (attachmentPanel != null && attachments != null && reading && local != null) {
@@ -454,6 +536,19 @@ fun AIyouApp(
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
+                searchState = searchState, searchQuery = searchQuery, searchFrom = searchFrom, searchThrough = searchThrough,
+                searchMode = searchMode, onSearchMode = { if (ownsNavigation()) {
+                    searchModeGeneration++
+                    searchMode = if (searchMode == OriginalSearchMode.KEYWORDS) OriginalSearchMode.EXACT else OriginalSearchMode.KEYWORDS
+                } },
+                onClearSearch = { if (ownsNavigation()) clearSearch() }, onOpenSearchResult = openSearchResult,
+                searchReturnAnchor = searchReturnAnchor,
+                ownsSearchReturn = { ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name &&
+                    !showSettings && !demo && searchReturnInput == searchInput() && currentLocal?.entries === searchReturnSource &&
+                    search.visible(currentLocal, searchInput()) === searchState },
+                onSearchReturnHandled = { if (ownsNavigation()) {
+                    searchReturnAnchor = null; searchReturnInput = null; searchReturnSource = null
+                } },
                 onRequestCaptureDiscard = { if (ownsNavigation()) onRequestCaptureDiscard() },
                 onConfirmCaptureDiscard = { if (ownsNavigation()) onConfirmCaptureDiscard(it) },
                 onCancelCaptureDiscard = { if (ownsNavigation()) onCancelCaptureDiscard(it) },
@@ -472,6 +567,8 @@ fun AIyouApp(
                         latest.ready && !latest.opening && latest.error == null && !latest.saving && !latest.savePending &&
                         latest.originalEdit == null && latest.originalHistory == null && attachments?.state?.value == null &&
                         latest.pendingEdits.any { it.entryId == id && it.id == draftId }) {
+                        search.pause(); searchReturnAnchor = null; searchReturnInput = null; searchReturnSource = null
+                        readerFromSearch = false
                         navigation.generation++; detailEntryId = id; onResumeOriginalEdit(id, draftId)
                     }
                 })

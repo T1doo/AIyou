@@ -1,0 +1,315 @@
+package com.t1doo.aiyou
+
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.text.selection.SelectionState
+import androidx.compose.runtime.Composable
+import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
+import androidx.compose.runtime.saveable.SaveableStateRegistry
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.StateRestorationTester
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
+import com.t1doo.aiyou.designsystem.AIyouDimensions
+import com.t1doo.aiyou.designsystem.AIyouTheme
+import com.t1doo.aiyou.model.ProcessingPolicy
+import com.t1doo.aiyou.model.StoredEntry
+import com.t1doo.aiyou.records.*
+import com.t1doo.aiyou.ui.Destination
+import java.time.Instant
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+/** Actual AIyouApp/Compose and product lookup, with synthetic current originals.
+ * Robolectric is not Android device, Room or SQLCipher execution evidence.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w360dp-h1000dp")
+class LocalOriginalSearchPresentationTest {
+    @get:Rule val compose = createComposeRule()
+    private data class Observation(val state: OriginalSearchState, val open: (OriginalSearchHit) -> Unit, val serial: Long)
+    private val observations = AtomicReference<Observation>()
+    private val serials = AtomicLong()
+    private lateinit var memories: LazyListState
+    private lateinit var back: OnBackPressedDispatcher
+    private var draftChanges = 0
+    private var saves = 0
+    private var saveableRegistry: SaveableStateRegistry? = null
+    private val searchObserver = object : OriginalSearchObserver {
+        override fun onResults(state: OriginalSearchState, open: (OriginalSearchHit) -> Unit) {
+            observations.set(Observation(state, open, serials.incrementAndGet()))
+        }
+    }
+    private val readingObserver = object : OriginalReadingObserver {
+        override fun onNavigation(callbacks: OriginalReadingCallbacks) = Unit
+        override fun onClipboard(clipboard: Clipboard) = Unit
+        override fun onSelection(selection: SelectionState) = Unit
+        override fun onRecordList(state: LazyListState, imeBottomPx: Int) { memories = state }
+    }
+
+    @Test fun editableKeywordExactAndSavedZoneDateFieldsOpenEveryOriginalCharacterWithoutTouchingDraft() {
+        val exact = "MiXeD \t咖啡🙂"
+        val full = "合成前文\n" + exact + "\n合成后文，保留空白。"
+        val state = local(entry("one", full, captured = "2026-10-13T23:30:00Z", zone = "Asia/Shanghai"),
+            entry("utc", "MiXeD 咖啡 原文", captured = "2026-10-13T23:30:00Z", zone = "UTC"), entry("missing", "MiXeD 茶 原文"))
+        content(state)
+        field("original-search-query", "mixed 咖啡")
+        assertEquals(listOf("one", "utc"), ready("mixed 咖啡").state.hits.map { it.entry.id })
+        field("original-search-from", "2026-10-14"); field("original-search-through", "2026-10-14")
+        val dates = observation { it.state.stage == OriginalSearchStage.READY && it.state.input.query == "mixed 咖啡" &&
+            it.state.input.from == "2026-10-14" && it.state.input.through == "2026-10-14" }
+        assertEquals(listOf("one"), dates.state.hits.map { it.entry.id })
+        compose.onNodeWithTag("original-search-mode").performScrollTo().assertIsEnabled().performClick()
+        observation { it.state.stage == OriginalSearchStage.READY && it.state.input.mode == OriginalSearchMode.EXACT }.let { assertTrue(it.state.hits.isEmpty()) }
+        field("original-search-query", exact)
+        val found = ready(exact)
+        assertEquals(OriginalSearchMode.EXACT, found.state.input.mode); assertEquals(listOf("one"), found.state.hits.map { it.entry.id })
+        assertEquals(full, found.state.hits.single().quote)
+        compose.onNodeWithText(found.state.hits.single().excerpt).performScrollTo().assertIsDisplayed()
+        openCard("one"); assertEquals(full, fullText())
+        compose.onNodeWithText("返回列表").performClick(); ready(exact)
+        assertEquals(exact, editable("original-search-query")); assertEquals("2026-10-14", editable("original-search-from"))
+        assertEquals("2026-10-14", editable("original-search-through"))
+        compose.runOnIdle {
+            assertEquals("synthetic-private-untouched-draft", state.value.text)
+            assertEquals(full, state.value.entries.single { it.id == "one" }.originalText)
+            assertEquals(0, draftChanges); assertEquals(0, saves)
+        }
+    }
+
+    @Test fun readerReturnKeepsActualMemoriesListIndexAndOffsetWhenPaddingShowsPreviousItem() {
+        val state = local(*(0..54).map { entry("record-$it", "marker 合成完整原文 $it\n" + "叶".repeat(300)) }.toTypedArray())
+        val authoritative = AtomicReference<LocalRecordUiState?>(state.value)
+        content(state, source = authoritative::get); field("original-search-query", "marker")
+        val first = ready("marker"); assertEquals(55, first.state.hits.size)
+        val ownedList = compose.runOnIdle { memories }
+        val index = 3 + 20
+        val padding = compose.runOnIdle { ownedList.layoutInfo.beforeContentPadding }
+        assertTrue(padding > 0)
+        var observedAnchor: Triple<Int, Int, Int>? = null
+        val candidates = listOf(0, -1, -(padding / 4).coerceAtLeast(1), -(padding / 2).coerceAtLeast(1),
+            -padding, -padding * 2, 1, padding / 2)
+        for (offset in candidates.distinct()) {
+            compose.runOnIdle { runBlocking { ownedList.scrollToItem(index, offset) } }
+            compose.waitForIdle()
+            val actual = compose.runOnIdle { Triple(ownedList.firstVisibleItemIndex,
+                ownedList.firstVisibleItemScrollOffset, ownedList.layoutInfo.visibleItemsInfo.first().index) }
+            if (actual.first == index && actual.third != actual.first) {
+                compose.runOnIdle { assertEquals("record-20", ownedList.layoutInfo.visibleItemsInfo.single { it.index == actual.first }.key) }
+                observedAnchor = actual; break
+            }
+        }
+        assertNotNull("Measured bounded offsets must create the actual padding/index mismatch", observedAnchor)
+        val before = checkNotNull(observedAnchor)
+        assertEquals(index, before.first); assertNotEquals("The previous item is visible only inside content padding", before.first, before.third)
+        repeat(2) { turn ->
+            val found = ready("marker"); val tail = found.state.hits.single { it.entry.id == "record-54" }
+            compose.runOnIdle { found.open(tail) }
+            assertEquals(state.value.entries.last().originalText, fullText())
+            compose.runOnIdle { found.open(found.state.hits.first()) }
+            assertEquals(state.value.entries.last().originalText, fullText())
+            if (turn == 0) compose.onNodeWithText("返回列表").performClick() else {
+                val fresh = state.value.copy(entries = state.value.entries.map {
+                    if (it.id == "record-54") it.copy(currentRevision = it.currentRevision + 1) else it
+                })
+                compose.runOnIdle { authoritative.set(fresh); back.onBackPressed() }
+                observation { it.state.stage == OriginalSearchStage.WAITING }
+                compose.runOnIdle { state.value = fresh }
+            }
+            ready("marker")
+            compose.waitUntil(2_000) { ownedList.firstVisibleItemIndex == before.first && ownedList.firstVisibleItemScrollOffset == before.second }
+            compose.runOnIdle { assertSame(ownedList, memories); assertEquals(before.first, memories.firstVisibleItemIndex)
+                assertEquals(before.second, memories.firstVisibleItemScrollOffset) }
+            assertEquals("marker", ready("marker").state.input.query)
+        }
+        assertEquals("synthetic-private-untouched-draft", state.value.text)
+    }
+
+    @Test
+    @Config(sdk = [35], qualifiers = "w320dp-h640dp")
+    fun narrowLargeFontSeparatesNoHitsInvalidAndFailedDatesAndKeepsCorrectionAndClearReachable() {
+        val original = entry("one", "needle 合成可找到的原文"); val state = local(original)
+        content(state, largeFont = true); field("original-search-query", "未命中合成词")
+        assertTrue(ready("未命中合成词").state.hits.isEmpty())
+        compose.onNodeWithText("没有匹配的原文").performScrollTo().assertIsDisplayed()
+        field("original-search-from", "2026-02-30"); observation { it.state.stage == OriginalSearchStage.INVALID }
+        compose.onNodeWithText("请检查查找条件").performScrollTo().assertIsDisplayed()
+        compose.onAllNodes(hasText("没有匹配的原文")).assertCountEquals(0); compose.onAllNodes(hasTestTag("entry-one")).assertCountEquals(0)
+        field("original-search-from", "2026-10-13"); field("original-search-through", "2026-10-12")
+        observation { it.state.stage == OriginalSearchStage.INVALID && it.state.input.through == "2026-10-12" }
+        field("original-search-through", "2026-10-13"); field("original-search-query", "needle")
+        assertEquals(listOf("one"), ready("needle").state.hits.map { it.entry.id })
+        compose.runOnIdle { state.value = state.value.copy(entries = listOf(original.copy(captureTimeZone = "Invalid/Synthetic"))) }
+        observation { it.state.stage == OriginalSearchStage.FAILED }
+        compose.onNodeWithText("本机查找需要处理").performScrollTo().assertIsDisplayed()
+        compose.onAllNodes(hasText("没有匹配的原文")).assertCountEquals(0)
+        compose.runOnIdle { state.value = state.value.copy(entries = listOf(original)) }; ready("needle")
+        val clear = compose.onNodeWithTag("original-search-clear").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        val bounds = clear.getUnclippedBoundsInRoot(); val viewport = compose.onNode(hasScrollToIndexAction()).getUnclippedBoundsInRoot()
+        assertTrue(bounds.height >= AIyouDimensions.minTouchTarget)
+        assertTrue(bounds.left >= viewport.left && bounds.right <= viewport.right); assertTrue(bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
+        clear.performClick(); observation { it.state.stage == OriginalSearchStage.BROWSE }
+        assertEquals("", editable("original-search-query")); assertEquals("", editable("original-search-from")); assertEquals("", editable("original-search-through"))
+        compose.onNodeWithTag("original-search-mode").performScrollTo().assertIsEnabled()
+        assertEquals(OriginalSearchMode.KEYWORDS, observations.get().state.input.mode); assertNull(state.value.error)
+        assertEquals("synthetic-private-untouched-draft", state.value.text); assertEquals(0, draftChanges); assertEquals(0, saves)
+    }
+
+    @Test fun retainedResultActionsRejectQueryAbaRevisionDeletionReadFailureAndPageLeave() {
+        val state = local(entry("one", "needle 合成当前原文")); val baseline = state.value
+        val authoritative = AtomicReference<LocalRecordUiState?>(baseline)
+        content(state, source = authoritative::get); field("original-search-query", "needle"); ready("needle")
+        for (changed in listOf(baseline.copy(entries = listOf(entry("one", "needle 合成新原文", revision = 2))),
+            baseline.copy(entries = emptyList()), baseline.copy(error = "synthetic current read failure"), baseline.copy(ready = false))) {
+            val retained = ready("needle"); val hit = retained.state.hits.single()
+            compose.runOnIdle { authoritative.set(changed); retained.open(hit); state.value = changed }
+            assertNoReader(); val after = serials.get()
+            compose.runOnIdle { authoritative.set(baseline); state.value = baseline }
+            observation { it.serial > after && it.state.stage == OriginalSearchStage.READY && it.state.input.query == "needle" &&
+                it.state.hits.singleOrNull()?.entry?.currentRevision == 1 }
+        }
+        val queryOld = ready("needle")
+        val edit = compose.onNodeWithTag("original-search-query").performScrollTo().fetchSemanticsNode().config[SemanticsActions.SetText].action!!
+        compose.runOnIdle { assertTrue(edit(AnnotatedString("临时合成词"))); assertTrue(edit(AnnotatedString("needle"))); queryOld.open(queryOld.state.hits.single()) }
+        assertNoReader()
+        observation { it.serial > queryOld.serial && it.state.stage == OriginalSearchStage.READY && it.state.input.query == "needle" }
+        val modeOld = ready("needle")
+        val toggle = compose.onNodeWithTag("original-search-mode").performScrollTo().fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        compose.runOnIdle { assertTrue(toggle()); assertTrue(toggle()); modeOld.open(modeOld.state.hits.single()) }
+        assertNoReader()
+        observation { it.serial > modeOld.serial && it.state.stage == OriginalSearchStage.READY && it.state.input.query == "needle" &&
+            it.state.input.mode == OriginalSearchMode.KEYWORDS }
+        val pageOld = ready("needle"); tab("待办").performClick()
+        compose.runOnIdle { pageOld.open(pageOld.state.hits.single()) }; assertNoReader()
+        tab("回忆").performClick(); observation { it.state.stage == OriginalSearchStage.BROWSE }
+        assertEquals("", editable("original-search-query"))
+        compose.runOnIdle { pageOld.open(pageOld.state.hits.single()) }; assertNoReader()
+        assertEquals("synthetic-private-untouched-draft", state.value.text); assertEquals(0, draftChanges); assertEquals(0, saves)
+    }
+
+    @Test fun compositionRestorationDropsSensitiveQueryDatesAndResultsAndRevokesOldActions() {
+        val marker = "synthetic-private-local-query"; val state = local(entry("one", "合成原文 $marker 完整保留"))
+        val sourceSnapshot = state.value.entries; val show = mutableStateOf(true); val restoration = StateRestorationTester(compose)
+        restoration.setContent { if (show.value) screen(state, source = { state.value }) else Text("合成查找已销毁") }
+        field("original-search-query", marker); field("original-search-from", "2026-10-13"); field("original-search-through", "2026-10-13")
+        compose.onNodeWithTag("original-search-mode").performScrollTo().performClick()
+        val beforeClear = observation { it.state.stage == OriginalSearchStage.READY && it.state.input.query == marker &&
+            it.state.input.mode == OriginalSearchMode.EXACT && it.state.input.from == "2026-10-13" && it.state.input.through == "2026-10-13" }
+        assertEquals(listOf("one"), beforeClear.state.hits.map { it.entry.id })
+        compose.onNodeWithTag("original-search-clear").performScrollTo().performClick(); observation { it.state.stage == OriginalSearchStage.BROWSE }
+        for (tag in listOf("original-search-query", "original-search-from", "original-search-through")) {
+            compose.onNodeWithTag(tag).performScrollTo().performClick().performKeyInput { keyDown(Key.CtrlLeft); pressKey(Key.Z); keyUp(Key.CtrlLeft) }
+            assertEquals("Clearing must not retain the previous input in Undo", "", editable(tag))
+        }
+        compose.runOnIdle { beforeClear.open(beforeClear.state.hits.single()) }; assertNoReader()
+        field("original-search-query", marker); field("original-search-from", "2026-10-13"); field("original-search-through", "2026-10-13")
+        compose.onNodeWithTag("original-search-mode").performScrollTo().performClick()
+        val retained = observation { it.state.stage == OriginalSearchStage.READY && it.state.input.query == marker &&
+            it.state.input.mode == OriginalSearchMode.EXACT && it.state.input.from == "2026-10-13" && it.state.input.through == "2026-10-13" }
+        assertFalse(retained.state.toString().contains(marker)); assertFalse(retained.state.input.toString().contains(marker))
+        compose.runOnIdle { assertNoSavedInput(checkNotNull(saveableRegistry).performSave(), marker, "2026-10-13") }
+        restoration.emulateSavedInstanceStateRestore()
+        observation { it.serial > retained.serial && it.state.stage == OriginalSearchStage.BROWSE }
+        assertEquals("", editable("original-search-query")); assertEquals("", editable("original-search-from")); assertEquals("", editable("original-search-through"))
+        assertEquals(OriginalSearchMode.KEYWORDS, observations.get().state.input.mode)
+        compose.runOnIdle { retained.open(retained.state.hits.single()) }; assertNoReader()
+        field("original-search-query", marker); val disposedAction = ready(marker)
+        compose.runOnIdle { show.value = false }; compose.onNodeWithText("合成查找已销毁").assertIsDisplayed()
+        compose.runOnIdle { disposedAction.open(disposedAction.state.hits.single()) }
+        compose.runOnIdle { show.value = true }
+        observation { it.serial > disposedAction.serial && it.state.stage == OriginalSearchStage.BROWSE }
+        assertEquals("", editable("original-search-query"))
+        compose.runOnIdle { disposedAction.open(disposedAction.state.hits.single()) }; assertNoReader()
+        compose.runOnIdle { assertSame(sourceSnapshot, state.value.entries); assertEquals("synthetic-private-untouched-draft", state.value.text)
+            assertEquals(0, draftChanges); assertEquals(0, saves) }
+    }
+
+    private fun entry(id: String, text: String, revision: Int = 1, captured: String = "2026-10-13T12:00:00Z", zone: String = "UTC") =
+        StoredEntry(id, revision, text, Instant.parse(captured).toEpochMilli(), zone, ProcessingPolicy.LOCAL_ONLY)
+    private fun local(vararg entries: StoredEntry) = mutableStateOf(LocalRecordUiState(ready = true, opening = false,
+        text = "synthetic-private-untouched-draft", entries = entries.toList()))
+    private fun content(state: MutableState<LocalRecordUiState>, largeFont: Boolean = false, source: () -> LocalRecordUiState? = { state.value }) {
+        compose.setContent { screen(state, largeFont, source) }
+    }
+    @Composable private fun screen(state: MutableState<LocalRecordUiState>, largeFont: Boolean = false, source: () -> LocalRecordUiState?) {
+        back = checkNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
+        val registry = LocalSaveableStateRegistry.current
+        SideEffect { saveableRegistry = registry }
+        val density = LocalDensity.current
+        CompositionLocalProvider(LocalOriginalSearchObserver provides searchObserver, LocalOriginalReadingObserver provides readingObserver,
+            LocalDensity provides if (largeFont) Density(density.density, 2f) else density) {
+            if (largeFont) Box(Modifier.size(width = 320.dp, height = 640.dp)) { app(state, source) } else app(state, source)
+        }
+    }
+    @Composable private fun app(state: MutableState<LocalRecordUiState>, source: () -> LocalRecordUiState?) {
+        AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES, local = state.value, currentRecords = source,
+            onDraftChange = { draftChanges++ }, onSave = { saves++ }) }
+    }
+    private fun field(tag: String, text: String) { compose.onNodeWithTag(tag).performScrollTo().assertIsEnabled().performTextReplacement(text) }
+    private fun editable(tag: String): String = compose.onNodeWithTag(tag).performScrollTo().fetchSemanticsNode().config[SemanticsProperties.EditableText].text
+    private fun openCard(id: String) {
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))
+        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-$id"))).performClick()
+    }
+    private fun fullText() = compose.onNodeWithTag("original-text").fetchSemanticsNode().config[SemanticsProperties.Text].single().text
+    private fun assertNoReader() {
+        compose.waitForIdle(); compose.onAllNodes(hasTestTag("original-text")).assertCountEquals(0); compose.onAllNodes(hasText("记录原文")).assertCountEquals(0)
+    }
+    private fun tab(label: String) = compose.onNode(hasText(label) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab))
+    private fun ready(query: String) = observation { it.state.stage == OriginalSearchStage.READY && it.state.input.query == query }
+    private fun observation(predicate: (Observation) -> Boolean): Observation {
+        compose.waitUntil(2_000) { observations.get()?.let(predicate) == true }; compose.waitForIdle()
+        return compose.runOnIdle { checkNotNull(observations.get()).also { check(predicate(it)) } }
+    }
+    private fun assertNoSavedInput(value: Any?, marker: String, date: String) {
+        when (value) {
+            is CharSequence -> { assertFalse("Query must never enter the saved payload", value.contains(marker))
+                assertFalse("Date filters must never enter the saved payload", value.contains(date)) }
+            is Map<*, *> -> value.forEach { (key, item) -> assertNoSavedInput(key, marker, date); assertNoSavedInput(item, marker, date) }
+            is Iterable<*> -> value.forEach { assertNoSavedInput(it, marker, date) }
+            is Array<*> -> value.forEach { assertNoSavedInput(it, marker, date) }
+        }
+    }
+}

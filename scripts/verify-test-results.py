@@ -18,9 +18,9 @@ targets = [("domain", "core/domain/build/test-results/test", 3)]
 if args.component:
     targets.append(("component", "core/designsystem/build/test-results/testDebugUnitTest", 7))
 if args.queue:
-    targets.append(("host queue", "checks/record-queue/build/test-results/test", 138))
+    targets.append(("host queue", "checks/record-queue/build/test-results/test", 146))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 102))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 107))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 if args.evidence:
@@ -47,6 +47,15 @@ for label, folder, minimum in targets:
     print(f"PASS: {label} tests={total} actual={cases} failures=0 errors=0 skipped=0")
     additional = {}
     if label == "host queue":
+        additional["com.t1doo.aiyou.records.LocalOriginalSearchTest"] = (
+            "keywordAndIsLiteralUnicodeLocaleIndependentAndPreservesSnapshotOrderAndPolicy",
+            "exactAndFoldedExcerptsRoundTripOriginalCodePointsWithoutChangingCaseOrWhitespace",
+            "captureDatesUseSavedIanaZoneInclusiveDaysAndDstWithOpenBounds",
+            "invalidConditionsAreDistinctFromNoHitsAndBlankKeywordIsBrowseButExactBlankIsLiteral",
+            "latestQueryAndSameQueryAbaRejectOldNonCancellableActualMatchingResults",
+            "freshSnapshotFencesRevisionDeletionAndReadFailureBeforeSyncAndRejectsForeignHitIdentity",
+            "pauseUsesExactSnapshotCacheWithNewGenerationAndClearCannotReuseItsResults",
+            "closedOwnerCannotResurrectAndOrdinaryMatcherFailureIsRedactedAndRetryable")
         additional["JpegPayloadValidationTest"] = (
             "baselineProgressiveAndAllExifDirectionsPreserveOriginalByDefault",
             "explicitStrippingKeepsDirectionAndEncodedScansWhileRemovingPrivateExtensions",
@@ -86,6 +95,12 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.LocalOriginalSearchPresentationTest"] = (
+            "editableKeywordExactAndSavedZoneDateFieldsOpenEveryOriginalCharacterWithoutTouchingDraft",
+            "readerReturnKeepsActualMemoriesListIndexAndOffsetWhenPaddingShowsPreviousItem",
+            "narrowLargeFontSeparatesNoHitsInvalidAndFailedDatesAndKeepsCorrectionAndClearReachable",
+            "retainedResultActionsRejectQueryAbaRevisionDeletionReadFailureAndPageLeave",
+            "compositionRestorationDropsSensitiveQueryDatesAndResultsAndRevokesOldActions")
         additional["com.t1doo.aiyou.ProductionTasksPresentationTest"] = (
             "localRecordsNeverBecomeTasksAndUnopenedCompletionIsExplicit",
             "shortNarrowDoubleFontTasksScrollAndSettingsReturnWithoutChangingDraft",
