@@ -1,5 +1,9 @@
 # D04 pure JVM protocol/SSE slice — full D04 remains OPEN
 
+This records the first slice at `d38da8041af1329f1f2dde82cd2e09e5504bcc7c`.
+Subsequent parent review found a read-partition defect; its actual red evidence,
+terminal policy and corrective validation are in [D04_PARTITION_FIX.md](D04_PARTITION_FIX.md).
+
 Baseline: `74c78326e51f6497306f032730b413c7c94a4b01`, development branch
 `codex/d04-jvm-protocol-sse-20261013`. Original Master Plan and Architecture
 documents are unchanged. This slice follows Master §§7, 11 and 17 and is

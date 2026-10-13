@@ -12,7 +12,12 @@ usage and exactly one terminal event. Only Chat `stop` followed by dispatched
 `[DONE]`, or a properly closed Anthropic sequence with `end_turn`/`stop_sequence`
 and `message_stop`, can complete. EOF, malformed UTF-8/JSON, resource limits,
 refusal, truncated output, unsupported tools/audio and cancellation cannot.
-Calls are serialized; terminal streams ignore subsequent input. Preview text
+The first fully dispatched and validated protocol terminal ends the response
+prefix. Its delimiter bytes are validated and counted; bytes/events after it
+are never decoded or counted, even when they occur in the same caller read.
+Frames are visited in wire order, so an error before the terminal preserves
+already dispatched preview events and then fails. Calls are serialized;
+terminal streams ignore subsequent input. Preview text
 does not constitute accepted memory or a completed task.
 
 `SseDecoder` implements incremental strict UTF-8, a single leading BOM,
@@ -20,9 +25,14 @@ CR/LF/CRLF, comments, multiline data and blank-line dispatch. Undispatched EOF
 data is discarded. Ordinary empty frames, ping and unknown event names are
 ignored by the protocol adapter; known empty control/error events fail.
 
-Default bounds: 256 KiB per push, 16,384 UTF-16 units per line, 65,536 per event,
+Default bounds: 16,384 UTF-16 units per line, 65,536 per event,
 4,096 dispatched frames, 8 MiB total response bytes, 1,048,576 preview UTF-16
 units, JSON nesting depth 64. Request text/model IDs also reject invalid UTF-16.
+Protocol reads are normalized into decoder windows of at most 256 KiB, without
+copying the input or rejecting a read merely because it is larger. The standalone
+raw `SseDecoder.push` retains its 256 KiB batch cap. UTF-8 carry is bounded to
+four bytes and decoded output to two UTF-16 units; protocol terminal detection
+never depends on decoding the rest of an input window.
 
 `FailurePolicy` returns a recommendation, with at most three total attempts and
 60 seconds delay by default. It never sends or replays requests. HTTP 401/403,

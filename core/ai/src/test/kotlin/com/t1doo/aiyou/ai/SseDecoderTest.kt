@@ -115,6 +115,22 @@ class SseDecoderTest {
         assertThrows(IllegalStateException::class.java) { decoder.finish() }
     }
 
+    @Test fun callbackCloseStopsConsumptionEvenWhenCallbackReturnsContinue() {
+        listOf("\n", "\r", "\r\n").forEach { ending ->
+            val decoder = SseDecoder()
+            val bytes = ("data: first$ending$ending" + "data: second$ending$ending").toByteArray() + byteArrayOf(0xFF.toByte())
+            val frames = mutableListOf<SseFrame>()
+            decoder.consume(bytes, 0, bytes.size) { frame ->
+                frames.add(frame)
+                decoder.close()
+                true
+            }
+            assertEquals(listOf("message" to "first"), values(frames))
+            assertThrows(IllegalStateException::class.java) { decoder.push("data: later\n\n".toByteArray()) }
+            assertThrows(IllegalStateException::class.java) { decoder.finish() }
+        }
+    }
+
     @Test fun diagnosticsDoNotExposeFrameContent() {
         val marker = "synthetic-private-marker"
         val frame = SseFrame(marker, marker)

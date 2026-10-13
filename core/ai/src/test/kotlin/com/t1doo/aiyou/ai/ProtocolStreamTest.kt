@@ -309,9 +309,21 @@ class ProtocolStreamTest {
         }
     }
 
-    @Test fun chunkAndNestingLimitsBecomeTerminalPublicFailures() {
-        val stream = ProtocolStream(Protocol.CHAT_COMPLETIONS, StreamLimits(maxChunkBytes = 4))
-        assertFailure(stream.push(chatStart.toByteArray()), FailureKind.LIMIT_EXCEEDED)
+    @Test fun largeReadsAreWindowedButTotalAndNestingLimitsRemainStrict() {
+        val wire = chatSuccess.toByteArray()
+        val bounds = StreamLimits(maxChunkBytes = 4)
+        val single = ProtocolStream(Protocol.CHAT_COMPLETIONS, bounds).push(wire)
+        val smallReadStream = ProtocolStream(Protocol.CHAT_COMPLETIONS, bounds)
+        val small = wire.asList().chunked(4).flatMap { smallReadStream.push(it.toByteArray()) }
+        assertSuccess(single, "中文🙂é")
+        assertSuccess(small, "中文🙂é")
+        assertEquals(text(small), text(single))
+        assertEquals(small.filterIsInstance<StreamEvent.Usage>(), single.filterIsInstance<StreamEvent.Usage>())
+        val limited = ProtocolStream(Protocol.CHAT_COMPLETIONS,
+            StreamLimits(maxChunkBytes = 4, maxTotalBytes = chatStart.toByteArray().size.toLong()))
+        val limitedEvents = limited.push(wire)
+        assertEquals(1, limitedEvents.count { it == StreamEvent.Started })
+        assertFailure(limitedEvents, FailureKind.LIMIT_EXCEEDED)
         val deep = "{\"synthetic\":" + "[".repeat(65) + "0" + "]".repeat(65) + "}"
         assertFailedWire(Protocol.CHAT_COMPLETIONS, "data: $deep\n\n", FailureKind.LIMIT_EXCEEDED)
     }

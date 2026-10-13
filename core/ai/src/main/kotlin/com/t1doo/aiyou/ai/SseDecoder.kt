@@ -14,7 +14,9 @@ internal class WireFailure(val kind: FailureKind) : RuntimeException(kind.name)
 class SseDecoder(private val limits: StreamLimits = StreamLimits()) {
     private val decoder = Charsets.UTF_8.newDecoder()
         .onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)
-    private var pending = byteArrayOf()
+    // At most one unfinished UTF-8 code point. Never decode ahead of dispatch.
+    private val input = ByteBuffer.allocate(4)
+    private val output = CharBuffer.allocate(2)
     private val line = StringBuilder()
     private val data = StringBuilder()
     private var event = ""
@@ -28,89 +30,114 @@ class SseDecoder(private val limits: StreamLimits = StreamLimits()) {
 
     fun push(bytes: ByteArray): List<SseFrame> {
         check(!ended) { "SSE decoder is closed" }
-        if (bytes.size > limits.maxChunkBytes || bytes.size.toLong() > limits.maxTotalBytes - totalBytes) {
+        if (bytes.size > limits.maxChunkBytes) {
             close()
             throw WireFailure(FailureKind.LIMIT_EXCEEDED)
         }
-        totalBytes += bytes.size
-        return try { decode(bytes, false) } catch (failure: WireFailure) {
-            close()
-            throw failure
-        }
+        val frames = mutableListOf<SseFrame>()
+        consume(bytes, 0, bytes.size) { frames.add(it); true }
+        return frames
     }
 
     fun finish() {
         check(!ended) { "SSE decoder is closed" }
-        try { decode(byteArrayOf(), true) } finally { close() }
+        try {
+            input.flip()
+            output.clear()
+            val status = decoder.decode(input, output, true)
+            if (status.isError) throw WireFailure(FailureKind.INVALID_UTF8)
+            check(status.isUnderflow && !input.hasRemaining() && output.position() == 0) {
+                "Unexpected UTF-8 finalization state"
+            }
+            val flushed = decoder.flush(output)
+            check(flushed.isUnderflow && output.position() == 0) { "Unexpected UTF-8 flush state" }
+        } finally { close() }
     }
 
     fun close() {
         ended = true
-        pending = byteArrayOf()
+        input.clear()
+        output.clear()
         line.setLength(0)
         data.setLength(0)
         event = ""
     }
 
-    private fun decode(bytes: ByteArray, final: Boolean): List<SseFrame> {
-        val input = ByteBuffer.wrap(pending + bytes)
-        val output = CharBuffer.allocate(4096)
-        val result = mutableListOf<SseFrame>()
-        do {
-            val status = decoder.decode(input, output, final)
-            if (status.isError) throw WireFailure(FailureKind.INVALID_UTF8)
-            output.flip()
-            while (output.hasRemaining()) accept(output.get(), result)
-            output.clear()
-            if (!status.isOverflow) break
-        } while (true)
-        pending = ByteArray(input.remaining()).also { input.get(it) }
-        if (final) {
-            if (pending.isNotEmpty()) throw WireFailure(FailureKind.INVALID_UTF8)
-            val status = decoder.flush(output)
-            if (status.isError) throw WireFailure(FailureKind.INVALID_UTF8)
+    /** Visit frames in wire order; false stops exactly at the dispatched frame's delimiter. */
+    internal fun consume(bytes: ByteArray, offset: Int, length: Int, emit: (SseFrame) -> Boolean) {
+        check(!ended) { "SSE decoder is closed" }
+        require(offset >= 0 && length in 0..limits.maxChunkBytes && offset <= bytes.size - length) {
+            "Invalid SSE input window"
         }
-        return result
+        try {
+            for (index in offset until offset + length) {
+                if (totalBytes >= limits.maxTotalBytes) throw WireFailure(FailureKind.LIMIT_EXCEEDED)
+                totalBytes++
+                input.put(bytes[index])
+                input.flip()
+                output.clear()
+                val status = decoder.decode(input, output, false)
+                if (status.isError) throw WireFailure(FailureKind.INVALID_UTF8)
+                check(status.isUnderflow) { "Unexpected UTF-8 decoding state" }
+                input.compact()
+                output.flip()
+                while (output.hasRemaining()) {
+                    if (!accept(output.get(), emit) || ended) {
+                        close()
+                        return
+                    }
+                }
+            }
+        } catch (failure: WireFailure) {
+            close()
+            throw failure
+        }
     }
 
-    private fun accept(char: Char, output: MutableList<SseFrame>) {
+    private fun accept(char: Char, emit: (SseFrame) -> Boolean): Boolean {
         if (first) {
             first = false
-            if (char == '\uFEFF') return
+            if (char == '\uFEFF') return true
         }
         if (afterCr) {
             afterCr = false
-            if (char == '\n') return
+            if (char == '\n') return true
         }
         when (char) {
-            '\r' -> { dispatchLine(output); afterCr = true }
-            '\n' -> dispatchLine(output)
+            '\r' -> {
+                if (!dispatchLine(emit)) return false
+                afterCr = true
+            }
+            '\n' -> if (!dispatchLine(emit)) return false
             else -> {
                 if (line.length >= limits.maxLineChars) throw WireFailure(FailureKind.LIMIT_EXCEEDED)
                 line.append(char)
             }
         }
+        return true
     }
 
-    private fun dispatchLine(output: MutableList<SseFrame>) {
+    private fun dispatchLine(emit: (SseFrame) -> Boolean): Boolean {
         val value = line.toString()
         line.setLength(0)
         if (value.isEmpty()) {
+            var frame: SseFrame? = null
             if (hasData) {
-                if (++frames > limits.maxFrames) throw WireFailure(FailureKind.LIMIT_EXCEEDED)
-                output.add(SseFrame(event.ifEmpty { "message" }, data.toString()))
+                if (frames >= limits.maxFrames) throw WireFailure(FailureKind.LIMIT_EXCEEDED)
+                frames++
+                frame = SseFrame(event.ifEmpty { "message" }, data.toString())
             }
             data.setLength(0)
             event = ""
             hasData = false
             eventChars = 0
-            return
+            return frame?.let(emit) ?: true
         }
-        if (value.startsWith(':')) return
+        if (value.startsWith(':')) return true
         val split = value.indexOf(':')
         val field = if (split == -1) value else value.substring(0, split)
         val content = if (split == -1) "" else value.substring(split + 1).removePrefix(" ")
-        if (field != "data" && field != "event") return
+        if (field != "data" && field != "event") return true
         eventChars += content.length.toLong() + 1
         if (eventChars > limits.maxEventChars) throw WireFailure(FailureKind.LIMIT_EXCEEDED)
         if (field == "event") event = content else {
@@ -118,5 +145,6 @@ class SseDecoder(private val limits: StreamLimits = StreamLimits()) {
             data.append(content)
             hasData = true
         }
+        return true
     }
 }

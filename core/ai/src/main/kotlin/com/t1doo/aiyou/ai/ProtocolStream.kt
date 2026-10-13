@@ -26,13 +26,19 @@ class ProtocolStream(val protocol: Protocol, private val limits: StreamLimits = 
         if (isTerminal) return emptyList()
         val events = mutableListOf<StreamEvent>()
         try {
-            for (frame in decoder.push(bytes)) {
-                if (isTerminal) break
-                if (frame.data.isEmpty() && frame.event == "message") continue
-                when (protocol) {
-                    Protocol.CHAT_COMPLETIONS -> chat(frame, events)
-                    Protocol.ANTHROPIC_MESSAGES -> anthropic(frame, events)
+            var offset = 0
+            while (offset < bytes.size && !isTerminal) {
+                val length = minOf(limits.maxChunkBytes, bytes.size - offset)
+                decoder.consume(bytes, offset, length) { frame ->
+                    if (!(frame.data.isEmpty() && frame.event == "message")) {
+                        when (protocol) {
+                            Protocol.CHAT_COMPLETIONS -> chat(frame, events)
+                            Protocol.ANTHROPIC_MESSAGES -> anthropic(frame, events)
+                        }
+                    }
+                    !isTerminal
                 }
+                offset += length
             }
         } catch (failure: WireFailure) {
             fail(failure.kind, events)
