@@ -13,7 +13,11 @@ sqlcipher = "4.19.1"
 sqlite = "2.7.0"
 #noinspection NewerVersionAvailable
 coroutines = "1.9.0"
+# D04 retains the reviewed Json-tree runtime pin; upgrades need separate compatibility review.
+# Suppress only newer-release advice for this version; other lint checks remain enabled.
+#noinspection NewerVersionAvailable
 serialization = "1.9.0"
+okhttp = "5.5.0"
 #noinspection GradleDependency
 lifecycle = "2.9.4"
 android-test-runner = "1.7.0"
@@ -37,6 +41,8 @@ sqlcipher = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher
 sqlite = { module = "androidx.sqlite:sqlite", version.ref = "sqlite" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "okhttp" }
 coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 android-test-runner = { module = "androidx.test:runner", version.ref = "android-test-runner" }

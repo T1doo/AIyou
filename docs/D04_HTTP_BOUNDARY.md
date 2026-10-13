@@ -1,8 +1,9 @@
-# Next independent HTTP/Mock-server slice: proposed execution boundary
+# Independent HTTP/Mock-server slice: execution boundary
 
-The partition correction must pass and freeze before transport implementation.
-This document prepares a concrete scope; it does not claim an HTTP client or
-Mock-server contract has already been delivered.
+The partition correction was frozen at
+`1579445108de02fb1e2eb8e1f762db6050b43b49` before this implementation.
+This document records the authorized HTTP scope; actual delivery and test
+evidence are recorded in `D04_HTTP_SLICE.md`. Full D04 acceptance remains OPEN.
 
 ## Product boundary
 

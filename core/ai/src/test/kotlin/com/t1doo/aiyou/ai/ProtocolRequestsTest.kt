@@ -106,6 +106,20 @@ class ProtocolRequestsTest {
         assertFalse(defaultChat.containsKey("max_completion_tokens"))
     }
 
+    @Test fun chatUsageOptionIsExplicitlyCapabilityGatedAndNeverSentToAnthropic() {
+        Protocol.entries.forEach { protocol ->
+            listOf(false, true).forEach { supported ->
+                val configured = TextRequest("synthetic", request.messages, chatUsageSupported = supported)
+                val body = Json.parseToJsonElement(ProtocolRequests.prepare("https://example.test/v1", protocol, configured).bodyJson).jsonObject
+                if (protocol == Protocol.CHAT_COMPLETIONS && supported) {
+                    assertEquals("true", body.getValue("stream_options").jsonObject.getValue("include_usage").jsonPrimitive.content)
+                } else assertFalse(body.containsKey("stream_options"))
+            }
+        }
+        val default = Json.parseToJsonElement(ProtocolRequests.prepare("https://example.test/v1", Protocol.CHAT_COMPLETIONS, request).bodyJson).jsonObject
+        assertFalse(default.containsKey("stream_options"))
+    }
+
     @Test fun rejectsUnpairedUtf16InAllInputFieldsAndPreservesEmoji() {
         listOf("\uD800", "\uDC00", "\uD800x", "x\uDC00").forEach { malformed ->
             assertBadRequest(TextRequest("synthetic-$malformed", request.messages))

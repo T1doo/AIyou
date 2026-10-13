@@ -22,7 +22,7 @@ def input_fingerprint():
                 inputs.append(path)
     inputs.extend(root / path for path in ("gradle/libs.versions.toml", "gradle/wrapper/gradle-wrapper.properties",
                                           "gradle/wrapper/gradle-wrapper.jar", "scripts/jvm-gradle.py",
-                                          "scripts/verify-ai-protocol-results.py"))
+                                          "scripts/verify-ai-http-dependencies.py", "scripts/verify-ai-protocol-results.py"))
     fingerprint = hashlib.sha256()
     for path in sorted(set(inputs)):
         fingerprint.update(str(path.relative_to(root)).encode() + b"\0")
@@ -51,7 +51,7 @@ for module in ("ai", "domain"):
         text = source.read_text()
         package = re.search(r"^package\s+([\w.]+)", text, re.MULTILINE)
         test_class = re.search(r"\bclass\s+(\w+)", text)
-        methods = re.findall(r"@Test\s+fun\s+(\w+)\s*\(", text)
+        methods = re.findall(r"@Test(?:\s*\([^)]*\))?\s+fun\s+(\w+)\s*\(", text)
         if methods and (package is None or test_class is None):
             raise SystemExit(f"Cannot collect test inventory: {source.relative_to(root)}")
         for method in methods:
@@ -89,7 +89,7 @@ for module in ("ai", "domain"):
     results.append({"module": "core:" + module, "tests": len(actual), "failures": 0, "errors": 0, "skipped": 0,
                     "methods": [list(key) for key in sorted(actual)], "xml": evidence})
 
-report = {"status": "PASS", "scope": "pure JVM protocol and domain contracts; no HTTP/device/App integration",
+report = {"status": "PASS", "scope": "pure JVM protocol, real loopback HTTP and domain contracts; no provider/device/App integration",
           "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
           "source_sha256": source_sha256, "results": results,
           "d02_native_acceptance": "NOT RUN", "full_d04_acceptance": "OPEN"}

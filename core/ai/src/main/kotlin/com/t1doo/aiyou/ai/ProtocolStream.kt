@@ -13,6 +13,8 @@ class ProtocolStream(val protocol: Protocol, private val limits: StreamLimits = 
     private val decoder = SseDecoder(limits)
     @Volatile var isTerminal = false
         private set
+    @Volatile internal var terminalEvent: StreamEvent? = null
+        private set
     private var started = false
     private var textChars = 0L
     private var inputTokens: Long? = null
@@ -23,8 +25,24 @@ class ProtocolStream(val protocol: Protocol, private val limits: StreamLimits = 
     private var nextBlock = 0
 
     @Synchronized fun push(bytes: ByteArray): List<StreamEvent> {
-        if (isTerminal) return emptyList()
         val events = mutableListOf<StreamEvent>()
+        pushTo(bytes, events::add)
+        return events
+    }
+
+    /** Deliver a validated frame before consuming the next frame in the same network read. */
+    @Synchronized internal fun pushTo(bytes: ByteArray, emit: (StreamEvent) -> Unit) {
+        if (isTerminal) return
+        val events = mutableListOf<StreamEvent>()
+        fun dispatchFrame() {
+            val terminalBeforeDelivery = terminalEvent
+            for (event in events) {
+                // A callback can cancel/fail the stream; do not deliver the rest of that frame.
+                if (terminalBeforeDelivery == null && isTerminal) break
+                emit(event)
+            }
+            events.clear()
+        }
         try {
             var offset = 0
             while (offset < bytes.size && !isTerminal) {
@@ -36,6 +54,7 @@ class ProtocolStream(val protocol: Protocol, private val limits: StreamLimits = 
                             Protocol.ANTHROPIC_MESSAGES -> anthropic(frame, events)
                         }
                     }
+                    dispatchFrame()
                     !isTerminal
                 }
                 offset += length
@@ -46,7 +65,7 @@ class ProtocolStream(val protocol: Protocol, private val limits: StreamLimits = 
             // Never retain parser exceptions: their messages can contain provider/user text.
             fail(FailureKind.MALFORMED_RESPONSE, events)
         }
-        return events
+        dispatchFrame()
     }
 
     @Synchronized fun finish(): List<StreamEvent> {
@@ -65,9 +84,17 @@ class ProtocolStream(val protocol: Protocol, private val limits: StreamLimits = 
 
     @Synchronized fun cancel(): List<StreamEvent> {
         if (isTerminal) return emptyList()
+        terminalEvent = StreamEvent.Cancelled
         isTerminal = true
         decoder.close()
         return listOf(StreamEvent.Cancelled)
+    }
+
+    @Synchronized internal fun transportFailure(kind: FailureKind): List<StreamEvent> {
+        if (isTerminal) return emptyList()
+        val events = mutableListOf<StreamEvent>()
+        fail(kind, events)
+        return events
     }
 
     private fun chat(frame: SseFrame, events: MutableList<StreamEvent>) {
@@ -198,6 +225,7 @@ class ProtocolStream(val protocol: Protocol, private val limits: StreamLimits = 
     }
 
     private fun complete(events: MutableList<StreamEvent>) {
+        terminalEvent = StreamEvent.Completed
         isTerminal = true
         decoder.close()
         events.add(StreamEvent.Completed)
@@ -205,6 +233,7 @@ class ProtocolStream(val protocol: Protocol, private val limits: StreamLimits = 
 
     private fun fail(kind: FailureKind, events: MutableList<StreamEvent>) {
         if (!isTerminal) {
+            terminalEvent = StreamEvent.Failed(kind)
             isTerminal = true
             decoder.close()
             events.add(StreamEvent.Failed(kind))

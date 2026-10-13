@@ -20,6 +20,7 @@ class TextRequest(
     val system: String? = null,
     val maxOutputTokens: Int = 1024,
     val chatTokenBudget: ChatTokenBudget = ChatTokenBudget.MAX_TOKENS,
+    val chatUsageSupported: Boolean = false,
 ) {
     override fun toString() = "TextRequest(messages=${messages.size}, content=<redacted>)"
 }
@@ -89,6 +90,9 @@ object ProtocolRequests {
         }
         val fields = body.toMutableMap<String, kotlinx.serialization.json.JsonElement>()
         fields["messages"] = JsonArray(messages)
+        if (protocol == Protocol.CHAT_COMPLETIONS && request.chatUsageSupported) {
+            fields["stream_options"] = JsonObject(mapOf("include_usage" to JsonPrimitive(true)))
+        }
         if (protocol == Protocol.ANTHROPIC_MESSAGES && request.system != null) {
             fields["system"] = JsonPrimitive(request.system)
         }

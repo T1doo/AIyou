@@ -1,0 +1,27 @@
+{
+  "verification": "Official Maven Central .jar.sha1 matched before computing and pinning SHA-256; Gradle-resolved JARs must match these payloads.",
+  "release_source": "https://github.com/square/okhttp/blob/parent-5.5.0/CHANGELOG.md",
+  "artifacts": [
+    {
+      "coordinate": "com.squareup.okhttp3:okhttp-jvm:5.5.0",
+      "source": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp-jvm/5.5.0/okhttp-jvm-5.5.0.jar",
+      "sha1": "cefe1eb26408176d30511420b7e36b065e38bca0",
+      "sha256": "234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52",
+      "bytes": 961167
+    },
+    {
+      "coordinate": "com.squareup.okhttp3:mockwebserver3:5.5.0",
+      "source": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/mockwebserver3/5.5.0/mockwebserver3-5.5.0.jar",
+      "sha1": "08379486f073a2761d468f9d65dae7cdad482895",
+      "sha256": "f8c1dccd0a63067fe56f66ed357b244a04866cac508b898a4c899326cf0d46c2",
+      "bytes": 71296
+    },
+    {
+      "coordinate": "com.squareup.okio:okio-jvm:3.18.1",
+      "source": "https://repo.maven.apache.org/maven2/com/squareup/okio/okio-jvm/3.18.1/okio-jvm-3.18.1.jar",
+      "sha1": "a3a8128bb3a0157d23ecc18c17e8330d9c0ac96c",
+      "sha256": "b97b640557a650d15411f2be29aef558c4e422a83653cb18ba494311dbed18be",
+      "bytes": 392463
+    }
+  ]
+}
