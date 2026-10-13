@@ -48,6 +48,7 @@ internal class SourceBoundLoopbackFixture(
     private val client: OkHttpClient
     val transport: OkHttpStreamingTransport
     private val heldBodies = mutableListOf<HeldBody>()
+    private val additionalTransports = mutableListOf<OkHttpStreamingTransport>()
     var selectedBody: HeldBody? = null
         private set
 
@@ -132,6 +133,15 @@ internal class SourceBoundLoopbackFixture(
 
     fun releaseTails() { heldBodies.forEach { it.release.countDown() } }
 
+    /** Same actual injected client; each production transport retains ownership isolation. */
+    fun additionalTransport(): OkHttpStreamingTransport =
+        OkHttpStreamingTransport::class.java
+            .getDeclaredConstructor(HttpBounds::class.java, OkHttpClient::class.java)
+            .apply { isAccessible = true }
+            .newInstance(HttpBounds(connectMillis = 500, totalMillis = 3_000,
+                idleMillis = 1_000, writeMillis = 1_000), client)
+            .also { additionalTransports.add(it) }
+
     fun wiped(resolver: Resolver) {
         assertTrue(resolver.values.isNotEmpty()); assertTrue(resolver.values.all { it.isClosed })
         assertTrue(resolver.arrays.all { chars -> chars.all { it == '\u0000' } })
@@ -139,7 +149,9 @@ internal class SourceBoundLoopbackFixture(
 
     override fun close() {
         releaseTails()
-        transport.close(); client.connectionPool.evictAll(); client.dispatcher.executorService.shutdownNow()
+        transport.close()
+        additionalTransports.forEach { it.close() }
+        client.connectionPool.evictAll(); client.dispatcher.executorService.shutdownNow()
         serverA.close(); serverB.close(); records.close()
     }
 

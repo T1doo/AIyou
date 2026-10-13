@@ -2,6 +2,8 @@
 
 本切片接续 `db26328cf5158ef37c3aa8786ed3cf71cd10e91a`，补齐已持久化撤销到活动请求的取消链路。完整 D04、D02 设备验收与 App 生命周期接线仍 **OPEN**；正式 Android instrumentation 的27业务方法及两个probe目前仅有编译/DEX证据，设备执行仍 **NOT RUN**。
 
+后续 transport 多请求关闭顺序修复与新增合同见 [D04_TRANSPORT_CLOSE.md](D04_TRANSPORT_CLOSE.md)。本页的246方法及输入指纹保留为本切片历史证据。
+
 ## 产品边界
 
 `SourceBoundTextRepository.subscribe` 是必需接口。正式 `RoomSourceBoundTextRepository` 通过原有 `RemoteTextTransactions` 查询同一加密 records 数据库；host 合同只替换 SQL 平台适配器，不复制授权或撤销逻辑。内存只保存该订阅已经失效/关闭的状态，不能提供新授权。

@@ -188,9 +188,22 @@ class OkHttpStreamingTransport private constructor(
             closed = true
             exchanges.toList().also { exchanges.clear() }
         }
-        owned.forEach { it.cancel() }
-        client.connectionPool.evictAll()
-        client.dispatcher.executorService.shutdown()
+        var firstFatal: Throwable? = null
+        fun attempt(action: () -> Unit) {
+            try { action() } catch (failure: Throwable) {
+                // One owner's failure must not skip other owned stops or cleanup.
+                // Preserve the first fatal object for propagation after all attempts.
+                if ((failure is VirtualMachineError || failure is ThreadDeath || failure is LinkageError) &&
+                    firstFatal == null) firstFatal = failure
+            }
+        }
+        // Stop every owned call/subscription before any cleanup can wait for SQL.
+        owned.forEach { exchange -> attempt { exchange.stopNetwork() } }
+        // Both resources were created for this transport; no injected/shared pool is closed.
+        attempt { client.connectionPool.evictAll() }
+        attempt { client.dispatcher.executorService.shutdown() }
+        owned.forEach { exchange -> attempt { exchange.cleanupPersistent() } }
+        firstFatal?.let { throw it }
     }
 
     private fun validateRequest(protocol: Protocol, description: PreparedRequest): Request {
@@ -264,7 +277,11 @@ class OkHttpStreamingTransport private constructor(
         }
     }
 
-    private interface OwnedExchange { fun cancel() }
+    private interface OwnedExchange {
+        fun cancel()
+        fun stopNetwork() { cancel() }
+        fun cleanupPersistent() { }
+    }
 
     private interface PersistentSendGate {
         fun check(): SendDenial?
@@ -320,6 +337,10 @@ class OkHttpStreamingTransport private constructor(
         private var delegate: GuardedStreamingExchange? = null
         private var subscription: SourceBoundTextSubscription? = null
         private var persistentInvalidation: SendDenial? = null
+
+        override fun stopNetwork() { cancelHttpOnly() }
+
+        override fun cleanupPersistent() { cancelOwnedJob() }
 
         override fun cancel() {
             if (!cancelHttpOnly()) return
