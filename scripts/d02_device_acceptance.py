@@ -2,7 +2,7 @@
 import re
 from pathlib import Path
 
-NATIVE_CASES = {
+LEGACY_NATIVE_CASES = {
     "com.t1doo.aiyou.data.EncryptedRecordsIntegrationTest": (
         "encryptedDraftAndEntrySurviveCloseAndReopen",
         "actualJobInsertFailureRollsBackEntryRevisionAndDraftConsumption",
@@ -29,6 +29,20 @@ NATIVE_CASES = {
         "changedNativeOriginalRejectsStaleEditAndDiscardTombstoneSurvivesReopen",
     ),
 }
+SOURCE_BOUND_NATIVE_CASES = {
+    "com.t1doo.aiyou.data.SourceBoundTextRecordsIntegrationTest": (
+        "freshVersionFourUsesGeneratedRoomAndEncryptedNativeStore",
+        "encryptedVersionThreeMigrationPreservesAllLegacyRowsAcrossReopen",
+        "withdrawFirstAcrossIndependentRoomsRejectsLateCommit",
+        "commitFirstAcrossIndependentRoomsWithdrawalRemovesAnnotation",
+        "annotationInsertThenFinishAbortRollsBackAcrossReopen",
+        "revisionAndTombstoneRejectLateResults",
+        "duplicateConflictAndForeignScopeNeverOverwriteOriginal",
+        "codePointReferencesRequireExactUnicodeQuotes",
+    ),
+}
+NATIVE_CASES = {**LEGACY_NATIVE_CASES, **SOURCE_BOUND_NATIVE_CASES}
+NATIVE_METHOD_COUNT = 27
 STORAGE_PROBE = "com.t1doo.aiyou.data.ProcessRestartPersistenceTest"
 STORAGE_PHASES = ("write", "read", "confirm", "cleanup")
 APP_PROBE = "com.t1doo.aiyou.ProductionColdStartPersistenceTest"
@@ -37,14 +51,26 @@ APP_PHASES = ("write", "read")
 
 def collect_source(root):
     collected = {}
+    source_root = Path(root) / "core/data/src/androidTest/kotlin"
+    allowed = set(NATIVE_CASES) | {STORAGE_PROBE}
+    for path in source_root.rglob("*.kt"):
+        methods = re.findall(r"@Test(?:\s*\([^)]*\))?\s+fun\s+(\w+)\s*\(", path.read_text())
+        class_name = ".".join(path.relative_to(source_root).with_suffix("").parts)
+        if methods and class_name not in allowed:
+            raise ValueError("Unregistered native test class: " + class_name)
     for class_name, expected in NATIVE_CASES.items():
-        path = Path(root) / "core/data/src/androidTest/kotlin" / (class_name.replace(".", "/") + ".kt")
-        actual = re.findall(r"@Test\s+fun\s+(\w+)\s*\(", path.read_text())
+        path = source_root / (class_name.replace(".", "/") + ".kt")
+        actual = re.findall(r"@Test(?:\s*\([^)]*\))?\s+fun\s+(\w+)\s*\(", path.read_text())
         if len(actual) != len(expected) or set(actual) != set(expected):
             raise ValueError("Exact native inventory drift: " + class_name)
         collected[class_name] = actual
-    if sum(map(len, collected.values())) != 19:
-        raise ValueError("Expected 19 real native methods")
+    if sum(map(len, collected.values())) != NATIVE_METHOD_COUNT:
+        raise ValueError("Expected 27 real native methods (legacy 19 + source-bound 8)")
+    for version in (2, 3, 4):
+        export = Path(root) / f"core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/{version}.json"
+        asset = Path(root) / f"core/data/src/androidTest/assets/records-schema-v{version}.json"
+        if asset.read_bytes() != export.read_bytes():
+            raise ValueError("Native fixture asset differs from exact Room export: " + str(version))
     return collected
 
 

@@ -154,6 +154,12 @@ encryption/migration behavior or Android process/device behavior. Android build,
 lint and native acceptance are reported separately. D02 device and App end-to-end
 remain **OPEN / NOT RUN**, and full D04 remains **OPEN**.
 
+The subsequent formal Room/SQLCipher test slice and exact CI-generated v4 schema
+are tracked in [D04_ROOM_NATIVE_VALIDATION.md](D04_ROOM_NATIVE_VALIDATION.md).
+Its source and compiled-test collection are separate from this historical
+233-method host run; native execution remains NOT RUN until an actual supported
+device records the exact registered instrumentation methods.
+
 The parent reported baseline normal CI run38402552049/job115313607705 D04/domain
 success at 13:09:23 UTC; the overall run was not terminal at that receipt. That
 result covers the accepted baseline only. No manual rerun/dispatch is requested,

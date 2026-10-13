@@ -1,9 +1,17 @@
 """Runner protocol guards only: these fixtures do not execute Android or validate storage."""
 import sys
+import importlib.util
 from pathlib import Path
+import shutil
+import tempfile
 import unittest
+import zipfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from d02_device_acceptance import collect_source, parse_result
+from d02_device_acceptance import NATIVE_METHOD_COUNT, collect_source, parse_result
+
+spec = importlib.util.spec_from_file_location("device_apk_inventory", Path(__file__).resolve().parents[1] / "inspect-d02-device-test-apks.py")
+apk_inventory = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(apk_inventory)
 
 
 def passing():
@@ -66,9 +74,45 @@ class DeviceProtocolTests(unittest.TestCase):
         for line in ('INSTRUMENTATION_STATUS: broken', 'INSTRUMENTATION_STATUS_CODE: -', 'INSTRUMENTATION_CODE: -'):
             with self.subTest(line=line), self.assertRaises(ValueError): self.parse(passing() + '\n' + line)
 
-    def test_inventory_contains_all_original_19_methods(self):
+    def test_inventory_contains_original_19_and_source_bound_8_methods(self):
         actual = collect_source(Path(__file__).resolve().parents[2])
-        self.assertEqual([13, 4, 2], [len(cases) for cases in actual.values()])
+        self.assertEqual([13, 4, 2, 8], [len(cases) for cases in actual.values()])
+        self.assertEqual(NATIVE_METHOD_COUNT, sum(map(len, actual.values())))
+
+    def test_unregistered_source_class_cannot_silently_keep_passing_count(self):
+        root = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary) / "core/data/src/androidTest/kotlin"
+            shutil.copytree(root / "core/data/src/androidTest/kotlin", destination)
+            (destination / "com/t1doo/aiyou/data/UnregisteredTest.kt").write_text("@Test fun hiddenCase() {}")
+            with self.assertRaisesRegex(ValueError, "Unregistered native test class"):
+                collect_source(temporary)
+
+    def test_compiled_fixture_assets_reject_missing_or_changed_exports(self):
+        root = Path(__file__).resolve().parents[2]
+        assets = {f"assets/records-schema-v{version}.json":
+            (root / f"core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/{version}.json").read_bytes()
+            for version in (2, 3, 4)}
+        with tempfile.TemporaryDirectory() as temporary:
+            apk = Path(temporary) / "synthetic-inventory-only.zip"
+            with zipfile.ZipFile(apk, "w") as archive:
+                for name, content in assets.items(): archive.writestr(name, content)
+            self.assertEqual({"2", "3", "4"}, set(apk_inventory.verify_schema_assets(apk, root)))
+            for changed in (dict(list(assets.items())[1:]), {**assets, "assets/records-schema-v4.json": b"{}"}):
+                with zipfile.ZipFile(apk, "w") as archive:
+                    for name, content in changed.items(): archive.writestr(name, content)
+                with self.assertRaises(ValueError): apk_inventory.verify_schema_assets(apk, root)
+
+    def test_unregistered_project_dex_class_and_wrong_method_are_rejected(self):
+        expected = {"com.t1doo.aiyou.data.RegisteredTest": ("one",)}
+        apk_inventory.verify_inventory(expected, expected)
+        for actual in (
+            {**expected, "com.t1doo.aiyou.data.UnregisteredTest": ("hidden",)},
+            {"com.t1doo.aiyou.data.RegisteredTest": ("other",)},
+            {"com.t1doo.aiyou.data.RegisteredTest": ("one", "one")},
+        ):
+            with self.subTest(actual=actual), self.assertRaises(ValueError):
+                apk_inventory.verify_inventory(actual, expected)
 
 
 if __name__ == '__main__':

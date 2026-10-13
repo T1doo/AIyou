@@ -1,6 +1,6 @@
 # D02 实际设备验收入口（设备结果仍 OPEN）
 
-本切片接齐已有 **13 + 4 + 2 = 19** 项原生测试，并增加外部强停分阶段验收。编译、源码收集、DEX 注解收集、Python 协议检查都不是设备执行。原 Master §17 的离线、重启恢复、迁移门槛保持不变；不提前实现 D03，不为收藏/标签自行指定阶段。
+当前入口接齐已有 **13 + 4 + 2 = 19** 项和新增 **8** 项正式 Room/SQLCipher source-bound 测试，共 **27** 项，并保留外部强停分阶段验收。编译、源码收集、DEX 注解收集、Python 协议检查都不是设备执行。原 Master §17 的离线、重启恢复、迁移门槛保持不变；不提前实现 D03，不为收藏/标签自行指定阶段。
 
 ## 最小受支持环境与命令
 
@@ -23,7 +23,7 @@ python3 scripts/run-d02-device-acceptance.py \
 
 当前保存云环境实查：无 SDK 包/接受记录、adb/emulator、/dev/kvm。此前同 SHA CI 38165543041 有已接受 SDK 与 adb，但无 emulator/system-image、KVM 不可用；已结束 job 不是持续设备服务。当前不存在受支持可用 serial 的证据。其他未暴露环境不能假定可用。因此此轮完整设备运行 **NOT RUN**，不伪造安装/启动/强停/重启日志。
 
-## 19 项逐条映射
+## 既有 19 项逐条映射
 
 脚本 `d02_device_acceptance.py` 固定精确类/方法集合。源码漂移直接失败；实际 runner 需每个方法恰好一次 start/pass、唯一成功 terminal、零 skip/error，数量相同但方法不同也失败。CI `inspect-d02-device-test-apks.py` 校验实际 DEX checksum/signature，按 `@org.junit.Test` 注解收集编译后的精确集合，而非只搜字符串。下表各项目前均 **NOT RUN on Android device**。
 
@@ -44,14 +44,31 @@ python3 scripts/run-d02-device-acceptance.py \
 |13|同上|fiveAcknowledgedSavesSurviveSeparateDatabaseReopens|五次已确认保存/独立重开|
 |14|AttachmentRecordsIntegrationTest|encryptedAttachmentIsRevisionBoundAndReopensWithoutChangingTextDraftOrJobs|附件绑定不可变版本/独立草稿|
 |15|同上|failedFinalRoomTransitionPreservesPublishedBlobAndStartupRecoveryIsIdempotent|真实 READY 转移失败、启动幂等恢复|
-|16|同上|encryptedVersionTwoFixtureMigratesWithoutChangingOriginalsDraftAndLedger|加密 v2→v3 附件 schema 迁移|
+|16|同上|encryptedVersionTwoFixtureMigratesWithoutChangingOriginalsDraftAndLedger|真实导出 v2 夹具，经 v3→v4 迁移后保留旧数据|
 |17|同上|wrappedMediaKeyHasSeparatePurposeAndMissingMaterialNeverReplacesIt|独立媒体 key/AAD 与缺失保全|
 |18|OriginalEditRecordsIntegrationTest|encryptedEditAndCaptureSurviveReopenWithoutChangingFormalOriginal|实际编辑 cipher/捕获独立持久化|
 |19|同上|changedNativeOriginalRejectsStaleEditAndDiscardTombstoneSurvivesReopen|编辑冲突/放弃墓碑/迟到写拒绝|
 
+## 新增 8 项正式 Room/SQLCipher 映射
+
+以下方法均属于 `com.t1doo.aiyou.data.SourceBoundTextRecordsIntegrationTest`，当前设备执行均 **NOT RUN**。真实生成 v4 schema 的来源与校验见 [D04_ROOM_NATIVE_VALIDATION.md](D04_ROOM_NATIVE_VALIDATION.md)。这些方法使用生产 `EncryptedEntryRepository`、其 `sourceBoundText` Room 适配及真实 SQLCipher 库；不采用 host SQLite bridge。
+
+| # | 方法 | 正式断言对象 |
+|---|---|---|
+|20|freshVersionFourUsesGeneratedRoomAndEncryptedNativeStore|Room 生成 v4、加密头、表结构/索引/外键/守卫|
+|21|encryptedVersionThreeMigrationPreservesAllLegacyRowsAcrossReopen|真实导出 v3 加密夹具、旧原文/草稿/作业/附件行、迁移与重开|
+|22|withdrawFirstAcrossIndependentRoomsRejectsLateCommit|同一库的两个独立 Room 实例，撤销先提交，迟到结果拒绝|
+|23|commitFirstAcrossIndependentRoomsWithdrawalRemovesAnnotation|结果先提交，随后撤销清理候选，重开后仍无候选|
+|24|annotationInsertThenFinishAbortRollsBackAcrossReopen|真实 trigger 在候选 INSERT 后拒绝 job UPDATE，整事务回滚与重开|
+|25|revisionAndTombstoneRejectLateResults|原文版本变化/删除墓碑拒绝旧结果|
+|26|duplicateConflictAndForeignScopeNeverOverwriteOriginal|幂等/不同候选/异源或不一致 job 元数据拒绝，原文不被覆盖|
+|27|codePointReferencesRequireExactUnicodeQuotes|Unicode code-point 范围与精确引用校验|
+
+源码和实际 DEX 收集均拒绝未注册的项目测试类；仅保留旧19的清单不能误报新增8已覆盖。存储 APK 必须有27项与独立重启探针1项，共28个实际 `@Test`；应用 APK 另有1项生产 Activity 探针。运行清单绑定完整 SHA、各 APK 的真实 SHA-256/大小及精确27方法集合。两组探针仍分别报告。
+
 ## 真实跨进程阶段与证据
 
-`ProcessRestartPersistenceTest` 同一方法由四次外部 instrumentation 调用执行。每阶段输出独立原生 PID、UUID token、phase；脚本核匹配元数据与不同 PID，强停后的 pidof 日志与完整 terminal 一起保全。既有 19 项以外单独报告，不混入19计数。
+`ProcessRestartPersistenceTest` 同一方法由四次外部 instrumentation 调用执行。每阶段输出独立原生 PID、UUID token、phase；脚本核匹配元数据与不同 PID，强停后的 pidof 日志与完整 terminal 一起保全。27项以外单独报告，不混入27计数。
 
 1. **write**：真实 AndroidKeystore 分别包装 DB/媒体/编辑随机 key；实际 Room/SQLCipher 提交文字+捕获草稿、ACTIVE 编辑、READY 附件；实际 SQLite trigger 拒绝另一个附件 READY，保留已发布密文/STAGED与hash；返回成功后外部强停。
 2. **read**：新 PID 重新解包真实 key；启动 prepare 遇到仍存在的 READY 故障时失败且字节保全，删除仅本合成库故障 trigger 后 prepare 两次恢复 READY；确认幂等不重拷；编辑草稿恢复，真实 receipt 插入 SQL 故障令新 revision+LOCAL_INDEX+receipt 全回滚；撤故障显式重试，正式追加一次；同一编辑重复提交返回原回执，留 ACTIVE 模拟提交后收尾前退出。随后外部强停。
@@ -60,7 +77,7 @@ python3 scripts/run-d02-device-acceptance.py \
 
 `ProductionColdStartPersistenceTest` 两个外部分离阶段使用 **实际生产 open(Application)、Room/SQLCipher、独立 Keystore 包装、生产 ViewModel 与 MainActivity**。write 要求生产库尚不存在，留下正式事务已提交但 ACTIVE 草稿未收尾的断点输入。另一合成记录通过生产 ViewModel 经一次草稿收尾异常、一次读取确认异常、显式重试完成，始终只新增一个版本。异常只在测试接口的确认交付边界注入；真实 DB/cipher/key 没有替换或 mock。read 新 PID 用 `ActivityScenario.launch(MainActivity)` 的真实 ViewModel，恢复列表→恢复编辑→核 awaitingReadback/非冲突→确认→无新增 revision，且独立捕获草稿不变。ActivityScenario 是本新 PID 内真实启动，不是跨 PID 证据的替代；跨 PID 来自外部强停和实际 PID。
 
-输出目录保存每条命令 stdout/stderr/超时、APK badging/manifest、安装、实际 runner、19方法完整结果、强停/pidof、6次阶段 terminal/PID、许可证前后 hash 与 RESULT.json。中途失败仅记录已真实结束的阶段，剩余 NOT RUN。不延长旧单例240s上限，不对失败阶段循环补测。
+输出目录保存每条命令 stdout/stderr/超时、APK badging/manifest、安装、实际 runner、27方法完整结果、强停/pidof、6次阶段 terminal/PID、许可证前后 hash 与 RESULT.json。中途失败仅记录已真实结束的阶段，剩余 NOT RUN。保留每次 instrumentation 240s 与总计2100s上限，不对失败阶段循环补测。
 
 ## 对应生产修正与边界
 

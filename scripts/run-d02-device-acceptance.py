@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 import uuid
-from d02_device_acceptance import APP_PHASES, APP_PROBE, collect_source, stop_packages, run_storage
+from d02_device_acceptance import APP_PHASES, APP_PROBE, NATIVE_CASES, NATIVE_METHOD_COUNT, collect_source, stop_packages, run_storage
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("device_experiment", ROOT / "scripts/run-d02-device-experiment.py")
@@ -33,7 +33,7 @@ def main():
         parser.error("budget must be 90..2100 seconds; cannot extend existing ceiling")
     inventory = collect_source(ROOT)
     if args.collect_source:
-        print(json.dumps({"result": "PASS: 19 source methods collected; APK/device collection NOT RUN", "native_cases": inventory}, indent=2))
+        print(json.dumps({"result": "PASS: 27 source methods collected (legacy 19 + source-bound 8); APK/device collection NOT RUN", "native_cases": inventory}, indent=2))
         return
     if not all((args.serial, args.expected_sha, args.apk_manifest, args.output)):
         parser.error("require --serial --expected-sha --apk-manifest --output; see docs/D02_DEVICE_ACCEPTANCE.md")
@@ -80,7 +80,8 @@ def main():
         if not report["api"].isdigit() or int(report["api"]) < 26:
             raise RuntimeError("Require API26+ device")
         manifest = json.loads(args.apk_manifest.read_text())
-        if manifest["source_sha"] != args.expected_sha or manifest["native_method_count"] != 19:
+        if manifest["source_sha"] != args.expected_sha or manifest["native_method_count"] != NATIVE_METHOD_COUNT or \
+                manifest["native_cases"] != {name: list(methods) for name, methods in NATIVE_CASES.items()}:
             raise RuntimeError("APK manifest does not bind exact reviewed SHA and inventory")
         declared = {}
         for role in ("app", "storage_test", "app_test"):
@@ -135,7 +136,7 @@ def main():
                 raise RuntimeError("Application phases did not prove distinct PIDs")
             pids.add(result["pid"]); report["app_phases"].append(result)
         report["apks"] = manifest["apks"]
-        report["result"] = "PASS: exact 19 native methods, 4 external storage phases and 2 production Activity/VM phases; separate 16KB/physical-performance gates remain OPEN"
+        report["result"] = "PASS: exact 27 native methods (legacy 19 + source-bound 8), 4 external storage phases and 2 production Activity/VM phases; separate 16KB/physical-performance gates remain OPEN"
         # Fresh test installation and synthetic library deliberately retained for review. No uninstall/reset.
     except Exception as error:
         report["result"] = "FAIL: " + str(error) + "; unrecorded device gates NOT RUN; all evidence retained"

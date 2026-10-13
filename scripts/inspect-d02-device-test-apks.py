@@ -7,7 +7,7 @@ import struct
 import subprocess
 import zipfile
 import zlib
-from d02_device_acceptance import APP_PROBE, NATIVE_CASES, STORAGE_PROBE, collect_source
+from d02_device_acceptance import APP_PROBE, NATIVE_CASES, NATIVE_METHOD_COUNT, STORAGE_PROBE, collect_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -75,6 +75,28 @@ def collect_apk(apk):
     return actual
 
 
+def verify_inventory(actual, expected):
+    scoped = {name: tuple(methods) for name, methods in actual.items() if name.startswith("com.t1doo.aiyou.")}
+    if set(scoped) != set(expected) or any(set(scoped[name]) != set(methods) or
+            len(scoped[name]) != len(methods) for name, methods in expected.items()):
+        raise ValueError("Actual DEX @Test inventory differs from exact registered project methods")
+
+
+def verify_schema_assets(apk, root):
+    schemas = {}
+    with zipfile.ZipFile(apk) as archive:
+        for version in (2, 3, 4):
+            path = f"assets/records-schema-v{version}.json"
+            if archive.namelist().count(path) != 1:
+                raise ValueError("Missing/duplicate actual native schema asset: " + path)
+            content = archive.read(path)
+            expected = (Path(root) / f"core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/{version}.json").read_bytes()
+            if content != expected:
+                raise ValueError("Actual APK native fixture differs from exact Room export: " + path)
+            schemas[str(version)] = {"path": path, "bytes": len(content), "sha256": hashlib.sha256(content).hexdigest()}
+    return schemas
+
+
 def main():
     collect_source(ROOT)
     storage = sorted((ROOT / "core/data/build/outputs/apk/androidTest/debug").glob("*.apk"))
@@ -85,14 +107,12 @@ def main():
     expected_app = {APP_PROBE: ("formalEditReceiptSurvivesKilledProcessAndActivityConfirmsWithoutAnotherRevision",)}
     for apk, expected in ((storage[0], expected_storage), (app_test[0], expected_app)):
         actual = collect_apk(apk)
-        scoped = {name: tuple(methods) for name, methods in actual.items() if name in expected}
-        if set(scoped) != set(expected) or any(set(scoped[name]) != set(methods) for name, methods in expected.items()):
-            raise ValueError("Actual DEX @Test inventory differs: " + str(apk))
+        verify_inventory(actual, expected)
     apks = {"app": ROOT / "app/build/outputs/apk/debug/app-debug.apk", "storage_test": storage[0], "app_test": app_test[0]}
     report = {"source_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
               "result": "PASS: actual compiled APK DEX @Test collection only; all device execution NOT RUN",
-              "native_method_count": 19, "native_cases": NATIVE_CASES, "storage_probe": STORAGE_PROBE,
-              "application_probe": APP_PROBE, "apks": {}}
+              "native_method_count": NATIVE_METHOD_COUNT, "native_cases": NATIVE_CASES, "storage_probe": STORAGE_PROBE,
+              "application_probe": APP_PROBE, "storage_schema_assets": verify_schema_assets(storage[0], ROOT), "apks": {}}
     for role, apk in apks.items():
         data = apk.read_bytes()
         report["apks"][role] = {"path": str(apk.relative_to(ROOT)), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}

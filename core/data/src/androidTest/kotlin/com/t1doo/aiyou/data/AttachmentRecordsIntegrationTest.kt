@@ -8,6 +8,10 @@ import com.t1doo.aiyou.domain.AttachmentIntegrityFailure
 import com.t1doo.aiyou.domain.StorageKeyUnavailable
 import com.t1doo.aiyou.model.AttachmentIntent
 import com.t1doo.aiyou.model.AttachmentState
+import com.t1doo.aiyou.model.OriginalRevision
+import com.t1doo.aiyou.model.ProcessingPolicy
+import com.t1doo.aiyou.model.StoredEntry
+import com.t1doo.aiyou.model.TextDraft
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.security.KeyStore
@@ -15,7 +19,6 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
-import net.zetetic.database.sqlcipher.SQLiteDatabase
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -107,26 +110,44 @@ class AttachmentRecordsIntegrationTest {
     }
 
     @Test fun encryptedVersionTwoFixtureMigratesWithoutChangingOriginalsDraftAndLedger() = runBlocking {
-        val initial = open()
-        val original = initial.saveDraft(initial.updateDraft("合成v2原文"), 1000, "Asia/Shanghai")
-        val updated = initial.revise(original.id, 1, "合成v2更新原文", 2000)
-        val draft = initial.updateDraft("合成v2草稿")
-        val revisions = initial.revisions(original.id)
-        initial.close()
-        // Synthetic v2 fixture: exact generated v3 four text tables, excluding the new empty table.
-        SQLiteDatabase.openOrCreateDatabase(databaseFile.path, key, null, null).use { db ->
-            db.execSQL("DROP TABLE attachments")
-            db.execSQL("DELETE FROM room_master_table")
-            db.version = 2
+        val id = "synthetic-v2-source"
+        val oldText = "合成v2原文"
+        val currentText = "合成v2更新原文"
+        val updated = StoredEntry(id, 2, currentText, 1000, "Asia/Shanghai", ProcessingPolicy.LOCAL_ONLY)
+        val draft = TextDraft("synthetic-v2-draft", 3, "合成v2草稿")
+        val revisions = listOf(OriginalRevision(id, 1, oldText, contentHash(oldText), 1000),
+            OriginalRevision(id, 2, currentText, contentHash(currentText), 2000))
+        // A native encrypted database from the exact exported v2 schema and v2 Room identity.
+        NativeRecordsSchemaFixture.create(databaseFile, key, 2) { db ->
+            db.execSQL("INSERT INTO entries VALUES(?,2,1000,'Asia/Shanghai','LOCAL_ONLY')", arrayOf(id))
+            revisions.forEach { revision ->
+                db.execSQL("INSERT INTO entry_revisions VALUES(?,?,?,?,?)",
+                    arrayOf(revision.entryId, revision.revision, revision.originalText, revision.contentHash, revision.createdAtMillis))
+                db.execSQL("INSERT INTO local_jobs VALUES(?,?,?,'LOCAL_INDEX','PENDING')",
+                    arrayOf("$id:${revision.revision}:LOCAL_INDEX", id, revision.revision))
+            }
+            db.execSQL("INSERT INTO capture_draft VALUES(1,?,?,?)", arrayOf(draft.id, draft.version, draft.text))
         }
         val migrated = open(); migrated.prepare()
-        assertEquals(listOf(updated), migrated.entries()); assertEquals(revisions, migrated.revisions(original.id))
-        assertEquals(draft, migrated.readDraft()); assertTrue(migrated.attachments.list(original.id, 1).isEmpty())
+        assertEquals(listOf(updated), migrated.entries()); assertEquals(revisions, migrated.revisions(id))
+        assertEquals(draft, migrated.readDraft()); assertTrue(migrated.attachments.list(id, 1).isEmpty())
+        NativeRecordsSchemaFixture.assertCurrentSchema(migrated.database.openHelper.writableDatabase)
         migrated.database.openHelper.writableDatabase.query("SELECT count(*) FROM local_jobs").use { it.moveToFirst(); assertEquals(2L, it.getLong(0)) }
-        assertEquals(3, migrated.database.openHelper.writableDatabase.version)
-        val request = intent(original.id)
-        migrated.attachments.save(request) { ByteArrayInputStream(data) }
-        assertArrayEquals(data, migrated.attachments.read(request.id))
+        for (table in listOf("remote_source_access", "remote_text_jobs", "text_annotations")) {
+            migrated.database.openHelper.writableDatabase.query("SELECT count(*) FROM $table").use { it.moveToFirst(); assertEquals(0L, it.getLong(0)) }
+        }
+        migrated.close()
+        val reopened = open(); reopened.prepare()
+        assertEquals(listOf(updated), reopened.entries()); assertEquals(revisions, reopened.revisions(id))
+        assertEquals(draft, reopened.readDraft()); assertTrue(reopened.attachments.list(id, 1).isEmpty())
+        NativeRecordsSchemaFixture.assertCurrentSchema(reopened.database.openHelper.writableDatabase)
+        reopened.database.openHelper.writableDatabase.query("SELECT count(*) FROM local_jobs").use { it.moveToFirst(); assertEquals(2L, it.getLong(0)) }
+        for (table in listOf("remote_source_access", "remote_text_jobs", "text_annotations")) {
+            reopened.database.openHelper.writableDatabase.query("SELECT count(*) FROM $table").use { it.moveToFirst(); assertEquals(0L, it.getLong(0)) }
+        }
+        val request = intent(id)
+        reopened.attachments.save(request) { ByteArrayInputStream(data) }
+        assertArrayEquals(data, reopened.attachments.read(request.id))
     }
 
     @Test fun wrappedMediaKeyHasSeparatePurposeAndMissingMaterialNeverReplacesIt() {

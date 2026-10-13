@@ -71,7 +71,7 @@ jobs:
           python3 scripts/verify-test-results.py --ui
       - name: Compile actual D02 native-storage instrumentation APK without claiming execution
         run: scripts/gradle.sh :core:data:assembleDebugAndroidTest :app:assembleDebugAndroidTest
-      - name: Collect exact 19 methods and external probes from actual compiled APK DEX (device NOT RUN)
+      - name: Collect exact 27 methods and external probes from actual compiled APK DEX (device NOT RUN)
         run: python3 scripts/inspect-d02-device-test-apks.py
       - name: Verify actual license assets and APK ZIP alignment (native execution NOT RUN)
         run: python3 scripts/inspect-d02-apks.py
