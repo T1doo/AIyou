@@ -122,7 +122,7 @@ class AttachmentRecordsIntegrationTest {
             db.execSQL("INSERT INTO entries VALUES(?,2,1000,'Asia/Shanghai','LOCAL_ONLY')", arrayOf(id))
             revisions.forEach { revision ->
                 db.execSQL("INSERT INTO entry_revisions VALUES(?,?,?,?,?)",
-                    arrayOf(revision.entryId, revision.revision, revision.originalText, revision.contentHash, revision.createdAtMillis))
+                    arrayOf<Any?>(revision.entryId, revision.revision, revision.originalText, revision.contentHash, revision.createdAtMillis))
                 db.execSQL("INSERT INTO local_jobs VALUES(?,?,?,'LOCAL_INDEX','PENDING')",
                     arrayOf<Any?>("$id:${revision.revision}:LOCAL_INDEX", id, revision.revision))
             }
