@@ -120,6 +120,10 @@ fun OriginalReadingScreen(
     editActionLabel: String = "编辑原文",
     onAttachments: ((String, Int) -> Unit)? = null,
     originalScrollState: ScrollState? = null,
+    onOpenAi: ((String, Int) -> Unit)? = null,
+    onStartAi: (Long) -> Unit = {},
+    onStopAi: (Long) -> Unit = {},
+    onCloseAi: (Long) -> Unit = {},
 ) {
     // Resolve the current local source on every update; navigation never carries plaintext.
     val entry = local.entries.firstOrNull { it.id == entryId }
@@ -160,6 +164,15 @@ fun OriginalReadingScreen(
                                 enabled = !local.saving && !local.savePending,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("查看附件") }
                         }
+                        onOpenAi?.let { openAi ->
+                            TextButton(onClick = { openAi(entry.id, entry.currentRevision) },
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
+                                    .testTag("original-reading-ai")) { Text("AI 整理") }
+                        }
+                    }
+                    local.ai?.takeIf { it.source.sourceId == entry.id &&
+                        it.source.revision == entry.currentRevision.toLong() }?.let { selected ->
+                        RecordAiSection(selected, onStartAi, onStopAi, onCloseAi)
                     }
                     if (copyDenied) Text("无法复制，原文已保留。", color = AIyouColors.error,
                         style = MaterialTheme.typography.bodySmall)

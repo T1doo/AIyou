@@ -96,7 +96,10 @@ class MainActivity : ComponentActivity() {
                 onBackOriginalHistory = records::backOriginalHistory, onRetryOriginalHistory = records::retryOriginalHistory,
                 onEditOriginalHistory = records::editOriginalHistory,
                 onConfirmHistoryReplacement = records::confirmHistoryReplacement,
-                onCancelHistoryReplacement = records::cancelHistoryReplacement, attachments = records.attachments) }
+                onCancelHistoryReplacement = records::cancelHistoryReplacement, attachments = records.attachments,
+                onOpenAiSession = { id, revision -> records.openAiSession(id, revision) },
+                onStartAiSession = records::startAiSession, onStopAiSession = records::stopAiSession,
+                onCloseAiSession = records::closeAiSession) }
         }
     }
 }
@@ -141,6 +144,10 @@ fun AIyouApp(
     onDisplayChange: (UiPreferences) -> Unit = {},
     onRetryDisplay: () -> Unit = {},
     previewSettings: Boolean = false,
+    onOpenAiSession: (String, Int) -> Unit = { _, _ -> },
+    onStartAiSession: (Long) -> Unit = {},
+    onStopAiSession: (Long) -> Unit = {},
+    onCloseAiSession: (Long) -> Unit = {},
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -196,6 +203,12 @@ fun AIyouApp(
     val attachmentPanel = attachments?.state?.collectAsState()?.value
     val editing = if (reading) local?.originalEdit?.takeIf { it.entryId == readerId } else null
     val history = if (reading) local?.originalHistory?.takeIf { it.entryId == readerId } else null
+    val visibleAiSession = local?.ai?.takeIf { reading && editing == null && history == null &&
+        attachmentPanel == null && it.source.sourceId == readerId }?.sessionId
+    // Leaving this reader (including composition disposal) retires exactly its AI session.
+    DisposableEffect(visibleAiSession) {
+        onDispose { visibleAiSession?.let(onCloseAiSession) }
+    }
     val historyList = remember(history?.sessionId) { LazyListState() }
     val originalScroll = remember(selected, readerId, local?.entries?.firstOrNull { it.id == readerId }?.currentRevision) { ScrollState(0) }
     val historicalScroll = remember(readerId, history?.sessionId, history?.selectedRevision) { ScrollState(0) }
@@ -433,7 +446,9 @@ fun AIyouApp(
         } else if (reading && local != null) {
             OriginalReadingScreen(checkNotNull(readerId), local, onRetry = retryReading,
                 onCopy = copy, canCopy = canCopy, modifier = modifier, onEdit = beginEdit, onHistory = beginHistory,
-                onAttachments = if (attachments != null) beginAttachments else null, originalScrollState = originalScroll)
+                onAttachments = if (attachments != null) beginAttachments else null, originalScrollState = originalScroll,
+                onOpenAi = { id, revision -> if (canCopy(id, revision)) onOpenAiSession(id, revision) },
+                onStartAi = onStartAiSession, onStopAi = onStopAiSession, onCloseAi = onCloseAiSession)
         } else if (!demo && local != null && selected != Destination.TASKS) {
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }

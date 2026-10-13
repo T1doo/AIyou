@@ -35,7 +35,7 @@ class EncryptedEntryRepository internal constructor(
     override val attachments: AttachmentStore get() = attachmentStorage
     override val editDrafts: EncryptedOriginalEditStore get() = originalEditStorage
     /** Blocking IO; shares the existing encrypted database and never enables remote processing. */
-    val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(database)
+    override val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(database)
 
     override suspend fun prepare() { attachmentStorage.recover() }
 
@@ -121,6 +121,7 @@ class EncryptedEntryRepository internal constructor(
     }
 
     override fun close() {
+        sourceBoundText.stopAndAwaitSqlIdle()
         try { database.close() } finally { attachmentStorage.close(); originalEditStorage.close(); keyBytes.fill(0) }
     }
 

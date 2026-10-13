@@ -15,6 +15,7 @@ import com.t1doo.aiyou.model.OriginalEditDraftState
 import com.t1doo.aiyou.model.ProcessingPolicy
 import com.t1doo.aiyou.model.StoredEntry
 import com.t1doo.aiyou.model.TextDraft
+import com.t1doo.aiyou.model.SourceVersion
 import java.time.Clock
 import java.time.ZoneId
 import java.util.UUID
@@ -22,11 +23,13 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class CaptureDiscardUiState(val requestId: Long, val busy: Boolean = false, val error: String? = null,
     val conflict: Boolean = false, val recoveryRequired: Boolean = false,
@@ -53,6 +56,7 @@ data class LocalRecordUiState(
     val editDraftError: String? = null,
     val editDraftIssueCount: Int = 0,
     val editDraftIndexAvailable: Boolean = true,
+    val ai: RecordAiUiState? = null,
 )
 
 /** All draft writes and saves share one queue, preserving edits around a save boundary. */
@@ -61,6 +65,7 @@ class LocalRecordsViewModel internal constructor(
     private val openStore: () -> EntryRepository,
     private val clock: Clock = Clock.systemUTC(),
     private val decodePng: (ByteArray) -> AttachmentPicture = PlatformImageDecoder::decode,
+    private val bindAi: ((EntryRepository) -> RecordAiCapability)? = null,
 ) : AndroidViewModel(application) {
     constructor(application: Application) : this(application, { EncryptedEntryRepository.open(application) })
     private val mutableState = MutableStateFlow(LocalRecordUiState())
@@ -72,6 +77,27 @@ class LocalRecordsViewModel internal constructor(
             !it.saving && !it.savePending && it.captureDiscard == null } },
         canUsePanel = { it.hasRecordAccess(mutableState.value) })
     private var repository: EntryRepository? = null
+    private var storageOwnership: RecordsStorageOwnership? = null // Local IO queue publishes one immutable owner.
+    private val ai = LocalRecordAiController(
+        currentPolicy = { source -> mutableState.value.let { local ->
+            if (editsDisposed || !local.ready || local.opening || local.error != null) null
+            else local.entries.firstOrNull { it.id == source.sourceId && it.currentRevision.toLong() == source.revision }?.policy
+        } },
+        publish = { selected -> update { local ->
+            val current = selected?.let { value -> local.entries.firstOrNull {
+                it.id == value.source.sourceId && it.currentRevision.toLong() == value.source.revision
+            } }
+            when {
+                selected == null -> local.copy(ai = null)
+                !editsDisposed && local.ready && !local.opening && local.error == null && current != null &&
+                    (current.policy == ProcessingPolicy.REMOTE_ALLOWED ||
+                        selected.phase == RecordAiPhase.BLOCKED && selected.preview.isEmpty() && selected.annotation == null) ->
+                    local.copy(ai = selected)
+                local.ai?.sessionId == selected.sessionId -> local.copy(ai = null)
+                else -> local
+            }
+        } },
+    )
     private var persistedDraft: TextDraft? = null
     private var captureDraftMayBeConsumed = false // IO queue only; an unacknowledged delete invalidates save reuse.
     private val editGeneration = AtomicLong()
@@ -93,13 +119,14 @@ class LocalRecordsViewModel internal constructor(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 open()
+                ai.reconcileRecords()
                 for (command in commands) {
                     try {
                         when (command) {
                             is Command.Edit -> {
                                 persistedDraft = checkNotNull(repository).updateDraft(command.text)
                                 captureDraftMayBeConsumed = false
-                                if (command.generation == editGeneration.get()) mutableState.update {
+                                if (command.generation == editGeneration.get()) update {
                                     it.copy(draftNotice = "草稿已保存在本机", error = null, saveNotice = null)
                                 }
                             }
@@ -116,7 +143,7 @@ class LocalRecordsViewModel internal constructor(
                                 captureDraftMayBeConsumed = false
                                 pendingIntent.compareAndSet(command.intent, null)
                                 // Success follows commit; the list is read from the database.
-                                mutableState.update { it.copy(text = "", saving = false, savePending = false, entries = entries, draftNotice = "没有未保存的草稿", saveNotice = "已保存在本机", saveFeedbackId = it.saveFeedbackId + 1, error = null) }
+                                update { it.copy(text = "", saving = false, savePending = false, entries = entries, draftNotice = "没有未保存的草稿", saveNotice = "已保存在本机", saveFeedbackId = it.saveFeedbackId + 1, error = null) }
                             }
                             is Command.DiscardCapture -> discardCapture(command.intent)
                             is Command.RestoreCapture -> restoreCapture(command.intent)
@@ -126,7 +153,7 @@ class LocalRecordsViewModel internal constructor(
                                 persistedDraft = store.updateDraft(command.text)
                                 captureDraftMayBeConsumed = false
                                 val entries = store.entries()
-                                mutableState.update { it.copy(opening = false, entries = entries, error = null,
+                                update { it.copy(opening = false, entries = entries, error = null,
                                     draftNotice = if (command.generation == editGeneration.get()) "草稿已保存在本机" else it.draftNotice,
                                     originalHistory = it.originalHistory?.let { history -> history.copy(
                                         requestId = history.requestId + 1, loading = true, revisions = emptyList(), error = null, unavailable = false,
@@ -148,22 +175,57 @@ class LocalRecordsViewModel internal constructor(
                         }
                     } catch (failure: CancellationException) { throw failure }
                     catch (failure: Exception) { failed(failure, preserveQueuedSave = command is Command.Edit) }
+                    finally { ai.reconcileRecords() }
                 }
             } finally {
                 editsDisposed = true
+                ai.markDisposed()
                 attachments.markDisposed()
-                attachments.disposeOnIo()
-                (repository as? AutoCloseable)?.close()
-                repository = null
+                withContext(NonCancellable + Dispatchers.IO) {
+                    try { ai.closeAndJoin() }
+                    finally {
+                        try { attachments.disposeOnIo() }
+                        finally { (repository as? AutoCloseable)?.close(); repository = null }
+                    }
+                }
             }
         }
     }
+
+    /** Local and AI writers validate the selected source in the same state CAS. */
+    private inline fun update(transform: (LocalRecordUiState) -> LocalRecordUiState) {
+        mutableState.update { previous ->
+            val next = transform(previous)
+            val selected = next.ai
+            val entry = selected?.let { value -> next.entries.firstOrNull {
+                it.id == value.source.sourceId && it.currentRevision.toLong() == value.source.revision
+            } }
+            if (selected == null || !editsDisposed && next.ready && !next.opening && next.error == null &&
+                entry != null && (entry.policy == ProcessingPolicy.REMOTE_ALLOWED ||
+                    selected.phase == RecordAiPhase.BLOCKED && selected.preview.isEmpty() && selected.annotation == null)) next
+            else next.copy(ai = null)
+        }
+    }
+
+    /** Opens a memory-only session over one already persisted current original. Never sends. */
+    fun openAiSession(entryId: String, expectedRevision: Int): Long {
+        mutableState.value.ai?.let { ai.leave(it.sessionId) }
+        val local = mutableState.value
+        if (editsDisposed || !local.ready || local.opening || local.error != null ||
+            local.originalEdit != null || local.originalHistory != null || attachments.state.value != null) return 0L
+        val entry = local.entries.firstOrNull { it.id == entryId && it.currentRevision == expectedRevision } ?: return 0L
+        return ai.open(SourceVersion(entry.id, entry.currentRevision.toLong()), entry.policy)
+    }
+
+    fun startAiSession(sessionId: Long) = ai.start(sessionId)
+    fun stopAiSession(sessionId: Long) = ai.stop(sessionId)
+    fun closeAiSession(sessionId: Long) = ai.leave(sessionId)
 
     fun changeText(text: String) {
         val current = mutableState.value
         if (editsDisposed || !current.ready || current.opening || current.saving || current.savePending || current.captureDiscard?.busy == true || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         if (text.length > EncryptedEntryRepository.MAX_TEXT_LENGTH) {
-            mutableState.update { it.copy(
+            update { it.copy(
                 inputNotice = "文本过长，输入长度上限为 ${EncryptedEntryRepository.MAX_TEXT_LENGTH}。本次输入未替换原草稿，请缩短后重试。",
                 saveNotice = null,
             ) }
@@ -171,7 +233,7 @@ class LocalRecordsViewModel internal constructor(
         }
         val generation = editGeneration.incrementAndGet()
         discardIntent = null
-        mutableState.update { it.copy(text = text, draftNotice = "正在保存草稿", saveNotice = null, inputNotice = null, captureDiscard = null) }
+        update { it.copy(text = text, draftNotice = "正在保存草稿", saveNotice = null, inputNotice = null, captureDiscard = null) }
         commands.trySend(Command.Edit(text, generation))
     }
 
@@ -179,7 +241,7 @@ class LocalRecordsViewModel internal constructor(
         val current = mutableState.value
         if (editsDisposed || !current.ready || current.captureDiscard != null || current.saving || current.text.isBlank() || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         val intent = pendingIntent.get() ?: SaveIntent(current.text, editGeneration.get()).also { pendingIntent.set(it) }
-        mutableState.update { it.copy(saving = true, savePending = true, saveNotice = null, error = null, inputNotice = null) }
+        update { it.copy(saving = true, savePending = true, saveNotice = null, error = null, inputNotice = null) }
         commands.trySend(Command.Save(intent))
     }
 
@@ -193,10 +255,10 @@ class LocalRecordsViewModel internal constructor(
         if (current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) {
             if (!current.ready || current.opening || current.error == null || current.originalEdit?.saving == true) return
             // Recover the prior capture write without replacing this editor or routing through changeText.
-            mutableState.update { it.copy(opening = true) }
+            update { it.copy(opening = true) }
             commands.trySend(Command.RecoverDraft(current.text, editGeneration.get()))
         } else if (!current.ready && !current.opening) {
-            mutableState.update { it.copy(opening = true, error = null) }
+            update { it.copy(opening = true, error = null) }
             commands.trySend(Command.Retry)
         } else if (mutableState.value.savePending) save()
         else if (mutableState.value.ready) changeText(mutableState.value.text)
@@ -209,7 +271,7 @@ class LocalRecordsViewModel internal constructor(
             current.originalHistory != null || attachments.state.value != null) return
         val intent = DiscardIntent(discardIds.incrementAndGet(), current.text, editGeneration.get())
         discardIntent = intent
-        mutableState.update { it.copy(captureDiscard = CaptureDiscardUiState(intent.id)) }
+        update { it.copy(captureDiscard = CaptureDiscardUiState(intent.id)) }
     }
 
     fun cancelCaptureDiscard(requestId: Long) {
@@ -220,7 +282,7 @@ class LocalRecordsViewModel internal constructor(
             return
         }
         discardIntent = null
-        mutableState.update { it.copy(captureDiscard = null,
+        update { it.copy(captureDiscard = null,
             draftNotice = if (active.recoveryFailed) "当前输入未确认保存在本机，退出应用可能丢失。" else it.draftNotice) }
     }
 
@@ -231,7 +293,7 @@ class LocalRecordsViewModel internal constructor(
         if (editsDisposed || active.requestId != requestId || active.busy || active.conflict || intent.id != requestId ||
             intent.generation != editGeneration.get() || intent.text != current.text) return
         if (active.recoveryFailed) { queueCaptureRecovery(requestId); return }
-        mutableState.update { it.copy(captureDiscard = active.copy(busy = true, error = null)) }
+        update { it.copy(captureDiscard = active.copy(busy = true, error = null)) }
         commands.trySend(Command.DiscardCapture(intent))
     }
 
@@ -241,7 +303,7 @@ class LocalRecordsViewModel internal constructor(
         val intent = discardIntent ?: return
         if (editsDisposed || active.requestId != requestId || active.busy || intent.id != requestId ||
             intent.generation != editGeneration.get() || intent.text != current.text || !active.recoveryRequired) return
-        mutableState.update { it.copy(captureDiscard = active.copy(busy = true, recovering = true, error = null)) }
+        update { it.copy(captureDiscard = active.copy(busy = true, recovering = true, error = null)) }
         commands.trySend(Command.RestoreCapture(intent))
     }
 
@@ -252,13 +314,13 @@ class LocalRecordsViewModel internal constructor(
             if (restored != intent.expected && restored != intent.replacement || store.readDraft() != restored) throw RecordConflict()
             persistedDraft = restored
             captureDraftMayBeConsumed = false
-            mutableState.update { current ->
+            update { current ->
                 if (current.captureDiscard?.requestId != intent.id || editGeneration.get() != intent.generation) current
                 else current.copy(captureDiscard = null, draftNotice = "草稿已保存在本机", error = null, saveNotice = null)
             }
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) {
-            mutableState.update { current ->
+            update { current ->
                 if (current.captureDiscard?.requestId != intent.id) current
                 else current.copy(draftNotice = "当前输入未确认保存在本机，退出应用可能丢失。",
                     captureDiscard = current.captureDiscard.copy(busy = false, recovering = false, recoveryFailed = true,
@@ -285,14 +347,14 @@ class LocalRecordsViewModel internal constructor(
             if (store.readDraft() != null) throw RecordConflict()
             persistedDraft = null
             captureDraftMayBeConsumed = false
-            mutableState.update { current ->
+            update { current ->
                 if (current.captureDiscard?.requestId != intent.id || editGeneration.get() != intent.generation) current
                 else current.copy(text = "", captureDiscard = null, draftNotice = "没有未保存的草稿",
                     saveNotice = null, inputNotice = null, error = null)
             }
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) {
-            mutableState.update { current ->
+            update { current ->
                 if (current.captureDiscard?.requestId != intent.id) current
                 else current.copy(draftNotice = if (intent.bound) "当前输入未确认保存在本机，退出前请保留或保存。" else current.draftNotice,
                     captureDiscard = current.captureDiscard.copy(busy = false, recoveryRequired = intent.bound,
@@ -309,9 +371,10 @@ class LocalRecordsViewModel internal constructor(
         if (current.captureDiscard != null) return
         if (!current.ready || current.opening || current.error != null || current.saving || current.savePending || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         val entry = current.entries.firstOrNull { it.id == entryId && it.currentRevision == expectedRevision } ?: return
+        current.ai?.let { ai.leave(it.sessionId) }
         val edit = OriginalEditUiState(originalEditIds.incrementAndGet(), entry.id, entry.currentRevision, entry.originalText,
             loadingDraft = current.supportsEditDrafts)
-        mutableState.update { it.copy(originalEdit = edit, originalEditNotice = null) }
+        update { it.copy(originalEdit = edit, originalEditNotice = null) }
         if (current.supportsEditDrafts) commands.trySend(Command.OpenEdit(edit, false))
     }
 
@@ -322,16 +385,17 @@ class LocalRecordsViewModel internal constructor(
             current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         val ref = current.pendingEdits.singleOrNull { it.entryId == entryId && it.id == draftId } ?: return
         val entry = current.entries.firstOrNull { it.id == entryId }
+        current.ai?.let { ai.leave(it.sessionId) }
         val edit = OriginalEditUiState(originalEditIds.incrementAndGet(), entryId, entry?.currentRevision ?: ref.baseRevision,
             entry?.originalText.orEmpty(), loadingDraft = true)
-        mutableState.update { it.copy(originalEdit = edit, originalEditNotice = null) }
+        update { it.copy(originalEdit = edit, originalEditNotice = null) }
         commands.trySend(Command.OpenEdit(edit, false, draftId))
     }
 
     fun changeOriginalEdit(sessionId: Long, text: String) {
         if (editsDisposed) return
         var accepted = false
-        mutableState.update { current ->
+        update { current ->
             val edit = current.originalEdit
             if (edit == null || edit.sessionId != sessionId || !edit.canCancel || current.originalHistory != null) current
             else if (text.length > EncryptedEntryRepository.MAX_TEXT_LENGTH) current.copy(originalEdit = edit.copy(
@@ -353,7 +417,7 @@ class LocalRecordsViewModel internal constructor(
         if (edit.sessionId != sessionId || !edit.canCancel || !edit.dirty || edit.draftConflict ||
             !current.supportsEditDrafts || !current.ready || current.opening || current.error != null ||
             current.originalHistory != null || attachments.state.value != null) return
-        mutableState.update { if (it.originalEdit != edit) it else it.copy(
+        update { if (it.originalEdit != edit) it else it.copy(
             originalEdit = edit.copy(keeping = true, error = null, draftNotice = "正在确认本机编辑草稿")) }
         if (mutableState.value.originalEdit?.let { it.sessionId == sessionId && it.keeping } == true)
             commands.trySend(Command.KeepEdit(sessionId, edit.text))
@@ -364,12 +428,12 @@ class LocalRecordsViewModel internal constructor(
         val active = mutableState.value.originalEdit ?: return
         if (active.sessionId != sessionId || !active.canCancel || mutableState.value.originalHistory != null) return
         if (mutableState.value.supportsEditDrafts && !active.draftConflict) {
-            mutableState.update { if (it.originalEdit?.sessionId != sessionId) it else it.copy(
+            update { if (it.originalEdit?.sessionId != sessionId) it else it.copy(
                 originalEdit = it.originalEdit.copy(discarding = true, error = null)) }
             commands.trySend(Command.DiscardEdit(sessionId))
             return
         }
-        mutableState.update { current ->
+        update { current ->
             val edit = current.originalEdit
             if (edit?.sessionId != sessionId || !edit.canCancel || current.originalHistory != null) current
             else current.copy(originalEdit = null, originalEditNotice = null)
@@ -383,7 +447,7 @@ class LocalRecordsViewModel internal constructor(
         val edit = current.originalEdit ?: return
         if (edit.sessionId != sessionId || edit.saving || edit.keeping || edit.conflict || edit.loadingDraft || edit.discarding || !current.ready || current.opening || current.error != null || current.originalHistory != null) return
         if (!edit.awaitingReadback && (edit.text.isBlank() || !edit.dirty || edit.text.length > EncryptedEntryRepository.MAX_TEXT_LENGTH)) return
-        mutableState.update { it.copy(originalEdit = edit.copy(saving = true, error = null, inputNotice = null)) }
+        update { it.copy(originalEdit = edit.copy(saving = true, error = null, inputNotice = null)) }
         commands.trySend(Command.Revise(sessionId, edit.entryId, edit.baseRevision, edit.text))
     }
 
@@ -393,8 +457,9 @@ class LocalRecordsViewModel internal constructor(
         if (!current.ready || current.opening || current.error != null || current.saving || current.savePending || current.originalHistory != null || attachments.state.value != null) return
         if (current.originalEdit?.let { it.entryId != entryId || !it.canCancel } == true) return
         if (current.entries.none { it.id == entryId && it.currentRevision == expectedRevision }) return
+        current.ai?.let { ai.leave(it.sessionId) }
         val history = OriginalHistoryUiState(originalHistoryIds.incrementAndGet(), entryId)
-        mutableState.update { it.copy(originalHistory = history) }
+        update { it.copy(originalHistory = history) }
         commands.trySend(Command.ReadHistory(history.sessionId, history.requestId))
     }
 
@@ -422,12 +487,12 @@ class LocalRecordsViewModel internal constructor(
         if (history.sessionId != sessionId) return
         if (history.replacement != null) cancelHistoryReplacement(sessionId, history.requestId, history.replacement.id)
         else if (history.selectedRevision != null) requestHistory(history.copy(selectedRevision = null))
-        else mutableState.update { if (it.originalHistory?.sessionId == sessionId) it.copy(originalHistory = null) else it }
+        else update { if (it.originalHistory?.sessionId == sessionId) it.copy(originalHistory = null) else it }
     }
 
     fun editOriginalHistory(sessionId: Long, requestId: Long, revision: Int, expectedCurrentRevision: Int) {
         val beforeEditId = mutableState.value.originalEdit?.sessionId
-        mutableState.update { current ->
+        update { current ->
             if (!canEditHistory(current, sessionId, requestId, revision, expectedCurrentRevision)) current
             else if (current.originalEdit?.dirty == true) current.copy(originalHistory = current.originalHistory!!.copy(
                 replacement = current.originalHistory.replacement ?: OriginalHistoryReplacement(
@@ -439,7 +504,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun confirmHistoryReplacement(sessionId: Long, requestId: Long, replacementId: Long) {
         val beforeEditId = mutableState.value.originalEdit?.sessionId
-        mutableState.update { current ->
+        update { current ->
             val history = current.originalHistory ?: return@update current
             val pending = history.replacement ?: return@update current
             if (pending.id != replacementId || current.originalEdit?.sessionId != pending.editSessionId ||
@@ -458,7 +523,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun cancelHistoryReplacement(sessionId: Long, requestId: Long, replacementId: Long) {
         if (attachments.state.value != null) return
-        mutableState.update { current ->
+        update { current ->
             val history = current.originalHistory
             if (history?.sessionId != sessionId || history.requestId != requestId || history.replacement?.id != replacementId) current
             else current.copy(originalHistory = history.copy(replacement = null))
@@ -489,7 +554,7 @@ class LocalRecordsViewModel internal constructor(
     private fun requestHistory(history: OriginalHistoryUiState) {
         val next = history.copy(requestId = history.requestId + 1, loading = true, revisions = emptyList(), error = null, unavailable = false,
             replacement = null)
-        mutableState.update { if (it.originalHistory?.sessionId == history.sessionId) it.copy(originalHistory = next) else it }
+        update { if (it.originalHistory?.sessionId == history.sessionId) it.copy(originalHistory = next) else it }
         commands.trySend(Command.ReadHistory(next.sessionId, next.requestId))
     }
 
@@ -507,7 +572,7 @@ class LocalRecordsViewModel internal constructor(
             val entries = store.entries().also { observedEntries = it }
             val after = entries.firstOrNull { it.id == history.entryId }
             if (after == null) {
-                mutableState.update { if (!owns(it)) it else it.copy(entries = entries, originalHistory =
+                update { if (!owns(it)) it else it.copy(entries = entries, originalHistory =
                     it.originalHistory!!.copy(loading = false, revisions = emptyList(), currentRevision = null, unavailable = true)) }
                 return
             }
@@ -516,12 +581,12 @@ class LocalRecordsViewModel internal constructor(
                 revisions.map { it.revision }.toSet().size == revisions.size &&
                 revisions.singleOrNull { it.revision == after.currentRevision }?.originalText == after.originalText)
             val ordered = revisions.sortedByDescending { it.revision }
-            mutableState.update { if (!owns(it)) it else it.copy(entries = entries, originalHistory =
+            update { if (!owns(it)) it else it.copy(entries = entries, originalHistory =
                 it.originalHistory!!.copy(loading = false, currentRevision = after.currentRevision, revisions = ordered,
                     unavailable = history.selectedRevision != null && ordered.none { r -> r.revision == history.selectedRevision })) }
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) {
-            mutableState.update { if (!owns(it)) it else it.copy(entries = observedEntries ?: it.entries, originalHistory = it.originalHistory!!.copy(
+            update { if (!owns(it)) it else it.copy(entries = observedEntries ?: it.entries, originalHistory = it.originalHistory!!.copy(
                 loading = false, revisions = emptyList(), error = if (failure is RecordConflict)
                     "读取期间原文版本变化。请重新读取，正在编辑的修改仍保留。"
                 else "历史版本读取失败。原文和正在编辑的修改仍保留，可以重试。")) }
@@ -529,7 +594,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     private fun updatePendingDraft(snapshot: OriginalEditDraft) {
-        mutableState.update { current -> current.copy(pendingEdits = current.pendingEdits.filter { it.entryId != snapshot.entryId } +
+        update { current -> current.copy(pendingEdits = current.pendingEdits.filter { it.entryId != snapshot.entryId } +
             if (snapshot.state == OriginalEditDraftState.ACTIVE) listOf(OriginalEditDraftRef(snapshot.id, snapshot.entryId, snapshot.baseRevision)) else emptyList()) }
     }
 
@@ -540,11 +605,11 @@ class LocalRecordsViewModel internal constructor(
     private suspend fun refreshPendingDrafts() {
         try {
             val pending = repository?.editDrafts?.pending() ?: OriginalEditDraftIndex(emptyList())
-            mutableState.update { it.copy(pendingEdits = pending.drafts, editDraftError = indexNotice(pending),
+            update { it.copy(pendingEdits = pending.drafts, editDraftError = indexNotice(pending),
                 editDraftIssueCount = pending.unreadableCount, editDraftIndexAvailable = true) }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) {
-            mutableState.update { it.copy(editDraftIndexAvailable = false, editDraftError = "编辑草稿目录暂不可读取，恢复列表尚未确认。已保留加密数据；请重试本机读取，未自动删除或替换。") }
+            update { it.copy(editDraftIndexAvailable = false, editDraftError = "编辑草稿目录暂不可读取，恢复列表尚未确认。已保留加密数据；请重试本机读取，未自动删除或替换。") }
         }
     }
 
@@ -584,7 +649,7 @@ class LocalRecordsViewModel internal constructor(
             originalDraft = DraftBinding(sessionId, snapshot, previous, restore)
             // Historical source selection itself creates a dirty input snapshot.
             if (command.replace && !restore && snapshot.text != snapshot.originalText && !conflict) persistDraftSnapshot(sessionId, snapshot.text)
-            mutableState.update { local ->
+            update { local ->
                 if (local.originalEdit?.sessionId != sessionId) local else local.copy(entries = entries,
                     originalEdit = command.edit.copy(baseRevision = snapshot.baseRevision, sourceRevision = snapshot.sourceRevision,
                         originalText = snapshot.originalText, text = snapshot.text, loadingDraft = false,
@@ -599,7 +664,7 @@ class LocalRecordsViewModel internal constructor(
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) {
             originalDraft = null
-            mutableState.update { local -> if (local.originalEdit?.sessionId != sessionId) local else local.copy(
+            update { local -> if (local.originalEdit?.sessionId != sessionId) local else local.copy(
                 originalEdit = local.originalEdit.copy(loadingDraft = false, conflict = true,
                     draftConflict = failure is OriginalEditDraftConflict,
                     error = "无法安全恢复编辑草稿。当前原文及加密数据已保留，未自动覆盖或删除。请关闭后重试。")) }
@@ -626,7 +691,7 @@ class LocalRecordsViewModel internal constructor(
         val records = checkNotNull(repository)
         val entries = records.entries()
         val source = entries.firstOrNull { it.id == binding.snapshot.entryId }
-        mutableState.update { local -> if (local.originalEdit?.sessionId != sessionId) local else local.copy(entries = entries,
+        update { local -> if (local.originalEdit?.sessionId != sessionId) local else local.copy(entries = entries,
             originalEdit = local.originalEdit.copy(conflict = local.originalEdit.conflict || source == null ||
                 source.currentRevision != binding.snapshot.baseRevision || source.policy != ProcessingPolicy.LOCAL_ONLY)) }
         if (source == null || source.policy != ProcessingPolicy.LOCAL_ONLY) throw RecordConflict()
@@ -649,7 +714,7 @@ class LocalRecordsViewModel internal constructor(
         if (mutableState.value.originalEdit?.sessionId != command.sessionId) return
         try {
             persistDraftSnapshot(command.sessionId, command.text)
-            mutableState.update { local ->
+            update { local ->
                 val edit = local.originalEdit
                 if (edit?.sessionId != command.sessionId || edit.text != command.text) local
                 else local.copy(originalEdit = edit.copy(draftNotice = "编辑草稿已加密保存在本机",
@@ -657,7 +722,7 @@ class LocalRecordsViewModel internal constructor(
             }
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) {
-            mutableState.update { local -> if (local.originalEdit?.sessionId != command.sessionId) local else local.copy(
+            update { local -> if (local.originalEdit?.sessionId != command.sessionId) local else local.copy(
                 originalEdit = local.originalEdit.copy(draftNotice = "编辑草稿保存状态待确认，当前输入仍保留。",
                     conflict = local.originalEdit.conflict || failure is OriginalEditDraftConflict || failure is RecordConflict,
                     draftConflict = failure is OriginalEditDraftConflict,
@@ -684,11 +749,11 @@ class LocalRecordsViewModel internal constructor(
                 throw OriginalEditDraftConflict()
             updatePendingDraft(snapshot)
             originalDraft = null
-            mutableState.update { if (!owns(it)) it else it.copy(originalEdit = null,
+            update { if (!owns(it)) it else it.copy(originalEdit = null,
                 originalEditNotice = "编辑草稿已保留，可稍后恢复。") }
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) {
-            mutableState.update { if (!owns(it)) it else it.copy(originalEdit = it.originalEdit!!.copy(
+            update { if (!owns(it)) it else it.copy(originalEdit = it.originalEdit!!.copy(
                 keeping = false, draftConflict = failure is OriginalEditDraftConflict,
                 conflict = it.originalEdit.conflict || failure is OriginalEditDraftConflict || failure is RecordConflict,
                 draftNotice = "保留草稿尚未确认，当前输入仍在编辑中。",
@@ -716,10 +781,10 @@ class LocalRecordsViewModel internal constructor(
                 updatePendingDraft(binding.snapshot)
             }
             originalDraft = null
-            mutableState.update { if (it.originalEdit?.sessionId != sessionId) it else it.copy(originalEdit = null, originalEditNotice = null) }
+            update { if (it.originalEdit?.sessionId != sessionId) it else it.copy(originalEdit = null, originalEditNotice = null) }
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) {
-            mutableState.update { local -> if (local.originalEdit?.sessionId != sessionId) local else local.copy(
+            update { local -> if (local.originalEdit?.sessionId != sessionId) local else local.copy(
                 originalEdit = local.originalEdit.copy(discarding = false,
                     draftNotice = "丢弃状态待确认，当前输入仍保留。",
                     draftConflict = failure is OriginalEditDraftConflict,
@@ -741,7 +806,7 @@ class LocalRecordsViewModel internal constructor(
                     else store.reviseFromDraft(draft, clock.millis())
                 }.also { entry ->
                     committedOriginal = command.sessionId to entry
-                    mutableState.update { current ->
+                    update { current ->
                         if (current.originalEdit?.sessionId != command.sessionId) current
                         else current.copy(originalEdit = current.originalEdit.copy(awaitingReadback = true))
                     }
@@ -769,7 +834,7 @@ class LocalRecordsViewModel internal constructor(
             val latest = entries.firstOrNull { it.id == committed.id }
             check(latest != null && latest.currentRevision >= committed.currentRevision &&
                 (latest.currentRevision != committed.currentRevision || latest.originalText == committed.originalText))
-            mutableState.update { current ->
+            update { current ->
                 if (current.originalEdit?.sessionId != command.sessionId) current
                 else current.copy(entries = entries, originalEdit = null,
                     originalEditNotice = if (competingDraft) "新版本已保存在本机；本机另一会话的编辑草稿已保留，请单独恢复处理。"
@@ -784,7 +849,7 @@ class LocalRecordsViewModel internal constructor(
             val refreshed = if (failure is RecordConflict && !committed) {
                 try { store.entries() } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             } else null
-            mutableState.update { current ->
+            update { current ->
                 val edit = current.originalEdit
                 if (edit?.sessionId != command.sessionId) current
                 else current.copy(entries = refreshed ?: current.entries, originalEdit = edit.copy(saving = false,
@@ -809,7 +874,11 @@ class LocalRecordsViewModel internal constructor(
             val entries = store.entries()
             val pending = try { store.editDrafts?.pending() ?: OriginalEditDraftIndex(emptyList()) }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
-            mutableState.update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
+            val ownership = storageOwnership ?: RecordsStorageOwnership(store, bindAi?.let { factory ->
+                { factory(store) }
+            }).also { storageOwnership = it }
+            ai.bind(ownership)
+            update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
                 entries = entries, draftNotice = if (persistedDraft == null) "没有未保存的草稿" else "已恢复本机草稿", error = null,
                 supportsEditDrafts = store.editDrafts != null, pendingEdits = pending?.drafts.orEmpty(),
                 editDraftIssueCount = pending?.unreadableCount ?: 0, editDraftIndexAvailable = pending != null,
@@ -820,13 +889,19 @@ class LocalRecordsViewModel internal constructor(
     }
 
     private fun failed(failure: Exception, preserveQueuedSave: Boolean = false) {
-        mutableState.update { it.copy(opening = false, saving = if (preserveQueuedSave) it.saving else false,
+        update { it.copy(opening = false, saving = if (preserveQueuedSave) it.saving else false,
             error = if (failure is StorageKeyUnavailable) "无法读取本机加密密钥。请保留原数据并先解锁设备重试。备份恢复尚未开放。"
             else "本机存储操作失败。输入与原数据已保留，可以重试。",
             draftNotice = if (it.ready) "草稿保存状态待确认" else "草稿尚未读取") }
     }
 
-    override fun onCleared() { editsDisposed = true; attachments.markDisposed(); commands.close(); super.onCleared() }
+    override fun onCleared() {
+        editsDisposed = true
+        ai.markDisposed()
+        attachments.markDisposed()
+        commands.close()
+        super.onCleared()
+    }
 
     private data class SaveIntent(val text: String, val generation: Long)
     private class DiscardIntent(val id: Long, val text: String, val generation: Long,

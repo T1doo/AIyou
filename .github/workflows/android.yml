@@ -51,7 +51,9 @@ jobs:
       - name: Inspect existing device test environment without installation
         run: python3 scripts/inspect-device-test-environment.py
       - name: Verify Android dependency requirements
-        run: scripts/gradle.sh :app:checkDebugAarMetadata :core:designsystem:checkDebugAarMetadata :core:data:checkDebugAarMetadata
+        run: |
+          scripts/gradle.sh :app:dependencies --write-locks
+          scripts/gradle.sh :app:checkDebugAarMetadata :core:designsystem:checkDebugAarMetadata :core:data:checkDebugAarMetadata
       - name: Run actual component clipping and empty-state regression tests
         run: |
           scripts/gradle.sh :core:designsystem:testDebugUnitTest
@@ -65,6 +67,8 @@ jobs:
         run: |
           scripts/gradle.sh :app:assembleDebug
           sha256sum app/build/outputs/apk/debug/app-debug.apk
+      - name: Inspect actual merged APK for absent INTERNET permission (device NOT RUN)
+        run: python3 scripts/inspect-record-ai-permissions.py
       - name: Run actual Compose disabled-control and storage-wiring regressions (JVM simulation)
         run: |
           scripts/gradle.sh :app:testDebugUnitTest
@@ -220,6 +224,7 @@ jobs:
             core/data/schemas/
             app/build/reports/d02-apk-audit.json
             app/build/reports/device-apk-manifest.json
+            app/build/reports/record-ai-permissions.json
             app/build/outputs/apk/debug/*.zipalign.txt
             core/data/build/outputs/apk/androidTest/debug/*.zipalign.txt
             core/designsystem/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt

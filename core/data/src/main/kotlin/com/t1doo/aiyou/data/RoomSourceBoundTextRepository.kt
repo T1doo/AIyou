@@ -10,7 +10,10 @@ import java.util.concurrent.Callable
 
 /** Blocking IO adapter over the SAME encrypted Room database as original records. */
 class RoomSourceBoundTextRepository internal constructor(database: RecordsDatabase) : SourceBoundTextRepository {
-    private val storage = RemoteTextTransactions(RoomRecordsSqlDatabase(database))
+    private val sql = DrainingRecordsSqlDatabase(RoomRecordsSqlDatabase(database))
+    private val storage = RemoteTextTransactions(sql)
+    /** The records owner calls this after its AI operations have finished, before Room close. */
+    internal fun stopAndAwaitSqlIdle() = sql.stopAndAwaitIdle()
     override fun queue(intent:RemoteSendIntent,promptVersion:String,clock:()->Instant)=storage.queue(intent,promptVersion,clock)
     override fun check(job:SourceBoundTextJob,clock:()->Instant)=storage.check(job,clock)
     override fun subscribe(job:SourceBoundTextJob,clock:()->Instant,onInvalidated:(SendDenial)->Unit)=

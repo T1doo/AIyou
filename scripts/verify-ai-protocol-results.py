@@ -23,6 +23,10 @@ def input_fingerprint():
     inputs.extend(root / path for path in ("gradle/libs.versions.toml", "gradle/wrapper/gradle-wrapper.properties",
                                           "gradle/wrapper/gradle-wrapper.jar", "scripts/jvm-gradle.py",
                                           "scripts/verify-ai-http-dependencies.py", "scripts/verify-ai-protocol-results.py"))
+    # The host now compiles actual ViewModel/controller sources; bind their upstream inputs too.
+    inputs.extend((root / "app/src/main/java/com/t1doo/aiyou/records").glob("*.kt"))
+    inputs.extend(root / path for path in ("app/src/main/java/com/t1doo/aiyou/MainActivity.kt",
+        "app/src/main/AndroidManifest.xml", "app/build.gradle.kts", "scripts/inspect-record-ai-permissions.py"))
     fingerprint = hashlib.sha256()
     for path in sorted(set(inputs)):
         fingerprint.update(str(path.relative_to(root)).encode() + b"\0")
@@ -92,7 +96,7 @@ for module, directory in modules.items():
     results.append({"module": task, "tests": len(actual), "failures": 0, "errors": 0, "skipped": 0,
                     "methods": [list(key) for key in sorted(actual)], "xml": evidence})
 
-report = {"status": "PASS", "scope": "pure JVM protocol, source-bound sending, product SQL transactions on host SQLite, loopback HTTP and domain; no Android/SQLCipher/live provider/device/App acceptance",
+report = {"status": "PASS", "scope": "actual App ViewModel/controller on JVM platform shells, source-bound sending, product remote SQL transactions on host SQLite, loopback HTTP and domain; local SQL driver is test-only; no Android/SQLCipher/live provider/device/native App acceptance",
           "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
           "source_sha256": source_sha256, "results": results,
           "d02_native_acceptance": "NOT RUN", "full_d04_acceptance": "OPEN"}

@@ -68,6 +68,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:domain"))
     implementation(project(":core:data"))
+    implementation(project(":core:ai"))
     implementation(libs.coroutines.android)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(project(":core:designsystem"))

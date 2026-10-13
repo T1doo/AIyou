@@ -7,18 +7,14 @@ dependencyLocking { lockAllConfigurations() }
 val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalRecordsViewModel.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/LocalRecordAiController.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/RecordAiCapability.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/RecordAiUiState.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalEditUiState.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalHistoryUiState.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalAttachmentController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/PngPayloadValidator.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/JpegPayloadValidator.kt")
-    from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/LocalRecords.kt")
-    from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/OriginalEditDraft.kt")
-    from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/ProcessingPolicy.kt")
-    from("../../core/model/src/main/kotlin/com/t1doo/aiyou/model/LocalAttachment.kt")
-    from("../../core/domain/src/main/kotlin/com/t1doo/aiyou/domain/EntryRepository.kt")
-    from("../../core/domain/src/main/kotlin/com/t1doo/aiyou/domain/OriginalEditDraftStore.kt")
-    from("../../core/domain/src/main/kotlin/com/t1doo/aiyou/domain/AttachmentStore.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedAttachmentStore.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedOriginalEditStore.kt")
     into(production)
@@ -35,6 +31,9 @@ kotlin.sourceSets.getByName("test").kotlin.srcDir(fixture)
 tasks.named("compileTestKotlin") { dependsOn(syncJpegFixture) }
 
 dependencies {
+    implementation(project(":core:model"))
+    implementation(project(":core:domain"))
+    implementation(project(":core:ai"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     testImplementation("junit:junit:4.13.2")
 }

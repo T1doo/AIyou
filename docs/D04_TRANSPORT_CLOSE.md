@@ -1,5 +1,7 @@
 # D04 transport 两阶段关闭
 
+后续实际 App／ViewModel 单原文会话归属见 [D04_APP_RECORD_AI_SESSION.md](D04_APP_RECORD_AI_SESSION.md)。本页的250方法与关闭证据保留为历史切片记录。
+
 本切片接续 `4cd5fcbe670015e828755a15925dfcd2c2ebba78`，修复 transport 逐个调用 source exchange 的 `cancel()` 时，第一项同步数据库清理阻塞后续 HTTP 取消的问题。持久撤销边界沿用 [D04_ACTIVE_HTTP_REVOCATION.md](D04_ACTIVE_HTTP_REVOCATION.md)。完整 D04、App 生命周期接线及 D02 原生设备验收仍 **OPEN**。
 
 ## 关闭与归属
