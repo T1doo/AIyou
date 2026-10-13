@@ -55,6 +55,7 @@ fun MainScreen(
     demo: Boolean,
     modifier: Modifier = Modifier,
     state: ComponentState = ComponentState.NORMAL,
+    companion: (@Composable () -> Unit)? = null,
 ) {
     BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.background).drawBehind {
         drawRect(Brush.verticalGradient(
@@ -72,23 +73,11 @@ fun MainScreen(
             ) {
                 item("summary") {
                     Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                        if (stackSummary) {
-                            Text(if (destination == Destination.NOW) "今天" else destination.label, style = MaterialTheme.typography.headlineMedium)
-                        } else {
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
-                                Text(if (destination == Destination.NOW) "今天" else destination.label, Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
-                                LocalProcessingStatus()
-                            }
-                        }
-                        Text(when (destination) {
-                            Destination.NOW -> if (demo) "10月10日 · 周六" else "随手记下一点生活"
+                        NotebookPageHeader(destination.label, when (destination) {
+                            Destination.NOW -> if (demo) "10月10日 · 周六 · 虚构示例" else "随手记下一点生活"
                             Destination.MEMORIES -> if (demo) "${ScreenSamples.memories.size} 条虚构记录" else "你的本机原始记录"
                             Destination.TASKS -> "建议与正式任务分别管理"
-                        }, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-                        if (stackSummary) {
-                            LocalProcessingStatus()
-                        }
+                        }, stackSummary, companion)
                         if (demo && destination != Destination.NOW) Text("虚构示例 · 不保存记录、不安排提醒", Modifier.padding(top = AIyouDimensions.spaceSm),
                             style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                     }
@@ -158,8 +147,6 @@ fun MainScreen(
                         }
                         item("today-tasks") { Text("今天 · 正式任务 0", style = MaterialTheme.typography.titleLarge) }
                         item("today-empty") { Text("尚未创建正式任务或安排提醒。", style = MaterialTheme.typography.bodyLarge) }
-                        item("next") { Text("接下来 · 0", style = MaterialTheme.typography.titleLarge) }
-                        item("done") { Text("已完成 · 0", style = MaterialTheme.typography.titleLarge) }
                         item("reminders") { StatusNotice("提醒功能尚未开放", "以后会分别显示任务确认、系统调度和通知权限状态。") }
                     }
                 }

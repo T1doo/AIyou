@@ -53,6 +53,10 @@ jobs:
         run: |
           scripts/gradle.sh :core:designsystem:testDebugUnitTest
           python3 scripts/verify-test-results.py --component
+      - name: Run production pre-open ciphertext evidence regressions
+        run: |
+          scripts/gradle.sh :core:data:testDebugUnitTest
+          python3 scripts/verify-test-results.py --evidence
       - name: Build debug APK
         id: assemble
         run: |

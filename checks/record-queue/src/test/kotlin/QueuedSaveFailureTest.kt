@@ -113,6 +113,7 @@ class QueuedSaveFailureTest {
             vm.state.first { it.draftNotice == "草稿已保存在本机" }
             vm.save()
             vm.state.first { it.error != null && !it.saving && it.savePending }
+            assertEquals(0L, vm.state.value.saveFeedbackId)
             vm.changeText("must not change pending submission")
             assertEquals("synthetic retry text", vm.state.value.text)
             vm.retry()
@@ -120,6 +121,7 @@ class QueuedSaveFailureTest {
             assertEquals(2, repository.submissions.size)
             assertEquals(repository.submissions[0], repository.submissions[1])
             assertEquals("synthetic retry text", vm.state.value.entries.single().originalText)
+            assertEquals(1L, vm.state.value.saveFeedbackId)
         } } finally { vm.scope.cancel() }
     }
 
@@ -135,11 +137,13 @@ class QueuedSaveFailureTest {
             vm.save()
             vm.state.first { it.error != null && !it.saving && it.savePending }
             assertTrue("No success list before confirmed database readback", vm.state.value.entries.isEmpty())
+            assertEquals(0L, vm.state.value.saveFeedbackId)
             vm.retry()
             vm.state.first { it.entries.size == 1 && !it.saving && !it.savePending && it.error == null }
             assertEquals(2, repository.submissions.size)
             assertEquals(repository.submissions[0], repository.submissions[1])
             assertEquals(1, repository.editCalls)
+            assertEquals(1L, vm.state.value.saveFeedbackId)
             assertNull(repository.draft)
         } } finally { vm.scope.cancel() }
     }

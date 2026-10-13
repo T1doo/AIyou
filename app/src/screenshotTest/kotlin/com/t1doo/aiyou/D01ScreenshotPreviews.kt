@@ -116,16 +116,16 @@ private val restoredLocal = LocalRecordUiState(ready = true, opening = false,
     text = "合成恢复的草稿：把沿途的树叶颜色记下来。", draftNotice = "已恢复本机草稿", entries = syntheticEntries)
 
 @PreviewTest @LocalRecordPreviews @Composable
-fun LocalEmptyRender() { AIyouTheme { AIyouApp(local = LocalRecordUiState(ready = true, opening = false, draftNotice = "没有未保存的草稿")) } }
+fun LocalEmptyRender() { AIyouTheme { AIyouApp(display = UiPreferencesState(UiPreferences(), ready = true), local = LocalRecordUiState(ready = true, opening = false, draftNotice = "没有未保存的草稿")) } }
 
 @PreviewTest @LocalRecordPreviews @Composable
-fun LocalRestoredRender() { AIyouTheme { AIyouApp(local = restoredLocal) } }
+fun LocalRestoredRender() { AIyouTheme { AIyouApp(display = UiPreferencesState(UiPreferences(), ready = true), local = restoredLocal) } }
 
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalSavingRender() { AIyouTheme { AIyouApp(local = restoredLocal.copy(saving = true, savePending = true, draftNotice = "草稿已保存在本机")) } }
 
 @PreviewTest @LocalRecordPreviews @Composable
-fun LocalSaveFailedRender() { AIyouTheme { AIyouApp(local = restoredLocal.copy(savePending = true,
+fun LocalSaveFailedRender() { AIyouTheme { AIyouApp(display = UiPreferencesState(UiPreferences(), ready = true), local = restoredLocal.copy(savePending = true,
     error = "合成保存失败。输入与原数据已保留，可以重试。", draftNotice = "草稿保存状态待确认")) } }
 
 @PreviewTest @LocalRecordPreviews @Composable
@@ -140,7 +140,7 @@ fun LocalRejectedInputRender() { AIyouTheme { AIyouApp(local = restoredLocal.cop
     inputNotice = "合成超限输入。输入长度上限为 100000，本次输入未替换原草稿，请缩短后重试。")) } }
 
 @PreviewTest @LocalRecordPreviews @Composable
-fun LocalMemoriesRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES, local = restoredLocal) } }
+fun LocalMemoriesRender() { AIyouTheme { AIyouApp(display = UiPreferencesState(UiPreferences(), ready = true), previewDestination = Destination.MEMORIES, local = restoredLocal) } }
 
 private val longOriginal = syntheticEntries.single().copy(id = "synthetic-long-original",
     originalText = "合成长原文：" + "散步时记录叶片的纹理与颜色。\n".repeat(90) + "合成全文末端。")
@@ -358,3 +358,14 @@ fun LocalHistoricalAttachmentEntryRender() {
         local = historyLocal.copy(originalHistory = historyLocal.originalHistory!!.copy(selectedRevision = 1)),
         previewEntryId = longOriginal.id, attachments = capability) }
 }
+
+// Production settings and original neutral companion; render smoke, not device evidence.
+@PreviewTest @LocalRecordPreviews @Composable
+fun LocalSettingsRender() { AIyouTheme { AIyouApp(previewSettings = true,
+    display = UiPreferencesState(UiPreferences(), ready = true), local = restoredLocal) } }
+
+@PreviewTest
+@Preview(name = "陪伴面板", widthDp = 360, heightDp = 800, locale = "zh-rCN")
+@Preview(name = "陪伴面板大字", widthDp = 320, heightDp = 1000, fontScale = 2f, locale = "zh-rCN")
+@Composable
+fun LocalCompanionRender() { AIyouTheme { CompanionDialog(onClose = {}, motionAllowed = false) } }

@@ -20,6 +20,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.AnnotatedString
@@ -129,7 +130,7 @@ class UnavailableControlsInteractionTest {
             AIyouTheme { AIyouApp(local = LocalRecordUiState(ready = true, opening = false)) }
         }
         compose.onNodeWithText("设置").performClick()
-        compose.onNodeWithText("开源许可与声明").performClick()
+        compose.onNodeWithText("开源许可与声明").performScrollTo().performClick()
         compose.onNodeWithText("开源许可与声明 · 离线文本").assertIsDisplayed()
         compose.onNodeWithText("返回设置").performClick()
         compose.onNodeWithText("回忆").performClick()

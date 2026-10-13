@@ -19,6 +19,10 @@ object AIyouColors {
     val outlineFunctional = Color(0xFF64819D)
     val success = Color(0xFF476852)
     val error = Color(0xFFA64237)
+    val companionBody = Color(0xFFC7A47D)
+    val companionFace = Color(0xFFE8D2B3)
+    val companionShade = Color(0xFF9D7857)
+    val companionInk = Color(0xFF513E32)
 }
 
 object AIyouDimensions {

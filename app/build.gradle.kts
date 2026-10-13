@@ -24,8 +24,8 @@ android {
         applicationId = "com.t1doo.aiyou"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.0.3-d02-text"
+        versionCode = 2
+        versionName = "0.0.4-d02-ui"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

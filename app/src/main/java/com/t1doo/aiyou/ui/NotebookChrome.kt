@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -21,6 +22,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.t1doo.aiyou.designsystem.AIyouColors
@@ -34,7 +37,10 @@ fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = 
             .heightIn(min = 56.dp).padding(horizontal = AIyouDimensions.pageNarrow),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
-            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+            if (title == "爱忆 AIyou") Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                Text("爱忆", Modifier.alignByBaseline().semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+                Text("AIyou", Modifier.alignByBaseline(), style = MaterialTheme.typography.labelSmall, color = AIyouColors.textSecondary)
+            } else Text(title, Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
             TextButton(onClick = onAction, enabled = actionEnabled, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) {
                 Text(actionLabel, style = MaterialTheme.typography.labelLarge)
             }
@@ -45,7 +51,7 @@ fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = 
 @Composable
 fun NotebookNavigation(selected: Destination?, onSelect: (Destination) -> Unit) {
     Surface(color = AIyouColors.surface) {
-        Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars),
+        Row(Modifier.fillMaxWidth().selectableGroup().windowInsetsPadding(WindowInsets.navigationBars),
             verticalAlignment = Alignment.CenterVertically) {
             Destination.entries.forEach { destination ->
                 val active = selected == destination

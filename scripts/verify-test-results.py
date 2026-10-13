@@ -12,6 +12,7 @@ parser.add_argument("--component", action="store_true", help="also require actua
 parser.add_argument("--queue", action="store_true", help="also require actual host queue regression XML")
 parser.add_argument("--ui", action="store_true", help="also require actual Compose interaction/semantics regression XML on the JVM simulator")
 parser.add_argument("--trace", action="store_true", help="also require actual test-only native observer regression XML")
+parser.add_argument("--evidence", action="store_true", help="require production pre-key evidence regression XML")
 args = parser.parse_args()
 targets = [("domain", "core/domain/build/test-results/test", 3)]
 if args.component:
@@ -19,9 +20,11 @@ if args.component:
 if args.queue:
     targets.append(("host queue", "checks/record-queue/build/test-results/test", 119))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 81))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 92))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
+if args.evidence:
+    targets.append(("pre-open evidence", "core/data/build/test-results/testDebugUnitTest", 21))
 for label, folder, minimum in targets:
     reports = list((root / folder).glob("TEST-*.xml"))
     if not reports:
@@ -83,6 +86,19 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.UiPreferencesTest"] = (
+            "bothDisplayChoicesSurviveNewStorageAndViewModelInstances",
+            "failedWriteKeepsConfirmedValuesAndRetryPersistsTheRequestedChoice",
+            "corruptPreferencesArePreservedAndNeverFlashTheCompanion")
+        additional["com.t1doo.aiyou.CompanionSettingsPresentationTest"] = (
+            "companionIsLocalOptionalAndSettingsReturnPreservesCapture",
+            "narrowDoubleFontSettingsHaveOneSwitchTargetAndReachableLicenseAndRetry",
+            "eachProductionDestinationReturnsFromSettingsWithoutChangingSelection",
+            "shortDoubleFontViewportKeepsDialogCloseAndProductionSaveReachable",
+            "loadingPreferencesAndFailedSaveDoNotPublishCompanionSuccess",
+            "oneNodEndsAndReducedMotionOrRemountCannotReplayIt",
+            "successfulReadbackAcknowledgementDoesNotReplayOnSettingsReturn",
+            "actualMotionGateTracksLifecycleSystemScalePowerSaverAndUserPreference")
         additional["com.t1doo.aiyou.PlatformJpegPipelineTest"] = (
             "nativeDecoderAppliesAllEightExifDirectionsOnceWithCorrectPixelsAndBothEndianHeaders",
             "progressiveAndLargeJpegActuallyDecodeWithinDisplayBound",

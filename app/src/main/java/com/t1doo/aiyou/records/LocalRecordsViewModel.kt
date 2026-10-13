@@ -37,6 +37,7 @@ data class LocalRecordUiState(
     val entries: List<StoredEntry> = emptyList(),
     val draftNotice: String = "正在读取本机草稿",
     val saveNotice: String? = null,
+    val saveFeedbackId: Long = 0L,
     val error: String? = null,
     val inputNotice: String? = null,
     val originalEdit: OriginalEditUiState? = null,
@@ -105,7 +106,7 @@ class LocalRecordsViewModel internal constructor(
                                 persistedDraft = null
                                 pendingIntent.compareAndSet(command.intent, null)
                                 // Success follows commit; the list is read from the database.
-                                mutableState.update { it.copy(text = "", saving = false, savePending = false, entries = entries, draftNotice = "没有未保存的草稿", saveNotice = "已保存在本机", error = null) }
+                                mutableState.update { it.copy(text = "", saving = false, savePending = false, entries = entries, draftNotice = "没有未保存的草稿", saveNotice = "已保存在本机", saveFeedbackId = it.saveFeedbackId + 1, error = null) }
                             }
                             Command.Retry -> open()
                             is Command.RecoverDraft -> {

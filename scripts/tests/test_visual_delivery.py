@@ -21,7 +21,7 @@ class VisualDeliveryTests(unittest.TestCase):
         items = []
         for method in delivery.METHODS:
             group = delivery.METHODS[method]
-            count = 14 if group == "components" else 4 if method.startswith("Local") else 2 if group in ("complete", "review") else delivery.GROUPS[group][1]
+            count = 2 if method == "LocalCompanionRender" else 14 if group == "components" else 4 if method.startswith("Local") else 2 if group in ("complete", "review") else delivery.GROUPS[group][1]
             for n in range(count):
                 name = f"com.t1doo.aiyou.D01ScreenshotPreviewsKt.{method}_{n}.png"
                 data = ("SYNTHETIC PACKAGING FIXTURE " + name).encode()
@@ -30,16 +30,16 @@ class VisualDeliveryTests(unittest.TestCase):
                               "sha256": hashlib.sha256(data).hexdigest()})
         report = root / "app/build/reports/d01-preview-manifest.json"
         report.parent.mkdir(parents=True)
-        report.write_text(json.dumps({"count": 380, "pngs": items}))
+        report.write_text(json.dumps({"count": 386, "pngs": items}))
         return reference, report, items
 
-    def test_all_380_original_bytes_and_lists_are_preserved_in_small_zips(self):
+    def test_all_386_original_bytes_and_lists_are_preserved_in_small_zips(self):
         with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()):
             root = Path(temp)
             reference, _, _ = self.fixture(root)
             index = delivery.package(root)
-            self.assertEqual(380, sum(p["count"] for p in index["packs"]))
-            self.assertEqual([28, 28, 28, 112, 2, 14, 108, 60], [p["count"] for p in index["packs"]])
+            self.assertEqual(386, sum(p["count"] for p in index["packs"]))
+            self.assertEqual([28, 28, 28, 112, 2, 14, 114, 60], [p["count"] for p in index["packs"]])
             for pack in index["packs"]:
                 target = root / "app/build/outputs/d01-visual-packs" / pack["file"]
                 self.assertEqual(pack["bytes"], target.stat().st_size)
@@ -56,7 +56,7 @@ class VisualDeliveryTests(unittest.TestCase):
             reference, _, items = self.fixture(root)
             with self.assertRaisesRegex(ValueError, "exceeds"):
                 delivery.package(root, max_zip_bytes=100)
-            self.assertEqual(380, len(list(reference.glob("*.png"))))
+            self.assertEqual(386, len(list(reference.glob("*.png"))))
             self.assertFalse((root / "app/build/outputs/d01-visual-packs/d01-visual-now.zip").exists())
 
     def test_changed_png_and_unsafe_duplicate_or_unknown_paths_rejected(self):
@@ -73,7 +73,7 @@ class VisualDeliveryTests(unittest.TestCase):
                 else:
                     (reference / "UnknownRender_0.png").write_bytes((reference / items[0]["file"]).read_bytes())
                     items[0]["file"] = "UnknownRender_0.png"
-                report.write_text(json.dumps({"count": 380, "pngs": items}))
+                report.write_text(json.dumps({"count": 386, "pngs": items}))
                 with self.assertRaises(ValueError):
                     delivery.package(root)
 
@@ -89,7 +89,7 @@ class VisualDeliveryTests(unittest.TestCase):
                     new = original.replace("NowRender", "TasksRender") + "_extra.png"
                     (reference / new).write_bytes((reference / original).read_bytes())
                     items[0]["file"] = new
-                report.write_text(json.dumps({"count": 380, "pngs": items}))
+                report.write_text(json.dumps({"count": 386, "pngs": items}))
                 with self.assertRaises(ValueError):
                     delivery.package(root)
 

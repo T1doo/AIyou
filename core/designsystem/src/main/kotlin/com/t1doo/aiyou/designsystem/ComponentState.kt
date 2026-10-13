@@ -1,5 +1,8 @@
 package com.t1doo.aiyou.designsystem
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+
 /** Presentation states only. A NORMAL component is not proof of persistence. */
 enum class ComponentState(val description: String) {
     NORMAL("正常"),
@@ -19,6 +22,8 @@ enum class MascotState(val description: String) {
 /** Resource boundary: no mascot owns permissions, persistence or task behavior. */
 fun interface MascotAssetProvider {
     fun labelFor(state: MascotState): String?
+    @Composable
+    fun Artwork(state: MascotState, modifier: Modifier) { NeutralCapybara(state, modifier) }
 }
 
 object NeutralMascotAssets : MascotAssetProvider {

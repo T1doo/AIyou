@@ -5,7 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,8 +43,8 @@ import com.t1doo.aiyou.designsystem.MemoryCard
 import com.t1doo.aiyou.designsystem.StatusNotice
 import com.t1doo.aiyou.data.EncryptedEntryRepository
 import com.t1doo.aiyou.ui.Destination
-import com.t1doo.aiyou.ui.LocalProcessingStatus
 import com.t1doo.aiyou.ui.SearchSection
+import com.t1doo.aiyou.ui.NotebookPageHeader
 import kotlinx.coroutines.flow.first
 
 @Composable
@@ -66,6 +65,7 @@ fun LocalRecordsScreen(
     ownsTailReturn: () -> Boolean = { false },
     onTailReturnHandled: () -> Unit = {},
     onResumeEdit: (String, String) -> Unit = { _, _ -> },
+    companion: (@Composable () -> Unit)? = null,
 ) {
     val displayedEntries = if (destination == Destination.NOW) local.entries.take(5) else local.entries
     var attachedViewport by remember { mutableStateOf(IntSize.Zero) }
@@ -126,15 +126,9 @@ fun LocalRecordsScreen(
                 contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
                 item("summary") {
-                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                            Text(destination.label, Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
-                            if (!stackSummary) LocalProcessingStatus()
-                        }
-                        Text(if (destination == Destination.MEMORIES) "${local.entries.size} 条本机记录" else "随手记下一点生活",
-                            Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-                        if (stackSummary) LocalProcessingStatus()
-                    }
+                    NotebookPageHeader(destination.label,
+                        if (destination == Destination.MEMORIES) "${local.entries.size} 条本机记录" else "随手记下一点生活",
+                        stackSummary, companion)
                 }
                 if (destination == Destination.NOW) item("composer") {
                     CaptureComposer(

@@ -8,7 +8,7 @@ import zipfile
 
 GROUPS = {"now": ("此刻", 28), "memories": ("回忆", 28), "tasks": ("待办", 28),
           "components": ("八种组件", 112), "shell": ("主导航", 2),
-          "complete": ("完整长文本", 14), "review": ("白蓝手机页面与正式本机状态", 108),
+          "complete": ("完整长文本", 14), "review": ("白蓝手机页面与正式本机状态", 114),
           "attachments": ("本机附件与历史版本只读状态", 60)}
 METHODS = {"NowRender": "now", "MemoriesRender": "memories", "TasksRender": "tasks",
            "ShellRender": "shell", **dict.fromkeys(
@@ -18,7 +18,7 @@ METHODS = {"NowRender": "now", "MemoriesRender": "memories", "TasksRender": "tas
                             "ProposalCompleteRender", "SourceCompleteRender", "MascotCompleteRender",
                             "ProviderCompleteRender"), "complete"),
            "ReviewNowRender": "review", "ReviewMemoriesRender": "review",
-           **dict.fromkeys(("LocalEmptyRender", "LocalRestoredRender", "LocalSavingRender", "LocalSaveFailedRender",
+           **dict.fromkeys(("LocalSettingsRender", "LocalCompanionRender", "LocalEmptyRender", "LocalRestoredRender", "LocalSavingRender", "LocalSaveFailedRender",
                             "LocalReadFailedRender", "LocalSavedRender", "LocalRejectedInputRender", "LocalMemoriesRender",
                             "LocalLongListRender", "LocalOriginalReadRender", "LocalMissingOriginalRender", "LocalOriginalReadFailureRender",
                             "LocalOriginalEditRender", "LocalOriginalEditSavingRender", "LocalOriginalEditFailedRender", "LocalOriginalEditConflictRender", "LocalOriginalEditStorageFailedRender", "LocalOriginalHistoryRender", "LocalOriginalHistoryReadRender", "LocalOriginalHistoryLoadingRender", "LocalOriginalHistoryFailedRender", "LocalOriginalHistoryUnavailableRender", "LocalHistoryEditorRender", "LocalHistoryEditorFailedRender", "LocalHistoryEditorUnchangedRender", "LocalHistoryReplacementRender"), "review")}

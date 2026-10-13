@@ -6,27 +6,31 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
+import kotlinx.coroutines.delay
+import com.t1doo.aiyou.ui.UiPreferences
+import com.t1doo.aiyou.ui.UiPreferencesState
+import com.t1doo.aiyou.ui.UiPreferencesViewModel
+import com.t1doo.aiyou.ui.SettingsScreen
+import com.t1doo.aiyou.ui.CompanionEntry
+import com.t1doo.aiyou.ui.CompanionDialog
+import com.t1doo.aiyou.ui.companionMotionAllowed
+import com.t1doo.aiyou.designsystem.MascotState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
@@ -45,8 +49,6 @@ import androidx.compose.ui.platform.LocalContext
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.designsystem.ComponentState
-import com.t1doo.aiyou.designsystem.ProviderConnectionCard
-import com.t1doo.aiyou.designsystem.StatusNotice
 import com.t1doo.aiyou.ui.Destination
 import com.t1doo.aiyou.ui.MainScreen
 import androidx.lifecycle.ViewModelProvider
@@ -78,9 +80,11 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
         )
         val records = ViewModelProvider(this)[LocalRecordsViewModel::class.java]
+        val preferences = ViewModelProvider(this)[UiPreferencesViewModel::class.java]
         setContent {
             val local by records.state.collectAsState()
-            AIyouTheme { AIyouApp(local = local, onDraftChange = records::changeText, onSave = records::save, onRetry = records::retry,
+            val display by preferences.state.collectAsState()
+            AIyouTheme { AIyouApp(local = local, display = display, onDisplayChange = preferences::change, onRetryDisplay = preferences::retry, onDraftChange = records::changeText, onSave = records::save, onRetry = records::retry,
                 onBeginOriginalEdit = records::beginOriginalEdit, onOriginalEditChange = records::changeOriginalEdit,
                 onOriginalEditSave = records::saveOriginalEdit, onOriginalEditCancel = records::cancelOriginalEdit,
                 onResumeOriginalEdit = records::resumeOriginalEdit,
@@ -125,13 +129,17 @@ fun AIyouApp(
     onConfirmHistoryReplacement: (Long, Long, Long) -> Unit = { _, _, _ -> },
     onCancelHistoryReplacement: (Long, Long, Long) -> Unit = { _, _, _ -> },
     attachments: LocalAttachmentController? = null,
+    display: UiPreferencesState = UiPreferencesState(),
+    onDisplayChange: (UiPreferences) -> Unit = {},
+    onRetryDisplay: () -> Unit = {},
+    previewSettings: Boolean = false,
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
     val generation = navigation.generation
     fun ownsNavigation() = navigation.active && navigation.generation == generation
     var selectedName by rememberSaveable { mutableStateOf(previewDestination.name) }
-    var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(previewSettings) }
     var showLicenses by rememberSaveable { mutableStateOf(false) }
     var demo by rememberSaveable { mutableStateOf(previewDemo) }
     var stateName by rememberSaveable { mutableStateOf(previewState.name) }
@@ -148,6 +156,30 @@ fun AIyouApp(
     val context = LocalContext.current
     val selected = Destination.valueOf(selectedName)
     val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS
+    var companionPanel by rememberSaveable { mutableStateOf(false) }
+    val companionVisible = display.ready && display.preferences.showCompanion && !showSettings && !reading && !demo
+    val motionAllowed = companionMotionAllowed(!display.ready || display.preferences.reduceMotion)
+    val feedbackId = local?.saveFeedbackId ?: 0L
+    var handledFeedback by rememberSaveable { mutableLongStateOf(feedbackId) }
+    var companionPulse by remember { mutableLongStateOf(0L) }
+    var companionSaved by remember { mutableStateOf(false) }
+    LaunchedEffect(feedbackId, companionVisible) {
+        companionSaved = false
+        if (feedbackId != handledFeedback) {
+            handledFeedback = feedbackId
+            if (companionVisible && local?.error == null && local?.saveNotice != null) {
+                companionSaved = true
+                companionPulse++
+                delay(800)
+                companionSaved = false
+            }
+        }
+        if (!companionVisible) companionPanel = false
+    }
+    val companion: (@Composable () -> Unit)? = if (companionVisible) ({
+        CompanionEntry(if (companionSaved) MascotState.Saved else MascotState.Idle,
+            companionPulse, motionAllowed, onOpen = { companionPanel = true })
+    }) else null
     val density = LocalDensity.current
     val imeBottomPx = WindowInsets.ime.getBottom(density)
     val imeVisible = imeBottomPx > 0
@@ -362,27 +394,12 @@ fun AIyouApp(
         if (showLicenses) {
             OpenSourceLicenses(modifier)
         } else if (showSettings) {
-            Column(
-                modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(AIyouDimensions.pageNarrow),
-                verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceLg),
-            ) {
-                StatusNotice("仅本机处理", if (attachments != null)
-                    "可保存文字、恢复草稿，并为已保存原文添加图片附件；AI 连接、录音与系统提醒尚未开放。"
-                    else "可保存文字与恢复草稿；AI 连接、录音与系统提醒尚未开放。")
-                ProviderConnectionCard("我的模型 · 未配置", "视觉、转写和语义检索能力未检测")
-                TextButton(onClick = { if (ownsNavigation()) { navigation.generation++; showLicenses = true } }) { Text("开源许可与声明") }
-                Text("界面示例", style = MaterialTheme.typography.titleLarge)
-                OutlinedButton(onClick = { if (ownsNavigation()) { navigation.generation++; demo = !demo } }) { Text(if (demo) "退出虚构示例" else "查看虚构示例") }
-                if (demo) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                        ComponentState.entries.forEach { state ->
-                            OutlinedButton(onClick = { if (ownsNavigation()) { navigation.generation++; stateName = state.name } }) {
-                                Text(state.description + if (stateName == state.name) " · 已选" else "")
-                            }
-                        }
-                    }
-                }
-            }
+            SettingsScreen(display, onDisplayChange, onRetryDisplay, attachments != null,
+                demo, ComponentState.valueOf(stateName),
+                onLicenses = { if (ownsNavigation()) { navigation.generation++; showLicenses = true } },
+                onDemo = { if (ownsNavigation()) { navigation.generation++; demo = !demo } },
+                onDemoState = { if (ownsNavigation()) { navigation.generation++; stateName = it.name } },
+                modifier = modifier)
         } else if (attachmentPanel != null && attachments != null && reading && local != null) {
             val panel = if (!local.ready || local.opening || local.error != null ||
                 !attachmentPanel.hasRecordAccess(local))
@@ -409,7 +426,7 @@ fun AIyouApp(
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
-            LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier,
+            LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
                 listState = if (selected == Destination.NOW) nowList else memoriesList,
                 selectedEntryId = if (selected == Destination.NOW) selectedNowId else selectedMemoriesId,
                 onOpenEntry = openEntry, tailReturnEntryId = request?.entryId, tailReturnGeneration = request?.generation,
@@ -430,11 +447,12 @@ fun AIyouApp(
                 })
         } else {
             MainScreen(
-                destination = selected, demo = demo, modifier = modifier,
+                destination = selected, demo = demo, modifier = modifier, companion = companion,
                 state = if (demo) ComponentState.valueOf(stateName) else ComponentState.NORMAL,
             )
         }
     }
+    if (companionVisible && companionPanel) CompanionDialog(onClose = { companionPanel = false }, motionAllowed = motionAllowed)
     discardEditSession?.let { sessionId ->
         if (editing?.sessionId == sessionId && editing.canCancel) {
             AlertDialog(onDismissRequest = { if (ownsEdit(sessionId)) discardEditSession = null },
