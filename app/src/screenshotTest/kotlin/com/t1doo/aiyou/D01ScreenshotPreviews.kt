@@ -123,7 +123,9 @@ fun LocalRestoredRender() { AIyouTheme { AIyouApp(display = UiPreferencesState(U
 
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalCaptureDiscardRender() { AIyouTheme { AIyouApp(local = restoredLocal.copy(
-    captureDiscard = com.t1doo.aiyou.records.CaptureDiscardUiState(1, error = "清空尚未确认，当前输入已保留。可以重试确认或返回编辑。"))) } }
+    draftNotice = "当前输入未确认保存在本机，退出应用可能丢失。",
+    captureDiscard = com.t1doo.aiyou.records.CaptureDiscardUiState(1, recoveryRequired = true, recoveryFailed = true,
+        error = "保留草稿尚未确认，退出应用可能丢失当前输入。请重试保留，或返回编辑后自行保留输入。"))) } }
 
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalSavingRender() { AIyouTheme { AIyouApp(local = restoredLocal.copy(saving = true, savePending = true, draftNotice = "草稿已保存在本机")) } }

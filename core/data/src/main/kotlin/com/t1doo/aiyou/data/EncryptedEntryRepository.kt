@@ -51,6 +51,16 @@ class EncryptedEntryRepository internal constructor(
         if (current != expected || dao.consumeDraft(expected.id, expected.version) != 1) throw RecordConflict()
     }
 
+    override suspend fun restoreDiscardedDraft(expected: TextDraft, replacement: TextDraft): TextDraft = database.withTransaction {
+        require(replacement.id != expected.id && replacement.version == 1L &&
+            replacement.text == expected.text && replacement.text.length <= MAX_TEXT_LENGTH)
+        val current = dao.draft()?.toModel()
+        if (current == expected || current == replacement) return@withTransaction checkNotNull(current)
+        if (current != null) throw RecordConflict()
+        dao.putDraft(DraftEntity(id = replacement.id, version = replacement.version, text = replacement.text))
+        checkNotNull(dao.draft()).toModel()
+    }
+
     override suspend fun saveDraft(expected: TextDraft, capturedAtMillis: Long, captureTimeZone: String): StoredEntry = database.withTransaction {
         require(expected.text.isNotBlank())
         ZoneId.of(captureTimeZone)

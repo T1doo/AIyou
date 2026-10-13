@@ -34,6 +34,13 @@ class CaptureDraftDiscardTest {
             if (readFailure && calls.isNotEmpty()) { readFailure = false; error("synthetic readback") }
             return base.draft
         }
+        override suspend fun restoreDiscardedDraft(expected: TextDraft, replacement: TextDraft): TextDraft {
+            val actual = base.draft
+            if (actual == expected || actual == replacement) return checkNotNull(actual)
+            if (actual != null) throw RecordConflict()
+            base.draft = replacement
+            return replacement
+        }
     }
     private suspend fun ready(store: Store): LocalRecordsViewModel = LocalRecordsViewModel(Application(), { store }).also {
         it.state.first { s -> s.ready }
@@ -165,10 +172,12 @@ class CaptureDraftDiscardTest {
             try {
                 val id = request(vm); vm.confirmCaptureDiscard(id)
                 vm.state.first { it.captureDiscard?.error != null }
-                vm.cancelCaptureDiscard(id); vm.save()
+                vm.cancelCaptureDiscard(id)
+                vm.state.first { it.captureDiscard == null }
+                vm.save()
                 vm.state.first { it.entries.size == 1 && !it.saving }
                 assertEquals("合成待清空草稿", vm.state.value.entries.single().originalText)
-                assertEquals(2, store.base.editCalls)
+                assertEquals(1, store.base.editCalls)
             } finally { vm.scope.cancel() }
         }
     }

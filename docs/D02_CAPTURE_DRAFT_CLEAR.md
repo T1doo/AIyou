@@ -54,3 +54,33 @@ license acceptance are still unverified. The old consumed CI request and its
 ACL-changing driver are not reused under the current no-ACL constraint. No new
 runner, SDK agreement, credential change, Library retry or network-policy change
 was started.
+
+## Follow-up: returning after an unacknowledged delete
+
+An extra independent review found a P2 lifecycle defect in 7fe399a: delete could
+commit before acknowledgement/readback failed; returning to editing merely
+closed the dialog, left the old saved notice, and a fresh repository/ViewModel
+restored nothing. A disk-backed synthetic capture fixture reproduced the actual
+loss before the fix. The former test immediately saved a record after returning,
+which concealed this missing lifecycle path.
+
+After a delete may have committed, the return action is now 保留输入并返回. It
+first explicitly restores and reads back the retained text. The recovery request
+carries a fixed, fresh draft identity: a transaction accepts the exact old draft,
+the exact recovery draft (idempotent retry), or an empty slot; any different draft
+conflicts, including same-text/new-identity ABA. An uncertain recovery result does
+not show a saved notice. Retry is labelled 重试保留. A user may explicitly choose
+返回编辑（未保存） after recovery fails; the visible draft status then warns that
+leaving the app may lose unconfirmed input. The UI does not promise persistence
+when writes fail. Ordinary delete retry never performs recovery, and cancelling
+before confirmation still performs no write.
+
+Six new tests rebuild the synthetic persistent adapter/VM and check both delete
+failure boundaries, failed recovery writes/acknowledgements, competing drafts and
+plain cancellation. Production Compose paths additionally check actual keep/return
+and retry controls at narrow large-font and landscape sizes. The existing native
+integration method includes recovery/reopen/identity protection assertions, but
+native execution remains NOT RUN. Only four changed recovery-state previews are
+rendered in this follow-up; the old394-image run stays evidence for 7fe399a, not
+this new source. Local APK paths identify workspace build artifacts and do not
+prove a user-accessible download or transfer.

@@ -9,24 +9,28 @@ from png_integrity import verified_dimensions
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
-parser.add_argument("--production-tasks-only", action="store_true",
+mode = parser.add_mutually_exclusive_group()
+mode.add_argument("--production-tasks-only", action="store_true",
                     help="verify only the four actual production task renders; never claim a full-suite pass")
+mode.add_argument("--capture-discard-only", action="store_true", help="verify only four capture recovery renders; never claim a full-suite pass")
 args = parser.parse_args()
+target_method = "LocalCaptureDiscardRender" if args.capture_discard_only else "LocalTasksRender" if args.production_tasks_only else None
+targeted = target_method is not None
 reports = list((root / "app/build/test-results/validateDebugScreenshotTest").rglob("*.xml"))
 cases = []
 for report in reports:
     cases.extend(ET.parse(report).getroot().iter("testcase"))
-expected = 4 if args.production_tasks_only else 394  # Includes four production capture-discard confirmation renders.
+expected = 4 if targeted else 394  # Includes four production capture-discard confirmation renders.
 if len(cases) != expected:
     raise SystemExit(f"FAIL: expected {expected} actual Preview smoke tests, found {len(cases)}")
 if any(any(case.find(tag) is not None for tag in ("failure", "error", "skipped")) for case in cases):
     raise SystemExit("FAIL: Preview smoke contains failing/error/skipped cases")
-if args.production_tasks_only and any(not case.get("name", "").startswith("LocalTasksRender_") for case in cases):
-    raise SystemExit("FAIL: targeted task proof includes a different render method")
+if targeted and any(not case.get("name", "").startswith(target_method + "_") for case in cases):
+    raise SystemExit("FAIL: targeted render proof includes a different render method")
 references = root / "app/src/screenshotTestDebug/reference"
 files = sorted(references.rglob("*.png"))
-if args.production_tasks_only:
-    files = [path for path in files if path.name.startswith("LocalTasksRender_")]
+if targeted:
+    files = [path for path in files if path.name.startswith(target_method + "_")]
 if len(files) != expected:
     raise SystemExit(f"FAIL: expected {expected} rendered PNGs, found {len(files)}")
 manifest = []
@@ -39,10 +43,10 @@ for path in files:
     manifest.append({"file": str(path.relative_to(references)), "width": width, "height": height,
                      "sha256": hashlib.sha256(data).hexdigest()})
 complete = [item for item in manifest if "CompleteRender_" in item["file"]]
-if not args.production_tasks_only and (len(complete) != 14 or any(item["height"] <= 2400 for item in complete)):
+if not targeted and (len(complete) != 14 or any(item["height"] <= 2400 for item in complete)):
     raise SystemExit("FAIL: require 14 explicit-height complete-content PNGs taller than the automatic 2400px cap")
 review = [item for item in manifest if "/ReviewNowRender_" in item["file"] or "/ReviewMemoriesRender_" in item["file"]]
-if not args.production_tasks_only and (len(review) != 4 or any(item["height"] < 2000 for item in review)):
+if not targeted and (len(review) != 4 or any(item["height"] < 2000 for item in review)):
     raise SystemExit("FAIL: require four actual whole-phone-page renders")
 local_methods = ("LocalCaptureDiscardRender", "LocalTasksRender", "LocalSettingsRender", "LocalEmptyRender", "LocalRestoredRender", "LocalSavingRender", "LocalSaveFailedRender",
                  "LocalReadFailedRender", "LocalSavedRender", "LocalRejectedInputRender", "LocalMemoriesRender",
@@ -54,14 +58,14 @@ attachment_methods = ("LocalAttachmentEmptyRender", "LocalAttachmentLoadingRende
                       "LocalHistoricalAttachmentReadyRender", "LocalHistoricalAttachmentFailedRender",
                       "LocalHistoricalAttachmentCorruptRender", "LocalHistoricalAttachmentUnavailableRender",
                       "LocalHistoricalAttachmentEntryRender", "LocalAttachmentJpegReadyRender", "LocalAttachmentJpegStrippedRender")
-for method in (("LocalTasksRender",) if args.production_tasks_only else local_methods + attachment_methods):
+for method in ((target_method,) if targeted else local_methods + attachment_methods):
     production = [item for item in manifest if "/" + method + "_" in item["file"]]
     if len(production) != 4:
         raise SystemExit(f"FAIL: require all four actual production sizes for {method}, found {len(production)}")
-target = root / ("app/build/reports/d02-production-tasks-preview-manifest.json" if args.production_tasks_only
+target = root / ("app/build/reports/d02-capture-recovery-preview-manifest.json" if args.capture_discard_only else "app/build/reports/d02-production-tasks-preview-manifest.json" if args.production_tasks_only
                  else "app/build/reports/d01-preview-manifest.json")
 target.parent.mkdir(parents=True, exist_ok=True)
-target.write_text(json.dumps({"kind": "targeted production task render smoke, not full-suite evidence" if args.production_tasks_only
+target.write_text(json.dumps({"kind": "targeted production render smoke, not full-suite evidence" if targeted
                              else "initial render smoke, not approved goldens", "count": expected,
                              "pngs": manifest}, ensure_ascii=False, indent=2) + "\n")
 print(f"PASS: Preview render smoke tests={len(cases)} PNGs={len(files)} failures/errors/skipped=0")

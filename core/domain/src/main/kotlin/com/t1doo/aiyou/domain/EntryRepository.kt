@@ -16,6 +16,10 @@ interface EntryRepository {
     suspend fun updateDraft(text: String): TextDraft
     /** Delete only this exact acknowledged snapshot. Missing is idempotent; a different draft conflicts. */
     suspend fun discardDraft(expected: TextDraft) { throw UnsupportedOperationException("Draft discard unavailable") }
+    /** Explicit recovery after uncertain discard. Never replace a different draft; replacement identity is stable across retries. */
+    suspend fun restoreDiscardedDraft(expected: TextDraft, replacement: TextDraft): TextDraft {
+        throw UnsupportedOperationException("Draft recovery unavailable")
+    }
     suspend fun saveDraft(expected: TextDraft, capturedAtMillis: Long, captureTimeZone: String): StoredEntry
     suspend fun entries(): List<StoredEntry>
     suspend fun revisions(entryId: String): List<OriginalRevision>

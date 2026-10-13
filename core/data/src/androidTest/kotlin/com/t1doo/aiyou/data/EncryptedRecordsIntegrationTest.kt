@@ -98,9 +98,18 @@ class EncryptedRecordsIntegrationTest {
         assertEquals(listOf(saved), store.entries())
         assertEquals(1L, count(store, "local_jobs"))
         assertEquals(1, store.revisions(saved.id).size)
+        val replacement = com.t1doo.aiyou.model.TextDraft(java.util.UUID.randomUUID().toString(), 1L, newer.text)
+        assertEquals(replacement, store.restoreDiscardedDraft(newer, replacement))
+        store.close()
+        store = open()
+        assertEquals(replacement, store.readDraft())
+        assertEquals(replacement, store.restoreDiscardedDraft(newer, replacement))
+        fails<com.t1doo.aiyou.domain.RecordConflict> { store.discardDraft(newer) }
+        store.discardDraft(replacement)
         val nextDraft = store.updateDraft("合成清空后的新草稿")
         assertNotEquals(newer.id, nextDraft.id)
         fails<com.t1doo.aiyou.domain.RecordConflict> { store.discardDraft(newer) }
+        fails<com.t1doo.aiyou.domain.RecordConflict> { store.restoreDiscardedDraft(newer, replacement) }
         assertEquals(nextDraft, store.readDraft())
     }
 

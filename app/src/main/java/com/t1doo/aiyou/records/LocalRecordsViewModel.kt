@@ -29,7 +29,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class CaptureDiscardUiState(val requestId: Long, val busy: Boolean = false, val error: String? = null,
-    val conflict: Boolean = false)
+    val conflict: Boolean = false, val recoveryRequired: Boolean = false,
+    val recovering: Boolean = false, val recoveryFailed: Boolean = false)
 
 data class LocalRecordUiState(
     val ready: Boolean = false,
@@ -118,6 +119,7 @@ class LocalRecordsViewModel internal constructor(
                                 mutableState.update { it.copy(text = "", saving = false, savePending = false, entries = entries, draftNotice = "没有未保存的草稿", saveNotice = "已保存在本机", saveFeedbackId = it.saveFeedbackId + 1, error = null) }
                             }
                             is Command.DiscardCapture -> discardCapture(command.intent)
+                            is Command.RestoreCapture -> restoreCapture(command.intent)
                             Command.Retry -> open()
                             is Command.RecoverDraft -> {
                                 val store = checkNotNull(repository)
@@ -212,8 +214,13 @@ class LocalRecordsViewModel internal constructor(
     fun cancelCaptureDiscard(requestId: Long) {
         val active = mutableState.value.captureDiscard ?: return
         if (active.requestId != requestId || active.busy) return
+        if (active.recoveryRequired && !active.recoveryFailed) {
+            queueCaptureRecovery(requestId)
+            return
+        }
         discardIntent = null
-        mutableState.update { it.copy(captureDiscard = null) }
+        mutableState.update { it.copy(captureDiscard = null,
+            draftNotice = if (active.recoveryFailed) "当前输入未确认保存在本机，退出应用可能丢失。" else it.draftNotice) }
     }
 
     fun confirmCaptureDiscard(requestId: Long) {
@@ -222,8 +229,43 @@ class LocalRecordsViewModel internal constructor(
         val intent = discardIntent ?: return
         if (editsDisposed || active.requestId != requestId || active.busy || active.conflict || intent.id != requestId ||
             intent.generation != editGeneration.get() || intent.text != current.text) return
+        if (active.recoveryFailed) { queueCaptureRecovery(requestId); return }
         mutableState.update { it.copy(captureDiscard = active.copy(busy = true, error = null)) }
         commands.trySend(Command.DiscardCapture(intent))
+    }
+
+    private fun queueCaptureRecovery(requestId: Long) {
+        val current = mutableState.value
+        val active = current.captureDiscard ?: return
+        val intent = discardIntent ?: return
+        if (editsDisposed || active.requestId != requestId || active.busy || intent.id != requestId ||
+            intent.generation != editGeneration.get() || intent.text != current.text || !active.recoveryRequired) return
+        mutableState.update { it.copy(captureDiscard = active.copy(busy = true, recovering = true, error = null)) }
+        commands.trySend(Command.RestoreCapture(intent))
+    }
+
+    private suspend fun restoreCapture(intent: DiscardIntent) {
+        try {
+            val store = checkNotNull(repository)
+            val restored = store.restoreDiscardedDraft(checkNotNull(intent.expected), intent.replacement)
+            if (restored != intent.expected && restored != intent.replacement || store.readDraft() != restored) throw RecordConflict()
+            persistedDraft = restored
+            captureDraftMayBeConsumed = false
+            mutableState.update { current ->
+                if (current.captureDiscard?.requestId != intent.id || editGeneration.get() != intent.generation) current
+                else current.copy(captureDiscard = null, draftNotice = "草稿已保存在本机", error = null, saveNotice = null)
+            }
+        } catch (failure: CancellationException) { throw failure }
+        catch (failure: Exception) {
+            mutableState.update { current ->
+                if (current.captureDiscard?.requestId != intent.id) current
+                else current.copy(draftNotice = "当前输入未确认保存在本机，退出应用可能丢失。",
+                    captureDiscard = current.captureDiscard.copy(busy = false, recovering = false, recoveryFailed = true,
+                        conflict = failure is RecordConflict,
+                        error = if (failure is RecordConflict) "本机已有变化后的草稿，未覆盖它。当前输入尚未确认保存；返回编辑或退出应用前请先保留输入。"
+                            else "保留草稿尚未确认，退出应用可能丢失当前输入。请重试保留，或返回编辑后自行保留输入。"))
+            }
+        }
     }
 
     private suspend fun discardCapture(intent: DiscardIntent) {
@@ -251,7 +293,8 @@ class LocalRecordsViewModel internal constructor(
         catch (failure: Exception) {
             mutableState.update { current ->
                 if (current.captureDiscard?.requestId != intent.id) current
-                else current.copy(captureDiscard = current.captureDiscard.copy(busy = false,
+                else current.copy(draftNotice = if (intent.bound) "当前输入未确认保存在本机，退出前请保留或保存。" else current.draftNotice,
+                    captureDiscard = current.captureDiscard.copy(busy = false, recoveryRequired = intent.bound,
                     conflict = failure is RecordConflict,
                     error = if (failure is RecordConflict) "本机草稿已变化，本次清空已停止。当前输入已保留，请返回编辑。"
                         else "清空尚未确认，当前输入已保留。可以重试确认或返回编辑。"))
@@ -741,7 +784,9 @@ class LocalRecordsViewModel internal constructor(
 
     private data class SaveIntent(val text: String, val generation: Long)
     private class DiscardIntent(val id: Long, val text: String, val generation: Long,
-        var expected: TextDraft? = null, var bound: Boolean = false)
+        var expected: TextDraft? = null, var bound: Boolean = false) {
+        val replacement = TextDraft(UUID.randomUUID().toString(), 1, text)
+    }
 
     private sealed interface Command {
         data object RefreshEditDrafts : Command
@@ -753,6 +798,7 @@ class LocalRecordsViewModel internal constructor(
         data class Edit(val text: String, val generation: Long) : Command
         data class Save(val intent: SaveIntent) : Command
         data class DiscardCapture(val intent: DiscardIntent) : Command
+        data class RestoreCapture(val intent: DiscardIntent) : Command
         data object Retry : Command
         data class RecoverDraft(val text: String, val generation: Long) : Command
         data class Revise(val sessionId: Long, val entryId: String, val expectedRevision: Int, val text: String) : Command

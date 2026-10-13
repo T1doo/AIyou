@@ -78,20 +78,21 @@ fun LocalRecordsScreen(
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
             onDismissRequest = { if (!discard.busy) onCancelCaptureDiscard(discard.requestId) },
-            title = { Text("清空这份未保存的草稿？") },
+            title = { Text(if (discard.recoveryFailed || discard.recovering) "保留这份输入为草稿" else "清空这份未保存的草稿？") },
             text = { Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text("清空后无法恢复这份草稿。已保存的记录不会删除。")
-                if (discard.busy) Text("正在确认本机清空结果…")
+                Text(if (discard.recoveryFailed || discard.recovering) "本机保存确认成功后再返回编辑。"
+                    else "清空后无法恢复这份草稿。已保存的记录不会删除。")
+                if (discard.busy) Text(if (discard.recovering) "正在保留本机草稿…" else "正在确认本机清空结果…")
                 discard.error?.let { Text(it, color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
             } },
             confirmButton = { TextButton(enabled = !discard.busy && !discard.conflict,
                 onClick = { onConfirmCaptureDiscard(discard.requestId) }) {
-                Text(if (discard.error == null) "确认清空" else "重试确认")
+                Text(if (discard.recoveryFailed) "重试保留" else if (discard.error == null) "确认清空" else "重试确认")
             } },
             dismissButton = { TextButton(enabled = !discard.busy,
                 onClick = { onCancelCaptureDiscard(discard.requestId) }) {
-                Text(if (discard.error == null) "保留草稿" else "返回编辑")
+                Text(if (discard.recoveryFailed) "返回编辑（未保存）" else if (discard.recoveryRequired) "保留输入并返回" else if (discard.error == null) "保留草稿" else "返回编辑")
             } },
         )
     }

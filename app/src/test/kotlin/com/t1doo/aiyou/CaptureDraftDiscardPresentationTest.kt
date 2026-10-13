@@ -32,6 +32,9 @@ class CaptureDraftDiscardPresentationTest {
         var draft: TextDraft? = TextDraft("synthetic-restored", 1, "合成恢复草稿")
         var deletes = 0
         var failOnce = false
+        var failAfterDelete = false
+        var failRecovery = false
+        var recoveries = 0
         override suspend fun readDraft() = draft
         override suspend fun updateDraft(text: String) = TextDraft(draft?.id ?: "synthetic-new", (draft?.version ?: 0) + 1, text).also { draft = it }
         override suspend fun discardDraft(expected: TextDraft) {
@@ -39,6 +42,15 @@ class CaptureDraftDiscardPresentationTest {
             if (failOnce) { failOnce = false; error("synthetic IO failure") }
             if (draft != null && draft != expected) throw RecordConflict()
             draft = null
+            if (failAfterDelete) { failAfterDelete = false; error("synthetic lost acknowledgement") }
+        }
+        override suspend fun restoreDiscardedDraft(expected: TextDraft, replacement: TextDraft): TextDraft {
+            recoveries++
+            if (failRecovery) { failRecovery = false; error("synthetic recovery unavailable") }
+            if (draft == expected || draft == replacement) return checkNotNull(draft)
+            if (draft != null) throw RecordConflict()
+            draft = replacement
+            return replacement
         }
         override suspend fun entries() = emptyList<StoredEntry>()
         override suspend fun revisions(entryId: String) = emptyList<OriginalRevision>()
@@ -91,4 +103,56 @@ class CaptureDraftDiscardPresentationTest {
     fun narrowLargeFontConfirmCancelAndFailedDeleteRetryRemainReachable() = runPath(large = true, fail = true)
     @Test @Config(sdk = [35], qualifiers = "w800dp-h360dp")
     fun landscapeConfirmCancelAndFreshInputRemainReachable() = runPath()
+
+    @Test @Config(sdk = [35], qualifiers = "w320dp-h640dp")
+    fun returningFromUnacknowledgedDeleteRetainsInputBeforeClosingAtLargeFont() = runReturnPath(true, false)
+
+    @Test @Config(sdk = [35], qualifiers = "w800dp-h360dp")
+    fun failedRetentionIsExplicitAndRetryKeepsInputWithoutAnotherDelete() = runReturnPath(false, true)
+
+    private fun runReturnPath(large: Boolean, recoveryFailure: Boolean) {
+        val store = Store().also { it.failAfterDelete = true; it.failRecovery = recoveryFailure }
+        val lifecycle = ViewModelStore()
+        val vm = LocalRecordsViewModel(RuntimeEnvironment.getApplication(), { store })
+        lifecycle.put("return", vm)
+        try {
+            compose.setContent {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, if (large) 2f else 1f)) {
+                    AIyouTheme { AIyouApp(local = vm.state.collectAsState().value,
+                        onRequestCaptureDiscard = vm::requestCaptureDiscard,
+                        onConfirmCaptureDiscard = vm::confirmCaptureDiscard,
+                        onCancelCaptureDiscard = vm::cancelCaptureDiscard) }
+                }
+            }
+            compose.waitUntil(5000) { vm.state.value.ready }
+            compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("清空草稿"))
+            compose.onNodeWithText("清空草稿").performClick()
+            compose.onNodeWithText("确认清空").performClick()
+            compose.waitUntil(5000) { vm.state.value.captureDiscard?.error != null }
+            compose.runOnIdle { assertNull(store.draft); assertTrue(vm.state.value.draftNotice.contains("未确认")) }
+            val keep = compose.onNodeWithText("保留输入并返回")
+            keep.assertIsDisplayed().assertIsEnabled()
+            val bounds = keep.getUnclippedBoundsInRoot()
+            val dialog = compose.onNode(isDialog()).getUnclippedBoundsInRoot()
+            assertTrue(bounds.height >= 48.dp && bounds.left >= dialog.left && bounds.right <= dialog.right && bounds.top >= dialog.top && bounds.bottom <= dialog.bottom)
+            keep.performClick()
+            if (recoveryFailure) {
+                compose.waitUntil(5000) { vm.state.value.captureDiscard?.recoveryFailed == true }
+                compose.onNodeWithText("返回编辑（未保存）").assertIsDisplayed()
+                compose.runOnIdle { assertNull(store.draft); assertTrue(vm.state.value.draftNotice.contains("退出应用可能丢失")) }
+                compose.onNodeWithText("重试保留").assertIsDisplayed().performClick()
+            }
+            compose.waitUntil(5000) { vm.state.value.captureDiscard == null }
+            compose.runOnIdle {
+                assertEquals("合成恢复草稿", vm.state.value.text)
+                assertEquals(vm.state.value.text, store.draft!!.text)
+                assertNotEquals("synthetic-restored", store.draft!!.id)
+                assertEquals("草稿已保存在本机", vm.state.value.draftNotice)
+                assertEquals(1, store.deletes)
+                assertEquals(if (recoveryFailure) 2 else 1, store.recoveries)
+                assertEquals(0L, vm.state.value.saveFeedbackId)
+            }
+        } finally { compose.runOnIdle { lifecycle.clear() } }
+    }
 }
