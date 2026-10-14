@@ -45,7 +45,8 @@ def validate(generated):
         additions = [
             {'fieldPath': 'isFavorite', 'columnName': 'isFavorite', 'affinity': 'INTEGER', 'notNull': True, 'defaultValue': '0'},
             {'fieldPath': 'favoriteVersion', 'columnName': 'favoriteVersion', 'affinity': 'INTEGER', 'notNull': True, 'defaultValue': '0'},
-            {'fieldPath': 'lastFavoriteMutationId', 'columnName': 'lastFavoriteMutationId', 'affinity': 'TEXT', 'notNull': False},
+            # Pinned Room KSP omits notNull for nullable fields; the exact DDL still proves TEXT NULL.
+            {'fieldPath': 'lastFavoriteMutationId', 'columnName': 'lastFavoriteMutationId', 'affinity': 'TEXT'},
             {'fieldPath': 'lastFavoriteSourceRevision', 'columnName': 'lastFavoriteSourceRevision', 'affinity': 'INTEGER', 'notNull': True, 'defaultValue': '0'},
         ]
         expected = dict(prior)

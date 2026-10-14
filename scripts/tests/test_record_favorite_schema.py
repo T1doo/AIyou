@@ -29,7 +29,8 @@ class RecordFavoriteSchemaOwnershipTest(unittest.TestCase):
         entry=next(e for e in self.value['database']['entities'] if e['tableName']=='entries')
         for name,affinity,not_null,default in [('isFavorite','INTEGER',True,'0'),('favoriteVersion','INTEGER',True,'0'),
                 ('lastFavoriteMutationId','TEXT',False,None),('lastFavoriteSourceRevision','INTEGER',True,'0')]:
-            field={'fieldPath':name,'columnName':name,'affinity':affinity,'notNull':not_null}
+            field={'fieldPath':name,'columnName':name,'affinity':affinity}
+            if not_null:field['notNull']=True
             if default is not None:field['defaultValue']=default
             entry['fields'].append(field)
         entry['createSql']=entry['createSql'].replace(', PRIMARY KEY',
@@ -52,6 +53,16 @@ class RecordFavoriteSchemaOwnershipTest(unittest.TestCase):
         self.assertEqual(prior,(self.directory/'8.json').read_bytes());self.assertIn('require another exact-head CI',result.stdout)
         self.commit();self.assertEqual(0,self.gate('--capture').returncode)
         self.assertEqual(0,self.gate('--verify').returncode)
+
+    def test_actual_ksp_export_accepts_omitted_nullable_flag_without_synthesizing_it(self):
+        actual=Path(__file__).resolve().parents[2]/'core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/9.json'
+        raw=actual.read_bytes();value=json.loads(raw)
+        entry=next(e for e in value['database']['entities'] if e['tableName']=='entries')
+        nullable=next(f for f in entry['fields'] if f['columnName']=='lastFavoriteMutationId')
+        self.assertNotIn('notNull',nullable)
+        self.assertEqual(0,self.gate('--capture').returncode)
+        self.export.write_bytes(raw);result=self.gate('--verify')
+        self.assertEqual(0,result.returncode,result.stderr);self.assertEqual(raw,self.asset.read_bytes())
 
     def test_wrong_default_nullable_column_source_or_independent_entity_is_preserved_and_rejected(self):
         self.assertEqual(0,self.gate('--capture').returncode)
