@@ -12,6 +12,58 @@ import java.util.concurrent.atomic.*
 
 /** Real FTS4 product proof/leases plus actual controller and MutableStateFlow CAS. */
 class LocalIndexedSearchControllerTest {
+    @Test fun metadataFenceCannotCreateNewEpochOverUncommittedTextAndInputAbaNeedsFreshProof(): Unit = Harness().use { h ->
+        h.controller.sync(true); val previous = h.ready()
+        assertTrue(h.controller.beforeInputCommit { true })
+        h.controller.sync(true) // actual text/ownership deliberately not committed yet
+        assertEquals(1, h.matchCount.get())
+        assertEquals(OriginalSearchStage.WAITING, h.controller.state.value.stage)
+        assertFalse(h.controller.canOpen(previous, previous.hits.single()))
+        h.input.set(OriginalSearchInput("别的词", ownership = Any()))
+        h.input.set(OriginalSearchInput("合成", ownership = Any()))
+        h.controller.sync(true); val current = h.ready()
+        assertTrue(current.inputEpoch > previous.inputEpoch)
+        assertNotSame(previous.proof, current.proof)
+        assertEquals(2, h.matchCount.get())
+        assertTrue(h.controller.canOpen(current, current.hits.single()))
+    }
+    @Test fun actualStateFlowCasRejectsReentrantInputFenceAndLeavesRejectedInputUnchanged(): Unit = Harness().use { h ->
+        val rejected = CountDownLatch(1)
+        val previous = h.input.get()
+        h.flow.beforeCas = { update ->
+            if (update.stage == OriginalSearchStage.READY) {
+                h.flow.beforeCas = null
+                if (h.controller.beforeInputCommit { true }) h.input.set(OriginalSearchInput("unsafe", ownership = Any()))
+                assertSame(previous, h.input.get())
+                rejected.countDown()
+            }
+        }
+        h.controller.sync(true); assertTrue(rejected.await(5, TimeUnit.SECONDS))
+        val current = h.ready()
+        assertSame(previous, current.input)
+        assertTrue(h.controller.canOpen(current, current.hits.single()))
+    }
+    @Test fun inputFenceOnIndependentThreadWaitsForActualCasThenRetiresOldResultBeforeCommit(): Unit = Harness().use { h ->
+        val pool = Executors.newSingleThreadExecutor()
+        val started = CountDownLatch(1)
+        val retiring = AtomicReference<Future<Boolean>>()
+        try {
+            h.flow.beforeCas = { update ->
+                if (update.stage == OriginalSearchStage.READY) {
+                    h.flow.beforeCas = null
+                    retiring.set(pool.submit<Boolean> { started.countDown(); h.controller.beforeInputCommit { true } })
+                    assertTrue(started.await(1, TimeUnit.SECONDS))
+                    assertThrows(TimeoutException::class.java) { retiring.get().get(100, TimeUnit.MILLISECONDS) }
+                }
+            }
+            h.controller.sync(true); val previous = h.ready()
+            assertTrue(retiring.get().get(2, TimeUnit.SECONDS))
+            assertEquals(OriginalSearchStage.WAITING, h.controller.visible(h.source.get(), h.input.get()).stage)
+            assertFalse(h.controller.canOpen(previous, previous.hits.single()))
+            h.input.set(OriginalSearchInput("新词", ownership = Any()))
+            h.controller.sync(true); assertTrue(h.ready().hits.isEmpty())
+        } finally { pool.shutdownNow(); assertTrue(pool.awaitTermination(2, TimeUnit.SECONDS)) }
+    }
     @Test fun committedIndependentWriteBetweenMatchingAndFinalLeasePublishesNoOldHits(): Unit = Harness().use { h ->
         val computed = CountDownLatch(1); val release = CountDownLatch(1)
         h.afterMatch = { computed.countDown(); assertTrue(release.await(5, TimeUnit.SECONDS)) }

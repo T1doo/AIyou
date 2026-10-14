@@ -2,6 +2,7 @@ package com.t1doo.aiyou.data
 
 import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
+import kotlinx.serialization.json.*
 import com.t1doo.aiyou.records.*
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -12,6 +13,15 @@ import java.util.concurrent.*
 
 /** Actual app tokenizer, FTS4, SQL, tag AEAD and private proof; synthetic host driver only. */
 class LocalSearchSqlTest {
+    @Test fun actualFtsCreationAndOptionsMatchRetrievedRoomV7Export(): Unit = Fixture().use { f ->
+        val schema = Json.parseToJsonElement(java.nio.file.Files.readString(PythonSqliteDatabase.repositoryRoot().resolve(
+            "core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/7.json"))).jsonObject["database"]!!.jsonObject
+        val entity = schema["entities"]!!.jsonArray.single { it.jsonObject["tableName"]!!.jsonPrimitive.content == "local_search_fts" }.jsonObject
+        val expected = entity["createSql"]!!.jsonPrimitive.content.replace("$" + "{TABLE_NAME}", "local_search_fts")
+        val actual = f.base.db.read("SELECT sql FROM sqlite_master WHERE name='local_search_fts'").single().single() as String
+        fun normalize(value: String) = value.replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), "").lowercase()
+        assertEquals(normalize(expected), normalize(actual))
+    }
     @Test fun realFts4RecallsChineseEnglishSubstringsAndDigitsWithNoUserMatchSyntax(): Unit = Fixture().use { f ->
         f.seed("a", "和小林喝咖啡，Meeting42 🙂e\u0301", 100)
         f.seed("b", "其他合成文字", 200)

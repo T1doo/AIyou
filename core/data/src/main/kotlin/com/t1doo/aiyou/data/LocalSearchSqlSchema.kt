@@ -3,7 +3,7 @@ package com.t1doo.aiyou.data
 /** The very same additive SQL is executed by Room migration and the synthetic host driver. */
 internal object LocalSearchSqlSchema {
     val migration6To7 = listOf(
-        "CREATE VIRTUAL TABLE IF NOT EXISTS local_search_fts USING FTS4(entryId TEXT NOT NULL, bodyTokens TEXT NOT NULL, tagTokens TEXT NOT NULL, tokenize=simple, notindexed=entryId)",
+        "CREATE VIRTUAL TABLE IF NOT EXISTS `local_search_fts` USING FTS4(`entryId` TEXT NOT NULL, `bodyTokens` TEXT NOT NULL, `tagTokens` TEXT NOT NULL, notindexed=`entryId`)",
         "CREATE TABLE IF NOT EXISTS local_search_documents (entryId TEXT NOT NULL PRIMARY KEY, sourceRevision INTEGER NOT NULL, contentHash TEXT NOT NULL, tagVersion INTEGER NOT NULL, visibilityGeneration INTEGER NOT NULL, tokenizerVersion INTEGER NOT NULL, tokenizerProfile TEXT NOT NULL, indexedEpoch INTEGER NOT NULL)",
         "CREATE TABLE IF NOT EXISTS local_search_epoch (slot INTEGER NOT NULL PRIMARY KEY, epoch INTEGER NOT NULL, tokenizerVersion INTEGER NOT NULL, tokenizerProfile TEXT NOT NULL)",
         "INSERT INTO local_search_epoch(slot,epoch,tokenizerVersion,tokenizerProfile) VALUES(1,0,1,'UNKNOWN')",

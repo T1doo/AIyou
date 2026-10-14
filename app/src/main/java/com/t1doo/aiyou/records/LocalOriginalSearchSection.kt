@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.maxLength
+import androidx.compose.foundation.text.input.then
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.*
@@ -24,6 +28,14 @@ import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 
 interface OriginalSearchObserver {
@@ -42,26 +54,44 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     mode: OriginalSearchMode, enabled: Boolean, onMode: () -> Unit, onClear: () -> Unit,
     tag: String? = null, tags: Map<String, ManualTagSnapshot> = emptyMap(), tagsAvailable: Boolean = false,
     tagsError: String? = null, onTag: (String?) -> Unit = {},
-    onSearchInputChange: (() -> Unit) -> Unit = { change -> change() },
+    onBeforeSearchInput: (TextFieldState) -> Boolean = { true },
+    onHistoryInputCommitted: () -> Unit = {},
     indexSupported: Boolean = false, indexBusy: Boolean = false, indexError: String? = null,
     onRebuild: () -> Unit = {}) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
             Text("本机原文查找", style = MaterialTheme.typography.titleMedium)
-            fun change(state: TextFieldState, raw: String, maximum: Int) {
-                if (raw.length <= maximum) onSearchInputChange {
-                    state.edit { replace(0, length, raw) }
-                    state.undoState.clearHistory()
+            fun transform(state: TextFieldState, maximum: Int) =
+                InputTransformation.maxLength(maximum).then {
+                    // Only retire a private request counter before an actual user
+                    // text change. No Flow/Compose/TextFieldState mutation here.
+                    if (changes.changeCount > 0 && !asCharSequence().contentEquals(originalText) &&
+                        !onBeforeSearchInput(state)) revertAllChanges()
                 }
+            fun historyKeys(state: TextFieldState) = Modifier.onPreviewKeyEvent { event ->
+                val shortcut = event.isCtrlPressed || event.isMetaPressed
+                val history = shortcut && (event.key == Key.Z || event.key == Key.Y)
+                if (history && event.type == KeyEventType.KeyDown) {
+                    val redo = event.key == Key.Y || event.isShiftPressed
+                    val available = if (redo) state.undoState.canRedo else state.undoState.canUndo
+                    if (available && onBeforeSearchInput(state)) {
+                        // Foundation's actual shared Undo, outside transformation.
+                        try { if (redo) state.undoState.redo() else state.undoState.undo() }
+                        finally { onHistoryInputCommitted() }
+                    }
+                }
+                // Consume both edges, including an unavailable/retired Undo, so
+                // a platform legacy fallback cannot insert a literal z/y.
+                history
             }
-            // Value-based fields own an internal editable state. Explicitly keep
-            // that state memory-only, and replace its Undo owner when clearing.
+            // The actual editable/Undo object is the caller's memory-only state.
             key(query) { CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
-            OutlinedTextField(value = query.text.toString(), onValueChange = { change(query, it, 100_000) },
+            OutlinedTextField(state = query,
                 enabled = enabled, label = { Text("关键词或精确片段") },
-                modifier = Modifier.fillMaxWidth().testTag("original-search-query"),
-                maxLines = 3,
+                modifier = Modifier.fillMaxWidth().then(historyKeys(query)).testTag("original-search-query"),
+                lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 3),
+                inputTransformation = transform(query, 100_000),
                 keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, capitalization = KeyboardCapitalization.None))
             } }
             TextButton(onClick = onMode, enabled = enabled,
@@ -69,16 +99,16 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 Text(if (mode == OriginalSearchMode.EXACT) "精确片段 · 区分大小写和空白" else "关键词 · 全部包含，忽略大小写")
             }
             key(from) { CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
-            OutlinedTextField(value = from.text.toString(), onValueChange = { change(from, it, 10) },
+            OutlinedTextField(state = from,
                 enabled = enabled, label = { Text("开始日期（YYYY-MM-DD，可留空）") },
-                modifier = Modifier.fillMaxWidth().testTag("original-search-from"),
-                singleLine = true)
+                modifier = Modifier.fillMaxWidth().then(historyKeys(from)).testTag("original-search-from"),
+                lineLimits = TextFieldLineLimits.SingleLine, inputTransformation = transform(from, 10))
             } }
             key(through) { CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
-            OutlinedTextField(value = through.text.toString(), onValueChange = { change(through, it, 10) },
+            OutlinedTextField(state = through,
                 enabled = enabled, label = { Text("结束日期（YYYY-MM-DD，可留空）") },
-                modifier = Modifier.fillMaxWidth().testTag("original-search-through"),
-                singleLine = true)
+                modifier = Modifier.fillMaxWidth().then(historyKeys(through)).testTag("original-search-through"),
+                lineLimits = TextFieldLineLimits.SingleLine, inputTransformation = transform(through, 10))
             } }
             var choosing by remember { mutableStateOf(false) }
             TextButton(onClick = { choosing = true }, enabled = enabled && tagsAvailable,

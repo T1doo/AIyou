@@ -719,8 +719,13 @@ fun AIyouApp(
                 onOpenRecycleBin = recycleBin?.let { controller -> { if (ownsNavigation() && selectedName == Destination.MEMORIES.name &&
                     detailEntryId == null && !showSettings && !demo) { navigation.advance(); clearSearch(); controller.open() } } },
                 searchState = searchState, searchQuery = searchQuery, searchFrom = searchFrom, searchThrough = searchThrough,
-                onSearchInputChange = { change -> search.changeInput { if (ownsNavigation() &&
-                    selectedName == Destination.MEMORIES.name && detailEntryId == null && !showSettings && !demo) change() } },
+                onBeforeSearchInput = { field -> search.beforeInputCommit {
+                    val source = searchSource()
+                    ownsNavigation() && selectedName == Destination.MEMORIES.name && detailEntryId == null &&
+                        !showSettings && !demo && source?.ready == true && !source.opening && source.error == null &&
+                        (field === searchQuery || field === searchFrom || field === searchThrough)
+                } },
+                onHistoryInputCommitted = search::inputCommitted,
                 onRebuildLocalSearch = { if (ownsNavigation() && selectedName == Destination.MEMORIES.name && detailEntryId == null &&
                     currentLocal?.ready == true && currentLocal?.opening == false && currentLocal?.error == null &&
                     currentLocal?.localSearch != null && currentLocal?.localIndexBusy == false)

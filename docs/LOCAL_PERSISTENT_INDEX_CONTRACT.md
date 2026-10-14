@@ -122,9 +122,16 @@ composition/session owner
 不能清除之后的新导航。搜索条件留在当前内存中以便重查，不伪称失败定位已确认。
 真实命中另有独立 matchStart/matchEnd code-point 范围（与上下文摘录范围分开）；
 只在当前 ID/revision/hash 相符时装饰原文并根据实际 TextLayout 行位置滚动。
-源版本变化后旧高亮消失。查询输入使用受控制提交，输入提交和输入 owner 退役
-共用 controller 锁；输入框内部编辑状态明确退出 SaveableStateRegistry，清空
-时换编辑 owner，避免旧 Undo 内容重现。必须实际核 raw SavedState 与真实键盘 Undo。
+源版本变化后旧高亮消失。查询使用同一个直接创建的 memory-only TextFieldState，
+保留 Foundation 的真实 Undo。实际文本变化前，锁内仅更新非响应式 epoch 与
+opaque 输入 identity，不改 StateFlow/Compose/TextFieldState；与发布 CAS/定位
+共用 controller 锁，拒绝发布中的重入。提交前的 sync 不能以新 epoch 查询旧文本，
+后续真实输入 identity 变化才解除 pending。Undo/Redo 键在 transformation 外先
+退役 owner，再调用实际 undoState，完成后显式唤醒查询（含 no-op group）。
+不依赖 InputTransformation 覆盖 Undo，不把此私有同步设计说成官方 API 的保证；
+须取得实际 publication/输入 ABA/键盘 Undo 证据。Root 还核精确字段 owner identity，
+拒绝清空替换后的旧编辑回调。输入框明确退出 SaveableStateRegistry，清空时换
+编辑 owner，避免旧 Undo 内容重现。必须实际核 raw SavedState 与真实键盘 Undo/Redo。
 
 ## 必须取得的证据与边界
 

@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -97,6 +98,7 @@ class LocalOriginalSearchPresentationTest {
         override fun toString() = "ActualInputs(redacted)"
     }
     private val actualInputs = AtomicReference<ActualInputs>()
+    private val actualView = AtomicReference<android.view.View>()
     private var draftChanges = 0
     private var saves = 0
     private var rebuilds = 0
@@ -282,13 +284,16 @@ class LocalOriginalSearchPresentationTest {
         compose.runOnIdle {
             val actual = checkNotNull(actualInputs.get()).query
             assertEquals("Observed actual UI object must contain the user edit", typed, actual.text.toString())
-            assertFalse("External memory-only value owner must not duplicate internal editable Undo", actual.undoState.canUndo)
+            assertTrue("Actual shared editable state must retain real user Undo", actual.undoState.canUndo)
         }
         // Exercise the real editable field's Undo, not programmatic fixture state.
-        focusedField("original-search-query").performKeyInput {
-            keyDown(Key.CtrlLeft); pressKey(Key.Z); keyUp(Key.CtrlLeft)
-        }
+        nativeHistory("original-search-query")
         assertEquals("Actual Undo must restore the previous query", beforeTyping, editable("original-search-query"))
+        compose.runOnIdle { assertTrue(checkNotNull(actualInputs.get()).query.undoState.canRedo) }
+        nativeHistory("original-search-query", redo = true)
+        assertEquals("Actual Redo must restore the real typed edit", typed, editable("original-search-query"))
+        nativeHistory("original-search-query")
+        assertEquals("Actual Undo must remain available after Redo", beforeTyping, editable("original-search-query"))
         val beforeClear = observation { it.state.stage == OriginalSearchStage.READY && it.state.input.query == marker &&
             it.state.input.mode == OriginalSearchMode.EXACT && it.state.input.from == "2026-10-13" && it.state.input.through == "2026-10-13" }
         assertEquals(listOf("one"), beforeClear.state.hits.map { it.entry.id })
@@ -306,14 +311,9 @@ class LocalOriginalSearchPresentationTest {
                 assertEquals("No old condition may reappear from history", "", actual.text.toString())
             }
             assertEquals("Clearing must not retain the previous input in Undo", "", editable(tag))
-            focusedField(tag).performKeyInput {
-                keyDown(Key.CtrlLeft); pressKey(Key.Z); keyUp(Key.CtrlLeft)
-            }
+            nativeHistory(tag)
             assertEquals("The actual new editable owner cannot Undo a cleared condition", "", editable(tag))
-            focusedField(tag).performKeyInput {
-                keyDown(Key.CtrlLeft); keyDown(Key.ShiftLeft); pressKey(Key.Z)
-                keyUp(Key.ShiftLeft); keyUp(Key.CtrlLeft)
-            }
+            nativeHistory(tag, redo = true)
             assertEquals("The actual new editable owner cannot Redo a cleared condition", "", editable(tag))
         }
         compose.runOnIdle { beforeClear.open(beforeClear.state.hits.single()) }; assertNoReader()
@@ -415,16 +415,21 @@ class LocalOriginalSearchPresentationTest {
 
     @Test fun indexedLocationExitFailureRetiresActualReaderAndKeepsCurrentSearchInput() {
         val state = local(entry("one", "合成咖啡当前原文"))
-        val reached = CountDownLatch(1); val release = CountDownLatch(1)
+        val reached = CountDownLatch(1); val release = CountDownLatch(1); val exited = CountDownLatch(1)
         val port = UiSearchPort { state.value }
-        port.afterLocation = { reached.countDown(); assertTrue(release.await(5, TimeUnit.SECONDS)); throw LocalSearchFailure() }
+        port.afterLocation = {
+            reached.countDown()
+            try { check(release.await(5, TimeUnit.SECONDS)); throw LocalSearchFailure() }
+            finally { exited.countDown() }
+        }
         state.value = state.value.copy(localSearch = port, localSearchEpoch = 7)
         content(state); field("original-search-query", "咖啡")
         val found = ready("咖啡")
         compose.runOnIdle { found.open(found.state.hits.single()) }
-        assertTrue(reached.await(5, TimeUnit.SECONDS))
-        assertEquals("合成咖啡当前原文", fullText())
-        release.countDown()
+        try {
+            assertTrue(reached.await(5, TimeUnit.SECONDS))
+            assertEquals("合成咖啡当前原文", fullText())
+        } finally { release.countDown(); assertTrue(exited.await(5, TimeUnit.SECONDS)) }
         ready("咖啡")
         assertNoReader()
         assertEquals("咖啡", editable("original-search-query"))
@@ -437,17 +442,20 @@ class LocalOriginalSearchPresentationTest {
         val port = UiSearchPort { state.value }
         port.afterLocation = {
             reached.countDown()
-            try { assertTrue(release.await(5, TimeUnit.SECONDS)); throw LocalSearchFailure() }
+            try { check(release.await(5, TimeUnit.SECONDS)); throw LocalSearchFailure() }
             finally { exited.countDown() }
         }
         state.value = state.value.copy(localSearch = port, localSearchEpoch = 7)
         content(state); field("original-search-query", "咖啡")
         val found = ready("咖啡")
         compose.runOnIdle { found.open(found.state.hits.single()) }
-        assertTrue(reached.await(5, TimeUnit.SECONDS))
-        assertEquals("合成咖啡当前原文", fullText())
-        tab("待办").performClick()
-        release.countDown(); assertTrue(exited.await(5, TimeUnit.SECONDS))
+        try {
+            assertTrue(reached.await(5, TimeUnit.SECONDS))
+            assertEquals("合成咖啡当前原文", fullText())
+            // The reader hides navigation tabs; return through the real control.
+            compose.onNodeWithText("返回列表").performClick()
+            tab("待办").performClick()
+        } finally { release.countDown(); assertTrue(exited.await(5, TimeUnit.SECONDS)) }
         compose.waitUntil(2_000) { refreshCallbacks.get() > 0 }
         assertNoReader()
         tab("待办").assertIsSelected()
@@ -484,7 +492,8 @@ class LocalOriginalSearchPresentationTest {
     @Composable private fun LookupTestScreen(state: MutableState<LocalRecordUiState>, largeFont: Boolean = false, source: () -> LocalRecordUiState?) {
         back = checkNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
         val registry = LocalSaveableStateRegistry.current
-        SideEffect { saveableRegistry = registry }
+        val view = LocalView.current
+        SideEffect { saveableRegistry = registry; actualView.set(view) }
         val density = LocalDensity.current
         CompositionLocalProvider(LocalOriginalSearchObserver provides searchObserver, LocalOriginalReadingObserver provides readingObserver,
             LocalDensity provides if (largeFont) Density(density.density, 2f) else density) {
@@ -503,6 +512,22 @@ class LocalOriginalSearchPresentationTest {
     }
     private fun focusedField(tag: String) = compose.onNodeWithTag(tag)
         .performScrollTo().assertIsEnabled().performClick().assertIsFocused()
+    private fun nativeHistory(tag: String, redo: Boolean = false) {
+        focusedField(tag)
+        // Held modifier simulation has previously delivered plain z in this JVM
+        // environment. Dispatch explicit native Ctrl metadata through the actual
+        // focused Compose View and the new production history key handler.
+        compose.runOnIdle {
+            val now = android.os.SystemClock.uptimeMillis()
+            val meta = android.view.KeyEvent.META_CTRL_ON or
+                (if (redo) android.view.KeyEvent.META_SHIFT_ON else 0)
+            for (action in listOf(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.ACTION_UP)) {
+                assertTrue("Actual focused history handler must consume the native chord",
+                    checkNotNull(actualView.get()).dispatchKeyEvent(android.view.KeyEvent(now, now,
+                        action, android.view.KeyEvent.KEYCODE_Z, 0, meta)))
+            }
+        }
+    }
     private fun editable(tag: String): String = compose.onNodeWithTag(tag).performScrollTo().fetchSemanticsNode().config[SemanticsProperties.EditableText].text
     private fun openCard(id: String) {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))

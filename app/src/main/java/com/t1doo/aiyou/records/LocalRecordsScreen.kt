@@ -92,7 +92,8 @@ fun LocalRecordsScreen(
     onBeginExport: (() -> Unit)? = null,
     onOpenRecycleBin: (() -> Unit)? = null,
     onBeginRecordPackage: (() -> Unit)? = null,
-    onSearchInputChange: (() -> Unit) -> Unit = { change -> change() },
+    onBeforeSearchInput: (TextFieldState) -> Boolean = { true },
+    onHistoryInputCommitted: () -> Unit = {},
     onRebuildLocalSearch: () -> Unit = {},
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
@@ -276,7 +277,8 @@ fun LocalRecordsScreen(
                         LocalOriginalSearchSection(searchQuery, searchFrom, searchThrough, searchMode,
                             local.ready && !local.opening && local.error == null, onSearchMode, onClearSearch,
                             searchTag, local.manualTags, local.manualTagsAvailable, local.manualTagsError, onSearchTag,
-                            onSearchInputChange = onSearchInputChange,
+                        onBeforeSearchInput = onBeforeSearchInput,
+                        onHistoryInputCommitted = onHistoryInputCommitted,
                             indexSupported = local.localSearch != null, indexBusy = local.localIndexBusy,
                             indexError = local.localIndexError, onRebuild = onRebuildLocalSearch)
                     else SearchSection(demo = false)

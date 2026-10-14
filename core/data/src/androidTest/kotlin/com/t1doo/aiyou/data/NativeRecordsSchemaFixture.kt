@@ -65,7 +65,7 @@ internal object NativeRecordsSchemaFixture {
                 // FTS PRAGMA nullability differs from declared fields. Verify the
                 // exact generated CREATE/options, columns and shadow inventory.
                 // The ordinary tables below retain their complete strict checks.
-                fun normalize(value: String) = value.replace(96.toChar().toString(), "").replace("\"", "")
+                fun normalize(value: String) = value.replace("IF NOT EXISTS ", "").replace(96.toChar().toString(), "").replace("\"", "")
                     .replace(Regex("\\s+"), "").lowercase()
                 val actualSql = db.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='local_search_fts'").use {
                     check(it.moveToFirst()); it.getString(0)
