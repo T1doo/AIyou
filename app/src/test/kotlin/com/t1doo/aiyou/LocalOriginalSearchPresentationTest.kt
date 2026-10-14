@@ -257,6 +257,14 @@ class LocalOriginalSearchPresentationTest {
         restoration.setContent { if (show.value) screen(state, source = { state.value }) else Text("合成查找已销毁") }
         field("original-search-query", marker); field("original-search-from", "2026-10-13"); field("original-search-through", "2026-10-13")
         compose.onNodeWithTag("original-search-mode").performScrollTo().performClick()
+        compose.runOnIdle {
+            // Semantics replacement is fixture setup; isolate the following actual user edit.
+            val actual = checkNotNull(actualInputs.get()).query
+            assertEquals(marker, actual.text.toString())
+            actual.undoState.clearHistory()
+            assertFalse(actual.undoState.canUndo); assertFalse(actual.undoState.canRedo)
+            assertEquals("History reset must preserve the prepared query", marker, actual.text.toString())
+        }
         val beforeTyping = editable("original-search-query")
         focusedField("original-search-query").performKeyInput { pressKey(Key.X) }
         val typed = editable("original-search-query")
@@ -351,6 +359,9 @@ class LocalOriginalSearchPresentationTest {
     private fun tab(label: String) = compose.onNode(hasText(label) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab))
     private fun ready(query: String) = observation { it.state.stage == OriginalSearchStage.READY && it.state.input.query == query }
     private fun observation(predicate: (Observation) -> Boolean): Observation {
+        // runOnIdle synchronizes before its action. Commit that action's pending UI frame
+        // before polling an external observer; waitUntil does not perform full idling.
+        compose.waitForIdle()
         try {
             compose.waitUntil(2_000) { observations.get()?.let(predicate) == true }
         } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
