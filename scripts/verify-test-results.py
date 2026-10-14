@@ -20,7 +20,7 @@ if args.component:
 if args.queue:
     targets.append(("host queue", "checks/record-queue/build/test-results/test", 148))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 118))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 127))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 if args.evidence:
@@ -97,6 +97,17 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.OriginalExportPresentationTest"] = (
+            "actualDialogRequiresSelectionPreviewAndFreshPlaintextConsentBeforeSystemDocumentIntent",
+            "sourceChangeShowsConflictAndRequiresExplicitNewPreviewWithoutWritingAnyFile",
+            "failedPartialFileHasNoAutomaticDeleteAndRequiresSeparateExactTargetConfirmation",
+            "narrowDoubleFontKeepsRiskDestinationAndCloseReachableAndHidesPreviewOnReadFailure",
+            "actualRegistryRestorationCannotRelaunchOrDeliverOldResultToNewVmUuid",
+            "rawSavedStateExcludesSnapshotOriginalTagsConsentAndDestinationAndNavigationRetiresPendingWork")
+        additional["com.t1doo.aiyou.PlatformExportDocumentTest"] = (
+            "actualContentResolverTruncatesSelectedSyntheticFileAndVerifiesExactUtf8Readback",
+            "actualProviderPermissionDenialPreservesExistingFileAndSelectedDeleteIsExplicit",
+            "fileAndNetworkSchemesCannotBecomeSelectedDocuments")
         additional["com.t1doo.aiyou.ManualTaskPresentationTest"] = (
             "explicitCreateWaitsForAckKeepsFailedInputThenCompletesAndCancelsOnlyConfirmedTasks",
             "sameTitleTasksUseExactIdentityAndRetainedVersionActionsRejectBeforeRecomposition",

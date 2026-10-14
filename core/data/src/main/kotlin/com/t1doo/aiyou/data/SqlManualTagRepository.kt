@@ -10,7 +10,12 @@ internal class SqlManualTagRepository(private val database: RecordsSqlDatabase, 
     private val cipher = ManualTagCipher(databaseKey)
     override fun read(entryId: String): ManualTagSnapshot = safely {
         ManualTags.identifier(entryId)
-        database.transaction { sql -> live(sql, entryId); row(sql, entryId)?.snapshot() ?: ManualTagSnapshot(entryId, 0, emptyList()) }
+        database.transaction { sql -> readWithin(sql, entryId) }
+    }
+    /** Owner's export reader already holds the counted transaction; do not start another snapshot. */
+    internal fun readWithin(sql: RecordsSqlConnection, entryId: String): ManualTagSnapshot {
+        ManualTags.identifier(entryId); live(sql, entryId)
+        return row(sql, entryId)?.snapshot() ?: ManualTagSnapshot(entryId, 0, emptyList())
     }
     override fun snapshots(): Map<String, ManualTagSnapshot> = safely {
         database.transaction { sql -> Collections.unmodifiableMap(sql.query(

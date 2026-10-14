@@ -13,6 +13,9 @@
 手工正式待办已支持明确创建、加密保存、查看、完成和取消；所有任务未设时间、没有系统提醒，完整 D07 仍未完成。
 切片范围与证据边界见 [手工待办说明](docs/MANUAL_TASKS_SLICE.md)。默认 `LOCAL_ONLY`，没有
 联网权限、真实模型调用、服务端或已授权角色素材。
+用户主动选择当前原文与手工标签可导出 Markdown/JSONL，须确认明文风险并选择系统文件目的地；
+附件、历史、待办与密钥不在此范围，完整加密备份与恢复仍未实现。
+范围、部分文件处理和原生 NOT RUN 边界见 [开放格式导出说明](docs/MANUAL_EXPORT_SLICE.md)。
 
 - 构建与 SDK 许可：[docs/BUILD.md](docs/BUILD.md)
 - 实际执行记录与阻塞：[docs/D00_STATUS.md](docs/D00_STATUS.md)

@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.rememberScrollState
@@ -88,6 +89,7 @@ fun LocalRecordsScreen(
     searchReturnAnchor: OriginalSearchReturnAnchor? = null,
     ownsSearchReturn: () -> Boolean = { false },
     onSearchReturnHandled: () -> Unit = {},
+    onBeginExport: (() -> Unit)? = null,
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -203,9 +205,15 @@ fun LocalRecordsScreen(
                 contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
                 item("summary") {
+                    Column {
                     NotebookPageHeader(destination.label,
                         if (destination == Destination.MEMORIES) "${local.entries.size} 条本机记录" else "随手记下一点生活",
                         stackSummary, companion)
+                    if (destination == Destination.MEMORIES && onBeginExport != null)
+                        OutlinedButton(onClick = onBeginExport, enabled = local.ready && !local.opening && local.error == null &&
+                            local.supportsOriginalExport && local.entries.isNotEmpty() && !local.saving && !local.savePending,
+                            modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("export-open")) { Text("导出选定原文") }
+                    }
                 }
                 if (destination == Destination.NOW) item("composer") {
                     CaptureComposer(

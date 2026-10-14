@@ -113,7 +113,7 @@ class MainActivity : ComponentActivity() {
                 onTaskBegin = records.tasks::begin, onTaskEdit = records.tasks::edit, onTaskCreate = records.tasks::create,
                 onTaskChange = records.tasks::change, onTaskRetry = records.tasks::retry,
                 onTaskRefresh = records.tasks::refresh, onTaskClose = records.tasks::close,
-                currentRecords = { records.state.value }) }
+                exports = records.exports, currentRecords = { records.state.value }) }
         }
     }
 }
@@ -176,6 +176,7 @@ fun AIyouApp(
     onTaskRetry: () -> Unit = {},
     onTaskRefresh: () -> Unit = {},
     onTaskClose: (Long) -> Unit = {},
+    exports: com.t1doo.aiyou.records.OriginalExportController? = null,
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -507,6 +508,17 @@ fun AIyouApp(
                 tagLocal.entries.any { it.id == editor.entryId && it.currentRevision == editor.revision })
     }
     BackHandler(enabled = reading, onBack = returnToList)
+    val exportUi = local?.originalExport
+    fun ownsExportRoute() = ownsNavigation() && selectedName == Destination.MEMORIES.name &&
+        detailEntryId == null && !showSettings && !demo
+    SideEffect {
+        if (exportUi != null && !ownsExportRoute()) exports?.close(exportUi.session)
+    }
+    if (exports != null && exportUi != null && ownsExportRoute()) {
+        com.t1doo.aiyou.records.OriginalExportPicker(exports, exportUi,
+            canLaunch = local?.ready == true && local.error == null && !local.opening, ::ownsExportRoute)
+        com.t1doo.aiyou.records.OriginalExportDialog(checkNotNull(local), exportUi, exports, ::ownsExportRoute)
+    }
 
     Scaffold(
         modifier = Modifier.imePadding().onSizeChanged { scaffoldHeightPx = it.height },
@@ -586,6 +598,7 @@ fun AIyouApp(
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
+                onBeginExport = exports?.let { controller -> { if (ownsExportRoute()) controller.open() } },
                 searchState = searchState, searchQuery = searchQuery, searchFrom = searchFrom, searchThrough = searchThrough,
                 searchTag = searchTag, onSearchTag = { tag -> if (ownsNavigation()) { searchTag = tag; searchModeGeneration++ } },
                 searchMode = searchMode, onSearchMode = { if (ownsNavigation()) {
