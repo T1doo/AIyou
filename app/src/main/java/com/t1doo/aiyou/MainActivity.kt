@@ -110,6 +110,9 @@ class MainActivity : ComponentActivity() {
                 onCloseAiSession = records::closeAiSession,
                 onOpenTags = records.tags::open, onTagEdit = records.tags::edit, onTagAdd = records.tags::add,
                 onTagRemove = records.tags::remove, onTagRetry = records.tags::retry, onTagClose = records.tags::close,
+                onTaskBegin = records.tasks::begin, onTaskEdit = records.tasks::edit, onTaskCreate = records.tasks::create,
+                onTaskChange = records.tasks::change, onTaskRetry = records.tasks::retry,
+                onTaskRefresh = records.tasks::refresh, onTaskClose = records.tasks::close,
                 currentRecords = { records.state.value }) }
         }
     }
@@ -166,6 +169,13 @@ fun AIyouApp(
     onTagRemove: (Long, Long, String, String) -> Unit = { _, _, _, _ -> },
     onTagRetry: (Long) -> Unit = {},
     onTagClose: (Long) -> Unit = {},
+    onTaskBegin: () -> Unit = {},
+    onTaskEdit: (Long, String) -> Unit = { _, _ -> },
+    onTaskCreate: (Long, String) -> Unit = { _, _ -> },
+    onTaskChange: (String, Long, com.t1doo.aiyou.model.ManualTaskStatus) -> Unit = { _, _, _ -> },
+    onTaskRetry: () -> Unit = {},
+    onTaskRefresh: () -> Unit = {},
+    onTaskClose: (Long) -> Unit = {},
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -560,6 +570,17 @@ fun AIyouApp(
                 onOpenAi = { id, revision -> if (canCopy(id, revision)) onOpenAiSession(id, revision) },
                 onStartAi = onStartAiSession, onStopAi = onStopAiSession, onCloseAi = onCloseAiSession,
                 onOpenTags = { id, revision -> if (canCopy(id, revision)) onOpenTags(id, revision) })
+        } else if (!demo && local != null && selected == Destination.TASKS &&
+            (local.tasks.supported || local.opening || local.error != null)) {
+            fun ownsTasks() = ownsNavigation() && selectedName == Destination.TASKS.name && !showSettings && !demo
+            com.t1doo.aiyou.records.ManualTasksScreen(local,
+                onBegin = { if (ownsTasks()) onTaskBegin() },
+                onEdit = { session, text -> if (ownsTasks()) onTaskEdit(session, text) },
+                onCreate = { session, text -> if (ownsTasks()) onTaskCreate(session, text) },
+                onChange = { id, version, status -> if (ownsTasks()) onTaskChange(id, version, status) },
+                onRetry = { if (ownsTasks()) onTaskRetry() }, onRefresh = { if (ownsTasks()) onTaskRefresh() },
+                onClose = { session -> if (ownsTasks()) onTaskClose(session) },
+                onRecordsRetry = { if (ownsTasks()) onRetry() }, modifier = modifier, companion = companion)
         } else if (!demo && local != null && selected != Destination.TASKS) {
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }

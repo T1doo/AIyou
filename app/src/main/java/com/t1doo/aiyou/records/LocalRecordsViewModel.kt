@@ -61,6 +61,7 @@ data class LocalRecordUiState(
     val manualTagsAvailable: Boolean = false,
     val manualTagsError: String? = null,
     val manualTagEditor: ManualTagEditor? = null,
+    val tasks: ManualTasksUiState = ManualTasksUiState(),
 )
 
 /** All draft writes and saves share one queue, preserving edits around a save boundary. */
@@ -82,6 +83,8 @@ class LocalRecordsViewModel internal constructor(
         canUsePanel = { it.hasRecordAccess(mutableState.value) })
     val tags = ManualTagController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.ManualTags(action)).isSuccess })
+    val tasks = ManualTaskController(current = { mutableState.value }, publish = { change -> update(change) },
+        enqueue = { action -> commands.trySend(Command.ManualTasks(action)).isSuccess }, clock = clock)
     private var repository: EntryRepository? = null
     private var storageOwnership: RecordsStorageOwnership? = null // Local IO queue publishes one immutable owner.
     private val ai = LocalRecordAiController(
@@ -179,6 +182,7 @@ class LocalRecordsViewModel internal constructor(
                             is Command.ReadHistory -> readHistory(command)
                             is Command.Attachment -> command.action(checkNotNull(repository))
                             is Command.ManualTags -> command.action(checkNotNull(repository))
+                            is Command.ManualTasks -> command.action(checkNotNull(repository))
                         }
                     } catch (failure: CancellationException) { throw failure }
                     catch (failure: Exception) { failed(failure, preserveQueuedSave = command is Command.Edit) }
@@ -189,6 +193,7 @@ class LocalRecordsViewModel internal constructor(
                 ai.markDisposed()
                 attachments.markDisposed()
                 tags.dispose()
+                tasks.dispose()
                 withContext(NonCancellable + Dispatchers.IO) {
                     try { ai.closeAndJoin() }
                     finally {
@@ -900,6 +905,7 @@ class LocalRecordsViewModel internal constructor(
                 supportsEditDrafts = store.editDrafts != null, pendingEdits = pending?.drafts.orEmpty(),
                 editDraftIssueCount = pending?.unreadableCount ?: 0, editDraftIndexAvailable = pending != null,
                 editDraftError = if (pending == null) "编辑草稿目录暂不可读取，恢复列表尚未确认。已保留加密数据；请重试本机读取，未自动删除或替换。" else indexNotice(pending)) }
+            tasks.initialize(store)
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) { failed(failure) }
         catch (_: LinkageError) { failed(IllegalStateException()) }
@@ -917,6 +923,7 @@ class LocalRecordsViewModel internal constructor(
         ai.markDisposed()
         attachments.markDisposed()
         tags.dispose()
+        tasks.dispose()
         commands.close()
         super.onCleared()
     }
@@ -928,6 +935,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     private sealed interface Command {
+        data class ManualTasks(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualTags(val action: suspend (EntryRepository) -> Unit) : Command
         data object RefreshEditDrafts : Command
         data class OpenEdit(val edit: OriginalEditUiState, val replace: Boolean, val expectedDraftId: String? = null) : Command

@@ -27,12 +27,14 @@ jobs:
           printf '%s  %s\n' \
             3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 \
             gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
-      - name: Generate actual Room v5 export and native fixture from the licensed CI toolchain
+      - name: Generate actual Room v6 export and native fixture from the licensed CI toolchain
         run: |
           python3 scripts/check-sdk.py
           python3 scripts/verify-manual-tag-schema.py --capture
+          python3 scripts/verify-manual-task-schema.py --capture
           scripts/gradle.sh :core:data:kspDebugKotlin
           python3 scripts/verify-manual-tag-schema.py --verify
+          python3 scripts/verify-manual-task-schema.py --verify
       - name: Run actual domain and D04 JVM wire contracts
         run: |
           python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test :remote-text:test
@@ -80,7 +82,7 @@ jobs:
           python3 scripts/verify-test-results.py --ui
       - name: Compile actual D02 native-storage instrumentation APK without claiming execution
         run: scripts/gradle.sh :core:data:assembleDebugAndroidTest :app:assembleDebugAndroidTest
-      - name: Collect exact 31 methods and external probes from actual compiled APK DEX (device NOT RUN)
+      - name: Collect exact 35 methods and external probes from actual compiled APK DEX (device NOT RUN)
         run: python3 scripts/inspect-d02-device-test-apks.py
       - name: Verify actual license assets and APK ZIP alignment (native execution NOT RUN)
         run: python3 scripts/inspect-d02-apks.py

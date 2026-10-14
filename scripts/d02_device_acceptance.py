@@ -31,7 +31,7 @@ LEGACY_NATIVE_CASES = {
 }
 SOURCE_BOUND_NATIVE_CASES = {
     "com.t1doo.aiyou.data.SourceBoundTextRecordsIntegrationTest": (
-        "freshVersionFiveUsesGeneratedRoomAndEncryptedNativeStore",
+        "freshVersionSixUsesGeneratedRoomAndEncryptedNativeStore",
         "encryptedVersionThreeMigrationPreservesAllLegacyRowsAcrossReopen",
         "withdrawFirstAcrossIndependentRoomsRejectsLateCommit",
         "commitFirstAcrossIndependentRoomsWithdrawalRemovesAnnotation",
@@ -43,14 +43,22 @@ SOURCE_BOUND_NATIVE_CASES = {
 }
 MANUAL_TAG_NATIVE_CASES = {
     "com.t1doo.aiyou.data.ManualTagRecordsIntegrationTest": (
-        "freshVersionFiveEncryptsManualTagsAndAuthenticatesAcrossReopen",
+        "freshVersionSixEncryptsManualTagsAndAuthenticatesAcrossReopen",
         "encryptedVersionFourMigrationPreservesOriginalDraftAndJobsWithEmptyTags",
         "independentRoomsCasAndActualInsertAbortPreserveOriginal",
         "replayEmptySetAndTombstoneRespectIndependentTagVersionAndOwnerClose",
     ),
 }
-NATIVE_CASES = {**LEGACY_NATIVE_CASES, **SOURCE_BOUND_NATIVE_CASES, **MANUAL_TAG_NATIVE_CASES}
-NATIVE_METHOD_COUNT = 31
+MANUAL_TASK_NATIVE_CASES = {
+    "com.t1doo.aiyou.data.ManualTaskRecordsIntegrationTest": (
+        "freshVersionSixPersistsExplicitTaskAndTerminalStatesAcrossEncryptedReopen",
+        "encryptedVersionFiveMigrationPreservesOriginalDraftJobAndManualTag",
+        "actualNativeTransitionAbortAndIndependentRoomsCasKeepSingleVersion",
+        "nativeReplayAuthenticationAndOwnerCloseNeverReplaceTaskCiphertext",
+    ),
+}
+NATIVE_CASES = {**LEGACY_NATIVE_CASES, **SOURCE_BOUND_NATIVE_CASES, **MANUAL_TAG_NATIVE_CASES, **MANUAL_TASK_NATIVE_CASES}
+NATIVE_METHOD_COUNT = 35
 STORAGE_PROBE = "com.t1doo.aiyou.data.ProcessRestartPersistenceTest"
 STORAGE_PHASES = ("write", "read", "confirm", "cleanup")
 APP_PROBE = "com.t1doo.aiyou.ProductionColdStartPersistenceTest"
@@ -73,8 +81,8 @@ def collect_source(root):
             raise ValueError("Exact native inventory drift: " + class_name)
         collected[class_name] = actual
     if sum(map(len, collected.values())) != NATIVE_METHOD_COUNT:
-        raise ValueError("Expected 31 real native methods (legacy 19 + source-bound 8 + manual tags 4)")
-    for version in (2, 3, 4, 5):
+        raise ValueError("Expected 35 real native methods (legacy 19 + source-bound 8 + manual tags 4 + manual tasks 4)")
+    for version in (2, 3, 4, 5, 6):
         export = Path(root) / f"core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/{version}.json"
         asset = Path(root) / f"core/data/src/androidTest/assets/records-schema-v{version}.json"
         if asset.read_bytes() != export.read_bytes():

@@ -39,6 +39,8 @@ class EncryptedEntryRepository internal constructor(
     override val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(borrowedSql)
     private val tagStorage = SqlManualTagRepository(borrowedSql, keyBytes)
     override val manualTags: com.t1doo.aiyou.domain.ManualTagRepository get() = tagStorage
+    private val taskStorage = SqlManualTaskRepository(borrowedSql, keyBytes)
+    override val manualTasks: com.t1doo.aiyou.domain.ManualTaskRepository get() = taskStorage
 
     override suspend fun prepare() { attachmentStorage.recover() }
 
@@ -125,7 +127,7 @@ class EncryptedEntryRepository internal constructor(
 
     override fun close() {
         borrowedSql.stopAndAwaitIdle()
-        try { database.close() } finally { attachmentStorage.close(); originalEditStorage.close(); tagStorage.wipeKey(); keyBytes.fill(0) }
+        try { database.close() } finally { attachmentStorage.close(); originalEditStorage.close(); tagStorage.wipeKey(); taskStorage.wipeKey(); keyBytes.fill(0) }
     }
 
     companion object {
@@ -194,11 +196,11 @@ class EncryptedEntryRepository internal constructor(
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
                 val created = Room.databaseBuilder(context.applicationContext, RecordsDatabase::class.java, file.absolutePath)
                 .openHelperFactory(SupportOpenHelperFactory(key))
-                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5)
+                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addCallback(object : RoomDatabase.Callback() {
-                    override fun onCreate(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db); installManualTagGuard(db) }
-                    override fun onOpen(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db); installManualTagGuard(db) }
+                    override fun onCreate(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db); installManualTagGuard(db); installManualTaskGuard(db) }
+                    override fun onOpen(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db); installManualTagGuard(db); installManualTaskGuard(db) }
                 }).build()
                 database = created
                 created.openHelper.writableDatabase // authenticate/schema validation before reporting ready

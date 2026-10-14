@@ -96,7 +96,7 @@ for module, directory in modules.items():
     results.append({"module": task, "tests": len(actual), "failures": 0, "errors": 0, "skipped": 0,
                     "methods": [list(key) for key in sorted(actual)], "xml": evidence})
 
-report = {"status": "PASS", "scope": "actual App ViewModel/controller on JVM platform shells, source-bound sending, product remote/tag SQL transactions and manual-tag AEAD on host SQLite, loopback HTTP and domain; local SQL driver is test-only; no Android/SQLCipher/live provider/device/native App acceptance",
+report = {"status": "PASS", "scope": "actual App ViewModel/controller on JVM platform shells, source-bound sending, product remote/tag/task SQL transactions and manual-tag/task AEAD on host SQLite, loopback HTTP and domain; local SQL driver is test-only; no Android/SQLCipher/live provider/device/native App acceptance",
           "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
           "source_sha256": source_sha256, "results": results,
           "d02_native_acceptance": "NOT RUN", "full_d04_acceptance": "OPEN"}

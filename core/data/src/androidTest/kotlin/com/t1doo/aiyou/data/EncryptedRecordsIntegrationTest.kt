@@ -292,7 +292,7 @@ class EncryptedRecordsIntegrationTest {
         assertEquals(3L, draft.version)
         assertEquals("合成迁移草稿", draft.text)
         val sql = store.database.openHelper.writableDatabase
-        assertEquals(5, sql.version)
+        assertEquals(6, sql.version)
         assertEquals(0L, count(store, "attachments"))
         assertEquals(0L, count(store, "remote_source_access"))
         assertEquals(0L, count(store, "remote_text_jobs"))

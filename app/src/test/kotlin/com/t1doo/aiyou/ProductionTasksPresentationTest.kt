@@ -25,7 +25,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Actual non-demo AIyouApp route. Task storage/creation/completion is not implemented. */
+/** Actual non-demo AIyouApp route with an unsupported task-capability fixture.
+ * Production task creation/storage/status behavior is covered by ManualTaskPresentationTest. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w360dp-h800dp")
 class ProductionTasksPresentationTest {

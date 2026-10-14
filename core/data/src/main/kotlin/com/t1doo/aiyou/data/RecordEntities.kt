@@ -117,3 +117,11 @@ internal data class ManualTagEntity(
     val lastMutationId: String,
     val ciphertext: ByteArray,
 )
+
+@Entity(tableName = "manual_tasks")
+internal data class ManualTaskEntity(
+    @PrimaryKey val id: String,
+    val version: Long,
+    val lastMutationId: String,
+    val ciphertext: ByteArray,
+)
