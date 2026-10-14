@@ -48,6 +48,19 @@ class LocalOriginalSearchController internal constructor(
         else OriginalSearchState(input, OriginalSearchStage.WAITING)
     }
 
+    /** Test observer only: booleans and enums, never query, dates or original text. */
+    internal fun visibilityDiagnostics(local: LocalRecordUiState?, input: OriginalSearchInput): String = synchronized(lock) {
+        val value = mutableState.value
+        val fresh = currentSource()
+        val freshInput = currentInput()
+        "raw=${value.stage}/${value.generation}, owner=$generation, active=$active, closed=$closed, " +
+            "renderUsable=${usable(local)}, freshUsable=${usable(fresh)}, " +
+            "renderSource=${local?.entries === value.entries}, freshSource=${fresh?.entries === value.entries}, " +
+            "renderInput=${input == value.input}, freshInput=${freshInput == value.input}, " +
+            "renderQuery=${input.query == value.input.query}, freshQuery=${freshInput.query == value.input.query}, " +
+            "renderOwnership=${input.ownership == value.input.ownership}, freshOwnership=${freshInput.ownership == value.input.ownership}"
+    }
+
     /** Called after a committed render; compare snapshot identity rather than List.equals. */
     fun sync(enabled: Boolean) = synchronized(lock) {
         if (closed) return@synchronized

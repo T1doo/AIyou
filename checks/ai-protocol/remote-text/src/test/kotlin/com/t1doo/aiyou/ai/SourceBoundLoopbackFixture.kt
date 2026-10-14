@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicReference
 import mockwebserver3.MockResponse
 import mockwebserver3.MockResponseBody
 import mockwebserver3.MockWebServer
+import mockwebserver3.SocketEffect
 import okhttp3.Call
 import okhttp3.Connection
 import okhttp3.EventListener
@@ -93,11 +94,13 @@ internal class SourceBoundLoopbackFixture(
                  repository: SourceBoundTextRepository = records.repository): SourceBoundStreamingExchange =
         transport.newSourceBoundExchange(repository, intent, maxOutputTokens = 73, secrets = secrets, clock = clock)
 
-    fun enqueueHeld(protocol: ConnectionProtocol, providerB: Boolean = records.selectedB): HeldBody =
-        HeldBody(openPreview(protocol), continuation(protocol)).also { held ->
+    fun enqueueHeld(protocol: ConnectionProtocol, providerB: Boolean = records.selectedB, keepAlive: Boolean = false): HeldBody =
+        HeldBody(openPreview(protocol), continuation(protocol), keepAlive).also { held ->
             heldBodies.add(held)
-            (if (providerB) serverB else serverA).enqueue(MockResponse.Builder().code(200)
-                .addHeader("Content-Type", "text/event-stream").body(held).build())
+            val response = MockResponse.Builder().code(200).addHeader("Content-Type", "text/event-stream").body(held)
+            if (keepAlive) response.removeHeader("Content-Length").addHeader("Connection", "close")
+                .onResponseEnd(SocketEffect.CloseSocket())
+            (if (providerB) serverB else serverA).enqueue(response.build())
         }
 
     fun resolver(onResolve: (SecretReference) -> Unit = {}): Resolver = Resolver { ref ->
@@ -178,13 +181,23 @@ internal class SourceBoundLoopbackFixture(
         override fun callFailed(call: Call, ioe: IOException) { finished.incrementAndGet(); settled.countDown() }
     }
 
-    class HeldBody(private val prefix: ByteArray, private val tail: ByteArray) : MockResponseBody {
+    class HeldBody(private val prefix: ByteArray, private val tail: ByteArray, private val keepAlive: Boolean = false) : MockResponseBody {
         val release = CountDownLatch(1); val prefixWritten = CountDownLatch(1); val finished = CountDownLatch(1)
-        override val contentLength: Long = (prefix.size + tail.size).toLong()
+        val heartbeats = AtomicInteger()
+        override val contentLength: Long = if (keepAlive) -1 else (prefix.size + tail.size).toLong()
         override fun writeTo(sink: BufferedSink) {
             try {
                 sink.write(prefix); sink.flush(); prefixWritten.countDown()
-                check(release.await(3, TimeUnit.SECONDS)) { "Owned server tail barrier exceeded deadline" }
+                if (keepAlive) {
+                    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3)
+                    do {
+                        check(System.nanoTime() < deadline) { "Owned server tail barrier exceeded deadline" }
+                        sink.writeUtf8(": owned active stream\n\n"); sink.flush(); heartbeats.incrementAndGet()
+                        val remaining = deadline - System.nanoTime()
+                        check(remaining > 0) { "Owned server tail barrier exceeded deadline" }
+                        if (release.await(minOf(remaining, TimeUnit.MILLISECONDS.toNanos(100)), TimeUnit.NANOSECONDS)) break
+                    } while (true)
+                } else check(release.await(3, TimeUnit.SECONDS)) { "Owned server tail barrier exceeded deadline" }
                 sink.write(tail); sink.flush()
             } catch (_: IOException) {
                 // A cancelled owned call closes the real socket before the tail is released.

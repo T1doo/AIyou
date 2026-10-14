@@ -18,6 +18,10 @@
 
 本地使用既有固定 JDK17 和校验过的 JVM Wrapper；未安装 SDK、接受新许可、运行 ADB／模拟器、生成认证密钥或更改拒绝目录。Android 构建、Compose JVM 模拟与 lint 使用既有免费 CI；这些不代替 D02 生产重启、真实设备 UI／可访问性或性能验收。最小后续是合法现有 SDK 与已授权设备条件具备后继续 D02 原生验收；当前仍 **NOT RUN**。
 
-首轮 [CI38485383837](https://github.com/T1doo/AIyou/actions/runs/38485383837) 在提交 `d151ec270d78fa6a3a3a5da01c9e5f89f8556691` 的 Android 编译停止：固定 Foundation 版本对三处直接 `undoState` 调用要求实验性标记。已移除多余调用，继续清空旧字段并替换全新 `TextFieldState`／Undo 实例；不新增实验性 Foundation 使用或依赖。实际 Ctrl+Z 与保存注册表负载测试保留，须由修正提交的同 SHA CI 裁定。首轮没有生成本任务 APK，也没有运行新 Compose 用例；失败日志保留。
+首轮 [CI38485383837](https://github.com/T1doo/AIyou/actions/runs/38485383837) 在提交 `d151ec270d78fa6a3a3a5da01c9e5f89f8556691` 的 Android 编译停止：固定 Foundation 版本对三处直接 `undoState` 调用要求实验性标记。已移除多余调用，继续清空旧字段并替换全新 `TextFieldState`／Undo 实例；生产代码不新增实验性 Foundation 使用或依赖。首轮没有生成本任务 APK，也没有运行新 Compose 用例；失败日志保留。
 
 第二轮 [CI38486833072](https://github.com/T1doo/AIyou/actions/runs/38486833072) 对提交 `02828d04bb7fb4e6612213a9c6229f2aaa497400` 实际构建 APK 且无 INTERNET 权限，执行107项 Compose 用例，其中9项失败。修正空条件浏览时短暂隐藏原有列表导致的锚点丢失；另以实际 host 工作者重现并修正“新来源拒绝完成结果后仍卡在 RUNNING”，只允许仍属当前请求的拒绝结果触发空 WAITING，交由下一次已提交界面同步重新计算。测试通过真实 LazyColumn 滚入离屏状态项，Undo 使用显式 Ctrl 元数据的原生按键并增加有效 Undo 正控制。两处 READY 等待超时保留原条件和2秒上限，新增脱敏状态诊断；不能仅由超时断定原因或预记修正通过。原失败日志完整保留，新提交须由同 SHA CI 验证。
+
+第三轮 [CI38490272450](https://github.com/T1doo/AIyou/actions/runs/38490272450) 对 `860d4790a083784759b13a0a8b395a9e529e40f6` 执行107项 Compose 用例，失败降为3项；原有列表锚点与离屏状态用例已通过。两处恢复仍呈现门禁生成的 WAITING，未据此判定后台原始状态。补充只含枚举、计数和布尔值的 observer 诊断，区分源／输入／归属不一致；每字段只读取一次文本快照，同一引用派生查询字符串与身份。原生 Ctrl+Z 正控制仍被此 JVM 模拟环境当作普通字符，不重试按键组合；改由实际界面传入的三 `TextFieldState` 验证真实 Undo／Redo 管理器，真实用户键必须生成可撤销修改并逐字还原，清空后实例更换、Undo／Redo 均为空，保存注册表与旧回调断言保持。实验性标记仅限测试方法，不将其冒充硬件快捷键或真机验收。恢复问题仍由新提交的实际 CI 裁定。
+
+本地协议复验另保留一项既有传输隔离测试的 `Completed`／`TIMEOUT` 失败。该测试在阻塞独立流尾部期间执行真实 SQL 和新请求，超出夹具1秒空闲期限；仅该活跃独立流增加实际 SSE 心跳，合法关闭定界并在响应结束关闭 socket。其1秒空闲、3秒总期限／服务器截止及全部隔离断言保持，其他默认阻塞流不变；不修改生产传输配置。复验须确认客户端仍消费完整结果，不以发送心跳本身记 PASS。

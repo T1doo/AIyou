@@ -308,7 +308,8 @@ class SourceBoundTransportCloseContractTest {
                     val originals = f.records.originals()
                     val foreignOriginals = foreign.originals()
                     val primaryBody = f.enqueueHeld(protocol)
-                    val independentBody = f.enqueueHeld(protocol)
+                    // This isolation test keeps a live stream while real SQL and new calls execute.
+                    val independentBody = f.enqueueHeld(protocol, keepAlive = true)
                     val independent = f.additionalTransport()
                     val foreignRepository = ObservedRepository(foreign.repository) { }
                     val primaryExchange = f.exchange(repository = primaryRepository, intent = primaryOther)
@@ -372,6 +373,7 @@ class SourceBoundTransportCloseContractTest {
                         assertEquals(committedRows, annotationRows(f.records))
                         assertEquals(4, f.serverA.requestCount)
                         assertEquals(0, f.serverB.requestCount)
+                        assertTrue("The independent active stream must send real heartbeats", independentBody.heartbeats.get() > 0)
                         independentBody.release.countDown()
                         val completed = independentResult.get(2, TimeUnit.SECONDS)
                         assertEquals(StreamEvent.Completed, completed.terminal)

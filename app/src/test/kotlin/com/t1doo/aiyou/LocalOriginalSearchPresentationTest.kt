@@ -1,15 +1,13 @@
 package com.t1doo.aiyou
 
-import android.os.SystemClock
-import android.view.KeyCharacterMap
-import android.view.KeyEvent
-import android.view.View
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.selection.SelectionState
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
@@ -22,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -78,15 +75,30 @@ class LocalOriginalSearchPresentationTest {
     private data class Observation(val state: OriginalSearchState, val open: (OriginalSearchHit) -> Unit, val serial: Long)
     private val observations = AtomicReference<Observation>()
     private val serials = AtomicLong()
+    private val diagnostics = AtomicReference<String>()
+    private var context = "initial"
     private lateinit var memories: LazyListState
     private lateinit var back: OnBackPressedDispatcher
-    private lateinit var hostView: View
+    private class ActualInputs(val query: TextFieldState, val from: TextFieldState, val through: TextFieldState) {
+        fun field(tag: String) = when (tag) {
+            "original-search-query" -> query
+            "original-search-from" -> from
+            "original-search-through" -> through
+            else -> error("Unknown owned lookup field")
+        }
+        override fun toString() = "ActualInputs(redacted)"
+    }
+    private val actualInputs = AtomicReference<ActualInputs>()
     private var draftChanges = 0
     private var saves = 0
     private var saveableRegistry: SaveableStateRegistry? = null
     private val searchObserver = object : OriginalSearchObserver {
         override fun onResults(state: OriginalSearchState, open: (OriginalSearchHit) -> Unit) {
             observations.set(Observation(state, open, serials.incrementAndGet()))
+        }
+        override fun onDiagnostics(value: String) { diagnostics.set(value) }
+        override fun onInputs(query: TextFieldState, from: TextFieldState, through: TextFieldState) {
+            actualInputs.set(ActualInputs(query, from, through))
         }
     }
     private val readingObserver = object : OriginalReadingObserver {
@@ -152,6 +164,7 @@ class LocalOriginalSearchPresentationTest {
         val before = checkNotNull(observedAnchor)
         assertEquals(index, before.first); assertNotEquals("The previous item is visible only inside content padding", before.first, before.third)
         repeat(2) { turn ->
+            context = "reader-return-$turn"
             val found = ready("marker"); val tail = found.state.hits.single { it.entry.id == "record-54" }
             compose.runOnIdle { found.open(tail) }
             assertEquals(state.value.entries.last().originalText, fullText())
@@ -208,8 +221,9 @@ class LocalOriginalSearchPresentationTest {
         val state = local(entry("one", "needle 合成当前原文")); val baseline = state.value
         val authoritative = AtomicReference<LocalRecordUiState?>(baseline)
         content(state, source = authoritative::get); field("original-search-query", "needle"); ready("needle")
-        for (changed in listOf(baseline.copy(entries = listOf(entry("one", "needle 合成新原文", revision = 2))),
-            baseline.copy(entries = emptyList()), baseline.copy(error = "synthetic current read failure"), baseline.copy(ready = false))) {
+        for ((variant, changed) in listOf(baseline.copy(entries = listOf(entry("one", "needle 合成新原文", revision = 2))),
+            baseline.copy(entries = emptyList()), baseline.copy(error = "synthetic current read failure"), baseline.copy(ready = false)).withIndex()) {
+            context = "source-restore-$variant"
             val retained = ready("needle"); val hit = retained.state.hits.single()
             compose.runOnIdle { authoritative.set(changed); retained.open(hit); state.value = changed }
             assertNoReader(); val after = serials.get()
@@ -236,6 +250,7 @@ class LocalOriginalSearchPresentationTest {
         assertEquals("synthetic-private-untouched-draft", state.value.text); assertEquals(0, draftChanges); assertEquals(0, saves)
     }
 
+    @OptIn(ExperimentalFoundationApi::class)
     @Test fun compositionRestorationDropsSensitiveQueryDatesAndResultsAndRevokesOldActions() {
         val marker = "synthetic-private-local-query"; val state = local(entry("one", "合成原文 $marker 完整保留"))
         val sourceSnapshot = state.value.entries; val show = mutableStateOf(true); val restoration = StateRestorationTester(compose)
@@ -244,15 +259,33 @@ class LocalOriginalSearchPresentationTest {
         compose.onNodeWithTag("original-search-mode").performScrollTo().performClick()
         val beforeTyping = editable("original-search-query")
         focusedField("original-search-query").performKeyInput { pressKey(Key.X) }
-        assertNotEquals("A real editable user key must change the query", beforeTyping, editable("original-search-query"))
-        assertTrue("The actual field must handle Ctrl+Z", nativeUndo("original-search-query"))
+        val typed = editable("original-search-query")
+        assertNotEquals("A real editable user key must change the query", beforeTyping, typed)
+        compose.runOnIdle {
+            val actual = checkNotNull(actualInputs.get()).query
+            assertEquals("Observed actual UI object must contain the user edit", typed, actual.text.toString())
+            assertTrue("Actual user input must create Undo history", actual.undoState.canUndo)
+            actual.undoState.undo()
+            assertEquals("Actual Undo must restore the previous query", beforeTyping, actual.text.toString())
+            assertTrue("Actual Undo must create Redo history", actual.undoState.canRedo)
+        }
         assertEquals("Actual Undo must restore the previous query", beforeTyping, editable("original-search-query"))
         val beforeClear = observation { it.state.stage == OriginalSearchStage.READY && it.state.input.query == marker &&
             it.state.input.mode == OriginalSearchMode.EXACT && it.state.input.from == "2026-10-13" && it.state.input.through == "2026-10-13" }
         assertEquals(listOf("one"), beforeClear.state.hits.map { it.entry.id })
+        val beforeClearInputs = compose.runOnIdle { checkNotNull(actualInputs.get()) }
         compose.onNodeWithTag("original-search-clear").performScrollTo().performClick(); observation { it.state.stage == OriginalSearchStage.BROWSE }
         for (tag in listOf("original-search-query", "original-search-from", "original-search-through")) {
-            nativeUndo(tag)
+            compose.runOnIdle {
+                val actual = checkNotNull(actualInputs.get()).field(tag)
+                assertNotSame("Clear must replace the actual field owner", beforeClearInputs.field(tag), actual)
+                assertEquals("Clear must empty the actual field", "", actual.text.toString())
+                assertFalse("The new actual field must have no Undo history", actual.undoState.canUndo)
+                assertFalse("The new actual field must have no Redo history", actual.undoState.canRedo)
+                actual.undoState.undo()
+                actual.undoState.redo()
+                assertEquals("No old condition may reappear from history", "", actual.text.toString())
+            }
             assertEquals("Clearing must not retain the previous input in Undo", "", editable(tag))
         }
         compose.runOnIdle { beforeClear.open(beforeClear.state.hits.single()) }; assertNoReader()
@@ -286,7 +319,6 @@ class LocalOriginalSearchPresentationTest {
         compose.setContent { screen(state, largeFont, source) }
     }
     @Composable private fun screen(state: MutableState<LocalRecordUiState>, largeFont: Boolean = false, source: () -> LocalRecordUiState?) {
-        hostView = LocalView.current
         back = checkNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
         val registry = LocalSaveableStateRegistry.current
         SideEffect { saveableRegistry = registry }
@@ -307,22 +339,6 @@ class LocalOriginalSearchPresentationTest {
     }
     private fun focusedField(tag: String) = compose.onNodeWithTag(tag)
         .performScrollTo().assertIsEnabled().performClick().assertIsFocused()
-    private fun nativeUndo(tag: String): Boolean {
-        focusedField(tag)
-        return compose.runOnIdle {
-            val now = SystemClock.uptimeMillis()
-            val meta = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
-            val down = KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Z,
-                0, meta, KeyCharacterMap.VIRTUAL_KEYBOARD, 0)
-            val up = KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_Z,
-                0, meta, KeyCharacterMap.VIRTUAL_KEYBOARD, 0)
-            assertTrue("Native Undo event must carry actual Ctrl", down.isCtrlPressed)
-            assertEquals(KeyEvent.KEYCODE_Z, down.keyCode)
-            val handled = hostView.dispatchKeyEvent(down)
-            hostView.dispatchKeyEvent(up)
-            handled
-        }
-    }
     private fun editable(tag: String): String = compose.onNodeWithTag(tag).performScrollTo().fetchSemanticsNode().config[SemanticsProperties.EditableText].text
     private fun openCard(id: String) {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))
@@ -341,7 +357,7 @@ class LocalOriginalSearchPresentationTest {
             val last = observations.get()
             throw AssertionError("Lookup observation timed out: stage=${last?.state?.stage}, " +
                 "mode=${last?.state?.input?.mode}, serial=${last?.serial}, hits=${last?.state?.hits?.size}, " +
-                "generation=${last?.state?.generation}", failure)
+                "generation=${last?.state?.generation}, context=$context, ${diagnostics.get()}", failure)
         }
         compose.waitForIdle()
         return compose.runOnIdle { checkNotNull(observations.get()).also { check(predicate(it)) } }

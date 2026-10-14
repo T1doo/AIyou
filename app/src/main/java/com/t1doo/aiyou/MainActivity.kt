@@ -185,9 +185,13 @@ fun AIyouApp(
     var searchThrough by remember { mutableStateOf(TextFieldState()) }
     var searchMode by remember { mutableStateOf(OriginalSearchMode.KEYWORDS) }
     var searchModeGeneration by remember { mutableLongStateOf(0L) }
-    fun searchInput() = OriginalSearchInput(searchQuery.text.toString(), searchFrom.text.toString(),
-        searchThrough.text.toString(), searchMode, OriginalSearchInputOwnership(searchQuery.text, searchFrom.text,
-            searchThrough.text, searchModeGeneration))
+    fun searchInput(): OriginalSearchInput {
+        val query = searchQuery.text
+        val from = searchFrom.text
+        val through = searchThrough.text
+        return OriginalSearchInput(query.toString(), from.toString(), through.toString(), searchMode,
+            OriginalSearchInputOwnership(query, from, through, searchModeGeneration))
+    }
     fun searchSource() = if (currentRecordsProvider != null) currentRecordsProvider?.invoke() else currentLocal
     val search = remember {
         LocalOriginalSearchController(
@@ -369,7 +373,11 @@ fun AIyouApp(
         }
     }
     LocalOriginalSearchObserver.current?.let { observer ->
-        SideEffect { observer.onResults(searchState, openSearchResult) }
+        SideEffect {
+            observer.onResults(searchState, openSearchResult)
+            observer.onDiagnostics(search.visibilityDiagnostics(local, renderedSearchInput))
+            observer.onInputs(searchQuery, searchFrom, searchThrough)
+        }
     }
     val canCopy: (String, Int) -> Boolean = { id, revision ->
         val latest = currentLocal

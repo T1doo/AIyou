@@ -25,6 +25,8 @@ import com.t1doo.aiyou.designsystem.AIyouDimensions
 
 interface OriginalSearchObserver {
     fun onResults(state: OriginalSearchState, open: (OriginalSearchHit) -> Unit)
+    fun onDiagnostics(value: String) = Unit
+    fun onInputs(query: TextFieldState, from: TextFieldState, through: TextFieldState) = Unit
 }
 val LocalOriginalSearchObserver = staticCompositionLocalOf<OriginalSearchObserver?> { null }
 
