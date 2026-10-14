@@ -254,7 +254,7 @@ class LocalOriginalSearchPresentationTest {
     @Test fun compositionRestorationDropsSensitiveQueryDatesAndResultsAndRevokesOldActions() {
         val marker = "synthetic-private-local-query"; val state = local(entry("one", "合成原文 $marker 完整保留"))
         val sourceSnapshot = state.value.entries; val show = mutableStateOf(true); val restoration = StateRestorationTester(compose)
-        restoration.setContent { if (show.value) screen(state, source = { state.value }) else Text("合成查找已销毁") }
+        restoration.setContent { if (show.value) LookupTestScreen(state, source = { state.value }) else Text("合成查找已销毁") }
         field("original-search-query", marker); field("original-search-from", "2026-10-13"); field("original-search-through", "2026-10-13")
         compose.onNodeWithTag("original-search-mode").performScrollTo().performClick()
         compose.runOnIdle {
@@ -324,19 +324,19 @@ class LocalOriginalSearchPresentationTest {
     private fun local(vararg entries: StoredEntry) = mutableStateOf(LocalRecordUiState(ready = true, opening = false,
         text = "synthetic-private-untouched-draft", entries = entries.toList()))
     private fun content(state: MutableState<LocalRecordUiState>, largeFont: Boolean = false, source: () -> LocalRecordUiState? = { state.value }) {
-        compose.setContent { screen(state, largeFont, source) }
+        compose.setContent { LookupTestScreen(state, largeFont, source) }
     }
-    @Composable private fun screen(state: MutableState<LocalRecordUiState>, largeFont: Boolean = false, source: () -> LocalRecordUiState?) {
+    @Composable private fun LookupTestScreen(state: MutableState<LocalRecordUiState>, largeFont: Boolean = false, source: () -> LocalRecordUiState?) {
         back = checkNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
         val registry = LocalSaveableStateRegistry.current
         SideEffect { saveableRegistry = registry }
         val density = LocalDensity.current
         CompositionLocalProvider(LocalOriginalSearchObserver provides searchObserver, LocalOriginalReadingObserver provides readingObserver,
             LocalDensity provides if (largeFont) Density(density.density, 2f) else density) {
-            if (largeFont) Box(Modifier.size(width = 320.dp, height = 640.dp)) { app(state, source) } else app(state, source)
+            if (largeFont) Box(Modifier.size(width = 320.dp, height = 640.dp)) { LookupTestApp(state, source) } else LookupTestApp(state, source)
         }
     }
-    @Composable private fun app(state: MutableState<LocalRecordUiState>, source: () -> LocalRecordUiState?) {
+    @Composable private fun LookupTestApp(state: MutableState<LocalRecordUiState>, source: () -> LocalRecordUiState?) {
         AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES, local = state.value, currentRecords = source,
             onDraftChange = { draftChanges++ }, onSave = { saves++ }) }
     }
