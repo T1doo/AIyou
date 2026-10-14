@@ -56,7 +56,7 @@ class SourceBoundTextRecordsIntegrationTest {
         } finally { if (::trace.isInitialized) trace.close() }
     }
 
-    @Test fun freshVersionFourUsesGeneratedRoomAndEncryptedNativeStore() = runBlocking {
+    @Test fun freshVersionFiveUsesGeneratedRoomAndEncryptedNativeStore() = runBlocking {
         val store = open()
         val entry = seed(store, "合成正式原文：需要来源绑定 🌿")
         trace.step("source_fresh_contract") {

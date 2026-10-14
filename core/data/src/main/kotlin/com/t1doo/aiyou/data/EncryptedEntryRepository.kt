@@ -35,7 +35,10 @@ class EncryptedEntryRepository internal constructor(
     override val attachments: AttachmentStore get() = attachmentStorage
     override val editDrafts: EncryptedOriginalEditStore get() = originalEditStorage
     /** Blocking IO; shares the existing encrypted database and never enables remote processing. */
-    override val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(database)
+    private val borrowedSql = DrainingRecordsSqlDatabase(RoomRecordsSqlDatabase(database))
+    override val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(borrowedSql)
+    private val tagStorage = SqlManualTagRepository(borrowedSql, keyBytes)
+    override val manualTags: com.t1doo.aiyou.domain.ManualTagRepository get() = tagStorage
 
     override suspend fun prepare() { attachmentStorage.recover() }
 
@@ -121,8 +124,8 @@ class EncryptedEntryRepository internal constructor(
     }
 
     override fun close() {
-        sourceBoundText.stopAndAwaitSqlIdle()
-        try { database.close() } finally { attachmentStorage.close(); originalEditStorage.close(); keyBytes.fill(0) }
+        borrowedSql.stopAndAwaitIdle()
+        try { database.close() } finally { attachmentStorage.close(); originalEditStorage.close(); tagStorage.wipeKey(); keyBytes.fill(0) }
     }
 
     companion object {
@@ -191,11 +194,11 @@ class EncryptedEntryRepository internal constructor(
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
                 val created = Room.databaseBuilder(context.applicationContext, RecordsDatabase::class.java, file.absolutePath)
                 .openHelperFactory(SupportOpenHelperFactory(key))
-                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4)
+                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addCallback(object : RoomDatabase.Callback() {
-                    override fun onCreate(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db) }
-                    override fun onOpen(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db) }
+                    override fun onCreate(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db); installManualTagGuard(db) }
+                    override fun onOpen(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db); installManualTagGuard(db) }
                 }).build()
                 database = created
                 created.openHelper.writableDatabase // authenticate/schema validation before reporting ready

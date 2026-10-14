@@ -9,8 +9,8 @@ import java.time.Instant
 import java.util.concurrent.Callable
 
 /** Blocking IO adapter over the SAME encrypted Room database as original records. */
-class RoomSourceBoundTextRepository internal constructor(database: RecordsDatabase) : SourceBoundTextRepository {
-    private val sql = DrainingRecordsSqlDatabase(RoomRecordsSqlDatabase(database))
+class RoomSourceBoundTextRepository internal constructor(private val sql: DrainingRecordsSqlDatabase) : SourceBoundTextRepository {
+    internal constructor(database: RecordsDatabase) : this(DrainingRecordsSqlDatabase(RoomRecordsSqlDatabase(database)))
     private val storage = RemoteTextTransactions(sql)
     /** The records owner calls this after its AI operations have finished, before Room close. */
     internal fun stopAndAwaitSqlIdle() = sql.stopAndAwaitIdle()
@@ -29,7 +29,7 @@ class RoomSourceBoundTextRepository internal constructor(database: RecordsDataba
     fun annotations(source:SourceVersion,clock:()->Instant)=storage.annotations(source,clock)
 }
 
-private class RoomRecordsSqlDatabase(private val room:RecordsDatabase):RecordsSqlDatabase {
+internal class RoomRecordsSqlDatabase(private val room:RecordsDatabase):RecordsSqlDatabase {
     override fun <T> transaction(block:(RecordsSqlConnection)->T):T = room.runInTransaction(Callable {
         block(RoomRecordsSqlConnection(room.openHelper.writableDatabase))
     })

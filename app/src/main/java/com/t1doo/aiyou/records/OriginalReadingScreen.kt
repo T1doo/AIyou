@@ -124,6 +124,7 @@ fun OriginalReadingScreen(
     onStartAi: (Long) -> Unit = {},
     onStopAi: (Long) -> Unit = {},
     onCloseAi: (Long) -> Unit = {},
+    onOpenTags: ((String, Int) -> Unit)? = null,
 ) {
     // Resolve the current local source on every update; navigation never carries plaintext.
     val entry = local.entries.firstOrNull { it.id == entryId }
@@ -163,6 +164,11 @@ fun OriginalReadingScreen(
                             TextButton(onClick = { attachments(entry.id, entry.currentRevision) },
                                 enabled = !local.saving && !local.savePending,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("查看附件") }
+                        }
+                        onOpenTags?.let { openTags ->
+                            TextButton(onClick = { openTags(entry.id, entry.currentRevision) },
+                                enabled = !local.saving && !local.savePending,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-manual-tags")) { Text("手工标签") }
                         }
                         onOpenAi?.let { openAi ->
                             TextButton(onClick = { openAi(entry.id, entry.currentRevision) },

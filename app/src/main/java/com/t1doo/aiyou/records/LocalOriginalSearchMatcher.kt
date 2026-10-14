@@ -12,7 +12,8 @@ enum class OriginalSearchMode { KEYWORDS, EXACT }
 
 /** Memory only. Never include the query in diagnostics, saved state or persistence. */
 data class OriginalSearchInput(val query: String = "", val from: String = "", val through: String = "",
-    val mode: OriginalSearchMode = OriginalSearchMode.KEYWORDS, internal val ownership: Any? = null) {
+    val mode: OriginalSearchMode = OriginalSearchMode.KEYWORDS, internal val ownership: Any? = null, val tag: String? = null,
+    internal val tagSnapshot: Map<String, com.t1doo.aiyou.model.ManualTagSnapshot>? = null) {
     override fun toString() = "OriginalSearchInput(redacted)"
 }
 
@@ -59,11 +60,14 @@ internal object LocalOriginalSearchMatcher {
             message = "关键词包含不完整的字符，请重新输入。")
         val terms = if (input.mode == OriginalSearchMode.EXACT) listOf(input.query).filter { it.isNotEmpty() }
             else input.query.split(Regex("[\\p{javaWhitespace}\\p{Zs}]+" )).filter { it.isNotEmpty() }
-        if (terms.isEmpty() && from == null && through == null) return OriginalSearchMatches(OriginalSearchStage.BROWSE)
+        if (input.tag != null && input.tagSnapshot == null) return OriginalSearchMatches(OriginalSearchStage.FAILED,
+            message = "手工标签暂不可读取，请重试本机读取。")
+        if (terms.isEmpty() && from == null && through == null && input.tag == null) return OriginalSearchMatches(OriginalSearchStage.BROWSE)
         val needles = terms.map { compileNeedle(if (input.mode == OriginalSearchMode.KEYWORDS) fold(it).text else it) }
         val hits = ArrayList<OriginalSearchHit>()
         for (entry in entries) {
             currentCoroutineContext().ensureActive()
+            if (input.tag != null && input.tag !in input.tagSnapshot?.get(entry.id)?.names.orEmpty()) continue
             if (from != null || through != null) {
                 val captured = try { Instant.ofEpochMilli(entry.capturedAtMillis).atZone(ZoneId.of(entry.captureTimeZone)).toLocalDate() }
                 catch (_: java.time.DateTimeException) { return OriginalSearchMatches(OriginalSearchStage.FAILED,

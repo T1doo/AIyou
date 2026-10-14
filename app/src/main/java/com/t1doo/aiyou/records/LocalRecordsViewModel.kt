@@ -57,6 +57,10 @@ data class LocalRecordUiState(
     val editDraftIssueCount: Int = 0,
     val editDraftIndexAvailable: Boolean = true,
     val ai: RecordAiUiState? = null,
+    val manualTags: Map<String, com.t1doo.aiyou.model.ManualTagSnapshot> = emptyMap(),
+    val manualTagsAvailable: Boolean = false,
+    val manualTagsError: String? = null,
+    val manualTagEditor: ManualTagEditor? = null,
 )
 
 /** All draft writes and saves share one queue, preserving edits around a save boundary. */
@@ -76,6 +80,8 @@ class LocalRecordsViewModel internal constructor(
         canUseRecord = { mutableState.value.let { it.ready && !it.opening && it.error == null &&
             !it.saving && !it.savePending && it.captureDiscard == null } },
         canUsePanel = { it.hasRecordAccess(mutableState.value) })
+    val tags = ManualTagController(current = { mutableState.value }, publish = { change -> update(change) },
+        enqueue = { action -> commands.trySend(Command.ManualTags(action)).isSuccess })
     private var repository: EntryRepository? = null
     private var storageOwnership: RecordsStorageOwnership? = null // Local IO queue publishes one immutable owner.
     private val ai = LocalRecordAiController(
@@ -172,6 +178,7 @@ class LocalRecordsViewModel internal constructor(
                             Command.RefreshEditDrafts -> refreshPendingDrafts()
                             is Command.ReadHistory -> readHistory(command)
                             is Command.Attachment -> command.action(checkNotNull(repository))
+                            is Command.ManualTags -> command.action(checkNotNull(repository))
                         }
                     } catch (failure: CancellationException) { throw failure }
                     catch (failure: Exception) { failed(failure, preserveQueuedSave = command is Command.Edit) }
@@ -181,6 +188,7 @@ class LocalRecordsViewModel internal constructor(
                 editsDisposed = true
                 ai.markDisposed()
                 attachments.markDisposed()
+                tags.dispose()
                 withContext(NonCancellable + Dispatchers.IO) {
                     try { ai.closeAndJoin() }
                     finally {
@@ -195,7 +203,12 @@ class LocalRecordsViewModel internal constructor(
     /** Local and AI writers validate the selected source in the same state CAS. */
     private inline fun update(transform: (LocalRecordUiState) -> LocalRecordUiState) {
         mutableState.update { previous ->
-            val next = transform(previous)
+            val transformed = transform(previous)
+            val editor = transformed.manualTagEditor
+            val next = if (editor != null && (!transformed.ready || transformed.opening || transformed.error != null ||
+                transformed.entries.none { it.id == editor.entryId && it.currentRevision == editor.revision }))
+                transformed.copy(manualTagEditor = editor.copy(busy = false, conflict = true,
+                    error = "原文已变化或不可用，输入已保留，请关闭后重新打开。")) else transformed
             val selected = next.ai
             val entry = selected?.let { value -> next.entries.firstOrNull {
                 it.id == value.source.sourceId && it.currentRevision.toLong() == value.source.revision
@@ -872,6 +885,8 @@ class LocalRecordsViewModel internal constructor(
             persistedDraft = store.readDraft()
             captureDraftMayBeConsumed = false
             val entries = store.entries()
+            val labels = try { store.manualTags?.snapshots() }
+                catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             val pending = try { store.editDrafts?.pending() ?: OriginalEditDraftIndex(emptyList()) }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             val ownership = storageOwnership ?: RecordsStorageOwnership(store, bindAi?.let { factory ->
@@ -879,7 +894,9 @@ class LocalRecordsViewModel internal constructor(
             }).also { storageOwnership = it }
             ai.bind(ownership)
             update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
-                entries = entries, draftNotice = if (persistedDraft == null) "没有未保存的草稿" else "已恢复本机草稿", error = null,
+                entries = entries, manualTags = labels.orEmpty(), manualTagsAvailable = labels != null,
+                manualTagsError = if (store.manualTags != null && labels == null) "手工标签暂不可读取，请重试。" else null,
+                draftNotice = if (persistedDraft == null) "没有未保存的草稿" else "已恢复本机草稿", error = null,
                 supportsEditDrafts = store.editDrafts != null, pendingEdits = pending?.drafts.orEmpty(),
                 editDraftIssueCount = pending?.unreadableCount ?: 0, editDraftIndexAvailable = pending != null,
                 editDraftError = if (pending == null) "编辑草稿目录暂不可读取，恢复列表尚未确认。已保留加密数据；请重试本机读取，未自动删除或替换。" else indexNotice(pending)) }
@@ -899,6 +916,7 @@ class LocalRecordsViewModel internal constructor(
         editsDisposed = true
         ai.markDisposed()
         attachments.markDisposed()
+        tags.dispose()
         commands.close()
         super.onCleared()
     }
@@ -910,6 +928,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     private sealed interface Command {
+        data class ManualTags(val action: suspend (EntryRepository) -> Unit) : Command
         data object RefreshEditDrafts : Command
         data class OpenEdit(val edit: OriginalEditUiState, val replace: Boolean, val expectedDraftId: String? = null) : Command
         data class PersistEdit(val sessionId: Long, val text: String) : Command

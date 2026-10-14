@@ -80,6 +80,8 @@ fun LocalRecordsScreen(
     searchFrom: TextFieldState? = null,
     searchThrough: TextFieldState? = null,
     searchMode: OriginalSearchMode = OriginalSearchMode.KEYWORDS,
+    searchTag: String? = null,
+    onSearchTag: (String?) -> Unit = {},
     onSearchMode: () -> Unit = {},
     onClearSearch: () -> Unit = {},
     onOpenSearchResult: (OriginalSearchHit) -> Unit = {},
@@ -108,7 +110,7 @@ fun LocalRecordsScreen(
             } },
         )
     }
-    val requestedSearch = searchState?.input?.let { it.from.isNotEmpty() || it.through.isNotEmpty() ||
+    val requestedSearch = searchState?.input?.let { it.tag != null || it.from.isNotEmpty() || it.through.isNotEmpty() ||
         (if (it.mode == OriginalSearchMode.EXACT) it.query.isNotEmpty() else it.query.isNotBlank()) } == true
     val filtered = destination == Destination.MEMORIES && requestedSearch && searchState?.stage != OriginalSearchStage.BROWSE
     val searchHits = remember(searchState) { searchState?.hits?.associateBy { it.entry.id }.orEmpty() }
@@ -240,7 +242,8 @@ fun LocalRecordsScreen(
                 if (destination == Destination.MEMORIES) item("search") {
                     if (searchState != null && searchQuery != null && searchFrom != null && searchThrough != null)
                         LocalOriginalSearchSection(searchQuery, searchFrom, searchThrough, searchMode,
-                            local.ready && !local.opening && local.error == null, onSearchMode, onClearSearch)
+                            local.ready && !local.opening && local.error == null, onSearchMode, onClearSearch,
+                            searchTag, local.manualTags, local.manualTagsAvailable, local.manualTagsError, onSearchTag)
                     else SearchSection(demo = false)
                 }
                 if (filtered) item("search-status") {

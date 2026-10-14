@@ -21,6 +21,38 @@ import org.junit.Test
 
 /** Actual app matcher/controller and immutable current-original snapshots. No storage or device claim. */
 class LocalOriginalSearchTest {
+    @Test(timeout = 5_000) fun manualTagOnlyAndCombinedFiltersFenceTagChangesAndReadFailureBeforeComposition() = runBlocking {
+        val records = listOf(entry("one", "咖啡原文"), entry("two", "咖啡原文"), entry("three", "茶原文"))
+        fun tags(version: Long) = mapOf("one" to com.t1doo.aiyou.model.ManualTagSnapshot("one", version, listOf("手工🙂")),
+            "three" to com.t1doo.aiyou.model.ManualTagSnapshot("three", version, listOf("手工🙂")))
+        val source = AtomicReference(LocalRecordUiState(ready = true, opening = false, entries = records,
+            manualTags = tags(1), manualTagsAvailable = true))
+        val input = AtomicReference(OriginalSearchInput(tag = "手工🙂", tagSnapshot = source.get().manualTags))
+        val calls = AtomicInteger()
+        val c = LocalOriginalSearchController(source::get, input::get) { entries, query -> calls.incrementAndGet(); LocalOriginalSearchMatcher.match(entries, query) }
+        try {
+            c.sync(true)
+            val only = withTimeout(2_000) { c.state.first { it.stage == OriginalSearchStage.READY } }
+            assertEquals(listOf("one", "three"), only.hits.map { it.entry.id })
+            input.set(OriginalSearchInput("咖啡", "2026-10-13", "2026-10-13", tag = "手工🙂", tagSnapshot = source.get().manualTags))
+            c.sync(true)
+            val combined = withTimeout(2_000) { c.state.first { it.stage == OriginalSearchStage.READY && it.input.query == "咖啡" } }
+            assertEquals(listOf("one"), combined.hits.map { it.entry.id }); assertTrue(c.canOpen(combined, combined.hits.single()))
+            source.set(source.get().copy(manualTags = tags(2)))
+            assertFalse(c.canOpen(combined, combined.hits.single()))
+            input.set(input.get().copy(tagSnapshot = source.get().manualTags)); c.sync(true)
+            withTimeout(2_000) { c.state.first { it.stage == OriginalSearchStage.READY && it !== combined } }
+            source.set(source.get().copy(manualTagsAvailable = false, manualTags = emptyMap()))
+            input.set(input.get().copy(tagSnapshot = null)); c.sync(true)
+            val failed = withTimeout(2_000) { c.state.first { it.stage == OriginalSearchStage.FAILED } }
+            assertTrue(failed.hits.isEmpty()); assertSame(failed, c.visible(source.get(), input.get()))
+            val bounded = calls.get(); repeat(10) { c.sync(true) }; assertEquals(bounded, calls.get())
+            source.set(source.get().copy(manualTagsAvailable = true, manualTags = emptyMap()))
+            input.set(input.get().copy(tagSnapshot = source.get().manualTags)); c.sync(true)
+            val empty = withTimeout(2_000) { c.state.first { it.stage == OriginalSearchStage.READY } }
+            assertTrue(empty.hits.isEmpty()); assertFalse(c.canOpen(combined, combined.hits.single()))
+        } finally { c.close() }
+    }
     @Test(timeout = 5_000) fun keywordAndIsLiteralUnicodeLocaleIndependentAndPreservesSnapshotOrderAndPolicy() = runBlocking {
         val oldLocale = Locale.getDefault()
         try {

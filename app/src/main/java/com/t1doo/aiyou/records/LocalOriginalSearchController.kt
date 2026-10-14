@@ -39,7 +39,8 @@ class LocalOriginalSearchController internal constructor(
     private fun owns(value: OriginalSearchState): Boolean {
         val local = currentSource()
         return !closed && active && value.generation == generation && usable(local) &&
-            local?.entries === value.entries && currentInput() == value.input
+            local?.entries === value.entries && currentInput() == value.input &&
+            (value.input.tag == null || (if (local?.manualTagsAvailable == true) local.manualTags else null) === value.input.tagSnapshot)
     }
 
     fun visible(local: LocalRecordUiState?, input: OriginalSearchInput): OriginalSearchState = synchronized(lock) {
@@ -68,7 +69,7 @@ class LocalOriginalSearchController internal constructor(
         val local = currentSource()
         val input = currentInput()
         val value = mutableState.value
-        if (active && value.input == input && value.entries === local?.entries &&
+        if (active && value.input == input && value.input.tagSnapshot === input.tagSnapshot && value.entries === local?.entries &&
             ((usable(local) && value.stage != OriginalSearchStage.WAITING &&
                 (value.stage != OriginalSearchStage.RUNNING || job?.isActive == true)) ||
                 (!usable(local) && value.stage == OriginalSearchStage.WAITING))) return@synchronized
@@ -82,13 +83,13 @@ class LocalOriginalSearchController internal constructor(
         }
         val entries = checkNotNull(local).entries
         // Preserve immediate manual browsing when no lookup is requested.
-        if (input.query.isEmpty() && input.from.isEmpty() && input.through.isEmpty()) {
+        if (input.query.isEmpty() && input.from.isEmpty() && input.through.isEmpty() && input.tag == null) {
             val browse = OriginalSearchState(input, OriginalSearchStage.BROWSE, entries = entries, generation = generation)
             cache = browse
             mutableState.value = browse
             return@synchronized
         }
-        val saved = cache?.takeIf { it.entries === entries && it.input == input }
+        val saved = cache?.takeIf { it.entries === entries && it.input == input && it.input.tagSnapshot === input.tagSnapshot }
         if (saved != null) {
             mutableState.value = OriginalSearchState(input, saved.stage, saved.hits, saved.message, entries, generation)
             return@synchronized
@@ -119,7 +120,7 @@ class LocalOriginalSearchController internal constructor(
     }
 
     fun canOpen(value: OriginalSearchState, hit: OriginalSearchHit): Boolean = synchronized(lock) {
-        owns(value) && value.stage == OriginalSearchStage.READY && value.hits.any { it === hit } &&
+        owns(value) && (value.input.tag == null || currentSource()?.manualTagsAvailable == true) && value.stage == OriginalSearchStage.READY && value.hits.any { it === hit } &&
             currentSource()?.entries?.any { it.id == hit.entry.id && it.currentRevision == hit.entry.currentRevision } == true
     }
 

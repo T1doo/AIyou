@@ -10,6 +10,10 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.maxLength
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.*
+import com.t1doo.aiyou.model.ManualTagSnapshot
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -36,7 +40,9 @@ data class OriginalSearchReturnAnchor(val key: String?, val index: Int, val offs
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldState, through: TextFieldState,
-    mode: OriginalSearchMode, enabled: Boolean, onMode: () -> Unit, onClear: () -> Unit) {
+    mode: OriginalSearchMode, enabled: Boolean, onMode: () -> Unit, onClear: () -> Unit,
+    tag: String? = null, tags: Map<String, ManualTagSnapshot> = emptyMap(), tagsAvailable: Boolean = false,
+    tagsError: String? = null, onTag: (String?) -> Unit = {}) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
@@ -56,6 +62,19 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
             OutlinedTextField(state = through, enabled = enabled, label = { Text("结束日期（YYYY-MM-DD，可留空）") },
                 modifier = Modifier.fillMaxWidth().testTag("original-search-through"),
                 lineLimits = TextFieldLineLimits.SingleLine, inputTransformation = InputTransformation.maxLength(10))
+            var choosing by remember { mutableStateOf(false) }
+            TextButton(onClick = { choosing = true }, enabled = enabled && tagsAvailable,
+                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-tag")) {
+                Text(tag?.let { "手工标签：$it" } ?: "按手工标签筛选")
+            }
+            DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }) {
+                DropdownMenuItem(text = { Text("全部标签") }, onClick = { choosing = false; onTag(null) })
+                tags.values.flatMap { it.names }.distinct().sorted().forEachIndexed { index, name ->
+                    DropdownMenuItem(text = { Text(name) }, onClick = { choosing = false; onTag(name) },
+                        modifier = Modifier.testTag("original-search-tag-option-$index"))
+                }
+            }
+            tagsError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Text("日期按记录保存的时区，包含起止两天。仅查当前本机原文，不使用 AI。",
                 style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onClear, enabled = enabled,

@@ -7,6 +7,7 @@ import com.t1doo.aiyou.model.OriginalEditDraft
 
 /** Successful completion means a durable transaction, never an optimistic UI insert. */
 interface EntryRepository {
+    val manualTags: ManualTagRepository? get() = null
     /** Borrowed capability over the same records database; it never enables remote processing. */
     val sourceBoundText: SourceBoundTextRepository? get() = null
     val editDrafts: OriginalEditDraftStore? get() = null

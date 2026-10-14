@@ -76,7 +76,7 @@ class DeviceProtocolTests(unittest.TestCase):
 
     def test_inventory_contains_original_19_and_source_bound_8_methods(self):
         actual = collect_source(Path(__file__).resolve().parents[2])
-        self.assertEqual([13, 4, 2, 8], [len(cases) for cases in actual.values()])
+        self.assertEqual([13, 4, 2, 8, 4], [len(cases) for cases in actual.values()])
         self.assertEqual(NATIVE_METHOD_COUNT, sum(map(len, actual.values())))
 
     def test_unregistered_source_class_cannot_silently_keep_passing_count(self):
@@ -92,13 +92,13 @@ class DeviceProtocolTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         assets = {f"assets/records-schema-v{version}.json":
             (root / f"core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/{version}.json").read_bytes()
-            for version in (2, 3, 4)}
+            for version in (2, 3, 4, 5)}
         with tempfile.TemporaryDirectory() as temporary:
             apk = Path(temporary) / "synthetic-inventory-only.zip"
             with zipfile.ZipFile(apk, "w") as archive:
                 for name, content in assets.items(): archive.writestr(name, content)
-            self.assertEqual({"2", "3", "4"}, set(apk_inventory.verify_schema_assets(apk, root)))
-            for changed in (dict(list(assets.items())[1:]), {**assets, "assets/records-schema-v4.json": b"{}"}):
+            self.assertEqual({"2", "3", "4", "5"}, set(apk_inventory.verify_schema_assets(apk, root)))
+            for changed in (dict(list(assets.items())[1:]), {**assets, "assets/records-schema-v5.json": b"{}"}):
                 with zipfile.ZipFile(apk, "w") as archive:
                     for name, content in changed.items(): archive.writestr(name, content)
                 with self.assertRaises(ValueError): apk_inventory.verify_schema_assets(apk, root)

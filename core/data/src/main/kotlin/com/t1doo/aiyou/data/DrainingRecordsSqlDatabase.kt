@@ -3,7 +3,7 @@ package com.t1doo.aiyou.data
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-/** Tracks every AI SQL transaction, including a subscription's already running observation. */
+/** Tracks every borrowed SQL transaction, including tag crypto and running AI observations. */
 internal class DrainingRecordsSqlDatabase(private val actual: RecordsSqlDatabase) : RecordsSqlDatabase {
     private val lock = ReentrantLock()
     private val idle = lock.newCondition()

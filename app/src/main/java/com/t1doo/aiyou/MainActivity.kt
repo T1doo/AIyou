@@ -108,6 +108,8 @@ class MainActivity : ComponentActivity() {
                 onOpenAiSession = { id, revision -> records.openAiSession(id, revision) },
                 onStartAiSession = records::startAiSession, onStopAiSession = records::stopAiSession,
                 onCloseAiSession = records::closeAiSession,
+                onOpenTags = records.tags::open, onTagEdit = records.tags::edit, onTagAdd = records.tags::add,
+                onTagRemove = records.tags::remove, onTagRetry = records.tags::retry, onTagClose = records.tags::close,
                 currentRecords = { records.state.value }) }
         }
     }
@@ -158,6 +160,12 @@ fun AIyouApp(
     onStopAiSession: (Long) -> Unit = {},
     onCloseAiSession: (Long) -> Unit = {},
     currentRecords: (() -> LocalRecordUiState?)? = null,
+    onOpenTags: (String, Int) -> Unit = { _, _ -> },
+    onTagEdit: (Long, Long, String) -> Unit = { _, _, _ -> },
+    onTagAdd: (Long, Long, String) -> Unit = { _, _, _ -> },
+    onTagRemove: (Long, Long, String, String) -> Unit = { _, _, _, _ -> },
+    onTagRetry: (Long) -> Unit = {},
+    onTagClose: (Long) -> Unit = {},
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -184,15 +192,18 @@ fun AIyouApp(
     var searchFrom by remember { mutableStateOf(TextFieldState()) }
     var searchThrough by remember { mutableStateOf(TextFieldState()) }
     var searchMode by remember { mutableStateOf(OriginalSearchMode.KEYWORDS) }
+    var searchTag by remember { mutableStateOf<String?>(null) }
     var searchModeGeneration by remember { mutableLongStateOf(0L) }
+    fun searchSource() = if (currentRecordsProvider != null) currentRecordsProvider?.invoke() else currentLocal
     fun searchInput(): OriginalSearchInput {
         val query = searchQuery.text
         val from = searchFrom.text
         val through = searchThrough.text
+        val tagsSource = searchSource()
         return OriginalSearchInput(query.toString(), from.toString(), through.toString(), searchMode,
-            OriginalSearchInputOwnership(query, from, through, searchModeGeneration))
+            OriginalSearchInputOwnership(query, from, through, searchModeGeneration), searchTag,
+            if (searchTag != null && tagsSource?.manualTagsAvailable == true) tagsSource.manualTags else null)
     }
-    fun searchSource() = if (currentRecordsProvider != null) currentRecordsProvider?.invoke() else currentLocal
     val search = remember {
         LocalOriginalSearchController(
             currentSource = { searchSource() },
@@ -215,6 +226,7 @@ fun AIyouApp(
         searchFrom = TextFieldState()
         searchThrough = TextFieldState()
         searchMode = OriginalSearchMode.KEYWORDS
+        searchTag = null
         searchModeGeneration++
         searchReturnAnchor = null
         searchReturnInput = null
@@ -228,7 +240,7 @@ fun AIyouApp(
         search.sync(selected == Destination.MEMORIES && !reading && !showSettings && !demo &&
             local != null && local.originalEdit == null && local.originalHistory == null)
         if (!reading && searchReturnAnchor != null &&
-            (renderedSearchInput != searchReturnInput || searchSource()?.entries !== searchReturnSource)) {
+            (renderedSearchInput.copy(tagSnapshot = null) != searchReturnInput?.copy(tagSnapshot = null) || searchSource()?.entries !== searchReturnSource)) {
             searchReturnAnchor = null; searchReturnInput = null; searchReturnSource = null
         }
     }
@@ -319,6 +331,7 @@ fun AIyouApp(
     }
     val returnToList: () -> Unit = {
         if (ownsNavigation() && reading) {
+            currentLocal?.manualTagEditor?.takeIf { it.entryId == detailEntryId }?.let { onTagClose(it.session) }
             val edit = currentLocal?.originalEdit?.takeIf { it.entryId == readerId }
             val activeHistory = currentLocal?.originalHistory?.takeIf { it.entryId == readerId }
             val activeAttachment = attachments?.state?.value
@@ -473,6 +486,16 @@ fun AIyouApp(
     BackHandler(enabled = showSettings) {
         if (ownsNavigation()) { navigation.generation++; if (showLicenses) showLicenses = false else showSettings = false }
     }
+    local?.manualTagEditor?.takeIf { reading && it.entryId == detailEntryId }?.let { editor ->
+        val tagLocal = checkNotNull(local)
+        com.t1doo.aiyou.records.ManualTagDialog(editor,
+            onEdit = { session, version, text -> if (ownsNavigation()) onTagEdit(session, version, text) },
+            onAdd = { session, version, text -> if (ownsNavigation()) onTagAdd(session, version, text) },
+            onRemove = { session, version, name, input -> if (ownsNavigation()) onTagRemove(session, version, name, input) },
+            onRetry = { if (ownsNavigation()) onTagRetry(it) }, onClose = { if (ownsNavigation()) onTagClose(it) },
+            sourceAvailable = tagLocal.ready && !tagLocal.opening && tagLocal.error == null &&
+                tagLocal.entries.any { it.id == editor.entryId && it.currentRevision == editor.revision })
+    }
     BackHandler(enabled = reading, onBack = returnToList)
 
     Scaffold(
@@ -535,13 +558,15 @@ fun AIyouApp(
                 onCopy = copy, canCopy = canCopy, modifier = modifier, onEdit = beginEdit, onHistory = beginHistory,
                 onAttachments = if (attachments != null) beginAttachments else null, originalScrollState = originalScroll,
                 onOpenAi = { id, revision -> if (canCopy(id, revision)) onOpenAiSession(id, revision) },
-                onStartAi = onStartAiSession, onStopAi = onStopAiSession, onCloseAi = onCloseAiSession)
+                onStartAi = onStartAiSession, onStopAi = onStopAiSession, onCloseAi = onCloseAiSession,
+                onOpenTags = { id, revision -> if (canCopy(id, revision)) onOpenTags(id, revision) })
         } else if (!demo && local != null && selected != Destination.TASKS) {
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
                 searchState = searchState, searchQuery = searchQuery, searchFrom = searchFrom, searchThrough = searchThrough,
+                searchTag = searchTag, onSearchTag = { tag -> if (ownsNavigation()) { searchTag = tag; searchModeGeneration++ } },
                 searchMode = searchMode, onSearchMode = { if (ownsNavigation()) {
                     searchModeGeneration++
                     searchMode = if (searchMode == OriginalSearchMode.KEYWORDS) OriginalSearchMode.EXACT else OriginalSearchMode.KEYWORDS
@@ -549,7 +574,7 @@ fun AIyouApp(
                 onClearSearch = { if (ownsNavigation()) clearSearch() }, onOpenSearchResult = openSearchResult,
                 searchReturnAnchor = searchReturnAnchor,
                 ownsSearchReturn = { ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name &&
-                    !showSettings && !demo && searchReturnInput == searchInput() && currentLocal?.entries === searchReturnSource &&
+                    !showSettings && !demo && searchReturnInput?.copy(tagSnapshot = null) == searchInput().copy(tagSnapshot = null) && currentLocal?.entries === searchReturnSource &&
                     search.visible(currentLocal, searchInput()) === searchState },
                 onSearchReturnHandled = { if (ownsNavigation()) {
                     searchReturnAnchor = null; searchReturnInput = null; searchReturnSource = null

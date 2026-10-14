@@ -107,3 +107,13 @@ internal data class TextAnnotationEntity(
     val resultHash: String,
     val createdAtMillis: Long,
 )
+
+@Entity(tableName = "entry_manual_tags", foreignKeys = [ForeignKey(
+    entity = EntryEntity::class, parentColumns = ["id"], childColumns = ["entryId"],
+)])
+internal data class ManualTagEntity(
+    @PrimaryKey val entryId: String,
+    val version: Long,
+    val lastMutationId: String,
+    val ciphertext: ByteArray,
+)

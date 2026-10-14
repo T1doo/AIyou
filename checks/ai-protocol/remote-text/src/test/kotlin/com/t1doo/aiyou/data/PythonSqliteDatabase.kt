@@ -15,6 +15,7 @@ internal class PythonSqliteDatabase(
     private val databasePath: Path,
     private val bridgePath: Path,
     initialize: Boolean,
+    schemaVersion: Int = 3,
 ) : RecordsSqlDatabase, Closeable {
     private val process: Process
     private val responses = LinkedBlockingQueue<String>()
@@ -30,7 +31,7 @@ internal class PythonSqliteDatabase(
     private var ended = false
 
     init {
-        val schema = repositoryRoot().resolve("core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/3.json")
+        val schema = repositoryRoot().resolve("core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/$schemaVersion.json")
         process = ProcessBuilder("python3", "-u", bridgePath.toString(), databasePath.toString(), schema.toString(),
             if (initialize) "initialize" else "open").start()
         writer = process.outputStream.bufferedWriter(Charsets.UTF_8)

@@ -37,7 +37,7 @@ internal interface RecordsDao {
 }
 
 @Database(entities = [EntryEntity::class, RevisionEntity::class, DraftEntity::class, LocalJobEntity::class,
-    AttachmentEntity::class, RemoteSourceAccessEntity::class, RemoteTextJobEntity::class, TextAnnotationEntity::class], version = 4, exportSchema = true)
+    AttachmentEntity::class, RemoteSourceAccessEntity::class, RemoteTextJobEntity::class, TextAnnotationEntity::class, ManualTagEntity::class], version = 5, exportSchema = true)
 internal abstract class RecordsDatabase : RoomDatabase() {
     abstract fun records(): RecordsDao
 }
@@ -76,3 +76,11 @@ internal val recordsMigration1To2 = object : Migration(1, 2) {
         installRevisionGuard(db)
     }
 }
+
+internal val recordsMigration4To5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        ManualTagSqlSchema.migration4To5.forEach(db::execSQL)
+        installManualTagGuard(db)
+    }
+}
+internal fun installManualTagGuard(db: SupportSQLiteDatabase) { db.execSQL(ManualTagSqlSchema.guard) }

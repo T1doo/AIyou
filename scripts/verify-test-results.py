@@ -18,9 +18,9 @@ targets = [("domain", "core/domain/build/test-results/test", 3)]
 if args.component:
     targets.append(("component", "core/designsystem/build/test-results/testDebugUnitTest", 7))
 if args.queue:
-    targets.append(("host queue", "checks/record-queue/build/test-results/test", 147))
+    targets.append(("host queue", "checks/record-queue/build/test-results/test", 148))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 107))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 112))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 if args.evidence:
@@ -48,6 +48,7 @@ for label, folder, minimum in targets:
     additional = {}
     if label == "host queue":
         additional["com.t1doo.aiyou.records.LocalOriginalSearchTest"] = (
+            "manualTagOnlyAndCombinedFiltersFenceTagChangesAndReadFailureBeforeComposition",
             "keywordAndIsLiteralUnicodeLocaleIndependentAndPreservesSnapshotOrderAndPolicy",
             "exactAndFoldedExcerptsRoundTripOriginalCodePointsWithoutChangingCaseOrWhitespace",
             "captureDatesUseSavedIanaZoneInclusiveDaysAndDstWithOpenBounds",
@@ -96,6 +97,12 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.ManualTagPresentationTest"] = (
+            "actualTagEditorWaitsForAcknowledgementKeepsFailedInputAndRemovesOnlyAfterConfirmation",
+            "tagOnlyAndKeywordSavedZoneDateCombinationOpenFullOriginalAndReturnActualListPosition",
+            "changedTagVersionRevokesOldResultBeforeCompositionAndReadFailureIsDistinctFromEmpty",
+            "narrowLargeFontEditorKeepsActionsReachableAndHidesPersistedLabelsWhenSourceFails",
+            "rawSavedStateAndRestorationExcludeTagConditionsInputsAndClearedFieldUndoHistory")
         additional["com.t1doo.aiyou.LocalOriginalSearchPresentationTest"] = (
             "editableKeywordExactAndSavedZoneDateFieldsOpenEveryOriginalCharacterWithoutTouchingDraft",
             "readerReturnKeepsActualMemoriesListIndexAndOffsetWhenPaddingShowsPreviousItem",
@@ -283,6 +290,12 @@ for label, folder, minimum in targets:
             print("D02_ATTACHMENT_PROCESS_EVENT=" + json.dumps(event, separators=(",", ":"), sort_keys=True))
         print("PASS: attachment independent-process evidence scenarios=15 child_pids=31 owned_terminations=14 confirmed_exits=31 authenticated_new_pid_reads=7 corruption_rejections=7")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.ManualTagPresentationTest"] = (
+            "actualTagEditorWaitsForAcknowledgementKeepsFailedInputAndRemovesOnlyAfterConfirmation",
+            "tagOnlyAndKeywordSavedZoneDateCombinationOpenFullOriginalAndReturnActualListPosition",
+            "changedTagVersionRevokesOldResultBeforeCompositionAndReadFailureIsDistinctFromEmpty",
+            "narrowLargeFontEditorKeepsActionsReachableAndHidesPersistedLabelsWhenSourceFails",
+            "rawSavedStateAndRestorationExcludeTagConditionsInputsAndClearedFieldUndoHistory")
         owner = "com.t1doo.aiyou.LocalRecordsPresentationTest"
         required = (
             "narrowLargeFontSaveFailureRetryScrollsIntoViewAndPreservesPendingDraft",
