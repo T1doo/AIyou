@@ -33,8 +33,8 @@ class PermanentErasureRecordsIntegrationTest {
     }
     @Test fun encryptedVersionSevenMigrationPreservesLegacyRowsAndCopiesExactIndependentPackageReceipts(): Unit = runBlocking {
         val text = "合成第七版原文"
-        val group = listOf("restore-receipt", "legacy", 1L, "PACKAGE_RESTORE", "CONFIRMED:synthetic-receipt")
-        val origin = listOf("origin-receipt", "legacy", 1L, "PACKAGE_ORIGIN", "CONFIRMED:synthetic-origin")
+        val group: List<Any> = listOf("restore-receipt", "legacy", 1L, "PACKAGE_RESTORE", "CONFIRMED:synthetic-receipt")
+        val origin: List<Any> = listOf("origin-receipt", "legacy", 1L, "PACKAGE_ORIGIN", "CONFIRMED:synthetic-origin")
         NativeRecordsSchemaFixture.create(file, key, 7) { sql ->
             sql.execSQL("INSERT INTO entries VALUES('legacy',1,55,'UTC','LOCAL_ONLY')")
             sql.execSQL("INSERT INTO entry_revisions VALUES('legacy',1,?,?,55)", arrayOf(text, OriginalExports.hash(text)))
