@@ -108,7 +108,9 @@ fun LocalRecordsScreen(
             } },
         )
     }
-    val filtered = destination == Destination.MEMORIES && searchState != null && searchState.stage != OriginalSearchStage.BROWSE
+    val requestedSearch = searchState?.input?.let { it.from.isNotEmpty() || it.through.isNotEmpty() ||
+        (if (it.mode == OriginalSearchMode.EXACT) it.query.isNotEmpty() else it.query.isNotBlank()) } == true
+    val filtered = destination == Destination.MEMORIES && requestedSearch && searchState?.stage != OriginalSearchStage.BROWSE
     val searchHits = remember(searchState) { searchState?.hits?.associateBy { it.entry.id }.orEmpty() }
     val displayedEntries = if (destination == Destination.NOW) local.entries.take(5)
         else if (filtered) searchState?.hits?.map { it.entry }.orEmpty() else local.entries

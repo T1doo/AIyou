@@ -56,7 +56,9 @@ class LocalOriginalSearchController internal constructor(
         val input = currentInput()
         val value = mutableState.value
         if (active && value.input == input && value.entries === local?.entries &&
-            ((usable(local) && value.stage != OriginalSearchStage.WAITING) || (!usable(local) && value.stage == OriginalSearchStage.WAITING))) return@synchronized
+            ((usable(local) && value.stage != OriginalSearchStage.WAITING &&
+                (value.stage != OriginalSearchStage.RUNNING || job?.isActive == true)) ||
+                (!usable(local) && value.stage == OriginalSearchStage.WAITING))) return@synchronized
         active = true
         generation++
         job?.cancel(); job = null
@@ -88,8 +90,16 @@ class LocalOriginalSearchController internal constructor(
             synchronized(lock) {
                 if (owns(request)) {
                     val completed = OriginalSearchState(input, result.stage, result.hits, result.message, entries, request.generation)
+                    job = null
                     cache = completed
                     mutableState.value = completed
+                } else if (!closed && active && generation == request.generation && mutableState.value === request) {
+                    // A fresh input/source can invalidate this worker before the next render.
+                    // Wake that render to sync again; never strand a completed worker in RUNNING.
+                    job = null
+                    cache = null
+                    mutableState.value = OriginalSearchState(input, OriginalSearchStage.WAITING,
+                        entries = entries, generation = request.generation)
                 }
             }
         }

@@ -150,6 +150,36 @@ class LocalOriginalSearchTest {
         }
     }
 
+    @Test(timeout = 5_000) fun rejectedCompletedWorkerInvalidatesRunningAndRestoredSnapshotCanFinish() {
+        val entered = CountDownLatch(1); val release = CountDownLatch(1); val calls = AtomicInteger()
+        val original = local(listOf(entry("source", "needle 当前原文")))
+        val source = AtomicReference<LocalRecordUiState?>(original)
+        val input = AtomicReference(OriginalSearchInput("needle"))
+        Workers().use { workers ->
+            val c = LocalOriginalSearchController(source::get, input::get, workers) { entries, query ->
+                if (calls.incrementAndGet() == 1) withContext(NonCancellable) {
+                    entered.countDown(); await(release); LocalOriginalSearchMatcher.match(entries, query)
+                } else LocalOriginalSearchMatcher.match(entries, query)
+            }
+            try {
+                c.sync(true); await(entered); val running = c.state.value
+                assertEquals(OriginalSearchStage.RUNNING, running.stage)
+                // The authoritative source changes before a committed render can call sync.
+                source.set(local(listOf(entry("source", "needle 修订原文", revision = 2))))
+                release.countDown(); await(workers.firstExited)
+                val rejected = c.state.value
+                assertEquals(OriginalSearchStage.WAITING, rejected.stage); assertTrue(rejected.hits.isEmpty())
+                assertEquals(running.generation, rejected.generation)
+                source.set(original); c.sync(true)
+                val recovered = ready(c, "needle")
+                assertEquals(listOf(1), recovered.hits.map { it.entry.currentRevision })
+                assertTrue(recovered.generation > running.generation); assertEquals(2, calls.get())
+                assertTrue(c.canOpen(recovered, recovered.hits.single()))
+                c.sync(true); assertSame(recovered, c.state.value); assertEquals(2, calls.get())
+            } finally { release.countDown(); c.close() }
+        }
+    }
+
     @Test(timeout = 5_000) fun pauseUsesExactSnapshotCacheWithNewGenerationAndClearCannotReuseItsResults() {
         val source = AtomicReference<LocalRecordUiState?>(local(listOf(entry("source", "needle"))))
         val input = AtomicReference(OriginalSearchInput("needle")); val calls = AtomicInteger()
