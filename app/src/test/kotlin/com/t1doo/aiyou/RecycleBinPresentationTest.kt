@@ -74,7 +74,7 @@ class RecycleBinPresentationTest {
         compose.onNodeWithTag("recycle-restore").performScrollTo().performClick()
         compose.onNodeWithTag("recycle-cancel").performClick(); compose.runOnIdle { assertTrue(f.deleted); assertEquals(1, f.applied.size) }
         compose.onNodeWithTag("recycle-restore").performScrollTo().performClick(); compose.onNodeWithTag("recycle-confirm").performClick(); pump()
-        compose.onNodeWithTag("recycle-notice").assertTextContains("旧远端授权未恢复")
+        compose.onNodeWithTag("recycle-notice").assertTextEquals("已恢复到本机列表；不参与 AI，旧远端授权未恢复。")
         compose.runOnIdle { assertFalse(f.deleted); assertEquals(ProcessingPolicy.AI_NONE, f.state.value.entries.single().policy)
             assertEquals(2, f.applied.size); navigation.get().selectDestination(Destination.MEMORIES) }
         compose.onNodeWithTag("entry-one").performScrollTo().assertExists()
