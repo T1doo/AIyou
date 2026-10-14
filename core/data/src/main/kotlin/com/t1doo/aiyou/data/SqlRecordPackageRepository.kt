@@ -6,9 +6,10 @@ import java.util.Base64
 import java.util.Collections
 import java.util.concurrent.CancellationException
 
-/** Same drained SQL owner and tag AEAD as normal records; no schema migration or raw import port. */
+/** Same drained SQL owner and tag AEAD; FK-free v8 receipts remain authoritative after erasure. */
 internal class SqlRecordPackageRepository(private val database: RecordsSqlDatabase,
-    private val tags: SqlManualTagRepository) : RecordPackageRepository {
+    private val tags: SqlManualTagRepository, private val maxGroups: Int = 4096) : RecordPackageRepository {
+    init { require(maxGroups in 1..4096) }
     override fun restore(verified: VerifiedRecordPackage, newIds: List<String>, importedAtMillis: Long): RecordPackageRestoreResult = safely {
         val pack = verified as? AuthenticatedRecordPackage ?: throw RecordPackageInvalid()
         require(newIds.size <= 20)
@@ -16,10 +17,24 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
         database.transaction { sql ->
             val existing = job(sql, GROUP + pack.manifest.backupId)
             if (existing != null) return@transaction replay(sql, pack, existing)
+            val groupCount = sql.query("SELECT count(*) FROM record_package_receipts WHERE operation='PACKAGE_RESTORE'").single().single() as Long
+            if (groupCount !in 0 until maxGroups.toLong()) throw RecordPackageConflict()
+            // Legacy mirrors are not replay authority, but surviving evidence forbids a fresh uncertain batch.
+            val mirrors = sql.query("SELECT id,entryId,sourceRevision,operation,state FROM local_jobs WHERE operation IN ('PACKAGE_RESTORE','PACKAGE_ORIGIN') ORDER BY id LIMIT ?",listOf(maxGroups*21+1))
+            require(mirrors.size <= maxGroups*21)
+            mirrors.forEach { row ->
+                if ((if (row[3] == "PACKAGE_RESTORE") group(row).id else origin(row).backupId) == pack.manifest.backupId)
+                    throw RecordPackageConflict()
+            }
             // A missing group ACK with surviving origin evidence cannot start an uncertain new batch.
-            sql.query("SELECT id,entryId,sourceRevision,operation,state FROM local_jobs WHERE operation='PACKAGE_ORIGIN'").forEach {
+            val origins = sql.query("SELECT id,entryId,sourceRevision,operation,state FROM record_package_receipts WHERE operation='PACKAGE_ORIGIN' ORDER BY id LIMIT ?",listOf(maxGroups*20+1))
+            require(origins.size <= maxGroups*20)
+            origins.forEach {
                 if (origin(it).backupId == pack.manifest.backupId) throw RecordPackageConflict()
             }
+            val proofs = sql.query("SELECT entryId,packageProof FROM permanent_erasure_receipts WHERE packageProof!='' ORDER BY entryId LIMIT ?",listOf(maxGroups*20+1))
+            require(proofs.size <= maxGroups*20)
+            proofs.forEach { if (proofBackupId(it[1] as String,it[0] as String) == pack.manifest.backupId) throw RecordPackageConflict() }
             require(importedAtMillis >= 0 && ids.size == pack.records.size && ids.distinct().size == ids.size)
             ids.forEach { id ->
                 RecordPackages.uuid(id)
@@ -37,11 +52,15 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
                 sql.execute("INSERT INTO local_jobs(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,'LOCAL_INDEX','PENDING')",
                     listOf("PACKAGE_INDEX:" + id, id))
                 val provenance = expectedOrigin(pack, index, id, importedAtMillis)
+                sql.execute("INSERT INTO record_package_receipts(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,'PACKAGE_ORIGIN',?)",
+                    listOf(ORIGIN + id, id, originState(provenance)))
                 sql.execute("INSERT INTO local_jobs(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,'PACKAGE_ORIGIN',?)",
                     listOf(ORIGIN + id, id, originState(provenance)))
             }
             val group = Group(pack.manifest.backupId, pack.digest, pack.manifest.createdAtMillis,
                 importedAtMillis, ids, pack.recordDigests)
+            sql.execute("INSERT INTO record_package_receipts(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,'PACKAGE_RESTORE',?)",
+                listOf(GROUP + group.id, ids.first(), groupState(group)))
             sql.execute("INSERT INTO local_jobs(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,'PACKAGE_RESTORE',?)",
                 listOf(GROUP + group.id, ids.first(), groupState(group)))
             replay(sql, pack, checkNotNull(job(sql, GROUP + group.id)), false)
@@ -50,15 +69,18 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
 
     override fun origins(): Map<String, RecordPackageOrigin> = safely {
         database.transaction { sql ->
-            val origins = sql.query("SELECT id,entryId,sourceRevision,operation,state FROM local_jobs WHERE operation='PACKAGE_ORIGIN'").map(::origin)
-            Collections.unmodifiableMap(origins.associate { value ->
+            groups(sql).forEach { validateMembers(sql,it) }
+            val originRows = sql.query("SELECT id,entryId,sourceRevision,operation,state FROM record_package_receipts WHERE operation='PACKAGE_ORIGIN' ORDER BY id LIMIT ?",listOf(maxGroups*20+1))
+            require(originRows.size <= maxGroups*20)
+            val origins = originRows.map(::origin)
+            Collections.unmodifiableMap(origins.mapNotNull { value ->
                 val group = group(checkNotNull(job(sql, GROUP + value.backupId)))
                 val index = group.ids.indexOf(value.newId); require(index >= 0)
                 require(group.digest == value.packageDigest && group.created == value.packageCreatedAtMillis &&
                     group.imported == value.importedAtMillis && group.hashes[index] == value.recordDigest)
                 immutable(sql, value, null)
-                value.newId to value
-            })
+                if (SqlErasureFileHooks.fenced(sql, value.newId)) null else value.newId to value
+            }.toMap())
         }
     }
 
@@ -67,15 +89,37 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
         val group = group(row)
         if (group.id != pack.manifest.backupId || group.digest != pack.digest || group.created != pack.manifest.createdAtMillis ||
             group.ids.size != pack.records.size || group.hashes != pack.recordDigests) throw RecordPackageConflict()
+        var deleted = 0; var erasing = 0
         group.ids.forEachIndexed { index, id ->
             require(pack.records.none { it.sourceId == id })
             val expected = expectedOrigin(pack, index, id, group.imported)
+            val erasure = sql.query("SELECT sourceRevision,generation,mutationId,phase,plan,packageProof FROM permanent_erasure_receipts WHERE entryId=?", listOf(id)).singleOrNull()
+            if (erasure != null) {
+                require((erasure[0] as Long) > 0 && (erasure[1] as Long) >= 0)
+                ManualTags.identifier(erasure[2] as String)
+                val phase = PermanentErasurePhase.valueOf(erasure[3] as String)
+                require(erasure[5] == erasureProof(group, index, id))
+                if (phase == PermanentErasurePhase.DONE) {
+                    require(erasure[4] == "" && job(sql, ORIGIN + id) == null &&
+                        sql.query("SELECT id FROM local_jobs WHERE id=?", listOf(ORIGIN+id)).isEmpty() &&
+                        sql.query("SELECT id FROM entries WHERE id=?", listOf(id)).isEmpty() &&
+                        sql.query("SELECT entryId FROM entry_revisions WHERE entryId=?", listOf(id)).isEmpty())
+                    deleted++
+                    return@forEachIndexed
+                }
+                require(phase != PermanentErasurePhase.PREPARED || erasure[4] == "")
+                require(phase != PermanentErasurePhase.PLANNED || (erasure[4] as String).isNotEmpty())
+                val originRow = checkNotNull(job(sql, ORIGIN + id))
+                require(originRow[4] == originState(expected)); immutable(sql, origin(originRow), pack.records[index])
+                erasing++
+                return@forEachIndexed
+            }
             val originRow = checkNotNull(job(sql, ORIGIN + id))
             val actual = origin(originRow)
             require(originRow[4] == originState(expected))
             immutable(sql, actual, pack.records[index])
         }
-        return RecordPackageRestoreResult(group.ids, group.imported, replayed)
+        return RecordPackageRestoreResult(group.ids, group.imported, replayed, deleted, erasing)
     }
 
     /** Raw SQL deliberately includes trashed rows and the immutable first imported revision. */
@@ -139,7 +183,60 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
         } finally { raw.fill(0) }
     }
     private fun job(sql: RecordsSqlConnection, id: String): List<Any?>? =
-        sql.query("SELECT id,entryId,sourceRevision,operation,state FROM local_jobs WHERE id=?", listOf(id)).singleOrNull()
+        sql.query("SELECT id,entryId,sourceRevision,operation,state FROM record_package_receipts WHERE id=?", listOf(id)).singleOrNull()
+
+    internal fun prepareErasureProof(sql: RecordsSqlConnection, entryId: String): String {
+        val row = job(sql, ORIGIN+entryId)
+        if (row == null) {
+            if (sql.query("SELECT id FROM local_jobs WHERE operation='PACKAGE_ORIGIN' AND entryId=? LIMIT 1",listOf(entryId)).isNotEmpty() ||
+                groups(sql).any { entryId in it.ids }) throw RecordPackageConflict()
+            return ""
+        }
+        val value = origin(row); val group = group(checkNotNull(job(sql, GROUP+value.backupId)))
+        validateMembers(sql,group)
+        val index = group.ids.indexOf(entryId); require(index >= 0)
+        require(group.digest == value.packageDigest && group.created == value.packageCreatedAtMillis &&
+            group.imported == value.importedAtMillis && group.hashes[index] == value.recordDigest)
+        immutable(sql, value, null)
+        return erasureProof(group, index, entryId)
+    }
+    private fun groups(sql: RecordsSqlConnection): List<Group> {
+        val rows = sql.query("SELECT id,entryId,sourceRevision,operation,state FROM record_package_receipts WHERE operation='PACKAGE_RESTORE' ORDER BY id LIMIT ?",listOf(maxGroups+1))
+        require(rows.size <= maxGroups)
+        return rows.map(::group).also { require(it.flatMap { g -> g.ids }.distinct().size == it.sumOf { g -> g.ids.size }) }
+    }
+    private fun validateMembers(sql: RecordsSqlConnection, group: Group) {
+        group.ids.forEachIndexed { index,id ->
+            val erasure = sql.query("SELECT sourceRevision,generation,mutationId,phase,plan,packageProof FROM permanent_erasure_receipts WHERE entryId=?",listOf(id)).singleOrNull()
+            if (erasure != null) {
+                require((erasure[0] as Long) in 1..Int.MAX_VALUE.toLong() && (erasure[1] as Long) >= 0)
+                ManualTags.identifier(erasure[2] as String)
+                val phase = PermanentErasurePhase.valueOf(erasure[3] as String)
+                require(erasure[5] == erasureProof(group,index,id) && (phase == PermanentErasurePhase.PLANNED) == (erasure[4] as String).isNotEmpty())
+                if (phase == PermanentErasurePhase.DONE) {
+                    require(job(sql,ORIGIN+id) == null && sql.query("SELECT id FROM local_jobs WHERE id=?",listOf(ORIGIN+id)).isEmpty() &&
+                        sql.query("SELECT id FROM entries WHERE id=?",listOf(id)).isEmpty() && sql.query("SELECT entryId FROM entry_revisions WHERE entryId=?",listOf(id)).isEmpty())
+                    return@forEachIndexed
+                }
+                require(sql.query("SELECT e.currentRevision,a.generation,a.deleted FROM entries e JOIN remote_source_access a ON a.entryId=e.id WHERE e.id=?",listOf(id)).single() == listOf(erasure[0],erasure[1],1L))
+            }
+            val value = origin(checkNotNull(job(sql,ORIGIN+id)))
+            require(value.newId == id && value.backupId == group.id && value.packageDigest == group.digest &&
+                value.packageCreatedAtMillis == group.created && value.importedAtMillis == group.imported && value.recordDigest == group.hashes[index])
+            immutable(sql,value,null)
+        }
+    }
+    private fun erasureProof(group: Group, index: Int, entryId: String): String = receipt { out ->
+        out.i32(1); out.i32(3); out.string(group.id,36); out.raw(packageUnhex(group.digest))
+        out.i32(index); out.string(entryId,36); out.raw(packageUnhex(group.hashes[index]))
+    }
+    private fun proofBackupId(state: String, entryId: String): String = readReceipt(state) { input ->
+        require(input.i32() == 1 && input.i32() == 3)
+        val backupId = input.string(36).also(RecordPackages::uuid)
+        input.raw(32); require(input.i32() in 0..19)
+        require(input.string(36).also(RecordPackages::uuid) == entryId); input.raw(32)
+        backupId
+    }
     private inline fun <T> safely(block: () -> T): T = try { block() }
         catch (failure: CancellationException) { throw failure }
         catch (failure: RecordPackageConflict) { throw failure }

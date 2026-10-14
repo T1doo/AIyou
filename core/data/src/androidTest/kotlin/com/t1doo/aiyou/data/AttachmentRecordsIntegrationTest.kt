@@ -42,7 +42,7 @@ class AttachmentRecordsIntegrationTest {
         System.loadLibrary("sqlcipher")
     }
     @After fun after() {
-        stores.forEach { it.close() }; key.fill(0)
+        stores.forEach { it.closeAndAwait() }; key.fill(0)
         aliases.forEach { KeyStore.getInstance("AndroidKeyStore").apply { load(null); deleteEntry(it) } }
         directory.deleteRecursively() // unique owned synthetic directory
     }
@@ -59,7 +59,7 @@ class AttachmentRecordsIntegrationTest {
         assertArrayEquals(data, store.attachments.read(request.id))
         val current = store.revise(original.id, 1, "合成新版原文", 2000)
         assertTrue(store.attachments.list(original.id, 2).isEmpty())
-        store.close(); store = open(); store.prepare()
+        store.closeAndAwait(); store = open(); store.prepare()
         assertEquals(listOf(current), store.entries()); assertEquals(independent, store.readDraft())
         assertEquals(2, store.revisions(original.id).size)
         assertArrayEquals(data, store.attachments.read(request.id))
@@ -99,7 +99,7 @@ class AttachmentRecordsIntegrationTest {
         val preserved = blob.readBytes()
         store.database.openHelper.writableDatabase.query("SELECT state FROM attachments").use { it.moveToFirst(); assertEquals("STAGED", it.getString(0)) }
         store.database.openHelper.writableDatabase.execSQL("DROP TRIGGER fail_attachment_ready")
-        store.close(); store = open(); store.prepare(); store.prepare()
+        store.closeAndAwait(); store = open(); store.prepare(); store.prepare()
         assertEquals(AttachmentState.READY, store.attachments.list(original.id, 1).single().state)
         assertEquals(AttachmentState.READY, store.attachments.save(request) { error("no repeated copy") }.state)
         assertArrayEquals(preserved, blob.readBytes()); assertArrayEquals(data, store.attachments.read(request.id))
@@ -136,7 +136,7 @@ class AttachmentRecordsIntegrationTest {
         for (table in listOf("remote_source_access", "remote_text_jobs", "text_annotations")) {
             migrated.database.openHelper.writableDatabase.query("SELECT count(*) FROM $table").use { it.moveToFirst(); assertEquals(0L, it.getLong(0)) }
         }
-        migrated.close()
+        migrated.closeAndAwait()
         val reopened = open(); reopened.prepare()
         assertEquals(listOf(updated), reopened.entries()); assertEquals(revisions, reopened.revisions(id))
         assertEquals(draft, reopened.readDraft()); assertTrue(reopened.attachments.list(id, 1).isEmpty())

@@ -12,6 +12,9 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/DrainingRecordsSqlDatabase.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedAttachmentStore.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedOriginalEditStore.kt")
+    listOf("ErasureFileProtocol.kt", "PermanentErasureSqlSchema.kt", "SqlPermanentErasureRepository.kt", "DrainingRecordsStorage.kt", "PermanentErasureRecovery.kt").forEach {
+        from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
+    }
     listOf("ManualTagSqlSchema.kt", "ManualTagCipher.kt", "SqlManualTagRepository.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
@@ -46,6 +49,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:domain"))
     implementation(project(":core:ai"))
+    implementation(libs.coroutines.core)
     testImplementation(libs.junit)
     testImplementation(libs.okhttp)
     testImplementation(libs.mockwebserver)
@@ -53,4 +57,8 @@ dependencies {
     testImplementation(libs.coroutines.core)
 }
 
-tasks.test { useJUnit() }
+tasks.test {
+    useJUnit()
+    systemProperty("aiyou.erasure.process.classpath", sourceSets.test.get().runtimeClasspath.asPath)
+    systemProperty("aiyou.erasure.process.evidence", layout.buildDirectory.dir("reports/erasure-process").get().asFile.absolutePath)
+}

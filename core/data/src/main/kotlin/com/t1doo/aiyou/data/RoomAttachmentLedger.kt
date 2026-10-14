@@ -10,6 +10,7 @@ internal class RoomAttachmentLedger(private val database: RecordsDatabase) : Att
     private val dao get() = database.records()
     override suspend fun find(id: String): LocalAttachment? = dao.attachment(id)?.toModel()
     override suspend fun all(): List<LocalAttachment> = dao.attachments().map { it.toModel() }
+    override suspend fun forEntry(entryId: String, limit: Int): List<LocalAttachment> = dao.attachmentsForEntry(entryId, limit).map { it.toModel() }
     override suspend fun insert(value: LocalAttachment) = database.withTransaction {
         val intent = value.intent
         if (value.state != AttachmentState.WRITING) throw AttachmentConflict()

@@ -45,7 +45,7 @@ class SourceBoundTextRecordsIntegrationTest {
 
     @After fun after() {
         val cleanup = {
-            try { stores.forEach { it.close() } } finally {
+            try { stores.forEach { it.closeAndAwait() } } finally {
                 stores.clear()
                 if (::syntheticKey.isInitialized) syntheticKey.fill(0)
                 if (::directory.isInitialized) directory.deleteRecursively() // Only this test's unique owned fixture.
@@ -56,7 +56,7 @@ class SourceBoundTextRecordsIntegrationTest {
         } finally { if (::trace.isInitialized) trace.close() }
     }
 
-    @Test fun freshVersionSevenUsesGeneratedRoomAndEncryptedNativeStore() = runBlocking {
+    @Test fun freshVersionEightUsesGeneratedRoomAndEncryptedNativeStore() = runBlocking {
         val store = open()
         val entry = seed(store, "合成正式原文：需要来源绑定 🌿")
         trace.step("source_fresh_contract") {
@@ -346,7 +346,7 @@ class SourceBoundTextRecordsIntegrationTest {
         if (file.exists()) "REOPEN_SAME_PROCESS" else "FRESH_FILE_FIRST_OPEN") {
         EncryptedEntryRepository.openWithKey(context, file, syntheticKey.copyOf()).also { stores += it }
     }
-    private fun close(store: EncryptedEntryRepository) = trace.step("source_close") { store.close(); stores.remove(store) }
+    private fun close(store: EncryptedEntryRepository) = trace.step("source_close") { store.closeAndAwait(); stores.remove(store) }
     private suspend fun seed(store: EncryptedEntryRepository, text: String): StoredEntry = trace.suspending("source_seed") {
         store.saveDraft(store.updateDraft(text), 1000, "Etc/UTC")
     }

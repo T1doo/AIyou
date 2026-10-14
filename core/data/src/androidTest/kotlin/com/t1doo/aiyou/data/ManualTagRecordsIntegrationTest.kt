@@ -31,13 +31,13 @@ class ManualTagRecordsIntegrationTest {
         directory = File(context.noBackupFilesDir, "manual-tags-${UUID.randomUUID()}").also { check(it.mkdirs()) }
         System.loadLibrary("sqlcipher")
     }
-    @After fun after() { try { stores.forEach { it.close() } } finally { key.fill(0); if (::directory.isInitialized) directory.deleteRecursively() } }
-    @Test fun freshVersionSevenEncryptsManualTagsAndAuthenticatesAcrossReopen(): Unit = runBlocking {
+    @After fun after() { try { stores.forEach { it.closeAndAwait() } } finally { key.fill(0); if (::directory.isInitialized) directory.deleteRecursively() } }
+    @Test fun freshVersionEightEncryptsManualTagsAndAuthenticatesAcrossReopen(): Unit = runBlocking {
         val store = open(); val entry = seed(store)
         NativeRecordsSchemaFixture.assertCurrentSchema(store.database.openHelper.writableDatabase)
         val tags = store.manualTags
         tags.replace(ManualTagMutation(entry.id, 0, listOf("合成私密手工标签🙂e\u0301"), "one"))
-        store.close(); val reopened = open()
+        store.closeAndAwait(); val reopened = open()
         assertEquals(listOf("合成私密手工标签🙂e\u0301"), reopened.manualTags.read(entry.id).names)
         assertFalse(file.readBytes().toString(Charsets.UTF_8).contains("合成私密手工标签"))
         val sql = reopened.database.openHelper.writableDatabase
@@ -60,7 +60,7 @@ class ManualTagRecordsIntegrationTest {
         assertEquals("合成迁移草稿", migrated.readDraft()!!.text); assertEquals(7L, migrated.readDraft()!!.version)
         assertEquals(0L, migrated.manualTags.read("legacy").version)
         migrated.manualTags.replace(ManualTagMutation("legacy", 0, listOf("手工"), "migration"))
-        migrated.close(); val reopened = open()
+        migrated.closeAndAwait(); val reopened = open()
         assertEquals(listOf("手工"), reopened.manualTags.read("legacy").names)
         assertEquals(text, reopened.entries().single().originalText); assertEquals(1, reopened.revisions("legacy").size)
         reopened.database.openHelper.writableDatabase.query("SELECT state FROM local_jobs").use { assertTrue(it.moveToFirst()); assertEquals("PENDING", it.getString(0)); assertFalse(it.moveToNext()) }
@@ -94,7 +94,7 @@ class ManualTagRecordsIntegrationTest {
         sql.execSQL("INSERT INTO remote_source_access(entryId,generation,deleted,connection,consent) VALUES(?,1,1,NULL,NULL) ON CONFLICT(entryId) DO UPDATE SET generation=generation+1,deleted=1", arrayOf(entry.id))
         assertThrows(ManualTagUnavailable::class.java) { store.manualTags.read(entry.id) }
         assertEquals(2, revised.currentRevision); assertTrue(store.manualTags.snapshots().isEmpty())
-        store.close(); store.close()
+        store.closeAndAwait(); store.closeAndAwait()
         assertThrows(ManualTagStorageFailure::class.java) { store.manualTags.snapshots() }
         val reopened = open(); assertTrue(reopened.entries().isEmpty()); assertTrue(reopened.manualTags.snapshots().isEmpty())
     }

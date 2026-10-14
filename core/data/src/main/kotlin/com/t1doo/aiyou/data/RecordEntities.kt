@@ -125,3 +125,15 @@ internal data class ManualTaskEntity(
     val lastMutationId: String,
     val ciphertext: ByteArray,
 )
+
+@Entity(tableName = "permanent_erasure_receipts", indices = [Index(value = ["mutationId"], unique = true)])
+internal data class PermanentErasureEntity(@PrimaryKey val entryId: String, val sourceRevision: Int,
+    val generation: Long, val mutationId: String, val phase: String, val plan: String, val packageProof: String)
+
+@Entity(tableName = "record_package_receipts")
+internal data class RecordPackageReceiptEntity(@PrimaryKey val id: String, val entryId: String,
+    val sourceRevision: Int, val operation: String, val state: String)
+
+@Entity(tableName = "owned_file_creations", primaryKeys = ["bucket", "name"], indices = [Index(value = ["entryId"])])
+internal data class OwnedFileCreationEntity(val bucket: String, val name: String, val entryId: String,
+    val state: String, val identity: String)

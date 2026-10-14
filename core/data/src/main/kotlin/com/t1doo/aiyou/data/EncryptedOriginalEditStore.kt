@@ -39,13 +39,16 @@ class EncryptedOriginalEditStore(
     private val keyBytes: ByteArray,
     private val checkpoint: (String) -> Unit = {},
 ) : OriginalEditDraftStore, AutoCloseable {
-    private val lifecycle = Any()
+    private val lifecycle = java.lang.Object()
+    private var erasureHooks: ErasureFileHooks = NoErasureFileHooks
     private var operations = 0
     private var closed = false
 
     init { require(keyBytes.size == 32) }
 
-    override suspend fun read(entryId: String): OriginalEditDraft? = locked { readLocked(entryId) }
+    override suspend fun read(entryId: String): OriginalEditDraft? = locked {
+        if (erasureHooks.fenced(entryId)) null else readLocked(entryId)
+    }
 
     override suspend fun pending(): OriginalEditDraftIndex = locked {
         val rootBefore = Files.readAttributes(directory.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
@@ -62,7 +65,7 @@ class EncryptedOriginalEditStore(
         for (target in targets) {
             try {
                 val draft = authenticated(target)
-                if (draft.state == OriginalEditDraftState.ACTIVE)
+                if (!erasureHooks.fenced(draft.entryId) && draft.state == OriginalEditDraftState.ACTIVE)
                     drafts += OriginalEditDraftRef(draft.id, draft.entryId, draft.baseRevision)
             } catch (_: OriginalEditDraftIntegrityFailure) { integrityFailures++ }
             catch (_: OriginalEditDraftChangedDuringRead) { changedReads++ }
@@ -74,6 +77,7 @@ class EncryptedOriginalEditStore(
 
     override suspend fun write(expected: OriginalEditDraft?, next: OriginalEditDraft): OriginalEditDraft = locked {
         validate(next)
+        if (erasureHooks.fenced(next.entryId)) throw OriginalEditDraftConflict()
         if (expected != null && expected.entryId != next.entryId) throw OriginalEditDraftConflict()
         val current = readLocked(next.entryId) // Corrupt files are preserved, never replaced.
         if (current == next) { syncDirectory(directory); return@locked current } // Confirm publication without rewriting ciphertext.
@@ -111,7 +115,7 @@ class EncryptedOriginalEditStore(
         Files.readAttributes(target.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
     } catch (_: NoSuchFileException) { throw OriginalEditDraftChangedDuringRead() }
 
-    private fun authenticated(target: File): OriginalEditDraft {
+    private fun authenticated(target: File, canonicalName: String = target.name): OriginalEditDraft {
         val before = observedFile(target)
         if (!before.isRegularFile || before.size() !in 30L..MAX_ENVELOPE_BYTES.toLong()) throw OriginalEditDraftIntegrityFailure()
         checkpoint("before-read")
@@ -130,7 +134,7 @@ class EncryptedOriginalEditStore(
         if (envelope.size !in 30..MAX_ENVELOPE_BYTES || envelope[0] != 1.toByte()) throw OriginalEditDraftIntegrityFailure()
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, "AES"), GCMParameterSpec(128, envelope.copyOfRange(1, 13)))
-        cipher.updateAAD(aad(target.name))
+        cipher.updateAAD(aad(canonicalName))
         val plain = try { cipher.doFinal(envelope, 13, envelope.size - 13) }
             catch (_: BadPaddingException) { throw OriginalEditDraftIntegrityFailure() }
         try {
@@ -138,7 +142,7 @@ class EncryptedOriginalEditStore(
                 DataInputStream(ByteArrayInputStream(plain)).use { input ->
                     val draft = OriginalEditDraft(input.readUTF(), input.readUTF(), input.readInt(), input.readInt(),
                         input.readLong(), readText(input), readText(input), OriginalEditDraftState.valueOf(input.readUTF()))
-                    if (input.available() != 0 || file(draft.entryId).name != target.name) throw OriginalEditDraftIntegrityFailure()
+                    if (input.available() != 0 || file(draft.entryId).name != canonicalName) throw OriginalEditDraftIntegrityFailure()
                     validate(draft)
                     draft
                 }
@@ -172,15 +176,25 @@ class EncryptedOriginalEditStore(
         } finally { plain.fill(0) }
         // Unique owned partials survive failure for diagnosis; they are never restoration sources.
         val temporary = File(directory, target.name + ".partial." + UUID.randomUUID())
-        FileOutputStream(temporary).use { it.write(envelope); it.fd.sync() }
+        erasureHooks.reserve(value.entryId, BUCKET, temporary.name)
+        Files.createFile(temporary.toPath())
+        FileOutputStream(temporary).use {
+            it.write(envelope, 0, 13); it.fd.sync(); syncDirectory(directory)
+            val proof = createdFileProof(temporary, 13)
+            erasureHooks.created(value.entryId, BUCKET, temporary.name, proof)
+            if (erasureHooks.fenced(value.entryId)) throw OriginalEditDraftConflict()
+            it.write(envelope, 13, envelope.size-13); it.fd.sync()
+        }
         checkpoint("encrypted")
+        if (erasureHooks.fenced(value.entryId)) throw OriginalEditDraftConflict()
         Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
         checkpoint("published")
         syncDirectory(directory)
         checkpoint("durable")
+        erasureHooks.forgotten(value.entryId, BUCKET, temporary.name)
     }
 
-    private suspend fun <T> locked(action: suspend () -> T): T {
+    private suspend fun <T> locked(action: suspend () -> T): T = trackedFileOperation(lifecycle) {
         synchronized(lifecycle) { check(!closed); operations++ }
         try {
             check(!Files.isSymbolicLink(directory.toPath()))
@@ -194,16 +208,60 @@ class EncryptedOriginalEditStore(
             FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel ->
                 val lock = try { channel.tryLock() } catch (_: OverlappingFileLockException) { null }
                 if (lock == null) throw OriginalEditDraftBusy()
-                lock.use { return action() }
+                lock.use { checkpoint("locked"); return@trackedFileOperation action() }
             }
         } finally {
-            synchronized(lifecycle) { operations--; if (closed && operations == 0) keyBytes.fill(0) }
+            synchronized(lifecycle) { operations--; if (operations == 0) lifecycle.notifyAll(); if (closed && operations == 0) keyBytes.fill(0) }
         }
     }
 
     override fun close() = synchronized(lifecycle) { closed = true; if (operations == 0) keyBytes.fill(0); Unit }
 
+    internal fun installErasureHooks(hooks: ErasureFileHooks) = synchronized(lifecycle) {
+        check(!closed && operations == 0 && erasureHooks === NoErasureFileHooks); erasureHooks = hooks
+    }
+    internal suspend fun <T> withErasureLease(action: suspend (ErasureDirectoryLease) -> T): T =
+        locked { action(ErasureDirectoryLease(BUCKET, directory)) }
+    internal fun erasurePlan(entryId: String, lease: ErasureDirectoryLease, budget: ErasureScanBudget): List<ErasureFileObservation> {
+        val canonical = file(entryId).name
+        val candidates = mutableListOf<File>()
+        // Bound both directory enumeration and this source's candidate count. Never truncate to DONE.
+        var scanned = 0
+        Files.newDirectoryStream(directory.toPath()).use { stream ->
+            for (path in stream) {
+                if (++scanned > 4096) throw com.t1doo.aiyou.domain.PermanentErasureIncomplete()
+                val name = path.fileName.toString()
+                if (name == canonical || name.startsWith(canonical + ".partial.")) {
+                    if (name != canonical) {
+                        val suffix = name.removePrefix(canonical + ".partial.")
+                        if (runCatching { UUID.fromString(suffix).toString() == suffix }.getOrDefault(false).not())
+                            throw com.t1doo.aiyou.domain.PermanentErasureIncomplete()
+                    }
+                    if (candidates.size >= 64) throw com.t1doo.aiyou.domain.PermanentErasureIncomplete()
+                    candidates += path.toFile()
+                }
+            }
+        }
+        return candidates.sortedBy { it.name }.map { candidate ->
+            val observed = lease.observe(candidate) ?: throw com.t1doo.aiyou.domain.PermanentErasureIncomplete()
+            budget.consume(observed)
+            val proof = if (candidate.name != canonical) erasureHooks.creation(entryId, BUCKET, candidate.name) else null
+            if ((proof == null || proof != createdFileProof(candidate, 13)) && authenticated(candidate, canonical).entryId != entryId)
+                throw com.t1doo.aiyou.domain.PermanentErasureIncomplete()
+            if (lease.observe(candidate) != observed) throw com.t1doo.aiyou.domain.PermanentErasureIncomplete()
+            observed
+        }
+    }
+    internal fun awaitIdle() {
+        checkExternalWait()
+        var interrupted = false
+        synchronized(lifecycle) { while (operations != 0) try { lifecycle.wait() } catch (_: InterruptedException) { interrupted = true } }
+        if (interrupted) Thread.currentThread().interrupt()
+    }
+    internal fun checkExternalWait() { checkExternalFileWait(lifecycle) }
+
     companion object {
+        internal const val BUCKET = "EDITS"
         const val MAX_TEXT_LENGTH = 100_000
         private const val MAX_ENVELOPE_BYTES = 402_048
         private fun aad(name: String) = ("AIyou original edit envelope v1:" + name).toByteArray(Charsets.US_ASCII)

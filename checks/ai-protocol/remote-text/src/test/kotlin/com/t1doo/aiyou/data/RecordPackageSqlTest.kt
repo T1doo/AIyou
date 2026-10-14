@@ -8,15 +8,15 @@ import java.util.concurrent.*
 import org.junit.Assert.*
 import org.junit.Test
 
-/** Actual production crypto and SQL on exported v6, never an unchecked plaintext import fake. */
+/** Actual production crypto and SQL on exact v5 followed by actual v6/v7/v8 migrations, never an unchecked plaintext import fake. */
 class RecordPackageSqlTest {
-    @Test fun authenticatedUnicodeImportUsesFreshIdsEncryptedTagsAiNoneAndPreservesLegacyTables(): Unit = ManualTaskSqlTest.Fixture().use { f ->
+    @Test fun authenticatedUnicodeImportUsesFreshIdsEncryptedTagsAiNoneAndPreservesLegacyTables(): Unit = packageFixture().use { f ->
         val old = f.legacy(); val tags = SqlManualTagRepository(f.db, ManualTaskSqlTest.KEY)
         try {
             val pack = RecordPackageCipherTest.verified(); val id = uuid()
             val result = SqlRecordPackageRepository(f.db, tags).restore(pack, listOf(id), 100)
             assertFalse(result.replayed); assertEquals(listOf(id), result.ids); assertEquals(100L, result.importedAtMillis)
-            assertTrue(f.legacy().containsAll(old)); assertEquals(6L, f.db.read("PRAGMA user_version").single().single())
+            assertTrue(f.legacy().containsAll(old)); assertEquals(8L, f.db.read("PRAGMA user_version").single().single())
             val row = f.db.read("SELECT * FROM entries WHERE id=?", id).single()
             assertEquals(listOf(id, 1L, -1L, "Asia/Shanghai", "AI_NONE"), row)
             assertEquals(listOf(1L, 0L, null, null), f.db.read("SELECT generation,deleted,connection,consent FROM remote_source_access WHERE entryId=?", id).single())
@@ -30,16 +30,16 @@ class RecordPackageSqlTest {
             assertFalse(origin.toString().contains(origin.sourceId))
         } finally { tags.wipeKey() }
     }
-    @Test fun actualReceiptInsertFailureRollsBackEveryNewRowAndLeavesLegacyEvidence(): Unit = ManualTaskSqlTest.Fixture().use { f ->
+    @Test fun actualReceiptInsertFailureRollsBackEveryNewRowAndLeavesLegacyEvidence(): Unit = packageFixture().use { f ->
         val before = f.legacy(); val tags = SqlManualTagRepository(f.db, ManualTaskSqlTest.KEY)
         try {
-            f.db.write("CREATE TEMP TRIGGER reject_package BEFORE INSERT ON local_jobs WHEN NEW.operation='PACKAGE_RESTORE' BEGIN SELECT RAISE(ABORT,'synthetic receipt abort'); END")
+            f.db.write("CREATE TEMP TRIGGER reject_package BEFORE INSERT ON record_package_receipts WHEN NEW.operation='PACKAGE_RESTORE' BEGIN SELECT RAISE(ABORT,'synthetic receipt abort'); END")
             val pack = RecordPackageCipherTest.verified()
             assertThrows(RecordPackageStorageFailure::class.java) { SqlRecordPackageRepository(f.db, tags).restore(pack, listOf(uuid()), 100) }
             assertEquals(before, f.legacy())
         } finally { tags.wipeKey() }
     }
-    @Test fun lostCommitAcknowledgementColdReopenReturnsOneStableBatchWithoutFurtherWrites(): Unit = ManualTaskSqlTest.Fixture().use { f ->
+    @Test fun lostCommitAcknowledgementColdReopenReturnsOneStableBatchWithoutFurtherWrites(): Unit = packageFixture().use { f ->
         val pack = RecordPackageCipherTest.verified(); val id = uuid(); var lost = false
         var tags = SqlManualTagRepository(f.db, ManualTaskSqlTest.KEY)
         try {
@@ -53,7 +53,7 @@ class RecordPackageSqlTest {
             assertEquals(durable, f.legacy()); assertEquals(2, f.db.read("SELECT id FROM entries").size)
         } finally { f.db.afterSql = null; tags.wipeKey() }
     }
-    @Test(timeout = 12_000) fun independentSqliteProcessesRaceSameBackupIdAndOnlyOneBatchCommits(): Unit = ManualTaskSqlTest.Fixture().use { f ->
+    @Test(timeout = 12_000) fun independentSqliteProcessesRaceSameBackupIdAndOnlyOneBatchCommits(): Unit = packageFixture().use { f ->
         f.second().use { other ->
             assertNotEquals(f.db.pid, other.pid)
             val pack = RecordPackageCipherTest.verified(); val tags = SqlManualTagRepository(f.db, ManualTaskSqlTest.KEY)
@@ -65,11 +65,11 @@ class RecordPackageSqlTest {
                 go.countDown(); val results = outcomes.map { it.get(3, TimeUnit.SECONDS) }
                 assertEquals(results[0].ids, results[1].ids); assertEquals(1, results.count { it.replayed })
                 assertEquals(2, f.db.read("SELECT id FROM entries").size)
-                assertEquals(1, f.db.read("SELECT id FROM local_jobs WHERE operation='PACKAGE_RESTORE'").size)
+                assertEquals(1, f.db.read("SELECT id FROM record_package_receipts WHERE operation='PACKAGE_RESTORE'").size)
             } finally { pool.shutdownNow(); assertTrue(pool.awaitTermination(2, TimeUnit.SECONDS)); tags.wipeKey(); otherTags.wipeKey() }
         }
     }
-    @Test fun replayAfterEditTagsTrashAndFreshAuthorizationNeverOverwritesOrRevives(): Unit = ManualTaskSqlTest.Fixture().use { f ->
+    @Test fun replayAfterEditTagsTrashAndFreshAuthorizationNeverOverwritesOrRevives(): Unit = packageFixture().use { f ->
         val tags = SqlManualTagRepository(f.db, ManualTaskSqlTest.KEY)
         try {
             val repo = SqlRecordPackageRepository(f.db, tags); val pack = RecordPackageCipherTest.verified(); val id = uuid()
@@ -93,7 +93,7 @@ class RecordPackageSqlTest {
             assertEquals("后来标签", tags.readWithinForTest(f.db, id).names.single())
         } finally { tags.wipeKey() }
     }
-    @Test fun sameIdDifferentAuthenticatedDigestAndInvalidNewIdsFailBeforeAnyWrite(): Unit = ManualTaskSqlTest.Fixture().use { f ->
+    @Test fun sameIdDifferentAuthenticatedDigestAndInvalidNewIdsFailBeforeAnyWrite(): Unit = packageFixture().use { f ->
         val tags = SqlManualTagRepository(f.db, ManualTaskSqlTest.KEY)
         try {
             val repo = SqlRecordPackageRepository(f.db, tags); val pack = RecordPackageCipherTest.verified()
@@ -107,7 +107,7 @@ class RecordPackageSqlTest {
             assertEquals(original, f.legacy())
         } finally { tags.wipeKey() }
     }
-    @Test fun fakePreviewCapabilityCannotReachSqlOrWriteEvenWhenFieldsMatchVerifiedData(): Unit = ManualTaskSqlTest.Fixture().use { f ->
+    @Test fun fakePreviewCapabilityCannotReachSqlOrWriteEvenWhenFieldsMatchVerifiedData(): Unit = packageFixture().use { f ->
         val tags = SqlManualTagRepository(f.db, ManualTaskSqlTest.KEY)
         try {
             val pack = RecordPackageCipherTest.verified(); val fake = object : VerifiedRecordPackage {
@@ -118,23 +118,23 @@ class RecordPackageSqlTest {
             assertFalse(called)
         } finally { f.db.beforeSql = null; tags.wipeKey() }
     }
-    @Test fun missingCorruptOrSubstitutedOriginAndMissingGroupFailClosedWithoutNewCopies(): Unit = ManualTaskSqlTest.Fixture().use { f ->
+    @Test fun missingCorruptOrSubstitutedOriginAndMissingGroupFailClosedWithoutNewCopies(): Unit = packageFixture().use { f ->
         val tags = SqlManualTagRepository(f.db, ManualTaskSqlTest.KEY)
         try {
             val repo = SqlRecordPackageRepository(f.db, tags); val pack = RecordPackageCipherTest.verified(); val id = uuid()
             repo.restore(pack, listOf(id), 100)
-            val originId = "PACKAGE_ORIGIN:" + id; val row = f.db.read("SELECT * FROM local_jobs WHERE id=?", originId).single()
-            f.db.write("UPDATE local_jobs SET state='CONFIRMED:AAAA' WHERE id=?", originId)
+            val originId = "PACKAGE_ORIGIN:" + id; val row = f.db.read("SELECT * FROM record_package_receipts WHERE id=?", originId).single()
+            f.db.write("UPDATE record_package_receipts SET state='CONFIRMED:AAAA' WHERE id=?", originId)
             val corrupt = f.legacy(); assertThrows(RecordPackageStorageFailure::class.java) { repo.restore(pack, listOf(uuid()), 100) }; assertEquals(corrupt, f.legacy())
-            f.db.write("UPDATE local_jobs SET state=? WHERE id=?", row[4], originId)
-            f.db.write("DELETE FROM local_jobs WHERE id=?", originId)
+            f.db.write("UPDATE record_package_receipts SET state=? WHERE id=?", row[4], originId)
+            f.db.write("DELETE FROM record_package_receipts WHERE id=?", originId)
             val missing = f.legacy(); assertThrows(RecordPackageStorageFailure::class.java) { repo.restore(pack, listOf(uuid()), 100) }; assertEquals(missing, f.legacy())
-            f.db.write("INSERT INTO local_jobs VALUES(?,?,?,?,?)", *row.toTypedArray())
-            f.db.write("DELETE FROM local_jobs WHERE id=?", "PACKAGE_RESTORE:" + pack.manifest.backupId)
+            f.db.write("INSERT INTO record_package_receipts VALUES(?,?,?,?,?)", *row.toTypedArray())
+            f.db.write("DELETE FROM record_package_receipts WHERE id=?", "PACKAGE_RESTORE:" + pack.manifest.backupId)
             val missingGroup = f.legacy(); assertThrows(RecordPackageConflict::class.java) { repo.restore(pack, listOf(uuid()), 100) }; assertEquals(missingGroup, f.legacy())
         } finally { tags.wipeKey() }
     }
-    @Test(timeout = 12_000) fun closeDrainsAnImportBeforeOwnerKeyRetirementAndLateImportIsRejected(): Unit = ManualTaskSqlTest.Fixture().use { f ->
+    @Test(timeout = 12_000) fun closeDrainsAnImportBeforeOwnerKeyRetirementAndLateImportIsRejected(): Unit = packageFixture().use { f ->
         val gateway = DrainingRecordsSqlDatabase(f.db); val tags = SqlManualTagRepository(gateway, ManualTaskSqlTest.KEY)
         val repo = SqlRecordPackageRepository(gateway, tags); val pack = RecordPackageCipherTest.verified()
         val entered = CountDownLatch(1); val release = CountDownLatch(1); val retired = CountDownLatch(1)

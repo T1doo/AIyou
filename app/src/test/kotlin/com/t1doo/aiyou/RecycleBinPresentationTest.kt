@@ -146,6 +146,55 @@ class RecycleBinPresentationTest {
         compose.runOnIdle { assertEquals("one", f.state.value.recycleBin!!.confirmation!!.record.entry.id) }
         compose.onNodeWithText("确认时的原文（节选）：" + originalPreview(f.original.originalText)).assertExists()
     }
+    @Test @Config(qualifiers = "w280dp-h1000dp")
+    fun permanentEraseRequiresExplicitConfirmationAndCancelKeepsPrivateStateOutOfSavedStateAtDoubleFont() {
+        f.deleted=true;f.state.value=f.state.value.copy(entries=emptyList(),supportsPermanentErasure=true)
+        content(doubleFont=true);browse()
+        compose.onNodeWithTag("recycle-view-one").performScrollTo().performClick()
+        compose.onNodeWithTag("recycle-erase").performScrollTo().performClick()
+        compose.onNodeWithText("永久删除这条记录？").assertExists()
+        compose.onNodeWithTag("recycle-confirm").assertIsDisplayed().assertIsEnabled()
+        compose.runOnIdle {
+            assertTrue(f.erasureApplied.isEmpty());assertFalse(f.erased)
+            val mutation=f.state.value.recycleBin!!.confirmation!!.erasureIntent!!.mutationId
+            assertNoPrivateState(saved!!.performSave(),listOf("合成私密原文🙂","合成私密标签","合成独立草稿",mutation))
+        }
+        compose.onNodeWithTag("recycle-cancel").performClick();pump()
+        compose.runOnIdle {assertTrue(f.erasureApplied.isEmpty());assertFalse(f.erased);assertNull(f.state.value.recycleBin!!.confirmation)}
+    }
+    @Test fun permanentEraseLostReceiptOffersExplicitRetryWithTheSameIntentAndNoFalseSuccess() {
+        f.deleted=true;f.failAfterErase=true;f.state.value=f.state.value.copy(entries=emptyList(),supportsPermanentErasure=true)
+        content();browse();compose.onNodeWithTag("recycle-view-one").performScrollTo().performClick()
+        compose.onNodeWithTag("recycle-erase").performScrollTo().performClick();compose.onNodeWithTag("recycle-confirm").performClick();pump()
+        compose.onNodeWithText("重试确认").assertExists();compose.onNodeWithTag("recycle-notice").assertDoesNotExist()
+        compose.onNodeWithTag("recycle-confirm").performClick();pump()
+        compose.runOnIdle {assertTrue(f.erased);assertEquals(2,f.erasureApplied.size);assertEquals(1,f.erasureApplied.distinct().size);assertNull(f.state.value.recycleBin!!.confirmation)}
+        compose.onNodeWithTag("recycle-notice").assertExists()
+    }
+    @Test fun rereadPendingErasureDisablesRestoreAndContinuesTheDurableConfirmation() {
+        f.deleted=true;f.failBeforeErase=true;f.state.value=f.state.value.copy(entries=emptyList(),supportsPermanentErasure=true)
+        content();browse();compose.onNodeWithTag("recycle-view-one").performScrollTo().performClick()
+        compose.onNodeWithTag("recycle-erase").performScrollTo().performClick();compose.onNodeWithTag("recycle-confirm").performClick();pump()
+        compose.onNodeWithTag("recycle-cancel").performClick();compose.onNodeWithTag("recycle-refresh").performClick();pump()
+        compose.onNodeWithTag("recycle-view-one").performScrollTo().performClick()
+        compose.onNodeWithTag("recycle-erasure-pending").performScrollTo().assertExists()
+        compose.onNodeWithTag("recycle-restore").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("recycle-erase").performScrollTo().performClick()
+        compose.runOnIdle {assertEquals(f.erasureApplied.single(),f.state.value.recycleBin!!.confirmation!!.erasureIntent!!.mutationId);f.failBeforeErase=false}
+        compose.onNodeWithTag("recycle-confirm").performClick();pump();compose.runOnIdle {assertTrue(f.erased)}
+    }
+    @Test fun retainedPermanentEraseButtonCannotRetargetAfterSelectionChangesBeforeRecomposition() {
+        f.deleted=true;f.extra=RecycleRecord(StoredEntry("two",1,"另一条合成原文 B",43,"UTC",ProcessingPolicy.AI_NONE),7,true,ManualTagSnapshot("two",0,emptyList()),1,0)
+        f.state.value=f.state.value.copy(entries=emptyList(),supportsPermanentErasure=true)
+        content();browse();compose.onNodeWithTag("recycle-view-two").performScrollTo().performClick()
+        val old=compose.onNodeWithTag("recycle-erase").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        compose.runOnIdle {
+            val session=f.state.value.recycleBin!!.session;f.controller.select(session,null);f.controller.select(session,"one");old()
+            assertNull(f.state.value.recycleBin!!.confirmation);assertTrue(f.queue.isEmpty());assertTrue(f.erasureApplied.isEmpty())
+        }
+        compose.onNodeWithTag("recycle-erase").performScrollTo().performClick()
+        compose.runOnIdle {assertEquals("one",f.state.value.recycleBin!!.confirmation!!.record.entry.id);assertEquals("two",f.extra!!.entry.id)}
+    }
     private fun assertNoPrivateState(value: Any?, forbidden: List<String>) {
         when (value) {
             null, is Number, is Boolean, is Char -> Unit
@@ -166,15 +215,18 @@ class RecycleBinPresentationTest {
         val tags = ManualTagSnapshot("one", 1, listOf("合成私密标签"))
         var deleted = false; var generation = 1L; var failRead = false; var failAfterCommit = false
         var extra: RecycleRecord? = null
+        var erased=false;var failBeforeErase=false;var failAfterErase=false
+        val erasureApplied=mutableListOf<String>();private var erasureReceipt: PermanentErasureReceipt?=null
         val applied = mutableListOf<String>(); private val receipts = mutableMapOf<String, Long>()
         val state = mutableStateOf(LocalRecordUiState(ready = true, opening = false, supportsRecycleBin = true,
             text = "合成独立草稿", entries = listOf(original), manualTagsAvailable = true, manualTags = mapOf("one" to tags)))
         val queue = ArrayDeque<suspend (EntryRepository) -> Unit>()
         private fun record() = RecycleRecord(original, generation, deleted, tags, 2, 1)
         private val bin = object : RecycleBinRepository {
-            override fun records(): List<RecycleRecord> { if (failRead) throw RecycleStorageFailure(); return (if (deleted) listOf(record()) else emptyList()) + listOfNotNull(extra) }
+            override fun records(): List<RecycleRecord> { if (failRead) throw RecycleStorageFailure(); return (if (deleted && !erased) listOf(record()) else emptyList()) + listOfNotNull(extra) }
             override fun read(entryId: String): RecycleRecord { check(entryId == "one"); return record() }
             override fun apply(mutation: RecycleMutation): RecycleRecord {
+                if(erasureReceipt!=null) throw RecycleConflict()
                 applied.add(mutation.mutationId)
                 if (receipts[mutation.mutationId] == generation && deleted != mutation.expectedDeleted) return record()
                 if (generation != mutation.expectedGeneration || deleted != mutation.expectedDeleted) throw RecycleConflict()
@@ -188,6 +240,22 @@ class RecycleBinPresentationTest {
             override fun replace(mutation: ManualTagMutation): ManualTagSnapshot = error("Outside UI port")
         }
         private val store = object : EntryRepository {
+            override val permanentErasure=object : PermanentErasureRepository {
+                override fun read(entryId: String)=erasureReceipt?.takeIf {it.intent.source.sourceId==entryId}
+                override fun pending(limit: Int,afterEntryId: String?)=PermanentErasurePage(listOfNotNull(erasureReceipt?.takeUnless {it.complete}),0,null)
+                override suspend fun erase(intent: PermanentErasureIntent): PermanentErasureReceipt {
+                    erasureApplied+=intent.mutationId
+                    val prior=erasureReceipt
+                    if(prior!=null && (prior.intent.source!=intent.source || prior.intent.generation!=intent.generation || prior.intent.mutationId!=intent.mutationId)) throw PermanentErasureConflict()
+                    if(prior?.complete==true) return prior
+                    if(!deleted || intent.source.sourceId!="one" || intent.source.revision!=original.currentRevision.toLong() || intent.generation!=generation) throw PermanentErasureConflict()
+                    erasureReceipt=PermanentErasureReceipt(intent,PermanentErasurePhase.PREPARED)
+                    if(failBeforeErase) throw PermanentErasureIncomplete()
+                    erased=true;erasureReceipt=PermanentErasureReceipt(intent,PermanentErasurePhase.DONE)
+                    if(failAfterErase) {failAfterErase=false;throw PermanentErasureIncomplete()}
+                    return erasureReceipt!!
+                }
+            }
             override val recycleBin = bin
             override val manualTags = tagPort
             override suspend fun readDraft(): TextDraft? = null

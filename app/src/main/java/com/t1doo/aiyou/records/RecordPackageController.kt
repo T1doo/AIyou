@@ -197,7 +197,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
         val active = work.get() ?: return; val ui = panel(session) ?: return; val verified = active.verified ?: return
         if (!owned(active) || ui.phase !in setOf(RecordPackagePhase.RESTORE_PREVIEW, RecordPackagePhase.UNCERTAIN) ||
             ui.epoch != epoch || verified.manifest.backupId != backupId || verified.digest != digest || ui.verified !== verified) return
-        updateOwned(active, ui.phase) { it.copy(phase = RecordPackagePhase.IMPORTING, error = null, notice = "正在提交并核对新副本；返回不会撤销已提交事务。") }
+        updateOwned(active, ui.phase) { it.copy(phase = RecordPackagePhase.IMPORTING, error = null, notice = "正在提交并核对本机恢复回执；返回不会撤销已提交事务。") }
         if (!enqueue { store ->
             try {
                 if (!owned(active, RecordPackagePhase.IMPORTING)) return@enqueue
@@ -210,7 +210,8 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                         local.copy(entries = entries, manualTags = tags, manualTagsAvailable = true, manualTagsError = null,
                             packageOrigins = origins, packageOriginsAvailable = true, packageOriginsError = null,
                             recordPackage = if (!owned(active, RecordPackagePhase.IMPORTING, local)) panel else checkNotNull(panel).copy(phase = RecordPackagePhase.DONE, verified = null, notice =
-                                if (result.replayed) "已核对第一次恢复回执，没有新增、覆盖或复活记录。副本以当前本机状态为准。"
+                                if (result.replayed) "已核对第一次恢复回执，没有新增、覆盖或复活记录。已永久删除 " + result.deletedCount +
+                                    " 条，删除未完成 " + result.erasingCount + " 条；其余副本以当前本机状态为准。"
                                 else "已保存并读回 " + result.ids.size + " 条新副本；初始策略为不参与 AI。原有记录保持不变。"))
                 }
                 if (work.compareAndSet(active, null)) active.retire()

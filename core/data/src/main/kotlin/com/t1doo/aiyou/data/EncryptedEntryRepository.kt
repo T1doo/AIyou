@@ -7,6 +7,7 @@ import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.t1doo.aiyou.domain.EntryRepository
 import com.t1doo.aiyou.domain.AttachmentStore
+import com.t1doo.aiyou.domain.AwaitableRecordStorage
 import com.t1doo.aiyou.domain.RecordConflict
 import com.t1doo.aiyou.domain.RecordIntegrityFailure
 import com.t1doo.aiyou.model.OriginalRevision
@@ -29,13 +30,13 @@ class EncryptedEntryRepository internal constructor(
     private val keyBytes: ByteArray,
     private val attachmentStorage: EncryptedAttachmentStore,
     private val originalEditStorage: EncryptedOriginalEditStore,
+    private val borrowedSql: DrainingRecordsSqlDatabase = DrainingRecordsSqlDatabase(RoomRecordsSqlDatabase(database)),
     private val newId: () -> String = { UUID.randomUUID().toString() },
-) : EntryRepository, AutoCloseable {
+) : EntryRepository, AwaitableRecordStorage {
     private val dao get() = database.records()
     override val attachments: AttachmentStore get() = attachmentStorage
     override val editDrafts: EncryptedOriginalEditStore get() = originalEditStorage
     /** Blocking IO; shares the existing encrypted database and never enables remote processing. */
-    private val borrowedSql = DrainingRecordsSqlDatabase(RoomRecordsSqlDatabase(database))
     override val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(borrowedSql)
     private val tagStorage = SqlManualTagRepository(borrowedSql, keyBytes)
     override val manualTags: com.t1doo.aiyou.domain.ManualTagRepository get() = tagStorage
@@ -45,12 +46,18 @@ class EncryptedEntryRepository internal constructor(
     override val manualTasks: com.t1doo.aiyou.domain.ManualTaskRepository get() = taskStorage
     override val originalExport: com.t1doo.aiyou.domain.OriginalExportRepository =
         SqlOriginalExportRepository(borrowedSql, tagStorage)
-    override val recordPackages: com.t1doo.aiyou.domain.RecordPackageRepository =
-        SqlRecordPackageRepository(borrowedSql, tagStorage)
+    private val packageStorage = SqlRecordPackageRepository(borrowedSql, tagStorage)
+    override val recordPackages: com.t1doo.aiyou.domain.RecordPackageRepository get() = packageStorage
+    override val permanentErasure: com.t1doo.aiyou.domain.PermanentErasureRepository =
+        SqlPermanentErasureRepository(borrowedSql, attachmentStorage, originalEditStorage, packageStorage)
     override val recycleBin: com.t1doo.aiyou.domain.RecycleBinRepository =
-        SqlRecycleBinRepository(borrowedSql, tagStorage)
+        SqlRecycleBinRepository(borrowedSql, tagStorage, SqlErasureFileHooks::fenced)
 
-    override suspend fun prepare() { attachmentStorage.recover() }
+    override suspend fun prepare() {
+        // Bounded resume before ordinary media recovery. A failed deletion remains visible for retry.
+        resumePermanentErasure(permanentErasure)
+        attachmentStorage.recover()
+    }
 
     override suspend fun readDraft(): TextDraft? = dao.draft()?.toModel()
 
@@ -133,10 +140,12 @@ class EncryptedEntryRepository internal constructor(
         current.copy(currentRevision = next, originalText = revision.originalText)
     }
 
-    override fun close() {
-        borrowedSql.stopAndAwaitIdle()
-        try { database.close() } finally { attachmentStorage.close(); originalEditStorage.close(); tagStorage.wipeKey(); taskStorage.wipeKey(); keyBytes.fill(0) }
-    }
+    private val lifetime = DrainingRecordsStorage(borrowedSql,attachmentStorage,originalEditStorage,
+        { database.close() }, { tagStorage.wipeKey(); taskStorage.wipeKey(); keyBytes.fill(0) })
+    override fun close() = lifetime.close()
+    override fun awaitClosed() = lifetime.awaitClosed()
+    /** Known external IO owner convenience, including native cold-reopen fixtures. */
+    fun closeAndAwait() { close(); awaitClosed() }
 
     companion object {
         const val MAX_TEXT_LENGTH = 100_000
@@ -197,6 +206,7 @@ class EncryptedEntryRepository internal constructor(
             var database: RecordsDatabase? = null
             var storage: EncryptedAttachmentStore? = null
             var edits: EncryptedOriginalEditStore? = null
+            var gateway: DrainingRecordsSqlDatabase? = null
             var opened = false
             try {
                 require(key.size == 32)
@@ -204,34 +214,40 @@ class EncryptedEntryRepository internal constructor(
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
                 val created = Room.databaseBuilder(context.applicationContext, RecordsDatabase::class.java, file.absolutePath)
                 .openHelperFactory(SupportOpenHelperFactory(key))
-                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7)
+                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7, recordsMigration7To8)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db)
                         installManualTagGuard(db); installManualTaskGuard(db)
                         db.execSQL("INSERT INTO local_search_epoch(slot,epoch,tokenizerVersion,tokenizerProfile) VALUES(1,0,1,'UNKNOWN')")
-                        installLocalSearchGuards(db)
+                        installLocalSearchGuards(db); installPermanentErasureGuards(db)
                     }
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db)
-                        installManualTagGuard(db); installManualTaskGuard(db); installLocalSearchGuards(db)
+                        installManualTagGuard(db); installManualTaskGuard(db); installLocalSearchGuards(db); installPermanentErasureGuards(db)
                     }
                 }).build()
                 database = created
                 created.openHelper.writableDatabase // authenticate/schema validation before reporting ready
+                val ownerSql = DrainingRecordsSqlDatabase(RoomRecordsSqlDatabase(created)).also { gateway = it }
+                val fileHooks = SqlErasureFileHooks(ownerSql)
                 val mediaKey = attachmentKey(created)
                 try {
                     require(mediaKey.size == 32)
-                    storage = EncryptedAttachmentStore(File(file.parentFile, file.name + ".attachments"), RoomAttachmentLedger(created), mediaKey)
+                    storage = EncryptedAttachmentStore(File(file.parentFile, file.name + ".attachments"), RoomAttachmentLedger(created), mediaKey).also { it.installErasureHooks(fileHooks) }
                 } catch (failure: Exception) { mediaKey.fill(0); throw failure }
                 val draftKey = editKey(created)
-                try { edits = EncryptedOriginalEditStore(File(file.parentFile, file.name + ".original-edits"), draftKey) }
+                try { edits = EncryptedOriginalEditStore(File(file.parentFile, file.name + ".original-edits"), draftKey).also { it.installErasureHooks(fileHooks) } }
                 catch (failure: Exception) { draftKey.fill(0); throw failure }
-                return EncryptedEntryRepository(created, key, checkNotNull(storage), checkNotNull(edits)).also { opened = true }
+                return EncryptedEntryRepository(created, key, checkNotNull(storage), checkNotNull(edits), ownerSql).also { opened = true }
             } finally {
                 if (!opened) {
-                    try { database?.close() } finally { storage?.close(); edits?.close(); key.fill(0) }
+                    gateway?.seal(); storage?.close(); edits?.close()
+                    try {
+                        gateway?.checkExternalWait(); storage?.checkExternalWait(); edits?.checkExternalWait()
+                        storage?.awaitIdle(); edits?.awaitIdle(); gateway?.awaitIdle(); database?.close()
+                    } finally { key.fill(0) }
                 }
             }
         }

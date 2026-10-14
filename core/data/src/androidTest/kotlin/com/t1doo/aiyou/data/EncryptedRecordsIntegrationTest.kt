@@ -43,7 +43,7 @@ class EncryptedRecordsIntegrationTest {
 
     @After fun tearDown() {
         try {
-            trace?.step("teardown_close") { stores.forEach { it.close() } }
+            trace?.step("teardown_close") { stores.forEach { it.closeAndAwait() } }
             aliases.forEach { alias -> KeyStore.getInstance("AndroidKeyStore").apply { load(null); deleteEntry(alias) } }
             if (::secret.isInitialized) secret.fill(0)
             if (::directory.isInitialized) directory.deleteRecursively() // unique owned directory only
@@ -62,14 +62,14 @@ class EncryptedRecordsIntegrationTest {
         }
         val draft = store.updateDraft(text)
         assertTrue(store.entries().isEmpty())
-        store.close()
+        store.closeAndAwait()
         store = open()
         assertEquals(draft, store.readDraft())
         val saved = store.saveDraft(draft, 1_792_000_000_000L, "Asia/Shanghai")
         assertEquals(ProcessingPolicy.LOCAL_ONLY, saved.policy)
         assertNull(store.readDraft())
         assertEquals(1L, count(store, "local_jobs"))
-        store.close()
+        store.closeAndAwait()
         val bytes = File(directory, "records.db").readBytes()
         assertFalse(bytes.take(16).toByteArray().contentEquals("SQLite format 3\u0000".toByteArray()))
         assertFalse(String(bytes, Charsets.ISO_8859_1).contains(String(text.toByteArray(), Charsets.ISO_8859_1)))
@@ -92,7 +92,7 @@ class EncryptedRecordsIntegrationTest {
         assertEquals(newer, store.readDraft())
         store.discardDraft(newer)
         store.discardDraft(newer) // Idempotent acknowledgement retry after a committed delete.
-        store.close()
+        store.closeAndAwait()
         store = open()
         assertNull(store.readDraft())
         assertEquals(listOf(saved), store.entries())
@@ -100,7 +100,7 @@ class EncryptedRecordsIntegrationTest {
         assertEquals(1, store.revisions(saved.id).size)
         val replacement = com.t1doo.aiyou.model.TextDraft(java.util.UUID.randomUUID().toString(), 1L, newer.text)
         assertEquals(replacement, store.restoreDiscardedDraft(newer, replacement))
-        store.close()
+        store.closeAndAwait()
         store = open()
         assertEquals(replacement, store.readDraft())
         assertEquals(replacement, store.restoreDiscardedDraft(newer, replacement))
@@ -137,7 +137,7 @@ class EncryptedRecordsIntegrationTest {
         fails<RecordConflict> { store.revise(saved.id, 1, "迟到编辑不能覆盖", 3000L) }
         assertEquals(updated, store.entries().single())
         assertEquals(2L, count(store, "local_jobs"))
-        store.close()
+        store.closeAndAwait()
         assertEquals(2, open().revisions(saved.id).size)
     }
 
@@ -160,7 +160,7 @@ class EncryptedRecordsIntegrationTest {
             listOf(a.await(), b.await())
         }
         assertEquals(results[0], results[1])
-        store.close()
+        store.closeAndAwait()
         val reopened = open()
         assertEquals(results[0], reopened.saveDraft(draft, 9000L, "Asia/Shanghai"))
         assertEquals(1L, count(reopened, "entries"))
@@ -189,7 +189,7 @@ class EncryptedRecordsIntegrationTest {
     @Test fun wrongDatabaseKeyFailsWithoutResettingExistingFile() = runBlocking {
         val store = open()
         val saved = store.saveDraft(store.updateDraft("合成错误密钥保护"), 1000L, "Etc/UTC")
-        store.close()
+        store.closeAndAwait()
         val file = File(directory, "records.db")
         val before = digest(file)
         fails<Exception> { open(key = ByteArray(32) { 42 }) }
@@ -235,7 +235,7 @@ class EncryptedRecordsIntegrationTest {
             store.database.openHelper.writableDatabase.execSQL("UPDATE entry_revisions SET originalText='synthetic overwrite'")
         }
         assertMigratedFixture(store)
-        store.close()
+        store.closeAndAwait()
         assertMigratedFixture(open("migration.db"))
     }
 
@@ -263,13 +263,13 @@ class EncryptedRecordsIntegrationTest {
                 if (n == 1) "FRESH_FILE_FIRST_OPEN" else "REOPEN_SAME_PROCESS") { open() }
             val draft = observer.suspending("update_draft", n) { store.updateDraft("合成重启样本 $n 🌿") }
             observer.suspending("save_draft", n) { store.saveDraft(draft, n.toLong(), "Etc/UTC") }
-            observer.step("close", n) { store.close() }
+            observer.step("close", n) { store.closeAndAwait() }
             val restarted = observer.step("open", n, "REOPEN_SAME_PROCESS") { open() }
             observer.suspending("query_count", n) { assertEquals(n, restarted.entries().size) }
             observer.suspending("query_latest", n) {
                 assertEquals("合成重启样本 $n 🌿", restarted.entries().first().originalText)
             }
-            observer.step("close", n) { restarted.close() }
+            observer.step("close", n) { restarted.closeAndAwait() }
         }
     }
 

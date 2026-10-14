@@ -31,6 +31,8 @@ internal interface RecordsDao {
     suspend fun revisionExists(entryId: String, revision: Int): Boolean
     @Query("SELECT * FROM attachments WHERE id=:id") suspend fun attachment(id: String): AttachmentEntity?
     @Query("SELECT * FROM attachments ORDER BY id") suspend fun attachments(): List<AttachmentEntity>
+    @Query("SELECT * FROM attachments WHERE entryId=:entryId ORDER BY id LIMIT :limit")
+    suspend fun attachmentsForEntry(entryId: String, limit: Int): List<AttachmentEntity>
     @Insert suspend fun insertAttachment(value: AttachmentEntity)
     @Query("UPDATE attachments SET state=:next WHERE id=:id AND state=:expected")
     suspend fun advanceAttachment(id: String, expected: String, next: String): Int
@@ -39,7 +41,8 @@ internal interface RecordsDao {
 @Database(entities = [EntryEntity::class, RevisionEntity::class, DraftEntity::class, LocalJobEntity::class,
     AttachmentEntity::class, RemoteSourceAccessEntity::class, RemoteTextJobEntity::class, TextAnnotationEntity::class, ManualTagEntity::class,
     ManualTaskEntity::class, LocalSearchFtsEntity::class, LocalSearchDocumentEntity::class,
-    LocalSearchEpochEntity::class], version = 7, exportSchema = true)
+    LocalSearchEpochEntity::class, PermanentErasureEntity::class, RecordPackageReceiptEntity::class,
+    OwnedFileCreationEntity::class], version = 8, exportSchema = true)
 internal abstract class RecordsDatabase : RoomDatabase() {
     abstract fun records(): RecordsDao
 }
@@ -102,3 +105,11 @@ internal val recordsMigration6To7 = object : Migration(6, 7) {
     }
 }
 internal fun installLocalSearchGuards(db: SupportSQLiteDatabase) { LocalSearchSqlSchema.guards.forEach(db::execSQL) }
+
+internal val recordsMigration7To8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        PermanentErasureSqlSchema.migration7To8.forEach(db::execSQL)
+        installPermanentErasureGuards(db)
+    }
+}
+internal fun installPermanentErasureGuards(db: SupportSQLiteDatabase) { PermanentErasureSqlSchema.guards.forEach(db::execSQL) }

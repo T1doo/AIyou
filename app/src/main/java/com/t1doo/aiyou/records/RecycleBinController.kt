@@ -9,21 +9,25 @@ import kotlinx.coroutines.CancellationException
 
 class RecycleConfirmation(val id: Long, val record: RecycleRecord, internal val mutation: RecycleMutation,
     val busy: Boolean = false, val uncertain: Boolean = false, val conflict: Boolean = false,
-    val error: String? = null) {
+    val error: String? = null, internal val erasureIntent: PermanentErasureIntent? = null) {
+    val permanent get() = erasureIntent != null
     internal fun copy(busy: Boolean = this.busy, uncertain: Boolean = this.uncertain,
         conflict: Boolean = this.conflict, error: String? = this.error) =
-        RecycleConfirmation(id, record, mutation, busy, uncertain, conflict, error)
+        RecycleConfirmation(id, record, mutation, busy, uncertain, conflict, error, erasureIntent)
     override fun toString() = "RecycleConfirmation(busy=$busy, redacted)"
 }
 class RecycleBinUiState(val session: Long, val browsing: Boolean, val loading: Boolean = true,
     records: List<RecycleRecord> = emptyList(), val selectedId: String? = null,
-    val confirmation: RecycleConfirmation? = null, val error: String? = null, val notice: String? = null) {
+    val confirmation: RecycleConfirmation? = null, val error: String? = null, val notice: String? = null,
+    erasures: Map<String,PermanentErasureReceipt> = emptyMap()) {
     val records = Collections.unmodifiableList(records.toList())
+    val erasures = Collections.unmodifiableMap(erasures.toMap())
     val busy get() = loading || confirmation?.busy == true
     internal fun copy(loading: Boolean = this.loading, records: List<RecycleRecord> = this.records,
         selectedId: String? = this.selectedId, confirmation: RecycleConfirmation? = this.confirmation,
-        error: String? = this.error, notice: String? = this.notice) =
-        RecycleBinUiState(session, browsing, loading, records, selectedId, confirmation, error, notice)
+        error: String? = this.error, notice: String? = this.notice,
+        erasures: Map<String,PermanentErasureReceipt> = this.erasures) =
+        RecycleBinUiState(session, browsing, loading, records, selectedId, confirmation, error, notice, erasures)
     override fun toString() = "RecycleBinUiState(busy=$busy, redacted)"
 }
 
@@ -39,7 +43,7 @@ class RecycleBinController internal constructor(
     private val confirmations = AtomicLong()
     @Volatile private var disposed = false
     private fun available(local: LocalRecordUiState = current()) = !disposed && local.ready && !local.opening &&
-        local.error == null && local.supportsRecycleBin
+        !local.recycleControllerRetired && local.error == null && local.supportsRecycleBin
     private fun owns(session: Long, local: LocalRecordUiState = current()) =
         available(local) && local.recycleBin?.session == session
     private fun update(session: Long, change: (RecycleBinUiState) -> RecycleBinUiState) = publish { local ->
@@ -84,8 +88,20 @@ class RecycleBinController internal constructor(
     fun requestRestore(session: Long, id: String, generation: Long) = publish { local ->
         val ui = local.recycleBin
         val record = ui?.records?.singleOrNull { it.entry.id == id && it.generation == generation && it.deleted }
-        if (!owns(session, local) || ui == null || !ui.browsing || ui.busy || ui.confirmation != null || record == null || ui.selectedId != id) local
+        if (!owns(session, local) || ui == null || !ui.browsing || ui.busy || ui.confirmation != null || record == null || ui.selectedId != id || id in ui.erasures) local
         else local.copy(recycleBin = ui.copy(confirmation = confirmation(record)))
+    }
+    fun requestErasure(session: Long, id: String, generation: Long) = publish { local ->
+        val ui = local.recycleBin
+        val record = ui?.records?.singleOrNull { it.entry.id == id && it.generation == generation && it.deleted }
+        if (!owns(session,local) || !local.supportsPermanentErasure || ui == null || !ui.browsing || ui.busy ||
+            ui.confirmation != null || record == null || ui.selectedId != id) local else {
+            val prior = ui.erasures[id]
+            val intent = prior?.intent ?: PermanentErasureIntent(SourceVersion(id,record.entry.currentRevision.toLong()),generation,UUID.randomUUID().toString())
+            if (intent.source != SourceVersion(id,record.entry.currentRevision.toLong()) || intent.generation != generation || prior?.complete == true) local
+            else local.copy(recycleBin=ui.copy(confirmation=RecycleConfirmation(confirmations.incrementAndGet(),record,
+                RecycleMutation(intent.source,generation,true,intent.mutationId),uncertain=prior != null,erasureIntent=intent)))
+        }
     }
     fun cancelConfirmation(session: Long, id: Long) = publish { local ->
         val ui = local.recycleBin
@@ -106,12 +122,13 @@ class RecycleBinController internal constructor(
             if (!owns(session)) return@enqueue
             try {
                 val records = checkNotNull(store.recycleBin).records()
+                val erasures = records.mapNotNull { r -> store.permanentErasure?.read(r.entry.id)?.let { r.entry.id to it } }.toMap()
                 val entries = store.entries()
                 val tags = store.manualTags?.snapshots()
                 publish { local -> if (!owns(session, local) || local.recycleBin?.loading != true) local else local.copy(
                     entries = entries, manualTags = tags.orEmpty(), manualTagsAvailable = tags != null,
                     manualTagsError = if (store.manualTags != null && tags == null) "手工标签暂不可读取，请重试。" else null,
-                    recycleBin = local.recycleBin.copy(loading = false, records = records, error = null)) }
+                    recycleBin = local.recycleBin.copy(loading = false, records = records, error = null, erasures = erasures)) }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { update(session) { it.copy(loading = false, records = emptyList(), selectedId = null,
                 error = "回收站读取失败，加密数据已保留。请重试读取。") } }
@@ -131,11 +148,19 @@ class RecycleBinController internal constructor(
                 val bin = checkNotNull(store.recycleBin)
                 if (!intent.record.deleted && (!canMove() || current().let { it.originalEdit != null ||
                     it.originalHistory != null || it.manualTagEditor != null })) throw RecycleConflict()
-                bin.apply(intent.mutation)
+                if (intent.permanent) {
+                    if (!current().supportsPermanentErasure) throw PermanentErasureConflict()
+                    val receipt = checkNotNull(store.permanentErasure).erase(checkNotNull(intent.erasureIntent))
+                    if (!receipt.complete) throw PermanentErasureIncomplete()
+                } else bin.apply(intent.mutation)
                 val entries = store.entries()
                 val tags = store.manualTags?.snapshots()
                 val recycled = if (ui.browsing) bin.records() else emptyList()
-                val notice = if (intent.record.deleted) "已恢复到本机列表；不参与 AI，旧远端授权未恢复。"
+                val erasures = recycled.mapNotNull { r -> store.permanentErasure?.read(r.entry.id)?.let { r.entry.id to it } }.toMap()
+                val origins = if (intent.permanent) store.recordPackages?.origins() else null
+                val pendingEdits = if (intent.permanent) store.editDrafts?.pending() else null
+                val notice = if (intent.permanent) "本机这条记录、全部原文版本、标签、派生内容及登记的附件和草稿已删除。已导出文件无法撤回。"
+                    else if (intent.record.deleted) "已恢复到本机列表；不参与 AI，旧远端授权未恢复。"
                     else "已移入回收站。原文版本、手工标签和附件已保留；已导出文件无法撤回。"
                 publish { local ->
                     if (disposed) local else {
@@ -144,15 +169,22 @@ class RecycleBinController internal constructor(
                         val confirmed = local.copy(entries = entries, manualTags = tags.orEmpty(), manualTagsAvailable = tags != null,
                             manualTagsError = if (store.manualTags != null && tags == null) "手工标签暂不可读取，请重试。" else null,
                             recycleNotice = notice,
-                            manualTagEditor = local.manualTagEditor?.takeUnless { !intent.record.deleted && it.entryId == intent.record.entry.id },
-                            originalHistory = local.originalHistory?.takeUnless { !intent.record.deleted && it.entryId == intent.record.entry.id },
-                            originalEdit = local.originalEdit?.takeUnless { !intent.record.deleted && it.entryId == intent.record.entry.id })
+                            packageOrigins = if (intent.permanent) origins.orEmpty() else local.packageOrigins,
+                            packageOriginsAvailable = if (intent.permanent) store.recordPackages == null || origins != null else local.packageOriginsAvailable,
+                            packageOriginsError = if (intent.permanent) null else local.packageOriginsError,
+                            pendingEdits = if (intent.permanent) pendingEdits?.drafts.orEmpty() else local.pendingEdits,
+                            editDraftIssueCount = if (intent.permanent) pendingEdits?.unreadableCount ?: 0 else local.editDraftIssueCount,
+                            editDraftIndexAvailable = if (intent.permanent) store.editDrafts == null || pendingEdits != null else local.editDraftIndexAvailable,
+                            editDraftError = if (intent.permanent) pendingEdits?.takeIf { it.unreadableCount > 0 }?.let { "其他编辑草稿存在未确认项，请重试读取。" } else local.editDraftError,
+                            manualTagEditor = local.manualTagEditor?.takeUnless { (intent.permanent || !intent.record.deleted) && it.entryId == intent.record.entry.id },
+                            originalHistory = local.originalHistory?.takeUnless { (intent.permanent || !intent.record.deleted) && it.entryId == intent.record.entry.id },
+                            originalEdit = local.originalEdit?.takeUnless { (intent.permanent || !intent.record.deleted) && it.entryId == intent.record.entry.id })
                         if (latest?.session != session || latest.confirmation?.id != id) confirmed
                         else confirmed.copy(recycleBin = if (!ui.browsing) null else latest.copy(records = recycled,
-                            selectedId = null, confirmation = null, error = null, notice = notice))
+                            selectedId = null, confirmation = null, error = null, notice = notice, erasures = erasures))
                     }
                 }
-                if (!intent.record.deleted) onCommittedMove(intent.record.entry.id)
+                if (intent.permanent || !intent.record.deleted) onCommittedMove(intent.record.entry.id)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) {
                 // A failed readback may follow a committed transaction. Reuse this exact durable receipt on retry.
@@ -167,14 +199,16 @@ class RecycleBinController internal constructor(
                         else refreshed.copy(recycleBin = latest.copy(records = emptyList(), selectedId = null,
                             error = if (latest.browsing) "操作后回收站状态尚未确认，请重新读取。" else latest.error,
                             confirmation = latest.confirmation.copy(busy = false,
-                            uncertain = failure !is RecycleConflict, conflict = failure is RecycleConflict,
-                            error = if (failure is RecycleConflict) "原文版本或回收站状态已变化。请关闭确认并重新读取。"
+                            uncertain = failure !is RecycleConflict && failure !is PermanentErasureConflict,
+                            conflict = failure is RecycleConflict || failure is PermanentErasureConflict,
+                            error = if (failure is RecycleConflict || failure is PermanentErasureConflict) "原文版本或回收站状态已变化。请关闭确认并重新读取。"
+                                else if (intent.permanent) "永久删除未完成或完成回执尚未确认。请用同一操作重试；已封闭的记录不能恢复。"
                                 else "操作结果尚未确认，请用同一操作重试确认；返回不会撤销已提交的操作。")))
                     }
                 }
-                if (!intent.record.deleted && entries != null && entries.none { it.id == intent.record.entry.id }) onCommittedMove(intent.record.entry.id)
+                if ((intent.permanent || !intent.record.deleted) && entries != null && entries.none { it.id == intent.record.entry.id }) onCommittedMove(intent.record.entry.id)
             }
         }) update(session) { it.copy(confirmation = it.confirmation?.copy(busy = false, error = "本机队列不可用，未执行操作。")) }
     }
-    fun dispose() { disposed = true; publish { it.copy(recycleBin = null) } }
+    fun dispose() { disposed = true; publish { it.copy(ready = false, recycleBin = null, recycleControllerRetired = true) } }
 }

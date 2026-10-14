@@ -20,7 +20,7 @@ if args.component:
 if args.queue:
     targets.append(("host queue", "checks/record-queue/build/test-results/test", 148))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 149))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 157))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 if args.evidence:
@@ -124,7 +124,11 @@ for label, folder, minimum in targets:
             "narrowDoubleFontKeepsConfirmCancelAndRestoreReachableAndHidesContentOnReadFailure",
             "retainedReaderAndConfirmationCallbacksRejectNavigationAndNewSessionBeforeRecomposition",
             "rawSavedStateExcludesRecycleOriginalTagsOperationAndConfirmationAndQueuedCloseDoesNotWrite",
-            "retainedRestoreButtonForBRejectsAfterSelectingAAndConfirmationNamesTheCurrentTarget")
+            "retainedRestoreButtonForBRejectsAfterSelectingAAndConfirmationNamesTheCurrentTarget",
+            "permanentEraseRequiresExplicitConfirmationAndCancelKeepsPrivateStateOutOfSavedStateAtDoubleFont",
+            "permanentEraseLostReceiptOffersExplicitRetryWithTheSameIntentAndNoFalseSuccess",
+            "rereadPendingErasureDisablesRestoreAndContinuesTheDurableConfirmation",
+            "retainedPermanentEraseButtonCannotRetargetAfterSelectionChangesBeforeRecomposition")
         additional["com.t1doo.aiyou.OriginalExportPresentationTest"] = (
             "actualDialogRequiresSelectionPreviewAndFreshPlaintextConsentBeforeSystemDocumentIntent",
             "sourceChangeShowsConflictAndRequiresExplicitNewPreviewWithoutWritingAnyFile",

@@ -7,6 +7,7 @@ import com.t1doo.aiyou.data.EncryptedEntryRepository
 import com.t1doo.aiyou.domain.StorageKeyUnavailable
 import com.t1doo.aiyou.domain.RecordConflict
 import com.t1doo.aiyou.domain.EntryRepository
+import com.t1doo.aiyou.domain.AwaitableRecordStorage
 import com.t1doo.aiyou.domain.OriginalEditDraftConflict
 import com.t1doo.aiyou.model.OriginalEditDraft
 import com.t1doo.aiyou.model.OriginalEditDraftRef
@@ -65,6 +66,8 @@ data class LocalRecordUiState(
     val supportsOriginalExport: Boolean = false,
     val originalExport: OriginalExportUiState? = null,
     val supportsRecycleBin: Boolean = false,
+    val supportsPermanentErasure: Boolean = false,
+    val recycleControllerRetired: Boolean = false,
     val recycleBin: RecycleBinUiState? = null,
     val recycleNotice: String? = null,
     val supportsRecordPackages: Boolean = false,
@@ -244,7 +247,11 @@ class LocalRecordsViewModel internal constructor(
                     try { ai.closeAndJoin() }
                     finally {
                         try { attachments.disposeOnIo() }
-                        finally { (repository as? AutoCloseable)?.close(); repository = null }
+                        finally {
+                            (repository as? AutoCloseable)?.close()
+                            (repository as? AwaitableRecordStorage)?.awaitClosed()
+                            repository = null
+                        }
                     }
                 }
             }
@@ -958,6 +965,7 @@ class LocalRecordsViewModel internal constructor(
                 localSearch = store.localSearch,
                 localSearchEpoch = searchEpoch,
                 supportsRecycleBin = store.recycleBin != null,
+                supportsPermanentErasure = store.permanentErasure != null,
                 manualTagsError = if (store.manualTags != null && labels == null) "手工标签暂不可读取，请重试。" else null,
                 draftNotice = if (persistedDraft == null) "没有未保存的草稿" else "已恢复本机草稿", error = null,
                 supportsEditDrafts = store.editDrafts != null, pendingEdits = pending?.drafts.orEmpty(),

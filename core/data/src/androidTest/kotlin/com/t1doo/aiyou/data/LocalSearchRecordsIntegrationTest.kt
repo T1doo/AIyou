@@ -28,7 +28,7 @@ class LocalSearchRecordsIntegrationTest {
         System.loadLibrary("sqlcipher")
     }
     @After fun after() {
-        try { stores.forEach { it.close() } }
+        try { stores.forEach { it.closeAndAwait() } }
         finally { key.fill(0); if (::directory.isInitialized) directory.deleteRecursively() }
     }
     @Test fun encryptedFtsChineseEnglishAndDigitsPersistAcrossReopenWithCurrentOwnerProof(): Unit = runBlocking {
@@ -40,7 +40,7 @@ class LocalSearchRecordsIntegrationTest {
         for (query in listOf("小林", "咖啡", "eeti", "42")) {
             assertEquals(listOf(original.id), first.localSearch.candidates(LocalSearchRequest(query)).entries.map { it.id })
         }
-        first.close()
+        first.closeAndAwait()
         val second = open()
         assertEquals(0, second.localSearch.batch().processed)
         assertFalse(second.localSearch.publishCurrent(previous) { fail("Foreign owner") })

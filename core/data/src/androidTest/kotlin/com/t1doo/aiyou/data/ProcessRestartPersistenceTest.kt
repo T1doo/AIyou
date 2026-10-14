@@ -50,7 +50,7 @@ class ProcessRestartPersistenceTest {
                 assertFalse(directory.exists())
                 assertTrue(directory.mkdirs())
                 val store = trace.step("open", openKind = "FRESH_FILE_FIRST_OPEN") { openStore() }
-                val acknowledgement = AutoCloseable { trace.step("close") { store.close() } }.use {
+                val acknowledgement = AutoCloseable { trace.step("close") { store.closeAndAwait() } }.use {
                     val committed = trace.suspending("update_draft") { store.updateDraft(original) }
                     val saved = trace.suspending("save_draft") { store.saveDraft(committed, 1000L, "Etc/UTC") }
                     assertEquals(original, saved.originalText)
@@ -81,7 +81,7 @@ class ProcessRestartPersistenceTest {
                 val writerPid = acknowledgement.getInt("pid")
                 assertNotEquals("Read must execute in a new process", writerPid, Process.myPid())
                 val store = trace.step("open", openKind = "EXISTING_FILE_FIRST_OPEN_NEW_PROCESS") { openStore() }
-                AutoCloseable { trace.step("close") { store.close() } }.use {
+                AutoCloseable { trace.step("close") { store.closeAndAwait() } }.use {
                     val stagedBlob = File(directory, "records.db.attachments/${acknowledgement.getString("stagedId")}.aead")
                     assertEquals(acknowledgement.getString("blobHash"), hash(stagedBlob.readBytes()))
                     try { store.prepare(); fail("Expected preserved native transition failure on startup") }
@@ -155,7 +155,8 @@ class ProcessRestartPersistenceTest {
                 val acknowledgement = JSONObject(marker.readText())
                 assertNotEquals(acknowledgement.getInt("pid"), Process.myPid())
                 assertNotEquals(acknowledgement.getInt("readPid"), Process.myPid())
-                openStore().use { store ->
+                val store = openStore()
+                try {
                     store.prepare()
                     val id = acknowledgement.getString("entryId")
                     val edit = checkNotNull(store.editDrafts.read(id))
@@ -175,7 +176,7 @@ class ProcessRestartPersistenceTest {
                         while (it.moveToNext()) counts[it.getString(0) + ":" + it.getString(1)] = it.getLong(2)
                         assertEquals(mapOf("LOCAL_INDEX:PENDING" to 2L, "ORIGINAL_EDIT_COMMIT:CONFIRMED" to 1L), counts)
                     }
-                }
+                } finally { store.closeAndAwait() }
             }
             "cleanup" -> {
                 // Only this explicit synthetic UUID namespace; never production records or aliases.

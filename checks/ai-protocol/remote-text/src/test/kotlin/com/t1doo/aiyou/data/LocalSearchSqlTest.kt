@@ -104,6 +104,12 @@ class LocalSearchSqlTest {
         assertFalse(f.index.candidates(LocalSearchRequest("合成")).pending)
     }
     @Test fun authenticatedNewCopyRestoreIsIndexedWithoutTouchingPackageReceipts(): Unit = Fixture().use { f ->
+        // Only this v8 package consumer upgrades; the v6→v7 preservation fixtures stay exact.
+        f.base.db.transaction { sql ->
+            PermanentErasureSqlSchema.migration7To8.forEach { sql.execute(it) }
+            PermanentErasureSqlSchema.guards.forEach { sql.execute(it) }
+            sql.execute("PRAGMA user_version=8")
+        }
         val pack = RecordPackageCipherTest.verified()
         val id = UUID.randomUUID().toString()
         SqlRecordPackageRepository(f.base.db, f.tags).restore(pack, listOf(id), 100)

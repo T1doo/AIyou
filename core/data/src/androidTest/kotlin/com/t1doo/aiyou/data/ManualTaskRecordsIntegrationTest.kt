@@ -28,13 +28,13 @@ class ManualTaskRecordsIntegrationTest {
         directory = File(context.noBackupFilesDir, "manual-tasks-" + UUID.randomUUID()).also { check(it.mkdirs()) }
         System.loadLibrary("sqlcipher")
     }
-    @After fun after() { try { stores.forEach { it.close() } } finally { key.fill(0); if (::directory.isInitialized) directory.deleteRecursively() } }
-    @Test fun freshVersionSevenPersistsExplicitTaskAndTerminalStatesAcrossEncryptedReopen(): Unit = runBlocking {
+    @After fun after() { try { stores.forEach { it.closeAndAwait() } } finally { key.fill(0); if (::directory.isInitialized) directory.deleteRecursively() } }
+    @Test fun freshVersionEightPersistsExplicitTaskAndTerminalStatesAcrossEncryptedReopen(): Unit = runBlocking {
         val store = open(); NativeRecordsSchemaFixture.assertCurrentSchema(store.database.openHelper.writableDatabase)
         assertTrue(store.manualTasks.snapshots().isEmpty()); assertTrue(store.entries().isEmpty())
         store.manualTasks.create(create("one")); store.manualTasks.create(create("two"))
         store.manualTasks.change(change("one", ManualTaskStatus.COMPLETED)); store.manualTasks.change(change("two", ManualTaskStatus.CANCELLED))
-        store.close(); val reopened = open()
+        store.closeAndAwait(); val reopened = open()
         assertEquals(ManualTaskStatus.COMPLETED, reopened.manualTasks.snapshots().single { it.id == "one" }.status)
         assertEquals(ManualTaskStatus.CANCELLED, reopened.manualTasks.snapshots().single { it.id == "two" }.status)
         assertEquals("合成手工待办🙂", reopened.manualTasks.snapshots().first().title)
@@ -54,7 +54,7 @@ class ManualTaskRecordsIntegrationTest {
         val store = open(); NativeRecordsSchemaFixture.assertCurrentSchema(store.database.openHelper.writableDatabase)
         assertTrue(store.manualTasks.snapshots().isEmpty()); assertEquals(listOf("合成原标签"), store.manualTags.read("legacy").names)
         assertEquals("合成独立草稿", store.readDraft()!!.text); assertEquals("合成原文", store.entries().single().originalText)
-        store.manualTasks.create(create("one")); store.close(); val reopened = open()
+        store.manualTasks.create(create("one")); store.closeAndAwait(); val reopened = open()
         assertEquals(1, reopened.manualTasks.snapshots().size); assertEquals(7L, reopened.readDraft()!!.version)
         assertEquals(1, reopened.revisions("legacy").size); assertEquals(listOf("合成原标签"), reopened.manualTags.read("legacy").names)
         reopened.database.openHelper.writableDatabase.query("SELECT state FROM local_jobs").use {
@@ -83,7 +83,7 @@ class ManualTaskRecordsIntegrationTest {
         val terminal = change("one", ManualTaskStatus.COMPLETED)
         store.manualTasks.change(terminal); assertEquals(2L, store.manualTasks.change(terminal).version)
         assertThrows(ManualTaskConflict::class.java) { store.manualTasks.create(request) }
-        val borrowed = store.manualTasks; store.close()
+        val borrowed = store.manualTasks; store.closeAndAwait()
         assertThrows(ManualTaskStorageFailure::class.java) { borrowed.snapshots() }
         val reopened = open(); val sql = reopened.database.openHelper.writableDatabase
         val blob = sql.query("SELECT ciphertext FROM manual_tasks").use { check(it.moveToFirst()); it.getBlob(0) }
@@ -91,7 +91,7 @@ class ManualTaskRecordsIntegrationTest {
         sql.execSQL("UPDATE manual_tasks SET version=version+1,ciphertext=? WHERE id='one'", arrayOf(blob))
         assertThrows(ManualTaskStorageFailure::class.java) { reopened.manualTasks.snapshots() }
         assertThrows(ManualTaskStorageFailure::class.java) { reopened.manualTasks.create(request) }
-        reopened.close(); assertThrows(ManualTaskStorageFailure::class.java) { open().manualTasks.snapshots() }
+        reopened.closeAndAwait(); assertThrows(ManualTaskStorageFailure::class.java) { open().manualTasks.snapshots() }
     }
     private fun open() = EncryptedEntryRepository.openWithKey(context, file, key.copyOf()).also(stores::add)
     private fun create(id: String) = ManualTaskCreate(id, "合成手工待办🙂", 55, "Asia/Shanghai", "create-$id")

@@ -28,6 +28,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/JpegPayloadValidator.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedAttachmentStore.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedOriginalEditStore.kt")
+    from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/ErasureFileProtocol.kt")
     into(production)
 }
 kotlin.sourceSets.getByName("main").kotlin.srcDir(production)

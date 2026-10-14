@@ -29,6 +29,8 @@ import javax.crypto.spec.SecretKeySpec
 internal interface AttachmentLedger {
     suspend fun find(id: String): LocalAttachment?
     suspend fun all(): List<LocalAttachment>
+    suspend fun forEntry(entryId: String, limit: Int): List<LocalAttachment> =
+        all().filter { it.intent.entryId == entryId }.take(limit)
     suspend fun insert(value: LocalAttachment)
     suspend fun transition(expected: LocalAttachment, next: AttachmentState): LocalAttachment
 }
@@ -45,11 +47,14 @@ internal class EncryptedAttachmentStore(
     private val keyBytes: ByteArray,
     private val checkpoint: (String) -> Unit = {},
 ) : AttachmentStore, AutoCloseable {
-    private val lifecycle = Any()
+    private val lifecycle = java.lang.Object()
+    private var erasureHooks: ErasureFileHooks = NoErasureFileHooks
+    private val creations = mutableMapOf<String, String>()
     private var activeOperations = 0
     @Volatile private var closed = false
     override suspend fun save(intent: AttachmentIntent, source: () -> InputStream): LocalAttachment = locked {
         validate(intent)
+        if (erasureHooks.fenced(intent.entryId)) throw AttachmentConflict()
         recoverLocked()
         var row = ledger.find(intent.id)
         if (row != null && row.intent != intent) throw AttachmentConflict()
@@ -71,6 +76,7 @@ internal class EncryptedAttachmentStore(
         checkpoint("encrypted")
         row = ledger.transition(row, AttachmentState.STAGED)
         checkpoint("staged")
+        if (erasureHooks.fenced(intent.entryId)) throw AttachmentConflict()
         authenticated(file(intent, true), intent).fill(0)
         publish(intent)
         checkpoint("published")
@@ -78,12 +84,14 @@ internal class EncryptedAttachmentStore(
     }
 
     override suspend fun list(entryId: String, revision: Int): List<LocalAttachment> = locked {
+        if (erasureHooks.fenced(entryId)) throw AttachmentConflict()
         recoverLocked()
         ledger.all().filter { it.intent.entryId == entryId && it.intent.revision == revision }
     }
 
     override suspend fun read(id: String): ByteArray = locked {
         val row = ledger.find(id) ?: throw AttachmentConflict()
+        if (erasureHooks.fenced(row.intent.entryId)) throw AttachmentConflict()
         validate(row.intent)
         if (row.state != AttachmentState.READY) throw AttachmentIntegrityFailure()
         try { authenticated(file(row.intent, false), row.intent) }
@@ -98,6 +106,7 @@ internal class EncryptedAttachmentStore(
     private suspend fun recoverLocked() {
         for (row in ledger.all()) {
             validate(row.intent)
+            if (erasureHooks.fenced(row.intent.entryId)) continue
             when (row.state) {
                 AttachmentState.WRITING -> {
                     // A file without the durable STAGED marker has no acknowledged complete copy.
@@ -135,10 +144,17 @@ internal class EncryptedAttachmentStore(
         val digest = MessageDigest.getInstance("SHA-256")
         var count = 0L
         // CREATE_NEW prevents replacing a file, including an unexpected symlink.
+        erasureHooks.reserve(intent.entryId, BUCKET, temporary.name)
         Files.createFile(temporary.toPath())
         FileOutputStream(temporary).use { output ->
             output.write(MAGIC)
             output.write(iv)
+            output.fd.sync(); syncDirectory()
+            val proof = createdFileProof(temporary, 17)
+            creations[temporary.name] = proof
+            erasureHooks.created(intent.entryId, BUCKET, temporary.name, proof)
+            checkpoint("created")
+            if (erasureHooks.fenced(intent.entryId)) throw AttachmentConflict()
             source().use { input ->
                 val buffer = ByteArray(8192)
                 try {
@@ -185,18 +201,29 @@ internal class EncryptedAttachmentStore(
     }
 
     private fun publish(intent: AttachmentIntent) {
+        if (erasureHooks.fenced(intent.entryId)) throw AttachmentConflict()
         val target = file(intent, false)
         if (target.exists()) throw AttachmentConflict()
         // No copy/delete fallback: unsupported atomic publication is a recoverable storage failure.
         Files.move(file(intent, true).toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
         syncDirectory()
+        creations.remove(file(intent, true).name)
+        erasureHooks.forgotten(intent.entryId, BUCKET, file(intent, true).name)
     }
 
     private fun deleteOwnedPartial(intent: AttachmentIntent) {
         if (file(intent, false).exists()) throw AttachmentIntegrityFailure()
         val partial = file(intent, true)
         if (Files.isSymbolicLink(partial.toPath())) throw AttachmentIntegrityFailure()
-        if (partial.exists()) { Files.delete(partial.toPath()); syncDirectory() }
+        if (partial.exists()) {
+            val before = observeErasureFile(BUCKET, partial) ?: throw AttachmentIntegrityFailure()
+            val proof = erasureHooks.creation(intent.entryId, BUCKET, partial.name) ?: creations[partial.name]
+            if (proof == null || proof != createdFileProof(partial, 17)) authenticated(partial, intent).fill(0)
+            if (observeErasureFile(BUCKET, partial) != before) throw AttachmentIntegrityFailure()
+            Files.delete(partial.toPath()); syncDirectory()
+        }
+        creations.remove(partial.name)
+        erasureHooks.forgotten(intent.entryId, BUCKET, partial.name)
     }
 
     private fun file(intent: AttachmentIntent, temporary: Boolean): File {
@@ -208,7 +235,7 @@ internal class EncryptedAttachmentStore(
         FileChannel.open(target.toPath(), StandardOpenOption.READ).use { it.force(true) }
     }
 
-    private suspend fun <T> locked(block: suspend () -> T): T {
+    private suspend fun <T> locked(block: suspend () -> T): T = trackedFileOperation(lifecycle) {
         synchronized(lifecycle) {
             check(!closed && keyBytes.size == 32)
             activeOperations++
@@ -226,15 +253,47 @@ internal class EncryptedAttachmentStore(
             FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel ->
                 val lock = try { channel.tryLock() } catch (_: OverlappingFileLockException) { null }
                 if (lock == null) throw AttachmentBusy()
-                lock.use { return block() }
+                lock.use { checkpoint("locked"); return@trackedFileOperation block() }
             }
         } finally {
             synchronized(lifecycle) {
                 activeOperations--
+                if (activeOperations == 0) lifecycle.notifyAll()
                 if (closed && activeOperations == 0) keyBytes.fill(0)
             }
         }
     }
+
+    internal fun installErasureHooks(hooks: ErasureFileHooks) = synchronized(lifecycle) {
+        check(!closed && activeOperations == 0 && erasureHooks === NoErasureFileHooks); erasureHooks = hooks
+    }
+    internal suspend fun <T> withErasureLease(action: suspend (ErasureDirectoryLease) -> T): T =
+        locked { action(ErasureDirectoryLease(BUCKET, directory)) }
+    internal suspend fun erasurePlan(entryId: String, lease: ErasureDirectoryLease, budget: ErasureScanBudget): List<ErasureFileObservation> {
+        val rows = ledger.forEntry(entryId, 65)
+        if (rows.size > 64) throw com.t1doo.aiyou.domain.PermanentErasureIncomplete()
+        val plan = mutableListOf<ErasureFileObservation>()
+        for (row in rows) {
+            validate(row.intent)
+            for (temporary in listOf(false, true)) {
+                val candidate = file(row.intent, temporary)
+                val observed = lease.observe(candidate) ?: continue
+                budget.consume(observed)
+                val proof = if (temporary) erasureHooks.creation(entryId, BUCKET, candidate.name) else null
+                if (proof == null || proof != createdFileProof(candidate, 17)) authenticated(candidate, row.intent).fill(0)
+                if (lease.observe(candidate) != observed) throw com.t1doo.aiyou.domain.PermanentErasureIncomplete()
+                plan += observed
+            }
+        }
+        return plan
+    }
+    internal fun awaitIdle() {
+        checkExternalWait()
+        var interrupted = false
+        synchronized(lifecycle) { while (activeOperations != 0) try { lifecycle.wait() } catch (_: InterruptedException) { interrupted = true } }
+        if (interrupted) Thread.currentThread().interrupt()
+    }
+    internal fun checkExternalWait() { checkExternalFileWait(lifecycle) }
 
     /** Stop new operations immediately; zero the key after already-started operations release it. */
     override fun close() = synchronized(lifecycle) {
@@ -243,6 +302,7 @@ internal class EncryptedAttachmentStore(
     }
 
     companion object {
+        internal const val BUCKET = "ATTACHMENTS"
         /** Safety bound for this internal storage API, not a frozen product media quota. */
         const val MAX_BYTES = 16L * 1024 * 1024
         private val MAGIC = "AIYA1".toByteArray(Charsets.US_ASCII)

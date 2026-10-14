@@ -39,9 +39,13 @@ class RecordPackageOrigin(val newId: String, val backupId: String, val packageDi
     override fun toString() = "RecordPackageOrigin(redacted)"
 }
 
-class RecordPackageRestoreResult(ids: List<String>, val importedAtMillis: Long, val replayed: Boolean) {
+class RecordPackageRestoreResult(ids: List<String>, val importedAtMillis: Long, val replayed: Boolean,
+    val deletedCount: Int = 0, val erasingCount: Int = 0) {
     val ids = Collections.unmodifiableList(ids.toList())
-    init { require(ids.size in 1..20 && ids.distinct().size == ids.size); ids.forEach(RecordPackages::uuid); require(importedAtMillis >= 0) }
+    init { require(ids.size in 1..20 && ids.distinct().size == ids.size); ids.forEach(RecordPackages::uuid); require(importedAtMillis >= 0)
+        require(deletedCount >= 0 && erasingCount >= 0 && deletedCount + erasingCount <= ids.size)
+        require(replayed || deletedCount + erasingCount == 0)
+    }
     override fun toString() = "RecordPackageRestoreResult(count=" + ids.size + ", replayed=" + replayed + ")"
 }
 

@@ -174,7 +174,7 @@ class RecordPackageControllerTest {
         override fun toString() = "SyntheticSelectedDocument(redacted)"
     }
     internal class Harness : AutoCloseable {
-        val fixture = ManualTaskSqlTest.Fixture()
+        val fixture = packageFixture()
         val tags = SqlManualTagRepository(fixture.db, ManualTaskSqlTest.KEY)
         val packages = SqlRecordPackageRepository(fixture.db, tags)
         private val state = MutableStateFlow(LocalRecordUiState(ready = true, opening = false, text = "independent capture input",

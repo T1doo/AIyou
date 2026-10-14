@@ -12,7 +12,7 @@
 
 保存状态选择依据 [Android 官方 TextFieldState 文档](https://developer.android.com/develop/ui/compose/text/user-input)；列表锚点遵守 [Compose LazyListState 内边距语义](https://raw.githubusercontent.com/androidx/androidx/androidx-main/compose/foundation/foundation/src/commonMain/kotlin/androidx/compose/foundation/lazy/LazyListState.kt)。现有手账样式、宠物与减少动效设置继续沿用，不新增外围入口。
 
-这只是本机原文字面查找，不是自然语言搜索、完整 D06 或已完成 `LOCAL_INDEX`。没有数据库迁移、索引／FTS、网络权限、凭据、真实模型或后台重试队列。未来 D06 的中文索引、别名、证据问答、纠错及性能验收仍 **OPEN**。
+以上描述属于最初内存字面查找阶段。后续 `e252615809e55b090edcb545379602fae53bed25` 已有限接收持久化索引、LOCAL_INDEX 作业、有界重建及当前原文定位，见 [LOCAL_PERSISTENT_INDEX_CONTRACT.md](LOCAL_PERSISTENT_INDEX_CONTRACT.md)；原始阶段的测试/失败证据仍保留。完整 D06 的别名、证据问答、纠错及设备性能验收仍 **OPEN**。
 
 新增9个实际生产 matcher／controller JVM 契约和5个实际 `AIyouApp` Compose 契约；门禁要求这些明确方法各出现一次且失败、错误、跳过均为0。验证包括 Unicode 摘录回算、精确空白、捕捉时区／DST、错误日期、旧计算不响应取消、源快照更新、同帧 ABA、读取失败、内存查询恢复边界、大字窄屏可达性，以及确实制造内边距与首可见索引不一致后的完整原文打开和两种返回。具体执行数字、输入指纹、提交 SHA 与同 SHA CI 见交付回执，未执行不记 PASS。
 
