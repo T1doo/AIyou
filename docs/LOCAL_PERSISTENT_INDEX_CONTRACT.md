@@ -132,6 +132,11 @@ opaque 输入 identity，不改 StateFlow/Compose/TextFieldState；与发布 CAS
 须取得实际 publication/输入 ABA/键盘 Undo 证据。Root 还核精确字段 owner identity，
 拒绝清空替换后的旧编辑回调。输入框明确退出 SaveableStateRegistry，清空时换
 编辑 owner，避免旧 Undo 内容重现。必须实际核 raw SavedState 与真实键盘 Undo/Redo。
+键盘回归还须从稳定 READY/BROWSE 的实际 observer epoch 取基线，并在真实 View
+Ctrl/Shift 键事件后要求 epoch 增加，不能只靠文本历史变化推断退役门已执行。
+该单个键盘/恢复隐私 JVM case 仅为 Magnifier 的 show/update/dismiss 使用视觉 shadow，
+避开已保全日志中 popup Surface=null 的 JVM teardown 路径；不替换编辑、Undo、
+查询 owner、导航或 SavedState。此 case 不证明设备放大镜绘制/销毁。
 
 ## 必须取得的证据与边界
 

@@ -1,5 +1,6 @@
 package com.t1doo.aiyou
 
+import android.widget.Magnifier
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -73,6 +74,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
 
 /** Actual AIyouApp/Compose and product lookup, with synthetic current originals.
  * Robolectric is not Android device, Room or SQLCipher execution evidence.
@@ -263,6 +266,7 @@ class LocalOriginalSearchPresentationTest {
     }
 
     @OptIn(ExperimentalFoundationApi::class)
+    @Config(sdk = [35], shadows = [KeyboardHistoryMagnifierShadow::class])
     @Test fun compositionRestorationDropsSensitiveQueryDatesAndResultsAndRevokesOldActions() {
         val marker = "synthetic-private-local-query"; val state = local(entry("one", "合成原文 $marker 完整保留"))
         val sourceSnapshot = state.value.entries; val show = mutableStateOf(true); val restoration = StateRestorationTester(compose)
@@ -514,6 +518,13 @@ class LocalOriginalSearchPresentationTest {
         .performScrollTo().assertIsEnabled().performClick().assertIsFocused()
     private fun nativeHistory(tag: String, redo: Boolean = false) {
         focusedField(tag)
+        val stable = observation { it.state.stage == OriginalSearchStage.READY ||
+            it.state.stage == OriginalSearchStage.BROWSE }
+        val before = compose.runOnIdle {
+            val field = checkNotNull(actualInputs.get()).field(tag)
+            (if (redo) field.undoState.canRedo else field.undoState.canUndo) to
+                stable.state.inputEpoch
+        }
         // Held modifier simulation has previously delivered plain z in this JVM
         // environment. Dispatch explicit native Ctrl metadata through the actual
         // focused Compose View and the new production history key handler.
@@ -526,6 +537,11 @@ class LocalOriginalSearchPresentationTest {
                     checkNotNull(actualView.get()).dispatchKeyEvent(android.view.KeyEvent(now, now,
                         action, android.view.KeyEvent.KEYCODE_Z, 0, meta)))
             }
+        }
+        if (before.first) {
+            // Foundation can consume the same chord itself. Require the real
+            // production ownership fence, not only successful text history.
+            observation { it.state.inputEpoch > before.second }
         }
     }
     private fun editable(tag: String): String = compose.onNodeWithTag(tag).performScrollTo().fetchSemanticsNode().config[SemanticsProperties.EditableText].text
@@ -554,6 +570,24 @@ class LocalOriginalSearchPresentationTest {
         compose.waitForIdle()
         return compose.runOnIdle { checkNotNull(observations.get()).also { check(predicate(it)) } }
     }
+    /** The retained JVM teardown log shows a null Magnifier popup Surface.
+     * Only the visual Magnifier boundary is shadowed; editing, Undo, ownership,
+     * restoration, navigation and their assertions remain real production paths.
+     * Magnifier rendering and teardown on a device remain NOT RUN.
+     * https://robolectric.org/extending/#custom-shadows
+     */
+    @Implements(Magnifier::class)
+    class KeyboardHistoryMagnifierShadow {
+        @Implementation fun show(@Suppress("UNUSED_PARAMETER") x: Float,
+            @Suppress("UNUSED_PARAMETER") y: Float) = Unit
+        @Implementation fun show(@Suppress("UNUSED_PARAMETER") x: Float,
+            @Suppress("UNUSED_PARAMETER") y: Float,
+            @Suppress("UNUSED_PARAMETER") windowX: Float,
+            @Suppress("UNUSED_PARAMETER") windowY: Float) = Unit
+        @Implementation fun update() = Unit
+        @Implementation fun dismiss() = Unit
+    }
+
     private fun assertNoSavedInput(value: Any?, marker: String, date: String) {
         when (value) {
             is OriginalReadingLocation, is LocalSearchSnapshot -> fail("Private live lookup/reader binding must never enter SavedState")
