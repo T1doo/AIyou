@@ -67,6 +67,11 @@ data class LocalRecordUiState(
     val supportsRecycleBin: Boolean = false,
     val recycleBin: RecycleBinUiState? = null,
     val recycleNotice: String? = null,
+    val supportsRecordPackages: Boolean = false,
+    val recordPackage: RecordPackageUiState? = null,
+    val packageOrigins: Map<String, com.t1doo.aiyou.model.RecordPackageOrigin> = emptyMap(),
+    val packageOriginsAvailable: Boolean = true,
+    val packageOriginsError: String? = null,
 )
 
 /** All draft writes and saves share one queue, preserving edits around a save boundary. */
@@ -92,6 +97,9 @@ class LocalRecordsViewModel internal constructor(
         enqueue = { action -> commands.trySend(Command.ManualTasks(action)).isSuccess }, clock = clock)
     val exports = OriginalExportController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.OriginalExport(action)).isSuccess }, clock = clock)
+    val recordPackages = RecordPackageController(current = { mutableState.value }, publish = { change -> update(change) },
+        enqueue = { action -> commands.trySend(Command.RecordPackage(action)).isSuccess },
+        cipher = com.t1doo.aiyou.data.JcaRecordPackageCipher(), clock = clock)
     val recycleBin = RecycleBinController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.RecycleBin(action)).isSuccess },
         canMove = { attachments.state.value == null },
@@ -199,6 +207,7 @@ class LocalRecordsViewModel internal constructor(
                             is Command.ManualTags -> command.action(checkNotNull(repository))
                             is Command.ManualTasks -> command.action(checkNotNull(repository))
                             is Command.OriginalExport -> command.action(checkNotNull(repository))
+                            is Command.RecordPackage -> command.action(checkNotNull(repository))
                             is Command.RecycleBin -> command.action(checkNotNull(repository))
                         }
                     } catch (failure: CancellationException) { throw failure }
@@ -212,6 +221,7 @@ class LocalRecordsViewModel internal constructor(
                 tags.dispose()
                 tasks.dispose()
                 exports.dispose()
+                recordPackages.dispose()
                 recycleBin.dispose()
                 withContext(NonCancellable + Dispatchers.IO) {
                     try { ai.closeAndJoin() }
@@ -249,7 +259,7 @@ class LocalRecordsViewModel internal constructor(
         mutableState.value.ai?.let { ai.leave(it.sessionId) }
         val local = mutableState.value
         if (editsDisposed || !local.ready || local.opening || local.error != null ||
-            local.originalEdit != null || local.originalHistory != null || local.recycleBin != null || attachments.state.value != null) return 0L
+            local.recordPackage != null || local.originalEdit != null || local.originalHistory != null || local.recycleBin != null || attachments.state.value != null) return 0L
         val entry = local.entries.firstOrNull { it.id == entryId && it.currentRevision == expectedRevision } ?: return 0L
         return ai.open(SourceVersion(entry.id, entry.currentRevision.toLong()), entry.policy)
     }
@@ -405,7 +415,7 @@ class LocalRecordsViewModel internal constructor(
     fun beginOriginalEdit(entryId: String, expectedRevision: Int) {
         if (editsDisposed) return
         val current = mutableState.value
-        if (current.captureDiscard != null || current.recycleBin != null) return
+        if (current.captureDiscard != null || current.recycleBin != null || current.recordPackage != null) return
         if (!current.ready || current.opening || current.error != null || current.saving || current.savePending || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         val entry = current.entries.firstOrNull { it.id == entryId && it.currentRevision == expectedRevision } ?: return
         current.ai?.let { ai.leave(it.sessionId) }
@@ -417,7 +427,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun resumeOriginalEdit(entryId: String, draftId: String) {
         val current = mutableState.value
-        if (current.captureDiscard != null || current.recycleBin != null) return
+        if (current.captureDiscard != null || current.recycleBin != null || current.recordPackage != null) return
         if (current.supportsRecycleBin && current.entries.none { it.id == entryId }) return
         if (editsDisposed || !current.ready || current.opening || current.error != null || !current.editDraftIndexAvailable || current.saving || current.savePending ||
             current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
@@ -491,7 +501,7 @@ class LocalRecordsViewModel internal constructor(
 
     fun beginOriginalHistory(entryId: String, expectedRevision: Int) {
         val current = mutableState.value
-        if (current.captureDiscard != null || current.recycleBin != null) return
+        if (current.captureDiscard != null || current.recycleBin != null || current.recordPackage != null) return
         if (!current.ready || current.opening || current.error != null || current.saving || current.savePending || current.originalHistory != null || attachments.state.value != null) return
         if (current.originalEdit?.let { it.entryId != entryId || !it.canCancel } == true) return
         if (current.entries.none { it.id == entryId && it.currentRevision == expectedRevision }) return
@@ -912,6 +922,8 @@ class LocalRecordsViewModel internal constructor(
             val entries = store.entries()
             val labels = try { store.manualTags?.snapshots() }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
+            val origins = try { store.recordPackages?.origins() ?: emptyMap() }
+                catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             val pending = try { store.editDrafts?.pending() ?: OriginalEditDraftIndex(emptyList()) }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             val ownership = storageOwnership ?: RecordsStorageOwnership(store, bindAi?.let { factory ->
@@ -921,6 +933,9 @@ class LocalRecordsViewModel internal constructor(
             update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
                 entries = entries, manualTags = labels.orEmpty(), manualTagsAvailable = labels != null,
                 supportsOriginalExport = store.originalExport != null,
+                supportsRecordPackages = store.recordPackages != null && store.originalExport != null && store.manualTags != null,
+                packageOrigins = origins.orEmpty(), packageOriginsAvailable = origins != null,
+                packageOriginsError = if (origins == null) "恢复来源暂不可读取，不能确认来源。" else null,
                 supportsRecycleBin = store.recycleBin != null,
                 manualTagsError = if (store.manualTags != null && labels == null) "手工标签暂不可读取，请重试。" else null,
                 draftNotice = if (persistedDraft == null) "没有未保存的草稿" else "已恢复本机草稿", error = null,
@@ -935,7 +950,7 @@ class LocalRecordsViewModel internal constructor(
 
     private fun failed(failure: Exception, preserveQueuedSave: Boolean = false) {
         update { it.copy(opening = false, saving = if (preserveQueuedSave) it.saving else false,
-            error = if (failure is StorageKeyUnavailable) "无法读取本机加密密钥。请保留原数据并先解锁设备重试。备份恢复尚未开放。"
+            error = if (failure is StorageKeyUnavailable) "无法读取本机加密密钥。请保留原数据并先解锁设备重试。原文包恢复需要可用的本机存储，无法替换设备绑定密钥。"
             else "本机存储操作失败。输入与原数据已保留，可以重试。",
             draftNotice = if (it.ready) "草稿保存状态待确认" else "草稿尚未读取") }
     }
@@ -947,6 +962,7 @@ class LocalRecordsViewModel internal constructor(
         tags.dispose()
         tasks.dispose()
         exports.dispose()
+        recordPackages.dispose()
         recycleBin.dispose()
         commands.close()
         super.onCleared()
@@ -959,6 +975,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     private sealed interface Command {
+        data class RecordPackage(val action: suspend (EntryRepository) -> Unit) : Command
         data class RecycleBin(val action: suspend (EntryRepository) -> Unit) : Command
         data class OriginalExport(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualTasks(val action: suspend (EntryRepository) -> Unit) : Command

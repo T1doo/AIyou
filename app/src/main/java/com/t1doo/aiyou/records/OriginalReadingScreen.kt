@@ -144,6 +144,14 @@ fun OriginalReadingScreen(
                 else -> {
                     Text(metadataText ?: originalMetadata(entry), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                     PrivacyChip(entry.policy)
+                    local.packageOrigins[entry.id]?.takeIf { local.packageOriginsAvailable }?.let { origin ->
+                        Text("加密包恢复副本 · 原文版本 " + origin.sourceRevision + " · 包创建于 " +
+                            java.time.Instant.ofEpochMilli(origin.packageCreatedAtMillis).atZone(java.time.ZoneId.of(entry.captureTimeZone))
+                                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日")),
+                            style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("package-provenance"))
+                    }
+                    if (!local.packageOriginsAvailable) Text(local.packageOriginsError ?: "恢复来源暂不可核对。",
+                        style = MaterialTheme.typography.bodySmall)
                     Text("长按选择文字，或复制全文。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                     local.originalEditNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = AIyouColors.success) }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {

@@ -81,6 +81,8 @@ import com.t1doo.aiyou.ui.NotebookAppBar
 import com.t1doo.aiyou.ui.NotebookNavigation
 
 class MainActivity : ComponentActivity() {
+    private var packagePicker: com.t1doo.aiyou.records.ActivityRecordPackagePicker? = null
+    private var packageRecords: LocalRecordsViewModel? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
@@ -88,6 +90,10 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
         )
         val records = ViewModelProvider(this)[LocalRecordsViewModel::class.java]
+        packageRecords = records
+        packagePicker = com.t1doo.aiyou.records.ActivityRecordPackagePicker(this, savedInstanceState).also {
+            records.recordPackages.attachPickerOwner(it)
+        }
         val preferences = ViewModelProvider(this)[UiPreferencesViewModel::class.java]
         setContent {
             val local by records.state.collectAsState()
@@ -113,8 +119,25 @@ class MainActivity : ComponentActivity() {
                 onTaskBegin = records.tasks::begin, onTaskEdit = records.tasks::edit, onTaskCreate = records.tasks::create,
                 onTaskChange = records.tasks::change, onTaskRetry = records.tasks::retry,
                 onTaskRefresh = records.tasks::refresh, onTaskClose = records.tasks::close,
-                exports = records.exports, recycleBin = records.recycleBin, currentRecords = { records.state.value }) }
+                exports = records.exports, recycleBin = records.recycleBin, recordPackages = records.recordPackages,
+                recordPackagePicker = packagePicker, currentRecords = { records.state.value }) }
         }
+    }
+    override fun onResume() { super.onResume(); packagePicker?.resumed() }
+    override fun onPause() { packagePicker?.paused(); super.onPause() }
+    override fun onSaveInstanceState(outState: Bundle) { packagePicker?.save(outState); super.onSaveInstanceState(outState) }
+    override fun onDestroy() {
+        packagePicker?.let { packageRecords?.recordPackages?.detachPickerOwner(it); it.destroy() }
+        packagePicker = null; packageRecords = null
+        super.onDestroy()
+    }
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        if (requestCode in 1..65535) {
+            packagePicker?.result(requestCode, resultCode, data)
+            return
+        }
+        super.onActivityResult(requestCode, resultCode, data)
     }
 }
 
@@ -178,6 +201,8 @@ fun AIyouApp(
     onTaskClose: (Long) -> Unit = {},
     exports: com.t1doo.aiyou.records.OriginalExportController? = null,
     recycleBin: com.t1doo.aiyou.records.RecycleBinController? = null,
+    recordPackages: com.t1doo.aiyou.records.RecordPackageController? = null,
+    recordPackagePicker: com.t1doo.aiyou.records.RecordPackagePicker? = null,
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -247,11 +272,13 @@ fun AIyouApp(
     }
     val context = LocalContext.current
     val selected = Destination.valueOf(selectedName)
+    val packageUi = local?.recordPackage
+    val browsingPackage = packageUi != null && selected == Destination.MEMORIES && detailEntryId == null && !showSettings && !demo
     val recycleUi = local?.recycleBin
     val browsingRecycle = recycleUi?.browsing == true && selected == Destination.MEMORIES && detailEntryId == null && !showSettings && !demo
     val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS && !browsingRecycle
     SideEffect {
-        search.sync(selected == Destination.MEMORIES && !reading && !browsingRecycle && !showSettings && !demo &&
+        search.sync(selected == Destination.MEMORIES && !reading && !browsingRecycle && !browsingPackage && !showSettings && !demo &&
             local != null && local.originalEdit == null && local.originalHistory == null)
         if (!reading && searchReturnAnchor != null &&
             (renderedSearchInput.copy(tagSnapshot = null) != searchReturnInput?.copy(tagSnapshot = null) || searchSource()?.entries !== searchReturnSource)) {
@@ -373,6 +400,7 @@ fun AIyouApp(
     val selectDestination: (Destination) -> Unit = { destination ->
         if (ownsNavigation() && currentLocal?.recycleBin?.busy != true && currentLocal?.originalEdit == null && currentLocal?.originalHistory == null && attachments?.state?.value == null) {
             currentLocal?.recycleBin?.let { recycleBin?.close(it.session) }
+            currentLocal?.recordPackage?.let { recordPackages?.close(it.session) }
             clearSearch()
             navigation.generation++
             tailReturnRequest = null
@@ -524,7 +552,14 @@ fun AIyouApp(
     }
     val exportUi = local?.originalExport
     fun ownsExportRoute() = ownsNavigation() && selectedName == Destination.MEMORIES.name &&
-        detailEntryId == null && !showSettings && !demo && currentLocal?.recycleBin == null
+        detailEntryId == null && !showSettings && !demo && currentLocal?.recycleBin == null && currentLocal?.recordPackage == null
+    fun ownsPackageRoute() = ownsNavigation() && selectedName == Destination.MEMORIES.name &&
+        detailEntryId == null && !showSettings && !demo && currentLocal?.recycleBin == null &&
+        currentLocal?.recordPackage?.session == packageUi?.session
+    SideEffect { if (packageUi != null && !ownsPackageRoute()) recordPackages?.close(packageUi.session) }
+    BackHandler(enabled = browsingPackage) {
+        if (ownsPackageRoute()) { recordPackages?.close(checkNotNull(packageUi).session); navigation.generation++ }
+    }
     SideEffect {
         if (exportUi != null && !ownsExportRoute()) exports?.close(exportUi.session)
     }
@@ -538,13 +573,15 @@ fun AIyouApp(
         modifier = Modifier.imePadding().onSizeChanged { scaffoldHeightPx = it.height },
         topBar = {
             NotebookAppBar(
-                if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
-                if (viewingPicture) "返回附件列表" else if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
+                if (browsingPackage) "加密原文包" else if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
+                if (browsingPackage) "返回列表" else if (viewingPicture) "返回附件列表" else if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
                 else if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
                 else if (editing != null) "取消编辑" else if (reading || browsingRecycle) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
                 actionEnabled = recycleUi?.busy != true && attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
             ) {
-                if (browsingRecycle && ownsRecycleRoute()) {
+                if (browsingPackage && ownsPackageRoute()) {
+                    recordPackages?.close(checkNotNull(packageUi).session); navigation.generation++
+                } else if (browsingRecycle && ownsRecycleRoute()) {
                     recycleBin?.close(checkNotNull(recycleUi).session); navigation.generation++
                 } else if (reading && recycleUi == null) returnToList() else if (ownsNavigation() && recycleUi == null) {
                     clearSearch()
@@ -573,6 +610,8 @@ fun AIyouApp(
                 onDemo = { if (ownsNavigation()) { clearSearch(); navigation.generation++; demo = !demo } },
                 onDemoState = { if (ownsNavigation()) { navigation.generation++; stateName = it.name } },
                 modifier = modifier)
+        } else if (browsingPackage && local != null && recordPackages != null && packageUi != null) {
+            com.t1doo.aiyou.records.RecordPackageScreen(local, packageUi, recordPackages, recordPackagePicker, ::ownsPackageRoute, modifier)
         } else if (browsingRecycle && local != null && recycleBin != null && recycleUi != null) {
             com.t1doo.aiyou.records.RecycleBinScreen(local, recycleUi, recycleBin, ::ownsRecycleRoute, modifier)
         } else if (attachmentPanel != null && attachments != null && reading && local != null) {
@@ -619,6 +658,10 @@ fun AIyouApp(
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
+                onBeginRecordPackage = recordPackages?.let { controller -> { if (ownsNavigation() &&
+                    selectedName == Destination.MEMORIES.name && detailEntryId == null && !showSettings && !demo) {
+                    clearSearch(); navigation.generation++; controller.open()
+                } } },
                 onBeginExport = exports?.let { controller -> { if (ownsExportRoute()) controller.open() } },
                 onOpenRecycleBin = recycleBin?.let { controller -> { if (ownsNavigation() && selectedName == Destination.MEMORIES.name &&
                     detailEntryId == null && !showSettings && !demo) { clearSearch(); navigation.generation++; controller.open() } } },

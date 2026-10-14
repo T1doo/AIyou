@@ -18,6 +18,19 @@ internal class SqlManualTagRepository(private val database: RecordsSqlDatabase, 
         if (!allowDeleted) live(sql, entryId)
         return row(sql, entryId)?.snapshot() ?: ManualTagSnapshot(entryId, 0, emptyList())
     }
+    /** Importer owns this exact transaction; initial tags never borrow a historical tag version. */
+    internal fun createWithin(sql: RecordsSqlConnection, entryId: String, names: List<String>, mutationId: String) {
+        ManualTags.identifier(entryId); ManualTags.identifier(mutationId)
+        require(ManualTags.canonical(names) == names && row(sql, entryId) == null)
+        live(sql, entryId)
+        if (names.isNotEmpty()) {
+            val bytes = cipher.seal(entryId, 1, mutationId, names)
+            sql.execute("INSERT INTO entry_manual_tags(entryId,version,lastMutationId,ciphertext) VALUES(?,?,?,?)",
+                listOf(entryId, 1, mutationId, bytes))
+        }
+        val stored = readWithin(sql, entryId)
+        require(stored.names == names && stored.version == if (names.isEmpty()) 0L else 1L)
+    }
     override fun snapshots(): Map<String, ManualTagSnapshot> = safely {
         database.transaction { sql -> Collections.unmodifiableMap(sql.query(
             "SELECT t.entryId,t.version,t.lastMutationId,t.ciphertext FROM entry_manual_tags t JOIN entries e ON e.id=t.entryId WHERE NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=e.id AND a.deleted=1) ORDER BY t.entryId"

@@ -7,6 +7,7 @@ import com.t1doo.aiyou.model.OriginalEditDraft
 
 /** Successful completion means a durable transaction, never an optimistic UI insert. */
 interface EntryRepository {
+    val recordPackages: RecordPackageRepository? get() = null
     val recycleBin: RecycleBinRepository? get() = null
     val originalExport: OriginalExportRepository? get() = null
     val manualTasks: ManualTaskRepository? get() = null

@@ -33,7 +33,7 @@ class ManualTagController internal constructor(
     }
     fun open(id: String, revision: Int) {
         val local = current()
-        if (disposed || !local.ready || local.opening || local.error != null || local.recycleBin != null || local.saving || local.savePending ||
+        if (disposed || !local.ready || local.opening || local.error != null || local.recordPackage != null || local.recycleBin != null || local.saving || local.savePending ||
             local.entries.none { it.id == id && it.currentRevision == revision }) return
         val editor = ManualTagEditor(sessions.incrementAndGet(), id, revision, busy = true)
         publish { latest -> if (!disposed && latest.ready && !latest.opening && latest.error == null &&

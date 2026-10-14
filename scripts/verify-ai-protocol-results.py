@@ -99,7 +99,9 @@ for module, directory in modules.items():
 report = {"status": "PASS", "scope": "actual App ViewModel/controller on JVM platform shells, source-bound sending, product remote/tag/task SQL transactions and manual-tag/task AEAD on host SQLite, loopback HTTP and domain; local SQL driver is test-only; no Android/SQLCipher/live provider/device/native App acceptance",
           "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
           "source_sha256": source_sha256, "results": results,
-          "d02_native_acceptance": "NOT RUN", "full_d04_acceptance": "OPEN"}
+          "d02_native_acceptance": "NOT RUN", "full_d04_acceptance": "OPEN",
+          "record_package_scope": "actual platform JCA and independent synthetic Node/OpenSSL fixture plus product limited new-copy SQL restore on host SQLite",
+          "full_d08_acceptance": "OPEN", "native_saf_keystore_fresh_install_restore": "NOT RUN"}
 output = root / "checks/ai-protocol/build/reports/verified-contracts.json"
 output.parent.mkdir(parents=True, exist_ok=True)
 output.write_text(json.dumps(report, indent=2) + "\n")

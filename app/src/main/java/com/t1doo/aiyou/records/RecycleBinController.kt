@@ -47,7 +47,7 @@ class RecycleBinController internal constructor(
     }
     fun open() {
         val local = current()
-        if (!available(local) || !canMove() || local.recycleBin != null || local.originalEdit != null || local.originalHistory != null ||
+        if (!available(local) || !canMove() || local.recordPackage != null || local.recycleBin != null || local.originalEdit != null || local.originalHistory != null ||
             local.saving || local.savePending) return
         val ui = RecycleBinUiState(sessions.incrementAndGet(), true)
         publish { latest -> if (available(latest) && latest.recycleBin == null) latest.copy(recycleBin = ui) else latest }
@@ -55,7 +55,7 @@ class RecycleBinController internal constructor(
     }
     fun requestMove(id: String, revision: Int) {
         val local = current()
-        if (!available(local) || !canMove() || local.recycleBin != null || local.originalEdit != null || local.originalHistory != null ||
+        if (!available(local) || !canMove() || local.recordPackage != null || local.recycleBin != null || local.originalEdit != null || local.originalHistory != null ||
             local.manualTagEditor != null || local.saving || local.savePending ||
             local.entries.none { it.id == id && it.currentRevision == revision }) return
         val ui = RecycleBinUiState(sessions.incrementAndGet(), false)

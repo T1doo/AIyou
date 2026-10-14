@@ -43,6 +43,8 @@ class EncryptedEntryRepository internal constructor(
     override val manualTasks: com.t1doo.aiyou.domain.ManualTaskRepository get() = taskStorage
     override val originalExport: com.t1doo.aiyou.domain.OriginalExportRepository =
         SqlOriginalExportRepository(borrowedSql, tagStorage)
+    override val recordPackages: com.t1doo.aiyou.domain.RecordPackageRepository =
+        SqlRecordPackageRepository(borrowedSql, tagStorage)
     override val recycleBin: com.t1doo.aiyou.domain.RecycleBinRepository =
         SqlRecycleBinRepository(borrowedSql, tagStorage)
 

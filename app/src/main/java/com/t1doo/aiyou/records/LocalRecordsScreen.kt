@@ -91,6 +91,7 @@ fun LocalRecordsScreen(
     onSearchReturnHandled: () -> Unit = {},
     onBeginExport: (() -> Unit)? = null,
     onOpenRecycleBin: (() -> Unit)? = null,
+    onBeginRecordPackage: (() -> Unit)? = null,
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -210,8 +211,13 @@ fun LocalRecordsScreen(
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
                 item("summary") {
                     if (destination == Destination.MEMORIES && ((onBeginExport != null && local.supportsOriginalExport) ||
-                        (onOpenRecycleBin != null && local.supportsRecycleBin))) {
+                        (onOpenRecycleBin != null && local.supportsRecycleBin) ||
+                        (onBeginRecordPackage != null && local.supportsRecordPackages))) {
                         Column(Modifier.fillMaxWidth()) {
+                            if (onBeginRecordPackage != null && local.supportsRecordPackages) OutlinedButton(
+                                onClick = onBeginRecordPackage,
+                                enabled = local.ready && !local.opening && local.error == null && !local.saving && !local.savePending,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("package-open")) { Text("加密原文包与恢复") }
                             NotebookPageHeader(destination.label, "${local.entries.size} 条本机记录", stackSummary, companion)
                             if (onBeginExport != null && local.supportsOriginalExport) OutlinedButton(onClick = onBeginExport, enabled = local.ready && !local.opening && local.error == null &&
                                 local.entries.isNotEmpty() && !local.saving && !local.savePending,
