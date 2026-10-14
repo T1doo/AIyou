@@ -49,8 +49,12 @@ class RecycleBinPresentationTest {
         }
     }
     private fun pump() = compose.runOnIdle { f.drain() }
+    private fun openOriginal() {
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"))
+        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-one"))).performScrollTo().performClick()
+    }
     private fun moveDialog() {
-        compose.onNodeWithTag("entry-one").performScrollTo().performClick()
+        openOriginal()
         compose.onNodeWithTag("original-recycle-move").performScrollTo().performClick(); pump()
     }
     private fun browse() { compose.onNodeWithTag("recycle-open").performScrollTo().performClick(); pump() }
@@ -106,7 +110,7 @@ class RecycleBinPresentationTest {
         compose.onNodeWithText("回收站暂不可读取").assertExists(); assertTrue(f.applied.isEmpty())
     }
     @Test fun retainedReaderAndConfirmationCallbacksRejectNavigationAndNewSessionBeforeRecomposition() {
-        content(); compose.onNodeWithTag("entry-one").performScrollTo().performClick()
+        content(); openOriginal()
         val move = compose.onNodeWithTag("original-recycle-move").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
         compose.runOnIdle { navigation.get().selectDestination(Destination.TASKS); move(); assertNull(f.state.value.recycleBin); assertTrue(f.queue.isEmpty()) }
         compose.runOnIdle { navigation.get().selectDestination(Destination.MEMORIES) }

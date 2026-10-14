@@ -82,7 +82,7 @@ class ManualTagPresentationTest {
         override fun onSelection(selection: SelectionState) = Unit
         override fun onRecordList(state: LazyListState, imeBottomPx: Int) { memories = state }
         override fun onListReturnStage(stage: String, generation: Long?, heightPx: Int, expectedHeightPx: Int?,
-            viewportReady: Boolean, state: LazyListState) { returnStage.set("$stage/$generation/$heightPx/$viewportReady") }
+            viewportReady: Boolean, state: LazyListState) { returnStage.set("$stage/$generation/$heightPx/expected=$expectedHeightPx/ready=$viewportReady") }
     }
 
     @Test fun actualTagEditorWaitsForAcknowledgementKeepsFailedInputAndRemovesOnlyAfterConfirmation() {
