@@ -66,18 +66,23 @@ class ManualTagPresentationTest {
     private class Result(val state: OriginalSearchState, val open: (OriginalSearchHit) -> Unit)
     private val results = AtomicReference<Result>()
     private val navigation = AtomicReference<OriginalReadingCallbacks>()
+    private val returnStage = AtomicReference<String>()
+    private val searchDiagnostics = AtomicReference<String>()
     private val inputs = AtomicReference<Triple<TextFieldState, TextFieldState, TextFieldState>>()
     private lateinit var memories: LazyListState
     private var registry: SaveableStateRegistry? = null
     private val searchObserver = object : OriginalSearchObserver {
         override fun onResults(state: OriginalSearchState, open: (OriginalSearchHit) -> Unit) { results.set(Result(state, open)) }
         override fun onInputs(query: TextFieldState, from: TextFieldState, through: TextFieldState) { inputs.set(Triple(query, from, through)) }
+        override fun onDiagnostics(value: String) { searchDiagnostics.set(value) }
     }
     private val readerObserver = object : OriginalReadingObserver {
         override fun onNavigation(callbacks: OriginalReadingCallbacks) { navigation.set(callbacks) }
         override fun onClipboard(clipboard: Clipboard) = Unit
         override fun onSelection(selection: SelectionState) = Unit
         override fun onRecordList(state: LazyListState, imeBottomPx: Int) { memories = state }
+        override fun onListReturnStage(stage: String, generation: Long?, heightPx: Int, expectedHeightPx: Int?,
+            viewportReady: Boolean, state: LazyListState) { returnStage.set("$stage/$generation/$heightPx/$viewportReady") }
     }
 
     @Test fun actualTagEditorWaitsForAcknowledgementKeepsFailedInputAndRemovesOnlyAfterConfirmation() {
@@ -108,7 +113,15 @@ class ManualTagPresentationTest {
         compose.onNodeWithTag("manual-tag-close").performScrollTo().performClick()
         compose.runOnIdle { navigation.get().returnToList() }
         result { it.stage == OriginalSearchStage.READY && it.input.tag == TAG }
-        compose.waitForIdle(); assertEquals(position, compose.runOnIdle { memories.firstVisibleItemIndex to memories.firstVisibleItemScrollOffset })
+        // READY publishes matches; the following layout/scroll effect completes independently.
+        // Use the same 2s positive position barrier as the existing actual reader-return regression.
+        try {
+            compose.waitUntil(2_000) { memories.firstVisibleItemIndex == position.first && memories.firstVisibleItemScrollOffset == position.second }
+        } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
+            throw AssertionError("Actual tag reader return did not restore position: ${returnStage.get()}, " +
+                "${searchDiagnostics.get()}, items=${memories.layoutInfo.totalItemsCount}", failure)
+        }
+        assertEquals(position, compose.runOnIdle { memories.firstVisibleItemIndex to memories.firstVisibleItemScrollOffset })
     }
     @Test fun changedTagVersionRevokesOldResultBeforeCompositionAndReadFailureIsDistinctFromEmpty() {
         content(); chooseTag(); val old = result { it.stage == OriginalSearchStage.READY && it.input.tag == TAG }

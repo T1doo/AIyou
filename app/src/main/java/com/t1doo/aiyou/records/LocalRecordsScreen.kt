@@ -136,12 +136,17 @@ fun LocalRecordsScreen(
     }
     LaunchedEffect(searchReturnAnchor, searchState, attachedViewport, contentKeys) {
         val anchor = searchReturnAnchor ?: return@LaunchedEffect
+        fun observe(stage: String) = returnObserver?.onListReturnStage("search-anchor-$stage",
+            searchState?.generation, attachedViewport.height, null, attachedViewport.height > 0, listState)
+        observe("evaluate")
         if (destination != Destination.MEMORIES || searchState?.stage != OriginalSearchStage.READY ||
-            !ownsSearchReturn() || attachedViewport.height == 0) return@LaunchedEffect
+            !ownsSearchReturn() || attachedViewport.height == 0) { observe("waiting"); return@LaunchedEffect }
         snapshotFlow { listState.layoutInfo }.first { it.viewportSize == attachedViewport && it.totalItemsCount == contentKeys.size }
         if (!ownsSearchReturn()) return@LaunchedEffect
         val index = contentKeys.indexOf(anchor.key).takeIf { it >= 0 } ?: anchor.index.coerceIn(0, contentKeys.lastIndex)
+        observe("layout")
         listState.scrollToItem(index, anchor.offset)
+        observe("scrolled")
         if (ownsSearchReturn()) onSearchReturnHandled()
     }
     LaunchedEffect(destination, tailReturnEntryId, tailReturnGeneration, attachedViewport, displayedEntries,
