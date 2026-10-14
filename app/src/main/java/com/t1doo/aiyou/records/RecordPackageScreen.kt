@@ -24,7 +24,7 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
     // Explicit remember, never rememberTextFieldState / saveable: secrets retire at every epoch/phase.
     val password = remember(ui.session, ui.epoch, ui.phase) { TextFieldState() }
     val again = remember(ui.session, ui.epoch, ui.phase) { TextFieldState() }
-    fun clearPasswords() { password.edit { delete(0, length) }; again.edit { delete(0, length) }
+    fun clearPasswords() { password.edit { replace(0, length, "") }; again.edit { replace(0, length, "") }
         password.undoState.clearHistory(); again.undoState.clearHistory() }
     DisposableEffect(password, again) { onDispose { clearPasswords() } }
     val key = ui.requestKey
