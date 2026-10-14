@@ -20,7 +20,7 @@ generation 和一次性客户端 mutation ID。取消确认不写库、不删文
 ## 同一加密数据库与删除阶段
 
 继续使用 records.db、SQLCipher、原有密钥和同一 counted/draining SQL owner。
-拟增 Room v8 的独立删除回执、包回执及自有文件创建证明表；回执没有指向被删源的外键。
+Room v8 使用独立删除回执、包回执及自有文件创建证明表；回执没有指向被删源的外键。
 7→8 只增表并逐字节复制既有 PACKAGE_RESTORE/PACKAGE_ORIGIN 回执，保留原表
 及 v2–v7 schema。实际 v8 export/asset 必须由既有许可 CI KSP 生成，再提交真实
 字节并通过下一轮 CHECKED_IN 同 SHA 门禁；不得手写导出或 destructive fallback。

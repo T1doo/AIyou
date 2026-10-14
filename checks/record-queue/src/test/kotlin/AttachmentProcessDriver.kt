@@ -53,7 +53,9 @@ object AttachmentProcessDriver {
         var sourceCalls = 0
         var status = ""
         var readHash = ""
-        EncryptedAttachmentStore(File(root, "blobs"), ledger, key, ::gate).use { store ->
+        EncryptedAttachmentStore(File(root, "blobs"), ledger, key, ::gate).also {
+            it.installErasureHooks(SyntheticCreationProofHooks(root))
+        }.use { store ->
             when (mode) {
                 "write", "bad-source" -> {
                     val data = processBytes().also { if (mode == "bad-source") it[0] = (it[0].toInt() xor 1).toByte() }

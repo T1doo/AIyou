@@ -12,6 +12,31 @@ import org.junit.Test
 
 /** Production transactions/AEAD/files on actual FK-enabled SQLite. These are host tests, not Room. */
 class PermanentErasureSqlTest {
+    @Test fun durableSqlCreatedProofAllowsExplicitFailedAttachmentRetryAfterColdOwnerWithoutWeakeningUnknownFileRefusal(): Unit = runBlocking {
+        PermanentErasureFixture().use { f ->
+            val id = f.entry(); val bytes = "合成完整附件".toByteArray(); val request = f.attachment(id, bytes)
+            try { f.media.save(request) { ByteArrayInputStream(bytes.dropLast(1).toByteArray()) }; fail("Expected failed copy") }
+            catch (_: AttachmentIntegrityFailure) { }
+            assertEquals(1, f.db.read("SELECT identity FROM owned_file_creations WHERE entryId=? AND state='CREATED'", id).size)
+            f.reopen(); f.media.recover()
+            assertEquals(AttachmentState.FAILED, f.media.list(id, 1).single().state)
+            var opens = 0
+            val saved = f.media.save(request) { opens++; ByteArrayInputStream(bytes) }
+            assertEquals(AttachmentState.READY, saved.state); assertEquals(request, saved.intent); assertEquals(1, opens)
+            assertArrayEquals(bytes, f.media.read(request.id))
+            assertTrue(f.db.read("SELECT * FROM owned_file_creations WHERE entryId=?", id).isEmpty())
+            assertFalse(File(f.mediaRoot, request.id + ".tmp").exists())
+            val unknown = f.attachment(id, bytes)
+            val target = File(f.mediaRoot, unknown.id + ".tmp")
+            val foreignBytes = byteArrayOf(7, 8, 9); target.writeBytes(foreignBytes)
+            try { f.media.save(unknown) { opens++; ByteArrayInputStream(bytes) }; fail("Unknown occupied file must be retained") }
+            catch (_: IllegalStateException) { }
+            assertTrue(f.db.read("SELECT * FROM owned_file_creations WHERE name=?", target.name).isEmpty())
+            f.reopen(); f.media.recover()
+            assertThrows(AttachmentIntegrityFailure::class.java) { runBlocking { f.media.save(unknown) { opens++; ByteArrayInputStream(bytes) } } }
+            assertEquals(1, opens); assertArrayEquals(foreignBytes, target.readBytes())
+        }
+    }
     @Test fun completeErasesAllHistoryDerivedTagsMediaAndEditsPreservingIndependentData(): Unit = runBlocking {
         PermanentErasureFixture().use { f ->
             val id = f.entry(); val other = f.entry(text="其他原文，保留")

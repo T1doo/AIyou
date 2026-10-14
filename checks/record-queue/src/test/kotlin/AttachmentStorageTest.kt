@@ -36,7 +36,9 @@ class AttachmentStorageTest {
     private val directory get() = File(root, "blobs")
     private fun ledger() = DiskLedger(File(root, "ledger"))
     private fun store(ledger: DiskLedger = ledger(), checkpoint: (String) -> Unit = {}) =
-        EncryptedAttachmentStore(directory, ledger, key.copyOf(), checkpoint)
+        EncryptedAttachmentStore(directory, ledger, key.copyOf(), checkpoint).also {
+            it.installErasureHooks(SyntheticCreationProofHooks(root))
+        }
     private fun intent(data: ByteArray = bytes, id: String = UUID.randomUUID().toString()) =
         AttachmentIntent(id, "synthetic-original", 1, "image/png", hash(data), data.size.toLong())
     private fun source(data: ByteArray = bytes): () -> InputStream = { ByteArrayInputStream(data) }
