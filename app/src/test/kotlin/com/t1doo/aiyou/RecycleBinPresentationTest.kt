@@ -108,8 +108,8 @@ class RecycleBinPresentationTest {
     @Test fun retainedReaderAndConfirmationCallbacksRejectNavigationAndNewSessionBeforeRecomposition() {
         content(); compose.onNodeWithTag("entry-one").performScrollTo().performClick()
         val move = compose.onNodeWithTag("original-recycle-move").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
-        compose.runOnIdle { navigation.get().selectDestination(Destination.TASKS); move(); assertNull(f.state.value.recycleBin); assertTrue(f.queue.isEmpty())
-            navigation.get().selectDestination(Destination.MEMORIES) }
+        compose.runOnIdle { navigation.get().selectDestination(Destination.TASKS); move(); assertNull(f.state.value.recycleBin); assertTrue(f.queue.isEmpty()) }
+        compose.runOnIdle { navigation.get().selectDestination(Destination.MEMORIES) }
         moveDialog(); val confirm = compose.onNodeWithTag("recycle-confirm").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
         compose.runOnIdle {
             val old = f.state.value.recycleBin!!; f.controller.cancelConfirmation(old.session, old.confirmation!!.id)
