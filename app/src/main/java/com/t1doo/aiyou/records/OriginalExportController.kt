@@ -61,7 +61,7 @@ class OriginalExportController internal constructor(
     private fun releaseWork() { work.getAndSet(null)?.let { it.cancelled.set(true); it.payload.release() } }
     fun open() {
         val local = current()
-        if (!available(local) || local.originalExport != null || local.originalEdit != null || local.originalHistory != null ||
+        if (!available(local) || local.recycleBin != null || local.originalExport != null || local.originalEdit != null || local.originalHistory != null ||
             local.saving || local.savePending || local.entries.isEmpty()) return
         releaseWork(); destination = null
         val ui = OriginalExportUiState(sessions.incrementAndGet())

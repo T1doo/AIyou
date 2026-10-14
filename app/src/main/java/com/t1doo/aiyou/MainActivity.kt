@@ -113,7 +113,7 @@ class MainActivity : ComponentActivity() {
                 onTaskBegin = records.tasks::begin, onTaskEdit = records.tasks::edit, onTaskCreate = records.tasks::create,
                 onTaskChange = records.tasks::change, onTaskRetry = records.tasks::retry,
                 onTaskRefresh = records.tasks::refresh, onTaskClose = records.tasks::close,
-                exports = records.exports, currentRecords = { records.state.value }) }
+                exports = records.exports, recycleBin = records.recycleBin, currentRecords = { records.state.value }) }
         }
     }
 }
@@ -177,6 +177,7 @@ fun AIyouApp(
     onTaskRefresh: () -> Unit = {},
     onTaskClose: (Long) -> Unit = {},
     exports: com.t1doo.aiyou.records.OriginalExportController? = null,
+    recycleBin: com.t1doo.aiyou.records.RecycleBinController? = null,
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -246,9 +247,11 @@ fun AIyouApp(
     }
     val context = LocalContext.current
     val selected = Destination.valueOf(selectedName)
-    val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS
+    val recycleUi = local?.recycleBin
+    val browsingRecycle = recycleUi?.browsing == true && selected == Destination.MEMORIES && detailEntryId == null && !showSettings && !demo
+    val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS && !browsingRecycle
     SideEffect {
-        search.sync(selected == Destination.MEMORIES && !reading && !showSettings && !demo &&
+        search.sync(selected == Destination.MEMORIES && !reading && !browsingRecycle && !showSettings && !demo &&
             local != null && local.originalEdit == null && local.originalHistory == null)
         if (!reading && searchReturnAnchor != null &&
             (renderedSearchInput.copy(tagSnapshot = null) != searchReturnInput?.copy(tagSnapshot = null) || searchSource()?.entries !== searchReturnSource)) {
@@ -256,7 +259,7 @@ fun AIyouApp(
         }
     }
     var companionPanel by rememberSaveable { mutableStateOf(false) }
-    val companionVisible = display.ready && display.preferences.showCompanion && !showSettings && !reading && !demo
+    val companionVisible = display.ready && display.preferences.showCompanion && !showSettings && !reading && !browsingRecycle && !demo
     val motionAllowed = companionMotionAllowed(!display.ready || display.preferences.reduceMotion)
     val feedbackId = local?.saveFeedbackId ?: 0L
     var handledFeedback by rememberSaveable { mutableLongStateOf(feedbackId) }
@@ -368,7 +371,8 @@ fun AIyouApp(
         }
     }
     val selectDestination: (Destination) -> Unit = { destination ->
-        if (ownsNavigation() && currentLocal?.originalEdit == null && currentLocal?.originalHistory == null && attachments?.state?.value == null) {
+        if (ownsNavigation() && currentLocal?.recycleBin?.busy != true && currentLocal?.originalEdit == null && currentLocal?.originalHistory == null && attachments?.state?.value == null) {
+            currentLocal?.recycleBin?.let { recycleBin?.close(it.session) }
             clearSearch()
             navigation.generation++
             tailReturnRequest = null
@@ -407,7 +411,7 @@ fun AIyouApp(
         val latest = currentLocal
         ownsNavigation() && detailEntryId == id && selectedName == origin.name && !showSettings && !demo &&
             latest != null && latest.ready && !latest.opening && latest.error == null &&
-            latest.originalEdit == null && latest.originalHistory == null && attachments?.state?.value == null &&
+            latest.originalEdit == null && latest.originalHistory == null && latest.recycleBin == null && attachments?.state?.value == null &&
             latest.entries.any { it.id == id && it.currentRevision == revision }
     }
     val beginEdit: (String, Int) -> Unit = { id, revision ->
@@ -507,10 +511,20 @@ fun AIyouApp(
             sourceAvailable = tagLocal.ready && !tagLocal.opening && tagLocal.error == null &&
                 tagLocal.entries.any { it.id == editor.entryId && it.currentRevision == editor.revision })
     }
-    BackHandler(enabled = reading, onBack = returnToList)
+    BackHandler(enabled = reading && recycleUi == null, onBack = returnToList)
+    fun ownsRecycleRoute() = ownsNavigation() && !showSettings && !demo &&
+        currentLocal?.recycleBin?.session == recycleUi?.session &&
+        (if (recycleUi?.browsing == true) selectedName == Destination.MEMORIES.name && detailEntryId == null else reading)
+    SideEffect { if (recycleUi != null && !ownsRecycleRoute()) recycleBin?.close(recycleUi.session) }
+    if (recycleBin != null && recycleUi != null && ownsRecycleRoute()) {
+        com.t1doo.aiyou.records.RecycleConfirmationDialog(checkNotNull(local), recycleUi, recycleBin, ::ownsRecycleRoute)
+    }
+    BackHandler(enabled = browsingRecycle && recycleUi?.busy == false) {
+        if (ownsRecycleRoute()) { recycleBin?.close(checkNotNull(recycleUi).session); navigation.generation++ }
+    }
     val exportUi = local?.originalExport
     fun ownsExportRoute() = ownsNavigation() && selectedName == Destination.MEMORIES.name &&
-        detailEntryId == null && !showSettings && !demo
+        detailEntryId == null && !showSettings && !demo && currentLocal?.recycleBin == null
     SideEffect {
         if (exportUi != null && !ownsExportRoute()) exports?.close(exportUi.session)
     }
@@ -524,13 +538,15 @@ fun AIyouApp(
         modifier = Modifier.imePadding().onSizeChanged { scaffoldHeightPx = it.height },
         topBar = {
             NotebookAppBar(
-                if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
+                if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
                 if (viewingPicture) "返回附件列表" else if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
                 else if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
-                else if (editing != null) "取消编辑" else if (reading) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
-                actionEnabled = attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
+                else if (editing != null) "取消编辑" else if (reading || browsingRecycle) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
+                actionEnabled = recycleUi?.busy != true && attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
             ) {
-                if (reading) returnToList() else if (ownsNavigation()) {
+                if (browsingRecycle && ownsRecycleRoute()) {
+                    recycleBin?.close(checkNotNull(recycleUi).session); navigation.generation++
+                } else if (reading && recycleUi == null) returnToList() else if (ownsNavigation() && recycleUi == null) {
                     clearSearch()
                     navigation.generation++
                     tailReturnRequest = null
@@ -557,6 +573,8 @@ fun AIyouApp(
                 onDemo = { if (ownsNavigation()) { clearSearch(); navigation.generation++; demo = !demo } },
                 onDemoState = { if (ownsNavigation()) { navigation.generation++; stateName = it.name } },
                 modifier = modifier)
+        } else if (browsingRecycle && local != null && recycleBin != null && recycleUi != null) {
+            com.t1doo.aiyou.records.RecycleBinScreen(local, recycleUi, recycleBin, ::ownsRecycleRoute, modifier)
         } else if (attachmentPanel != null && attachments != null && reading && local != null) {
             val panel = if (!local.ready || local.opening || local.error != null ||
                 !attachmentPanel.hasRecordAccess(local))
@@ -581,7 +599,10 @@ fun AIyouApp(
                 onAttachments = if (attachments != null) beginAttachments else null, originalScrollState = originalScroll,
                 onOpenAi = { id, revision -> if (canCopy(id, revision)) onOpenAiSession(id, revision) },
                 onStartAi = onStartAiSession, onStopAi = onStopAiSession, onCloseAi = onCloseAiSession,
-                onOpenTags = { id, revision -> if (canCopy(id, revision)) onOpenTags(id, revision) })
+                onOpenTags = { id, revision -> if (canCopy(id, revision)) onOpenTags(id, revision) },
+                onMoveToRecycleBin = recycleBin?.let { controller -> { id, revision ->
+                    if (canCopy(id, revision)) { navigation.generation++; controller.requestMove(id, revision) }
+                } })
         } else if (!demo && local != null && selected == Destination.TASKS &&
             (local.tasks.supported || local.opening || local.error != null)) {
             fun ownsTasks() = ownsNavigation() && selectedName == Destination.TASKS.name && !showSettings && !demo
@@ -599,6 +620,8 @@ fun AIyouApp(
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
                 onBeginExport = exports?.let { controller -> { if (ownsExportRoute()) controller.open() } },
+                onOpenRecycleBin = recycleBin?.let { controller -> { if (ownsNavigation() && selectedName == Destination.MEMORIES.name &&
+                    detailEntryId == null && !showSettings && !demo) { clearSearch(); navigation.generation++; controller.open() } } },
                 searchState = searchState, searchQuery = searchQuery, searchFrom = searchFrom, searchThrough = searchThrough,
                 searchTag = searchTag, onSearchTag = { tag -> if (ownsNavigation()) { searchTag = tag; searchModeGeneration++ } },
                 searchMode = searchMode, onSearchMode = { if (ownsNavigation()) {

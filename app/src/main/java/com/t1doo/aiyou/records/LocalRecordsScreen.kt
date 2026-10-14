@@ -90,6 +90,7 @@ fun LocalRecordsScreen(
     ownsSearchReturn: () -> Boolean = { false },
     onSearchReturnHandled: () -> Unit = {},
     onBeginExport: (() -> Unit)? = null,
+    onOpenRecycleBin: (() -> Unit)? = null,
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -114,6 +115,8 @@ fun LocalRecordsScreen(
     }
     val requestedSearch = searchState?.input?.let { it.tag != null || it.from.isNotEmpty() || it.through.isNotEmpty() ||
         (if (it.mode == OriginalSearchMode.EXACT) it.query.isNotEmpty() else it.query.isNotBlank()) } == true
+    // Keep the durable index in memory; a restored record immediately reveals its existing edit draft again.
+    val visiblePendingEdits = if (local.supportsRecycleBin) local.pendingEdits.filter { draft -> local.entries.any { it.id == draft.entryId } } else local.pendingEdits
     val filtered = destination == Destination.MEMORIES && requestedSearch && searchState?.stage != OriginalSearchStage.BROWSE
     val searchHits = remember(searchState) { searchState?.hits?.associateBy { it.entry.id }.orEmpty() }
     val displayedEntries = if (destination == Destination.NOW) local.entries.take(5)
@@ -129,7 +132,7 @@ fun LocalRecordsScreen(
         if (local.error != null) add("error")
         if (local.error == null && local.saveNotice != null) add("saved")
         if (local.editDraftError != null) add("edit-draft-error")
-        addAll(local.pendingEdits.map { "edit-draft-${it.id}" })
+        addAll(visiblePendingEdits.map { "edit-draft-${it.id}" })
         if (destination == Destination.MEMORIES) add("search")
         if (filtered) add("search-status")
         if (destination == Destination.NOW) add("recent")
@@ -205,12 +208,17 @@ fun LocalRecordsScreen(
                 contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
                 item("summary") {
-                    if (destination == Destination.MEMORIES && onBeginExport != null && local.supportsOriginalExport) {
+                    if (destination == Destination.MEMORIES && ((onBeginExport != null && local.supportsOriginalExport) ||
+                        (onOpenRecycleBin != null && local.supportsRecycleBin))) {
                         Column(Modifier.fillMaxWidth()) {
                             NotebookPageHeader(destination.label, "${local.entries.size} 条本机记录", stackSummary, companion)
-                            OutlinedButton(onClick = onBeginExport, enabled = local.ready && !local.opening && local.error == null &&
+                            if (onBeginExport != null && local.supportsOriginalExport) OutlinedButton(onClick = onBeginExport, enabled = local.ready && !local.opening && local.error == null &&
                                 local.entries.isNotEmpty() && !local.saving && !local.savePending,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("export-open")) { Text("导出选定原文") }
+                            if (onOpenRecycleBin != null && local.supportsRecycleBin) TextButton(onClick = onOpenRecycleBin,
+                                enabled = local.ready && !local.opening && local.error == null && !local.saving && !local.savePending && local.originalExport == null,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("recycle-open")) { Text("回收站") }
+                            local.recycleNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                         }
                     } else NotebookPageHeader(destination.label,
                         if (destination == Destination.MEMORIES) "${local.entries.size} 条本机记录" else "随手记下一点生活",
@@ -242,12 +250,13 @@ fun LocalRecordsScreen(
                 local.editDraftError?.let { message -> item("edit-draft-error") {
                     StatusNotice(if (local.editDraftIndexAvailable && local.editDraftIssueCount > 0) "${local.editDraftIssueCount} 份编辑草稿无法读取" else "编辑草稿需要处理", message, state = ComponentState.ERROR, actionLabel = "重试读取", onAction = onRetry)
                 } }
-                items(local.pendingEdits, key = { "edit-draft-${it.id}" }) { draft ->
+                items(visiblePendingEdits, key = { "edit-draft-${it.id}" }) { draft ->
                     Column(Modifier.fillMaxWidth()) {
                         Text(if (local.entries.any { it.id == draft.entryId }) "有未保存的原文修改 · 基于版本 ${draft.baseRevision}"
                             else "有未保存的修改 · 源记录已不可用", style = MaterialTheme.typography.bodySmall)
                         TextButton(onClick = { onResumeEdit(draft.entryId, draft.id) },
-                            enabled = local.ready && !local.opening && local.error == null && local.editDraftIndexAvailable && !local.saving && !local.savePending,
+                            enabled = local.ready && !local.opening && local.error == null && local.editDraftIndexAvailable && !local.saving && !local.savePending &&
+                                (!local.supportsRecycleBin || local.entries.any { it.id == draft.entryId }),
                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("resume-edit-${draft.entryId}")) {
                             Text("恢复编辑草稿")
                         }

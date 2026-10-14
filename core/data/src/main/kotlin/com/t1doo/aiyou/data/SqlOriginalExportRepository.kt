@@ -25,12 +25,12 @@ internal class SqlOriginalExportRepository(private val database: RecordsSqlDatab
         }
     }
     private fun read(sql: RecordsSqlConnection, source: SourceVersion, refreshCurrent: Boolean = false): OriginalExportRecord {
-        val row = sql.query("SELECT e.id,e.currentRevision,r.originalText,r.contentHash,e.capturedAtMillis,e.captureTimeZone,e.privacyPolicy FROM entries e JOIN entry_revisions r ON e.id=r.entryId AND e.currentRevision=r.revision WHERE e.id=? AND NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=e.id AND a.deleted=1)", listOf(source.sourceId)).singleOrNull()
+        val row = sql.query("SELECT e.id,e.currentRevision,r.originalText,r.contentHash,e.capturedAtMillis,e.captureTimeZone,e.privacyPolicy,COALESCE((SELECT a.generation FROM remote_source_access a WHERE a.entryId=e.id),0) FROM entries e JOIN entry_revisions r ON e.id=r.entryId AND e.currentRevision=r.revision WHERE e.id=? AND NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=e.id AND a.deleted=1)", listOf(source.sourceId)).singleOrNull()
             ?: throw OriginalExportConflict()
         if (!refreshCurrent && row[1] as Long != source.revision) throw OriginalExportConflict()
         val entry = StoredEntry(row[0] as String, Math.toIntExact(row[1] as Long), row[2] as String,
             row[4] as Long, row[5] as String, ProcessingPolicy.valueOf(row[6] as String))
-        return OriginalExportRecord(entry, row[3] as String, tags.readWithin(sql, entry.id))
+        return OriginalExportRecord(entry, row[3] as String, tags.readWithin(sql, entry.id), row[7] as Long)
     }
     private inline fun <T> safely(block: () -> T): T = try { block() }
         catch (cancelled: CancellationException) { throw cancelled }

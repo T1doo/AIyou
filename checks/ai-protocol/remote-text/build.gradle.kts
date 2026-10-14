@@ -10,10 +10,12 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RemoteTextCodec.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RemoteTextSqlSchema.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/DrainingRecordsSqlDatabase.kt")
+    from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedAttachmentStore.kt")
+    from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedOriginalEditStore.kt")
     listOf("ManualTagSqlSchema.kt", "ManualTagCipher.kt", "SqlManualTagRepository.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
-    listOf("ManualTaskSqlSchema.kt", "ManualTaskCipher.kt", "SqlManualTaskRepository.kt", "SqlOriginalExportRepository.kt").forEach {
+    listOf("ManualTaskSqlSchema.kt", "ManualTaskCipher.kt", "SqlManualTaskRepository.kt", "SqlOriginalExportRepository.kt", "SqlRecycleBinRepository.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
     into(production)
@@ -24,7 +26,7 @@ tasks.named("compileKotlin") { dependsOn(syncProduction) }
 // Actual ViewModel/controller code, with only Android opening/lifecycle/image platform shells.
 val vmProduction = layout.buildDirectory.dir("vm-production-test-sources")
 val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
-    listOf("OriginalExportController.kt", "OriginalExportIo.kt", "ManualTaskController.kt", "ManualTagController.kt", "LocalRecordsViewModel.kt", "OriginalEditUiState.kt", "OriginalHistoryUiState.kt",
+    listOf("RecycleBinController.kt", "OriginalExportController.kt", "OriginalExportIo.kt", "ManualTaskController.kt", "ManualTagController.kt", "LocalRecordsViewModel.kt", "OriginalEditUiState.kt", "OriginalHistoryUiState.kt",
         "LocalAttachmentController.kt", "PngPayloadValidator.kt", "JpegPayloadValidator.kt",
         "LocalRecordAiController.kt", "RecordAiCapability.kt", "RecordAiUiState.kt").forEach { name ->
         from("../../../app/src/main/java/com/t1doo/aiyou/records/$name")

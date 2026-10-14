@@ -40,6 +40,37 @@ jobs:
           python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test :remote-text:test
           python3 scripts/verify-ai-http-dependencies.py
           python3 scripts/verify-ai-protocol-results.py
+          # Preserve this verified round before the queue project reruns shared core tests.
+          python3 - <<'PY'
+          import hashlib, json, shutil
+          from pathlib import Path
+          root = Path.cwd()
+          receipt = root / 'checks/ai-protocol/build/reports/verified-contracts.json'
+          report = json.loads(receipt.read_text())
+          assert report['status'] == 'PASS'
+          inventory = [(module['module'], Path(item['path']).name, item['sha256'])
+                       for module in report['results'] for item in module['xml']]
+          snapshot = hashlib.sha256(json.dumps(inventory, sort_keys=True).encode()).hexdigest()
+          target = receipt.parent / 'xml-snapshots' / snapshot
+          for module in report['results']:
+              for item in module['xml']:
+                  source = root / item['path']
+                  raw = source.read_bytes()
+                  assert hashlib.sha256(raw).hexdigest() == item['sha256'], 'XML changed after verification'
+                  destination = target / module['module'].replace(':', '_') / source.name
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  if destination.exists():
+                      assert destination.read_bytes() == raw, 'Preserved XML must not be overwritten'
+                  else:
+                      shutil.copy2(source, destination)
+                  item['original_path'] = item['path']
+                  item['path'] = str(destination.relative_to(root))
+          report['xml_snapshot_sha256'] = snapshot
+          receipt.write_text(json.dumps(report, indent=2) + '\n')
+          print('AI_PROTOCOL_XML_SNAPSHOT_JSON ' + json.dumps({
+              'status': 'PASS', 'head': report['head'], 'source_sha256': report['source_sha256'],
+              'snapshot_sha256': snapshot, 'tests': {item['module']: item['tests'] for item in report['results']}}))
+          PY
       - name: Run actual ViewModel queue failure regressions (host boundary)
         run: |
           scripts/gradle.sh --project-dir checks/record-queue test
@@ -213,6 +244,7 @@ jobs:
             core/ai/build/reports/tests/test/
             core/ai/build/reports/inputs-at-test.json
             checks/ai-protocol/build/reports/verified-contracts.json
+            checks/ai-protocol/build/reports/xml-snapshots/
             checks/ai-protocol/remote-text/build/test-results/test/
             checks/ai-protocol/remote-text/build/reports/tests/test/
             checks/record-queue/build/test-results/test/

@@ -125,6 +125,7 @@ fun OriginalReadingScreen(
     onStopAi: (Long) -> Unit = {},
     onCloseAi: (Long) -> Unit = {},
     onOpenTags: ((String, Int) -> Unit)? = null,
+    onMoveToRecycleBin: ((String, Int) -> Unit)? = null,
 ) {
     // Resolve the current local source on every update; navigation never carries plaintext.
     val entry = local.entries.firstOrNull { it.id == entryId }
@@ -138,7 +139,7 @@ fun OriginalReadingScreen(
                 !local.ready || local.error != null -> StatusNotice("原文暂不可读取", local.error ?: "请返回列表，等待本机记录读取完成。",
                     state = ComponentState.ERROR, actionLabel = if (local.error != null) "重试" else null, onAction = onRetry,
                     modifier = Modifier.verticalScroll(rememberScrollState()))
-                entry == null -> StatusNotice("这条记录已不可用", "它可能已被移除。返回列表查看当前记录。", state = ComponentState.EMPTY,
+                entry == null -> StatusNotice("这条记录已不可用", local.recycleNotice ?: "它可能已被移除。返回列表查看当前记录。", state = ComponentState.EMPTY,
                     modifier = Modifier.verticalScroll(rememberScrollState()))
                 else -> {
                     Text(metadataText ?: originalMetadata(entry), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
@@ -169,6 +170,11 @@ fun OriginalReadingScreen(
                             TextButton(onClick = { openTags(entry.id, entry.currentRevision) },
                                 enabled = !local.saving && !local.savePending,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-manual-tags")) { Text("手工标签") }
+                        }
+                        onMoveToRecycleBin?.let { move ->
+                            TextButton(onClick = { move(entry.id, entry.currentRevision) },
+                                enabled = local.supportsRecycleBin && !local.saving && !local.savePending && local.recycleBin == null,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-recycle-move")) { Text("移入回收站") }
                         }
                         onOpenAi?.let { openAi ->
                             TextButton(onClick = { openAi(entry.id, entry.currentRevision) },

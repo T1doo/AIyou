@@ -13,8 +13,9 @@ internal class SqlManualTagRepository(private val database: RecordsSqlDatabase, 
         database.transaction { sql -> readWithin(sql, entryId) }
     }
     /** Owner's export reader already holds the counted transaction; do not start another snapshot. */
-    internal fun readWithin(sql: RecordsSqlConnection, entryId: String): ManualTagSnapshot {
-        ManualTags.identifier(entryId); live(sql, entryId)
+    internal fun readWithin(sql: RecordsSqlConnection, entryId: String, allowDeleted: Boolean = false): ManualTagSnapshot {
+        ManualTags.identifier(entryId)
+        if (!allowDeleted) live(sql, entryId)
         return row(sql, entryId)?.snapshot() ?: ManualTagSnapshot(entryId, 0, emptyList())
     }
     override fun snapshots(): Map<String, ManualTagSnapshot> = safely {
