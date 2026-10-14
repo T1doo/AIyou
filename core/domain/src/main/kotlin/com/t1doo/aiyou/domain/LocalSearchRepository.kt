@@ -5,12 +5,14 @@ import com.t1doo.aiyou.model.StoredEntry
 
 /** Memory-only user lookup. No query or document may be logged or saved by the caller. */
 class LocalSearchRequest(val query: String, val exact: Boolean = false,
-    val from: String = "", val through: String = "", val tag: String? = null) {
+    val from: String = "", val through: String = "", val tag: String? = null,
+    val onlyFavorites: Boolean = false) {
     override fun toString() = "LocalSearchRequest(redacted)"
 }
 
 /** Actual implementations carry a private proof and records owner, never an unchecked ID list. */
 interface LocalSearchSnapshot {
+    val favorites: Map<String, com.t1doo.aiyou.model.RecordFavoriteSnapshot>? get() = null
     val epoch: Long
     val entries: List<StoredEntry>
     val tags: Map<String, ManualTagSnapshot>
@@ -35,3 +37,4 @@ open class LocalSearchFailure : IllegalStateException("Local search unavailable"
 class LocalSearchStale : LocalSearchFailure()
 class LocalSearchTooBroad : LocalSearchFailure()
 class LocalSearchInvalid : LocalSearchFailure()
+class LocalSearchFavoriteLimit : LocalSearchFailure()

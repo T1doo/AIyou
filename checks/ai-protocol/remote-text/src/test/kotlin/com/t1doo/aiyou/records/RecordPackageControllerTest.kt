@@ -173,20 +173,43 @@ class RecordPackageControllerTest {
         }
         override fun toString() = "SyntheticSelectedDocument(redacted)"
     }
-    internal class Harness : AutoCloseable {
+    @Test fun actualFavoriteImportReadbackIsFreshAndMetadataFailureNeverTurnsConfirmedRestoreIntoUncertain(): Unit {
+        for (failMetadata in listOf(false,true)) Harness(favoriteUpgrade=true).use { h ->
+            h.failFavoriteReadback=failMetadata
+            h.restorePreview();h.confirm();h.drain()
+            assertEquals(RecordPackagePhase.DONE,h.ui.phase);assertEquals(2,h.local.entries.size)
+            if(failMetadata){assertFalse(h.local.favoritesAvailable);assertNotNull(h.local.favoritesError)}
+            else {
+                assertTrue(h.local.favoritesAvailable);assertEquals(h.local.entries.map{it.id}.toSet(),h.local.favorites.keys)
+                assertTrue(h.local.favorites.values.all{it.version==0L&&!it.isFavorite})
+            }
+            assertEquals(1,h.imports)
+        }
+    }
+    internal class Harness(favoriteUpgrade:Boolean=false) : AutoCloseable {
         val fixture = packageFixture()
+        init { if(favoriteUpgrade)fixture.db.transaction{sql->
+            RecordFavoriteSqlSchema.migration8To9.forEach{sql.execute(it)};sql.execute("PRAGMA user_version=9")
+        } }
+        private val favoritePort:RecordFavoriteRepository?=if(favoriteUpgrade)SqlRecordFavoriteRepository(fixture.db)else null
         val tags = SqlManualTagRepository(fixture.db, ManualTaskSqlTest.KEY)
         val packages = SqlRecordPackageRepository(fixture.db, tags)
         private val state = MutableStateFlow(LocalRecordUiState(ready = true, opening = false, text = "independent capture input",
             entries = listOf(StoredEntry(ManualTaskSqlTest.LEGACY_ID, 1, "合成原文", 5, "UTC", ProcessingPolicy.LOCAL_ONLY)),
-            supportsRecordPackages = true))
+            supportsRecordPackages = true,supportsFavorites=favoriteUpgrade))
         var local: LocalRecordUiState
             get() = state.value
             set(value) { state.value = value }
         val queue = ArrayDeque<suspend (EntryRepository) -> Unit>()
         var imports = 0; var failReadback = false
+        var failFavoriteReadback=false
         var beforePublish: ((LocalRecordUiState) -> Unit)? = null
         val store = object : EntryRepository {
+            override val favorites:RecordFavoriteRepository?=favoritePort?.let{actual->object:RecordFavoriteRepository by actual {
+                override fun snapshots():Map<String,RecordFavoriteSnapshot> {
+                    if(failFavoriteReadback)throw RecordFavoriteStorageFailure();return actual.snapshots()
+                }
+            } }
             override val manualTags = tags
             override val originalExport = SqlOriginalExportRepository(fixture.db, tags)
             override val recordPackages = object : RecordPackageRepository {

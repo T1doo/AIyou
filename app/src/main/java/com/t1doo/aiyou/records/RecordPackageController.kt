@@ -203,6 +203,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                 if (!owned(active, RecordPackagePhase.IMPORTING)) return@enqueue
                 val result = checkNotNull(store.recordPackages).restore(verified, active.ids, clock.millis())
                 val entries = store.entries(); val tags = checkNotNull(store.manualTags).snapshots()
+                val favorites = readFavoriteSource(store)
                 val origins = checkNotNull(store.recordPackages).origins()
                 publish { local ->
                     val panel = local.recordPackage
@@ -213,6 +214,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                                 if (result.replayed) "已核对第一次恢复回执，没有新增、覆盖或复活记录。已永久删除 " + result.deletedCount +
                                     " 条，删除未完成 " + result.erasingCount + " 条；其余副本以当前本机状态为准。"
                                 else "已保存并读回 " + result.ids.size + " 条新副本；初始策略为不参与 AI。原有记录保持不变。"))
+                            .withFavoriteSource(favorites)
                 }
                 if (work.compareAndSet(active, null)) active.retire()
             } catch (cancelled: CancellationException) { throw cancelled }

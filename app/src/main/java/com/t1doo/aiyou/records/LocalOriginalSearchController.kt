@@ -50,7 +50,8 @@ class LocalOriginalSearchController internal constructor(
         return !closed && active && !pendingInput && value.generation == generation && value.inputEpoch == inputEpoch && usable(local) &&
             local?.entries === value.entries && currentInput() == value.input &&
             local?.localSearch === value.owner && local?.localSearchEpoch == value.indexEpoch &&
-            (value.input.tag == null || (if (local?.manualTagsAvailable == true) local.manualTags else null) === value.input.tagSnapshot)
+            (value.input.tag == null || (if (local?.manualTagsAvailable == true) local.manualTags else null) === value.input.tagSnapshot) &&
+            (!value.input.onlyFavorites || (if (local?.favoritesAvailable == true) local.favorites else null) === value.input.favoriteSnapshot)
     }
 
     fun visible(local: LocalRecordUiState?, input: OriginalSearchInput): OriginalSearchState = synchronized(lock) {
@@ -91,7 +92,8 @@ class LocalOriginalSearchController internal constructor(
             }
             pendingInput = false; pendingInputOwner = null
         }
-        if (active && value.inputEpoch == inputEpoch && value.input == input && value.input.tagSnapshot === input.tagSnapshot && value.entries === local?.entries &&
+        if (active && value.inputEpoch == inputEpoch && value.input == input && value.input.tagSnapshot === input.tagSnapshot &&
+            value.input.favoriteSnapshot === input.favoriteSnapshot && value.entries === local?.entries &&
             value.indexEpoch == local?.localSearchEpoch && value.owner === local?.localSearch &&
             ((usable(local) && value.stage != OriginalSearchStage.WAITING &&
                 (value.stage != OriginalSearchStage.RUNNING || job?.isActive == true)) ||
@@ -107,7 +109,7 @@ class LocalOriginalSearchController internal constructor(
         }
         val entries = checkNotNull(local).entries
         // Preserve immediate manual browsing when no lookup is requested.
-        if (input.query.isEmpty() && input.from.isEmpty() && input.through.isEmpty() && input.tag == null) {
+        if (input.query.isEmpty() && input.from.isEmpty() && input.through.isEmpty() && input.tag == null && !input.onlyFavorites) {
             val browse = OriginalSearchState(input, OriginalSearchStage.BROWSE, entries = entries, generation = generation,
                 owner = local.localSearch, indexEpoch = local.localSearchEpoch, inputEpoch = inputEpoch)
             cache = browse
@@ -171,7 +173,8 @@ class LocalOriginalSearchController internal constructor(
     }
 
     fun canOpen(value: OriginalSearchState, hit: OriginalSearchHit): Boolean = synchronized(lock) {
-        owns(value) && (value.input.tag == null || currentSource()?.manualTagsAvailable == true) && value.stage == OriginalSearchStage.READY && value.hits.any { it === hit } &&
+        owns(value) && (value.input.tag == null || currentSource()?.manualTagsAvailable == true) &&
+            (!value.input.onlyFavorites || currentSource()?.favoritesAvailable == true) && value.stage == OriginalSearchStage.READY && value.hits.any { it === hit } &&
             currentSource()?.entries?.any { it.id == hit.entry.id && it.currentRevision == hit.entry.currentRevision } == true
     }
 

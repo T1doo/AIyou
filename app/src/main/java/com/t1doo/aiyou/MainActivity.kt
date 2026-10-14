@@ -116,6 +116,7 @@ class MainActivity : ComponentActivity() {
                 onStartAiSession = records::startAiSession, onStopAiSession = records::stopAiSession,
                 onCloseAiSession = records::closeAiSession,
                 onOpenTags = records.tags::open, onTagEdit = records.tags::edit, onTagAdd = records.tags::add,
+                favorites = records.favorites,
                 onTagRemove = records.tags::remove, onTagRetry = records.tags::retry, onTagClose = records.tags::close,
                 onTaskBegin = records.tasks::begin, onTaskEdit = records.tasks::edit, onTaskCreate = records.tasks::create,
                 onTaskChange = records.tasks::change, onTaskRetry = records.tasks::retry,
@@ -206,6 +207,7 @@ fun AIyouApp(
     onTagRemove: (Long, Long, String, String) -> Unit = { _, _, _, _ -> },
     onTagRetry: (Long) -> Unit = {},
     onTagClose: (Long) -> Unit = {},
+    favorites: com.t1doo.aiyou.records.RecordFavoriteController? = null,
     onTaskBegin: () -> Unit = {},
     onTaskEdit: (Long, String) -> Unit = { _, _ -> },
     onTaskCreate: (Long, String) -> Unit = { _, _ -> },
@@ -246,6 +248,7 @@ fun AIyouApp(
     var searchThrough by remember { mutableStateOf(TextFieldState()) }
     var searchMode by remember { mutableStateOf(OriginalSearchMode.KEYWORDS) }
     var searchTag by remember { mutableStateOf<String?>(null) }
+    var onlyFavorites by rememberSaveable { mutableStateOf(false) }
     var searchModeGeneration by remember { mutableLongStateOf(0L) }
     fun searchSource() = if (currentRecordsProvider != null) currentRecordsProvider?.invoke() else currentLocal
     fun searchInput(): OriginalSearchInput {
@@ -255,7 +258,9 @@ fun AIyouApp(
         val tagsSource = searchSource()
         return OriginalSearchInput(query.toString(), from.toString(), through.toString(), searchMode,
             OriginalSearchInputOwnership(query, from, through, searchModeGeneration), searchTag,
-            if (searchTag != null && tagsSource?.manualTagsAvailable == true) tagsSource.manualTags else null)
+            if (searchTag != null && tagsSource?.manualTagsAvailable == true) tagsSource.manualTags else null,
+            onlyFavorites,
+            if (onlyFavorites && tagsSource?.favoritesAvailable == true) tagsSource.favorites else null)
     }
     val search = remember {
         LocalOriginalSearchController(
@@ -287,6 +292,7 @@ fun AIyouApp(
         searchThrough = TextFieldState()
         searchMode = OriginalSearchMode.KEYWORDS
         searchTag = null
+        onlyFavorites = false
         searchModeGeneration++
         searchReturnAnchor = null
         searchReturnInput = null
@@ -690,6 +696,11 @@ fun AIyouApp(
                 onStartAi = onStartAiSession, onStopAi = onStopAiSession, onCloseAi = onCloseAiSession,
                 onOpenTags = { id, revision -> if (canCopy(id, revision)) onOpenTags(id, revision) },
                 location = searchLocation,
+                onSetFavorite = favorites?.let { controller -> { id, revision, hash, version, desired ->
+                    if (canCopy(id, revision)) controller.set(id, revision, hash, version, desired)
+                } },
+                onRetryFavorite = { id -> if (ownsNavigation() && detailEntryId == id && !showSettings && !demo) favorites?.retry(id) },
+                onRefreshFavorites = { if (ownsNavigation() && !showSettings && !demo) favorites?.refresh() },
                 onMoveToRecycleBin = recycleBin?.let { controller -> { id, revision ->
                     if (canCopy(id, revision)) { navigation.advance(); controller.requestMove(id, revision) }
                 } })
@@ -731,6 +742,12 @@ fun AIyouApp(
                     currentLocal?.localSearch != null && currentLocal?.localIndexBusy == false)
                     onRebuildLocalSearch() },
                 searchTag = searchTag, onSearchTag = { tag -> search.changeInput { if (ownsNavigation()) { searchTag = tag; searchModeGeneration++ } } },
+                onlyFavorites = onlyFavorites, onSearchFavorites = { value -> search.changeInput {
+                    if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) {
+                        onlyFavorites = value; searchModeGeneration++
+                    }
+                } },
+                onRefreshFavorites = { if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) favorites?.refresh() },
                 searchMode = searchMode, onSearchMode = { search.changeInput { if (ownsNavigation()) {
                     searchModeGeneration++
                     searchMode = if (searchMode == OriginalSearchMode.KEYWORDS) OriginalSearchMode.EXACT else OriginalSearchMode.KEYWORDS

@@ -139,6 +139,9 @@ fun OriginalReadingScreen(
     onOpenTags: ((String, Int) -> Unit)? = null,
     onMoveToRecycleBin: ((String, Int) -> Unit)? = null,
     location: OriginalReadingLocation? = null,
+    onSetFavorite: ((String, Int, String, Long, Boolean) -> Unit)? = null,
+    onRetryFavorite: (String) -> Unit = {},
+    onRefreshFavorites: () -> Unit = {},
 ) {
     // Resolve the current local source on every update; navigation never carries plaintext.
     val entry = local.entries.firstOrNull { it.id == entryId }
@@ -167,6 +170,34 @@ fun OriginalReadingScreen(
                         style = MaterialTheme.typography.bodySmall)
                     Text("长按选择文字，或复制全文。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                     local.originalEditNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = AIyouColors.success) }
+                    if (local.supportsFavorites) {
+                        val favorite = local.favorites[entry.id]
+                        val writing = local.favoriteWrites[entry.id]
+                        val sourceHash = remember(entry.originalText) { OriginalExports.hash(entry.originalText) }
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                            TextButton(onClick = {
+                                favorite?.let { onSetFavorite?.invoke(entry.id, entry.currentRevision, sourceHash, it.version, !it.isFavorite) }
+                            }, enabled = onSetFavorite != null && local.favoritesAvailable && favorite != null &&
+                                !local.favoritesLoading && writing == null && !local.saving && !local.savePending,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-favorite-set")) {
+                                Text(if (favorite?.isFavorite == true && local.favoritesAvailable) "取消收藏" else "收藏")
+                            }
+                            if (writing != null && !writing.busy) TextButton(onClick = { onRetryFavorite(entry.id) },
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-favorite-retry")) {
+                                Text(if (writing.conflict) "重新读取收藏" else "重试确认收藏")
+                            }
+                            else if ((!local.favoritesAvailable || favorite == null) && !local.favoritesLoading) TextButton(onClick = onRefreshFavorites,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-favorite-refresh")) { Text("重新读取收藏") }
+                        }
+                        if (writing?.busy == true || local.favoritesLoading) Text("正在确认本机收藏…", style = MaterialTheme.typography.bodySmall)
+                        val error = writing?.error ?: local.favoritesError
+                        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.testTag("original-favorite-error")) }
+                        local.favoriteNotice?.takeIf { local.favoritesAvailable && local.favoriteNoticeReceipt?.let { receipt ->
+                            receipt.entryId == entry.id && favorite?.let { it.version == receipt.version && it.isFavorite == receipt.isFavorite } == true
+                        } == true }?.let { Text(it, style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.testTag("original-favorite-notice")) }
+                    }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                         TextButton(onClick = {
                             if (canCopy(entry.id, entry.currentRevision)) copyDenied = !onCopy(entry.id, entry.currentRevision)

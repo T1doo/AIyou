@@ -13,7 +13,9 @@ enum class OriginalSearchMode { KEYWORDS, EXACT }
 /** Memory only. Never include the query in diagnostics, saved state or persistence. */
 data class OriginalSearchInput(val query: String = "", val from: String = "", val through: String = "",
     val mode: OriginalSearchMode = OriginalSearchMode.KEYWORDS, internal val ownership: Any? = null, val tag: String? = null,
-    internal val tagSnapshot: Map<String, com.t1doo.aiyou.model.ManualTagSnapshot>? = null) {
+    internal val tagSnapshot: Map<String, com.t1doo.aiyou.model.ManualTagSnapshot>? = null,
+    val onlyFavorites: Boolean = false,
+    internal val favoriteSnapshot: Map<String, com.t1doo.aiyou.model.RecordFavoriteSnapshot>? = null) {
     override fun toString() = "OriginalSearchInput(redacted)"
 }
 
@@ -48,13 +50,19 @@ internal object LocalOriginalSearchMatcher {
         if (validation.stage != OriginalSearchStage.READY) return validation
         return try {
             val proof = owner.candidates(com.t1doo.aiyou.domain.LocalSearchRequest(input.query,
-                input.mode == OriginalSearchMode.EXACT, input.from, input.through, input.tag))
+                input.mode == OriginalSearchMode.EXACT, input.from, input.through, input.tag, input.onlyFavorites))
             if (proof.entries.any { fresh -> entries.none { it == fresh } })
                 return OriginalSearchMatches(OriginalSearchStage.WAITING)
             if (input.tag != null && proof.tags.any { (id, fresh) ->
                 input.tagSnapshot?.get(id)?.let { it.version == fresh.version && it.names == fresh.names } != true })
                 return OriginalSearchMatches(OriginalSearchStage.WAITING)
-            val result = match(proof.entries, input.copy(tagSnapshot = proof.tags))
+            if (input.onlyFavorites && proof.favorites == null)
+                return OriginalSearchMatches(OriginalSearchStage.FAILED, message = "收藏查找暂不可读取，请重试本机读取。")
+            if (input.onlyFavorites && proof.entries.any { entry ->
+                val fresh = proof.favorites?.get(entry.id)
+                input.favoriteSnapshot?.get(entry.id)?.let { fresh != null && it.version == fresh.version && it.isFavorite == fresh.isFavorite } != true
+            }) return OriginalSearchMatches(OriginalSearchStage.WAITING)
+            val result = match(proof.entries, input.copy(tagSnapshot = proof.tags, favoriteSnapshot = proof.favorites))
             val whole = if (input.mode == OriginalSearchMode.KEYWORDS) fold(input.query).text else input.query
             val ranked = ArrayList<Pair<OriginalSearchHit, Boolean>>()
             for (hit in result.hits) {
@@ -66,7 +74,9 @@ internal object LocalOriginalSearchMatcher {
                 .thenByDescending { it.first.entry.capturedAtMillis }.thenBy { it.first.entry.id }).map { it.first },
                 if (proof.pending) "本机查找正在更新；未整理的记录仍按当前原文核验。" else null, proof, owner)
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-        catch (_: com.t1doo.aiyou.domain.LocalSearchTooBroad) {
+        catch (_: com.t1doo.aiyou.domain.LocalSearchFavoriteLimit) {
+            OriginalSearchMatches(OriginalSearchStage.FAILED, message = "收藏读取范围过大，无法确认完整结果。可以先切换全部记录浏览。")
+        } catch (_: com.t1doo.aiyou.domain.LocalSearchTooBroad) {
             OriginalSearchMatches(OriginalSearchStage.FAILED, message = "查找范围过大，请缩短关键词或收窄日期、手工标签后重试。")
         } catch (_: com.t1doo.aiyou.domain.LocalSearchInvalid) {
             OriginalSearchMatches(OriginalSearchStage.INVALID, message = "请检查查找条件。")
@@ -97,11 +107,14 @@ internal object LocalOriginalSearchMatcher {
             else input.query.split(Regex("[\\p{javaWhitespace}\\p{Zs}]+" )).filter { it.isNotEmpty() }
         if (input.tag != null && input.tagSnapshot == null) return OriginalSearchMatches(OriginalSearchStage.FAILED,
             message = "手工标签暂不可读取，请重试本机读取。")
-        if (terms.isEmpty() && from == null && through == null && input.tag == null) return OriginalSearchMatches(OriginalSearchStage.BROWSE)
+        if (input.onlyFavorites && input.favoriteSnapshot == null) return OriginalSearchMatches(OriginalSearchStage.FAILED,
+            message = "收藏状态暂不可读取，请重试本机读取。")
+        if (terms.isEmpty() && from == null && through == null && input.tag == null && !input.onlyFavorites) return OriginalSearchMatches(OriginalSearchStage.BROWSE)
         val needles = terms.map { compileNeedle(if (input.mode == OriginalSearchMode.KEYWORDS) fold(it).text else it) }
         val hits = ArrayList<OriginalSearchHit>()
         for (entry in entries) {
             currentCoroutineContext().ensureActive()
+            if (input.onlyFavorites && input.favoriteSnapshot?.get(entry.id)?.isFavorite != true) continue
             if (input.tag != null && input.tag !in input.tagSnapshot?.get(entry.id)?.names.orEmpty()) continue
             if (from != null || through != null) {
                 val captured = try { Instant.ofEpochMilli(entry.capturedAtMillis).atZone(ZoneId.of(entry.captureTimeZone)).toLocalDate() }

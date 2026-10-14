@@ -80,7 +80,7 @@ class PermanentErasureRecordsIntegrationTest {
         assertErased(reopened, original.id)
         assertEquals(listOf(other), reopened.entries()); assertEquals(listOf(task), reopened.manualTasks.snapshots())
         assertThrows(Exception::class.java) {
-            reopened.database.openHelper.writableDatabase.execSQL("INSERT INTO entries VALUES(?,1,55,'UTC','LOCAL_ONLY')", arrayOf(original.id))
+            reopened.database.openHelper.writableDatabase.execSQL("INSERT INTO entries(id,currentRevision,capturedAtMillis,captureTimeZone,privacyPolicy) VALUES(?,1,55,'UTC','LOCAL_ONLY')", arrayOf(original.id))
         }
     }
     @Test fun nativeFinalSqlAbortKeepsStablePendingIntentAndActualStartupResumesAfterColdReopen(): Unit = runBlocking {

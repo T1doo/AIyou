@@ -1,6 +1,7 @@
 package com.t1doo.aiyou.data
 
 import androidx.room.Entity
+import androidx.room.ColumnInfo
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -15,6 +16,10 @@ internal data class EntryEntity(
     val capturedAtMillis: Long,
     val captureTimeZone: String,
     val privacyPolicy: String,
+    @ColumnInfo(defaultValue = "0") val isFavorite: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val favoriteVersion: Long = 0,
+    val lastFavoriteMutationId: String? = null,
+    @ColumnInfo(defaultValue = "0") val lastFavoriteSourceRevision: Int = 0,
 )
 
 @Entity(tableName = "entry_revisions", primaryKeys = ["entryId", "revision"], foreignKeys = [ForeignKey(

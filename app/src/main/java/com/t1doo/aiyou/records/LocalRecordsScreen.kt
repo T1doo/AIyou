@@ -95,6 +95,9 @@ fun LocalRecordsScreen(
     onBeforeSearchInput: (TextFieldState) -> Boolean = { true },
     onHistoryInputCommitted: () -> Unit = {},
     onRebuildLocalSearch: () -> Unit = {},
+    onlyFavorites: Boolean = false,
+    onSearchFavorites: (Boolean) -> Unit = {},
+    onRefreshFavorites: () -> Unit = {},
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -117,7 +120,7 @@ fun LocalRecordsScreen(
             } },
         )
     }
-    val requestedSearch = searchState?.input?.let { it.tag != null || it.from.isNotEmpty() || it.through.isNotEmpty() ||
+    val requestedSearch = searchState?.input?.let { it.onlyFavorites || it.tag != null || it.from.isNotEmpty() || it.through.isNotEmpty() ||
         (if (it.mode == OriginalSearchMode.EXACT) it.query.isNotEmpty() else it.query.isNotBlank()) } == true
     // Keep the durable index in memory; a restored record immediately reveals its existing edit draft again.
     val visiblePendingEdits = if (local.supportsRecycleBin) local.pendingEdits.filter { draft -> local.entries.any { it.id == draft.entryId } } else local.pendingEdits
@@ -280,14 +283,19 @@ fun LocalRecordsScreen(
                         onBeforeSearchInput = onBeforeSearchInput,
                         onHistoryInputCommitted = onHistoryInputCommitted,
                             indexSupported = local.localSearch != null, indexBusy = local.localIndexBusy,
-                            indexError = local.localIndexError, onRebuild = onRebuildLocalSearch)
+                            indexError = local.localIndexError, onRebuild = onRebuildLocalSearch,
+                            favoritesSupported = local.supportsFavorites, favoritesAvailable = local.favoritesAvailable,
+                            favoritesLoading = local.favoritesLoading, favoritesError = local.favoritesError,
+                            onlyFavorites = onlyFavorites, onFavorites = onSearchFavorites, onRefreshFavorites = onRefreshFavorites)
                     else SearchSection(demo = false)
                 }
                 if (filtered) item("search-status") {
                     when (searchState?.stage) {
                         OriginalSearchStage.RUNNING -> StatusNotice("正在查找本机原文", "查找在后台进行。", state = ComponentState.LOADING)
-                        OriginalSearchStage.READY -> StatusNotice(if (displayedEntries.isEmpty()) "没有匹配的原文" else "找到 ${displayedEntries.size} 条原文",
-                            if (displayedEntries.isEmpty()) "试试更短的关键词或调整日期。" else
+                        OriginalSearchStage.READY -> StatusNotice(if (displayedEntries.isEmpty()) {
+                            if (onlyFavorites && searchState.input.query.isEmpty() && searchState.input.tag == null && searchState.input.from.isEmpty() && searchState.input.through.isEmpty()) "还没有收藏记录" else "没有匹配的原文"
+                        } else "找到 ${displayedEntries.size} 条原文",
+                            if (displayedEntries.isEmpty()) { if (onlyFavorites) "可以切换全部记录，或在原文页收藏记录。" else "试试更短的关键词或调整日期。" } else
                                 searchState.message ?: "摘录来自当前版本，可以打开全文。",
                             state = if (displayedEntries.isEmpty()) ComponentState.EMPTY else ComponentState.NORMAL)
                         OriginalSearchStage.INVALID -> StatusNotice("请检查查找条件", searchState.message.orEmpty(), state = ComponentState.ERROR)

@@ -21,9 +21,9 @@ internal interface RecordsDao {
     @Query("SELECT * FROM local_jobs WHERE id=:id") suspend fun job(id: String): LocalJobEntity?
     @Query("UPDATE entries SET currentRevision = :next WHERE id = :id AND currentRevision = :expected")
     suspend fun advance(id: String, expected: Int, next: Int): Int
-    @Query("SELECT e.*, r.originalText, r.contentHash FROM entries e JOIN entry_revisions r ON e.id=r.entryId AND e.currentRevision=r.revision WHERE NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=e.id AND a.deleted=1) ORDER BY e.capturedAtMillis DESC, e.id")
+    @Query("SELECT e.id,e.currentRevision,e.capturedAtMillis,e.captureTimeZone,e.privacyPolicy,r.originalText,r.contentHash FROM entries e JOIN entry_revisions r ON e.id=r.entryId AND e.currentRevision=r.revision WHERE NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=e.id AND a.deleted=1) ORDER BY e.capturedAtMillis DESC, e.id")
     suspend fun entries(): List<EntryRow>
-    @Query("SELECT e.*, r.originalText, r.contentHash FROM entries e JOIN entry_revisions r ON e.id=r.entryId AND e.currentRevision=r.revision WHERE e.id=:id AND NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=e.id AND a.deleted=1)")
+    @Query("SELECT e.id,e.currentRevision,e.capturedAtMillis,e.captureTimeZone,e.privacyPolicy,r.originalText,r.contentHash FROM entries e JOIN entry_revisions r ON e.id=r.entryId AND e.currentRevision=r.revision WHERE e.id=:id AND NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=e.id AND a.deleted=1)")
     suspend fun entry(id: String): EntryRow?
     @Query("SELECT * FROM entry_revisions WHERE entryId=:id AND NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=:id AND a.deleted=1) ORDER BY revision")
     suspend fun revisions(id: String): List<RevisionEntity>
@@ -42,7 +42,7 @@ internal interface RecordsDao {
     AttachmentEntity::class, RemoteSourceAccessEntity::class, RemoteTextJobEntity::class, TextAnnotationEntity::class, ManualTagEntity::class,
     ManualTaskEntity::class, LocalSearchFtsEntity::class, LocalSearchDocumentEntity::class,
     LocalSearchEpochEntity::class, PermanentErasureEntity::class, RecordPackageReceiptEntity::class,
-    OwnedFileCreationEntity::class], version = 8, exportSchema = true)
+    OwnedFileCreationEntity::class], version = 9, exportSchema = true)
 internal abstract class RecordsDatabase : RoomDatabase() {
     abstract fun records(): RecordsDao
 }
@@ -113,3 +113,19 @@ internal val recordsMigration7To8 = object : Migration(7, 8) {
     }
 }
 internal fun installPermanentErasureGuards(db: SupportSQLiteDatabase) { PermanentErasureSqlSchema.guards.forEach(db::execSQL) }
+
+internal val recordsMigration8To9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) { RecordFavoriteSqlSchema.migration8To9.forEach(db::execSQL) }
+}
+
+/** Atomically replace the legacy update trigger; another owner cannot write in a DDL gap. */
+internal fun installRecordFavoriteGuards(db: SupportSQLiteDatabase) {
+    val ownsTransaction = !db.inTransaction()
+    if (ownsTransaction) db.beginTransaction()
+    try {
+        RecordFavoriteSqlSchema.guards.forEach(db::execSQL)
+        db.execSQL("DROP TRIGGER IF EXISTS local_search_entries_update")
+        db.execSQL(RecordFavoriteSqlSchema.sourceIndexUpdate)
+        if (ownsTransaction) db.setTransactionSuccessful()
+    } finally { if (ownsTransaction) db.endTransaction() }
+}

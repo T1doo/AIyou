@@ -13,12 +13,14 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
     private val tags: SqlManualTagRepository,
     private val runtimeProfile: () -> String = { LocalSearchTokenizer.profile }) : LocalSearchRepository {
     private data class Stamp(val epoch: Long, val version: Int, val profile: String)
+    private val favorites = SqlRecordFavoriteRepository(database)
     private fun activeProfile(): String = runtimeProfile().also {
         require(Regex("v1:[0-9a-f]{64}").matches(it))
     }
     private data class Binding(val entry: StoredEntry, val hash: String, val tagVersion: Long, val visibility: Long)
     private inner class Proof(val stamp: Stamp, val runtime: String, val bindings: List<Binding>,
-        tagValues: Map<String, ManualTagSnapshot>, override val pending: Boolean) : LocalSearchSnapshot {
+        tagValues: Map<String, ManualTagSnapshot>, override val pending: Boolean,
+        override val favorites: Map<String, RecordFavoriteSnapshot>? = null) : LocalSearchSnapshot {
         override val epoch = stamp.epoch
         val owner = this@SqlLocalSearchRepository
         override val entries = Collections.unmodifiableList(bindings.map { it.entry })
@@ -148,6 +150,11 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         request.tag?.let { if (ManualTags.canonical(listOf(it)) != listOf(it)) throw LocalSearchInvalid() }
         database.transaction { sql ->
             val stamp = epochWithin(sql)
+            // Never interpret missing or malformed favorite metadata as an empty collection.
+            if (request.onlyFavorites) try { favorites.validateWithin(sql) }
+                catch (_: RecordFavoriteTooBroad) { throw LocalSearchFavoriteLimit() }
+            val favoriteValues = if (request.onlyFavorites) HashMap<String,RecordFavoriteSnapshot>() else null
+            val favoriteCondition = if (request.onlyFavorites) " AND e.isFavorite=1" else ""
             val expression = LocalSearchTokenizer.query(request.query, request.exact)
             val condition = if (expression == null || stamp.version != 1 || stamp.profile != profile) "" else
                 " AND (" + valid(stamp.epoch, profile) + "=0 OR e.id IN (SELECT entryId FROM local_search_fts WHERE local_search_fts MATCH ?))"
@@ -158,7 +165,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             var scanned = 0
             while (true) {
                 val page = sql.query("SELECT e.id,e.capturedAtMillis,e.captureTimeZone" + sourceFrom +
-                    "WHERE " + live + condition + " ORDER BY e.id LIMIT 100 OFFSET " + scanned, args)
+                    "WHERE " + live + favoriteCondition + condition + " ORDER BY e.id LIMIT 100 OFFSET " + scanned, args)
                 if (page.isEmpty()) break
                 for (row in page) {
                     if (++scanned > 10_000) throw LocalSearchTooBroad()
@@ -173,13 +180,15 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                     budget.add(bound.entry.originalText)
                     bindings += bound
                     labels[id] = tag
+                    if (favoriteValues != null) favoriteValues[id] = favorites.readWithin(sql,id)
                     if (bindings.size > 1000) throw LocalSearchTooBroad()
                 }
                 if (page.size < 100) break
             }
             val pending = sql.query("SELECT e.id" + sourceFrom + "WHERE " + live + " AND " + dirty(stamp.epoch, profile) +
                 " LIMIT 1").isNotEmpty() || stamp.version != 1 || stamp.profile != profile
-            Proof(stamp, profile, Collections.unmodifiableList(bindings.toList()), labels, pending)
+            Proof(stamp, profile, Collections.unmodifiableList(bindings.toList()), labels, pending,
+                favoriteValues?.let { Collections.unmodifiableMap(it) })
         }
     }
 

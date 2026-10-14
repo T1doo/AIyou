@@ -39,6 +39,7 @@ class EncryptedEntryRepository internal constructor(
     /** Blocking IO; shares the existing encrypted database and never enables remote processing. */
     override val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(borrowedSql)
     private val tagStorage = SqlManualTagRepository(borrowedSql, keyBytes)
+    override val favorites: com.t1doo.aiyou.domain.RecordFavoriteRepository = SqlRecordFavoriteRepository(borrowedSql)
     override val manualTags: com.t1doo.aiyou.domain.ManualTagRepository get() = tagStorage
     override val localSearch: com.t1doo.aiyou.domain.LocalSearchRepository =
         SqlLocalSearchRepository(borrowedSql, tagStorage)
@@ -214,7 +215,7 @@ class EncryptedEntryRepository internal constructor(
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
                 val created = Room.databaseBuilder(context.applicationContext, RecordsDatabase::class.java, file.absolutePath)
                 .openHelperFactory(SupportOpenHelperFactory(key))
-                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7, recordsMigration7To8)
+                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7, recordsMigration7To8, recordsMigration8To9)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
@@ -222,10 +223,12 @@ class EncryptedEntryRepository internal constructor(
                         installManualTagGuard(db); installManualTaskGuard(db)
                         db.execSQL("INSERT INTO local_search_epoch(slot,epoch,tokenizerVersion,tokenizerProfile) VALUES(1,0,1,'UNKNOWN')")
                         installLocalSearchGuards(db); installPermanentErasureGuards(db)
+                        installRecordFavoriteGuards(db)
                     }
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db)
                         installManualTagGuard(db); installManualTaskGuard(db); installLocalSearchGuards(db); installPermanentErasureGuards(db)
+                        installRecordFavoriteGuards(db)
                     }
                 }).build()
                 database = created

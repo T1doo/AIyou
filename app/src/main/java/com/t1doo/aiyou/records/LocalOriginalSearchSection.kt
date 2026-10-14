@@ -57,7 +57,10 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     onBeforeSearchInput: (TextFieldState) -> Boolean = { true },
     onHistoryInputCommitted: () -> Unit = {},
     indexSupported: Boolean = false, indexBusy: Boolean = false, indexError: String? = null,
-    onRebuild: () -> Unit = {}) {
+    onRebuild: () -> Unit = {},
+    favoritesSupported: Boolean = false, favoritesAvailable: Boolean = false, favoritesLoading: Boolean = false,
+    favoritesError: String? = null, onlyFavorites: Boolean = false,
+    onFavorites: (Boolean) -> Unit = {}, onRefreshFavorites: () -> Unit = {}) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
@@ -123,6 +126,17 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 }
             }
             tagsError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (favoritesSupported) {
+                TextButton(onClick = { onFavorites(!onlyFavorites) },
+                    enabled = enabled && (onlyFavorites || (favoritesAvailable && !favoritesLoading)),
+                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-favorites")) {
+                    Text(if (onlyFavorites) "仅收藏 · 切换全部记录" else "仅看收藏记录")
+                }
+                if (favoritesLoading) Text("正在读取收藏状态…", style = MaterialTheme.typography.bodySmall)
+                favoritesError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                if (!favoritesAvailable) TextButton(onClick = onRefreshFavorites, enabled = enabled && !favoritesLoading,
+                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-favorites-retry")) { Text("重试读取收藏") }
+            }
             Text("日期按记录保存的时区，包含起止两天。仅查当前本机原文，不使用 AI。",
                 style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onClear, enabled = enabled,

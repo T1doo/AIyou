@@ -31,7 +31,7 @@ LEGACY_NATIVE_CASES = {
 }
 SOURCE_BOUND_NATIVE_CASES = {
     "com.t1doo.aiyou.data.SourceBoundTextRecordsIntegrationTest": (
-        "freshVersionEightUsesGeneratedRoomAndEncryptedNativeStore",
+        "freshVersionNineUsesGeneratedRoomAndEncryptedNativeStore",
         "encryptedVersionThreeMigrationPreservesAllLegacyRowsAcrossReopen",
         "withdrawFirstAcrossIndependentRoomsRejectsLateCommit",
         "commitFirstAcrossIndependentRoomsWithdrawalRemovesAnnotation",
@@ -43,7 +43,7 @@ SOURCE_BOUND_NATIVE_CASES = {
 }
 MANUAL_TAG_NATIVE_CASES = {
     "com.t1doo.aiyou.data.ManualTagRecordsIntegrationTest": (
-        "freshVersionEightEncryptsManualTagsAndAuthenticatesAcrossReopen",
+        "freshVersionNineEncryptsManualTagsAndAuthenticatesAcrossReopen",
         "encryptedVersionFourMigrationPreservesOriginalDraftAndJobsWithEmptyTags",
         "independentRoomsCasAndActualInsertAbortPreserveOriginal",
         "replayEmptySetAndTombstoneRespectIndependentTagVersionAndOwnerClose",
@@ -51,7 +51,7 @@ MANUAL_TAG_NATIVE_CASES = {
 }
 MANUAL_TASK_NATIVE_CASES = {
     "com.t1doo.aiyou.data.ManualTaskRecordsIntegrationTest": (
-        "freshVersionEightPersistsExplicitTaskAndTerminalStatesAcrossEncryptedReopen",
+        "freshVersionNinePersistsExplicitTaskAndTerminalStatesAcrossEncryptedReopen",
         "encryptedVersionFiveMigrationPreservesOriginalDraftJobAndManualTag",
         "actualNativeTransitionAbortAndIndependentRoomsCasKeepSingleVersion",
         "nativeReplayAuthenticationAndOwnerCloseNeverReplaceTaskCiphertext",
@@ -71,9 +71,16 @@ PERMANENT_ERASURE_NATIVE_CASES = {
         "nativeFinalSqlAbortKeepsStablePendingIntentAndActualStartupResumesAfterColdReopen",
     ),
 }
+RECORD_FAVORITE_NATIVE_CASES = {
+    "com.t1doo.aiyou.data.RecordFavoriteRecordsIntegrationTest": (
+        "encryptedVersionEightMigrationPreservesRowsAndColdFavoriteDefaults",
+        "nativeFavoriteReplayCombinesFiltersAndSurvivesEditTrashRestoreAndReopen",
+        "nativeFavoriteAbortAndIndependentOwnerConflictPreserveChoiceAndOriginal",
+    ),
+}
 NATIVE_CASES = {**LEGACY_NATIVE_CASES, **SOURCE_BOUND_NATIVE_CASES, **MANUAL_TAG_NATIVE_CASES,
-                **MANUAL_TASK_NATIVE_CASES, **LOCAL_SEARCH_NATIVE_CASES, **PERMANENT_ERASURE_NATIVE_CASES}
-NATIVE_METHOD_COUNT = 41
+                **MANUAL_TASK_NATIVE_CASES, **LOCAL_SEARCH_NATIVE_CASES, **PERMANENT_ERASURE_NATIVE_CASES, **RECORD_FAVORITE_NATIVE_CASES}
+NATIVE_METHOD_COUNT = 44
 STORAGE_PROBE = "com.t1doo.aiyou.data.ProcessRestartPersistenceTest"
 STORAGE_PHASES = ("write", "read", "confirm", "cleanup")
 APP_PROBE = "com.t1doo.aiyou.ProductionColdStartPersistenceTest"
@@ -96,8 +103,8 @@ def collect_source(root):
             raise ValueError("Exact native inventory drift: " + class_name)
         collected[class_name] = actual
     if sum(map(len, collected.values())) != NATIVE_METHOD_COUNT:
-        raise ValueError("Expected 41 real native methods (legacy 19 + source-bound 8 + manual tags 4 + manual tasks 4 + local index 3 + permanent erasure 3)")
-    for version in (2, 3, 4, 5, 6, 7, 8):
+        raise ValueError("Expected 44 real native methods (legacy 19 + source-bound 8 + manual tags 4 + manual tasks 4 + local index 3 + permanent erasure 3 + favorites 3)")
+    for version in (2, 3, 4, 5, 6, 7, 8, 9):
         export = Path(root) / f"core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/{version}.json"
         asset = Path(root) / f"core/data/src/androidTest/assets/records-schema-v{version}.json"
         if asset.read_bytes() != export.read_bytes():

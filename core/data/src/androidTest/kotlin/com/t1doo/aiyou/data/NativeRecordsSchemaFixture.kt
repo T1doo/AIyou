@@ -11,7 +11,7 @@ import org.json.JSONObject
 /** Schema-only fixture from the exact checked-in Room export; never copies authorization logic. */
 internal object NativeRecordsSchemaFixture {
     fun create(file: File, syntheticKey: ByteArray, version: Int, seed: (SQLiteDatabase) -> Unit) {
-        require(version in 2..7)
+        require(version in 2..8)
         check(!file.exists()) { "Native fixture must own a new database file" }
         val schema = exported(version)
         check(schema.getInt("version") == version)
@@ -40,10 +40,10 @@ internal object NativeRecordsSchemaFixture {
         }
     }
 
-    /** Reads the actual generated v8 export; never substitutes Room validation. */
+    /** Reads the actual generated v9 export; never substitutes Room validation. */
     fun assertCurrentSchema(db: SupportSQLiteDatabase) {
-        val schema = exported(8)
-        assertEquals(8, db.version)
+        val schema = exported(9)
+        assertEquals(9, db.version)
         db.query("PRAGMA foreign_keys").use { check(it.moveToFirst()); assertEquals(1, it.getInt(0)) }
         db.query("SELECT identity_hash FROM room_master_table WHERE id=42").use {
             check(it.moveToFirst()); assertEquals(schema.getString("identityHash"), it.getString(0))

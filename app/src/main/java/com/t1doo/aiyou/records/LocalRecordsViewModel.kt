@@ -62,6 +62,16 @@ data class LocalRecordUiState(
     val manualTagsAvailable: Boolean = false,
     val manualTagsError: String? = null,
     val manualTagEditor: ManualTagEditor? = null,
+    val supportsFavorites: Boolean = false,
+    val favorites: Map<String, com.t1doo.aiyou.model.RecordFavoriteSnapshot> = emptyMap(),
+    val favoritesAvailable: Boolean = false,
+    val favoritesLoading: Boolean = false,
+    val favoritesError: String? = null,
+    val favoriteWrites: Map<String, RecordFavoriteWrite> = emptyMap(),
+    val favoriteNotice: String? = null,
+    val favoriteNoticeEntryId: String? = null,
+    val favoriteNoticeReceipt: com.t1doo.aiyou.model.RecordFavoriteSnapshot? = null,
+    val favoriteControllerRetired: Boolean = false,
     val tasks: ManualTasksUiState = ManualTasksUiState(),
     val supportsOriginalExport: Boolean = false,
     val originalExport: OriginalExportUiState? = null,
@@ -100,6 +110,8 @@ class LocalRecordsViewModel internal constructor(
         canUsePanel = { it.hasRecordAccess(mutableState.value) })
     val tags = ManualTagController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.ManualTags(action)).isSuccess })
+    val favorites = RecordFavoriteController(current = { mutableState.value }, publish = { change -> update(change) },
+        enqueue = { action -> commands.trySend(Command.Favorites(action)).isSuccess })
     val tasks = ManualTaskController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.ManualTasks(action)).isSuccess }, clock = clock)
     val exports = OriginalExportController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -182,12 +194,13 @@ class LocalRecordsViewModel internal constructor(
                                 pendingCommit = draft
                                 store.saveDraft(draft, clock.millis(), ZoneId.systemDefault().id)
                                 val entries = store.entries()
+                                val favoriteValues = readFavoriteSource(store)
                                 pendingCommit = null
                                 persistedDraft = null
                                 captureDraftMayBeConsumed = false
                                 pendingIntent.compareAndSet(command.intent, null)
                                 // Success follows commit; the list is read from the database.
-                                update { it.copy(text = "", saving = false, savePending = false, entries = entries, draftNotice = "没有未保存的草稿", saveNotice = "已保存在本机", saveFeedbackId = it.saveFeedbackId + 1, error = null) }
+                                update { it.copy(text = "", saving = false, savePending = false, entries = entries, draftNotice = "没有未保存的草稿", saveNotice = "已保存在本机", saveFeedbackId = it.saveFeedbackId + 1, error = null).withFavoriteSource(favoriteValues) }
                             }
                             is Command.DiscardCapture -> discardCapture(command.intent)
                             is Command.RestoreCapture -> restoreCapture(command.intent)
@@ -217,6 +230,7 @@ class LocalRecordsViewModel internal constructor(
                             is Command.ReadHistory -> readHistory(command)
                             is Command.Attachment -> command.action(checkNotNull(repository))
                             is Command.ManualTags -> command.action(checkNotNull(repository))
+                            is Command.Favorites -> command.action(checkNotNull(repository))
                             is Command.ManualTasks -> command.action(checkNotNull(repository))
                             is Command.OriginalExport -> command.action(checkNotNull(repository))
                             is Command.RecordPackage -> command.action(checkNotNull(repository))
@@ -239,6 +253,7 @@ class LocalRecordsViewModel internal constructor(
                 ai.markDisposed()
                 attachments.markDisposed()
                 tags.dispose()
+                favorites.dispose()
                 tasks.dispose()
                 exports.dispose()
                 recordPackages.dispose()
@@ -261,7 +276,10 @@ class LocalRecordsViewModel internal constructor(
     /** Local and AI writers validate the selected source in the same state CAS. */
     private inline fun update(transform: (LocalRecordUiState) -> LocalRecordUiState) {
         mutableState.update { previous ->
-            val transformed = transform(previous)
+            val candidate = transform(previous)
+            val transformed = if (candidate.supportsFavorites && candidate.favoritesAvailable &&
+                candidate.entries.any { !candidate.favorites.containsKey(it.id) }) candidate.copy(
+                    favoritesAvailable = false, favoritesError = "记录列表已变化，请重新读取收藏状态。") else candidate
             val editor = transformed.manualTagEditor
             val next = if (editor != null && (!transformed.ready || transformed.opening || transformed.error != null ||
                 transformed.entries.none { it.id == editor.entryId && it.currentRevision == editor.revision }))
@@ -946,6 +964,8 @@ class LocalRecordsViewModel internal constructor(
             val entries = store.entries()
             val labels = try { store.manualTags?.snapshots() }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
+            val favoriteValues = try { store.favorites?.snapshots() }
+                catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             val origins = try { store.recordPackages?.origins() ?: emptyMap() }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             val pending = try { store.editDrafts?.pending() ?: OriginalEditDraftIndex(emptyList()) }
@@ -958,6 +978,9 @@ class LocalRecordsViewModel internal constructor(
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
                 entries = entries, manualTags = labels.orEmpty(), manualTagsAvailable = labels != null,
+                supportsFavorites = store.favorites != null, favorites = favoriteValues.orEmpty(),
+                favoritesAvailable = favoriteValues != null, favoritesLoading = false,
+                favoritesError = if (store.favorites != null && favoriteValues == null) "收藏状态暂不可读取，请重试。" else null,
                 supportsOriginalExport = store.originalExport != null,
                 supportsRecordPackages = store.recordPackages != null && store.originalExport != null && store.manualTags != null,
                 packageOrigins = origins.orEmpty(), packageOriginsAvailable = origins != null,
@@ -1037,9 +1060,13 @@ class LocalRecordsViewModel internal constructor(
         val entries = store.entries()
         val labels = try { store.manualTags?.snapshots() } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { null }
+        val favoriteValues = try { store.favorites?.snapshots() } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { null }
         val epoch = try { store.localSearch?.epoch() } catch (_: Exception) { null }
         update { if (!it.ready || editsDisposed) it else it.copy(entries = entries,
             manualTags = labels.orEmpty(), manualTagsAvailable = labels != null, localSearchEpoch = epoch,
+            favorites = favoriteValues.orEmpty(), favoritesAvailable = favoriteValues != null,
+            favoritesError = if (store.favorites != null && favoriteValues == null) "收藏状态暂不可读取，请重试。" else null,
             manualTagsError = if (store.manualTags != null && labels == null) "手工标签暂不可读取，请重试。" else null) }
     }
 
@@ -1055,6 +1082,7 @@ class LocalRecordsViewModel internal constructor(
         ai.markDisposed()
         attachments.markDisposed()
         tags.dispose()
+        favorites.dispose()
         tasks.dispose()
         exports.dispose()
         recordPackages.dispose()
@@ -1078,6 +1106,7 @@ class LocalRecordsViewModel internal constructor(
         data class OriginalExport(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualTasks(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualTags(val action: suspend (EntryRepository) -> Unit) : Command
+        data class Favorites(val action: suspend (EntryRepository) -> Unit) : Command
         data object RefreshEditDrafts : Command
         data class OpenEdit(val edit: OriginalEditUiState, val replace: Boolean, val expectedDraftId: String? = null) : Command
         data class PersistEdit(val sessionId: Long, val text: String) : Command
