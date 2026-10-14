@@ -92,6 +92,8 @@ fun LocalRecordsScreen(
     onBeginExport: (() -> Unit)? = null,
     onOpenRecycleBin: (() -> Unit)? = null,
     onBeginRecordPackage: (() -> Unit)? = null,
+    onSearchInputChange: (() -> Unit) -> Unit = { change -> change() },
+    onRebuildLocalSearch: () -> Unit = {},
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -273,14 +275,18 @@ fun LocalRecordsScreen(
                     if (searchState != null && searchQuery != null && searchFrom != null && searchThrough != null)
                         LocalOriginalSearchSection(searchQuery, searchFrom, searchThrough, searchMode,
                             local.ready && !local.opening && local.error == null, onSearchMode, onClearSearch,
-                            searchTag, local.manualTags, local.manualTagsAvailable, local.manualTagsError, onSearchTag)
+                            searchTag, local.manualTags, local.manualTagsAvailable, local.manualTagsError, onSearchTag,
+                            onSearchInputChange = onSearchInputChange,
+                            indexSupported = local.localSearch != null, indexBusy = local.localIndexBusy,
+                            indexError = local.localIndexError, onRebuild = onRebuildLocalSearch)
                     else SearchSection(demo = false)
                 }
                 if (filtered) item("search-status") {
                     when (searchState?.stage) {
                         OriginalSearchStage.RUNNING -> StatusNotice("正在查找本机原文", "查找在后台进行。", state = ComponentState.LOADING)
                         OriginalSearchStage.READY -> StatusNotice(if (displayedEntries.isEmpty()) "没有匹配的原文" else "找到 ${displayedEntries.size} 条原文",
-                            if (displayedEntries.isEmpty()) "试试更短的关键词或调整日期。" else "摘录来自当前版本，可以打开全文。",
+                            if (displayedEntries.isEmpty()) "试试更短的关键词或调整日期。" else
+                                searchState.message ?: "摘录来自当前版本，可以打开全文。",
                             state = if (displayedEntries.isEmpty()) ComponentState.EMPTY else ComponentState.NORMAL)
                         OriginalSearchStage.INVALID -> StatusNotice("请检查查找条件", searchState.message.orEmpty(), state = ComponentState.ERROR)
                         OriginalSearchStage.FAILED -> StatusNotice("本机查找需要处理", searchState.message.orEmpty(), state = ComponentState.ERROR)

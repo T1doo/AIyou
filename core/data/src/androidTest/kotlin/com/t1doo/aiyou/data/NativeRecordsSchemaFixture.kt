@@ -11,7 +11,7 @@ import org.json.JSONObject
 /** Schema-only fixture from the exact checked-in Room export; never copies authorization logic. */
 internal object NativeRecordsSchemaFixture {
     fun create(file: File, syntheticKey: ByteArray, version: Int, seed: (SQLiteDatabase) -> Unit) {
-        require(version in 2..5)
+        require(version in 2..6)
         check(!file.exists()) { "Native fixture must own a new database file" }
         val schema = exported(version)
         check(schema.getInt("version") == version)
@@ -40,10 +40,10 @@ internal object NativeRecordsSchemaFixture {
         }
     }
 
-    /** Reads the actual generated v6 export; never substitutes Room validation. */
+    /** Reads the actual generated v7 export; never substitutes Room validation. */
     fun assertCurrentSchema(db: SupportSQLiteDatabase) {
-        val schema = exported(6)
-        assertEquals(6, db.version)
+        val schema = exported(7)
+        assertEquals(7, db.version)
         db.query("PRAGMA foreign_keys").use { check(it.moveToFirst()); assertEquals(1, it.getInt(0)) }
         db.query("SELECT identity_hash FROM room_master_table WHERE id=42").use {
             check(it.moveToFirst()); assertEquals(schema.getString("identityHash"), it.getString(0))
@@ -54,12 +54,29 @@ internal object NativeRecordsSchemaFixture {
             "AND name NOT IN ('android_metadata','room_master_table')").use { cursor ->
             buildSet { while (cursor.moveToNext()) add(cursor.getString(0)) }
         }
-        assertEquals(10, expectedTables.size)
-        assertEquals(expectedTables, actualTables)
+        assertEquals(13, expectedTables.size)
+        val ftsShadows = setOf("content", "segments", "segdir", "docsize", "stat").map { "local_search_fts_" + it }.toSet()
+        assertEquals(expectedTables + ftsShadows, actualTables)
         for (position in 0 until entities.length()) {
             val entity = entities.getJSONObject(position)
             val table = entity.getString("tableName")
             val fields = entity.getJSONArray("fields")
+            if (table == "local_search_fts") {
+                // FTS PRAGMA nullability differs from declared fields. Verify the
+                // exact generated CREATE/options, columns and shadow inventory.
+                // The ordinary tables below retain their complete strict checks.
+                fun normalize(value: String) = value.replace(96.toChar().toString(), "").replace("\"", "")
+                    .replace(Regex("\\s+"), "").lowercase()
+                val actualSql = db.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='local_search_fts'").use {
+                    check(it.moveToFirst()); it.getString(0)
+                }
+                assertEquals(normalize(entity.getString("createSql").replace("\${TABLE_NAME}", table)), normalize(actualSql))
+                val columns = db.query("PRAGMA table_info(local_search_fts)").use { cursor ->
+                    buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
+                }
+                assertEquals((0 until fields.length()).map { fields.getJSONObject(it).getString("columnName") }, columns)
+                continue
+            }
             val primaryKeys = strings(entity.getJSONObject("primaryKey").getJSONArray("columnNames"))
             val expectedColumns = (0 until fields.length()).map { index ->
                 val field = fields.getJSONObject(index)

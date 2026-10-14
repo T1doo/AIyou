@@ -30,16 +30,51 @@ internal class OriginalSearchInputOwnership(private val query: CharSequence, pri
 enum class OriginalSearchStage { BROWSE, WAITING, RUNNING, READY, INVALID, FAILED }
 
 class OriginalSearchHit internal constructor(val entry: StoredEntry, val quote: String,
-    val startCodePoint: Int, val endCodePoint: Int, val leading: Boolean, val trailing: Boolean) {
+    val startCodePoint: Int, val endCodePoint: Int, val leading: Boolean, val trailing: Boolean,
+    val matchStartCodePoint: Int = startCodePoint, val matchEndCodePoint: Int = endCodePoint) {
     val excerpt: String get() = (if (leading) "…" else "") + quote + (if (trailing) "…" else "")
     override fun toString() = "OriginalSearchHit(redacted)"
 }
 
 internal class OriginalSearchMatches(val stage: OriginalSearchStage, val hits: List<OriginalSearchHit> = emptyList(),
-    val message: String? = null)
+    val message: String? = null, val proof: com.t1doo.aiyou.domain.LocalSearchSnapshot? = null,
+    val owner: com.t1doo.aiyou.domain.LocalSearchRepository? = null)
 
 /** Literal lookup of the current originals, without an index, normalization or AI. */
 internal object LocalOriginalSearchMatcher {
+    suspend fun indexed(entries: List<StoredEntry>, input: OriginalSearchInput,
+        owner: com.t1doo.aiyou.domain.LocalSearchRepository): OriginalSearchMatches {
+        val validation = match(emptyList(), input)
+        if (validation.stage != OriginalSearchStage.READY) return validation
+        return try {
+            val proof = owner.candidates(com.t1doo.aiyou.domain.LocalSearchRequest(input.query,
+                input.mode == OriginalSearchMode.EXACT, input.from, input.through, input.tag))
+            if (proof.entries.any { fresh -> entries.none { it == fresh } })
+                return OriginalSearchMatches(OriginalSearchStage.WAITING)
+            if (input.tag != null && proof.tags.any { (id, fresh) ->
+                input.tagSnapshot?.get(id)?.let { it.version == fresh.version && it.names == fresh.names } != true })
+                return OriginalSearchMatches(OriginalSearchStage.WAITING)
+            val result = match(proof.entries, input.copy(tagSnapshot = proof.tags))
+            val whole = if (input.mode == OriginalSearchMode.KEYWORDS) fold(input.query).text else input.query
+            val ranked = ArrayList<Pair<OriginalSearchHit, Boolean>>()
+            for (hit in result.hits) {
+                currentCoroutineContext().ensureActive()
+                val body = if (input.mode == OriginalSearchMode.KEYWORDS) fold(hit.entry.originalText).text else hit.entry.originalText
+                ranked += hit to (whole.isNotEmpty() && body.contains(whole))
+            }
+            OriginalSearchMatches(result.stage, ranked.sortedWith(compareByDescending<Pair<OriginalSearchHit, Boolean>> { it.second }
+                .thenByDescending { it.first.entry.capturedAtMillis }.thenBy { it.first.entry.id }).map { it.first },
+                if (proof.pending) "本机查找正在更新；未整理的记录仍按当前原文核验。" else null, proof, owner)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: com.t1doo.aiyou.domain.LocalSearchTooBroad) {
+            OriginalSearchMatches(OriginalSearchStage.FAILED, message = "查找范围过大，请缩短关键词或收窄日期、手工标签后重试。")
+        } catch (_: com.t1doo.aiyou.domain.LocalSearchInvalid) {
+            OriginalSearchMatches(OriginalSearchStage.INVALID, message = "请检查查找条件。")
+        } catch (_: Exception) {
+            OriginalSearchMatches(OriginalSearchStage.FAILED, message = "本机查找暂不可读取，原文已保留。可以重试本机读取或重新整理查找。")
+        }
+    }
+
     suspend fun match(entries: List<StoredEntry>, input: OriginalSearchInput): OriginalSearchMatches {
         fun date(value: String): LocalDate? {
             if (value.isEmpty()) return null
@@ -77,13 +112,17 @@ internal object LocalOriginalSearchMatcher {
             val text = entry.originalText
             val haystack = if (input.mode == OriginalSearchMode.KEYWORDS && needles.isNotEmpty()) fold(text) else null
             var firstStart = Int.MAX_VALUE
+            var firstEnd = 0
             var found = true
             for (needle in needles) {
                 currentCoroutineContext().ensureActive()
                 val index = find((haystack?.text ?: text), needle)
                 if (index < 0) { found = false; break }
                 val start = haystack?.originalOffsets?.get(index) ?: index
-                if (start < firstStart) firstStart = start
+                if (start < firstStart) {
+                    firstStart = start
+                    firstEnd = haystack?.originalOffsets?.get(index + needle.text.length) ?: (index + needle.text.length)
+                }
             }
             if (found) {
                 val total = text.codePointCount(0, text.length)
@@ -91,7 +130,8 @@ internal object LocalOriginalSearchMatcher {
                 val start = (matchStart - 80).coerceAtLeast(0)
                 val end = (start + 240).coerceAtMost(total)
                 val quote = text.substring(text.offsetByCodePoints(0, start), text.offsetByCodePoints(0, end))
-                hits += OriginalSearchHit(entry, quote, start, end, start > 0, end < total)
+                val matchEnd = if (firstStart == Int.MAX_VALUE) 0 else text.codePointCount(0, firstEnd)
+                hits += OriginalSearchHit(entry, quote, start, end, start > 0, end < total, matchStart, matchEnd)
             }
         }
         return OriginalSearchMatches(OriginalSearchStage.READY, hits)

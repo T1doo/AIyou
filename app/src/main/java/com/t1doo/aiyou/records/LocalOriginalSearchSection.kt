@@ -1,15 +1,13 @@
 package com.t1doo.aiyou.records
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.TextFieldLineLimits
-import androidx.compose.foundation.text.input.InputTransformation
-import androidx.compose.foundation.text.input.maxLength
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.*
@@ -22,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -37,31 +36,50 @@ val LocalOriginalSearchObserver = staticCompositionLocalOf<OriginalSearchObserve
 /** Position contains no query or original text; retained only by the live composition. */
 data class OriginalSearchReturnAnchor(val key: String?, val index: Int, val offset: Int)
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldState, through: TextFieldState,
     mode: OriginalSearchMode, enabled: Boolean, onMode: () -> Unit, onClear: () -> Unit,
     tag: String? = null, tags: Map<String, ManualTagSnapshot> = emptyMap(), tagsAvailable: Boolean = false,
-    tagsError: String? = null, onTag: (String?) -> Unit = {}) {
+    tagsError: String? = null, onTag: (String?) -> Unit = {},
+    onSearchInputChange: (() -> Unit) -> Unit = { change -> change() },
+    indexSupported: Boolean = false, indexBusy: Boolean = false, indexError: String? = null,
+    onRebuild: () -> Unit = {}) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
             Text("本机原文查找", style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(state = query, enabled = enabled, label = { Text("关键词或精确片段") },
+            fun change(state: TextFieldState, raw: String, maximum: Int) {
+                if (raw.length <= maximum) onSearchInputChange {
+                    state.edit { replace(0, length, raw) }
+                    state.undoState.clearHistory()
+                }
+            }
+            // Value-based fields own an internal editable state. Explicitly keep
+            // that state memory-only, and replace its Undo owner when clearing.
+            key(query) { CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
+            OutlinedTextField(value = query.text.toString(), onValueChange = { change(query, it, 100_000) },
+                enabled = enabled, label = { Text("关键词或精确片段") },
                 modifier = Modifier.fillMaxWidth().testTag("original-search-query"),
-                lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 3),
-                inputTransformation = InputTransformation.maxLength(100_000),
+                maxLines = 3,
                 keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, capitalization = KeyboardCapitalization.None))
+            } }
             TextButton(onClick = onMode, enabled = enabled,
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-mode")) {
                 Text(if (mode == OriginalSearchMode.EXACT) "精确片段 · 区分大小写和空白" else "关键词 · 全部包含，忽略大小写")
             }
-            OutlinedTextField(state = from, enabled = enabled, label = { Text("开始日期（YYYY-MM-DD，可留空）") },
+            key(from) { CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
+            OutlinedTextField(value = from.text.toString(), onValueChange = { change(from, it, 10) },
+                enabled = enabled, label = { Text("开始日期（YYYY-MM-DD，可留空）") },
                 modifier = Modifier.fillMaxWidth().testTag("original-search-from"),
-                lineLimits = TextFieldLineLimits.SingleLine, inputTransformation = InputTransformation.maxLength(10))
-            OutlinedTextField(state = through, enabled = enabled, label = { Text("结束日期（YYYY-MM-DD，可留空）") },
+                singleLine = true)
+            } }
+            key(through) { CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
+            OutlinedTextField(value = through.text.toString(), onValueChange = { change(through, it, 10) },
+                enabled = enabled, label = { Text("结束日期（YYYY-MM-DD，可留空）") },
                 modifier = Modifier.fillMaxWidth().testTag("original-search-through"),
-                lineLimits = TextFieldLineLimits.SingleLine, inputTransformation = InputTransformation.maxLength(10))
+                singleLine = true)
+            } }
             var choosing by remember { mutableStateOf(false) }
             TextButton(onClick = { choosing = true }, enabled = enabled && tagsAvailable,
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-tag")) {
@@ -79,6 +97,14 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onClear, enabled = enabled,
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-clear")) { Text("清空查找条件") }
+            if (indexSupported) {
+                if (indexBusy) Text("正在整理本机查找，原文仍可查找。", style = MaterialTheme.typography.bodySmall)
+                indexError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = onRebuild, enabled = enabled && !indexBusy,
+                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-rebuild")) {
+                    Text("重新整理本机查找")
+                }
+            }
         }
     }
 }

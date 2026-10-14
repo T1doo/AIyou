@@ -39,6 +39,8 @@ class EncryptedEntryRepository internal constructor(
     override val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(borrowedSql)
     private val tagStorage = SqlManualTagRepository(borrowedSql, keyBytes)
     override val manualTags: com.t1doo.aiyou.domain.ManualTagRepository get() = tagStorage
+    override val localSearch: com.t1doo.aiyou.domain.LocalSearchRepository =
+        SqlLocalSearchRepository(borrowedSql, tagStorage)
     private val taskStorage = SqlManualTaskRepository(borrowedSql, keyBytes)
     override val manualTasks: com.t1doo.aiyou.domain.ManualTaskRepository get() = taskStorage
     override val originalExport: com.t1doo.aiyou.domain.OriginalExportRepository =
@@ -202,11 +204,19 @@ class EncryptedEntryRepository internal constructor(
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
                 val created = Room.databaseBuilder(context.applicationContext, RecordsDatabase::class.java, file.absolutePath)
                 .openHelperFactory(SupportOpenHelperFactory(key))
-                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6)
+                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addCallback(object : RoomDatabase.Callback() {
-                    override fun onCreate(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db); installManualTagGuard(db); installManualTaskGuard(db) }
-                    override fun onOpen(db: SupportSQLiteDatabase) { installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db); installManualTagGuard(db); installManualTaskGuard(db) }
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db)
+                        installManualTagGuard(db); installManualTaskGuard(db)
+                        db.execSQL("INSERT INTO local_search_epoch(slot,epoch,tokenizerVersion,tokenizerProfile) VALUES(1,0,1,'UNKNOWN')")
+                        installLocalSearchGuards(db)
+                    }
+                    override fun onOpen(db: SupportSQLiteDatabase) {
+                        installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db)
+                        installManualTagGuard(db); installManualTaskGuard(db); installLocalSearchGuards(db)
+                    }
                 }).build()
                 database = created
                 created.openHelper.writableDatabase // authenticate/schema validation before reporting ready

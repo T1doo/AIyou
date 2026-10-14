@@ -21,6 +21,9 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     listOf("RecordPackageBinary.kt", "JcaRecordPackageCipher.kt", "SqlRecordPackageRepository.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
+    listOf("LocalSearchTokenizer.kt", "LocalSearchSqlSchema.kt", "SqlLocalSearchRepository.kt").forEach {
+        from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
+    }
     into(production)
 }
 kotlin.sourceSets.getByName("main").kotlin.srcDir(production)
@@ -29,7 +32,7 @@ tasks.named("compileKotlin") { dependsOn(syncProduction) }
 // Actual ViewModel/controller code, with only Android opening/lifecycle/image platform shells.
 val vmProduction = layout.buildDirectory.dir("vm-production-test-sources")
 val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
-    listOf("RecordPackageController.kt", "RecordPackageIo.kt", "RecycleBinController.kt", "OriginalExportController.kt", "OriginalExportIo.kt", "ManualTaskController.kt", "ManualTagController.kt", "LocalRecordsViewModel.kt", "OriginalEditUiState.kt", "OriginalHistoryUiState.kt",
+    listOf("LocalOriginalSearchController.kt", "LocalOriginalSearchMatcher.kt", "RecordPackageController.kt", "RecordPackageIo.kt", "RecycleBinController.kt", "OriginalExportController.kt", "OriginalExportIo.kt", "ManualTaskController.kt", "ManualTagController.kt", "LocalRecordsViewModel.kt", "OriginalEditUiState.kt", "OriginalHistoryUiState.kt",
         "LocalAttachmentController.kt", "PngPayloadValidator.kt", "JpegPayloadValidator.kt",
         "LocalRecordAiController.kt", "RecordAiCapability.kt", "RecordAiUiState.kt").forEach { name ->
         from("../../../app/src/main/java/com/t1doo/aiyou/records/$name")

@@ -27,7 +27,9 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollToIndexAction
@@ -42,8 +44,10 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
@@ -53,10 +57,14 @@ import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.model.ProcessingPolicy
 import com.t1doo.aiyou.model.StoredEntry
 import com.t1doo.aiyou.records.*
+import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.ui.Destination
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
@@ -91,6 +99,8 @@ class LocalOriginalSearchPresentationTest {
     private val actualInputs = AtomicReference<ActualInputs>()
     private var draftChanges = 0
     private var saves = 0
+    private var rebuilds = 0
+    private val refreshCallbacks = AtomicInteger()
     private var saveableRegistry: SaveableStateRegistry? = null
     private val searchObserver = object : OriginalSearchObserver {
         override fun onResults(state: OriginalSearchState, open: (OriginalSearchHit) -> Unit) {
@@ -272,10 +282,11 @@ class LocalOriginalSearchPresentationTest {
         compose.runOnIdle {
             val actual = checkNotNull(actualInputs.get()).query
             assertEquals("Observed actual UI object must contain the user edit", typed, actual.text.toString())
-            assertTrue("Actual user input must create Undo history", actual.undoState.canUndo)
-            actual.undoState.undo()
-            assertEquals("Actual Undo must restore the previous query", beforeTyping, actual.text.toString())
-            assertTrue("Actual Undo must create Redo history", actual.undoState.canRedo)
+            assertFalse("External memory-only value owner must not duplicate internal editable Undo", actual.undoState.canUndo)
+        }
+        // Exercise the real editable field's Undo, not programmatic fixture state.
+        focusedField("original-search-query").performKeyInput {
+            keyDown(Key.CtrlLeft); pressKey(Key.Z); keyUp(Key.CtrlLeft)
         }
         assertEquals("Actual Undo must restore the previous query", beforeTyping, editable("original-search-query"))
         val beforeClear = observation { it.state.stage == OriginalSearchStage.READY && it.state.input.query == marker &&
@@ -295,6 +306,15 @@ class LocalOriginalSearchPresentationTest {
                 assertEquals("No old condition may reappear from history", "", actual.text.toString())
             }
             assertEquals("Clearing must not retain the previous input in Undo", "", editable(tag))
+            focusedField(tag).performKeyInput {
+                keyDown(Key.CtrlLeft); pressKey(Key.Z); keyUp(Key.CtrlLeft)
+            }
+            assertEquals("The actual new editable owner cannot Undo a cleared condition", "", editable(tag))
+            focusedField(tag).performKeyInput {
+                keyDown(Key.CtrlLeft); keyDown(Key.ShiftLeft); pressKey(Key.Z)
+                keyUp(Key.ShiftLeft); keyUp(Key.CtrlLeft)
+            }
+            assertEquals("The actual new editable owner cannot Redo a cleared condition", "", editable(tag))
         }
         compose.runOnIdle { beforeClear.open(beforeClear.state.hits.single()) }; assertNoReader()
         field("original-search-query", marker); field("original-search-from", "2026-10-13"); field("original-search-through", "2026-10-13")
@@ -319,6 +339,141 @@ class LocalOriginalSearchPresentationTest {
             assertEquals(0, draftChanges); assertEquals(0, saves) }
     }
 
+    @Test
+    @Config(sdk = [35], qualifiers = "w320dp-h640dp")
+    fun longOriginalTailHitScrollsToExactUnicodeRangeAndChangedVersionDropsOldHighlight() {
+        val needle = "末尾目标🙂"
+        val text = "合成🌿e\u0301前文\n".repeat(600) + needle + "\n合成保留末行"
+        val state = local(entry("one", text))
+        content(state, largeFont = true)
+        field("original-search-query", needle)
+        val found = ready(needle)
+        val hit = found.state.hits.single()
+        val at = text.indexOf(needle)
+        assertEquals(text.codePointCount(0, at), hit.matchStartCodePoint)
+        assertEquals(needle, text.substring(text.offsetByCodePoints(0, hit.matchStartCodePoint),
+            text.offsetByCodePoints(0, hit.matchEndCodePoint)))
+        openCard("one")
+        val field = compose.onNodeWithTag("original-text")
+        val actual = field.fetchSemanticsNode().config[SemanticsProperties.Text].single()
+        assertEquals(text, actual.text)
+        assertTrue(actual.spanStyles.any { it.start == at && it.end == at + needle.length })
+        compose.runOnIdle {
+            assertNoSavedInput(checkNotNull(saveableRegistry).performSave(), needle,
+                com.t1doo.aiyou.model.OriginalExports.hash(text))
+        }
+        val layouts = mutableListOf<TextLayoutResult>()
+        field.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { assertTrue(it(layouts)) }
+        val layout = layouts.single()
+        val scrollNode = compose.onNodeWithTag("original-scroll")
+        val scroll = scrollNode.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        val line = layout.getLineForOffset(at)
+        assertTrue("Tail location must actually scroll", scroll.value() > 0f)
+        assertTrue(layout.getLineTop(line) - scroll.value() >= -1f)
+        assertTrue(layout.getLineBottom(line) - scroll.value() <= scrollNode.fetchSemanticsNode().size.height + 1f)
+        compose.runOnIdle { state.value = state.value.copy(entries = listOf(entry("one", "合成当前新版本", revision = 2))) }
+        val changed = compose.onNodeWithTag("original-text").fetchSemanticsNode().config[SemanticsProperties.Text].single()
+        assertEquals("合成当前新版本", changed.text)
+        assertTrue("An old source range cannot decorate the new version", changed.spanStyles.isEmpty())
+        compose.onNodeWithText("返回列表").performClick()
+        compose.runOnIdle { found.open(hit) }
+        assertNoReader()
+        assertEquals("synthetic-private-untouched-draft", state.value.text)
+        assertEquals(0, draftChanges); assertEquals(0, saves)
+    }
+
+    @Test fun indexPendingAndFailureKeepLiteralResultsAndExplicitRebuildControlHonest() {
+        val state = local(entry("one", "合成咖啡当前原文"))
+        // UI port shell only; actual tokenizer/FTS/AEAD/leases are tested by host SQL.
+        val port = object : LocalSearchRepository {
+            override fun epoch() = 7L
+            override fun batch() = LocalSearchProgress(0, false, 7)
+            override fun rebuild() = 8L
+            override fun candidates(request: LocalSearchRequest) = object : LocalSearchSnapshot {
+                override val epoch = 7L
+                override val entries = state.value.entries
+                override val tags = emptyMap<String, com.t1doo.aiyou.model.ManualTagSnapshot>()
+                override val pending = true
+            }
+            override fun publishCurrent(snapshot: LocalSearchSnapshot, publish: () -> Unit): Boolean { publish(); return true }
+            override fun resolve(snapshot: LocalSearchSnapshot, entryId: String, publish: (StoredEntry) -> Unit): Boolean {
+                state.value.entries.firstOrNull { it.id == entryId }?.let(publish) ?: return false
+                return true
+            }
+        }
+        state.value = state.value.copy(localSearch = port, localSearchEpoch = 7, localIndexBusy = true)
+        content(state); field("original-search-query", "咖啡")
+        assertEquals(listOf("one"), ready("咖啡").state.hits.map { it.entry.id })
+        compose.onNodeWithTag("original-search-rebuild").performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle { state.value = state.value.copy(localIndexBusy = false, localIndexError = "合成查找整理暂停") }
+        compose.onNodeWithTag("original-search-rebuild").performScrollTo().assertIsEnabled().performClick()
+        assertEquals(1, rebuilds)
+        assertEquals("咖啡", editable("original-search-query"))
+        assertEquals("synthetic-private-untouched-draft", state.value.text)
+        assertEquals(0, draftChanges); assertEquals(0, saves)
+    }
+
+    @Test fun indexedLocationExitFailureRetiresActualReaderAndKeepsCurrentSearchInput() {
+        val state = local(entry("one", "合成咖啡当前原文"))
+        val reached = CountDownLatch(1); val release = CountDownLatch(1)
+        val port = UiSearchPort { state.value }
+        port.afterLocation = { reached.countDown(); assertTrue(release.await(5, TimeUnit.SECONDS)); throw LocalSearchFailure() }
+        state.value = state.value.copy(localSearch = port, localSearchEpoch = 7)
+        content(state); field("original-search-query", "咖啡")
+        val found = ready("咖啡")
+        compose.runOnIdle { found.open(found.state.hits.single()) }
+        assertTrue(reached.await(5, TimeUnit.SECONDS))
+        assertEquals("合成咖啡当前原文", fullText())
+        release.countDown()
+        ready("咖啡")
+        assertNoReader()
+        assertEquals("咖啡", editable("original-search-query"))
+        assertEquals("synthetic-private-untouched-draft", state.value.text)
+    }
+
+    @Test fun indexedLocationExitFailureCannotRevertActualLaterDestinationNavigation() {
+        val state = local(entry("one", "合成咖啡当前原文"))
+        val reached = CountDownLatch(1); val release = CountDownLatch(1); val exited = CountDownLatch(1)
+        val port = UiSearchPort { state.value }
+        port.afterLocation = {
+            reached.countDown()
+            try { assertTrue(release.await(5, TimeUnit.SECONDS)); throw LocalSearchFailure() }
+            finally { exited.countDown() }
+        }
+        state.value = state.value.copy(localSearch = port, localSearchEpoch = 7)
+        content(state); field("original-search-query", "咖啡")
+        val found = ready("咖啡")
+        compose.runOnIdle { found.open(found.state.hits.single()) }
+        assertTrue(reached.await(5, TimeUnit.SECONDS))
+        assertEquals("合成咖啡当前原文", fullText())
+        tab("待办").performClick()
+        release.countDown(); assertTrue(exited.await(5, TimeUnit.SECONDS))
+        compose.waitUntil(2_000) { refreshCallbacks.get() > 0 }
+        assertNoReader()
+        tab("待办").assertIsSelected()
+        assertEquals("synthetic-private-untouched-draft", state.value.text)
+        assertEquals(0, draftChanges); assertEquals(0, saves)
+    }
+
+    /** Compose wiring shell; real after-callback SQL commit failures are separate host tests. */
+    private class UiSearchPort(private val source: () -> LocalRecordUiState) : LocalSearchRepository {
+        @Volatile var afterLocation: (() -> Unit)? = null
+        override fun epoch() = 7L
+        override fun batch() = LocalSearchProgress(0, false, 7)
+        override fun rebuild() = 8L
+        override fun candidates(request: LocalSearchRequest) = object : LocalSearchSnapshot {
+            override val epoch = 7L
+            override val entries = source().entries
+            override val tags = emptyMap<String, com.t1doo.aiyou.model.ManualTagSnapshot>()
+            override val pending = false
+        }
+        override fun publishCurrent(snapshot: LocalSearchSnapshot, publish: () -> Unit): Boolean { publish(); return true }
+        override fun resolve(snapshot: LocalSearchSnapshot, entryId: String, publish: (StoredEntry) -> Unit): Boolean {
+            val entry = source().entries.firstOrNull { it.id == entryId } ?: return false
+            publish(entry); afterLocation?.invoke(); return true
+        }
+    }
+
     private fun entry(id: String, text: String, revision: Int = 1, captured: String = "2026-10-13T12:00:00Z", zone: String = "UTC") =
         StoredEntry(id, revision, text, Instant.parse(captured).toEpochMilli(), zone, ProcessingPolicy.LOCAL_ONLY)
     private fun local(vararg entries: StoredEntry) = mutableStateOf(LocalRecordUiState(ready = true, opening = false,
@@ -338,7 +493,8 @@ class LocalOriginalSearchPresentationTest {
     }
     @Composable private fun LookupTestApp(state: MutableState<LocalRecordUiState>, source: () -> LocalRecordUiState?) {
         AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES, local = state.value, currentRecords = source,
-            onDraftChange = { draftChanges++ }, onSave = { saves++ }) }
+            onDraftChange = { draftChanges++ }, onSave = { saves++ }, onRebuildLocalSearch = { rebuilds++ },
+            onRefreshLocalSearch = { refreshCallbacks.incrementAndGet() }) }
     }
     private fun field(tag: String, text: String) { compose.onNodeWithTag(tag).performScrollTo().assertIsEnabled().performTextReplacement(text) }
     private fun shownStatus(text: String) {
@@ -375,11 +531,30 @@ class LocalOriginalSearchPresentationTest {
     }
     private fun assertNoSavedInput(value: Any?, marker: String, date: String) {
         when (value) {
+            is OriginalReadingLocation, is LocalSearchSnapshot -> fail("Private live lookup/reader binding must never enter SavedState")
+            is androidx.compose.runtime.State<*> -> assertNoSavedInput(value.value, marker, date)
+            is android.os.Bundle -> value.keySet().forEach { key ->
+                assertNoSavedInput(key, marker, date); assertNoSavedInput(value.get(key), marker, date)
+            }
             is CharSequence -> { assertFalse("Query must never enter the saved payload", value.contains(marker))
                 assertFalse("Date filters must never enter the saved payload", value.contains(date)) }
+            is ByteArray -> for (encoding in listOf(Charsets.UTF_8, Charsets.UTF_16LE, Charsets.UTF_16BE)) {
+                assertNoSavedInput(value.toString(encoding), marker, date)
+            }
+            is android.util.SparseArray<*> -> for (index in 0 until value.size()) {
+                assertNoSavedInput(value.keyAt(index), marker, date)
+                assertNoSavedInput(value.valueAt(index), marker, date)
+            }
             is Map<*, *> -> value.forEach { (key, item) -> assertNoSavedInput(key, marker, date); assertNoSavedInput(item, marker, date) }
             is Iterable<*> -> value.forEach { assertNoSavedInput(it, marker, date) }
             is Array<*> -> value.forEach { assertNoSavedInput(it, marker, date) }
+            is android.os.Parcelable -> {
+                val parcel = android.os.Parcel.obtain()
+                try {
+                    parcel.writeParcelable(value, 0)
+                    assertNoSavedInput(parcel.marshall(), marker, date)
+                } finally { parcel.recycle() }
+            }
         }
     }
 }

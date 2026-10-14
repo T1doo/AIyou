@@ -26,6 +26,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -41,15 +42,26 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontWeight
 import com.t1doo.aiyou.designsystem.AIyouColors
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.ComponentState
 import com.t1doo.aiyou.designsystem.PrivacyChip
 import com.t1doo.aiyou.designsystem.StatusNotice
 import com.t1doo.aiyou.model.StoredEntry
+import com.t1doo.aiyou.model.OriginalExports
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.roundToInt
+
+/** Memory-only source binding/offsets. No original/query text or Saver. */
+data class OriginalReadingLocation(val entryId: String, val revision: Int, val contentHash: String,
+    val startCodePoint: Int, val endCodePoint: Int) {
+    override fun toString() = "OriginalReadingLocation(redacted)"
+}
 
 /** Bounded presentation excerpt only. Never passed to a repository or clipboard. */
 internal fun originalPreview(text: String): String {
@@ -126,6 +138,7 @@ fun OriginalReadingScreen(
     onCloseAi: (Long) -> Unit = {},
     onOpenTags: ((String, Int) -> Unit)? = null,
     onMoveToRecycleBin: ((String, Int) -> Unit)? = null,
+    location: OriginalReadingLocation? = null,
 ) {
     // Resolve the current local source on every update; navigation never carries plaintext.
     val entry = local.entries.firstOrNull { it.id == entryId }
@@ -211,12 +224,33 @@ fun OriginalReadingScreen(
                             SideEffect { observer.onClipboard(clipboard); observer.onSelection(selection) }
                         }
                         val scroll = originalScrollState ?: rememberScrollState()
+                        val currentLocation = location?.takeIf { it.entryId == entry.id &&
+                            it.revision == revision && it.contentHash == OriginalExports.hash(entry.originalText) &&
+                            it.startCodePoint >= 0 && it.endCodePoint > it.startCodePoint &&
+                            it.endCodePoint <= entry.originalText.codePointCount(0, entry.originalText.length) }
+                        val start = currentLocation?.let { entry.originalText.offsetByCodePoints(0, it.startCodePoint) }
+                        val end = currentLocation?.let { entry.originalText.offsetByCodePoints(0, it.endCodePoint) }
+                        val annotated = remember(entry.originalText, currentLocation) {
+                            AnnotatedString.Builder(entry.originalText).apply {
+                                if (start != null && end != null) addStyle(SpanStyle(
+                                    background = AIyouColors.surfaceMuted, fontWeight = FontWeight.Bold), start, end)
+                            }.toAnnotatedString()
+                        }
+                        var layout by remember(entry.originalText, currentLocation) { mutableStateOf<TextLayoutResult?>(null) }
+                        LaunchedEffect(currentLocation, layout, scroll) {
+                            val measured = layout
+                            if (start != null && measured != null && currentGate(entry.id, revision)) {
+                                val line = measured.getLineForOffset(start)
+                                scroll.scrollTo(measured.getLineTop(line).roundToInt().coerceAtLeast(0))
+                            }
+                        }
                         CompositionLocalProvider(LocalClipboard provides clipboard) {
                             SelectionContainer(state = selection,
                                 modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(scroll).testTag("original-scroll")) {
                                 // One fully composed text supports selecting/copying the whole original.
-                                Text(AnnotatedString(entry.originalText), style = MaterialTheme.typography.bodyLarge,
+                                Text(annotated, style = MaterialTheme.typography.bodyLarge,
                                     color = AIyouColors.textPrimary,
+                                    onTextLayout = { layout = it },
                                     modifier = Modifier.fillMaxWidth().testTag("original-text")
                                         .semantics { contentDescription = "记录完整原文" })
                             }

@@ -32,7 +32,7 @@ class ManualTagRecordsIntegrationTest {
         System.loadLibrary("sqlcipher")
     }
     @After fun after() { try { stores.forEach { it.close() } } finally { key.fill(0); if (::directory.isInitialized) directory.deleteRecursively() } }
-    @Test fun freshVersionSixEncryptsManualTagsAndAuthenticatesAcrossReopen(): Unit = runBlocking {
+    @Test fun freshVersionSevenEncryptsManualTagsAndAuthenticatesAcrossReopen(): Unit = runBlocking {
         val store = open(); val entry = seed(store)
         NativeRecordsSchemaFixture.assertCurrentSchema(store.database.openHelper.writableDatabase)
         val tags = store.manualTags

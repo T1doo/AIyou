@@ -99,6 +99,7 @@ class MainActivity : ComponentActivity() {
             val local by records.state.collectAsState()
             val display by preferences.state.collectAsState()
             AIyouTheme { AIyouApp(local = local, display = display, onDisplayChange = preferences::change, onRetryDisplay = preferences::retry, onDraftChange = records::changeText, onSave = records::save, onRetry = records::retry,
+                onRefreshLocalSearch = records::refreshLocalSearch, onRebuildLocalSearch = records::rebuildLocalSearch,
                 onBeginOriginalEdit = records::beginOriginalEdit, onOriginalEditChange = records::changeOriginalEdit,
                 onOriginalEditSave = records::saveOriginalEdit, onOriginalEditCancel = records::cancelOriginalEdit,
                 onOriginalEditKeep = records::keepOriginalEdit,
@@ -143,8 +144,21 @@ class MainActivity : ComponentActivity() {
 
 /** A callback belongs to one live navigation session, including repeated opens of the same ID. */
 private class NavigationOwner {
-    var generation by mutableStateOf(0L)
-    var active = true
+    private val lock = Any()
+    private val current = mutableStateOf(0L)
+    private var alive = true
+    val generation get() = synchronized(lock) { current.value }
+    var active: Boolean
+        get() = synchronized(lock) { alive }
+        set(value) = synchronized(lock) { alive = value }
+    fun advance() = synchronized(lock) { current.value = Math.addExact(current.value, 1) }
+    fun tryAdvance(expected: Long): Boolean = synchronized(lock) {
+        if (!alive || current.value != expected) false
+        else { current.value = Math.addExact(current.value, 1); true }
+    }
+    fun publish(expected: Long, action: () -> Unit) = synchronized(lock) {
+        if (alive && current.value == expected) action()
+    }
 }
 
 /** One real reader return; a later navigation cannot complete this request. */
@@ -203,6 +217,8 @@ fun AIyouApp(
     recycleBin: com.t1doo.aiyou.records.RecycleBinController? = null,
     recordPackages: com.t1doo.aiyou.records.RecordPackageController? = null,
     recordPackagePicker: com.t1doo.aiyou.records.RecordPackagePicker? = null,
+    onRefreshLocalSearch: () -> Unit = {},
+    onRebuildLocalSearch: () -> Unit = {},
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -244,7 +260,13 @@ fun AIyouApp(
     val search = remember {
         LocalOriginalSearchController(
             currentSource = { searchSource() },
-            currentInput = { searchInput() })
+            currentInput = { searchInput() }, dispatcher = kotlinx.coroutines.Dispatchers.IO,
+            onInvalidated = onRefreshLocalSearch,
+            matcher = { entries, input ->
+                val owner = searchSource()?.localSearch
+                if (owner == null) com.t1doo.aiyou.records.LocalOriginalSearchMatcher.match(entries, input)
+                else com.t1doo.aiyou.records.LocalOriginalSearchMatcher.indexed(entries, input, owner)
+            })
     }
     DisposableEffect(search) { onDispose { search.close() } }
     val searchEmission by search.state.collectAsState()
@@ -254,6 +276,7 @@ fun AIyouApp(
     var searchReturnInput by remember { mutableStateOf<OriginalSearchInput?>(null) }
     var searchReturnSource by remember { mutableStateOf<List<com.t1doo.aiyou.model.StoredEntry>?>(null) }
     var readerFromSearch by remember { mutableStateOf(false) }
+    var searchLocation by remember { mutableStateOf<com.t1doo.aiyou.records.OriginalReadingLocation?>(null) }
     fun clearSearch() {
         search.clear()
         searchQuery.edit { replace(0, length, "") }
@@ -269,6 +292,7 @@ fun AIyouApp(
         searchReturnInput = null
         searchReturnSource = null
         readerFromSearch = false
+        searchLocation = null
     }
     val context = LocalContext.current
     val selected = Destination.valueOf(selectedName)
@@ -337,22 +361,22 @@ fun AIyouApp(
         selectedName == origin.name && !showSettings && !demo &&
         currentLocal?.originalHistory?.let { it.sessionId == sessionId && it.entryId == readerId } == true
     val backHistory: (Long) -> Unit = { sessionId ->
-        if (ownsHistory(sessionId)) { navigation.generation++; onBackOriginalHistory(sessionId) }
+        if (ownsHistory(sessionId)) { navigation.advance(); onBackOriginalHistory(sessionId) }
     }
     val selectHistory: (Long, Int) -> Unit = { sessionId, revision ->
         if (ownsHistory(sessionId) && currentLocal?.originalHistory?.let { !it.loading && it.error == null && !it.unavailable &&
                 it.revisions.any { r -> r.revision == revision } } == true) {
-            navigation.generation++; onSelectOriginalRevision(sessionId, revision)
+            navigation.advance(); onSelectOriginalRevision(sessionId, revision)
         }
     }
     val retryHistory: (Long) -> Unit = { sessionId ->
         if (ownsHistory(sessionId) && currentLocal?.originalHistory?.loading == false) {
-            navigation.generation++; onRetryOriginalHistory(sessionId)
+            navigation.advance(); onRetryOriginalHistory(sessionId)
         }
     }
     val discardEdit: (Long) -> Unit = { sessionId ->
         if (ownsEdit(sessionId) && currentLocal?.originalEdit?.canCancel == true) {
-            navigation.generation++; discardEditSession = null; onOriginalEditCancel(sessionId)
+            navigation.advance(); discardEditSession = null; onOriginalEditCancel(sessionId)
         }
     }
     val cancelEdit: (Long) -> Unit = { sessionId ->
@@ -378,18 +402,19 @@ fun AIyouApp(
             val activeAttachment = attachments?.state?.value
             if (activeAttachment != null) {
                 if (!activeAttachment.saving) {
-                    navigation.generation++
+                    navigation.advance()
                     if (canShowPicture(activeAttachment, currentLocal)) attachments?.closePicture(activeAttachment.sessionId)
                     else attachments?.close(activeAttachment.sessionId)
                 }
             } else if (activeHistory != null) backHistory(activeHistory.sessionId)
             else if (edit != null) cancelEdit(edit.sessionId) else {
-                navigation.generation++
+                navigation.advance()
                 val latest = currentLocal
                 val last = if (origin == Destination.NOW) latest?.entries?.take(5)?.lastOrNull() else latest?.entries?.lastOrNull()
                 tailReturnRequest = if (!readerFromSearch && latest?.ready == true && !latest.opening && latest.error == null && last?.id == readerId)
                     TailReturnRequest(origin, checkNotNull(readerId), navigation.generation) else null
                 detailEntryId = null
+                searchLocation = null
                 if (readerFromSearch && origin == Destination.MEMORIES) {
                     search.sync(true)
                     searchReturnSource = search.state.value.entries
@@ -398,21 +423,23 @@ fun AIyouApp(
         }
     }
     val selectDestination: (Destination) -> Unit = { destination ->
-        if (ownsNavigation() && currentLocal?.recycleBin?.busy != true && currentLocal?.originalEdit == null && currentLocal?.originalHistory == null && attachments?.state?.value == null) {
+        if (ownsNavigation() && currentLocal?.recycleBin?.busy != true && currentLocal?.originalEdit == null && currentLocal?.originalHistory == null && attachments?.state?.value == null &&
+            navigation.tryAdvance(generation)) {
             currentLocal?.recycleBin?.let { recycleBin?.close(it.session) }
             currentLocal?.recordPackage?.let { recordPackages?.close(it.session) }
             clearSearch()
-            navigation.generation++
             tailReturnRequest = null
+            searchLocation = null
             selectedName = destination.name; detailEntryId = null; showSettings = false; showLicenses = false
         }
     }
     val openEntry: (String) -> Unit = { id ->
-        if (ownsNavigation() && selectedName == origin.name && !showSettings && !demo && detailEntryId == null) {
+        if (ownsNavigation() && selectedName == origin.name && !showSettings && !demo && detailEntryId == null &&
+            navigation.tryAdvance(generation)) {
             readerFromSearch = origin == Destination.MEMORIES && searchState.stage == OriginalSearchStage.READY
             search.pause()
-            navigation.generation++
             tailReturnRequest = null
+            searchLocation = null
             if (origin == Destination.NOW) selectedNowId = id else selectedMemoriesId = id
             detailEntryId = id
         }
@@ -420,12 +447,35 @@ fun AIyouApp(
     val openSearchResult: (com.t1doo.aiyou.records.OriginalSearchHit) -> Unit = { hit ->
         if (ownsNavigation() && selected == Destination.MEMORIES && !reading && !showSettings && !demo &&
             search.canOpen(searchState, hit)) {
-            val index = memoriesList.firstVisibleItemIndex
-            searchReturnAnchor = OriginalSearchReturnAnchor(memoriesList.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.key as? String,
-                index, memoriesList.firstVisibleItemScrollOffset)
-            searchReturnInput = searchState.input
-            searchReturnSource = searchState.entries
-            openEntry(hit.entry.id)
+            var locationToken: com.t1doo.aiyou.records.OriginalReadingLocation? = null
+            var locationGeneration: Long? = null
+            search.open(searchState, hit, rollback = {
+                locationGeneration?.let { token -> navigation.publish(token) {
+                    if (detailEntryId == hit.entry.id && searchLocation === locationToken) {
+                        navigation.advance()
+                        detailEntryId = null; searchLocation = null; readerFromSearch = false
+                        searchReturnAnchor = null; searchReturnInput = null; searchReturnSource = null
+                        search.invalidateInput()
+                    }
+                } }
+            }) {
+                navigation.publish(generation) { if (ownsNavigation() && selectedName == Destination.MEMORIES.name && detailEntryId == null &&
+                    !showSettings && !demo && search.canOpen(searchState, hit)) {
+                    val index = memoriesList.firstVisibleItemIndex
+                    searchReturnAnchor = OriginalSearchReturnAnchor(memoriesList.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.key as? String,
+                        index, memoriesList.firstVisibleItemScrollOffset)
+                    searchReturnInput = searchState.input
+                    searchReturnSource = searchState.entries
+                    openEntry(hit.entry.id)
+                    if (detailEntryId == hit.entry.id) {
+                        locationToken = com.t1doo.aiyou.records.OriginalReadingLocation(
+                            hit.entry.id, hit.entry.currentRevision, com.t1doo.aiyou.model.OriginalExports.hash(hit.entry.originalText),
+                            hit.matchStartCodePoint, hit.matchEndCodePoint)
+                        searchLocation = locationToken
+                        locationGeneration = navigation.generation
+                    }
+                } }
+            }
         }
     }
     LocalOriginalSearchObserver.current?.let { observer ->
@@ -444,12 +494,12 @@ fun AIyouApp(
     }
     val beginEdit: (String, Int) -> Unit = { id, revision ->
         if (canCopy(id, revision) && currentLocal?.saving == false && currentLocal?.savePending == false) {
-            navigation.generation++; onBeginOriginalEdit(id, revision)
+            navigation.advance(); onBeginOriginalEdit(id, revision)
         }
     }
     val beginAttachments: (String, Int) -> Unit = { id, revision ->
         if (canCopy(id, revision) && currentLocal?.saving == false && currentLocal?.savePending == false) {
-            navigation.generation++; attachments?.open(id, revision)
+            navigation.advance(); attachments?.open(id, revision)
         }
     }
     val beginHistory: (String, Int) -> Unit = { id, revision ->
@@ -458,7 +508,7 @@ fun AIyouApp(
             latest != null && latest.ready && !latest.opening && latest.error == null && !latest.saving && !latest.savePending &&
             latest.originalHistory == null && attachments?.state?.value == null && latest.originalEdit?.canCancel != false &&
             latest.entries.any { it.id == id && it.currentRevision == revision }) {
-            navigation.generation++; onBeginOriginalHistory(id, revision)
+            navigation.advance(); onBeginOriginalHistory(id, revision)
         }
     }
     val canCopyHistory: (String, Int) -> Boolean = { id, revision ->
@@ -474,7 +524,7 @@ fun AIyouApp(
         val live = latest?.originalHistory
         if (attachments != null && canCopyHistory(id, revision) && latest?.saving == false && !latest.savePending &&
             latest.originalEdit?.canCancel != false && live != null && live.replacement == null && live.currentRevision != null) {
-            navigation.generation++
+            navigation.advance()
             attachments?.openHistorical(id, revision, AttachmentHistoryOwner(live.sessionId, live.requestId, live.currentRevision))
         }
     }
@@ -489,21 +539,21 @@ fun AIyouApp(
         val latest = currentLocal
         if (history != null && revision != null && currentRevision != null && canCopyHistory(history.entryId, revision) &&
             latest?.saving == false && !latest.savePending && latest.originalEdit?.canCancel != false) {
-            navigation.generation++
+            navigation.advance()
             onEditOriginalHistory(history.sessionId, history.requestId, revision, currentRevision)
         }
     }
     val confirmHistoryReplacement: (Long) -> Unit = { replacementId ->
         if (history?.selectedRevision != null && canCopyHistory(history.entryId, history.selectedRevision) &&
             currentLocal?.originalHistory?.replacement?.id == replacementId) {
-            navigation.generation++
+            navigation.advance()
             onConfirmHistoryReplacement(history.sessionId, history.requestId, replacementId)
         }
     }
     val cancelHistoryReplacement: (Long) -> Unit = { replacementId ->
         if (history != null && ownsHistory(history.sessionId) &&
             currentLocal?.originalHistory?.let { it.requestId == history.requestId && it.replacement?.id == replacementId } == true) {
-            navigation.generation++
+            navigation.advance()
             onCancelHistoryReplacement(history.sessionId, history.requestId, replacementId)
         }
     }
@@ -527,7 +577,7 @@ fun AIyouApp(
         }
     }
     BackHandler(enabled = showSettings) {
-        if (ownsNavigation()) { navigation.generation++; if (showLicenses) showLicenses = false else showSettings = false }
+        if (ownsNavigation()) { navigation.advance(); if (showLicenses) showLicenses = false else showSettings = false }
     }
     local?.manualTagEditor?.takeIf { reading && it.entryId == detailEntryId }?.let { editor ->
         val tagLocal = checkNotNull(local)
@@ -548,7 +598,7 @@ fun AIyouApp(
         com.t1doo.aiyou.records.RecycleConfirmationDialog(checkNotNull(local), recycleUi, recycleBin, ::ownsRecycleRoute)
     }
     BackHandler(enabled = browsingRecycle && recycleUi?.busy == false) {
-        if (ownsRecycleRoute()) { recycleBin?.close(checkNotNull(recycleUi).session); navigation.generation++ }
+        if (ownsRecycleRoute()) { recycleBin?.close(checkNotNull(recycleUi).session); navigation.advance() }
     }
     val exportUi = local?.originalExport
     fun ownsExportRoute() = ownsNavigation() && selectedName == Destination.MEMORIES.name &&
@@ -558,7 +608,7 @@ fun AIyouApp(
         currentLocal?.recordPackage?.session == packageUi?.session
     SideEffect { if (packageUi != null && !ownsPackageRoute()) recordPackages?.close(packageUi.session) }
     BackHandler(enabled = browsingPackage) {
-        if (ownsPackageRoute()) { recordPackages?.close(checkNotNull(packageUi).session); navigation.generation++ }
+        if (ownsPackageRoute()) { recordPackages?.close(checkNotNull(packageUi).session); navigation.advance() }
     }
     SideEffect {
         if (exportUi != null && !ownsExportRoute()) exports?.close(exportUi.session)
@@ -580,12 +630,12 @@ fun AIyouApp(
                 actionEnabled = recycleUi?.busy != true && attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
             ) {
                 if (browsingPackage && ownsPackageRoute()) {
-                    recordPackages?.close(checkNotNull(packageUi).session); navigation.generation++
+                    recordPackages?.close(checkNotNull(packageUi).session); navigation.advance()
                 } else if (browsingRecycle && ownsRecycleRoute()) {
-                    recycleBin?.close(checkNotNull(recycleUi).session); navigation.generation++
-                } else if (reading && recycleUi == null) returnToList() else if (ownsNavigation() && recycleUi == null) {
+                    recycleBin?.close(checkNotNull(recycleUi).session); navigation.advance()
+                } else if (reading && recycleUi == null) returnToList() else if (ownsNavigation() && recycleUi == null &&
+                    navigation.tryAdvance(generation)) {
                     clearSearch()
-                    navigation.generation++
                     tailReturnRequest = null
                     if (showLicenses) showLicenses = false else showSettings = !showSettings
                 }
@@ -606,9 +656,9 @@ fun AIyouApp(
         } else if (showSettings) {
             SettingsScreen(display, onDisplayChange, onRetryDisplay, attachments != null,
                 demo, ComponentState.valueOf(stateName),
-                onLicenses = { if (ownsNavigation()) { navigation.generation++; showLicenses = true } },
-                onDemo = { if (ownsNavigation()) { clearSearch(); navigation.generation++; demo = !demo } },
-                onDemoState = { if (ownsNavigation()) { navigation.generation++; stateName = it.name } },
+                onLicenses = { if (ownsNavigation()) { navigation.advance(); showLicenses = true } },
+                onDemo = { if (ownsNavigation()) { navigation.advance(); clearSearch(); demo = !demo } },
+                onDemoState = { if (ownsNavigation()) { navigation.advance(); stateName = it.name } },
                 modifier = modifier)
         } else if (browsingPackage && local != null && recordPackages != null && packageUi != null) {
             com.t1doo.aiyou.records.RecordPackageScreen(local, packageUi, recordPackages, recordPackagePicker, ::ownsPackageRoute, modifier)
@@ -639,8 +689,9 @@ fun AIyouApp(
                 onOpenAi = { id, revision -> if (canCopy(id, revision)) onOpenAiSession(id, revision) },
                 onStartAi = onStartAiSession, onStopAi = onStopAiSession, onCloseAi = onCloseAiSession,
                 onOpenTags = { id, revision -> if (canCopy(id, revision)) onOpenTags(id, revision) },
+                location = searchLocation,
                 onMoveToRecycleBin = recycleBin?.let { controller -> { id, revision ->
-                    if (canCopy(id, revision)) { navigation.generation++; controller.requestMove(id, revision) }
+                    if (canCopy(id, revision)) { navigation.advance(); controller.requestMove(id, revision) }
                 } })
         } else if (!demo && local != null && selected == Destination.TASKS &&
             (local.tasks.supported || local.opening || local.error != null)) {
@@ -660,17 +711,25 @@ fun AIyouApp(
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
                 onBeginRecordPackage = recordPackages?.let { controller -> { if (ownsNavigation() &&
                     selectedName == Destination.MEMORIES.name && detailEntryId == null && !showSettings && !demo) {
-                    clearSearch(); navigation.generation++; controller.open()
+                    navigation.advance(); clearSearch(); controller.open()
                 } } },
-                onBeginExport = exports?.let { controller -> { if (ownsExportRoute()) controller.open() } },
+                onBeginExport = exports?.let { controller -> { if (ownsExportRoute() && navigation.tryAdvance(generation)) {
+                    search.pause(); controller.open()
+                } } },
                 onOpenRecycleBin = recycleBin?.let { controller -> { if (ownsNavigation() && selectedName == Destination.MEMORIES.name &&
-                    detailEntryId == null && !showSettings && !demo) { clearSearch(); navigation.generation++; controller.open() } } },
+                    detailEntryId == null && !showSettings && !demo) { navigation.advance(); clearSearch(); controller.open() } } },
                 searchState = searchState, searchQuery = searchQuery, searchFrom = searchFrom, searchThrough = searchThrough,
-                searchTag = searchTag, onSearchTag = { tag -> if (ownsNavigation()) { searchTag = tag; searchModeGeneration++ } },
-                searchMode = searchMode, onSearchMode = { if (ownsNavigation()) {
+                onSearchInputChange = { change -> search.changeInput { if (ownsNavigation() &&
+                    selectedName == Destination.MEMORIES.name && detailEntryId == null && !showSettings && !demo) change() } },
+                onRebuildLocalSearch = { if (ownsNavigation() && selectedName == Destination.MEMORIES.name && detailEntryId == null &&
+                    currentLocal?.ready == true && currentLocal?.opening == false && currentLocal?.error == null &&
+                    currentLocal?.localSearch != null && currentLocal?.localIndexBusy == false)
+                    onRebuildLocalSearch() },
+                searchTag = searchTag, onSearchTag = { tag -> search.changeInput { if (ownsNavigation()) { searchTag = tag; searchModeGeneration++ } } },
+                searchMode = searchMode, onSearchMode = { search.changeInput { if (ownsNavigation()) {
                     searchModeGeneration++
                     searchMode = if (searchMode == OriginalSearchMode.KEYWORDS) OriginalSearchMode.EXACT else OriginalSearchMode.KEYWORDS
-                } },
+                } } },
                 onClearSearch = { if (ownsNavigation()) clearSearch() }, onOpenSearchResult = openSearchResult,
                 searchReturnAnchor = searchReturnAnchor,
                 ownsSearchReturn = { ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name &&
@@ -697,9 +756,9 @@ fun AIyouApp(
                         latest.ready && !latest.opening && latest.error == null && !latest.saving && !latest.savePending &&
                         latest.originalEdit == null && latest.originalHistory == null && attachments?.state?.value == null &&
                         latest.pendingEdits.any { it.entryId == id && it.id == draftId }) {
-                        search.pause(); searchReturnAnchor = null; searchReturnInput = null; searchReturnSource = null
+                        navigation.advance(); search.pause(); searchReturnAnchor = null; searchReturnInput = null; searchReturnSource = null
                         readerFromSearch = false
-                        navigation.generation++; detailEntryId = id; onResumeOriginalEdit(id, draftId)
+                        detailEntryId = id; onResumeOriginalEdit(id, draftId)
                     }
                 })
         } else {

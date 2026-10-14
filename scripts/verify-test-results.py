@@ -155,7 +155,11 @@ for label, folder, minimum in targets:
             "readerReturnKeepsActualMemoriesListIndexAndOffsetWhenPaddingShowsPreviousItem",
             "narrowLargeFontSeparatesNoHitsInvalidAndFailedDatesAndKeepsCorrectionAndClearReachable",
             "retainedResultActionsRejectQueryAbaRevisionDeletionReadFailureAndPageLeave",
-            "compositionRestorationDropsSensitiveQueryDatesAndResultsAndRevokesOldActions")
+            "compositionRestorationDropsSensitiveQueryDatesAndResultsAndRevokesOldActions",
+            "longOriginalTailHitScrollsToExactUnicodeRangeAndChangedVersionDropsOldHighlight",
+            "indexPendingAndFailureKeepLiteralResultsAndExplicitRebuildControlHonest",
+            "indexedLocationExitFailureRetiresActualReaderAndKeepsCurrentSearchInput",
+            "indexedLocationExitFailureCannotRevertActualLaterDestinationNavigation")
         additional["com.t1doo.aiyou.ProductionTasksPresentationTest"] = (
             "localRecordsNeverBecomeTasksAndUnopenedCompletionIsExplicit",
             "shortNarrowDoubleFontTasksScrollAndSettingsReturnWithoutChangingDraft",

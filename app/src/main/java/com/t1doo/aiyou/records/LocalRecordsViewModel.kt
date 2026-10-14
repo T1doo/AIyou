@@ -72,6 +72,10 @@ data class LocalRecordUiState(
     val packageOrigins: Map<String, com.t1doo.aiyou.model.RecordPackageOrigin> = emptyMap(),
     val packageOriginsAvailable: Boolean = true,
     val packageOriginsError: String? = null,
+    val localSearch: com.t1doo.aiyou.domain.LocalSearchRepository? = null,
+    val localSearchEpoch: Long? = null,
+    val localIndexBusy: Boolean = false,
+    val localIndexError: String? = null,
 )
 
 /** All draft writes and saves share one queue, preserving edits around a save boundary. */
@@ -109,6 +113,9 @@ class LocalRecordsViewModel internal constructor(
             mutableState.value.originalExport?.takeIf { it.selection.any { source -> source.sourceId == id } }?.let { exports.close(it.session) }
         })
     private var repository: EntryRepository? = null
+    private var indexQueued = false // Existing IO actor only.
+    private var indexFailed = false
+    private val searchRefreshQueued = java.util.concurrent.atomic.AtomicBoolean()
     private var storageOwnership: RecordsStorageOwnership? = null // Local IO queue publishes one immutable owner.
     private val ai = LocalRecordAiController(
         currentPolicy = { source -> mutableState.value.let { local ->
@@ -146,12 +153,14 @@ class LocalRecordsViewModel internal constructor(
         var expected: OriginalEditDraft?, var persisted: Boolean, var unacknowledged: OriginalEditDraft? = null)
     private var originalDraft: DraftBinding? = null // IO queue owned, never Bundle/log/plaintext storage.
     @Volatile private var editsDisposed = false
+    private val indexRebuildQueued = java.util.concurrent.atomic.AtomicBoolean()
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 open()
                 ai.reconcileRecords()
+                scheduleLocalIndex()
                 for (command in commands) {
                     try {
                         when (command) {
@@ -179,7 +188,7 @@ class LocalRecordsViewModel internal constructor(
                             }
                             is Command.DiscardCapture -> discardCapture(command.intent)
                             is Command.RestoreCapture -> restoreCapture(command.intent)
-                            Command.Retry -> open()
+                            Command.Retry -> { indexFailed = false; open() }
                             is Command.RecoverDraft -> {
                                 val store = checkNotNull(repository)
                                 persistedDraft = store.updateDraft(command.text)
@@ -209,10 +218,18 @@ class LocalRecordsViewModel internal constructor(
                             is Command.OriginalExport -> command.action(checkNotNull(repository))
                             is Command.RecordPackage -> command.action(checkNotNull(repository))
                             is Command.RecycleBin -> command.action(checkNotNull(repository))
+                            Command.IndexBatch -> runLocalIndex()
+                            Command.RebuildIndex -> try { rebuildLocalIndex() } finally { indexRebuildQueued.set(false) }
+                            Command.RefreshSearch -> try { refreshSearchSource() } finally { searchRefreshQueued.set(false) }
                         }
                     } catch (failure: CancellationException) { throw failure }
                     catch (failure: Exception) { failed(failure, preserveQueuedSave = command is Command.Edit) }
-                    finally { ai.reconcileRecords() }
+                    finally {
+                        ai.reconcileRecords()
+                        if (command is Command.Save || command is Command.Revise || command is Command.ManualTags ||
+                            command is Command.RecordPackage || command is Command.RecycleBin ||
+                            command is Command.Retry || command is Command.RefreshSearch) scheduleLocalIndex()
+                    }
                 }
             } finally {
                 editsDisposed = true
@@ -930,12 +947,16 @@ class LocalRecordsViewModel internal constructor(
                 { factory(store) }
             }).also { storageOwnership = it }
             ai.bind(ownership)
+            val searchEpoch = try { store.localSearch?.epoch() }
+                catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
                 entries = entries, manualTags = labels.orEmpty(), manualTagsAvailable = labels != null,
                 supportsOriginalExport = store.originalExport != null,
                 supportsRecordPackages = store.recordPackages != null && store.originalExport != null && store.manualTags != null,
                 packageOrigins = origins.orEmpty(), packageOriginsAvailable = origins != null,
                 packageOriginsError = if (origins == null) "恢复来源暂不可读取，不能确认来源。" else null,
+                localSearch = store.localSearch,
+                localSearchEpoch = searchEpoch,
                 supportsRecycleBin = store.recycleBin != null,
                 manualTagsError = if (store.manualTags != null && labels == null) "手工标签暂不可读取，请重试。" else null,
                 draftNotice = if (persistedDraft == null) "没有未保存的草稿" else "已恢复本机草稿", error = null,
@@ -946,6 +967,72 @@ class LocalRecordsViewModel internal constructor(
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) { failed(failure) }
         catch (_: LinkageError) { failed(IllegalStateException()) }
+    }
+
+    fun refreshLocalSearch() {
+        if (!editsDisposed && mutableState.value.ready && searchRefreshQueued.compareAndSet(false, true) &&
+            !commands.trySend(Command.RefreshSearch).isSuccess) searchRefreshQueued.set(false)
+    }
+    fun rebuildLocalSearch() {
+        if (!editsDisposed && mutableState.value.ready && !mutableState.value.opening &&
+            mutableState.value.error == null && mutableState.value.localSearch != null &&
+            !mutableState.value.localIndexBusy && indexRebuildQueued.compareAndSet(false, true)) {
+            update { it.copy(localIndexBusy = true) }
+            if (!commands.trySend(Command.RebuildIndex).isSuccess) {
+                indexRebuildQueued.set(false)
+                update { if (editsDisposed) it else it.copy(localIndexBusy = false) }
+            }
+        }
+    }
+    private fun scheduleLocalIndex() {
+        if (!editsDisposed && !indexQueued && !indexFailed && repository?.localSearch != null &&
+            mutableState.value.ready && mutableState.value.error == null) {
+            indexQueued = commands.trySend(Command.IndexBatch).isSuccess
+        }
+    }
+    private fun runLocalIndex() {
+        indexQueued = false
+        val owner = repository?.localSearch ?: return
+        if (editsDisposed || !mutableState.value.ready || mutableState.value.error != null) return
+        update { if (editsDisposed || it.localSearch !== owner) it else it.copy(localIndexBusy = true) }
+        try {
+            val progress = owner.batch()
+            update { if (!it.ready || editsDisposed || it.localSearch !== owner) it else
+                it.copy(localSearchEpoch = progress.epoch, localIndexBusy = progress.remaining, localIndexError = null) }
+            if (progress.remaining) scheduleLocalIndex()
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) {
+            indexFailed = true
+            update { if (!it.ready || editsDisposed || it.localSearch !== owner) it else
+                it.copy(localIndexBusy = false, localIndexError = "本机查找整理暂停。原文已保留，可以明确重新整理。") }
+        }
+    }
+    private fun rebuildLocalIndex() {
+        val owner = repository?.localSearch ?: return
+        if (editsDisposed || !mutableState.value.ready || mutableState.value.error != null) return
+        try {
+            val epoch = owner.rebuild()
+            indexFailed = false
+            update { if (!it.ready || editsDisposed || it.localSearch !== owner) it else
+                it.copy(localSearchEpoch = epoch, localIndexError = null, localIndexBusy = true) }
+            scheduleLocalIndex()
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) {
+            indexFailed = true
+            update { if (!it.ready || editsDisposed || it.localSearch !== owner) it else
+                it.copy(localIndexBusy = false, localIndexError = "本机查找重新整理失败。原文与现有数据已保留，可以重试。") }
+        }
+    }
+    private suspend fun refreshSearchSource() {
+        val store = repository ?: return
+        if (editsDisposed || !mutableState.value.ready) return
+        val entries = store.entries()
+        val labels = try { store.manualTags?.snapshots() } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { null }
+        val epoch = try { store.localSearch?.epoch() } catch (_: Exception) { null }
+        update { if (!it.ready || editsDisposed) it else it.copy(entries = entries,
+            manualTags = labels.orEmpty(), manualTagsAvailable = labels != null, localSearchEpoch = epoch,
+            manualTagsError = if (store.manualTags != null && labels == null) "手工标签暂不可读取，请重试。" else null) }
     }
 
     private fun failed(failure: Exception, preserveQueuedSave: Boolean = false) {
@@ -975,6 +1062,9 @@ class LocalRecordsViewModel internal constructor(
     }
 
     private sealed interface Command {
+        data object IndexBatch : Command
+        data object RebuildIndex : Command
+        data object RefreshSearch : Command
         data class RecordPackage(val action: suspend (EntryRepository) -> Unit) : Command
         data class RecycleBin(val action: suspend (EntryRepository) -> Unit) : Command
         data class OriginalExport(val action: suspend (EntryRepository) -> Unit) : Command

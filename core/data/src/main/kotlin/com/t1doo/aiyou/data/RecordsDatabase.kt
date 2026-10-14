@@ -38,7 +38,8 @@ internal interface RecordsDao {
 
 @Database(entities = [EntryEntity::class, RevisionEntity::class, DraftEntity::class, LocalJobEntity::class,
     AttachmentEntity::class, RemoteSourceAccessEntity::class, RemoteTextJobEntity::class, TextAnnotationEntity::class, ManualTagEntity::class,
-    ManualTaskEntity::class], version = 6, exportSchema = true)
+    ManualTaskEntity::class, LocalSearchFtsEntity::class, LocalSearchDocumentEntity::class,
+    LocalSearchEpochEntity::class], version = 7, exportSchema = true)
 internal abstract class RecordsDatabase : RoomDatabase() {
     abstract fun records(): RecordsDao
 }
@@ -93,3 +94,11 @@ internal val recordsMigration5To6 = object : Migration(5, 6) {
     }
 }
 internal fun installManualTaskGuard(db: SupportSQLiteDatabase) { db.execSQL(ManualTaskSqlSchema.guard) }
+
+internal val recordsMigration6To7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        LocalSearchSqlSchema.migration6To7.forEach(db::execSQL)
+        installLocalSearchGuards(db)
+    }
+}
+internal fun installLocalSearchGuards(db: SupportSQLiteDatabase) { LocalSearchSqlSchema.guards.forEach(db::execSQL) }
