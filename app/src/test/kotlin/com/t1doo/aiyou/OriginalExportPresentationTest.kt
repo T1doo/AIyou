@@ -174,6 +174,8 @@ class OriginalExportPresentationTest {
             // Compose Dialog saves its own window UUID. Check its exact value too; export UUIDs remain forbidden.
             // https://github.com/androidx/androidx/blob/androidx-main/compose/ui/ui/src/androidMain/kotlin/androidx/compose/ui/window/AndroidDialog.android.kt
             is java.util.UUID -> assertNoPrivateState(value.toString(), forbidden)
+            // Inspect the actual saved value, including framework mutable-state wrappers.
+            is State<*> -> assertNoPrivateState(value.value, forbidden)
             is ByteArray -> assertNoPrivateState(value.toString(Charsets.UTF_8), forbidden)
             is Map<*, *> -> value.forEach { (key, child) -> assertNoPrivateState(key, forbidden); assertNoPrivateState(child, forbidden) }
             is Iterable<*> -> value.forEach { assertNoPrivateState(it, forbidden) }
