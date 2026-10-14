@@ -516,6 +516,7 @@ class LocalOriginalSearchPresentationTest {
     }
     private fun focusedField(tag: String) = compose.onNodeWithTag(tag)
         .performScrollTo().assertIsEnabled().performClick().assertIsFocused()
+    @OptIn(ExperimentalFoundationApi::class)
     private fun nativeHistory(tag: String, redo: Boolean = false) {
         focusedField(tag)
         val stable = observation { it.state.stage == OriginalSearchStage.READY ||
