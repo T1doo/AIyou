@@ -1,5 +1,8 @@
 package com.t1doo.aiyou.records
 
+import android.content.Context
+import android.content.Intent
+
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,6 +22,10 @@ import com.t1doo.aiyou.model.OriginalExportFormat
 import com.t1doo.aiyou.model.OriginalExports
 
 private class ExportPickerHandle { var launcher: ActivityResultLauncher<String>? = null }
+private class ExportDocumentContract(mimeType: String) : ActivityResultContracts.CreateDocument(mimeType) {
+    override fun createIntent(context: Context, input: String): Intent =
+        super.createIntent(context, input).addCategory(Intent.CATEGORY_OPENABLE)
+}
 
 /** Keys live in this VM session, not SavedState. Recreated VMs cannot adopt old results. */
 @Composable
@@ -30,7 +37,7 @@ fun OriginalExportPicker(controller: OriginalExportController, ui: OriginalExpor
         val registry = checkNotNull(LocalActivityResultRegistryOwner.current).activityResultRegistry
         val currentOwner by rememberUpdatedState(ownsRoute)
         val handle = remember(requestKey) { ExportPickerHandle() }
-        val contract = remember(requestKey) { ActivityResultContracts.CreateDocument(ui.format.mimeType) }
+        val contract = remember(requestKey) { ExportDocumentContract(ui.format.mimeType) }
         DisposableEffect(registry, requestKey, controller) {
             val launcher = registry.register(requestKey, contract) { uri ->
                 if (!currentOwner()) controller.cancel(ui.session)

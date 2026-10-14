@@ -20,7 +20,7 @@ if args.component:
 if args.queue:
     targets.append(("host queue", "checks/record-queue/build/test-results/test", 148))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 127))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 128))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 if args.evidence:
@@ -116,6 +116,7 @@ for label, folder, minimum in targets:
             "rawSavedStateExcludesTitlesAndEditorUndoAndRestorationRevokesOldNavigation",
             "failedCompletionRetainsStableTargetAndInputWithoutClaimingTaskSuccess")
         additional["com.t1doo.aiyou.ManualTagPresentationTest"] = (
+            "tagSearchReturnKeepsExactPositionWithExportControlVisible",
             "actualTagEditorWaitsForAcknowledgementKeepsFailedInputAndRemovesOnlyAfterConfirmation",
             "tagOnlyAndKeywordSavedZoneDateCombinationOpenFullOriginalAndReturnActualListPosition",
             "changedTagVersionRevokesOldResultBeforeCompositionAndReadFailureIsDistinctFromEmpty",

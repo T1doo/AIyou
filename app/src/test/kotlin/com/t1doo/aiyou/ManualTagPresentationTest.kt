@@ -98,8 +98,12 @@ class ManualTagPresentationTest {
         assertEquals(2, persisted.getValue("one").names.size); pump(); assertEquals(listOf(TAG), persisted.getValue("one").names)
         assertEquals("合成草稿", state.value.text); assertEquals(1, state.value.entries.first().currentRevision)
     }
-    @Test fun tagOnlyAndKeywordSavedZoneDateCombinationOpenFullOriginalAndReturnActualListPosition() {
-        content(); chooseTag(); val only = result { it.stage == OriginalSearchStage.READY && it.input.tag == TAG }
+    @Test fun tagOnlyAndKeywordSavedZoneDateCombinationOpenFullOriginalAndReturnActualListPosition() = assertTagSearchReturn(false)
+    @Test fun tagSearchReturnKeepsExactPositionWithExportControlVisible() = assertTagSearchReturn(true)
+    private fun assertTagSearchReturn(exportVisible: Boolean) {
+        content(exportVisible = exportVisible)
+        if (exportVisible) compose.onNodeWithTag("export-open").assertIsEnabled()
+        chooseTag(); val only = result { it.stage == OriginalSearchStage.READY && it.input.tag == TAG }
         assertEquals(listOf("one", "two"), only.state.hits.map { it.entry.id })
         field("original-search-query", "咖啡"); field("original-search-from", "2026-10-14"); field("original-search-through", "2026-10-14")
         val found = result { it.stage == OriginalSearchStage.READY && it.input.from == "2026-10-14" && it.input.through == "2026-10-14" }
@@ -118,7 +122,8 @@ class ManualTagPresentationTest {
         try {
             compose.waitUntil(2_000) { memories.firstVisibleItemIndex == position.first && memories.firstVisibleItemScrollOffset == position.second }
         } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
-            throw AssertionError("Actual tag reader return did not restore position: ${returnStage.get()}, " +
+            throw AssertionError("Actual tag reader return did not restore position: expected=$position " +
+                "actual=${memories.firstVisibleItemIndex to memories.firstVisibleItemScrollOffset}, ${returnStage.get()}, " +
                 "${searchDiagnostics.get()}, items=${memories.layoutInfo.totalItemsCount}", failure)
         }
         assertEquals(position, compose.runOnIdle { memories.firstVisibleItemIndex to memories.firstVisibleItemScrollOffset })
@@ -172,14 +177,19 @@ class ManualTagPresentationTest {
         compose.runOnIdle { assertPrivate(registry!!.performSave(), listOf(TAG, "合成私密标签输入")) }
         assertEquals("合成私密标签输入", editable("manual-tag-input"))
     }
-    private fun content(large: Boolean = false) { state.value = state.value.copy(manualTags = persisted.toMap(), manualTagsAvailable = true); compose.setContent { TestScreen(large) }; compose.waitForIdle() }
-    @Composable private fun TestScreen(large: Boolean) {
+    private fun content(large: Boolean = false, exportVisible: Boolean = false) {
+        state.value = state.value.copy(manualTags = persisted.toMap(), manualTagsAvailable = true, supportsOriginalExport = exportVisible)
+        compose.setContent { TestScreen(large, exportVisible) }; compose.waitForIdle()
+    }
+    private val exports = OriginalExportController({ state.value }, { state.value = it(state.value) }, { false }, java.time.Clock.systemUTC())
+    @Composable private fun TestScreen(large: Boolean, exportVisible: Boolean = false) {
         val saved = LocalSaveableStateRegistry.current; SideEffect { registry = saved }
         val density = LocalDensity.current
         CompositionLocalProvider(LocalOriginalSearchObserver provides searchObserver, LocalOriginalReadingObserver provides readerObserver,
             LocalDensity provides if (large) Density(density.density, 2f) else density) {
             Box(if (large) Modifier.size(320.dp, 640.dp) else Modifier) {
                 AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES, local = state.value, currentRecords = { state.value },
+                    exports = exports.takeIf { exportVisible },
                     onOpenTags = controller::open, onTagEdit = controller::edit, onTagAdd = controller::add,
                     onTagRemove = controller::remove, onTagRetry = controller::retry, onTagClose = controller::close) }
             }

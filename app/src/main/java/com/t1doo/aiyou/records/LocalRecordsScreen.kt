@@ -205,15 +205,16 @@ fun LocalRecordsScreen(
                 contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
                 item("summary") {
-                    Column {
-                    NotebookPageHeader(destination.label,
+                    if (destination == Destination.MEMORIES && onBeginExport != null && local.supportsOriginalExport) {
+                        Column(Modifier.fillMaxWidth()) {
+                            NotebookPageHeader(destination.label, "${local.entries.size} 条本机记录", stackSummary, companion)
+                            OutlinedButton(onClick = onBeginExport, enabled = local.ready && !local.opening && local.error == null &&
+                                local.entries.isNotEmpty() && !local.saving && !local.savePending,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("export-open")) { Text("导出选定原文") }
+                        }
+                    } else NotebookPageHeader(destination.label,
                         if (destination == Destination.MEMORIES) "${local.entries.size} 条本机记录" else "随手记下一点生活",
                         stackSummary, companion)
-                    if (destination == Destination.MEMORIES && onBeginExport != null)
-                        OutlinedButton(onClick = onBeginExport, enabled = local.ready && !local.opening && local.error == null &&
-                            local.supportsOriginalExport && local.entries.isNotEmpty() && !local.saving && !local.savePending,
-                            modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("export-open")) { Text("导出选定原文") }
-                    }
                 }
                 if (destination == Destination.NOW) item("composer") {
                     CaptureComposer(

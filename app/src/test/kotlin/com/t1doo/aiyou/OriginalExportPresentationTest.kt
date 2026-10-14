@@ -83,7 +83,7 @@ class OriginalExportPresentationTest {
             assertEquals(1, registry.intents.size); val intent = registry.intents.single()
             assertEquals(Intent.ACTION_CREATE_DOCUMENT, intent.action); assertEquals("application/x-ndjson", intent.type)
             assertEquals("AIyou-current-originals.jsonl", intent.getStringExtra(Intent.EXTRA_TITLE))
-            assertTrue(intent.categories.contains(Intent.CATEGORY_OPENABLE)); assertEquals(0, intent.flags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            assertTrue(intent.categories?.contains(Intent.CATEGORY_OPENABLE) == true); assertEquals(0, intent.flags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
             assertFalse(intent.toString().contains("私密")); assertFalse(fixture.ui().hasFile)
             registry.dispatchResult(registry.codes.single(), null as Uri?)
         }
@@ -98,7 +98,7 @@ class OriginalExportPresentationTest {
         compose.runOnIdle { assertEquals(OriginalExportPhase.CHANGED, fixture.ui().phase); assertTrue(registry.codes.isEmpty())
             fixture.state.value = fixture.state.value.copy(entries = listOf(fixture.original)) }
         compose.onNodeWithText("重新预览最新原文").performScrollTo().performClick(); pump()
-        compose.onNodeWithText("合成新原文").performScrollTo().assertExists()
+        compose.onNodeWithTag("export-preview-one").performScrollTo().assertTextEquals("合成新原文")
         compose.runOnIdle { assertFalse(fixture.ui().riskAccepted); assertEquals(2, fixture.ui().snapshot!!.records.single().entry.currentRevision) }
     }
     @Test fun failedPartialFileHasNoAutomaticDeleteAndRequiresSeparateExactTargetConfirmation() {
@@ -171,6 +171,9 @@ class OriginalExportPresentationTest {
         when (value) {
             null, is Number, is Boolean, is Char -> Unit
             is String -> forbidden.forEach { assertFalse("Private export state entered SavedState", value.contains(it)) }
+            // Compose Dialog saves its own window UUID. Check its exact value too; export UUIDs remain forbidden.
+            // https://github.com/androidx/androidx/blob/androidx-main/compose/ui/ui/src/androidMain/kotlin/androidx/compose/ui/window/AndroidDialog.android.kt
+            is java.util.UUID -> assertNoPrivateState(value.toString(), forbidden)
             is ByteArray -> assertNoPrivateState(value.toString(Charsets.UTF_8), forbidden)
             is Map<*, *> -> value.forEach { (key, child) -> assertNoPrivateState(key, forbidden); assertNoPrivateState(child, forbidden) }
             is Iterable<*> -> value.forEach { assertNoPrivateState(it, forbidden) }
