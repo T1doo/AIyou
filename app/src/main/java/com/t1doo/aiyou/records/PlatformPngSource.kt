@@ -10,6 +10,7 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.scale
 import java.io.InputStream
 import java.nio.ByteBuffer
 
@@ -29,7 +30,7 @@ class PlatformAttachmentPicture internal constructor(private val bitmap: Bitmap)
     internal fun thumbnail(): PlatformAttachmentPicture {
         val scale=minOf(1f,160f/maxOf(width,height))
         if(scale==1f) return this
-        val small=Bitmap.createScaledBitmap(bitmap,maxOf(1,(width*scale).toInt()),maxOf(1,(height*scale).toInt()),true)
+        val small=bitmap.scale(maxOf(1,(width*scale).toInt()),maxOf(1,(height*scale).toInt()),true)
         bitmap.recycle();return PlatformAttachmentPicture(small)
     }
 }
