@@ -94,3 +94,41 @@ F09 专项是继承背景，本批没有把它们冒充为新提交的实测。
 
 原生 SAF、Keystore、SQLCipher、设备重启/进程死亡、真机全新安装恢复、OEM
 与 16 KiB 原生兼容验收均未执行；JVM 模拟、CI 和构建均不能替代真机验收。
+
+## 2026-10-15 Compose 原图预览 CI 回归修正
+
+从已核验的开发祖先 `84defbe52570faa5a0443b45a24da7003a8e47a5` 建立
+`codex/fix-export-preview-graphics-20261015`。根据用户提供的 CI 摘要，
+[run 38797060169 / job 116636123752](https://github.com/T1doo/AIyou/actions/runs/38797060169/job/116636123752)
+在第 18 步 Compose JVM 回归中执行 191 项、失败 1 项：
+`imageOnlyZipShowsActualAuthenticatedPictureAndRequiresConsentBeforeZipIntent`
+在原第 80 行找不到 `export-image-total`。该次 CI 的 SDK preflight、debug APK
+和无 INTERNET 权限检查已通过，后续 instrumentation / native / lint 跳过。
+这是用户提供的结果，不是本地重跑，也不归因于本地 SDK 缺失；未取得原始
+CI XML / 异常日志，未重试此前被拒绝的 Actions API 或另换路径取日志。
+
+源码核对发现该类注入真实 `PlatformImageDecoder::thumbnail`，却缺少其他真实
+图片测试的 Native 图形配置。固定 Robolectric 4.17 的
+`GraphicsModeConfigurer` 默认 `LEGACY`；其 `ShadowBitmapFactory.decodeByteArray`
+及所调用的 `create` 不填 `Options.outMimeType`。生产 PNG 解码器严格要求
+`image/png`，异常会让控制器拒绝发布预览，随后图片统计节点自然不存在。
+固定版本公开源码取自 Maven Central 的
+[robolectric sources](https://repo.maven.apache.org/maven2/org/robolectric/robolectric/4.17/robolectric-4.17-sources.jar)
+和 [shadows-framework sources](https://repo.maven.apache.org/maven2/org/robolectric/shadows-framework/4.17/shadows-framework-4.17-sources.jar)。
+同步排空队列、纯图记录快照和版本匹配均未见缺陷。此为源码支持的根因链，
+尚未通过本地 Robolectric 执行复现。
+
+修复仅为测试类增加 `@GraphicsMode(NATIVE)`，与相邻图片测试保持一致；
+生产代码、PNG MIME / CRC / 像素校验与导出策略保持原样。保留原节点、真实
+图片显示、风险确认、ZIP Intent、损坏 PNG 拒绝断言；增加预览状态 / 无错误 /
+图片数量及真实 1×1 像素 `0xff225599` 断言，以便区分解码失败和 UI 节点失败。
+只读独审通过，无阻塞意见。
+
+本次实际离线执行开放 ZIP 12、原文编码 4、原文 SQL 6、导出控制器 11 项，
+合计 **33/33**；逐项核对 JUnit XML 与源码方法清单，0 failure / error / skip。
+Python **123/123**，`git diff --check` 通过。未把祖先的全量 628 项和队列
+148 项作为本次重跑。当前环境仍无 Android SDK / Robolectric 运行依赖；未
+安装或接受 SDK 协议。因此修复后的 Compose、assembleDebug、AAR metadata、
+lint 与原生验收均 **NOT RUN**，无本次新 APK，推送后的 CI 结果尚待验证。
+旧 94/96 两项 SQLite 初始化 / 退出超时及 c43561f 的未知步骤 CI 失败仍保留，
+本次结果不意味着它们已经解决。

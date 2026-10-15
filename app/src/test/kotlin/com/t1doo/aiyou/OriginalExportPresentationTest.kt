@@ -34,10 +34,12 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
-/** Production Compose/controller/registry. Synthetic memory ports; SQL evidence is separate. */
+/** Production Compose/controller/registry and native image decoding; SQL evidence is separate. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w360dp-h1000dp")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @OptIn(ExperimentalFoundationApi::class)
 class OriginalExportPresentationTest {
     @get:Rule val compose = createComposeRule()
@@ -77,9 +79,21 @@ class OriginalExportPresentationTest {
         compose.onNodeWithTag("export-select-one").performScrollTo().performClick()
         compose.onNodeWithTag("export-format-MEDIA_ZIP").performScrollTo().performClick()
         compose.onNodeWithTag("export-prepare").performScrollTo().performClick(); pump()
+        compose.runOnIdle {
+            val ui = fixture.ui()
+            assertNull("Authenticated PNG preview failed: ${ui.error}", ui.error)
+            assertEquals(OriginalExportPhase.PREVIEW, ui.phase)
+            assertEquals(1, ui.mediaPreview!!.images.size)
+        }
         compose.onNodeWithTag("export-image-total").performScrollTo().assertExists()
         compose.onNodeWithTag("export-view-" + Fixture.IMAGE_ID).performScrollTo().performClick(); pump()
         compose.onNodeWithTag("export-picture").performScrollTo().assertIsDisplayed()
+        compose.runOnIdle {
+            val picture = fixture.ui().picture as PlatformAttachmentPicture
+            assertEquals(1, picture.width); assertEquals(1, picture.height)
+            val pixels = IntArray(1); picture.image.readPixels(pixels)
+            assertEquals(0xff225599.toInt(), pixels.single())
+        }
         compose.onNodeWithTag("export-choose").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithTag("export-risk").performScrollTo().performClick()
         compose.onNodeWithTag("export-choose").performScrollTo().performClick(); pump()
