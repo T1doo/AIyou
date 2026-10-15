@@ -223,7 +223,7 @@ class LocalCandidatePresentationTest {
         click("local-candidate-cancel-" + batch.id); drain()
         assertEquals(LocalCandidateState.CANCELLED, durable.single().state)
         assertTrue(durable.single().items.isEmpty())
-        val regenerated = generate(); val regeneratedSuffix = suffix(regenerated)
+        val regenerated = generate(); val regeneratedSuffix = this.suffix(regenerated)
         click("local-candidate-accept-" + regeneratedSuffix)
         for (tag in listOf("local-candidate-confirm", "local-candidate-cancel-confirm", "local-candidates-close")) {
             val node = compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
