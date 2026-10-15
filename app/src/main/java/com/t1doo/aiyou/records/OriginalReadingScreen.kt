@@ -45,6 +45,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import com.t1doo.aiyou.designsystem.AIyouColors
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.ComponentState
@@ -201,7 +202,9 @@ fun OriginalReadingScreen(
                         } == true }?.let { Text(it, style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.testTag("original-favorite-notice")) }
                     }
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                    // Keep detail actions reachable without consuming the full original viewport.
+                    FlowRow(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())
+                        .testTag("original-actions"), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                         TextButton(onClick = {
                             if (canCopy(entry.id, entry.currentRevision)) copyDenied = !onCopy(entry.id, entry.currentRevision)
                         },

@@ -27,7 +27,7 @@ jobs:
           printf '%s  %s\n' \
             3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 \
             gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
-      - name: Generate actual Room v9 favorites export and preserve prior native fixtures from the licensed CI toolchain
+      - name: Generate actual Room v10 candidates export and preserve prior native fixtures from the licensed CI toolchain
         run: |
           python3 scripts/check-sdk.py
           python3 scripts/verify-manual-tag-schema.py --capture
