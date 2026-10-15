@@ -15,6 +15,7 @@ import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
@@ -199,6 +200,126 @@ class ManualTaskPresentationTest {
         assertEquals(ManualTaskStatus.COMPLETED, persisted.getValue("one").status); assertEquals(2L, persisted.getValue("one").version)
         assertEquals(1, identities.distinct().size); assertEquals(capture, state.value.text)
     }
+    @Test fun explicitDateOnlyCreateModifyPostponeAndClearWaitForAcknowledgement() {
+        content(); begin("明天三点只是标题")
+        dateFields("2042-11-19", "", "Asia/Shanghai")
+        compose.onNodeWithTag("manual-task-create").performScrollTo().performClick()
+        assertTrue(persisted.isEmpty()); assertNull(state.value.tasks.notice); pump()
+        val id = persisted.keys.single(); assertNull(persisted.getValue(id).schedule!!.time)
+        compose.onNodeWithTag("manual-task-date-" + id).performScrollTo().assertTextContains("仅日期")
+        openDate(id); dateFields("2042-11-20", "09:30", "Europe/Paris"); saveDate()
+        assertEquals("2042-11-19", persisted.getValue(id).schedule!!.date.toString()); pump()
+        assertEquals("Europe/Paris", persisted.getValue(id).schedule!!.timeZone)
+        compose.onNodeWithTag("manual-task-postpone-" + id).performScrollTo().performClick()
+        dateFields("2042-11-21", "09:30", "Europe/Paris"); saveDate(); pump()
+        assertEquals("2042-11-21", persisted.getValue(id).schedule!!.date.toString())
+        compose.onNodeWithTag("manual-task-clear-" + id).performScrollTo().performClick()
+        compose.onNodeWithText("确认清除").performScrollTo().assertIsDisplayed(); saveDate(); pump()
+        assertNull(persisted.getValue(id).schedule); assertEquals(4L, persisted.getValue(id).version)
+        assertEquals(ManualTaskStatus.OPEN, persisted.getValue(id).status)
+        assertEquals("明天三点只是标题", persisted.getValue(id).title); assertEquals(capture, state.value.text)
+    }
+    @Test fun nonexistentAndRepeatedLocalTimesRequireExplicitCorrectionsAndOffsetChoice() {
+        persisted["one"] = snapshot("one", "明天三点"); content()
+        assertNull(persisted.getValue("one").schedule); openDate("one")
+        dateFields("2026-03-08", "02:30", "America/New_York"); saveDate()
+        assertTrue(queued.isEmpty()); assertNull(persisted.getValue("one").schedule)
+        compose.onNodeWithText("这个本地时刻因夏令时跳转不存在，请明确选择其他时刻。").performScrollTo().assertIsDisplayed()
+        dateFields("2026-11-01", "01:30", "America/New_York"); saveDate()
+        assertTrue(queued.isEmpty())
+        compose.onNodeWithText("这个本地时刻出现两次，请明确选择第一次或第二次。").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("manual-task-offset-SECOND").performScrollTo().performClick()
+        saveDate(); assertEquals(1L, persisted.getValue("one").version); pump()
+        assertEquals(-18_000, persisted.getValue("one").schedule!!.offsetSeconds)
+        compose.onNodeWithTag("manual-task-date-one").performScrollTo().assertTextContains("偏移 -05:00")
+    }
+    @Test fun lostDateReadbackKeepsStableRequestAfterCloseAndNeverShowsFalseEmpty() {
+        persisted["one"] = snapshot("one", "合成日期待确认"); content(); openDate("one")
+        dateFields("2042-11-19", "", "Asia/Shanghai"); failRead = true; saveDate(); pump()
+        assertEquals(2L, persisted.getValue("one").version); assertNull(state.value.tasks.notice)
+        compose.onNodeWithTag("manual-task-date-save").performScrollTo().assertIsNotEnabled()
+        val request = dateRequests.single()
+        compose.onNodeWithTag("manual-task-date-close").performScrollTo().performClick()
+        compose.runOnIdle { callbacks.get().beginDate("one", 2, ManualTaskDateOperation.CLEAR) }
+        assertNull(state.value.tasks.dateEditor)
+        compose.onAllNodesWithText("还没有正式待办").assertCountEquals(0)
+        failRead = false; compose.onNodeWithTag("manual-task-retry").performScrollTo().performClick(); pump()
+        assertSame(request, dateRequests[1]); assertEquals(2L, persisted.getValue("one").version)
+        assertTrue(state.value.tasks.available); assertNull(state.value.tasks.pending)
+    }
+    @Test fun dateGroupsUseChosenZoneAndTerminalStateRetainsItsPlan() {
+        fun due(day: String, zone: String = "Asia/Shanghai") = checkNotNull(ManualTaskDateInput(day, "", zone).parse())
+        persisted["none"] = snapshot("none", "明天三点")
+        persisted["today"] = snapshot("today", "合成今天").copy(schedule = due("2026-10-14"))
+        persisted["next"] = snapshot("next", "合成接下来").copy(schedule = due("2026-10-15"))
+        persisted["past"] = snapshot("past", "合成过去").copy(schedule = due("2026-10-13"))
+        persisted["done"] = snapshot("done", "合成完成").copy(version = 2, status = ManualTaskStatus.COMPLETED, schedule = due("2026-10-13"))
+        persisted["cancel"] = snapshot("cancel", "合成取消").copy(version = 2, status = ManualTaskStatus.CANCELLED, schedule = due("2026-10-15"))
+        content()
+        for ((group, title) in listOf(ManualTaskGroup.UNDATED to "未设时间 · 待办", ManualTaskGroup.TODAY to "今天",
+            ManualTaskGroup.UPCOMING to "接下来", ManualTaskGroup.PAST to "过去 · 未完成",
+            ManualTaskGroup.COMPLETED to "已完成", ManualTaskGroup.CANCELLED to "已取消")) {
+            compose.onNodeWithTag("manual-task-heading-" + group).performScrollTo().assertTextEquals(title + " 1")
+        }
+        compose.onNodeWithTag("manual-task-date-today").performScrollTo().assertTextContains("仅日期").assertTextContains("Asia/Shanghai")
+        compose.onNodeWithTag("manual-task-date-done").performScrollTo().assertTextContains("2026-10-13")
+        compose.onAllNodesWithTag("manual-task-date-open-done").assertCountEquals(0)
+        compose.onAllNodesWithTag("manual-task-complete-cancel").assertCountEquals(0)
+        assertNull(persisted.getValue("none").schedule)
+    }
+    @Test
+    @Config(sdk = [35], qualifiers = "w320dp-h640dp")
+    fun narrowDoubleFontDateActionsAndOldBusinessCallbacksRespectCloseAndNavigation() {
+        persisted["one"] = snapshot("one", "同名合成计划"); persisted["two"] = snapshot("two", "同名合成计划")
+        content(true); openDate("one")
+        val old = callbacks.get(); val session = checkNotNull(state.value.tasks.dateEditor).session
+        dateFields("2042-11-19", "", "Asia/Shanghai")
+        for (tag in listOf("manual-task-date-save", "manual-task-date-close")) {
+            val node = compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
+            assertTrue(node.getUnclippedBoundsInRoot().height >= 48.dp)
+        }
+        compose.onNodeWithTag("manual-task-date-close").performClick()
+        compose.runOnIdle { old.saveDate(session, ManualTaskDateInput("2042-11-19")) }
+        assertTrue(queued.isEmpty()); assertNull(state.value.tasks.dateEditor)
+        compose.onNodeWithText("设置").performClick(); compose.onNodeWithText("返回").performClick()
+        compose.runOnIdle { old.beginDate("one", 1, ManualTaskDateOperation.SET); old.saveDate(session, ManualTaskDateInput("2042-11-19")) }
+        assertTrue(queued.isEmpty()); assertNull(state.value.tasks.dateEditor)
+        openDate("two"); val next = checkNotNull(state.value.tasks.dateEditor)
+        assertEquals("", next.input.date)
+        compose.runOnIdle { old.closeDate(session); old.saveDate(session, ManualTaskDateInput("2042-11-19")) }
+        assertEquals(next.session, state.value.tasks.dateEditor!!.session)
+        dateFields("2043-01-02", "", "Asia/Shanghai"); saveDate(); pump()
+        assertNull(persisted.getValue("one").schedule); assertNotNull(persisted.getValue("two").schedule)
+    }
+    @Test fun rawSavedStateExcludesPlanFieldsAndRecreationRetiresOldBusinessCallbacks() {
+        persisted["one"] = snapshot("one", "合成私密计划标题")
+        val restoration = StateRestorationTester(compose)
+        runBlocking { controller.initialize(store) }; restoration.setContent { TestScreen(false) }
+        openDate("one"); dateFields("2042-11-19", "07:35", "Pacific/Chatham")
+        val old = callbacks.get(); val session = checkNotNull(state.value.tasks.dateEditor).session
+        compose.runOnIdle { assertPrivate(registry!!.performSave(),
+            listOf("2042-11-19", "07:35", "Pacific/Chatham", "合成私密计划标题", capture)) }
+        compose.onNodeWithTag("manual-task-date-close").performScrollTo().performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.runOnIdle {
+            old.beginDate("one", 1, ManualTaskDateOperation.SET)
+            old.editDate(session, ManualTaskDateInput("2042-11-19")); old.saveDate(session, ManualTaskDateInput("2042-11-19"))
+            assertNull(state.value.tasks.dateEditor); assertTrue(queued.isEmpty())
+            assertPrivate(registry!!.performSave(), listOf("2042-11-19", "07:35", "Pacific/Chatham", capture))
+            controller.dispose(); val frozen = state.value
+            callbacks.get().beginDate("one", 1, ManualTaskDateOperation.SET)
+            callbacks.get().saveDate(session, ManualTaskDateInput("2042-11-19")); callbacks.get().closeDate(session)
+            assertSame(frozen, state.value)
+        }
+    }
+    private fun dateFields(date: String, time: String, zone: String) {
+        compose.onNodeWithTag("manual-task-date-input").performScrollTo().performTextReplacement(date)
+        compose.onNodeWithTag("manual-task-time-input").performScrollTo().performTextReplacement(time)
+        compose.onNodeWithTag("manual-task-zone-input").performScrollTo().performTextReplacement(zone)
+        compose.waitForIdle()
+    }
+    private fun openDate(id: String) { compose.onNodeWithTag("manual-task-date-open-" + id).performScrollTo().performClick(); compose.waitForIdle() }
+    private fun saveDate() { compose.onNodeWithTag("manual-task-date-save").performScrollTo().performClick() }
     private fun content(large: Boolean = false) { runBlocking { controller.initialize(store) }; compose.setContent { TestScreen(large) }; compose.waitForIdle() }
     @Composable private fun TestScreen(large: Boolean) {
         val saved = LocalSaveableStateRegistry.current; SideEffect { registry = saved }

@@ -4,6 +4,11 @@ This slice implements user-authored formal tasks. Full D07 reminder acceptance r
 OPEN, as do the previous native migration and production process-restart gates.
 The original master Markdown and product architecture DOCX remain unchanged.
 
+This page records the initial undated-task slice. The subsequent explicit date/time,
+postponement and versioned-ciphertext extension is specified in
+[MANUAL_TASK_DATES_CONTRACT.md](MANUAL_TASK_DATES_CONTRACT.md). Its final verification
+is separate; it does not close the native restart or full D07 reminder gates.
+
 ## User behavior
 
 - The production 待办 page supports explicit 创建待办 → title input → 确认创建.
@@ -14,7 +19,7 @@ The original master Markdown and product architecture DOCX remain unchanged.
   ID/version. Same-title tasks remain distinct. COMPLETED/CANCELLED are retained
   terminal states in this slice; editing, deletion and changing them back to OPEN
   are outside scope.
-- All tasks are undated. The page says 没有系统提醒 and 未设时间. Words such as
+- In this initial slice all tasks were undated. The page says 没有系统提醒 and 未设时间. Words such as
   “明天三点” remain literal title text. There is no time parser, alarm, worker,
   notification, permission request, calendar integration, or AI task creation.
 - Creation/update timestamps and the creation zone are audit metadata, not deadlines.
@@ -88,4 +93,5 @@ TextFieldState with no Saver; the editor's input/undo history never enter SavedS
   exact-head CI in CHECKED_IN mode. Ownership gates reject drift without repair.
 
 LOCAL_ONLY remains the default. Full D06 / LOCAL_INDEX, AI proposal confirmation,
-dates, postponement, permission/status-aware scheduling and full D07 remain OPEN.
+permission/status-aware scheduling and full D07 remain OPEN. Explicit manual dates
+and postponement are covered by the extension linked above, with their own evidence.

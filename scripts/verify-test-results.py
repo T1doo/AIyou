@@ -20,7 +20,7 @@ if args.component:
 if args.queue:
     targets.append(("host queue", "checks/record-queue/build/test-results/test", 148))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 161))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 167))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 if args.evidence:
@@ -151,7 +151,13 @@ for label, folder, minimum in targets:
             "lostReadbackAckReinitializationPreservesOneIdentityAndNeverPublishesFalseEmpty",
             "narrowDoubleFontKeepsCreateCloseAndNavigationReachableAndRevokesOldPageCallbacks",
             "rawSavedStateExcludesTitlesAndEditorUndoAndRestorationRevokesOldNavigation",
-            "failedCompletionRetainsStableTargetAndInputWithoutClaimingTaskSuccess")
+            "failedCompletionRetainsStableTargetAndInputWithoutClaimingTaskSuccess",
+            "explicitDateOnlyCreateModifyPostponeAndClearWaitForAcknowledgement",
+            "nonexistentAndRepeatedLocalTimesRequireExplicitCorrectionsAndOffsetChoice",
+            "lostDateReadbackKeepsStableRequestAfterCloseAndNeverShowsFalseEmpty",
+            "dateGroupsUseChosenZoneAndTerminalStateRetainsItsPlan",
+            "narrowDoubleFontDateActionsAndOldBusinessCallbacksRespectCloseAndNavigation",
+            "rawSavedStateExcludesPlanFieldsAndRecreationRetiresOldBusinessCallbacks")
         additional["com.t1doo.aiyou.ManualTagPresentationTest"] = (
             "tagSearchReturnKeepsExactPositionWithExportControlVisible",
             "actualTagEditorWaitsForAcknowledgementKeepsFailedInputAndRemovesOnlyAfterConfirmation",
