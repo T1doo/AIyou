@@ -202,7 +202,7 @@ class LocalRecordsViewModel internal constructor(
                 for (command in commands) {
                     try {
                         if(command is Command.Save || command is Command.Revise ||
-                            command is Command.ManualTags || command is Command.RecordPackage || command is Command.RecycleBin ||
+                            command is Command.RecordPackage || command is Command.RecycleBin ||
                             command is Command.MixedCapture || command is Command.Retry || command is Command.RefreshSearch) factRecaps.invalidate()
                         when (command) {
                             is Command.FactRecap -> command.action(checkNotNull(repository))
@@ -265,7 +265,11 @@ class LocalRecordsViewModel internal constructor(
                                 factRecaps.checkCurrent(store)
                                 try { command.action(store) } finally { factRecaps.checkCurrent(store) }
                             }
-                            is Command.ManualTags -> command.action(checkNotNull(repository))
+                            is Command.ManualTags -> {
+                                val store=checkNotNull(repository)
+                                factRecaps.checkCurrent(store)
+                                try { command.action(store) } finally { factRecaps.checkCurrent(store) }
+                            }
                             is Command.Favorites -> command.action(checkNotNull(repository))
                             is Command.ManualTasks -> command.action(checkNotNull(repository))
                             is Command.LocalCandidates -> command.action(checkNotNull(repository))

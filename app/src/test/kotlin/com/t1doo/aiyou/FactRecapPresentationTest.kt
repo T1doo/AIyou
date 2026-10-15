@@ -35,7 +35,8 @@ class FactRecapPresentationTest {
     private fun content() {compose.setContent {
         registry=LocalSaveableStateRegistry.current;val d=LocalDensity.current
         CompositionLocalProvider(LocalDensity provides Density(d.density,2f)) {
-            AIyouTheme {AIyouApp(previewDestination=Destination.MEMORIES,local=f.local.value,factRecaps=f.c,attachments=f.attachments)}
+            AIyouTheme {AIyouApp(previewDestination=Destination.MEMORIES,local=f.local.value,factRecaps=f.c,attachments=f.attachments,
+                onOpenTags=f.tags::open,onTagClose=f.tags::close)}
         }
     }}
     private fun click(tag:String) {compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag(tag));compose.onNodeWithTag(tag).assertIsDisplayed().assertIsEnabled().performClick()}
@@ -48,6 +49,10 @@ class FactRecapPresentationTest {
         compose.onNodeWithTag("recap-source:$id").assertHeightIsAtLeast(48.dp).performClick();drain()
         val text=compose.onNodeWithTag("original-text").fetchSemanticsNode().config[SemanticsProperties.Text].single().text
         assertEquals(f.records[5].originalText,text);assertTrue(text.endsWith("合成全文尾部5"))
+        val snapshot=f.local.value.factRecap!!.snapshot
+        compose.onNodeWithTag("original-manual-tags").performScrollTo().performClick();drain()
+        compose.onNodeWithTag("manual-tag-close").performScrollTo().performClick();drain()
+        compose.runOnIdle {assertSame(snapshot,f.local.value.factRecap!!.snapshot)}
         compose.onNodeWithText("返回回顾").performClick();drain()
         compose.onNodeWithTag("recap-source:$id").assertIsDisplayed()
         compose.runOnIdle {assertEquals(20,f.local.value.factRecap!!.snapshot!!.recordCount)}
@@ -78,6 +83,9 @@ class FactRecapPresentationTest {
     @Test fun explicitWeekZoneEmptyResultPrivateSavedStateAndAccurateBackupSettings() {
         content();open();click("recap-week")
         compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag("recap-zone"));compose.onNodeWithTag("recap-zone").performTextReplacement("America/New_York")
+        generate()
+        compose.runOnIdle {assertTrue(f.local.value.factRecap!!.snapshot!!.cards.any { "合成私密标签" in it.tags.names })
+            val saved=registry!!.performSave().toString();assertFalse(saved.contains("合成原文0"));assertFalse(saved.contains("合成私密标签"));assertFalse(saved.contains("America/New_York"))}
         compose.runOnIdle {f.records=emptyList();f.refresh()};generate()
         compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag("recap-empty"));compose.onNodeWithTag("recap-empty").assertIsDisplayed()
         compose.runOnIdle {val s=f.local.value.factRecap!!.snapshot!!;assertEquals(7,s.range.days.size);assertEquals("America/New_York",s.range.zone)
@@ -91,10 +99,19 @@ class FactRecapPresentationTest {
         private val imageId=UUID.randomUUID().toString();private val imageEntry=records.first().id
         private val bytes=Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNQCp35HwADvQIQaYgMTgAAAABJRU5ErkJggg==")
         private fun picture()=LocalAttachment(AttachmentIntent(imageId,imageEntry,1,"image/png",java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString(""){"%02x".format(it)},bytes.size.toLong()),AttachmentState.READY)
-        val local=mutableStateOf(LocalRecordUiState(ready=true,opening=false,supportsFactRecaps=true,supportsRecordPackages=true,entries=records,manualTagsAvailable=true))
+        private val labels=mutableMapOf(imageEntry to ManualTagSnapshot(imageEntry,1,listOf("合成私密标签")))
+        val local=mutableStateOf(LocalRecordUiState(ready=true,opening=false,supportsFactRecaps=true,supportsRecordPackages=true,entries=records,manualTagsAvailable=true,manualTags=labels.toMap()))
         val queue=ArrayDeque<suspend(EntryRepository)->Unit>();var fail=false
         fun refresh(){local.value=reconcileFactRecap(local.value,local.value.copy(entries=records))}
         val store=object:EntryRepository {
+            override val manualTags=object:ManualTagRepository {
+                override fun read(entryId:String)=labels[entryId] ?: ManualTagSnapshot(entryId,0,emptyList())
+                override fun snapshots()=labels.toMap()
+                override fun replace(mutation:ManualTagMutation):ManualTagSnapshot {
+                    require(read(mutation.entryId).version==mutation.expectedVersion)
+                    return ManualTagSnapshot(mutation.entryId,mutation.expectedVersion+1,mutation.names).also {labels[mutation.entryId]=it}
+                }
+            }
             override val factRecaps=object:FactRecapRepository {
                 override fun capture(range:FactRecapRange):FactRecapSnapshot {
                     if(fail)error("Synthetic read failure")
@@ -102,7 +119,7 @@ class FactRecapPresentationTest {
                         override val range=range
                         override val cards=records.filter {it.capturedAtMillis>=range.startMillis&&it.capturedAtMillis<range.endMillis}.map {
                             FactRecapCard(SourceVersion(it.id,it.currentRevision.toLong()),it.capturedAtMillis,it.captureTimeZone,OriginalExports.hash(it.originalText),0,it.originalText.take(240),it.originalText.length>240,
-                                ManualTagSnapshot(it.id,0,emptyList()),if(it.id==imageEntry && it.currentRevision==1)listOf(FactRecapImage(picture().intent,AttachmentState.READY))else emptyList(),it.policy)
+                                manualTags.read(it.id),if(it.id==imageEntry && it.currentRevision==1)listOf(FactRecapImage(picture().intent,AttachmentState.READY))else emptyList(),it.policy)
                         }
                     }
                 }
@@ -123,6 +140,7 @@ class FactRecapPresentationTest {
             override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry=error("Unrelated")
         }
         val c=FactRecapController({local.value},{change->local.value=reconcileFactRecap(local.value,change(local.value))},{queue.add(it);true},clock)
+        val tags=ManualTagController({local.value},{change->local.value=reconcileFactRecap(local.value,change(local.value))},{queue.add(it);true})
         val attachments=LocalAttachmentController({queue.add(it);true},PlatformImageDecoder::decode,
             canUseRecord={local.value.ready},canUsePanel={it.hasRecordAccess(local.value)})
     }

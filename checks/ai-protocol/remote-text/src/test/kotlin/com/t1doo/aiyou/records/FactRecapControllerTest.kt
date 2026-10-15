@@ -124,7 +124,7 @@ class FactRecapControllerTest {
             h.c.checkCurrent(h.store);assertNull(h.ui.snapshot)
         }
     }
-    @Test(timeout=15000) fun actualVmActorInvalidatesBeforeTagMutationAndKeepsCorrectDurableTag():Unit=runBlocking {
+    @Test(timeout=15000) fun actualVmActorPreservesTagReadAndCancelThenInvalidatesRealMutation():Unit=runBlocking {
         FactRecapHarness().use { h->
             val closed=CountDownLatch(1)
             val owner=object:EntryRepository by h.store,AutoCloseable {override fun close(){closed.countDown()}}
@@ -132,8 +132,11 @@ class FactRecapControllerTest {
             try {
                 withTimeout(5000){vm.state.first{it.ready && it.supportsFactRecaps}}
                 vm.factRecaps.open();vm.factRecaps.generate();withTimeout(5000){vm.state.first{it.factRecap?.snapshot!=null}}
+                val original=vm.state.value.factRecap!!.snapshot
                 vm.tags.open(h.id,1);withTimeout(5000){vm.state.first{it.manualTagEditor?.snapshot!=null}}
-                assertNull(vm.state.value.factRecap!!.snapshot)
+                assertSame(original,vm.state.value.factRecap!!.snapshot)
+                vm.tags.close(vm.state.value.manualTagEditor!!.session);assertSame(original,vm.state.value.factRecap!!.snapshot)
+                vm.tags.open(h.id,1);withTimeout(5000){vm.state.first{it.manualTagEditor?.snapshot!=null}}
                 val editor=vm.state.value.manualTagEditor!!;vm.tags.add(editor.session,editor.snapshot!!.version,"合成新标签")
                 withTimeout(5000){vm.state.first{it.manualTags[h.id]?.names==listOf("合成新标签")}}
                 assertNull(vm.state.value.factRecap!!.snapshot);vm.factRecaps.generate()

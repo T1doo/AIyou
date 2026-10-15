@@ -40,8 +40,11 @@ navigation; the StateFlow CAS checks generation and current availability again. 
 and queue waiting stay outside the gate. Validation failures cannot retire a newer request.
 Cancellation discards publication; the bounded in-flight read releases its
 existing transaction normally. The VM clears old visible results before source-affecting
-commands and synchronously on source-list/tag/readiness changes. No recap, source text,
-tags, range-input undo history or proof is put in a Bundle/Saver, export or plaintext cache.
+commands and synchronously on source-list/tag/readiness changes.
+Ordinary attachment or manual-tag reads and canceled tag editing preserve an unchanged proof;
+their IO actions check the complete proof before and after, including failure/ACK loss.
+No recap, source text, tags, range-input undo history or proof is put in a Bundle/Saver,
+export or plaintext cache.
 Retry always reads fresh evidence; storage failures are distinct from a genuine empty range.
 
 Settings now distinguishes the available selected-record/original-image encrypted package
