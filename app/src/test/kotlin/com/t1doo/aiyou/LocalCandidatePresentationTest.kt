@@ -166,7 +166,10 @@ class LocalCandidatePresentationTest {
         click("local-candidate-accept-" + suffix)
         assertTrue(reviews.isEmpty())
         click("local-candidate-cancel-confirm"); assertTrue(reviews.isEmpty())
-        click("local-candidate-accept-" + suffix); click("local-candidate-confirm")
+        click("local-candidate-accept-" + suffix)
+        val retainedConfirm = action("local-candidate-confirm")
+        click("local-candidate-confirm")
+        compose.runOnIdle { retainedConfirm(); assertEquals(1, queue.size) }
         assertEquals(ExcerptReview.PROPOSED, durable.single().items.single().review)
         drain()
         compose.onNodeWithTag("local-candidate-review-" + suffix).assertTextEquals("已采纳摘录")
@@ -220,7 +223,10 @@ class LocalCandidatePresentationTest {
             val node = compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertIsEnabled()
             assertTrue(node.getUnclippedBoundsInRoot().height >= 48.dp)
         }
-        click("local-candidate-cancel-" + batch.id); drain()
+        val retainedCancel = action("local-candidate-cancel-" + batch.id)
+        click("local-candidate-cancel-" + batch.id)
+        compose.runOnIdle { retainedCancel(); assertEquals(1, queue.size) }
+        drain()
         assertEquals(LocalCandidateState.CANCELLED, durable.single().state)
         assertTrue(durable.single().items.isEmpty())
         val regenerated = generate(); val regeneratedSuffix = this.suffix(regenerated)
