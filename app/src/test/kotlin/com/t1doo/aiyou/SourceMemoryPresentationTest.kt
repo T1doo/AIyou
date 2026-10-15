@@ -37,7 +37,7 @@ import org.robolectric.annotation.Config
 @Config(sdk=[35],qualifiers="w360dp-h1000dp")
 class SourceMemoryPresentationTest {
     @get:Rule val compose=createComposeRule()
-    private val one=StoredEntry("one",1,"🙂合成原文：他说“开心”只是引用，没有去旅行。",55,"UTC",ProcessingPolicy.LOCAL_ONLY)
+    private val one=StoredEntry("one",1,"🙂合成原文：他说我很开心；我并不开心；如果明天成功会开心；旅行计划还没有完成。",55,"UTC",ProcessingPolicy.LOCAL_ONLY)
     private val two=StoredEntry("two",1,"其他合成原文",65,"UTC",ProcessingPolicy.LOCAL_ONLY)
     private val state=mutableStateOf(LocalRecordUiState(ready=true,opening=false,entries=listOf(one,two),supportsSourceMemories=true))
     private val queue=ConcurrentLinkedQueue<suspend(EntryRepository)->Unit>()
@@ -126,6 +126,9 @@ class SourceMemoryPresentationTest {
         click("source-memory-ACCEPT-0");assertEquals(SourceMemoryReview.PROPOSED,saved!!.current!!.review)
         click("source-memory-confirm");drain();assertEquals(SourceMemoryReview.ACCEPTED,saved!!.current!!.review)
         click("source-memories-close");open();compose.onNodeWithTag("source-memory-review-0").performScrollTo().assertTextEquals("人工已采纳线索")
+        assertEquals(SourceMemoryAssertion.UNCERTAIN,saved!!.current!!.content.assertion)
+        assertEquals(SourceMemoryKind.EVENT,saved!!.current!!.content.kind);assertEquals(one.originalText,saved!!.current!!.content.reference.quote)
+        compose.onNodeWithText("事件线索 · 含义未确认").assertExists()
         for(tag in listOf("source-memory-correct-0","source-memory-source-0","source-memory-REVOKE-0")) {
             val node=compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed();assertTrue(node.getUnclippedBoundsInRoot().height>=48.dp)
         }

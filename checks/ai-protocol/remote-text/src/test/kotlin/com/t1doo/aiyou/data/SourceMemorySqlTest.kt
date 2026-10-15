@@ -18,6 +18,8 @@ class SourceMemorySqlTest {
         val accepted=f.store.mutate(f.change(pending,SourceMemoryAction.ACCEPT));assertEquals(SourceMemoryReview.ACCEPTED,accepted.current!!.review)
         assertEquals(old,f.base.snapshotOld());assertFalse(f.bytes().toString(Charsets.UTF_8).contains("人工合成备注"))
         f.reopen();val read=f.store.memories(f.source).single();assertEquals(accepted.versions,read.versions)
+        assertEquals(SourceMemoryAssertion.UNCERTAIN,read.current!!.content.assertion)
+        assertEquals(SourceMemoryKind.EVENT,read.current!!.content.kind);assertEquals(f.original,read.current!!.content.reference.quote)
         assertEquals(5L,read.capturedAtMillis);assertEquals("Asia/Shanghai",read.captureTimeZone)
         assertTrue(f.db.read("SELECT * FROM entry_manual_tags").isEmpty());assertTrue(f.db.read("SELECT * FROM manual_tasks").isEmpty())
     }
@@ -66,7 +68,8 @@ class SourceMemorySqlTest {
         val delayed=f.request(id="delayed");val saved=f.create()
         f.db.transaction { sql -> sql.execute("INSERT INTO remote_source_access VALUES('source',77,0,NULL,NULL)");sql.execute("DELETE FROM remote_source_access WHERE entryId='source'") }
         assertThrows(SourceMemoryConflict::class.java) { f.store.create(delayed) };assertThrows(SourceMemoryConflict::class.java) { f.store.mutate(f.change(saved,SourceMemoryAction.ACCEPT)) }
-        assertEquals(SourceMemoryState.INVALIDATED,f.store.memories(f.source).single().state);assertTrue(f.bytes().isEmpty())
+        val invalidated=f.store.memories(f.source).single();assertEquals(SourceMemoryState.INVALIDATED,invalidated.state);assertTrue(f.bytes().isEmpty())
+        assertTrue(invalidated.versions.isEmpty());assertNull(invalidated.current);assertNull(invalidated.capturedAtMillis);assertNull(invalidated.captureTimeZone)
         val fresh=f.create("fresh");f.db.transaction { sql -> sql.execute("UPDATE entries SET privacyPolicy='AI_NONE' WHERE id='source'");sql.execute("UPDATE entries SET privacyPolicy='LOCAL_ONLY' WHERE id='source'") }
         assertThrows(SourceMemoryConflict::class.java) { f.store.mutate(f.change(fresh,SourceMemoryAction.ACCEPT)) }
         val latest=f.create("latest");f.db.transaction { it.execute("UPDATE remote_source_access SET deleted=1 WHERE entryId='source'") }
@@ -98,17 +101,24 @@ class SourceMemorySqlTest {
         val valid=f.store.create(SourceMemoryCreate("unique",repeated,unique,"unique",61))
         assertThrows(InvalidSourceMemory::class.java) { f.store.mutate(f.change(valid,SourceMemoryAction.CORRECT,ambiguous)) }
     }
-    @Test fun independentOwnersHaveOneReviewWinnerAndContentLimitStillAllowsRevocation():Unit=SourceMemoryFixture().use { f ->
+    @Test fun independentOwnersHaveOneCorrectionWinnerAndContentLimitStillAllowsRevocation():Unit=SourceMemoryFixture().use { f ->
         val pending=f.create();f.base.second().use { db2 ->
             val other=SqlSourceMemoryRepository(db2,LocalCandidateFixture.KEY);val pool=Executors.newFixedThreadPool(2);val go=CountDownLatch(1)
             try {
-                val futures=listOf(f.store to SourceMemoryAction.ACCEPT,other to SourceMemoryAction.REJECT).map { (repo,action) -> pool.submit<String> {
-                    go.await();try { repo.mutate(f.change(pending,action));"saved" } catch(_:SourceMemoryConflict) { "conflict" }
-                } };go.countDown();assertEquals(listOf("conflict","saved"),futures.map { it.get(3,TimeUnit.SECONDS) }.sorted())
+                val requests=listOf("并发纠正A","并发纠正B").mapIndexed { i,note -> f.change(pending,SourceMemoryAction.CORRECT,pending.current!!.content.copy(note=note),"concurrent-"+i) }
+                val futures=listOf(f.store,other).mapIndexed { i,repo -> pool.submit<String> {
+                    go.await();try { repo.mutate(requests[i]);"saved" } catch(_:SourceMemoryConflict) { "conflict" }
+                } };go.countDown();val outcomes=futures.map { it.get(3,TimeUnit.SECONDS) };assertEquals(listOf("conflict","saved"),outcomes.sorted())
+                val winner=outcomes.indexOf("saved");val loser=outcomes.indexOf("conflict");val read=f.store.memories(f.source).single()
+                assertEquals(1L,f.db.read("SELECT COUNT(*) FROM local_candidate_batches WHERE id='memory' AND ruleVersion=2").single().single())
+                assertEquals(2,read.versions.size);assertEquals(SourceMemoryReview.PROPOSED,read.current!!.review)
+                assertEquals(SourceMemoryReview.SUPERSEDED,read.versions.first().review);assertEquals(SourceMemoryReview.PROPOSED,read.versions.first().priorReview)
+                assertEquals(requests[winner].content,read.current!!.content)
+                val bytes=f.bytes().copyOf();assertThrows(SourceMemoryConflict::class.java) { f.store.mutate(requests[loser]) };assertArrayEquals(bytes,f.bytes())
             } finally { pool.shutdown();assertTrue(pool.awaitTermination(3,TimeUnit.SECONDS));other.wipeKey() }
         }
         var current=f.store.memories(f.source).single()
-        repeat(7) { n -> current=f.store.mutate(f.change(current,SourceMemoryAction.CORRECT,current.current!!.content.copy(note="内容纠正"+n),"correct-"+n)) }
+        repeat(6) { n -> current=f.store.mutate(f.change(current,SourceMemoryAction.CORRECT,current.current!!.content.copy(note="内容纠正"+n),"correct-"+n)) }
         assertEquals(8,current.versions.size)
         assertThrows(SourceMemoryLimit::class.java) { f.store.mutate(f.change(current,SourceMemoryAction.CORRECT,current.current!!.content.copy(note="第九版"),"ninth")) }
         current=f.store.mutate(f.change(current,SourceMemoryAction.ACCEPT,mutation="final-accept"))

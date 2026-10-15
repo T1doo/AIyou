@@ -6,7 +6,7 @@ import com.t1doo.aiyou.model.*
 internal class SourceMemoryFixture : AutoCloseable {
     val base=LocalCandidateFixture();val db get()=base.db
     val source=SourceVersion("source",2)
-    val original="合成🙂我说“开心”只是引用；没有去咖啡馆。假如以后去旅行，还没有发生。"
+    val original="合成🙂原文：他说我很开心；我并不开心；如果明天成功会开心；旅行计划还没有完成。"
     var store=SqlSourceMemoryRepository(base.gateway,LocalCandidateFixture.KEY);private set
     init { base.revise(original) }
     fun content(p:SourceMemoryPreview=store.preview(source),note:String="人工合成备注",kind:SourceMemoryKind=SourceMemoryKind.EVENT,

@@ -36,7 +36,7 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
         }
         if(source.epoch!=p.epoch) throw SourceMemoryConflict()
         if((sql.query("SELECT COUNT(*) FROM local_candidate_batches WHERE entryId=? AND sourceRevision=? AND ruleVersion=2 AND state='READY'",
-                listOf(source.sourceId,source.revision)).single().single() as Long)>=SourceMemoryRules.MAX_MEMORIES) throw SourceMemoryLimit()
+                listOf(source.source.sourceId,source.source.revision)).single().single() as Long)>=SourceMemoryRules.MAX_MEMORIES) throw SourceMemoryLimit()
         val version=SourceMemoryVersion(1,request.content,SourceMemoryReview.PROPOSED,null,null,request.requestedAtMillis,request.requestedAtMillis)
         val initial=Row(request.id,source.source,source.sourceHash,source.generation,PROFILE_VERSION,1,"READY",receipt,request.requestedAtMillis,byteArrayOf())
         val data=SourceMemoryCipher.Payload(source.capturedAtMillis,source.captureTimeZone,source.policy,p.epoch,listOf(version),"CREATE",0,0,null,request.requestedAtMillis)
