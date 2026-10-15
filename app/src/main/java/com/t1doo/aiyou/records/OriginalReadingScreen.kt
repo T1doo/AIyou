@@ -145,6 +145,7 @@ fun OriginalReadingScreen(
     onRefreshFavorites: () -> Unit = {},
     candidateController: LocalCandidateController? = null,
     sourceTagController: SourceTagController? = null,
+    sourceMemoryController: SourceMemoryController? = null,
     canUseCandidates: (String, Int) -> Boolean = { _, _ -> false },
     onCandidateLocation: (OriginalReadingLocation) -> Unit = {},
 ) {
@@ -252,6 +253,11 @@ fun OriginalReadingScreen(
                                 onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-tags")) { Text("从原文添加标签") }
                         }
+                        sourceMemoryController?.let { controller ->
+                            TextButton(enabled = local.supportsSourceMemories && !local.saving && !local.savePending && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
+                                onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-memories")) { Text("事件与当次情绪") }
+                        }
                     }
                     local.candidates?.takeIf { it.source.sourceId == entry.id && it.source.revision == entry.currentRevision.toLong() }?.let { ui ->
                         candidateController?.let { controller ->
@@ -262,6 +268,11 @@ fun OriginalReadingScreen(
                         sourceTagController?.let { controller ->
                             SourceTagDialog(ui, controller, { canUseCandidates(entry.id, entry.currentRevision) }, onCandidateLocation,
                                 { onOpenTags?.invoke(entry.id, entry.currentRevision) })
+                        }
+                    }
+                    local.sourceMemories?.takeIf { it.source.sourceId == entry.id && it.source.revision == entry.currentRevision.toLong() }?.let { ui ->
+                        sourceMemoryController?.let { controller ->
+                            SourceMemoryDialog(ui, controller, { canUseCandidates(entry.id, entry.currentRevision) }, onCandidateLocation)
                         }
                     }
                     local.ai?.takeIf { it.source.sourceId == entry.id &&

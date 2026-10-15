@@ -42,6 +42,8 @@ class EncryptedEntryRepository internal constructor(
     override val localCandidates: com.t1doo.aiyou.domain.LocalCandidateRepository get() = candidateStorage
     private val tagStorage = SqlManualTagRepository(borrowedSql, keyBytes)
     override val sourceTags: com.t1doo.aiyou.domain.SourceTagRepository = SqlSourceTagRepository(borrowedSql, tagStorage)
+    private val sourceMemoryStorage = SqlSourceMemoryRepository(borrowedSql, keyBytes)
+    override val sourceMemories: com.t1doo.aiyou.domain.SourceMemoryRepository get() = sourceMemoryStorage
     override val favorites: com.t1doo.aiyou.domain.RecordFavoriteRepository = SqlRecordFavoriteRepository(borrowedSql)
     override val manualTags: com.t1doo.aiyou.domain.ManualTagRepository get() = tagStorage
     override val localSearch: com.t1doo.aiyou.domain.LocalSearchRepository =
@@ -145,7 +147,7 @@ class EncryptedEntryRepository internal constructor(
     }
 
     private val lifetime = DrainingRecordsStorage(borrowedSql,attachmentStorage,originalEditStorage,
-        { database.close() }, { tagStorage.wipeKey(); taskStorage.wipeKey(); candidateStorage.wipeKey(); keyBytes.fill(0) })
+        { database.close() }, { tagStorage.wipeKey(); taskStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); keyBytes.fill(0) })
     override fun close() = lifetime.close()
     override fun awaitClosed() = lifetime.awaitClosed()
     /** Known external IO owner convenience, including native cold-reopen fixtures. */

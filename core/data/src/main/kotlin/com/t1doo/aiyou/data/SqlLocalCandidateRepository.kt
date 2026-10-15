@@ -63,7 +63,7 @@ internal class SqlLocalCandidateRepository(private val database: RecordsSqlDatab
     override fun batches(source: SourceVersion): List<LocalCandidateBatch> = safe {
         database.transaction { sql ->
             val current = readSource(sql, source)
-            sql.query("SELECT " + COLUMNS + " FROM local_candidate_batches WHERE entryId=? ORDER BY createdAtMillis DESC,id LIMIT 20",
+            sql.query("SELECT " + COLUMNS + " FROM local_candidate_batches WHERE entryId=? AND ruleVersion=1 ORDER BY createdAtMillis DESC,id LIMIT 20",
                 listOf(source.sourceId)).map { cells ->
                 val value = decode(cells)
                 if (value.state == LocalCandidateState.INVALIDATED || !matches(value, current))

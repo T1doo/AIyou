@@ -119,6 +119,7 @@ class MainActivity : ComponentActivity() {
                 favorites = records.favorites,
                 candidates = records.candidates,
                 sourceTags = records.sourceTags,
+                sourceMemories = records.sourceMemories,
                 onTagRemove = records.tags::remove, onTagRetry = records.tags::retry, onTagClose = records.tags::close,
                 onTaskBegin = records.tasks::begin, onTaskEdit = records.tasks::edit, onTaskCreate = records.tasks::create,
                 onTaskChange = records.tasks::change, onTaskRetry = records.tasks::retry,
@@ -214,6 +215,7 @@ fun AIyouApp(
     favorites: com.t1doo.aiyou.records.RecordFavoriteController? = null,
     candidates: com.t1doo.aiyou.records.LocalCandidateController? = null,
     sourceTags: com.t1doo.aiyou.records.SourceTagController? = null,
+    sourceMemories: com.t1doo.aiyou.records.SourceMemoryController? = null,
     onTaskBegin: () -> Unit = {},
     onTaskEdit: (Long, String) -> Unit = { _, _ -> },
     onTaskCreate: (Long, String) -> Unit = { _, _ -> },
@@ -710,6 +712,7 @@ fun AIyouApp(
                 location = searchLocation,
                 candidateController = candidates,
                 sourceTagController = sourceTags,
+                sourceMemoryController = sourceMemories,
                 canUseCandidates = canCopy,
                 onCandidateLocation = { location ->
                     if (canCopy(location.entryId, location.revision)) {

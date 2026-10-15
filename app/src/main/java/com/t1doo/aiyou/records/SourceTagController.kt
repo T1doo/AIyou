@@ -35,7 +35,7 @@ class SourceTagController(private val current: () -> LocalRecordUiState,
     fun open(id: String, revision: Int) {
         val local = current()
         if (disposed || !local.ready || local.opening || local.error != null || !local.supportsSourceTags ||
-            local.saving || local.savePending || local.candidates != null || local.sourceTags != null ||
+            local.saving || local.savePending || local.candidates != null || local.sourceTags != null || local.sourceMemories != null ||
             local.manualTagEditor != null || local.recordPackage != null || local.recycleBin != null) return
         val entry = local.entries.singleOrNull { it.id == id && it.currentRevision == revision && it.policy != ProcessingPolicy.AI_NONE } ?: return
         val ui = SourceTagUiState(sessions.incrementAndGet(), SourceVersion(id, revision.toLong()), OriginalExports.hash(entry.originalText), busy = false)

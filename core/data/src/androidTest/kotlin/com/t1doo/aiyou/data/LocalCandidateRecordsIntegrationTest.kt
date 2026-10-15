@@ -97,6 +97,24 @@ class LocalCandidateRecordsIntegrationTest {
         store.closeAndAwait(); store = open()
         assertEquals(listOf("生活"), store.manualTags.read("local").names)
         assertEquals(1L, store.manualTags.read("local").version)
+        val memoryPreview = store.sourceMemories.preview(source)
+        val memoryContent = SourceMemoryContent(SourceMemoryRules.reference(memoryPreview,text),SourceMemoryKind.EVENT,SourceMemoryAssertion.UNCERTAIN,"合成当次人工备注")
+        val memoryCreate = SourceMemoryCreate("native-memory",memoryPreview,memoryContent,"native-memory-create",100)
+        val pendingMemory = store.sourceMemories.create(memoryCreate)
+        store.sourceMemories.create(memoryCreate)
+        val acceptMemory = SourceMemoryMutation(pendingMemory.id,source,pendingMemory.sourceHash,pendingMemory.generation,pendingMemory.version,1,
+            SourceMemoryReview.PROPOSED,SourceMemoryAction.ACCEPT,null,"native-memory-accept",101)
+        val acceptedMemory = store.sourceMemories.mutate(acceptMemory)
+        val memoryCorrection = SourceMemoryMutation(acceptedMemory.id,source,acceptedMemory.sourceHash,acceptedMemory.generation,acceptedMemory.version,1,
+            SourceMemoryReview.ACCEPTED,SourceMemoryAction.CORRECT,memoryContent.copy(kind=SourceMemoryKind.OCCASION_EMOTION,assertion=SourceMemoryAssertion.CONTEXT,note="纠正：只是本次原文线索"),"native-memory-correct",102)
+        store.sourceMemories.mutate(memoryCorrection)
+        store.closeAndAwait(); store = open()
+        val memoryRead = store.sourceMemories.memories(source).single()
+        assertEquals(SourceMemoryReview.PROPOSED,memoryRead.current!!.review)
+        assertEquals(SourceMemoryReview.ACCEPTED,memoryRead.versions.first().priorReview)
+        assertEquals(SourceMemoryReview.SUPERSEDED,memoryRead.versions.first().review)
+        assertThrows(SourceMemoryConflict::class.java) { store.sourceMemories.mutate(acceptMemory) }
+        assertEquals(1,store.localCandidates.batches(source).size)
         assertFalse(file.readBytes().toString(Charsets.UTF_8).contains(text))
     }
     @Test fun nativeSourceEditTrashRestoreAndErasureInvalidateCandidatesAndLateCompletion(): Unit = runBlocking {

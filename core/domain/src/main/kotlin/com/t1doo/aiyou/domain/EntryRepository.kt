@@ -8,6 +8,7 @@ import com.t1doo.aiyou.model.OriginalEditDraft
 /** Successful completion means a durable transaction, never an optimistic UI insert. */
 interface EntryRepository {
     val sourceTags: SourceTagRepository? get() = null
+    val sourceMemories: SourceMemoryRepository? get() = null
     val localCandidates: LocalCandidateRepository? get() = null
     val favorites: RecordFavoriteRepository? get() = null
     val permanentErasure: PermanentErasureRepository? get() = null
