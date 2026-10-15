@@ -144,7 +144,10 @@ class LocalCandidatePresentationTest {
     private fun generate(): LocalCandidateBatch {
         compose.onNodeWithTag("local-candidates-generate").performScrollTo().performClick()
         drain()
-        compose.waitUntil(3_000) { queue.isNotEmpty() }
+        // The worker can enqueue COMPLETE while the first drain is still consuming BEGIN.
+        compose.waitUntil(3_000) { queue.isNotEmpty() || state.value.candidates?.let { ui ->
+            !ui.computing && ui.batches.any { it.state == LocalCandidateState.READY }
+        } == true }
         drain()
         return durable.single { it.state == LocalCandidateState.READY }
     }
