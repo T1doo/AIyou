@@ -121,6 +121,8 @@ class MainActivity : ComponentActivity() {
                 onTaskBegin = records.tasks::begin, onTaskEdit = records.tasks::edit, onTaskCreate = records.tasks::create,
                 onTaskChange = records.tasks::change, onTaskRetry = records.tasks::retry,
                 onTaskRefresh = records.tasks::refresh, onTaskClose = records.tasks::close,
+                onTaskCreationDate = records.tasks::editCreationDate, onTaskBeginDate = records.tasks::beginDate,
+                onTaskEditDate = records.tasks::editDate, onTaskSaveDate = records.tasks::saveDate, onTaskCloseDate = records.tasks::closeDate,
                 exports = records.exports, recycleBin = records.recycleBin, recordPackages = records.recordPackages,
                 recordPackagePicker = packagePicker, currentRecords = { records.state.value }) }
         }
@@ -215,6 +217,12 @@ fun AIyouApp(
     onTaskRetry: () -> Unit = {},
     onTaskRefresh: () -> Unit = {},
     onTaskClose: (Long) -> Unit = {},
+    onTaskCreationDate: (Long, com.t1doo.aiyou.model.ManualTaskDateInput) -> Unit = { _, _ -> },
+    onTaskBeginDate: (String, Long, com.t1doo.aiyou.model.ManualTaskDateOperation) -> Unit = { _, _, _ -> },
+    onTaskEditDate: (Long, com.t1doo.aiyou.model.ManualTaskDateInput) -> Unit = { _, _ -> },
+    onTaskSaveDate: (Long, com.t1doo.aiyou.model.ManualTaskDateInput) -> Unit = { _, _ -> },
+    onTaskCloseDate: (Long) -> Unit = {},
+    taskClock: java.time.Clock = java.time.Clock.systemUTC(),
     exports: com.t1doo.aiyou.records.OriginalExportController? = null,
     recycleBin: com.t1doo.aiyou.records.RecycleBinController? = null,
     recordPackages: com.t1doo.aiyou.records.RecordPackageController? = null,
@@ -714,7 +722,12 @@ fun AIyouApp(
                 onChange = { id, version, status -> if (ownsTasks()) onTaskChange(id, version, status) },
                 onRetry = { if (ownsTasks()) onTaskRetry() }, onRefresh = { if (ownsTasks()) onTaskRefresh() },
                 onClose = { session -> if (ownsTasks()) onTaskClose(session) },
-                onRecordsRetry = { if (ownsTasks()) onRetry() }, modifier = modifier, companion = companion)
+                onRecordsRetry = { if (ownsTasks()) onRetry() }, modifier = modifier, companion = companion,
+                onCreationDate = { session, input -> if (ownsTasks()) onTaskCreationDate(session, input) },
+                onBeginDate = { id, version, operation -> if (ownsTasks()) onTaskBeginDate(id, version, operation) },
+                onEditDate = { session, input -> if (ownsTasks()) onTaskEditDate(session, input) },
+                onSaveDate = { session, input -> if (ownsTasks()) onTaskSaveDate(session, input) },
+                onCloseDate = { session -> if (ownsTasks()) onTaskCloseDate(session) }, clock = taskClock)
         } else if (!demo && local != null && selected != Destination.TASKS) {
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }

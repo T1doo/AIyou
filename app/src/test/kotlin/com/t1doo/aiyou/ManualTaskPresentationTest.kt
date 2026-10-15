@@ -46,6 +46,7 @@ class ManualTaskPresentationTest {
     private val identities = mutableListOf<Pair<String, String>>()
     private var failWrite = false
     private var failRead = false
+    private val dateRequests = mutableListOf<ManualTaskScheduleMutation>()
     private val port = object : ManualTaskRepository {
         override fun snapshots(): List<ManualTaskSnapshot> {
             if (failRead) throw ManualTaskStorageFailure()
@@ -55,7 +56,7 @@ class ManualTaskPresentationTest {
             identities.add(request.id to request.mutationId)
             if (failWrite) throw ManualTaskStorageFailure()
             val expected = ManualTaskSnapshot(request.id, 1, request.title, ManualTaskStatus.OPEN,
-                request.createdAtMillis, request.creationTimeZone, request.createdAtMillis)
+                request.createdAtMillis, request.creationTimeZone, request.createdAtMillis, request.schedule)
             persisted[request.id]?.let {
                 if (it != expected || lastMutation[request.id] != request.mutationId) throw ManualTaskConflict()
                 return it
@@ -71,6 +72,18 @@ class ManualTaskPresentationTest {
             if (old.version != request.expectedVersion || old.status != ManualTaskStatus.OPEN) throw ManualTaskConflict()
             lastMutation[request.id] = request.mutationId
             return old.copy(version = old.version + 1, status = request.status,
+                updatedAtMillis = maxOf(old.updatedAtMillis, request.requestedAtMillis)).also { persisted[it.id] = it }
+        }
+        override fun reschedule(request: ManualTaskScheduleMutation): ManualTaskSnapshot {
+            identities.add(request.id to request.mutationId); dateRequests.add(request)
+            if (failWrite) throw ManualTaskStorageFailure()
+            val old = checkNotNull(persisted[request.id])
+            if (old.version == request.expectedVersion + 1 && lastMutation[request.id] == request.mutationId &&
+                old.status == ManualTaskStatus.OPEN && old.schedule == request.schedule) return old
+            if (old.version != request.expectedVersion || old.status != ManualTaskStatus.OPEN) throw ManualTaskConflict()
+            ManualTaskDates.validate(request.operation, old.schedule, request.schedule)
+            lastMutation[request.id] = request.mutationId
+            return old.copy(version = old.version + 1, schedule = request.schedule,
                 updatedAtMillis = maxOf(old.updatedAtMillis, request.requestedAtMillis)).also { persisted[it.id] = it }
         }
     }
@@ -196,7 +209,10 @@ class ManualTaskPresentationTest {
                 AIyouTheme { AIyouApp(previewDestination = Destination.TASKS, local = state.value, currentRecords = { state.value },
                     onTaskBegin = controller::begin, onTaskEdit = controller::edit, onTaskCreate = controller::create,
                     onTaskChange = controller::change, onTaskRetry = controller::retry, onTaskRefresh = controller::refresh,
-                    onTaskClose = controller::close) }
+                    onTaskClose = controller::close, onTaskCreationDate = controller::editCreationDate,
+                    onTaskBeginDate = controller::beginDate, onTaskEditDate = controller::editDate,
+                    onTaskSaveDate = controller::saveDate, onTaskCloseDate = controller::closeDate,
+                    taskClock = Clock.fixed(Instant.parse("2026-10-14T01:30:00Z"), ZoneOffset.UTC)) }
             }
         }
     }
