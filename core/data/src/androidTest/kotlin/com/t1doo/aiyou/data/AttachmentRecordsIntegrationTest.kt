@@ -98,7 +98,7 @@ class AttachmentRecordsIntegrationTest {
         store.closeAndAwait();store=open();store.prepare();capture=store.captureRecords
         pure=capture.current();val result=capture.save(pure,3000,"UTC")
         assertEquals(pure.id,result.id);assertEquals("",store.entries().single { it.id==pure.id }.originalText)
-        assertEquals(ProcessingPolicy.AI_NONE,store.entries().single { it.id==pure.id }.policy)
+        assertEquals(ProcessingPolicy.LOCAL_ONLY,store.entries().single { it.id==pure.id }.policy)
         assertArrayEquals(png,store.attachments.read(media.id));assertTrue(capture.save(pure,9999,"UTC").replayed)
     }
 

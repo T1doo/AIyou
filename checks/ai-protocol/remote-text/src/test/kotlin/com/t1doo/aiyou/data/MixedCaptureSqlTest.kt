@@ -45,7 +45,7 @@ class MixedCaptureSqlTest {
             val raw=f.mediaRoot.resolve(i.id+".aead").readBytes();assertFalse(raw.contentEquals(png))
             f.reopen();c=repo(f);c.recover();d=c.current();assertEquals(id,d.id);assertEquals("",d.text)
             val result=c.save(d,10,"UTC");assertFalse(result.replayed)
-            assertEquals(listOf("","AI_NONE"),f.db.read("SELECT r.originalText,e.privacyPolicy FROM entries e JOIN entry_revisions r ON r.entryId=e.id WHERE e.id=?",id).single())
+            assertEquals(listOf("","LOCAL_ONLY"),f.db.read("SELECT r.originalText,e.privacyPolicy FROM entries e JOIN entry_revisions r ON r.entryId=e.id WHERE e.id=?",id).single())
             assertArrayEquals(png,f.media.read(i.id));assertEquals(AttachmentState.READY,f.media.list(id,1).single().state)
             assertNotEquals(id,c.current().id)
         }

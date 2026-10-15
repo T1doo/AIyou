@@ -93,7 +93,7 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
             val a=required(sql,expected.id);same(expected,a)
             require(!SqlErasureFileHooks.fenced(sql,a.id))
             require((sql.query("SELECT count(*) FROM record_package_receipts WHERE operation='CAPTURE_SAVED'").single().single() as Long)<4096)
-            sql.execute("INSERT INTO entries(id,currentRevision,capturedAtMillis,captureTimeZone,privacyPolicy) VALUES(?,1,?,?,'AI_NONE')",listOf(a.id,capturedAtMillis,zone))
+            sql.execute("INSERT INTO entries(id,currentRevision,capturedAtMillis,captureTimeZone,privacyPolicy) VALUES(?,1,?,?,?)",listOf(a.id,capturedAtMillis,zone,ProcessingDefaults.policy.name))
             sql.execute("INSERT INTO entry_revisions VALUES(?,1,?,?,?)",listOf(a.id,a.text,OriginalExports.hash(a.text),capturedAtMillis))
             sql.execute("INSERT INTO remote_source_access VALUES(?,1,0,NULL,NULL)",listOf(a.id))
             a.images.forEach { val i=it.intent

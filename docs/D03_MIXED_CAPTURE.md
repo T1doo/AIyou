@@ -2,7 +2,7 @@
 
 The production Now route accepts text, JPEG/PNG images, or both. Empty text without images is rejected.
 An image-only entry stores its real empty original text; “图片记录” is presentation text only. New entries
-are AI_NONE and processing stays LOCAL_ONLY. There is no OCR, audio recording or model invocation.
+use the product's LOCAL_ONLY default. There is no OCR, audio recording or model invocation.
 Full D02/D03 and device/SAF/Keystore/fresh-install/TalkBack/performance acceptance remain OPEN / NOT RUN.
 
 ## Draft and save contract
@@ -24,7 +24,7 @@ reselected, retried or explicitly removed. Failed images prevent a text-only fal
 
 An entry does not exist during image staging. Save authenticates every READY encrypted original while
 holding the existing media lock, then atomically inserts entry/revision, all READY attachment rows,
-AI_NONE access, initial manual labels, local-index job and a durable CAPTURE_SAVED snapshot digest,
+LOCAL_ONLY access with no connection or consent, initial manual labels, local-index job and a durable CAPTURE_SAVED snapshot digest,
 and consumes the exact draft. File IO stays outside this short database transaction. The success
 notice follows durable save plus entry/tag/favorite readback. Lost ACK freezes the original request;
 retry consults its stable receipt without another entry, image ID or overwrite. The receipt survives
@@ -47,6 +47,16 @@ Local search indexes the real text and manual labels; no content is inferred fro
 capture command refreshes favorite snapshots and schedules the existing index after actual entry
 changes. Text-based derived candidates are unavailable for empty/AI_NONE records. Original-text
 editing retains its existing text constraint; this batch does not change revision-bound image editing.
+
+The earlier direct-capture implementation wrote AI_NONE, conflicting with the master plan §14.1,
+ProcessingDefaults and the prior text save path. As a result even freshly typed text was blocked from
+the existing explicit local-excerpt, source-tag and source-memory flows. The correction only changes
+the initial policy of future self-authored captures; it does not migrate old AI_NONE records, loosen
+candidate eligibility, or change encrypted-package/recycle restoration's AI_NONE policy. A replayed
+save acknowledges its original receipt without replacing a subsequently restricted policy. Empty
+image-only originals remain empty and cannot become text excerpts. LOCAL_ONLY still cannot pass
+the remote-processing gate, with or without an unrelated consent flag. No excerpt extraction or remote
+processing starts automatically.
 
 Open Markdown/JSONL export keeps an empty body and its metadata/tags; its existing explicit scope
 excludes image bytes and remains an incomplete plaintext export. Use the encrypted image package to

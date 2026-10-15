@@ -85,7 +85,7 @@ class MixedCapturePresentationTest {
                 override suspend fun discard(draftId:String):CaptureDraft { draft=CaptureDraft(uuid(),1,"",emptyList());return draft }
                 override suspend fun save(expected:CaptureDraft,capturedAtMillis:Long,zone:String):CaptureSaveResult {
                     if(failSave)error("Synthetic failed save")
-                    saves++;entries=entries+StoredEntry(expected.id,1,expected.text,capturedAtMillis,zone,ProcessingPolicy.AI_NONE)
+                    saves++;entries=entries+StoredEntry(expected.id,1,expected.text,capturedAtMillis,zone,ProcessingDefaults.policy)
                     draft=CaptureDraft(uuid(),1,"",emptyList());return CaptureSaveResult(expected.id,false,false)
                 }
                 override suspend fun recover()=Unit

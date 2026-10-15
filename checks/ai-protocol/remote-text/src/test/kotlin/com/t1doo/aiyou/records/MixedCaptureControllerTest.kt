@@ -65,7 +65,7 @@ class MixedCaptureControllerTest {
             h.failEntries=true;c.save();assertTrue(h.f.db.read("SELECT id FROM entries").isEmpty());h.drain()
             assertTrue(h.ui.uncertainSave);assertEquals("合成图文输入",h.ui.text);assertEquals(1,h.ui.draft!!.images.size)
             c.save();h.drain();assertEquals(1,h.local.entries.size);assertEquals(id,h.local.entries.single().id)
-            assertEquals(ProcessingPolicy.AI_NONE,h.local.entries.single().policy);assertEquals("",h.ui.text)
+            assertEquals(ProcessingPolicy.LOCAL_ONLY,h.local.entries.single().policy);assertEquals("",h.ui.text)
             h.add();c.save();h.drain();assertEquals(2,h.local.entries.size);assertEquals("",h.local.entries.last().originalText)
             assertEquals(2,h.f.db.read("SELECT id FROM attachments").size)
         }
