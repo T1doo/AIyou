@@ -8,17 +8,13 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Collections
 import javax.crypto.Cipher
-import javax.crypto.SecretKeyFactory
-import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.PBEKeySpec
-import javax.crypto.spec.SecretKeySpec
 
 /** v2 flat authenticated frames, not an archive: no names are ever interpreted as filesystem paths.
  * Each image is independently bounded (16 MiB), with a 64 MiB cumulative bound. Metadata is <=2 MiB+32 KiB.
  * Frame nonce = random 8-byte prefix + checked sequence; AAD binds header, metadata hash and frame index.
  * An authenticated terminal frame and exact EOF prevent a valid prefix from becoming a valid package.
  */
-internal class RecordMediaPackageCipher {
+internal class RecordMediaPackageCipher(private val random: SecureRandom = SecureRandom(), private val beforeKdf: () -> Unit = {}) {
     private val legacy = JcaRecordPackageCipher()
     suspend fun seal(preview: RecordMediaPreview, password: CharArray,
         read: suspend (RecordPackageImage) -> ByteArray, current: suspend () -> Boolean): PreparedRecordMediaPackage {
@@ -26,10 +22,10 @@ internal class RecordMediaPackageCipher {
         try {
             RecordPackages.password(password)
             val metadata = metadata(preview)
-            val salt = ByteArray(16).also(SecureRandom()::nextBytes)
-            val prefix = ByteArray(8).also(SecureRandom()::nextBytes)
+            val salt = ByteArray(16).also(random::nextBytes)
+            val prefix = ByteArray(8).also(random::nextBytes)
             val header = ByteBuffer.allocate(40).put(MAGIC).putInt(2).putInt(RecordPackages.ITERATIONS).put(salt).put(prefix).array()
-            key = derive(password, salt)
+            key = RecordPackageCrypto.derive(password, salt,beforeKdf)
             return Prepared(header, metadata, checkNotNull(key), preview.images, read, current).also { key = null }
         } catch (_: Exception) { throw RecordPackageInvalid() }
         finally { key?.fill(0); password.fill('\u0000') }
@@ -58,7 +54,7 @@ internal class RecordMediaPackageCipher {
                 val salt = ByteArray(16).also(fields::get)
                 val firstLength = exact(input,4)
                 require(ByteBuffer.wrap(firstLength).int in 16..RecordMediaPackages.MAX_METADATA+16)
-                key = derive(password, salt)
+                key = RecordPackageCrypto.derive(password, salt,beforeKdf)
                 val parsed = scan(SequenceInputStream(firstLength.inputStream(),input), header, checkNotNull(key), null, null)
                 return AuthenticatedMediaPackage(parsed.first, parsed.second, parsed.third, header, checkNotNull(key), source, this)
                     .also { key = null }
@@ -144,18 +140,12 @@ internal class RecordMediaPackageCipher {
         private val ZERO = ByteArray(32)
         private val SCOPE = listOf("currentOriginals","manualTags","readyOriginalImages")
         private val EXCLUDED = listOf("originalHistory","tasks","drafts","aiDerived","serviceKeys","deviceKeys")
-        private fun derive(password: CharArray, salt: ByteArray): ByteArray {
-            val spec = PBEKeySpec(password, salt, RecordPackages.ITERATIONS, 256)
-            val secret = try { SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec) } finally { spec.clearPassword() }
-            return try { secret.encoded } finally { try { secret.destroy() } catch (_: Exception) {} }
-        }
         private fun crypt(mode: Int, header: ByteArray, key: ByteArray, index: Int, binding: ByteArray, input: ByteArray): ByteArray {
             val nonce = header.copyOfRange(32,40) + ByteBuffer.allocate(4).putInt(index).array()
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(mode, SecretKeySpec(key,"AES"), GCMParameterSpec(128,nonce))
-            cipher.updateAAD(header); cipher.updateAAD(binding); cipher.updateAAD(ByteBuffer.allocate(4).putInt(index).array())
-            return cipher.doFinal(input)
+            val aad = header + binding + ByteBuffer.allocate(4).putInt(index).array()
+            return RecordPackageCrypto.crypt(mode,key,nonce,aad,input)
         }
+
         private fun frameWrite(out: OutputStream, header: ByteArray, key: ByteArray, index: Int, binding: ByteArray, bytes: ByteArray) {
             val encrypted = crypt(Cipher.ENCRYPT_MODE,header,key,index,binding,bytes)
             try { out.write(ByteBuffer.allocate(4).putInt(encrypted.size).array()); out.write(encrypted) } finally { encrypted.fill(0) }

@@ -13,6 +13,17 @@ interface SelectedRecordPackageDocument {
 }
 class RecordPackageCancelled : IllegalStateException("Record package operation retired")
 object RecordPackageIo {
+    /** Ownership is checked between provider reads. A blocking provider call cannot be forcibly interrupted. */
+    fun openRead(document: SelectedRecordPackageDocument, active: () -> Boolean): InputStream {
+        if (!active()) throw RecordPackageCancelled()
+        return object : java.io.FilterInputStream(document.openForRead()) {
+            private fun checkOwner() { if (!active()) throw RecordPackageCancelled() }
+            override fun read(): Int { checkOwner(); return super.read().also { checkOwner() } }
+            override fun read(bytes: ByteArray, offset: Int, length: Int): Int {
+                checkOwner(); return super.read(bytes,offset,length).also { checkOwner() }
+            }
+        }
+    }
     /** Compare streaming ciphertext digest + exact byte count, with a fixed 8 KiB readback buffer. */
     suspend fun writeMediaAndVerify(document: SelectedRecordPackageDocument,
         payload: com.t1doo.aiyou.domain.PreparedRecordMediaPackage, active: () -> Boolean) {

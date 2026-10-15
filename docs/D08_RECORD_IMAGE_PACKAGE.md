@@ -29,7 +29,8 @@ Limits: 20 records, 20 images, 16 MiB per image, 64 MiB combined images, legacy 
 32 KiB metadata, and a fixed total file upper bound. The complete package is never materialized in
 memory. One bounded original image is authenticated/processed at a time; existing attachment storage
 itself authenticates bounded complete images. Selected document ciphertext readback uses 8 KiB.
-No plaintext temporary files or durable package passphrases/keys are written.
+No plaintext temporary files or durable package passphrases/keys are written. v1 and v2 call the same
+shared JCA KDF/AEAD primitives; the frozen independent v1 and v2 Node/OpenSSL fixtures verify their byte contracts.
 
 Header: `AIYOUPK2`, format=2, PBKDF2 iteration count=600000, random 16-byte salt, random 8-byte nonce
 prefix. The existing maintained JCA PBKDF2-HMAC-SHA256 (256 bits) and AES-256-GCM (128-bit tag) are used.
@@ -53,7 +54,9 @@ header and digest; replacement/truncation cannot commit a prefix. Cancellation r
 The existing encrypted database `record_package_receipts` holds a durable PACKAGE_MEDIA_INTENT with
 package digest, stable new record/image IDs, immutable image intents, first import time and phase.
 No new schema or device key is needed. A bounded startup scan cleans incomplete PENDING/ABORTED
-batches before records are presented. Cleanup only touches exact registered UUID files, authenticates
+batches before records are presented (only PENDING is active recovery work; cleaned ABORTED history
+does not consume that budget). Explicit retry first transitions ABORTED back to PENDING using the
+same mapping. Cleanup only touches exact registered UUID files, authenticates
 final ciphertext, verifies owned partial creation proofs, and is reentrant. Unknown/corrupt ownership
 fails explicitly without deleting arbitrary files. At most 64 unfinished batches are recovered per
 opening; a larger workload fails visibly. At most 4096 batch receipts are accepted.

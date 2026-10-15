@@ -8,9 +8,47 @@ import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
+import kotlinx.serialization.json.*
 
 /** Actual platform JCA + independent SQLite owners + encrypted files. No model/SAF/device substitute claim. */
 class RecordMediaPackageTest {
+    @Test fun independentNodeOpenSslV2KnownAnswerMatchesProductionInBothDirections(): Unit = runBlocking {
+        val fixture = fixture(); assertEquals("v24.19.0",fixture["generatorNode"]!!.jsonPrimitive.content)
+        assertEquals("3.5.7",fixture["generatorOpenSsl"]!!.jsonPrimitive.content)
+        val bytes = RecordPackageCipherTest.unhex(fixture["envelopeHex"]!!.jsonPrimitive.content)
+        val cipher = RecordMediaPackageCipher(); val pack = cipher.open({ bytes.inputStream() },fixture["password"]!!.jsonPrimitive.content.toCharArray())
+        try {
+            assertEquals(fixture["packageDigest"]!!.jsonPrimitive.content,pack.digest)
+            assertEquals("合成原文😀\n第二行 e\u0301",pack.records.single().originalText)
+            assertEquals(fixture["imageSha256"]!!.jsonPrimitive.content,pack.images.single().sha256)
+            val fixed = object : java.security.SecureRandom() {
+                override fun nextBytes(bytes: ByteArray) { bytes.indices.forEach { bytes[it]=(if (bytes.size==16) it else it+16).toByte() } }
+            }
+            val record = pack.records.single()
+            val snapshot = OriginalExportSnapshot(pack.manifest.backupId,pack.manifest.createdAtMillis,listOf(OriginalExportRecord(
+                StoredEntry(record.sourceId,record.sourceRevision,record.originalText,record.capturedAtMillis,record.captureTimeZone,ProcessingPolicy.AI_NONE),
+                record.contentHash,ManualTagSnapshot(record.sourceId,record.sourceTagVersion,record.tags))))
+            val prepared = RecordMediaPackageCipher(fixed).seal(RecordMediaPreview(snapshot,pack.images),fixture["password"]!!.jsonPrimitive.content.toCharArray(),
+                { RecordPackageCipherTest.unhex(fixture["imageHex"]!!.jsonPrimitive.content) },{ true })
+            val out = ByteArrayOutputStream()
+            try { prepared.writeTo(out) { true }; assertArrayEquals(bytes,out.toByteArray()) } finally { prepared.release() }
+        } finally { pack.release() }
+    }
+    @Test fun independentlyAuthenticatedInvalidV2ManifestsAndOuterBoundsReleaseNoPreview(): Unit = runBlocking {
+        val fixture = fixture(); val cipher = RecordMediaPackageCipher()
+        fixture["malformedEnvelopes"]!!.jsonObject.forEach { (_,hex) ->
+            val bytes = RecordPackageCipherTest.unhex(hex.jsonPrimitive.content)
+            val password = fixture["password"]!!.jsonPrimitive.content.toCharArray()
+            fails { cipher.open({ bytes.inputStream() },password) }; assertTrue(password.all { it == '\u0000' })
+        }
+        val valid = RecordPackageCipherTest.unhex(fixture["envelopeHex"]!!.jsonPrimitive.content); var kdfCalls = 0
+        val bounded = RecordMediaPackageCipher(java.security.SecureRandom()) { kdfCalls++ }
+        for (position in listOf(8,12,40)) {
+            val bad = valid.copyOf().also { java.nio.ByteBuffer.wrap(it,position,4).putInt(Int.MAX_VALUE) }
+            fails { bounded.open({ bad.inputStream() },password()) }
+        }
+        assertEquals(0,kdfCalls)
+    }
     @Test fun multiImagePackageExceedsLegacyBoundAndRestoresFreshEncryptedCopies(): Unit = runBlocking {
         PermanentErasureFixture().use { source -> PermanentErasureFixture().use { target ->
             val id = source.entry(); val first = source.attachment(id,png)
@@ -67,9 +105,12 @@ class RecordMediaPackageTest {
         PermanentErasureFixture().use { f ->
             val id = f.entry(); val image = f.attachment(id,png); f.media.save(image) { png.inputStream() }
             val r = repo(f); val p = preview(f,id)
-            f.db.write("UPDATE attachments SET state='CORRUPT' WHERE id=?",image.id)
-            assertFalse(r.isCurrent(p)); fails { preview(f,id) }
+            for (state in listOf("WRITING","STAGED","FAILED","CORRUPT")) {
+                f.db.write("UPDATE attachments SET state=? WHERE id=?",state,image.id)
+                assertFalse(r.isCurrent(p)); fails { preview(f,id) }
+            }
             f.db.write("UPDATE attachments SET state='READY' WHERE id=?",image.id)
+            OriginalExportSqlTest.revise(f.db,id,"后来原文",2); assertFalse(r.isCurrent(p))
             f.mediaRoot.resolve(image.id+".aead").delete(); fails { preview(f,id) }
             f.db.write("UPDATE remote_source_access SET deleted=1,generation=generation+1 WHERE entryId=?",id)
             assertFalse(r.isCurrent(p)); val pass = password(); fails { r.seal(p,pass) }; assertTrue(pass.all { it == '\u0000' })
@@ -198,6 +239,55 @@ class RecordMediaPackageTest {
             fails { opened(r,change.toByteArray()) }; assertTrue(changed)
         }
     }
+    @Test fun alreadyCleanedAbortedHistoryDoesNotExhaustStartupRecoveryBudget(): Unit = runBlocking {
+        PermanentErasureFixture().use { source -> PermanentErasureFixture().use { target ->
+            val id = source.entry(); source.media.save(source.attachment(id,png)) { png.inputStream() }
+            val bytes = exported(repo(source),preview(source,id)); val r = repo(target)
+            target.mediaCheckpoint = { if (it == "package-image-published") error("Synthetic interrupted publish") }
+            fails { r.restore(opened(r,bytes),listOf(uuid()),22) }; target.mediaCheckpoint = {}; r.recover()
+            val state = target.db.read("SELECT state FROM record_package_receipts WHERE operation='PACKAGE_MEDIA_INTENT'").single().single() as String
+            for (index in 1..65) {
+                val backup = uuid(); val encoded = Base64.getDecoder().decode(state)
+                backup.toByteArray(Charsets.US_ASCII).copyInto(encoded,8)
+                target.db.write("INSERT INTO record_package_receipts VALUES(?,?,1,'PACKAGE_MEDIA_INTENT',?)",
+                    "PACKAGE_MEDIA:"+backup,uuid(),Base64.getEncoder().encodeToString(encoded))
+            }
+            r.recover(); r.recover()
+            assertFalse(r.restore(opened(r,bytes),listOf(uuid()),99).replayed)
+        } }
+    }
+    @Test fun partialFileCreationAndInterruptedCleanupAreRecoverableAfterReopen(): Unit = runBlocking {
+        PermanentErasureFixture().use { source -> PermanentErasureFixture().use { target ->
+            val id = source.entry(); source.media.save(source.attachment(id,png)) { png.inputStream() }
+            val bytes = exported(repo(source),preview(source,id)); val newId = uuid()
+            target.mediaCheckpoint = { if (it == "created") error("Synthetic interruption after registered file creation") }
+            fails { repo(target).restore(opened(repo(target),bytes),listOf(newId),19) }
+            assertTrue(target.mediaRoot.listFiles()!!.any { it.name.endsWith(".tmp") && it.length() == 17L })
+            assertTrue(target.db.read("SELECT id FROM entries").isEmpty())
+            target.reopen(); target.mediaCheckpoint = { if (it == "package-cleaned") error("Synthetic lost cleanup ACK") }
+            fails { repo(target).recover() }
+            target.mediaCheckpoint = {}; repo(target).recover(); repo(target).recover()
+            assertFalse(target.mediaRoot.listFiles()!!.any { it.name.endsWith(".tmp") || it.name.endsWith(".aead") })
+            assertEquals(listOf(newId),repo(target).restore(opened(repo(target),bytes),listOf(uuid()),999).ids)
+        } }
+    }
+    @Test fun currentSelectionExcludesHistoricalImagesAndRequiresFreshTagVersion(): Unit = runBlocking {
+        PermanentErasureFixture().use { f ->
+            val id = f.entry(); val historical = f.attachment(id,png); f.media.save(historical) { png.inputStream() }
+            OriginalExportSqlTest.revise(f.db,id,"合成当前版本",2)
+            val current = f.attachment(id,png,2); f.media.save(current) { png.inputStream() }
+            val originals = SqlOriginalExportRepository(f.gateway,f.tags); val r = repo(f)
+            val snapshot = originals.capture(listOf(SourceVersion(id,2)),uuid(),10)
+            val preview = r.preview(snapshot); assertEquals(listOf(current.id),preview.images.map { it.attachmentId })
+            f.mediaRoot.resolve(historical.id+".aead").delete() // Unselected historical file does not silently alter current scope.
+            assertTrue(r.isCurrent(preview))
+            f.tags.replace(ManualTagMutation(id,0,listOf("新手工标签"),uuid()))
+            assertFalse(r.isCurrent(preview)); fails { r.seal(preview,password()) }
+            val fresh = r.preview(originals.capture(listOf(SourceVersion(id,2)),uuid(),10))
+            assertEquals(listOf("新手工标签"),fresh.snapshot.records.single().tags.names)
+            assertEquals(2,fresh.images.single().sourceRevision)
+        }
+    }
     private fun repo(f: PermanentErasureFixture) = SqlRecordMediaPackageRepository(f.gateway,SqlOriginalExportRepository(f.gateway,f.tags),f.media,f.packages)
     private suspend fun preview(f: PermanentErasureFixture,id: String) = repo(f).preview(SqlOriginalExportRepository(f.gateway,f.tags).capture(listOf(SourceVersion(id,1)),uuid(),5))
     private suspend fun exported(r: RecordMediaPackageRepository,p: RecordMediaPreview): ByteArray {
@@ -207,6 +297,8 @@ class RecordMediaPackageTest {
     private suspend fun opened(r: RecordMediaPackageRepository,bytes: ByteArray) = r.open({ bytes.inputStream() },password())
     private suspend fun fails(block: suspend () -> Any?) { var failed = false; try { block() } catch (_: Exception) { failed = true }; assertTrue("Expected fail closed",failed) }
     companion object {
+        private fun fixture() = Json.parseToJsonElement(checkNotNull(RecordMediaPackageTest::class.java.getResourceAsStream("/record-package-v2/fixture.json"))
+            .bufferedReader().use { it.readText() }).jsonObject
         private fun uuid() = UUID.randomUUID().toString()
         private fun password() = "synthetic media recovery 42".toCharArray()
         private val png = Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=")

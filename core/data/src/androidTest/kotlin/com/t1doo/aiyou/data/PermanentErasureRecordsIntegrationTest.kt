@@ -66,6 +66,27 @@ class PermanentErasureRecordsIntegrationTest {
         val edit = OriginalEditDraft(UUID.randomUUID().toString(), original.id, 2, 2, 1,
             "合成应删除的咖啡第二版", "合成未提交编辑")
         store.editDrafts.write(null, edit)
+        // Actual Room wiring, independent image IDs/ciphertext and stable erased-package replay.
+        // This is a native assertion contract; compile/DEX alone does not mean it ran.
+        val png = java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=")
+        val imageId = UUID.randomUUID().toString()
+        val imageHash = packageHex(packageHash(png))
+        store.attachments.save(AttachmentIntent(imageId,original.id,2,"image/png",imageHash,png.size.toLong())) { png.inputStream() }
+        val media = store.mediaPackages
+        val preview = media.preview(store.originalExport.capture(listOf(SourceVersion(original.id,2)),UUID.randomUUID().toString(),70))
+        val out = java.io.ByteArrayOutputStream()
+        val prepared = media.seal(preview,"synthetic native package password".toCharArray())
+        try { prepared.writeTo(out) { true } } finally { prepared.release() }
+        val pack = media.open({ out.toByteArray().inputStream() },"synthetic native package password".toCharArray())
+        val copyId = UUID.randomUUID().toString()
+        try {
+            assertEquals(listOf(copyId),media.restore(pack,listOf(copyId),75).ids)
+            val image = store.attachments.list(copyId,1).single()
+            assertNotEquals(imageId,image.intent.id); assertArrayEquals(png,store.attachments.read(image.intent.id))
+            assertEquals(ProcessingPolicy.AI_NONE,store.entries().single { it.id==copyId }.policy)
+            assertTrue(store.permanentErasure.erase(intent(store,copyId,1)).complete)
+            assertEquals(1,media.restore(pack,listOf(UUID.randomUUID().toString()),80).deletedCount)
+        } finally { pack.release() }
         var batches = 0
         do { check(++batches <= 100); val batch = store.localSearch.batch() } while (batch.remaining)
         val held = store.localSearch.candidates(LocalSearchRequest("咖啡"))

@@ -59,7 +59,12 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
             if (existing != null) {
                 val parsed = decode(existing)
                 validate(pack,parsed)
-                parsed
+                if (parsed.phase == "ABORTED") {
+                    val resumed = parsed.copy(phase="PENDING")
+                    require(sql.execute("UPDATE record_package_receipts SET state=? WHERE id=? AND state=?",
+                        listOf(encode(resumed),PREFIX+parsed.backupId,existing)) == 1)
+                    resumed
+                } else parsed
             } else {
                 require(sql.query("SELECT id FROM record_package_receipts WHERE id=?",listOf("PACKAGE_RESTORE:"+pack.manifest.backupId)).isEmpty())
                 require((sql.query("SELECT count(*) FROM record_package_receipts WHERE operation=?",listOf(OP)).single().single() as Long) < 4096)
@@ -97,7 +102,7 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
     override suspend fun recover(): Unit = safely {
         val plans = database.transaction { sql ->
             val rows = sql.query("SELECT state FROM record_package_receipts WHERE operation=? ORDER BY id LIMIT 4097",listOf(OP))
-            require(rows.size <= 4096); rows.map { decode(it.single() as String) }.filter { it.phase != "DONE" }
+            require(rows.size <= 4096); rows.map { decode(it.single() as String) }.filter { it.phase == "PENDING" }
         }
         require(plans.size <= 64) // Bounded startup recovery; larger interrupted workloads fail visibly.
         for (plan in plans) {

@@ -67,21 +67,8 @@ class JcaRecordPackageCipher internal constructor(private val random: SecureRand
 
     private fun crypt(mode: Int, password: CharArray, salt: ByteArray, nonce: ByteArray,
         aad: ByteArray, input: ByteArray): ByteArray {
-        val spec = PBEKeySpec(password, salt, RecordPackages.ITERATIONS, 256)
-        var secret: SecretKey? = null
-        var key: ByteArray? = null
-        try {
-            beforeKdf() // Read-only test observation; the actual platform factory always performs the KDF.
-            secret = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec)
-            key = secret.encoded
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(mode, SecretKeySpec(key, "AES"), GCMParameterSpec(128, nonce))
-            cipher.updateAAD(aad)
-            return cipher.doFinal(input)
-        } finally {
-            spec.clearPassword(); key?.fill(0)
-            try { secret?.destroy() } catch (_: Exception) { /* Provider destruction is best effort. */ }
-        }
+        val key = RecordPackageCrypto.derive(password,salt,beforeKdf)
+        return try { RecordPackageCrypto.crypt(mode,key,nonce,aad,input) } finally { key.fill(0) }
     }
 
     internal fun encode(snapshot: OriginalExportSnapshot): ByteArray {
@@ -159,4 +146,26 @@ internal fun encodePackageRecord(record: RecordPackageOriginal): ByteArray = Pac
     out.string(record.captureTimeZone, 128); out.raw(packageUnhex(record.contentHash))
     out.string(record.originalText, 400_000); out.i64(record.sourceTagVersion); out.strings(record.tags, 12, 640)
     out.bytes()
+}
+
+/** Shared v1/v2 maintained platform primitives, preserving the original v1 known-answer byte contract. */
+internal object RecordPackageCrypto {
+    fun derive(password: CharArray,salt: ByteArray,beforeKdf: () -> Unit = {}): ByteArray {
+        val spec = PBEKeySpec(password,salt,RecordPackages.ITERATIONS,256)
+        var secret: SecretKey? = null
+        try {
+            beforeKdf()
+            secret = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec)
+            return secret.encoded
+        } finally {
+            spec.clearPassword()
+            try { secret?.destroy() } catch (_: Exception) { /* Provider destruction remains best effort. */ }
+        }
+    }
+    fun crypt(mode: Int,key: ByteArray,nonce: ByteArray,aad: ByteArray,input: ByteArray): ByteArray {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(mode,SecretKeySpec(key,"AES"),GCMParameterSpec(128,nonce))
+        cipher.updateAAD(aad)
+        return cipher.doFinal(input)
+    }
 }

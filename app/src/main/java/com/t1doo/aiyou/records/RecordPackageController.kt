@@ -182,7 +182,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                     check(media.isCurrent(preview))
                 } else RecordPackageIo.writeAndVerify(document, checkNotNull(active.payload)) { owned(active, RecordPackagePhase.WRITING) }
                 updateOwned(active, RecordPackagePhase.WRITING) { it.copy(phase = RecordPackagePhase.DONE,
-                    snapshot = null, scopeAccepted = false, notice = "加密包已写入并完整读回核对。它包含确认的有限快照，不保证文件服务的后续同步。") }
+                    snapshot = null, mediaPreview = null, scopeAccepted = false, notice = "加密包已写入并完整读回核对。它包含确认的有限快照，不保证文件服务的后续同步。") }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { fail(active, "写入或核对失败，可能留下空文件或部分密文。文件已保留，请检查。") }
             finally { if (work.compareAndSet(active, null)) active.retire() }
@@ -201,7 +201,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                     if (!owned(active, RecordPackagePhase.READING)) return@enqueue
                     val document = checkNotNull(active.document)
                     val media = store.mediaPackages
-                    val verified = if (media != null) media.open({ document.openForRead() },active.takePassword()) else {
+                    val verified = if (media != null) media.open({ RecordPackageIo.openRead(document) { owned(active) } },active.takePassword()) else {
                         bytes = RecordPackageIo.read(document) { owned(active, RecordPackagePhase.READING) }
                         cipher.open(checkNotNull(bytes), active.takePassword())
                     }
