@@ -128,8 +128,10 @@ class RecordFavoritePresentationTest {
         val node=compose.onNodeWithTag("original-favorite-set").assertIsDisplayed().assertIsEnabled()
         val bounds=node.getUnclippedBoundsInRoot();assertTrue(bounds.height>=48.dp)
         val old=node.fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
-        compose.onNodeWithText("返回列表").performClick();open("two")
-        compose.runOnIdle{old();assertTrue(queue.isEmpty())}
+        val back=compose.onNodeWithText("返回列表").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        // Exercise the navigation fence before recomposition detaches the old clickable node.
+        compose.runOnIdle{back();old();assertTrue(queue.isEmpty())}
+        open("two")
         compose.onNodeWithTag("original-favorite-set").performClick();drain()
         assertTrue(durable.getValue("two").isFavorite);assertFalse(durable.getValue("one").isFavorite)
     }
