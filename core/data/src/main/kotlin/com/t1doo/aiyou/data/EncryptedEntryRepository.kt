@@ -41,6 +41,7 @@ class EncryptedEntryRepository internal constructor(
     private val candidateStorage = SqlLocalCandidateRepository(borrowedSql, keyBytes)
     override val localCandidates: com.t1doo.aiyou.domain.LocalCandidateRepository get() = candidateStorage
     private val tagStorage = SqlManualTagRepository(borrowedSql, keyBytes)
+    override val factRecaps: com.t1doo.aiyou.domain.FactRecapRepository = SqlFactRecapRepository(borrowedSql, tagStorage)
     override val sourceTags: com.t1doo.aiyou.domain.SourceTagRepository = SqlSourceTagRepository(borrowedSql, tagStorage)
     private val sourceMemoryStorage = SqlSourceMemoryRepository(borrowedSql, keyBytes)
     override val captureRecords: com.t1doo.aiyou.domain.CaptureRepository = SqlCaptureRepository(borrowedSql,attachmentStorage,tagStorage)

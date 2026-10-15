@@ -44,6 +44,7 @@ fun SettingsScreen(
     onDemo: () -> Unit,
     onDemoState: (ComponentState) -> Unit,
     modifier: Modifier = Modifier,
+    hasRecordPackages: Boolean = false,
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
@@ -71,7 +72,8 @@ fun SettingsScreen(
                     Text("仅本机处理", style = MaterialTheme.typography.titleMedium)
                     Text(if (hasAttachments) "文字、草稿与已保存记录的图片附件保存在本机。" else "文字与草稿保存在本机。",
                         style = MaterialTheme.typography.bodyMedium)
-                    Text("记录保存不需要模型或网络。录音、备份与系统提醒尚未开放。",
+                    Text(if(hasRecordPackages) "记录保存不需要模型或网络。可在回忆中制作选定记录与原图的加密包并恢复；整库备份、录音和系统提醒尚未开放。"
+                        else "记录保存不需要模型或网络。整库备份、录音与系统提醒尚未开放。",
                         style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                 }
                 SettingsGroup("模型连接") {

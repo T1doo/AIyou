@@ -1,0 +1,129 @@
+package com.t1doo.aiyou.records
+
+import com.t1doo.aiyou.data.*
+import com.t1doo.aiyou.domain.*
+import com.t1doo.aiyou.model.*
+import java.time.*
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
+import org.junit.Assert.*
+import org.junit.Test
+
+class FactRecapControllerTest {
+    @Test fun explicitGenerateReadsRealSqlAndOpensOnlyExactCurrentSource():Unit=runBlocking {
+        FactRecapHarness().use { h->
+            h.c.open();assertNull(h.ui.snapshot);h.c.generate();assertTrue(h.ui.loading);h.drain()
+            assertEquals(1,h.ui.snapshot!!.recordCount);val card=h.ui.snapshot!!.cards.single();var opens=0
+            h.c.source(card){opens++};assertEquals(0,opens);h.drain();assertEquals(1,opens)
+            h.f.db.write("UPDATE remote_source_access SET generation=generation+1 WHERE entryId=?",h.id)
+            h.c.source(card){opens++};h.drain();assertEquals(1,opens);assertNull(h.ui.snapshot);assertNotNull(h.ui.error)
+        }
+    }
+    @Test fun cancelCloseAndInputChangesRetireQueuedAndLateGeneratedPrivateResults():Unit=runBlocking {
+        FactRecapHarness().use { h->
+            h.c.open();h.c.generate();h.c.cancel();h.drain();assertNull(h.ui.snapshot);assertFalse(h.ui.loading)
+            h.afterCapture={h.c.input("2026-10-16","UTC",FactRecapPeriod.WEEK)};h.c.generate();h.drain()
+            assertNull(h.ui.snapshot);assertEquals("2026-10-16",h.ui.date)
+            h.afterCapture={h.c.close()};h.c.generate();h.drain();assertNull(h.local.factRecap)
+            h.c.open();h.afterCapture={};h.c.generate();h.drain();assertNotNull(h.ui.snapshot)
+            val card=h.ui.snapshot!!.cards.single();var calls=0;h.c.source(card){calls++};h.c.close();h.c.open();h.drain();assertEquals(0,calls)
+        }
+    }
+    @Test fun failuresRetryCancellationAndRejectedQueueNeverPublishFalseEmpty():Unit=runBlocking {
+        FactRecapHarness().use { h->
+            h.c.open();h.failCapture=true;h.c.generate();h.drain();assertNotNull(h.ui.error);assertNull(h.ui.snapshot)
+            h.failCapture=false;h.c.generate();h.drain();assertEquals(1,h.ui.snapshot!!.recordCount)
+            h.c.cancel();h.accept=false;h.c.generate();assertFalse(h.ui.loading);assertNull(h.ui.snapshot);assertNotNull(h.ui.error)
+            h.accept=true;h.c.generate();h.drain();assertEquals(1,h.ui.snapshot!!.recordCount)
+            h.c.input("2026-02-30","Made/Up",FactRecapPeriod.DAY);h.c.generate();assertNotNull(h.ui.error);assertTrue(h.queue.isEmpty())
+        }
+    }
+    @Test fun newRecordsTagsErrorsAndUnavailableStateSynchronouslyHideOldExcerpts():Unit=runBlocking {
+        FactRecapHarness().use { h->
+            h.c.open();h.c.generate();h.drain();assertNotNull(h.ui.snapshot)
+            h.local=reconcileFactRecap(h.local,h.local.copy(error="合成读取失败"));assertNull(h.ui.snapshot)
+            h.local=h.local.copy(error=null);h.c.generate();h.drain()
+            h.f.tags.replace(ManualTagMutation(h.id,0,listOf("合成新标签"),java.util.UUID.randomUUID().toString()))
+            h.local=reconcileFactRecap(h.local,h.local.copy(manualTags=h.f.tags.snapshots()));assertNull(h.ui.snapshot)
+            h.c.generate();h.drain();h.f.entry().also {h.f.db.write("UPDATE entries SET capturedAtMillis=? WHERE id=?",h.clock.millis(),it)}
+            h.local=reconcileFactRecap(h.local,h.local.copy(entries=h.store.entries()));assertNull(h.ui.snapshot)
+        }
+    }
+    @Test fun returnValidationRejectsImageLedgerChangesAndDisposeErasesOnlyPrivateView():Unit=runBlocking {
+        FactRecapHarness().use { h->
+            h.c.open();h.c.generate();h.drain()
+            h.f.db.write("INSERT INTO attachments VALUES(?,?,1,'image/png',?,8,'FAILED')",java.util.UUID.randomUUID().toString(),h.id,"0".repeat(64))
+            h.c.validate();h.drain();assertNull(h.ui.snapshot);assertNotNull(h.ui.error)
+            h.c.generate();h.drain();assertEquals(1,h.ui.snapshot!!.imageCount)
+            h.c.dispose();assertNull(h.local.factRecap);assertEquals(1,h.store.entries().size)
+            assertFalse(FactRecapUiState(date="PRIVATE_DATE",zone="PRIVATE_ZONE").toString().contains("PRIVATE"))
+        }
+    }
+    @Test fun unchangedReferencesWithUnavailableLabelsAndSameBodyPolicyChangesRetireExcerpts():Unit=runBlocking {
+        FactRecapHarness().use { h->
+            h.c.open();h.c.generate();h.drain();assertNotNull(h.ui.snapshot)
+            h.local=reconcileFactRecap(h.local,h.local.copy(manualTagsAvailable=false));assertNull(h.ui.snapshot)
+            h.local=h.local.copy(manualTagsAvailable=true);h.c.generate();h.drain()
+            h.local=reconcileFactRecap(h.local,h.local.copy(entries=h.local.entries.map {it.copy(policy=ProcessingPolicy.AI_NONE)}))
+            assertNull(h.ui.snapshot)
+        }
+    }
+    @Test fun attachmentReadRetainsOriginalViewWhileLedgerMutationImmediatelyRetiresIt():Unit=runBlocking {
+        FactRecapHarness().use {h->
+            h.c.open();h.c.generate();h.drain();val s=h.ui.snapshot
+            h.c.checkCurrent(h.store);assertSame(s,h.ui.snapshot)
+            h.f.db.write("INSERT INTO attachments VALUES(?,?,1,'image/png',?,8,'FAILED')",java.util.UUID.randomUUID().toString(),h.id,"0".repeat(64))
+            h.c.checkCurrent(h.store);assertNull(h.ui.snapshot)
+        }
+    }
+    @Test(timeout=15000) fun actualVmActorInvalidatesBeforeTagMutationAndKeepsCorrectDurableTag():Unit=runBlocking {
+        FactRecapHarness().use { h->
+            val closed=CountDownLatch(1)
+            val owner=object:EntryRepository by h.store,AutoCloseable {override fun close(){closed.countDown()}}
+            val vm=LocalRecordsViewModel(android.app.Application(),{owner},clock=h.clock)
+            try {
+                withTimeout(5000){vm.state.first{it.ready && it.supportsFactRecaps}}
+                vm.factRecaps.open();vm.factRecaps.generate();withTimeout(5000){vm.state.first{it.factRecap?.snapshot!=null}}
+                vm.tags.open(h.id,1);withTimeout(5000){vm.state.first{it.manualTagEditor?.snapshot!=null}}
+                assertNull(vm.state.value.factRecap!!.snapshot)
+                val editor=vm.state.value.manualTagEditor!!;vm.tags.add(editor.session,editor.snapshot!!.version,"合成新标签")
+                withTimeout(5000){vm.state.first{it.manualTags[h.id]?.names==listOf("合成新标签")}}
+                assertNull(vm.state.value.factRecap!!.snapshot);vm.factRecaps.generate()
+                withTimeout(5000){vm.state.first{it.factRecap?.snapshot?.cards?.singleOrNull()?.tags?.names==listOf("合成新标签")}}
+            } finally {vm.clearForHostTest();assertTrue(closed.await(3,TimeUnit.SECONDS))}
+        }
+    }
+}
+
+internal class FactRecapHarness : AutoCloseable {
+    val f=PermanentErasureFixture()
+    val clock:Clock=Clock.fixed(Instant.parse("2026-10-15T08:00:00Z"),ZoneId.of("UTC"))
+    val id=f.entry(text="合成：只是计划，不是已经发生的事件。🙂").also {f.db.write("UPDATE entries SET capturedAtMillis=? WHERE id=?",clock.millis(),it)}
+    var failCapture=false;var afterCapture:()->Unit={};var accept=true
+    private val base=SqlFactRecapRepository(f.gateway,f.tags)
+    val store=object:EntryRepository {
+        override val factRecaps=object:FactRecapRepository by base {
+            override fun capture(range:FactRecapRange):FactRecapSnapshot {
+                if(failCapture)error("Synthetic read failure")
+                return base.capture(range).also{afterCapture()}
+            }
+        }
+        override val manualTags=f.tags
+        override suspend fun entries()=f.db.read("SELECT e.id,e.currentRevision,r.originalText,e.capturedAtMillis,e.captureTimeZone,e.privacyPolicy FROM entries e JOIN entry_revisions r ON r.entryId=e.id AND r.revision=e.currentRevision WHERE NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=e.id AND a.deleted=1)").map {
+            StoredEntry(it[0] as String,(it[1] as Long).toInt(),it[2] as String,it[3] as Long,it[4] as String,ProcessingPolicy.valueOf(it[5] as String))
+        }
+        override suspend fun readDraft():TextDraft?=null
+        override suspend fun updateDraft(text:String):TextDraft=error("Unrelated")
+        override suspend fun saveDraft(expected:TextDraft,capturedAtMillis:Long,captureTimeZone:String):StoredEntry=error("Unrelated")
+        override suspend fun revisions(entryId:String)=emptyList<OriginalRevision>()
+        override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry=error("Unrelated")
+    }
+    var local=runBlocking {LocalRecordUiState(ready=true,opening=false,supportsFactRecaps=true,manualTagsAvailable=true,manualTags=f.tags.snapshots(),entries=store.entries())}
+    val queue=ArrayDeque<suspend(EntryRepository)->Unit>()
+    val c=FactRecapController({local},{change->local=reconcileFactRecap(local,change(local))},{if(accept){queue.add(it);true}else false},clock)
+    val ui get()=checkNotNull(local.factRecap)
+    suspend fun drain(){while(queue.isNotEmpty())queue.removeFirst()(store)}
+    override fun close(){c.dispose();f.close()}
+}

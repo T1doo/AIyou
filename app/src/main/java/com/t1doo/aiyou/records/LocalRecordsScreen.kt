@@ -92,6 +92,7 @@ fun LocalRecordsScreen(
     onBeginExport: (() -> Unit)? = null,
     onOpenRecycleBin: (() -> Unit)? = null,
     onBeginRecordPackage: (() -> Unit)? = null,
+    onOpenFactRecap: (() -> Unit)? = null,
     onBeforeSearchInput: (TextFieldState) -> Boolean = { true },
     onHistoryInputCommitted: () -> Unit = {},
     onRebuildLocalSearch: () -> Unit = {},
@@ -218,8 +219,12 @@ fun LocalRecordsScreen(
                 item("summary") {
                     if (destination == Destination.MEMORIES && ((onBeginExport != null && local.supportsOriginalExport) ||
                         (onOpenRecycleBin != null && local.supportsRecycleBin) ||
-                        (onBeginRecordPackage != null && local.supportsRecordPackages))) {
+                        (onBeginRecordPackage != null && local.supportsRecordPackages) ||
+                        (onOpenFactRecap != null && local.supportsFactRecaps))) {
                         Column(Modifier.fillMaxWidth()) {
+                            if(onOpenFactRecap!=null && local.supportsFactRecaps) OutlinedButton(onOpenFactRecap,
+                                enabled=local.ready && !local.opening && local.error==null,
+                                modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("recap-open")){Text("生成本机日／周回顾")}
                             if (onBeginRecordPackage != null && local.supportsRecordPackages) OutlinedButton(
                                 onClick = onBeginRecordPackage,
                                 enabled = local.ready && !local.opening && local.error == null && !local.saving && !local.savePending,

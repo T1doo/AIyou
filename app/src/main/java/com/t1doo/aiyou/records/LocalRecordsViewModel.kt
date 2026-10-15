@@ -37,6 +37,8 @@ data class CaptureDiscardUiState(val requestId: Long, val busy: Boolean = false,
     val recovering: Boolean = false, val recoveryFailed: Boolean = false)
 
 data class LocalRecordUiState(
+    val supportsFactRecaps: Boolean = false,
+    val factRecap: FactRecapUiState? = null,
     val supportsMixedCapture: Boolean = false,
     val mixedCapture: MixedCaptureUiState? = null,
     val ready: Boolean = false,
@@ -113,6 +115,8 @@ class LocalRecordsViewModel internal constructor(
     private val mutableState = MutableStateFlow(LocalRecordUiState())
     val state = mutableState.asStateFlow()
     private val commands = Channel<Command>(Channel.UNLIMITED)
+    val factRecaps = FactRecapController({ mutableState.value }, { change -> update(change) },
+        { action -> commands.trySend(Command.FactRecap(action)).isSuccess },clock.withZone(ZoneId.systemDefault()))
     val mixedCapture = MixedCaptureController({ mutableState.value },{ change -> update(change) },
         { action -> commands.trySend(Command.MixedCapture(action)).isSuccess },decodeCapture,clock)
     val attachments = LocalAttachmentController(
@@ -197,7 +201,11 @@ class LocalRecordsViewModel internal constructor(
                 scheduleLocalIndex()
                 for (command in commands) {
                     try {
+                        if(command is Command.Save || command is Command.Revise ||
+                            command is Command.ManualTags || command is Command.RecordPackage || command is Command.RecycleBin ||
+                            command is Command.MixedCapture || command is Command.Retry || command is Command.RefreshSearch) factRecaps.invalidate()
                         when (command) {
+                            is Command.FactRecap -> command.action(checkNotNull(repository))
                             is Command.Edit -> {
                                 persistedDraft = checkNotNull(repository).updateDraft(command.text)
                                 captureDraftMayBeConsumed = false
@@ -252,7 +260,11 @@ class LocalRecordsViewModel internal constructor(
                                 command.action(checkNotNull(repository))
                                 if(mutableState.value.entries!=before) scheduleLocalIndex()
                             }
-                            is Command.Attachment -> command.action(checkNotNull(repository))
+                            is Command.Attachment -> {
+                                val store=checkNotNull(repository)
+                                factRecaps.checkCurrent(store)
+                                try { command.action(store) } finally { factRecaps.checkCurrent(store) }
+                            }
                             is Command.ManualTags -> command.action(checkNotNull(repository))
                             is Command.Favorites -> command.action(checkNotNull(repository))
                             is Command.ManualTasks -> command.action(checkNotNull(repository))
@@ -275,6 +287,7 @@ class LocalRecordsViewModel internal constructor(
                 }
             } finally {
                 editsDisposed = true
+                factRecaps.dispose()
                 mixedCapture.dispose()
                 ai.markDisposed()
                 attachments.markDisposed()
@@ -306,7 +319,7 @@ class LocalRecordsViewModel internal constructor(
     /** Local and AI writers validate the selected source in the same state CAS. */
     private inline fun update(transform: (LocalRecordUiState) -> LocalRecordUiState) {
         mutableState.update { previous ->
-            val candidate = transform(previous)
+            val candidate = reconcileFactRecap(previous,transform(previous))
             val transformed = if (candidate.supportsFavorites && candidate.favoritesAvailable &&
                 candidate.entries.any { !candidate.favorites.containsKey(it.id) }) candidate.copy(
                     favoritesAvailable = false, favoritesError = "记录列表已变化，请重新读取收藏状态。") else candidate
@@ -1022,6 +1035,7 @@ class LocalRecordsViewModel internal constructor(
             val searchEpoch = try { store.localSearch?.epoch() }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
+                supportsFactRecaps = store.factRecaps != null,
                 supportsMixedCapture = store.captureRecords != null,
                 supportsCandidates = store.localCandidates != null,
                 supportsSourceTags = store.sourceTags != null,
@@ -1129,6 +1143,7 @@ class LocalRecordsViewModel internal constructor(
 
     override fun onCleared() {
         editsDisposed = true
+        factRecaps.dispose()
         mixedCapture.dispose()
         ai.markDisposed()
         attachments.markDisposed()
@@ -1152,6 +1167,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     private sealed interface Command {
+        data class FactRecap(val action: suspend (EntryRepository) -> Unit) : Command
         data object IndexBatch : Command
         data object RebuildIndex : Command
         data object RefreshSearch : Command

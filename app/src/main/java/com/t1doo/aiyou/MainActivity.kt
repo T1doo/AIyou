@@ -126,12 +126,12 @@ class MainActivity : ComponentActivity() {
                 onTaskRefresh = records.tasks::refresh, onTaskClose = records.tasks::close,
                 onTaskCreationDate = records.tasks::editCreationDate, onTaskBeginDate = records.tasks::beginDate,
                 onTaskEditDate = records.tasks::editDate, onTaskSaveDate = records.tasks::saveDate, onTaskCloseDate = records.tasks::closeDate,
-                exports = records.exports, recycleBin = records.recycleBin, recordPackages = records.recordPackages,
+                exports = records.exports, recycleBin = records.recycleBin, recordPackages = records.recordPackages, factRecaps = records.factRecaps,
                 recordPackagePicker = packagePicker, currentRecords = { records.state.value }) }
         }
     }
     override fun onResume() { super.onResume(); packagePicker?.resumed() }
-    override fun onPause() { packagePicker?.paused(); super.onPause() }
+    override fun onPause() { packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); super.onPause() }
     override fun onSaveInstanceState(outState: Bundle) { packagePicker?.save(outState); super.onSaveInstanceState(outState) }
     override fun onDestroy() {
         packagePicker?.let { packageRecords?.recordPackages?.detachPickerOwner(it); it.destroy() }
@@ -198,6 +198,7 @@ fun AIyouApp(
     onCancelHistoryReplacement: (Long, Long, Long) -> Unit = { _, _, _ -> },
     attachments: LocalAttachmentController? = null,
     mixedCapture: com.t1doo.aiyou.records.MixedCaptureController? = null,
+    factRecaps: com.t1doo.aiyou.records.FactRecapController? = null,
     display: UiPreferencesState = UiPreferencesState(),
     onDisplayChange: (UiPreferences) -> Unit = {},
     onRetryDisplay: () -> Unit = {},
@@ -255,6 +256,9 @@ fun AIyouApp(
     var navigationHeightPx by remember { mutableIntStateOf(0) }
     val nowList = rememberLazyListState()
     val memoriesList = rememberLazyListState()
+    val recapList = remember { LazyListState() }
+    var recapRoute by remember { mutableStateOf(false) }
+    DisposableEffect(factRecaps) { onDispose { factRecaps?.close() } }
     val currentLocal by rememberUpdatedState(local)
     val currentRecordsProvider by rememberUpdatedState(currentRecords)
     // Construct directly: rememberTextFieldState has a Saver and would put the query in Bundle.
@@ -323,7 +327,7 @@ fun AIyouApp(
     val browsingRecycle = recycleUi?.browsing == true && selected == Destination.MEMORIES && detailEntryId == null && !showSettings && !demo
     val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS && !browsingRecycle
     SideEffect {
-        search.sync(selected == Destination.MEMORIES && !reading && !browsingRecycle && !browsingPackage && !showSettings && !demo &&
+        search.sync(selected == Destination.MEMORIES && !recapRoute && !reading && !browsingRecycle && !browsingPackage && !showSettings && !demo &&
             local != null && local.originalEdit == null && local.originalHistory == null)
         if (!reading && searchReturnAnchor != null &&
             (renderedSearchInput.copy(tagSnapshot = null) != searchReturnInput?.copy(tagSnapshot = null) || searchSource()?.entries !== searchReturnSource)) {
@@ -436,6 +440,7 @@ fun AIyouApp(
                     TailReturnRequest(origin, checkNotNull(readerId), navigation.generation) else null
                 detailEntryId = null
                 searchLocation = null
+                if(recapRoute) { tailReturnRequest=null;factRecaps?.validate() }
                 if (readerFromSearch && origin == Destination.MEMORIES) {
                     search.sync(true)
                     searchReturnSource = search.state.value.entries
@@ -448,6 +453,7 @@ fun AIyouApp(
             navigation.tryAdvance(generation)) {
             currentLocal?.recycleBin?.let { recycleBin?.close(it.session) }
             currentLocal?.recordPackage?.let { recordPackages?.close(it.session) }
+            factRecaps?.close();recapRoute=false
             clearSearch()
             tailReturnRequest = null
             searchLocation = null
@@ -611,6 +617,9 @@ fun AIyouApp(
                 tagLocal.entries.any { it.id == editor.entryId && it.currentRevision == editor.revision })
     }
     BackHandler(enabled = reading && recycleUi == null, onBack = returnToList)
+    BackHandler(enabled = recapRoute && !reading && !showSettings && selected==Destination.MEMORIES) {
+        if(ownsNavigation()) { navigation.advance();factRecaps?.close();recapRoute=false }
+    }
     fun ownsRecycleRoute() = ownsNavigation() && !showSettings && !demo &&
         currentLocal?.recycleBin?.session == recycleUi?.session &&
         (if (recycleUi?.browsing == true) selectedName == Destination.MEMORIES.name && detailEntryId == null else reading)
@@ -644,17 +653,19 @@ fun AIyouApp(
         modifier = Modifier.imePadding().onSizeChanged { scaffoldHeightPx = it.height },
         topBar = {
             NotebookAppBar(
-                if (browsingPackage) "加密原文包" else if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else "爱忆 AIyou",
+                if (browsingPackage) "加密原文包" else if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else if(recapRoute) "本机回顾" else "爱忆 AIyou",
                 if (browsingPackage) "返回列表" else if (viewingPicture) "返回附件列表" else if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
                 else if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
-                else if (editing != null) "取消编辑" else if (reading || browsingRecycle) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else "设置",
+                else if (editing != null) "取消编辑" else if(reading && recapRoute) "返回回顾" else if (reading || browsingRecycle) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else if(recapRoute) "返回回忆" else "设置",
                 actionEnabled = recycleUi?.busy != true && attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
             ) {
                 if (browsingPackage && ownsPackageRoute()) {
                     recordPackages?.close(checkNotNull(packageUi).session); navigation.advance()
                 } else if (browsingRecycle && ownsRecycleRoute()) {
                     recycleBin?.close(checkNotNull(recycleUi).session); navigation.advance()
-                } else if (reading && recycleUi == null) returnToList() else if (ownsNavigation() && recycleUi == null &&
+                } else if (reading && recycleUi == null) returnToList() else if(recapRoute && ownsNavigation()) {
+                    navigation.advance();factRecaps?.close();recapRoute=false
+                } else if (ownsNavigation() && recycleUi == null &&
                     navigation.tryAdvance(generation)) {
                     clearSearch()
                     tailReturnRequest = null
@@ -680,7 +691,7 @@ fun AIyouApp(
                 onLicenses = { if (ownsNavigation()) { navigation.advance(); showLicenses = true } },
                 onDemo = { if (ownsNavigation()) { navigation.advance(); clearSearch(); demo = !demo } },
                 onDemoState = { if (ownsNavigation()) { navigation.advance(); stateName = it.name } },
-                modifier = modifier)
+                modifier = modifier, hasRecordPackages=local?.supportsRecordPackages==true)
         } else if (browsingPackage && local != null && recordPackages != null && packageUi != null) {
             com.t1doo.aiyou.records.RecordPackageScreen(local, packageUi, recordPackages, recordPackagePicker, ::ownsPackageRoute, modifier)
         } else if (browsingRecycle && local != null && recycleBin != null && recycleUi != null) {
@@ -711,6 +722,7 @@ fun AIyouApp(
                 onStartAi = onStartAiSession, onStopAi = onStopAiSession, onCloseAi = onCloseAiSession,
                 onOpenTags = { id, revision -> if (canCopy(id, revision)) onOpenTags(id, revision) },
                 location = searchLocation,
+                requiredSource = if(recapRoute) searchLocation else null,
                 candidateController = candidates,
                 sourceTagController = sourceTags,
                 sourceMemoryController = sourceMemories,
@@ -731,6 +743,24 @@ fun AIyouApp(
                 onMoveToRecycleBin = recycleBin?.let { controller -> { id, revision ->
                     if (canCopy(id, revision)) { navigation.advance(); controller.requestMove(id, revision) }
                 } })
+        } else if(!demo && local!=null && selected==Destination.MEMORIES && recapRoute && factRecaps!=null) {
+            com.t1doo.aiyou.records.FactRecapScreen(local,factRecaps,recapList,{card,images ->
+                if(ownsNavigation() && detailEntryId==null && recapRoute && !showSettings) {
+                    val routeGeneration=generation
+                    factRecaps.source(card) {
+                        navigation.publish(routeGeneration) {
+                            if(recapRoute && selectedName==Destination.MEMORIES.name && detailEntryId==null && !showSettings && !demo &&
+                                currentLocal?.entries?.any { it.id==card.source.sourceId && it.currentRevision.toLong()==card.source.revision &&
+                                    com.t1doo.aiyou.model.OriginalExports.hash(it.originalText)==card.contentHash }==true) {
+                                navigation.advance();search.pause();readerFromSearch=false;tailReturnRequest=null
+                                searchLocation=com.t1doo.aiyou.records.OriginalReadingLocation(card.source.sourceId,card.source.revision.toInt(),card.contentHash,0,0)
+                                detailEntryId=card.source.sourceId
+                                if(images) attachments?.open(card.source.sourceId,card.source.revision.toInt())
+                            }
+                        }
+                    }
+                }
+            },modifier,onRetryRecords={if(ownsNavigation() && recapRoute && !reading) onRetry()})
         } else if (!demo && local != null && selected == Destination.TASKS &&
             (local.tasks.supported || local.opening || local.error != null)) {
             fun ownsTasks() = ownsNavigation() && selectedName == Destination.TASKS.name && !showSettings && !demo
@@ -755,6 +785,9 @@ fun AIyouApp(
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
+                onOpenFactRecap = factRecaps?.let { controller -> { if(ownsNavigation() && selected==Destination.MEMORIES && !reading && !showSettings && !demo) {
+                    navigation.advance();clearSearch();controller.open();recapRoute=true
+                } } },
                 onBeginRecordPackage = recordPackages?.let { controller -> { if (ownsNavigation() &&
                     selectedName == Destination.MEMORIES.name && detailEntryId == null && !showSettings && !demo) {
                     navigation.advance(); clearSearch(); controller.open()
