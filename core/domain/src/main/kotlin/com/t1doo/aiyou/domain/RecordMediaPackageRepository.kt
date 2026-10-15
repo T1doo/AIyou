@@ -11,8 +11,17 @@ interface PreparedRecordMediaPackage {
 }
 interface RecordMediaPackageRepository {
     suspend fun preview(snapshot: OriginalExportSnapshot): RecordMediaPreview
+    suspend fun previewOpenZip(snapshot: OriginalExportSnapshot, active: () -> Boolean): RecordMediaPreview = preview(snapshot)
     suspend fun isCurrent(preview: RecordMediaPreview): Boolean
     suspend fun seal(preview: RecordMediaPreview, password: CharArray): PreparedRecordMediaPackage
+    /** Explicitly confirmed plaintext ZIP; current originals + every current image, no restore capability. */
+    suspend fun exportOpenZip(preview: RecordMediaPreview): PreparedRecordMediaPackage {
+        throw UnsupportedOperationException("Open image export unavailable")
+    }
+    /** One revocable preview read. Caller wipes bytes after decoding a bounded thumbnail. */
+    suspend fun readOpenImage(preview: RecordMediaPreview, image: RecordPackageImage): ByteArray {
+        throw UnsupportedOperationException("Open image preview unavailable")
+    }
     /** Fully authenticates the input before releasing a preview; retains only a revocable read handle/key. */
     suspend fun open(source: () -> InputStream, password: CharArray): VerifiedRecordPackage
     suspend fun restore(verified: VerifiedRecordPackage, newIds: List<String>, importedAtMillis: Long): RecordPackageRestoreResult

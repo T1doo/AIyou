@@ -20,6 +20,7 @@ object OriginalExportCodec {
         val text = when (format) {
             OriginalExportFormat.JSONL -> jsonl(snapshot)
             OriginalExportFormat.MARKDOWN -> markdown(snapshot)
+            OriginalExportFormat.MEDIA_ZIP -> throw IllegalArgumentException("Use the streaming image export")
         }
         val bytes = OriginalExports.utf8(text)
         try {
@@ -30,7 +31,7 @@ object OriginalExportCodec {
     private fun manifest(snapshot: OriginalExportSnapshot) = "{\"type\":\"manifest\",\"format\":\"AIyou-current-originals\",\"formatVersion\":1,\"snapshotId\":" +
         quoted(snapshot.id) + ",\"createdAtMillis\":" + snapshot.createdAtMillis + ",\"recordCount\":" + snapshot.records.size +
         ",\"encrypted\":false,\"scope\":[\"currentOriginals\",\"manualTags\"],\"excluded\":[\"attachments\",\"history\",\"tasks\",\"keys\"]}"
-    private fun record(value: OriginalExportRecord): String {
+    internal fun record(value: OriginalExportRecord): String {
         val e = value.entry
         return "{\"type\":\"currentOriginal\",\"entryId\":" + quoted(e.id) + ",\"revision\":" + e.currentRevision +
             ",\"capturedAtMillis\":" + e.capturedAtMillis + ",\"captureTimeZone\":" + quoted(e.captureTimeZone) +
@@ -56,14 +57,14 @@ object OriginalExportCodec {
         }
         append("导出结束 · 原文条数 "); append(snapshot.records.size); append("\n")
     }
-    private fun fenced(language: String, text: String): String {
+    internal fun fenced(language: String, text: String): String {
         val ticks = 96.toChar()
         var run = 0; var longest = 0
         text.forEach { ch -> if (ch == ticks) { run++; longest = maxOf(longest, run) } else run = 0 }
         val fence = ticks.toString().repeat(maxOf(3, longest + 1))
         return fence + language + "\n" + text + "\n" + fence + "\n"
     }
-    private fun quoted(text: String) = buildString {
+    internal fun quoted(text: String) = buildString {
         append('"')
         text.forEach { ch ->
             when (ch) {

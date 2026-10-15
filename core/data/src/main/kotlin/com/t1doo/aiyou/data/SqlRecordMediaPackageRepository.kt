@@ -12,12 +12,17 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
     private val originals: OriginalExportRepository, private val media: EncryptedAttachmentStore,
     private val packages: SqlRecordPackageRepository) : RecordMediaPackageRepository {
     private val cipher = RecordMediaPackageCipher()
-    override suspend fun preview(snapshot: OriginalExportSnapshot): RecordMediaPreview = safely {
+    override suspend fun preview(snapshot: OriginalExportSnapshot): RecordMediaPreview = checkedPreview(snapshot) { true }
+    override suspend fun previewOpenZip(snapshot: OriginalExportSnapshot, active: () -> Boolean): RecordMediaPreview = checkedPreview(snapshot, active)
+    private suspend fun checkedPreview(snapshot: OriginalExportSnapshot, active: () -> Boolean): RecordMediaPreview = safely {
+        if (!active()) throw OpenRecordZipCancelled()
         check(originals.isCurrent(snapshot))
         val images = inventory(snapshot)
         for (image in images) {
+            if (!active()) throw OpenRecordZipCancelled()
             val bytes = media.read(image.attachmentId)
             try { RecordMediaPackageCipher.checkImage(image,bytes) } finally { bytes.fill(0) }
+            if (!active()) throw OpenRecordZipCancelled()
         }
         check(originals.isCurrent(snapshot) && images == inventory(snapshot))
         RecordMediaPreview(snapshot,images)
@@ -30,6 +35,23 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
             check(isCurrent(preview))
             return cipher.seal(preview,password,{ media.read(it.attachmentId) },{ isCurrent(preview) })
         } finally { password.fill('\u0000') }
+    }
+    override suspend fun exportOpenZip(preview: RecordMediaPreview): PreparedRecordMediaPackage {
+        if (!isCurrent(preview)) throw OriginalExportConflict()
+        return OpenRecordZipCodec.prepare(preview, { image ->
+            val bytes = media.read(image.attachmentId)
+            try { RecordMediaPackageCipher.checkImage(image, bytes); bytes }
+            catch (failure: Exception) { bytes.fill(0); throw failure }
+        }, { isCurrent(preview) })
+    }
+    override suspend fun readOpenImage(preview: RecordMediaPreview, image: RecordPackageImage): ByteArray {
+        if (image !in preview.images || !isCurrent(preview)) throw OriginalExportConflict()
+        val bytes = media.read(image.attachmentId)
+        try {
+            RecordMediaPackageCipher.checkImage(image, bytes)
+            if (!isCurrent(preview)) throw OriginalExportConflict()
+            return bytes
+        } catch (failure: Exception) { bytes.fill(0); throw failure }
     }
     override suspend fun open(source: () -> InputStream, password: CharArray): VerifiedRecordPackage = cipher.open(source,password)
 
@@ -154,6 +176,7 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         "SELECT state FROM record_package_receipts WHERE id=? AND operation=?",listOf(PREFIX+id,OP)).singleOrNull()?.single() as String?
     private suspend inline fun <T> safely(block: () -> T): T = try { block() }
         catch (e: CancellationException) { throw e }
+        catch (e: OpenRecordZipCancelled) { throw e }
         catch (e: RecordPackageInvalid) { throw e }
         catch (_: Exception) { throw RecordPackageStorageFailure() }
     companion object { private const val PREFIX = "PACKAGE_MEDIA:"; private const val OP = "PACKAGE_MEDIA_INTENT" }

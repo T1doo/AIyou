@@ -17,17 +17,20 @@ class OriginalExportUiState(val session: Long, val phase: OriginalExportPhase = 
     selection: List<SourceVersion> = emptyList(), val format: OriginalExportFormat = OriginalExportFormat.MARKDOWN,
     val snapshot: OriginalExportSnapshot? = null, val riskAccepted: Boolean = false, val requestKey: String? = null,
     val pickerLaunched: Boolean = false, val hasFile: Boolean = false, val error: String? = null,
-    val notice: String? = null, internal val epoch: Long = 0) {
+    val notice: String? = null, internal val epoch: Long = 0, val mediaPreview: RecordMediaPreview? = null,
+    val readingImageId: String? = null, val pictureId: String? = null, val picture: AttachmentPicture? = null) {
     val selection = Collections.unmodifiableList(selection.toList())
-    val busy get() = phase in setOf(OriginalExportPhase.PREPARING, OriginalExportPhase.CHECKING,
+    val busy get() = readingImageId != null || phase in setOf(OriginalExportPhase.PREPARING, OriginalExportPhase.CHECKING,
         OriginalExportPhase.WRITING, OriginalExportPhase.CANCELLING, OriginalExportPhase.CLEANING)
     internal fun copy(phase: OriginalExportPhase = this.phase, selection: List<SourceVersion> = this.selection,
         format: OriginalExportFormat = this.format, snapshot: OriginalExportSnapshot? = this.snapshot,
         riskAccepted: Boolean = this.riskAccepted, requestKey: String? = this.requestKey,
         pickerLaunched: Boolean = this.pickerLaunched, hasFile: Boolean = this.hasFile,
-        error: String? = this.error, notice: String? = this.notice, epoch: Long = this.epoch) =
+        error: String? = this.error, notice: String? = this.notice, epoch: Long = this.epoch,
+        mediaPreview: RecordMediaPreview? = this.mediaPreview, readingImageId: String? = this.readingImageId,
+        pictureId: String? = this.pictureId, picture: AttachmentPicture? = this.picture) =
         OriginalExportUiState(session, phase, selection, format, snapshot, riskAccepted, requestKey,
-            pickerLaunched, hasFile, error, notice, epoch)
+            pickerLaunched, hasFile, error, notice, epoch, mediaPreview, readingImageId, pictureId, picture)
     override fun toString() = "OriginalExportUiState(phase=$phase, redacted)"
 }
 
@@ -37,11 +40,15 @@ class OriginalExportController internal constructor(
     private val publish: ((LocalRecordUiState) -> LocalRecordUiState) -> Unit,
     private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
     private val clock: Clock,
+    private val decodeImage: (ByteArray) -> AttachmentPicture = { throw UnsupportedOperationException("Image decoder unavailable") },
 ) {
     private val sessions = AtomicLong()
     @Volatile private var disposed = false
     private class Work(val session: Long, val key: String, val snapshot: OriginalExportSnapshot,
-        val payload: OriginalExportPayload, val cancelled: AtomicBoolean = AtomicBoolean())
+        val payload: OriginalExportPayload?, val zip: PreparedRecordMediaPackage? = null,
+        val mediaPreview: RecordMediaPreview? = null, val cancelled: AtomicBoolean = AtomicBoolean()) {
+        fun release() { payload?.release(); zip?.release() }
+    }
     private class Destination(val session: Long, val key: String, val document: SelectedExportDocument)
     private val work = AtomicReference<Work?>()
     @Volatile private var destination: Destination? = null
@@ -58,7 +65,7 @@ class OriginalExportController internal constructor(
         if (disposed || (requireAvailable && !available(local)) || ui?.session != session || ui.epoch != epoch || ui.phase != phase) local
         else local.copy(originalExport = change(ui))
     }
-    private fun releaseWork() { work.getAndSet(null)?.let { it.cancelled.set(true); it.payload.release() } }
+    private fun releaseWork() { work.getAndSet(null)?.let { it.cancelled.set(true); it.release() } }
     fun open() {
         val local = current()
         if (!available(local) || local.recordPackage != null || local.recycleBin != null || local.originalExport != null || local.originalEdit != null || local.originalHistory != null ||
@@ -81,7 +88,12 @@ class OriginalExportController internal constructor(
     fun format(session: Long, value: OriginalExportFormat) {
         val ui = panel(session) ?: return
         if (!available() || ui.busy || ui.phase == OriginalExportPhase.PICKING || ui.hasFile) return
-        releaseWork(); updateOwned(session, ui.epoch, ui.phase) { it.copy(format = value, riskAccepted = false,
+        releaseWork()
+        val changedScope = (ui.format == OriginalExportFormat.MEDIA_ZIP) != (value == OriginalExportFormat.MEDIA_ZIP)
+        updateOwned(session, ui.epoch, ui.phase) { it.copy(format = value, riskAccepted = false,
+            phase = if (changedScope) OriginalExportPhase.SELECTING else it.phase,
+            snapshot = if (changedScope) null else it.snapshot, mediaPreview = if (changedScope) null else it.mediaPreview,
+            picture = null, pictureId = null,
             requestKey = null, pickerLaunched = false, notice = null, epoch = it.epoch + 1) }
     }
     fun prepare(session: Long, refreshCurrent: Boolean = false) {
@@ -90,16 +102,58 @@ class OriginalExportController internal constructor(
         val epoch = ui.epoch + 1
         releaseWork()
         update(session) { it.copy(phase = OriginalExportPhase.PREPARING, snapshot = null, riskAccepted = false,
-            requestKey = null, pickerLaunched = false, error = null, notice = null, epoch = epoch) }
+            requestKey = null, pickerLaunched = false, error = null, notice = null, epoch = epoch, mediaPreview = null,
+            picture = null, pictureId = null) }
         if (!enqueue { store ->
             if (!owns(session, epoch, OriginalExportPhase.PREPARING)) return@enqueue
             try {
                 val snapshot = checkNotNull(store.originalExport).capture(ui.selection, UUID.randomUUID().toString(), clock.millis(), refreshCurrent)
+                val mediaPreview = if (ui.format == OriginalExportFormat.MEDIA_ZIP) {
+                    val media = checkNotNull(store.mediaPackages)
+                    fun preparing() = owns(session, epoch, OriginalExportPhase.PREPARING) && available()
+                    val preview = media.previewOpenZip(snapshot, ::preparing)
+                    for (image in preview.images) {
+                        if (!preparing()) return@enqueue
+                        val bytes = media.readOpenImage(preview, image)
+                        try { if (!preparing()) return@enqueue; decodeImage(bytes).releaseUnpublished() }
+                        finally { bytes.fill(0) }
+                    }
+                    if (!preparing()) return@enqueue
+                    if (!media.isCurrent(preview)) throw OriginalExportConflict()
+                    preview
+                } else null
                 if (!available()) throw OriginalExportStorageFailure()
-                updateOwned(session, epoch, OriginalExportPhase.PREPARING) { it.copy(phase = OriginalExportPhase.PREVIEW, snapshot = snapshot,
+                updateOwned(session, epoch, OriginalExportPhase.PREPARING) { it.copy(phase = OriginalExportPhase.PREVIEW, snapshot = snapshot, mediaPreview = mediaPreview,
                     selection = snapshot.records.map { r -> SourceVersion(r.entry.id, r.entry.currentRevision.toLong()) }, error = null) }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { fail(session, epoch, failure) }
+        }) fail(session, epoch, IllegalStateException())
+    }
+    fun viewImage(session: Long, attachmentId: String) {
+        val ui = panel(session) ?: return
+        val preview = ui.mediaPreview ?: return
+        val image = preview.images.singleOrNull { it.attachmentId == attachmentId } ?: return
+        if (!available() || ui.phase != OriginalExportPhase.PREVIEW || ui.busy || ui.hasFile) return
+        val epoch = ui.epoch + 1
+        updateOwned(session, ui.epoch, OriginalExportPhase.PREVIEW) { it.copy(readingImageId = attachmentId,
+            picture = null, pictureId = null, riskAccepted = false, epoch = epoch) }
+        if (!enqueue { store ->
+            var decoded: AttachmentPicture? = null
+            var offeredToUi = false
+            try {
+                if (!owns(session, epoch, OriginalExportPhase.PREVIEW) || !available()) return@enqueue
+                val bytes = checkNotNull(store.mediaPackages).readOpenImage(preview, image)
+                try { decoded = decodeImage(bytes) } finally { bytes.fill(0) }
+                if (!store.mediaPackages!!.isCurrent(preview)) throw OriginalExportConflict()
+                updateOwned(session, epoch, OriginalExportPhase.PREVIEW) {
+                    // publish may retry its CAS. Once offered, Compose may retain a frame even if
+                    // Cancel/Close immediately retires it; only definitely unpublished images recycle.
+                    offeredToUi = true
+                    it.copy(readingImageId = null, pictureId = attachmentId, picture = decoded)
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { fail(session, epoch, failure) }
+            finally { if (!offeredToUi) decoded?.releaseUnpublished() }
         }) fail(session, epoch, IllegalStateException())
     }
     fun acceptRisk(session: Long, snapshotId: String, format: OriginalExportFormat, epoch: Long, accepted: Boolean) {
@@ -112,22 +166,27 @@ class OriginalExportController internal constructor(
     fun choose(session: Long, snapshotId: String, format: OriginalExportFormat, expectedEpoch: Long) {
         val ui = panel(session) ?: return
         val snapshot = ui.snapshot ?: return
-        if (!available() || ui.phase != OriginalExportPhase.PREVIEW || !ui.riskAccepted || ui.hasFile ||
+        if (!available() || ui.phase != OriginalExportPhase.PREVIEW || ui.busy || !ui.riskAccepted || ui.hasFile ||
             snapshot.id != snapshotId || ui.format != format || ui.epoch != expectedEpoch) return
         val epoch = ui.epoch + 1
         updateOwned(session, expectedEpoch, OriginalExportPhase.PREVIEW) {
             if (!it.riskAccepted || it.snapshot?.id != snapshotId || it.format != format || it.hasFile) it
-            else it.copy(phase = OriginalExportPhase.CHECKING, error = null, notice = null, epoch = epoch)
+            else it.copy(phase = OriginalExportPhase.CHECKING, error = null, notice = null, epoch = epoch, picture = null, pictureId = null)
         }
         if (!enqueue { store ->
             var payload: OriginalExportPayload? = null
             var candidate: Work? = null
+            var zip: PreparedRecordMediaPackage? = null
             try {
                 if (!owns(session, epoch, OriginalExportPhase.CHECKING)) return@enqueue
                 if (!available()) throw OriginalExportStorageFailure()
                 if (!checkNotNull(store.originalExport).isCurrent(snapshot)) throw OriginalExportConflict()
-                payload = OriginalExportCodec.render(snapshot, ui.format)
-                val ready = Work(session, UUID.randomUUID().toString(), snapshot, payload)
+                if (ui.format == OriginalExportFormat.MEDIA_ZIP) {
+                    val mediaPreview = checkNotNull(ui.mediaPreview)
+                    if (!checkNotNull(store.mediaPackages).isCurrent(mediaPreview)) throw OriginalExportConflict()
+                    zip = store.mediaPackages!!.exportOpenZip(mediaPreview)
+                } else payload = OriginalExportCodec.render(snapshot, ui.format)
+                val ready = Work(session, UUID.randomUUID().toString(), snapshot, payload, zip, ui.mediaPreview)
                 candidate = ready
                 if (!work.compareAndSet(null, ready)) return@enqueue
                 updateOwned(session, epoch, OriginalExportPhase.CHECKING) {
@@ -136,14 +195,14 @@ class OriginalExportController internal constructor(
                 }
                 if (panel(session)?.let { it.epoch == epoch && it.phase == OriginalExportPhase.PICKING && it.requestKey == ready.key } == true &&
                     !ready.cancelled.get() && work.get() === ready) {
-                    payload = null; candidate = null // The published UUID now owns this payload.
+                    payload = null; zip = null; candidate = null // The published UUID now owns this payload.
                 }
                 else if (owns(session, epoch, OriginalExportPhase.CHECKING) && !available()) throw OriginalExportStorageFailure()
             } catch (cancelled: CancellationException) { payload?.release(); throw cancelled }
             catch (failure: Exception) { payload?.release(); fail(session, epoch, failure) }
             finally {
                 candidate?.let { work.compareAndSet(it, null); it.cancelled.set(true) }
-                payload?.release()
+                payload?.release(); zip?.release()
             }
         }) fail(session, epoch, IllegalStateException())
     }
@@ -176,10 +235,16 @@ class OriginalExportController internal constructor(
             try {
                 if (!writing(active)) throw OriginalExportCancelled()
                 if (!checkNotNull(store.originalExport).isCurrent(active.snapshot)) throw OriginalExportConflict()
-                OriginalExportIo.writeAndVerify(target.document, active.payload) { writing(active) }
+                if (active.zip != null) {
+                    val preview = checkNotNull(active.mediaPreview)
+                    if (!checkNotNull(store.mediaPackages).isCurrent(preview)) throw OriginalExportConflict()
+                    OriginalExportIo.writeZipAndVerify(target.document, active.zip) { writing(active) }
+                    if (!store.mediaPackages!!.isCurrent(preview)) throw OriginalExportConflict()
+                } else OriginalExportIo.writeAndVerify(target.document, checkNotNull(active.payload)) { writing(active) }
                 if (!writing(active)) throw OriginalExportCancelled()
                 val fresh = try { store.originalExport?.isCurrent(active.snapshot) }
                     catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
+                if (active.zip != null && fresh != true) throw OriginalExportConflict()
                 updateOwned(session, ui.epoch, OriginalExportPhase.WRITING) { state -> if (state.requestKey != key || active.cancelled.get()) state else state.copy(
                     phase = OriginalExportPhase.DONE, error = null, riskAccepted = false,
                     notice = when (fresh) {
@@ -189,8 +254,9 @@ class OriginalExportController internal constructor(
                     }) }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: OriginalExportCancelled) { stopped(session, key) }
+            catch (_: OpenRecordZipCancelled) { stopped(session, key) }
             catch (failure: Exception) { if (active.cancelled.get()) stopped(session, key) else fail(session, ui.epoch, failure) }
-            finally { active.payload.release(); work.compareAndSet(active, null) }
+            finally { active.release(); work.compareAndSet(active, null) }
         }) { releaseWork(); fail(session, ui.epoch, IllegalStateException()) }
     }
     private fun stopped(session: Long, key: String) = update(session) {
@@ -209,6 +275,7 @@ class OriginalExportController internal constructor(
         } else {
             releaseWork()
             update(session) { it.copy(phase = OriginalExportPhase.CANCELLED, riskAccepted = false, epoch = it.epoch + 1,
+                readingImageId = null, picture = null, pictureId = null,
                 requestKey = if (it.hasFile) it.requestKey else null, error = null,
                 notice = "已取消本次导出；若选择器已经建立文件，可能留下空文件。") }
         }
@@ -243,8 +310,10 @@ class OriginalExportController internal constructor(
     private fun owns(session: Long, epoch: Long, phase: OriginalExportPhase) = panel(session)?.let { it.epoch == epoch && it.phase == phase } == true
     private fun fail(session: Long, epoch: Long, failure: Exception) = update(session) { ui ->
         if (ui.epoch != epoch) ui else ui.copy(phase = if (failure is OriginalExportConflict) OriginalExportPhase.CHANGED else OriginalExportPhase.FAILED,
+            readingImageId = null, picture = null, pictureId = null,
             riskAccepted = false, notice = null, error = when (failure) {
-                is OriginalExportConflict -> "所选原文或标签已变化，未自动改用新内容。请重新预览最新原文后再确认。"
+                is OriginalExportConflict -> "所选原文、标签或图片已变化，未自动改用新内容。请重新预览最新原文后再确认。" +
+                    if (ui.hasFile) "所选文件可能不完整，请检查或明确删除。" else ""
                 is OriginalExportTooLarge -> "选择的数据较多，请关闭后减少选择，再重新预览。"
                 else -> if (ui.hasFile) "导出写入尚未确认。所选文件可能为空或不完整，请检查或明确删除后重试。"
                     else "导出准备或选择失败。原文与标签已保留，请重新预览。"

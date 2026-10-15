@@ -138,7 +138,7 @@ class LocalRecordsViewModel internal constructor(
     val sourceMemories = SourceMemoryController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.LocalCandidates(action)).isSuccess }, clock = clock)
     val exports = OriginalExportController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> commands.trySend(Command.OriginalExport(action)).isSuccess }, clock = clock)
+        enqueue = { action -> commands.trySend(Command.OriginalExport(action)).isSuccess }, clock = clock, decodeImage = decodeCapture)
     val recordPackages = RecordPackageController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.RecordPackage(action)).isSuccess },
         cipher = com.t1doo.aiyou.data.JcaRecordPackageCipher(), clock = clock)

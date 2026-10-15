@@ -7,6 +7,8 @@ import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
@@ -75,8 +77,11 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
     AlertDialog(onDismissRequest = { act { controller.close(ui.session) } }, title = { Text("导出选定原文") },
         text = { Column(Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("仅导出选定当前原文和手工标签。不含附件、历史版本、待办或密钥，不能用于完整恢复。")
+            Text(if (ui.format == OriginalExportFormat.MEDIA_ZIP)
+                "图文 ZIP 含选定当前原文、手工标签、原图、Markdown、JSONL 和哈希清单。不含历史版本、待办或密钥，不能用于完整恢复。最多 20 张图，单图 16 MiB，原图合计 64 MiB；缺图或损坏会使整个导出失败。"
+                else "仅导出选定当前原文和手工标签。不含附件、历史版本、待办或密钥，不能用于完整恢复。")
             Text("文件是明文。目的地可能是云盘，访问该文件的人可以读取内容。请自行选择可信位置；写入可能覆盖所选已有文件，建议创建新文件。")
+            if (ui.format == OriginalExportFormat.MEDIA_ZIP) Text("原图包含原始元数据，可能含拍摄位置等隐私。需要加密时请使用加密记录包。")
             if (!available) Text("本机记录暂不可读取，预览已隐藏；恢复记录后再继续。")
             when (ui.phase) {
                 OriginalExportPhase.SELECTING -> {
@@ -88,7 +93,7 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
                                 onValueChange = { act { controller.toggle(ui.session, entry.id, entry.currentRevision) } }),
                             verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(checked, onCheckedChange = null)
-                            Text(entry.originalText.takeCodePoints(80), Modifier.weight(1f))
+                            Text(entry.originalText.takeCodePoints(80).ifBlank { "纯图片记录 · ${entry.id}" }, Modifier.weight(1f))
                         }
                     }
                     Text("已选 ${ui.selection.size} 条")
@@ -102,29 +107,46 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
                 else -> Unit
             }
             if (!ui.busy && ui.phase != OriginalExportPhase.PICKING && !ui.hasFile && available) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OriginalExportFormat.entries.forEach { format ->
                         FilterChip(selected = ui.format == format, onClick = { act { controller.format(ui.session, format) } },
-                            label = { Text(if (format == OriginalExportFormat.MARKDOWN) "Markdown" else "JSONL") },
+                            label = { Text(when (format) {
+                                OriginalExportFormat.MARKDOWN -> "Markdown"
+                                OriginalExportFormat.JSONL -> "JSONL"
+                                OriginalExportFormat.MEDIA_ZIP -> "图文 ZIP"
+                            }) },
                             modifier = Modifier.testTag("export-format-" + format.name))
                     }
                 }
             }
             if (snapshotVisible && ui.phase != OriginalExportPhase.SELECTING) ui.snapshot?.let { snapshot ->
                 Text("确认快照 · ${snapshot.records.size} 条原文 · ${ui.format.name}")
+                ui.mediaPreview?.let { media -> Text("已认证 ${media.images.size} 张原图 · ${media.imageBytes} 字节", Modifier.testTag("export-image-total")) }
                 snapshot.records.forEach { record ->
                     Text("记录 ${record.entry.id} · 版本 ${record.entry.currentRevision}")
                     Text("记录时间 ${record.entry.capturedAtMillis} · ${record.entry.captureTimeZone}")
                     Text("正文 SHA-256 ${record.contentHash}", style = MaterialTheme.typography.bodySmall)
                     Text("手工标签：" + record.tags.names.joinToString("、").ifEmpty { "无" })
                     Text(record.entry.originalText.takeCodePoints(300), Modifier.testTag("export-preview-" + record.entry.id))
+                    ui.mediaPreview?.images?.filter { it.sourceId == record.entry.id }?.forEach { image ->
+                        Text("原图 ${image.attachmentId} · ${image.mediaType} · ${image.byteSize} 字节\nSHA-256 ${image.sha256}",
+                            style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("export-image-" + image.attachmentId))
+                        if (ui.phase == OriginalExportPhase.PREVIEW) TextButton(enabled = !ui.busy, onClick = { act {
+                            controller.viewImage(ui.session, image.attachmentId)
+                        } }, modifier = Modifier.heightIn(min = 48.dp).testTag("export-view-" + image.attachmentId)) { Text("预览这张原图") }
+                        if (ui.pictureId == image.attachmentId) (ui.picture as? PlatformAttachmentPicture)?.let { picture ->
+                            Image(picture.image, "选定原图预览", contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxWidth().height(180.dp).testTag("export-picture"))
+                        }
+                    }
                     if (record.entry.originalText.codePointCount(0, record.entry.originalText.length) > 300)
                         Text("这里只预览前 300 字符，导出包含完整正文。")
                 }
             }
             ui.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("export-error")) }
             ui.notice?.let { Text(it, Modifier.testTag("export-notice")) }
-            if (ui.phase == OriginalExportPhase.PREVIEW && snapshotVisible && !ui.hasFile) {
+            if (ui.readingImageId != null) Text("正在认证并读取选定原图预览…")
+            if (ui.phase == OriginalExportPhase.PREVIEW && snapshotVisible && !ui.hasFile && !ui.busy) {
                 val snapshot = checkNotNull(ui.snapshot)
                 Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("export-risk")
                     .toggleable(ui.riskAccepted, role = Role.Checkbox, onValueChange = { value -> act {

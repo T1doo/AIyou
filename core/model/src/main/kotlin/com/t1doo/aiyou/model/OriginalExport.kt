@@ -8,6 +8,7 @@ import java.nio.charset.CodingErrorAction
 
 enum class OriginalExportFormat(val extension: String, val mimeType: String) {
     MARKDOWN("md", "text/markdown"), JSONL("jsonl", "application/x-ndjson"),
+    MEDIA_ZIP("zip", "application/zip"),
 }
 
 /** One current original and its independently versioned labels from the SAME SQL snapshot. */

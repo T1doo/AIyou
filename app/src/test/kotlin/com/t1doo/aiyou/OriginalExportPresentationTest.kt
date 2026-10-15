@@ -69,6 +69,40 @@ class OriginalExportPresentationTest {
         compose.onNodeWithTag("export-select-one").performScrollTo().performClick()
         compose.onNodeWithTag("export-prepare").performScrollTo().performClick(); pump()
     }
+    @Test fun imageOnlyZipShowsActualAuthenticatedPictureAndRequiresConsentBeforeZipIntent() {
+        fixture.includeImage = true; fixture.original = fixture.original.copy(originalText = "")
+        fixture.state.value = fixture.state.value.copy(entries = listOf(fixture.original))
+        content(true)
+        compose.onNodeWithTag("export-open").performScrollTo().performClick()
+        compose.onNodeWithTag("export-select-one").performScrollTo().performClick()
+        compose.onNodeWithTag("export-format-MEDIA_ZIP").performScrollTo().performClick()
+        compose.onNodeWithTag("export-prepare").performScrollTo().performClick(); pump()
+        compose.onNodeWithTag("export-image-total").performScrollTo().assertExists()
+        compose.onNodeWithTag("export-view-" + Fixture.IMAGE_ID).performScrollTo().performClick(); pump()
+        compose.onNodeWithTag("export-picture").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("export-choose").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("export-risk").performScrollTo().performClick()
+        compose.onNodeWithTag("export-choose").performScrollTo().performClick(); pump()
+        compose.runOnIdle {
+            assertEquals("application/zip", registry.intents.single().type)
+            assertEquals("AIyou-current-originals.zip", registry.intents.single().getStringExtra(Intent.EXTRA_TITLE))
+            assertEquals(1, fixture.ui().mediaPreview!!.images.size)
+            registry.dispatchResult(registry.codes.single(), null as Uri?)
+        }
+        compose.runOnIdle { assertFalse(fixture.ui().riskAccepted); assertEquals(OriginalExportPhase.PREVIEW, fixture.ui().phase) }
+    }
+    @Test fun mixedZipMalformedAuthenticatedOriginalFailsBeforePreviewOrSystemPicker() {
+        fixture.includeImage = true
+        fixture.imageBytes = Fixture.PNG.copyOf().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
+        content()
+        compose.onNodeWithTag("export-open").performScrollTo().performClick()
+        compose.onNodeWithTag("export-select-one").performScrollTo().performClick()
+        compose.onNodeWithTag("export-format-MEDIA_ZIP").performScrollTo().performClick()
+        compose.onNodeWithTag("export-prepare").performScrollTo().performClick(); pump()
+        compose.onNodeWithTag("export-error").performScrollTo().assertExists()
+        compose.onAllNodesWithTag("export-risk").assertCountEquals(0)
+        compose.runOnIdle { assertEquals(OriginalExportPhase.FAILED, fixture.ui().phase); assertNull(fixture.ui().snapshot); assertTrue(registry.intents.isEmpty()) }
+    }
     @Test fun actualDialogRequiresSelectionPreviewAndFreshPlaintextConsentBeforeSystemDocumentIntent() {
         content(); compose.onNodeWithTag("export-open").performScrollTo().performClick()
         compose.onNodeWithTag("export-prepare").assertIsNotEnabled(); assertTrue(fixture.ui().selection.isEmpty())
@@ -192,6 +226,8 @@ class OriginalExportPresentationTest {
         }
     }
     private class Fixture {
+        var includeImage = false
+        var imageBytes = PNG.copyOf()
         var original = StoredEntry("one", 1, "合成私密原文🙂".repeat(70), 42, "Asia/Shanghai", ProcessingPolicy.LOCAL_ONLY)
         private val tags = ManualTagSnapshot("one", 1, listOf("合成私密标签"))
         val state = mutableStateOf(LocalRecordUiState(ready = true, opening = false, supportsOriginalExport = true,
@@ -200,12 +236,26 @@ class OriginalExportPresentationTest {
         private val export = object : OriginalExportRepository {
             override fun capture(sources: List<SourceVersion>, snapshotId: String, createdAtMillis: Long, refreshCurrent: Boolean): OriginalExportSnapshot {
                 if (!refreshCurrent && sources.single().revision != original.currentRevision.toLong()) throw OriginalExportConflict()
-                return OriginalExportSnapshot(snapshotId, createdAtMillis, listOf(OriginalExportRecord(original, OriginalExports.hash(original.originalText), tags)))
+                return OriginalExportSnapshot(snapshotId, createdAtMillis, listOf(OriginalExportRecord(original, OriginalExports.hash(original.originalText), tags,
+                    imageCount = if (includeImage) 1 else 0)))
             }
             override fun isCurrent(snapshot: OriginalExportSnapshot) = snapshot.records.single().entry == original && snapshot.records.single().tags.version == tags.version
         }
+        private val media = object : RecordMediaPackageRepository {
+            override suspend fun preview(snapshot: OriginalExportSnapshot) = RecordMediaPreview(snapshot, if (includeImage) listOf(
+                RecordPackageImage("one", original.currentRevision, IMAGE_ID, "image/png", imageBytes.size.toLong(),
+                    java.security.MessageDigest.getInstance("SHA-256").digest(imageBytes).joinToString("") { "%02x".format(it) })) else emptyList())
+            override suspend fun isCurrent(preview: RecordMediaPreview) = export.isCurrent(preview.snapshot)
+            override suspend fun readOpenImage(preview: RecordMediaPreview, image: RecordPackageImage) = imageBytes.copyOf()
+            override suspend fun exportOpenZip(preview: RecordMediaPreview) = OpenRecordZipCodec.prepare(preview, { imageBytes.copyOf() }, { isCurrent(preview) })
+            override suspend fun seal(preview: RecordMediaPreview, password: CharArray): PreparedRecordMediaPackage = error("Unrelated")
+            override suspend fun open(source: () -> InputStream, password: CharArray): VerifiedRecordPackage = error("Unrelated")
+            override suspend fun restore(verified: VerifiedRecordPackage, newIds: List<String>, importedAtMillis: Long): RecordPackageRestoreResult = error("Unrelated")
+            override suspend fun recover() = Unit
+        }
         private val store = object : EntryRepository {
             override val originalExport = export
+            override val mediaPackages = media
             override suspend fun readDraft(): TextDraft? = null
             override suspend fun updateDraft(text: String): TextDraft = error("Outside UI port")
             override suspend fun saveDraft(expected: TextDraft, capturedAtMillis: Long, captureTimeZone: String): StoredEntry = error("Outside UI port")
@@ -213,13 +263,17 @@ class OriginalExportPresentationTest {
             override suspend fun revisions(entryId: String) = emptyList<OriginalRevision>()
             override suspend fun revise(entryId: String, expectedRevision: Int, text: String, createdAtMillis: Long): StoredEntry = error("Outside UI port")
         }
-        val controller = OriginalExportController({ state.value }, { state.value = it(state.value) }, { queue.addLast(it); true }, Clock.systemUTC())
+        val controller = OriginalExportController({ state.value }, { state.value = it(state.value) }, { queue.addLast(it); true }, Clock.systemUTC(), PlatformImageDecoder::thumbnail)
         fun ui() = state.value.originalExport!!
         fun drain() { runBlocking { while (queue.isNotEmpty()) queue.removeFirst()(store) } }
         fun previewAndPick() {
             controller.open(); controller.toggle(ui().session, "one", 1); controller.prepare(ui().session); drain()
             val preview = ui(); controller.acceptRisk(preview.session, preview.snapshot!!.id, preview.format, preview.epoch, true)
             controller.choose(preview.session, preview.snapshot.id, preview.format, preview.epoch); drain()
+        }
+        companion object {
+            const val IMAGE_ID = "00000000-0000-4000-8000-000000000001"
+            val PNG = java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNQCp35HwADvQIQaYgMTgAAAABJRU5ErkJggg==")
         }
     }
     private class FailingDocument : SelectedExportDocument {

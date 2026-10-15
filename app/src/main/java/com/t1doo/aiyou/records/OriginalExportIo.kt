@@ -18,6 +18,48 @@ class OriginalExportFileFailure : IllegalStateException("Export file could not b
  * Generic document providers are not transactional: failure/cancel can leave an empty/partial file.
  */
 object OriginalExportIo {
+    /** Hash and exact length of the entire ZIP, including its central directory; 8 KiB readback. */
+    suspend fun writeZipAndVerify(document: SelectedExportDocument,
+        payload: com.t1doo.aiyou.domain.PreparedRecordMediaPackage, active: () -> Boolean) {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        var size = 0L
+        fun checkActive() { if (!active()) throw OriginalExportCancelled() }
+        checkActive()
+        document.openForWrite().use { destination ->
+            val output = object : OutputStream() {
+                override fun write(value: Int) { write(byteArrayOf(value.toByte()), 0, 1) }
+                override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                    checkActive()
+                    if (size + length > com.t1doo.aiyou.domain.OpenRecordZipCodec.MAX_FILE_BYTES) throw OriginalExportFileFailure()
+                    destination.write(bytes, offset, length); digest.update(bytes, offset, length); size += length
+                    checkActive()
+                }
+                override fun flush() { checkActive(); destination.flush(); checkActive() }
+            }
+            payload.writeTo(output, active); output.flush()
+        }
+        checkActive()
+        val expected = digest.digest()
+        val actual = java.security.MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(8192)
+        try {
+            var read = 0L; var zeros = 0
+            document.openForRead().use { input ->
+                while (true) {
+                    checkActive()
+                    val n = input.read(buffer)
+                    checkActive()
+                    if (n < 0) break
+                    if (n == 0) { if (++zeros > 16) throw OriginalExportFileFailure(); continue }
+                    zeros = 0; read += n
+                    if (read > size) throw OriginalExportFileFailure()
+                    actual.update(buffer, 0, n)
+                }
+                if (read != size || !java.security.MessageDigest.isEqual(expected, actual.digest())) throw OriginalExportFileFailure()
+            }
+            checkActive()
+        } finally { buffer.fill(0); expected.fill(0) }
+    }
     fun writeAndVerify(document: SelectedExportDocument, payload: OriginalExportPayload, active: () -> Boolean) {
         val bytes = payload.copyBytes()
         fun checkActive() { if (!active()) throw OriginalExportCancelled() }
