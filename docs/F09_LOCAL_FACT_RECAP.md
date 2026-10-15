@@ -35,7 +35,10 @@ a visible failure. Its separate LazyListState preserves the review position when
 
 The controller uses the existing serial records IO actor and fresh generation tokens for
 each explicit request. Cancel, changed input, route exit, backgrounding and disposal retire
-late results. Cancellation discards publication; the bounded in-flight read releases its
+late results. A short ownership gate binds generation changes to final publication and source
+navigation; the StateFlow CAS checks generation and current availability again. SQL queries
+and queue waiting stay outside the gate. Validation failures cannot retire a newer request.
+Cancellation discards publication; the bounded in-flight read releases its
 existing transaction normally. The VM clears old visible results before source-affecting
 commands and synchronously on source-list/tag/readiness changes. No recap, source text,
 tags, range-input undo history or proof is put in a Bundle/Saver, export or plaintext cache.

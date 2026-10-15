@@ -102,7 +102,7 @@ class FactRecapPresentationTest {
                         override val range=range
                         override val cards=records.filter {it.capturedAtMillis>=range.startMillis&&it.capturedAtMillis<range.endMillis}.map {
                             FactRecapCard(SourceVersion(it.id,it.currentRevision.toLong()),it.capturedAtMillis,it.captureTimeZone,OriginalExports.hash(it.originalText),0,it.originalText.take(240),it.originalText.length>240,
-                                ManualTagSnapshot(it.id,0,emptyList()),if(it.id==imageEntry)listOf(FactRecapImage(picture().intent,AttachmentState.READY))else emptyList(),it.policy)
+                                ManualTagSnapshot(it.id,0,emptyList()),if(it.id==imageEntry && it.currentRevision==1)listOf(FactRecapImage(picture().intent,AttachmentState.READY))else emptyList(),it.policy)
                         }
                     }
                 }

@@ -750,6 +750,7 @@ fun AIyouApp(
                     factRecaps.source(card) {
                         navigation.publish(routeGeneration) {
                             if(recapRoute && selectedName==Destination.MEMORIES.name && detailEntryId==null && !showSettings && !demo &&
+                                currentLocal?.factRecap?.snapshot?.cards?.any { it===card }==true &&
                                 currentLocal?.entries?.any { it.id==card.source.sourceId && it.currentRevision.toLong()==card.source.revision &&
                                     com.t1doo.aiyou.model.OriginalExports.hash(it.originalText)==card.contentHash }==true) {
                                 navigation.advance();search.pause();readerFromSearch=false;tailReturnRequest=null

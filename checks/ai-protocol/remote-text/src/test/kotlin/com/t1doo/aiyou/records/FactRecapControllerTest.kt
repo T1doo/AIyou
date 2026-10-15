@@ -12,6 +12,52 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class FactRecapControllerTest {
+    @Test fun changedGenerationBetweenOwnershipCheckAndStateTransformCannotWriteOldSnapshot():Unit=runBlocking {
+        for(cancel in listOf(false,true)) FactRecapHarness().use {h->
+            h.c.open();h.c.generate()
+            // Deterministic interleaving at the actual publisher boundary after the initial ownership check.
+            h.beforeStateCommit={h.beforeStateCommit={}
+                if(cancel)h.c.cancel() else h.c.input("2026-10-16","UTC",FactRecapPeriod.WEEK)}
+            h.drain();assertNull(h.ui.snapshot);assertFalse(h.ui.loading)
+            if(!cancel)assertEquals("2026-10-16",h.ui.date)
+        }
+    }
+    @Test(timeout=15000) fun finalPublicationAndInputOrCancelHaveOneAtomicOwnershipOrder():Unit=runBlocking {
+        for(cancel in listOf(false,true)) FactRecapHarness().use {h->
+            h.c.open();h.c.generate()
+            val reached=CountDownLatch(1);val release=CountDownLatch(1)
+            val failure=java.util.concurrent.atomic.AtomicReference<Throwable?>()
+            h.beforePublication={reached.countDown();check(release.await(5,TimeUnit.SECONDS))}
+            val worker=Thread {try{runBlocking{h.drain()}}catch(t:Throwable){failure.set(t)}}
+            worker.start()
+            try {
+                assertTrue(reached.await(5,TimeUnit.SECONDS))
+                if(cancel)h.c.cancel() else h.c.input("2026-10-16","UTC",FactRecapPeriod.WEEK)
+            } finally {release.countDown();worker.join(5000)}
+            assertFalse(worker.isAlive);assertNull(failure.get());assertNull(h.ui.snapshot);assertFalse(h.ui.loading)
+            if(!cancel)assertEquals("2026-10-16",h.ui.date)
+        }
+    }
+    @Test(timeout=15000) fun sourceCallbackCannotNavigateAfterCloseAndNewSessionAtItsFinalGate():Unit=runBlocking {
+        FactRecapHarness().use {h->
+            h.c.open();h.c.generate();h.drain();val card=h.ui.snapshot!!.cards.single()
+            val reached=CountDownLatch(1);val release=CountDownLatch(1)
+            val failure=java.util.concurrent.atomic.AtomicReference<Throwable?>();val opens=java.util.concurrent.atomic.AtomicInteger()
+            h.beforeResolve={reached.countDown();check(release.await(5,TimeUnit.SECONDS))}
+            h.c.source(card){opens.incrementAndGet()}
+            val worker=Thread {try{runBlocking{h.drain()}}catch(t:Throwable){failure.set(t)}};worker.start()
+            try {assertTrue(reached.await(5,TimeUnit.SECONDS));h.c.close();h.c.open()}
+            finally {release.countDown();worker.join(5000)}
+            assertFalse(worker.isAlive);assertNull(failure.get());assertEquals(0,opens.get());assertNull(h.ui.snapshot)
+        }
+    }
+    @Test fun finalStateTransformRechecksIndependentReadinessFailureInsideCas():Unit=runBlocking {
+        FactRecapHarness().use {h->
+            h.c.open();h.c.generate()
+            h.beforeStateCommit={h.beforeStateCommit={};h.local=h.local.copy(error="合成独立读取失败")}
+            h.drain();assertNull(h.ui.snapshot);assertEquals("合成独立读取失败",h.local.error)
+        }
+    }
     @Test fun explicitGenerateReadsRealSqlAndOpensOnlyExactCurrentSource():Unit=runBlocking {
         FactRecapHarness().use { h->
             h.c.open();assertNull(h.ui.snapshot);h.c.generate();assertTrue(h.ui.loading);h.drain()
@@ -101,7 +147,8 @@ internal class FactRecapHarness : AutoCloseable {
     val f=PermanentErasureFixture()
     val clock:Clock=Clock.fixed(Instant.parse("2026-10-15T08:00:00Z"),ZoneId.of("UTC"))
     val id=f.entry(text="合成：只是计划，不是已经发生的事件。🙂").also {f.db.write("UPDATE entries SET capturedAtMillis=? WHERE id=?",clock.millis(),it)}
-    var failCapture=false;var afterCapture:()->Unit={};var accept=true
+    var failCapture=false;var afterCapture:()->Unit={};var beforePublication:()->Unit={};var beforeResolve:()->Unit={}
+    var beforeStateCommit:()->Unit={};var accept=true
     private val base=SqlFactRecapRepository(f.gateway,f.tags)
     val store=object:EntryRepository {
         override val factRecaps=object:FactRecapRepository by base {
@@ -109,6 +156,8 @@ internal class FactRecapHarness : AutoCloseable {
                 if(failCapture)error("Synthetic read failure")
                 return base.capture(range).also{afterCapture()}
             }
+            override fun publishCurrent(snapshot:FactRecapSnapshot,publish:()->Unit)=base.publishCurrent(snapshot){beforePublication();publish()}
+            override fun resolve(snapshot:FactRecapSnapshot,source:SourceVersion,publish:()->Unit)=base.resolve(snapshot,source){beforeResolve();publish()}
         }
         override val manualTags=f.tags
         override suspend fun entries()=f.db.read("SELECT e.id,e.currentRevision,r.originalText,e.capturedAtMillis,e.captureTimeZone,e.privacyPolicy FROM entries e JOIN entry_revisions r ON r.entryId=e.id AND r.revision=e.currentRevision WHERE NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=e.id AND a.deleted=1)").map {
@@ -120,9 +169,9 @@ internal class FactRecapHarness : AutoCloseable {
         override suspend fun revisions(entryId:String)=emptyList<OriginalRevision>()
         override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry=error("Unrelated")
     }
-    var local=runBlocking {LocalRecordUiState(ready=true,opening=false,supportsFactRecaps=true,manualTagsAvailable=true,manualTags=f.tags.snapshots(),entries=store.entries())}
+    @Volatile var local=runBlocking {LocalRecordUiState(ready=true,opening=false,supportsFactRecaps=true,manualTagsAvailable=true,manualTags=f.tags.snapshots(),entries=store.entries())}
     val queue=ArrayDeque<suspend(EntryRepository)->Unit>()
-    val c=FactRecapController({local},{change->local=reconcileFactRecap(local,change(local))},{if(accept){queue.add(it);true}else false},clock)
+    val c=FactRecapController({local},{change->beforeStateCommit();local=reconcileFactRecap(local,change(local))},{if(accept){queue.add(it);true}else false},clock)
     val ui get()=checkNotNull(local.factRecap)
     suspend fun drain(){while(queue.isNotEmpty())queue.removeFirst()(store)}
     override fun close(){c.dispose();f.close()}
