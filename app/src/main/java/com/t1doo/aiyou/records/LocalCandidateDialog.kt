@@ -15,11 +15,21 @@ import androidx.compose.ui.window.DialogProperties
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.model.*
 
+/** Observe the exact memory-only business actions, independently of a clickable node's lifetime. */
+internal class CandidateDialogActions(val confirm: () -> Unit, val cancelConfirmation: () -> Unit)
+internal fun interface CandidateDialogObserver { fun onActions(actions: CandidateDialogActions) }
+internal val LocalCandidateDialogObserver = staticCompositionLocalOf<CandidateDialogObserver?> { null }
+
 @Composable
 internal fun LocalCandidateDialog(ui: LocalCandidateUiState, controller: LocalCandidateController,
     canUse: () -> Boolean, onLocate: (OriginalReadingLocation) -> Unit) {
     DisposableEffect(controller, ui.session) { onDispose { controller.close(ui.session) } }
     fun allowed() = canUse()
+    val confirmation = ui.confirmation
+    val actions = CandidateDialogActions(
+        confirm = { if (allowed() && confirmation != null) controller.confirm(ui.session, confirmation) },
+        cancelConfirmation = { if (allowed() && confirmation != null) controller.cancelConfirmation(ui.session, confirmation) })
+    LocalCandidateDialogObserver.current?.let { observer -> SideEffect { observer.onActions(actions) } }
     Dialog(onDismissRequest = { if (allowed()) controller.close(ui.session) },
         properties = DialogProperties(usePlatformDefaultWidth = false)) {
         CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
@@ -37,7 +47,6 @@ internal fun LocalCandidateDialog(ui: LocalCandidateUiState, controller: LocalCa
                     if (ui.loading) Text("正在读取已保存的候选与审阅结果。")
                     if (ui.busy) Text("正在确认本机存储回执。")
                     if (ui.computing) Text("正在本机生成摘录，原文保存可继续。")
-                    val confirmation = ui.confirmation
                     if (confirmation != null) {
                         val batch = ui.batches.singleOrNull { it.id == confirmation.batchId && it.version == confirmation.version }
                         val item = batch?.items?.singleOrNull { it.id == confirmation.itemId }
@@ -46,12 +55,12 @@ internal fun LocalCandidateDialog(ui: LocalCandidateUiState, controller: LocalCa
                             Text(item.proposal.quote, modifier = Modifier.testTag("local-candidate-confirm-quote"))
                             Text("来源：原文版本 " + batch.source.revision + " · 本机规则摘录")
                             Button(enabled = !ui.busy && ui.pending == null,
-                                onClick = { if (allowed()) controller.confirm(ui.session, confirmation) },
+                                onClick = actions.confirm,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("local-candidate-confirm")) {
                                 Text("确认采纳摘录")
                             }
                             TextButton(enabled = !ui.busy,
-                                onClick = { if (allowed()) controller.cancelConfirmation(ui.session, confirmation) },
+                                onClick = actions.cancelConfirmation,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("local-candidate-cancel-confirm")) { Text("取消确认") }
                         }
                     } else {

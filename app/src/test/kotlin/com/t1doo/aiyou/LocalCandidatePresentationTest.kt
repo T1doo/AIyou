@@ -24,6 +24,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.*
 import org.junit.After
 import org.junit.Assert.*
@@ -115,12 +116,15 @@ class LocalCandidatePresentationTest {
     private val controller = LocalCandidateController({ state.value }, { state.value = it(state.value) },
         { queue.add(it); true }, scope, Clock.fixed(Instant.ofEpochMilli(100), ZoneOffset.UTC))
     private var registry: SaveableStateRegistry? = null
+    private val callbacks = AtomicReference<CandidateDialogActions>()
+    private val observer = CandidateDialogObserver { callbacks.set(it) }
     @After fun close() { controller.dispose(); scope.cancel() }
     @Composable private fun Screen(large: Boolean = false) {
         val saved = LocalSaveableStateRegistry.current
         SideEffect { registry = saved }
         val density = LocalDensity.current
-        CompositionLocalProvider(LocalDensity provides if (large) Density(density.density, 2f) else density) {
+        CompositionLocalProvider(LocalCandidateDialogObserver provides observer,
+            LocalDensity provides if (large) Density(density.density, 2f) else density) {
             AIyouTheme {
                 Box(if (large) Modifier.size(320.dp, 640.dp) else Modifier) {
                     AIyouApp(previewDestination = Destination.MEMORIES, local = state.value,
@@ -154,6 +158,7 @@ class LocalCandidatePresentationTest {
     private fun suffix(batch: LocalCandidateBatch) = batch.id + "-" + batch.items.single().id
     private fun click(tag: String) { compose.onNodeWithTag(tag).performScrollTo().performClick() }
     private fun action(tag: String) = compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+    private fun business() = checkNotNull(callbacks.get())
     private fun seed() {
         val job = port.begin(LocalCandidateStart("synthetic-private-batch", SourceVersion("one", 1), 55))
         port.complete(job, LocalExcerptRules.extract(job))
@@ -167,7 +172,7 @@ class LocalCandidatePresentationTest {
         assertTrue(reviews.isEmpty())
         click("local-candidate-cancel-confirm"); assertTrue(reviews.isEmpty())
         click("local-candidate-accept-" + suffix)
-        val retainedConfirm = action("local-candidate-confirm")
+        val retainedConfirm = business().confirm
         click("local-candidate-confirm")
         compose.runOnIdle { retainedConfirm(); assertEquals(1, queue.size) }
         assertEquals(ExcerptReview.PROPOSED, durable.single().items.single().review)
@@ -192,6 +197,11 @@ class LocalCandidatePresentationTest {
         compose.onAllNodesWithTag("local-candidates-notice").assertCountEquals(0)
         compose.onAllNodesWithText("还没有保存的本机摘录候选。").assertCountEquals(0)
         assertEquals(ExcerptReview.ACCEPTED, durable.single().items.single().review)
+        compose.runOnIdle {
+            val raw = checkNotNull(registry).performSave().toString()
+            for (secret in listOf(reviews.single().mutationId, batch.sourceHash,
+                batch.items.single().proposal.quote, one.originalText)) assertFalse(raw.contains(secret))
+        }
         failRead = false; click("local-candidates-retry"); drain()
         assertSame(reviews[0], reviews[1]); assertEquals(2L, durable.single().version)
         compose.onNodeWithTag("local-candidate-review-" + suffix).assertTextEquals("已采纳摘录")
@@ -201,11 +211,11 @@ class LocalCandidatePresentationTest {
         seed(); compose.setContent { Screen() }; openReader(); openCandidates()
         val suffix = suffix(durable.single())
         click("local-candidate-accept-" + suffix)
-        val oldConfirm = action("local-candidate-confirm"); val oldCancel = action("local-candidate-cancel-confirm")
+        val oldConfirm = business().confirm; val oldCancel = business().cancelConfirmation
         click("local-candidate-cancel-confirm"); click("local-candidate-accept-" + suffix)
         compose.runOnIdle { oldCancel(); oldConfirm(); assertTrue(queue.isEmpty()) }
         compose.onNodeWithTag("local-candidate-confirm").assertExists()
-        val freshConfirm = action("local-candidate-confirm")
+        val freshConfirm = business().confirm
         val back = compose.onNodeWithText("返回列表").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
         compose.runOnIdle { back(); freshConfirm(); assertTrue(queue.isEmpty()) }
         compose.waitForIdle(); assertTrue(reviews.isEmpty())
@@ -245,7 +255,7 @@ class LocalCandidatePresentationTest {
         seed(); val restoration = StateRestorationTester(compose)
         restoration.setContent { Screen() }; openReader(); openCandidates()
         val batch = durable.single(); click("local-candidate-accept-" + suffix(batch))
-        val confirm = action("local-candidate-confirm")
+        val confirm = business().confirm
         compose.runOnIdle {
             val raw = checkNotNull(registry).performSave().toString()
             for (secret in listOf(one.originalText, batch.items.single().proposal.quote,
