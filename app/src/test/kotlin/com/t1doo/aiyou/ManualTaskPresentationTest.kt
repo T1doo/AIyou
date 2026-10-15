@@ -206,14 +206,14 @@ class ManualTaskPresentationTest {
         compose.onNodeWithTag("manual-task-create").performScrollTo().performClick()
         assertTrue(persisted.isEmpty()); assertNull(state.value.tasks.notice); pump()
         val id = persisted.keys.single(); assertNull(persisted.getValue(id).schedule!!.time)
-        compose.onNodeWithTag("manual-task-date-" + id).performScrollTo().assertTextContains("仅日期")
+        taskNode("manual-task-date-" + id).assertTextContains("仅日期", substring = true)
         openDate(id); dateFields("2042-11-20", "09:30", "Europe/Paris"); saveDate()
         assertEquals("2042-11-19", persisted.getValue(id).schedule!!.date.toString()); pump()
         assertEquals("Europe/Paris", persisted.getValue(id).schedule!!.timeZone)
-        compose.onNodeWithTag("manual-task-postpone-" + id).performScrollTo().performClick()
+        taskNode("manual-task-postpone-" + id).performClick()
         dateFields("2042-11-21", "09:30", "Europe/Paris"); saveDate(); pump()
         assertEquals("2042-11-21", persisted.getValue(id).schedule!!.date.toString())
-        compose.onNodeWithTag("manual-task-clear-" + id).performScrollTo().performClick()
+        taskNode("manual-task-clear-" + id).performClick()
         compose.onNodeWithText("确认清除").performScrollTo().assertIsDisplayed(); saveDate(); pump()
         assertNull(persisted.getValue(id).schedule); assertEquals(4L, persisted.getValue(id).version)
         assertEquals(ManualTaskStatus.OPEN, persisted.getValue(id).status)
@@ -224,14 +224,14 @@ class ManualTaskPresentationTest {
         assertNull(persisted.getValue("one").schedule); openDate("one")
         dateFields("2026-03-08", "02:30", "America/New_York"); saveDate()
         assertTrue(queued.isEmpty()); assertNull(persisted.getValue("one").schedule)
-        compose.onNodeWithText("这个本地时刻因夏令时跳转不存在，请明确选择其他时刻。").performScrollTo().assertIsDisplayed()
+        dialogError("这个本地时刻因夏令时跳转不存在，请明确选择其他时刻。")
         dateFields("2026-11-01", "01:30", "America/New_York"); saveDate()
         assertTrue(queued.isEmpty())
-        compose.onNodeWithText("这个本地时刻出现两次，请明确选择第一次或第二次。").performScrollTo().assertIsDisplayed()
+        dialogError("这个本地时刻出现两次，请明确选择第一次或第二次。")
         compose.onNodeWithTag("manual-task-offset-SECOND").performScrollTo().performClick()
         saveDate(); assertEquals(1L, persisted.getValue("one").version); pump()
         assertEquals(-18_000, persisted.getValue("one").schedule!!.offsetSeconds)
-        compose.onNodeWithTag("manual-task-date-one").performScrollTo().assertTextContains("偏移 -05:00")
+        taskNode("manual-task-date-one").assertTextContains("偏移 -05:00", substring = true)
     }
     @Test fun lostDateReadbackKeepsStableRequestAfterCloseAndNeverShowsFalseEmpty() {
         persisted["one"] = snapshot("one", "合成日期待确认"); content(); openDate("one")
@@ -259,10 +259,10 @@ class ManualTaskPresentationTest {
         for ((group, title) in listOf(ManualTaskGroup.UNDATED to "未设时间 · 待办", ManualTaskGroup.TODAY to "今天",
             ManualTaskGroup.UPCOMING to "接下来", ManualTaskGroup.PAST to "过去 · 未完成",
             ManualTaskGroup.COMPLETED to "已完成", ManualTaskGroup.CANCELLED to "已取消")) {
-            compose.onNodeWithTag("manual-task-heading-" + group).performScrollTo().assertTextEquals(title + " 1")
+            taskNode("manual-task-heading-" + group).assertTextEquals(title + " 1")
         }
-        compose.onNodeWithTag("manual-task-date-today").performScrollTo().assertTextContains("仅日期").assertTextContains("Asia/Shanghai")
-        compose.onNodeWithTag("manual-task-date-done").performScrollTo().assertTextContains("2026-10-13")
+        taskNode("manual-task-date-today").assertTextContains("仅日期", substring = true).assertTextContains("Asia/Shanghai", substring = true)
+        taskNode("manual-task-date-done").assertTextContains("2026-10-13", substring = true)
         compose.onAllNodesWithTag("manual-task-date-open-done").assertCountEquals(0)
         compose.onAllNodesWithTag("manual-task-complete-cancel").assertCountEquals(0)
         assertNull(persisted.getValue("none").schedule)
@@ -318,7 +318,15 @@ class ManualTaskPresentationTest {
         compose.onNodeWithTag("manual-task-zone-input").performScrollTo().performTextReplacement(zone)
         compose.waitForIdle()
     }
-    private fun openDate(id: String) { compose.onNodeWithTag("manual-task-date-open-" + id).performScrollTo().performClick(); compose.waitForIdle() }
+    private fun taskNode(tag: String): SemanticsNodeInteraction {
+        // Lazy items outside the viewport have no node until the list finds and composes them.
+        compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(tag))
+        return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
+    }
+    private fun dialogError(message: String) {
+        compose.onNode(hasText(message) and hasAnyAncestor(isDialog())).performScrollTo().assertIsDisplayed()
+    }
+    private fun openDate(id: String) { taskNode("manual-task-date-open-" + id).performClick(); compose.waitForIdle() }
     private fun saveDate() { compose.onNodeWithTag("manual-task-date-save").performScrollTo().performClick() }
     private fun content(large: Boolean = false) { runBlocking { controller.initialize(store) }; compose.setContent { TestScreen(large) }; compose.waitForIdle() }
     @Composable private fun TestScreen(large: Boolean) {
