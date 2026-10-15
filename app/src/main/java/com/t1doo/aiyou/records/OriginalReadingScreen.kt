@@ -144,6 +144,7 @@ fun OriginalReadingScreen(
     onRetryFavorite: (String) -> Unit = {},
     onRefreshFavorites: () -> Unit = {},
     candidateController: LocalCandidateController? = null,
+    sourceTagController: SourceTagController? = null,
     canUseCandidates: (String, Int) -> Boolean = { _, _ -> false },
     onCandidateLocation: (OriginalReadingLocation) -> Unit = {},
 ) {
@@ -245,10 +246,22 @@ fun OriginalReadingScreen(
                                 onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-local-candidates")) { Text("本机摘录候选") }
                         }
+                        sourceTagController?.let { controller ->
+                            TextButton(enabled = local.supportsSourceTags && !local.saving && !local.savePending &&
+                                entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
+                                onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-tags")) { Text("从原文添加标签") }
+                        }
                     }
                     local.candidates?.takeIf { it.source.sourceId == entry.id && it.source.revision == entry.currentRevision.toLong() }?.let { ui ->
                         candidateController?.let { controller ->
                             LocalCandidateDialog(ui, controller, { canUseCandidates(entry.id, entry.currentRevision) }, onCandidateLocation)
+                        }
+                    }
+                    local.sourceTags?.takeIf { it.source.sourceId == entry.id && it.source.revision == entry.currentRevision.toLong() }?.let { ui ->
+                        sourceTagController?.let { controller ->
+                            SourceTagDialog(ui, controller, { canUseCandidates(entry.id, entry.currentRevision) }, onCandidateLocation,
+                                { onOpenTags?.invoke(entry.id, entry.currentRevision) })
                         }
                     }
                     local.ai?.takeIf { it.source.sourceId == entry.id &&

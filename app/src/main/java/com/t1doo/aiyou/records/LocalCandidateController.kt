@@ -51,7 +51,7 @@ class LocalCandidateController(
 
     fun open(id: String, revision: Int) {
         val local = current()
-        if (disposed || !local.ready || local.opening || local.error != null || !local.supportsCandidates) return
+        if (disposed || !local.ready || local.opening || local.error != null || !local.supportsCandidates || local.sourceTags != null) return
         val entry = local.entries.singleOrNull { it.id == id && it.currentRevision == revision && it.policy != ProcessingPolicy.AI_NONE } ?: return
         worker?.cancel()
         val ui = LocalCandidateUiState(sessions.incrementAndGet(), SourceVersion(id, revision.toLong()), OriginalExports.hash(entry.originalText))

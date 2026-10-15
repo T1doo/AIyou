@@ -37,12 +37,15 @@ internal class SqlManualTagRepository(private val database: RecordsSqlDatabase, 
         ).associate { cells -> val row = decode(cells); row.id to row.snapshot() }) }
     }
     override fun replace(mutation: ManualTagMutation): ManualTagSnapshot = safely {
-        database.transaction { sql ->
+        database.transaction { sql -> replaceWithin(sql, mutation) }
+    }
+    /** Caller owns the same counted transaction; retains the original manual-tag wire format. */
+    internal fun replaceWithin(sql: RecordsSqlConnection, mutation: ManualTagMutation): ManualTagSnapshot {
             live(sql, mutation.entryId)
             val previous = row(sql, mutation.entryId)
             val snapshot = previous?.snapshot() ?: ManualTagSnapshot(mutation.entryId, 0, emptyList())
             if (previous?.mutation == mutation.mutationId) {
-                if (snapshot.version == mutation.expectedVersion + 1 && snapshot.names == mutation.names) snapshot
+                if (snapshot.version == mutation.expectedVersion + 1 && snapshot.names == mutation.names) return snapshot
                 else throw ManualTagConflict()
             } else {
                 if (snapshot.version != mutation.expectedVersion) throw ManualTagConflict()
@@ -52,11 +55,10 @@ internal class SqlManualTagRepository(private val database: RecordsSqlDatabase, 
                     listOf(mutation.entryId, next, mutation.mutationId, bytes))
                 else if (sql.execute("UPDATE entry_manual_tags SET version=?,lastMutationId=?,ciphertext=? WHERE entryId=? AND version=?",
                     listOf(next, mutation.mutationId, bytes, mutation.entryId, mutation.expectedVersion)) != 1) throw ManualTagConflict()
-                checkNotNull(row(sql, mutation.entryId)).snapshot().also {
+                return checkNotNull(row(sql, mutation.entryId)).snapshot().also {
                     check(it.version == next && it.names == mutation.names)
                 }
             }
-        }
     }
     private fun live(sql: RecordsSqlConnection, id: String) {
         if (sql.query("SELECT id FROM entries e WHERE id=? AND NOT EXISTS(SELECT 1 FROM remote_source_access a WHERE a.entryId=e.id AND a.deleted=1)", listOf(id)).size != 1)

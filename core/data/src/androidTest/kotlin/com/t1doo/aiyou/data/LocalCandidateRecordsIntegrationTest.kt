@@ -35,7 +35,7 @@ class LocalCandidateRecordsIntegrationTest {
     } }
 
     @Test fun encryptedVersionNineMigrationPreservesOpaqueAnnotationsAndExplicitExcerptReviews(): Unit = runBlocking {
-        val text = "我不喝咖啡🙂，这不是稳定人格推断。"
+        val text = "我不喝咖啡🙂，这不是稳定人格推断。\n标签：#生活"
         val oldText = "合成旧来源"
         val oldSource = SourceVersion("remote", 1)
         val oldBytes = RemoteTextCodec.encodeCandidate(DerivedTextCandidate("合成旧 opaque 注记",
@@ -90,6 +90,13 @@ class LocalCandidateRecordsIntegrationTest {
         assertEquals(ExcerptReview.REJECTED, store.localCandidates.batches(source).single().items.single().review)
         assertEquals(text,store.entries().single { it.id=="local" }.originalText)
         assertTrue(store.manualTasks.snapshots().isEmpty()); assertTrue(store.manualTags.read("local").names.isEmpty())
+        val tagPreview = store.sourceTags.preview(source)
+        val tagRequest = SourceTagRequest(tagPreview, tagPreview.proposals.single(), "native-source-tag", 99)
+        store.sourceTags.apply(tagRequest)
+        store.sourceTags.apply(tagRequest)
+        store.closeAndAwait(); store = open()
+        assertEquals(listOf("生活"), store.manualTags.read("local").names)
+        assertEquals(1L, store.manualTags.read("local").version)
         assertFalse(file.readBytes().toString(Charsets.UTF_8).contains(text))
     }
     @Test fun nativeSourceEditTrashRestoreAndErasureInvalidateCandidatesAndLateCompletion(): Unit = runBlocking {

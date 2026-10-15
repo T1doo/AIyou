@@ -59,6 +59,8 @@ data class LocalRecordUiState(
     val editDraftIndexAvailable: Boolean = true,
     val ai: RecordAiUiState? = null,
     val supportsCandidates: Boolean = false,
+    val supportsSourceTags: Boolean = false,
+    val sourceTags: SourceTagUiState? = null,
     val candidates: LocalCandidateUiState? = null,
     val manualTags: Map<String, com.t1doo.aiyou.model.ManualTagSnapshot> = emptyMap(),
     val manualTagsAvailable: Boolean = false,
@@ -120,6 +122,8 @@ class LocalRecordsViewModel internal constructor(
     val candidates = LocalCandidateController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.LocalCandidates(action)).isSuccess },
         scope = viewModelScope, clock = clock, extract = extractLocalCandidates)
+    val sourceTags = SourceTagController(current = { mutableState.value }, publish = { change -> update(change) },
+        enqueue = { action -> commands.trySend(Command.LocalCandidates(action)).isSuccess }, clock = clock)
     val exports = OriginalExportController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.OriginalExport(action)).isSuccess }, clock = clock)
     val recordPackages = RecordPackageController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -263,6 +267,7 @@ class LocalRecordsViewModel internal constructor(
                 favorites.dispose()
                 tasks.dispose()
                 candidates.dispose()
+                sourceTags.dispose()
                 exports.dispose()
                 recordPackages.dispose()
                 recycleBin.dispose()
@@ -298,14 +303,19 @@ class LocalRecordsViewModel internal constructor(
                 labelled.entries.none { it.id == review.source.sourceId && it.currentRevision.toLong() == review.source.revision &&
                     it.policy != ProcessingPolicy.AI_NONE && com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == review.sourceHash }))
                 labelled.copy(candidates = null) else labelled
-            val selected = next.ai
-            val entry = selected?.let { value -> next.entries.firstOrNull {
+            val sourcePreview = next.sourceTags
+            val visible = if (sourcePreview != null && (editsDisposed || !next.ready || next.opening || next.error != null ||
+                next.entries.none { it.id == sourcePreview.source.sourceId && it.currentRevision.toLong() == sourcePreview.source.revision &&
+                    it.policy != ProcessingPolicy.AI_NONE && com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == sourcePreview.sourceHash }))
+                next.copy(sourceTags = null) else next
+            val selected = visible.ai
+            val entry = selected?.let { value -> visible.entries.firstOrNull {
                 it.id == value.source.sourceId && it.currentRevision.toLong() == value.source.revision
             } }
-            if (selected == null || !editsDisposed && next.ready && !next.opening && next.error == null &&
+            if (selected == null || !editsDisposed && visible.ready && !visible.opening && visible.error == null &&
                 entry != null && (entry.policy == ProcessingPolicy.REMOTE_ALLOWED ||
-                    selected.phase == RecordAiPhase.BLOCKED && selected.preview.isEmpty() && selected.annotation == null)) next
-            else next.copy(ai = null)
+                    selected.phase == RecordAiPhase.BLOCKED && selected.preview.isEmpty() && selected.annotation == null)) visible
+            else visible.copy(ai = null)
         }
     }
 
@@ -991,6 +1001,7 @@ class LocalRecordsViewModel internal constructor(
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
                 supportsCandidates = store.localCandidates != null,
+                supportsSourceTags = store.sourceTags != null,
                 entries = entries, manualTags = labels.orEmpty(), manualTagsAvailable = labels != null,
                 supportsFavorites = store.favorites != null, favorites = favoriteValues.orEmpty(),
                 favoritesAvailable = favoriteValues != null, favoritesLoading = false,
@@ -1099,6 +1110,7 @@ class LocalRecordsViewModel internal constructor(
         favorites.dispose()
         tasks.dispose()
         candidates.dispose()
+        sourceTags.dispose()
         exports.dispose()
         recordPackages.dispose()
         recycleBin.dispose()
