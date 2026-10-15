@@ -220,15 +220,19 @@ class LocalCandidatePresentationTest {
             val node = compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertIsEnabled()
             assertTrue(node.getUnclippedBoundsInRoot().height >= 48.dp)
         }
-        click("local-candidate-accept-" + suffix)
+        click("local-candidate-cancel-" + batch.id); drain()
+        assertEquals(LocalCandidateState.CANCELLED, durable.single().state)
+        assertTrue(durable.single().items.isEmpty())
+        val regenerated = generate(); val regeneratedSuffix = suffix(regenerated)
+        click("local-candidate-accept-" + regeneratedSuffix)
         for (tag in listOf("local-candidate-confirm", "local-candidate-cancel-confirm", "local-candidates-close")) {
             val node = compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
             assertTrue(node.getUnclippedBoundsInRoot().height >= 48.dp)
         }
-        click("local-candidate-cancel-confirm"); click("local-candidate-reject-" + suffix); drain()
-        compose.onNodeWithTag("local-candidate-review-" + suffix).performScrollTo().assertTextEquals("已拒绝摘录")
+        click("local-candidate-cancel-confirm"); click("local-candidate-reject-" + regeneratedSuffix); drain()
+        compose.onNodeWithTag("local-candidate-review-" + regeneratedSuffix).performScrollTo().assertTextEquals("已拒绝摘录")
         click("local-candidates-close"); assertNull(state.value.candidates)
-        assertEquals(1, reviews.size); assertTrue(cancels.isEmpty())
+        assertEquals(1, reviews.size); assertEquals(1, cancels.size)
     }
 
     @Test fun restorationDropsPrivateCandidateAndConfirmationStateAndRetiresOldCallbacks() {
