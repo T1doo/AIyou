@@ -158,12 +158,23 @@ class LocalCandidateSqlTest {
         val id = f.entry(); val source = SourceVersion(id, 1); val job = store.begin(LocalCandidateStart("batch", source, 20))
         val batch = store.complete(job, LocalExcerptRules.extract(job))
         store.review(ExcerptReviewRequest(batch.id, source, batch.sourceHash, batch.generation, 1, "excerpt-1", ExcerptReview.ACCEPTED, "review", 30))
-        val target = f.base.intent(id)
+        val trashed = f.base.intent(id)
         assertThrows(LocalCandidateConflict::class.java) { store.complete(job, LocalExcerptRules.extract(job)) }
         assertTrue(f.db.read("SELECT payload FROM local_candidate_batches").all { (it.single() as ByteArray).isEmpty() })
+        val restored = f.base.bin.apply(RecycleMutation(source, trashed.generation, true, "restore-source"))
+        assertEquals(ProcessingPolicy.AI_NONE, restored.entry.policy)
+        assertThrows(LocalCandidateConflict::class.java) { store.batches(source) }
+        assertNull(RemoteTextTransactions(f.base.gateway).updateAuthorization(source, restored.generation,
+            ProcessingPolicy.LOCAL_ONLY, null, null))
+        assertTrue(store.batches(source).all { it.state == LocalCandidateState.INVALIDATED && it.items.isEmpty() })
+        assertThrows(LocalCandidateConflict::class.java) { store.review(ExcerptReviewRequest(batch.id, source,
+            batch.sourceHash, batch.generation, 1, "excerpt-1", ExcerptReview.ACCEPTED, "old-after-restore", 40)) }
+        val delayed = store.begin(LocalCandidateStart("late-after-restore", source, 40))
+        val target = f.base.intent(id)
         assertTrue(kotlinx.coroutines.runBlocking { f.base.erase.erase(target) }.complete)
         assertTrue(f.db.read("SELECT * FROM local_candidate_batches").isEmpty())
         assertThrows(LocalCandidateConflict::class.java) { store.complete(job, LocalExcerptRules.extract(job)) }
+        assertThrows(LocalCandidateConflict::class.java) { store.complete(delayed, LocalExcerptRules.extract(delayed)) }
         assertTrue(f.db.read("SELECT id FROM entries WHERE id=?", id).isEmpty()); store.wipeKey()
     }
     @Test fun sourceInvalidationAtMaximumVersionNeverBlocksOriginalSaving() = LocalCandidateFixture().use { f ->
