@@ -83,7 +83,7 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
             require(reader.string(32) == "AIyou-images-v2" && reader.i32() == 2 && reader.i32() == 1)
             require(reader.strings(3,32) == SCOPE && reader.strings(6,32) == EXCLUDED)
             val originalBytes = reader.raw(reader.i32(), RecordPackages.MAX_PLAINTEXT)
-            val original = try { legacy.parse(originalBytes) } finally { originalBytes.fill(0) }
+            val original = try { legacy.parse(originalBytes,true) } finally { originalBytes.fill(0) }
             val images = List(reader.count(RecordMediaPackages.MAX_IMAGES)) {
                 RecordPackageImage(reader.string(512), reader.i32(), reader.string(36), reader.string(32), reader.i64(), packageHex(reader.raw(32)))
             }
@@ -101,7 +101,7 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
     }
 
     private fun metadata(preview: RecordMediaPreview): ByteArray {
-        val original = legacy.encode(preview.snapshot)
+        val original = legacy.encode(preview.snapshot,true)
         return try { PackageWriter(RecordMediaPackages.MAX_METADATA).use { out ->
             out.string("AIyou-images-v2", 32); out.i32(2); out.i32(1); out.strings(SCOPE,3,32); out.strings(EXCLUDED,6,32); out.i32(original.size); out.raw(original); out.i32(preview.images.size)
             preview.images.forEach { i -> out.string(i.sourceId,512); out.i32(i.sourceRevision); out.string(i.attachmentId,36)
@@ -113,6 +113,9 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
         require(images.map { it.attachmentId }.distinct().size == images.size)
         require(images.sumOf { it.byteSize } <= RecordMediaPackages.MAX_IMAGE_TOTAL)
         images.forEach { i -> require(original.records.any { it.sourceId == i.sourceId && it.sourceRevision == i.sourceRevision }) }
+        original.records.filter { it.originalText.isBlank() }.forEach { r ->
+            require(images.any { it.sourceId==r.sourceId && it.sourceRevision==r.sourceRevision })
+        }
     }
     private inner class Prepared(private val header: ByteArray, private val metadata: ByteArray, private val key: ByteArray,
         private val images: List<RecordPackageImage>, private val read: suspend (RecordPackageImage) -> ByteArray,

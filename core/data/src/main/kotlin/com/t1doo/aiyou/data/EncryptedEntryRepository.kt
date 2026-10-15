@@ -43,6 +43,7 @@ class EncryptedEntryRepository internal constructor(
     private val tagStorage = SqlManualTagRepository(borrowedSql, keyBytes)
     override val sourceTags: com.t1doo.aiyou.domain.SourceTagRepository = SqlSourceTagRepository(borrowedSql, tagStorage)
     private val sourceMemoryStorage = SqlSourceMemoryRepository(borrowedSql, keyBytes)
+    override val captureRecords: com.t1doo.aiyou.domain.CaptureRepository = SqlCaptureRepository(borrowedSql,attachmentStorage,tagStorage)
     override val sourceMemories: com.t1doo.aiyou.domain.SourceMemoryRepository get() = sourceMemoryStorage
     override val favorites: com.t1doo.aiyou.domain.RecordFavoriteRepository = SqlRecordFavoriteRepository(borrowedSql)
     override val manualTags: com.t1doo.aiyou.domain.ManualTagRepository get() = tagStorage
@@ -64,6 +65,7 @@ class EncryptedEntryRepository internal constructor(
     override suspend fun prepare() {
         // Bounded resume before ordinary media recovery. A failed deletion remains visible for retry.
         resumePermanentErasure(permanentErasure)
+        captureRecords.recover()
         mediaPackages.recover()
         attachmentStorage.recover()
     }

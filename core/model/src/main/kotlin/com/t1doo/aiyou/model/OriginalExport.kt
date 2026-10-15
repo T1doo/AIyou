@@ -12,16 +12,16 @@ enum class OriginalExportFormat(val extension: String, val mimeType: String) {
 
 /** One current original and its independently versioned labels from the SAME SQL snapshot. */
 class OriginalExportRecord(val entry: StoredEntry, val contentHash: String, val tags: ManualTagSnapshot,
-    val sourceGeneration: Long = 0) {
+    val sourceGeneration: Long = 0, val imageCount: Int = 0) {
     init {
         ManualTags.identifier(entry.id); require(entry.currentRevision > 0 && tags.entryId == entry.id)
         require(sourceGeneration >= 0)
-        require(entry.originalText.isNotBlank() && entry.originalText.length <= 100_000)
+        require(imageCount in 0..64 && (entry.originalText.isNotBlank() || imageCount > 0) && entry.originalText.length <= 100_000)
         ZoneId.of(entry.captureTimeZone)
         require(contentHash.matches(Regex("[0-9a-f]{64}")) && OriginalExports.hash(entry.originalText) == contentHash)
     }
     fun same(other: OriginalExportRecord) = entry == other.entry && contentHash == other.contentHash &&
-        tags.version == other.tags.version && tags.names == other.tags.names && sourceGeneration == other.sourceGeneration
+        tags.version == other.tags.version && tags.names == other.tags.names && sourceGeneration == other.sourceGeneration && imageCount == other.imageCount
     override fun toString() = "OriginalExportRecord(redacted)"
 }
 

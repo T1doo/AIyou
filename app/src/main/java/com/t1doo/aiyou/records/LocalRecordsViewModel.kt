@@ -37,6 +37,8 @@ data class CaptureDiscardUiState(val requestId: Long, val busy: Boolean = false,
     val recovering: Boolean = false, val recoveryFailed: Boolean = false)
 
 data class LocalRecordUiState(
+    val supportsMixedCapture: Boolean = false,
+    val mixedCapture: MixedCaptureUiState? = null,
     val ready: Boolean = false,
     val opening: Boolean = true,
     val saving: Boolean = false,
@@ -105,11 +107,14 @@ class LocalRecordsViewModel internal constructor(
     private val decodePng: (ByteArray) -> AttachmentPicture = PlatformImageDecoder::decode,
     private val bindAi: ((EntryRepository) -> RecordAiCapability)? = null,
     private val extractLocalCandidates: (com.t1doo.aiyou.model.LocalCandidateJob) -> com.t1doo.aiyou.model.ExcerptDocument = com.t1doo.aiyou.domain.LocalExcerptRules::extract,
+    private val decodeCapture: (ByteArray) -> AttachmentPicture = PlatformImageDecoder::thumbnail,
 ) : AndroidViewModel(application) {
     constructor(application: Application) : this(application, { EncryptedEntryRepository.open(application) })
     private val mutableState = MutableStateFlow(LocalRecordUiState())
     val state = mutableState.asStateFlow()
     private val commands = Channel<Command>(Channel.UNLIMITED)
+    val mixedCapture = MixedCaptureController({ mutableState.value },{ change -> update(change) },
+        { action -> commands.trySend(Command.MixedCapture(action)).isSuccess },decodeCapture,clock)
     val attachments = LocalAttachmentController(
         enqueue = { action -> commands.trySend(Command.Attachment(action)).isSuccess }, decodePng = decodePng,
         canUseRecord = { mutableState.value.let { it.ready && !it.opening && it.error == null &&
@@ -242,6 +247,11 @@ class LocalRecordsViewModel internal constructor(
                             }
                             Command.RefreshEditDrafts -> refreshPendingDrafts()
                             is Command.ReadHistory -> readHistory(command)
+                            is Command.MixedCapture -> {
+                                val before=mutableState.value.entries
+                                command.action(checkNotNull(repository))
+                                if(mutableState.value.entries!=before) scheduleLocalIndex()
+                            }
                             is Command.Attachment -> command.action(checkNotNull(repository))
                             is Command.ManualTags -> command.action(checkNotNull(repository))
                             is Command.Favorites -> command.action(checkNotNull(repository))
@@ -265,6 +275,7 @@ class LocalRecordsViewModel internal constructor(
                 }
             } finally {
                 editsDisposed = true
+                mixedCapture.dispose()
                 ai.markDisposed()
                 attachments.markDisposed()
                 tags.dispose()
@@ -279,6 +290,7 @@ class LocalRecordsViewModel internal constructor(
                 withContext(NonCancellable + Dispatchers.IO) {
                     try { ai.closeAndJoin() }
                     finally {
+                        mixedCapture.disposeOnIo()
                         try { attachments.disposeOnIo() }
                         finally {
                             (repository as? AutoCloseable)?.close()
@@ -1010,6 +1022,7 @@ class LocalRecordsViewModel internal constructor(
             val searchEpoch = try { store.localSearch?.epoch() }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
+                supportsMixedCapture = store.captureRecords != null,
                 supportsCandidates = store.localCandidates != null,
                 supportsSourceTags = store.sourceTags != null,
                 supportsSourceMemories = store.sourceMemories != null,
@@ -1030,6 +1043,7 @@ class LocalRecordsViewModel internal constructor(
                 supportsEditDrafts = store.editDrafts != null, pendingEdits = pending?.drafts.orEmpty(),
                 editDraftIssueCount = pending?.unreadableCount ?: 0, editDraftIndexAvailable = pending != null,
                 editDraftError = if (pending == null) "编辑草稿目录暂不可读取，恢复列表尚未确认。已保留加密数据；请重试本机读取，未自动删除或替换。" else indexNotice(pending)) }
+            mixedCapture.initialize(store)
             tasks.initialize(store)
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) { failed(failure) }
@@ -1115,6 +1129,7 @@ class LocalRecordsViewModel internal constructor(
 
     override fun onCleared() {
         editsDisposed = true
+        mixedCapture.dispose()
         ai.markDisposed()
         attachments.markDisposed()
         tags.dispose()
@@ -1153,6 +1168,7 @@ class LocalRecordsViewModel internal constructor(
         data class KeepEdit(val sessionId: Long, val text: String) : Command
         data class DiscardEdit(val sessionId: Long) : Command
         data class ReleaseEdit(val sessionId: Long) : Command
+        data class MixedCapture(val action: suspend (EntryRepository) -> Unit) : Command
         data class Attachment(val action: suspend (EntryRepository) -> Unit) : Command
         data class Edit(val text: String, val generation: Long) : Command
         data class Save(val intent: SaveIntent) : Command

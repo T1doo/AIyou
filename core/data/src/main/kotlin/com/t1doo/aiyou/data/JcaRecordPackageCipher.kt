@@ -71,10 +71,10 @@ class JcaRecordPackageCipher internal constructor(private val random: SecureRand
         return try { RecordPackageCrypto.crypt(mode,key,nonce,aad,input) } finally { key.fill(0) }
     }
 
-    internal fun encode(snapshot: OriginalExportSnapshot): ByteArray {
+    internal fun encode(snapshot: OriginalExportSnapshot, allowImageOnly: Boolean = false): ByteArray {
         RecordPackages.uuid(snapshot.id)
         val originals = snapshot.records.map { r -> RecordPackageOriginal(r.entry.id, r.entry.currentRevision,
-            r.entry.capturedAtMillis, r.entry.captureTimeZone, r.entry.originalText, r.contentHash, r.tags.version, r.tags.names) }
+            r.entry.capturedAtMillis, r.entry.captureTimeZone, r.entry.originalText, r.contentHash, r.tags.version, r.tags.names, allowImageOnly) }
         require(originals.sumOf { it.originalText.length.toLong() } <= OriginalExports.MAX_TEXT_UNITS)
         val blocks = mutableListOf<ByteArray>()
         try {
@@ -93,7 +93,7 @@ class JcaRecordPackageCipher internal constructor(private val random: SecureRand
         } finally { blocks.forEach { it.fill(0) } }
     }
 
-    internal fun parse(plain: ByteArray): AuthenticatedRecordPackage {
+    internal fun parse(plain: ByteArray, allowImageOnly: Boolean = false): AuthenticatedRecordPackage {
         val input = PackageReader(plain)
         require(input.string(64) == NAME && input.i32() == 1 && input.i32() == 1)
         val id = input.string(36); val created = input.i64()
@@ -112,7 +112,7 @@ class JcaRecordPackageCipher internal constructor(private val random: SecureRand
             val block = input.raw(length, 420_000)
             try {
                 require(MessageDigest.isEqual(hash, packageHash(block)))
-                records += decodeRecord(block); hashes += packageHex(hash)
+                records += decodeRecord(block,allowImageOnly); hashes += packageHex(hash)
             } finally { block.fill(0) }
         }
         input.end()
@@ -121,12 +121,12 @@ class JcaRecordPackageCipher internal constructor(private val random: SecureRand
         return AuthenticatedPackage(manifest, records, packageHex(packageHash(plain)), hashes)
     }
 
-    private fun decodeRecord(bytes: ByteArray): RecordPackageOriginal {
+    private fun decodeRecord(bytes: ByteArray,allowImageOnly: Boolean): RecordPackageOriginal {
         val input = PackageReader(bytes)
         val id = input.string(512); val revision = input.i32(); val captured = input.i64(); val zone = input.string(128)
         val hash = packageHex(input.raw(32)); val text = input.string(400_000); val tagVersion = input.i64()
         val tags = input.strings(12, 640); input.end()
-        return RecordPackageOriginal(id, revision, captured, zone, text, hash, tagVersion, tags)
+        return RecordPackageOriginal(id, revision, captured, zone, text, hash, tagVersion, tags,allowImageOnly)
     }
 
     private inline fun <T> sanitized(password: CharArray, block: () -> T): T =

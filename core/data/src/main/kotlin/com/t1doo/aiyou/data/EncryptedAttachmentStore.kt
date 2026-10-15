@@ -103,6 +103,40 @@ internal class EncryptedAttachmentStore(
 
     override suspend fun recover(): Unit = locked { recoverLocked() }
 
+    internal suspend fun <T> stageCapture(intent: AttachmentIntent,bytes: ByteArray,commit: () -> T): T = locked {
+        validate(intent); check(ledger.find(intent.id)==null && !erasureHooks.fenced(intent.entryId))
+        if (file(intent,false).exists()) authenticated(file(intent,false),intent).fill(0)
+        else {
+            deleteOwnedPartial(intent); writeEncrypted(intent) { bytes.inputStream() }
+            authenticated(file(intent,true),intent).fill(0); publish(intent)
+        }
+        val target=file(intent,false)
+        if (erasureHooks.creation(intent.entryId,BUCKET,target.name)==null) {
+            erasureHooks.forgotten(intent.entryId,BUCKET,target.name)
+            erasureHooks.reserve(intent.entryId,BUCKET,target.name)
+            erasureHooks.created(intent.entryId,BUCKET,target.name,createdFileProof(target,17))
+        }
+        checkpoint("capture-published"); commit()
+    }
+    internal suspend fun readCapture(intent: AttachmentIntent): ByteArray = locked {
+        validate(intent);check(ledger.find(intent.id)==null && !erasureHooks.fenced(intent.entryId))
+        authenticated(file(intent,false),intent)
+    }
+    internal suspend fun recoverCapture(intent: AttachmentIntent): Boolean = locked {
+        validate(intent);check(ledger.find(intent.id)==null && !erasureHooks.fenced(intent.entryId))
+        try {
+            val final=file(intent,false)
+            if (final.exists()) authenticated(final,intent).fill(0)
+            else { authenticated(file(intent,true),intent).fill(0);publish(intent) }
+            true
+        } catch (_: AttachmentIntegrityFailure) { false }
+    }
+    internal suspend fun <T> commitCapture(intents: List<AttachmentIntent>,commit: () -> T): T = locked {
+        require(intents.size<=20)
+        intents.forEach { validate(it);check(ledger.find(it.id)==null && !erasureHooks.fenced(it.entryId));authenticated(file(it,false),it).fill(0) }
+        checkpoint("capture-before-commit");commit().also { checkpoint("capture-committed") }
+    }
+
     /** Package-owned durable intents exist before this call. Publish authenticated device ciphertext
      * before one short DB commit inserts entries + READY rows + final package receipt together.
      * No file IO is performed inside that transaction; the existing file -> DB lock order is kept.
@@ -138,10 +172,12 @@ internal class EncryptedAttachmentStore(
             val target = file(intent,false)
             val before = observeErasureFile(BUCKET,target)
             if (before != null) {
-                authenticated(target,intent).fill(0)
+                val proof=erasureHooks.creation(intent.entryId,BUCKET,target.name)
+                if (proof==null || proof!=createdFileProof(target,17)) authenticated(target,intent).fill(0)
                 check(observeErasureFile(BUCKET,target) == before)
                 Files.delete(target.toPath()); syncDirectory()
             }
+            erasureHooks.forgotten(intent.entryId,BUCKET,target.name)
             deleteOwnedPartial(intent)
             checkpoint("package-cleaned")
         }

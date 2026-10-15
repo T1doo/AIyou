@@ -56,7 +56,8 @@ internal class SqlRecycleBinRepository(private val database: RecordsSqlDatabase,
         val row = sql.query("SELECT e.id,e.currentRevision,r.originalText,r.contentHash,e.capturedAtMillis,e.captureTimeZone,e.privacyPolicy,COALESCE(a.generation,0),COALESCE(a.deleted,0),(SELECT count(*) FROM entry_revisions v WHERE v.entryId=e.id),(SELECT count(*) FROM attachments f WHERE f.entryId=e.id) FROM entries e JOIN entry_revisions r ON e.id=r.entryId AND e.currentRevision=r.revision LEFT JOIN remote_source_access a ON a.entryId=e.id WHERE e.id=?", listOf(id)).singleOrNull()
             ?: throw RecycleConflict()
         val text = row[2] as String
-        require(text.isNotBlank() && text.length <= 100_000 && OriginalExports.hash(text) == row[3])
+        require(text.length <= 100_000 && OriginalExports.hash(text) == row[3])
+        require(text.isNotBlank() || sql.query("SELECT id FROM attachments WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg') LIMIT 1",listOf(id,row[1])).isNotEmpty())
         ZoneId.of(row[5] as String)
         val deleted = row[8] as Long; require(deleted in 0..1)
         val entry = StoredEntry(row[0] as String, Math.toIntExact(row[1] as Long), text, row[4] as Long,

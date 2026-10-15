@@ -53,6 +53,15 @@ private class PickerHandle { var launcher: ActivityResultLauncher<PickVisualMedi
 /** VM-owned UUID registry key survives configuration, but a new VM never adopts saved launcher keys. */
 @Composable
 fun AttachmentPicker(controller: LocalAttachmentController, selection: AttachmentSelection?, canLaunch: Boolean = true) {
+    ScopedImagePicker(controller,selection,canLaunch,controller::claimPicker,controller::selected,controller::pickerFailed)
+}
+@Composable
+fun MixedCapturePicker(controller: MixedCaptureController,selection: AttachmentSelection?) {
+    ScopedImagePicker(controller,selection,true,controller::claimPicker,controller::selected,controller::pickerFailed)
+}
+@Composable
+private fun ScopedImagePicker(owner: Any,selection: AttachmentSelection?,canLaunch: Boolean,
+    claim: (Long)->Boolean,selected: (Long,SelectedImageSource?)->Unit,failed: (Long)->Unit) {
     if (selection?.phase != AttachmentImportPhase.PICKING) return
     key(selection.pickerKey) {
         val requestId = selection.requestId
@@ -60,20 +69,20 @@ fun AttachmentPicker(controller: LocalAttachmentController, selection: Attachmen
         val registry = checkNotNull(LocalActivityResultRegistryOwner.current).activityResultRegistry
         val handle = remember(selection.pickerKey) { PickerHandle() }
         val contract = remember(selection.pickerKey) { PickVisualMedia() }
-        DisposableEffect(registry, selection.pickerKey, controller) {
+        DisposableEffect(registry, selection.pickerKey, owner) {
             val registered = registry.register(selection.pickerKey, contract) { uri ->
-                if (uri == null) controller.selected(requestId, null)
-                else try { controller.selected(requestId, PlatformPngSource(resolver, uri)) }
-                catch (_: Exception) { controller.pickerFailed(requestId) }
+                if (uri == null) selected(requestId, null)
+                else try { selected(requestId, PlatformPngSource(resolver, uri)) }
+                catch (_: Exception) { failed(requestId) }
             }
             handle.launcher = registered
             onDispose { handle.launcher = null; registered.unregister() }
         }
         LaunchedEffect(selection.pickerKey, canLaunch) {
-            if (canLaunch && controller.claimPicker(requestId)) try {
+            if (canLaunch && claim(requestId)) try {
                 val type = if (Build.VERSION.SDK_INT >= 28) PickVisualMedia.ImageOnly else PickVisualMedia.SingleMimeType("image/png")
                 checkNotNull(handle.launcher).launch(PickVisualMediaRequest(type))
-            } catch (_: Exception) { controller.pickerFailed(requestId) }
+            } catch (_: Exception) { failed(requestId) }
         }
     }
 }

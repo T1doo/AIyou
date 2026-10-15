@@ -87,6 +87,19 @@ class AttachmentRecordsIntegrationTest {
         assertEquals(1, store.attachments.list(original.id, 1).size)
         fails<Exception> { store.database.openHelper.writableDatabase.execSQL("UPDATE attachments SET revision=2") }
         assertEquals(request, store.attachments.list(original.id, 1).single().intent)
+        // Current capture draft migrates without losing its text; pure-picture save is a real empty body.
+        var capture=store.captureRecords
+        val migrated=capture.current();assertEquals(independent.text,migrated.text)
+        var pure=capture.edit(migrated,"")
+        val png=java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNQCp35HwADvQIQaYgMTgAAAABJRU5ErkJggg==")
+        val media=AttachmentIntent(UUID.randomUUID().toString(),pure.id,1,"image/png",packageHex(packageHash(png)),png.size.toLong())
+        pure=capture.add(pure,media,png)
+        assertTrue(store.entries().none { it.id==pure.id })
+        store.closeAndAwait();store=open();store.prepare();capture=store.captureRecords
+        pure=capture.current();val result=capture.save(pure,3000,"UTC")
+        assertEquals(pure.id,result.id);assertEquals("",store.entries().single { it.id==pure.id }.originalText)
+        assertEquals(ProcessingPolicy.AI_NONE,store.entries().single { it.id==pure.id }.policy)
+        assertArrayEquals(png,store.attachments.read(media.id));assertTrue(capture.save(pure,9999,"UTC").replayed)
     }
 
     @Test fun failedFinalRoomTransitionPreservesPublishedBlobAndStartupRecoveryIsIdempotent() = runBlocking {

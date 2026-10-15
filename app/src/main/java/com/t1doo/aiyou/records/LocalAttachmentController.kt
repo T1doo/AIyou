@@ -334,13 +334,13 @@ class LocalAttachmentController(
         const val MAX_SOURCE_BYTES = 16 * 1024 * 1024
         val IMAGE_TYPES = setOf("image/png", "image/jpeg")
         private val PNG_HEADER = byteArrayOf(-119, 80, 78, 71, 13, 10, 26, 10)
-        private fun matchesHeader(bytes: ByteArray, mediaType: String) = when (mediaType) {
+        internal fun matchesHeader(bytes: ByteArray, mediaType: String) = when (mediaType) {
             "image/png" -> bytes.size >= 8 && bytes.copyOfRange(0, 8).contentEquals(PNG_HEADER)
             "image/jpeg" -> bytes.size >= 3 && bytes[0] == (-1).toByte() && bytes[1] == 0xd8.toByte() && bytes[2] == (-1).toByte()
             else -> false
         }
-        private fun hash(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-        private fun bounded(input: InputStream, active: () -> Boolean): ByteArray {
+        internal fun hash(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        internal fun bounded(input: InputStream, active: () -> Boolean): ByteArray {
             val buffer = ByteArray(8192)
             val output = ByteArray(MAX_SOURCE_BYTES)
             var total = 0

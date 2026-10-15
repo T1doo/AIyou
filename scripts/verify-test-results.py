@@ -20,7 +20,7 @@ if args.component:
 if args.queue:
     targets.append(("host queue", "checks/record-queue/build/test-results/test", 148))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 182))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 185))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 if args.evidence:
@@ -118,6 +118,11 @@ for label, folder, minimum in targets:
             "uncertainChoiceHasReachableStableRetryAndNoCrossRecordSuccessNotice",
             "narrowDoubleFontControlIsReachableAndRetainedReaderActionCannotWriteAfterNavigation",
             "restorationKeepsPublicFilterAndDropsPrivateQueryWhileReadFailureCannotShowEmptyFavorites")
+        additional["com.t1doo.aiyou.MixedCapturePresentationTest"] = (
+            "actualNowPurePictureHasThumbnailCountRemovalAndSeparateDurableSaveAtLargeFont",
+            "removingLastImageRejectsEmptyRecordAndCancelKeepsDraftAndRetiresPicker",
+            "failedSaveRetainsTextAndImagesAndPrivateComposerNeverEntersSavedState",
+        )
         additional["com.t1doo.aiyou.RecordPackagePresentationTest"] = (
             "actualFullPreviewRequiresScopeAndTwoMatchingSecretInputsBeforeExportPicker",
             "restoreAuthenticatesAndPreviewsBeforeDistinctConfirmationAndNoImplicitWrite",

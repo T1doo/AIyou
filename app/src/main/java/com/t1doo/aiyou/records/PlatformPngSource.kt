@@ -26,10 +26,17 @@ class PlatformAttachmentPicture internal constructor(private val bitmap: Bitmap)
     override val height = bitmap.height
     val pixelBytes = bitmap.byteCount
     override fun releaseUnpublished() { bitmap.recycle() }
+    internal fun thumbnail(): PlatformAttachmentPicture {
+        val scale=minOf(1f,160f/maxOf(width,height))
+        if(scale==1f) return this
+        val small=Bitmap.createScaledBitmap(bitmap,maxOf(1,(width*scale).toInt()),maxOf(1,(height*scale).toInt()),true)
+        bitmap.recycle();return PlatformAttachmentPicture(small)
+    }
 }
 
 /** API26/27 retains the PNG path; never use a lenient JPEG decoder as a silent fallback. */
 object PlatformImageDecoder {
+    fun thumbnail(bytes: ByteArray): AttachmentPicture = (decode(bytes) as PlatformAttachmentPicture).thumbnail()
     fun decode(bytes: ByteArray): AttachmentPicture {
         if (bytes.size >= 2 && bytes[0] == (-1).toByte() && bytes[1] == 0xd8.toByte()) {
             if (Build.VERSION.SDK_INT < 28) throw IllegalArgumentException("JPEG requires Android 9 or later")

@@ -12,6 +12,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordPackageBinary.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordMediaPackageCipher.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalRecordsViewModel.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/MixedCaptureController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/ManualTagController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/RecordFavoriteController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/ManualTaskController.kt")

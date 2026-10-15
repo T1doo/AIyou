@@ -12,12 +12,12 @@ class RecordPackageManifest(val backupId: String, val createdAtMillis: Long, val
 
 class RecordPackageOriginal(val sourceId: String, val sourceRevision: Int,
     val capturedAtMillis: Long, val captureTimeZone: String, val originalText: String,
-    val contentHash: String, val sourceTagVersion: Long, tags: List<String>) {
+    val contentHash: String, val sourceTagVersion: Long, tags: List<String>, allowImageOnly: Boolean = false) {
     val tags = Collections.unmodifiableList(tags.toList())
     init {
         ManualTags.identifier(sourceId); require(sourceRevision > 0)
         ZoneId.of(captureTimeZone); require(captureTimeZone.toByteArray(Charsets.UTF_8).size <= 128)
-        require(originalText.isNotBlank() && originalText.length <= 100_000)
+        require((originalText.isNotBlank() || allowImageOnly) && originalText.length <= 100_000)
         require(contentHash == OriginalExports.hash(originalText))
         require(sourceTagVersion >= 0 && (sourceTagVersion != 0L || tags.isEmpty()))
         require(ManualTags.canonical(tags) == tags)

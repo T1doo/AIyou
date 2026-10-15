@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity() {
                 onBackOriginalHistory = records::backOriginalHistory, onRetryOriginalHistory = records::retryOriginalHistory,
                 onEditOriginalHistory = records::editOriginalHistory,
                 onConfirmHistoryReplacement = records::confirmHistoryReplacement,
-                onCancelHistoryReplacement = records::cancelHistoryReplacement, attachments = records.attachments,
+                onCancelHistoryReplacement = records::cancelHistoryReplacement, attachments = records.attachments, mixedCapture = records.mixedCapture,
                 onOpenAiSession = { id, revision -> records.openAiSession(id, revision) },
                 onStartAiSession = records::startAiSession, onStopAiSession = records::stopAiSession,
                 onCloseAiSession = records::closeAiSession,
@@ -197,6 +197,7 @@ fun AIyouApp(
     onConfirmHistoryReplacement: (Long, Long, Long) -> Unit = { _, _, _ -> },
     onCancelHistoryReplacement: (Long, Long, Long) -> Unit = { _, _, _ -> },
     attachments: LocalAttachmentController? = null,
+    mixedCapture: com.t1doo.aiyou.records.MixedCaptureController? = null,
     display: UiPreferencesState = UiPreferencesState(),
     onDisplayChange: (UiPreferences) -> Unit = {},
     onRetryDisplay: () -> Unit = {},
@@ -746,6 +747,9 @@ fun AIyouApp(
                 onEditDate = { session, input -> if (ownsTasks()) onTaskEditDate(session, input) },
                 onSaveDate = { session, input -> if (ownsTasks()) onTaskSaveDate(session, input) },
                 onCloseDate = { session -> if (ownsTasks()) onTaskCloseDate(session) }, clock = taskClock)
+        } else if (!demo && local != null && selected==Destination.NOW && local.supportsMixedCapture && mixedCapture!=null) {
+            com.t1doo.aiyou.records.MixedCapturePicker(mixedCapture,local.mixedCapture?.selection)
+            com.t1doo.aiyou.records.MixedCaptureScreen(local,mixedCapture,modifier)
         } else if (!demo && local != null && selected != Destination.TASKS) {
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }

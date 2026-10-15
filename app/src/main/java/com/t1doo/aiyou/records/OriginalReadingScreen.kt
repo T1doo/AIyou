@@ -66,6 +66,7 @@ data class OriginalReadingLocation(val entryId: String, val revision: Int, val c
 
 /** Bounded presentation excerpt only. Never passed to a repository or clipboard. */
 internal fun originalPreview(text: String): String {
+    if (text.isBlank()) return "图片记录 · 无文字正文"
     var end = 0
     var points = 0
     while (end < text.length && points < 240) {
@@ -213,7 +214,7 @@ fun OriginalReadingScreen(
                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("复制全文") }
                         onEdit?.let { edit ->
                             TextButton(onClick = { edit(entry.id, entry.currentRevision) },
-                                enabled = !local.saving && !local.savePending,
+                                enabled = entry.originalText.isNotBlank() && !local.saving && !local.savePending,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-reading-edit")) { Text(editActionLabel) }
                         }
                         onHistory?.let { history ->
@@ -243,18 +244,18 @@ fun OriginalReadingScreen(
                         }
                         candidateController?.let { controller ->
                             TextButton(enabled = local.supportsCandidates && !local.saving && !local.savePending &&
-                                entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
+                                entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
                                 onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-local-candidates")) { Text("本机摘录候选") }
                         }
                         sourceTagController?.let { controller ->
                             TextButton(enabled = local.supportsSourceTags && !local.saving && !local.savePending &&
-                                entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
+                                entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
                                 onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-tags")) { Text("从原文添加标签") }
                         }
                         sourceMemoryController?.let { controller ->
-                            TextButton(enabled = local.supportsSourceMemories && !local.saving && !local.savePending && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
+                            TextButton(enabled = local.supportsSourceMemories && !local.saving && !local.savePending && entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
                                 onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-memories")) { Text("事件与当次情绪") }
                         }
@@ -281,6 +282,7 @@ fun OriginalReadingScreen(
                     }
                     if (copyDenied) Text("无法复制，原文已保留。", color = AIyouColors.error,
                         style = MaterialTheme.typography.bodySmall)
+                    if (entry.originalText.isBlank()) Text("图片记录 · 无文字正文；请打开附件查看原图。")
                     key(entry.id, entry.currentRevision) {
                         val id = entry.id
                         val revision = entry.currentRevision

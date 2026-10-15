@@ -30,7 +30,7 @@ internal class SqlOriginalExportRepository(private val database: RecordsSqlDatab
         if (!refreshCurrent && row[1] as Long != source.revision) throw OriginalExportConflict()
         val entry = StoredEntry(row[0] as String, Math.toIntExact(row[1] as Long), row[2] as String,
             row[4] as Long, row[5] as String, ProcessingPolicy.valueOf(row[6] as String))
-        return OriginalExportRecord(entry, row[3] as String, tags.readWithin(sql, entry.id), row[7] as Long)
+        return OriginalExportRecord(entry, row[3] as String, tags.readWithin(sql, entry.id), row[7] as Long, Math.toIntExact(sql.query("SELECT count(*) FROM attachments WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg')",listOf(entry.id,entry.currentRevision)).single().single() as Long))
     }
     private inline fun <T> safely(block: () -> T): T = try { block() }
         catch (cancelled: CancellationException) { throw cancelled }

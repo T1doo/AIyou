@@ -228,7 +228,8 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         require(rows.size == 1)
         val row = rows.single()
         val text = row[2] as String; val hash = row[3] as String
-        require(text.isNotBlank() && text.length <= 100_000 && OriginalExports.hash(text) == hash)
+        require(text.length <= 100_000 && OriginalExports.hash(text) == hash)
+        require(text.isNotBlank() || sql.query("SELECT id FROM attachments WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg') LIMIT 1",listOf(id,row[1])).isNotEmpty())
         val revision = Math.toIntExact(row[1] as Long)
         val tagVersion = row[7] as Long; val visibility = row[8] as Long
         require(revision > 0 && tagVersion >= 0 && visibility >= 0)
