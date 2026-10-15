@@ -7,9 +7,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.t1doo.aiyou.designsystem.AIyouDimensions
@@ -23,6 +23,8 @@ internal val LocalCandidateDialogObserver = staticCompositionLocalOf<CandidateDi
 @Composable
 internal fun LocalCandidateDialog(ui: LocalCandidateUiState, controller: LocalCandidateController,
     canUse: () -> Boolean, onLocate: (OriginalReadingLocation) -> Unit) {
+    val windowHeight = LocalWindowInfo.current.containerSize.height
+    val maxHeight = with(LocalDensity.current) { windowHeight.toDp() * 0.9f }
     DisposableEffect(controller, ui.session) { onDispose { controller.close(ui.session) } }
     fun allowed() = canUse()
     val confirmation = ui.confirmation
@@ -35,7 +37,7 @@ internal fun LocalCandidateDialog(ui: LocalCandidateUiState, controller: LocalCa
         CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
             Surface(Modifier.fillMaxWidth().padding(AIyouDimensions.pageNarrow)
                 .widthIn(max = AIyouDimensions.contentMaxWidth)
-                .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.9f),
+                .heightIn(max = maxHeight),
                 shape = MaterialTheme.shapes.large) {
                 Column(Modifier.verticalScroll(rememberScrollState()).padding(AIyouDimensions.pageNarrow)
                     .testTag("local-candidates-dialog"),
