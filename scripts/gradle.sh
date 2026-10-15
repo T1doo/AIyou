@@ -42,4 +42,10 @@ PY
 fi
 
 cd "$project_root"
-exec ./gradlew --no-daemon --console=plain "$@"
+# Only the explicitly selected Android phase on the ephemeral CI runner reuses
+# its compatible 2 GB daemon. Local runs and earlier host projects stay isolated.
+daemon_flag=--no-daemon
+if [[ "${GITHUB_ACTIONS:-}" == true && "${AIYOU_CI_ANDROID_DAEMON:-}" == true ]]; then
+    daemon_flag=--daemon
+fi
+exec ./gradlew "$daemon_flag" --console=plain "$@"
