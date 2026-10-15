@@ -137,7 +137,9 @@ class SourceTagPresentationTest {
         compose.runOnIdle { val raw=checkNotNull(registry).performSave().toString();assertFalse(raw.contains(one.originalText));assertFalse(raw.contains(OriginalExports.hash(one.originalText))) }
         restoration.emulateSavedInstanceStateRestore();compose.waitForIdle()
         compose.runOnIdle { old.confirm();fresh();assertTrue(queue.isEmpty()) };assertTrue(applied.isEmpty());assertNull(state.value.sourceTags)
-        openReader();open();click("source-tag-add-0");val retained=actions.get().confirm
+        // The saved reader route survives; only its private confirmation preview is retired.
+        compose.onNodeWithTag("original-text").assertExists()
+        open();click("source-tag-add-0");val retained=actions.get().confirm
         val back=compose.onNodeWithText("返回列表").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!!
         compose.runOnIdle { back();retained();assertTrue(queue.isEmpty()) };assertTrue(applied.isEmpty())
     }
