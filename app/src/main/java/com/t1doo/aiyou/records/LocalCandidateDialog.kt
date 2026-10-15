@@ -53,13 +53,14 @@ internal fun LocalCandidateDialog(ui: LocalCandidateUiState, controller: LocalCa
                         val batch = ui.batches.singleOrNull { it.id == confirmation.batchId && it.version == confirmation.version }
                         val item = batch?.items?.singleOrNull { it.id == confirmation.itemId }
                         if (batch != null && item != null) {
-                            Text("确认采纳这段原文摘录？", style = MaterialTheme.typography.titleMedium)
+                            val correcting = confirmation.previousReview != ExcerptReview.PROPOSED
+                            Text(if (correcting) "撤回原审阅结果，重新待确认？" else "确认采纳这段原文摘录？", style = MaterialTheme.typography.titleMedium)
                             Text(item.proposal.quote, modifier = Modifier.testTag("local-candidate-confirm-quote"))
                             Text("来源：原文版本 " + batch.source.revision + " · 本机规则摘录")
                             Button(enabled = !ui.busy && ui.pending == null,
                                 onClick = actions.confirm,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("local-candidate-confirm")) {
-                                Text("确认采纳摘录")
+                                Text(if (correcting) "确认重新审阅" else "确认采纳摘录")
                             }
                             TextButton(enabled = !ui.busy,
                                 onClick = actions.cancelConfirmation,
@@ -103,6 +104,13 @@ internal fun LocalCandidateDialog(ui: LocalCandidateUiState, controller: LocalCa
                                                         onClick = { if (allowed()) controller.reject(ui.session, batch.id, batch.version, item.id) },
                                                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
                                                             .testTag("local-candidate-reject-" + suffix)) { Text("拒绝摘录") }
+                                                }
+                                            } else {
+                                                TextButton(enabled = !ui.busy && !ui.computing && ui.pending == null,
+                                                    onClick = { if (allowed()) controller.requestReopen(ui.session, batch.id, batch.version, item.id) },
+                                                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
+                                                        .testTag("local-candidate-reopen-" + suffix)) {
+                                                    Text(if (item.review == ExcerptReview.ACCEPTED) "撤回采纳，重新审阅" else "恢复为待确认")
                                                 }
                                             }
                                         }

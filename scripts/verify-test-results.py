@@ -20,7 +20,7 @@ if args.component:
 if args.queue:
     targets.append(("host queue", "checks/record-queue/build/test-results/test", 148))
 if args.ui:
-    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 172))
+    targets.append(("Compose JVM interaction", "app/build/test-results/testDebugUnitTest", 174))
 if args.trace:
     targets.append(("native trace observer", "checks/native-trace/build/test-results/test", 8))
 if args.evidence:
@@ -98,6 +98,8 @@ for label, folder, minimum in targets:
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
         additional["com.t1doo.aiyou.LocalCandidatePresentationTest"] = (
+            "narrowCorrectionFlowPreviewsCancelsReopensAndRequiresASeparateNewAcceptance",
+            "correctionConfirmationRestorationAndReopenedTokensCannotExecuteRetainedActions",
             "actualReaderGeneratesPreviewsConfirmsAndReturnsToExactOriginalWithoutTaskSideEffects",
             "lostReadbackShowsUncertainStateAndRetriesTheSameExplicitReviewWithoutFalseEmptyOrSuccess",
             "reopenedSameItemAndRetainedNavigationCallbacksCannotReuseOldConfirmation",

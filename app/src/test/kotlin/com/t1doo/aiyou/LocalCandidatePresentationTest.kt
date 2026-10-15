@@ -49,6 +49,7 @@ class LocalCandidatePresentationTest {
     private val durable = mutableListOf<LocalCandidateBatch>()
     private val reviews = mutableListOf<ExcerptReviewRequest>()
     private val cancels = mutableListOf<CandidateCancelRequest>()
+    private val reopens = mutableListOf<ExcerptReopenRequest>()
     private var failRead = false
     private var loseReviewReadback = false
     private var lastReview: ExcerptReviewRequest? = null
@@ -102,6 +103,20 @@ class LocalCandidatePresentationTest {
                 old.version + 1, LocalCandidateState.CANCELLED, old.createdAtMillis, emptyList())
             durable[durable.indexOf(old)] = cancelled
             return cancelled
+        }
+        override fun reopen(request: ExcerptReopenRequest): LocalCandidateBatch {
+            reopens += request
+            val old = durable.single { it.id == request.batchId }
+            check(old.version == request.expectedVersion && old.state == LocalCandidateState.READY)
+            val next = LocalCandidateBatch(old.id, old.source, old.sourceHash, old.generation,
+                old.version + 1, old.state, old.createdAtMillis, old.items.map {
+                    if (it.id == request.itemId) {
+                        check(it.review == request.previousReview)
+                        it.copy(review = ExcerptReview.PROPOSED)
+                    } else it
+                })
+            durable[durable.indexOf(old)] = next
+            return next
         }
     }
     private val store = object : EntryRepository {
@@ -186,6 +201,48 @@ class LocalCandidatePresentationTest {
         assertEquals(listOf(one, two), state.value.entries)
         assertTrue(state.value.manualTags.isEmpty()); assertTrue(state.value.tasks.items.isEmpty())
         assertEquals("synthetic-private-draft", state.value.text); assertEquals(1, reviews.size)
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w320dp-h640dp")
+    fun narrowCorrectionFlowPreviewsCancelsReopensAndRequiresASeparateNewAcceptance() {
+        seed(); compose.setContent { Screen(true) }; openReader(); openCandidates()
+        val suffix = suffix(durable.single())
+        click("local-candidate-accept-" + suffix); click("local-candidate-confirm"); drain()
+        val control = compose.onNodeWithTag("local-candidate-reopen-" + suffix).performScrollTo().assertIsDisplayed()
+        assertTrue(control.getUnclippedBoundsInRoot().height >= 48.dp)
+        click("local-candidate-reopen-" + suffix)
+        compose.onNodeWithTag("local-candidate-confirm-quote").performScrollTo().assertTextEquals(durable.single().items.single().proposal.quote)
+        click("local-candidate-cancel-confirm"); assertTrue(reopens.isEmpty())
+        assertEquals(ExcerptReview.ACCEPTED, durable.single().items.single().review)
+        click("local-candidate-reopen-" + suffix); click("local-candidate-confirm"); drain()
+        compose.onNodeWithTag("local-candidate-review-" + suffix).performScrollTo().assertTextEquals("待确认摘录")
+        assertEquals(1, reviews.size); assertEquals(1, reopens.size)
+        click("local-candidate-reject-" + suffix); drain()
+        click("local-candidate-reopen-" + suffix); click("local-candidate-confirm"); drain()
+        compose.onNodeWithTag("local-candidate-review-" + suffix).performScrollTo().assertTextEquals("待确认摘录")
+        click("local-candidate-accept-" + suffix); click("local-candidate-confirm"); drain()
+        compose.onNodeWithTag("local-candidate-review-" + suffix).performScrollTo().assertTextEquals("已采纳摘录")
+        assertEquals(6L, durable.single().version)
+        assertEquals(listOf(one, two), state.value.entries); assertTrue(state.value.manualTags.isEmpty()); assertTrue(state.value.tasks.items.isEmpty())
+    }
+
+    @Test fun correctionConfirmationRestorationAndReopenedTokensCannotExecuteRetainedActions() {
+        seed(); val restoration = StateRestorationTester(compose)
+        restoration.setContent { Screen() }; openReader(); openCandidates()
+        val suffix = suffix(durable.single())
+        click("local-candidate-reject-" + suffix); drain()
+        click("local-candidate-reopen-" + suffix); val old = business()
+        click("local-candidate-cancel-confirm"); click("local-candidate-reopen-" + suffix)
+        compose.runOnIdle { old.cancelConfirmation(); old.confirm(); assertTrue(queue.isEmpty()) }
+        val fresh = business().confirm
+        compose.runOnIdle {
+            val raw = checkNotNull(registry).performSave().toString()
+            assertFalse(raw.contains(one.originalText)); assertFalse(raw.contains(durable.single().sourceHash))
+        }
+        restoration.emulateSavedInstanceStateRestore(); compose.waitForIdle()
+        compose.runOnIdle { fresh(); old.confirm(); assertTrue(queue.isEmpty()) }
+        assertNull(state.value.candidates); assertTrue(reopens.isEmpty())
+        assertEquals(ExcerptReview.REJECTED, durable.single().items.single().review)
     }
 
     @Test fun lostReadbackShowsUncertainStateAndRetriesTheSameExplicitReviewWithoutFalseEmptyOrSuccess() {

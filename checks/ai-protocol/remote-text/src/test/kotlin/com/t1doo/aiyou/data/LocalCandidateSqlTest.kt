@@ -9,6 +9,87 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LocalCandidateSqlTest {
+    @Test fun correctingAcceptedOrRejectedExcerptPersistsPendingAndRequiresANewDecisionWithoutOtherWrites() = LocalCandidateFixture().use { f ->
+        val before = f.snapshotOld()
+        for (decision in listOf(ExcerptReview.ACCEPTED, ExcerptReview.REJECTED)) {
+            val job = f.store.begin(f.start(decision.name))
+            val batch = f.store.complete(job, LocalExcerptRules.extract(job))
+            val original = f.review(batch, decision, "initial-" + decision.name)
+            val reviewed = f.store.review(original)
+            val corrected = f.store.reopen(reopen(reviewed, "correct-" + decision.name))
+            assertEquals(3L, corrected.version)
+            assertEquals(ExcerptReview.PROPOSED, corrected.items.single().review)
+            f.reopen()
+            val pending = f.store.batches(f.source).single { it.id == batch.id }
+            assertEquals(ExcerptReview.PROPOSED, pending.items.single().review)
+            assertThrows(LocalCandidateConflict::class.java) { f.store.review(original) }
+            assertThrows(LocalCandidateConflict::class.java) { f.store.complete(job, LocalExcerptRules.extract(job)) }
+            val final = f.store.review(f.review(pending, ExcerptReview.REJECTED, "new-" + decision.name))
+            assertEquals(4L, final.version); assertEquals(ExcerptReview.REJECTED, final.items.single().review)
+        }
+        assertEquals(before, f.snapshotOld())
+    }
+    @Test fun correctionLostCommitAckReplaysExactRequestWithoutReencryptingAndRejectsChangedTuple(): Unit = LocalCandidateFixture().use { f ->
+        val accepted = f.store.review(f.review(f.ready()))
+        val request = reopen(accepted)
+        var lost = false
+        f.db.afterSql = { sql -> if (sql == "COMMIT" && !lost) { lost = true; throw IllegalStateException("Synthetic lost correction ack") } }
+        assertThrows(LocalCandidateStorageFailure::class.java) { f.store.reopen(request) }
+        f.db.afterSql = null
+        val bytes = (f.row()[3] as ByteArray).copyOf()
+        assertEquals(3L, f.store.reopen(request).version); assertArrayEquals(bytes, f.row()[3] as ByteArray)
+        for (changed in listOf(
+            ExcerptReopenRequest(accepted.id, accepted.source, accepted.sourceHash, accepted.generation, 2,
+                "excerpt-1", ExcerptReview.REJECTED, request.mutationId, 40),
+            ExcerptReopenRequest(accepted.id, accepted.source, accepted.sourceHash, accepted.generation, 2,
+                "excerpt-1", ExcerptReview.ACCEPTED, request.mutationId, 41))) {
+            assertThrows(LocalCandidateConflict::class.java) { f.store.reopen(changed) }
+        }
+        val next = f.store.review(f.review(f.store.batches(f.source).single(), ExcerptReview.ACCEPTED, "new-decision"))
+        assertEquals(4L, next.version)
+        assertThrows(LocalCandidateConflict::class.java) { f.store.reopen(request) }
+        assertEquals(ExcerptReview.ACCEPTED, f.store.batches(f.source).single().items.single().review)
+    }
+    @Test fun correctionCannotReopenProposedCancelledInvalidatedOrChangedSources(): Unit = LocalCandidateFixture().use { f ->
+        val proposed = f.ready()
+        assertThrows(IllegalArgumentException::class.java) {
+            ExcerptReopenRequest(proposed.id, proposed.source, proposed.sourceHash, proposed.generation, 1,
+                "excerpt-1", ExcerptReview.PROPOSED, "invalid", 40)
+        }
+        assertThrows(LocalCandidateConflict::class.java) { f.store.reopen(reopen(proposed)) }
+        val cancelled = f.store.cancel(f.cancel(proposed))
+        assertThrows(LocalCandidateConflict::class.java) { f.store.reopen(reopen(cancelled)) }
+        val accepted = f.store.review(f.review(f.ready("accepted")))
+        val request = reopen(accepted)
+        f.db.transaction { sql -> sql.execute("UPDATE entries SET privacyPolicy='AI_NONE' WHERE id='source'"); sql.execute("UPDATE entries SET privacyPolicy='LOCAL_ONLY' WHERE id='source'") }
+        assertThrows(LocalCandidateConflict::class.java) { f.store.reopen(request) }
+        assertTrue(f.store.batches(f.source).all { it.state == LocalCandidateState.INVALIDATED && it.items.isEmpty() })
+        val current = f.store.review(f.review(f.ready("edited")))
+        f.revise()
+        assertThrows(LocalCandidateConflict::class.java) { f.store.reopen(reopen(current)) }
+        assertTrue(f.store.batches(SourceVersion("source", 2)).all { it.items.isEmpty() })
+    }
+    @Test fun correctionAbortAndIndependentConnectionsKeepOneAuthenticatedWholeBatchWinner() = LocalCandidateFixture().use { f ->
+        val accepted = f.store.review(f.review(f.ready()))
+        val request = reopen(accepted)
+        val before = f.row(); val bytes = (before[3] as ByteArray).copyOf()
+        f.db.transaction { it.execute("CREATE TRIGGER synthetic_correction_abort AFTER UPDATE ON local_candidate_batches BEGIN SELECT RAISE(ABORT,'synthetic'); END") }
+        assertThrows(LocalCandidateStorageFailure::class.java) { f.store.reopen(request) }
+        f.db.transaction { it.execute("DROP TRIGGER synthetic_correction_abort") }
+        assertEquals(before.take(3), f.row().take(3)); assertArrayEquals(bytes, f.row()[3] as ByteArray)
+        f.second().use { db2 ->
+            val other = SqlLocalCandidateRepository(db2, LocalCandidateFixture.KEY)
+            try {
+                val winner = f.store.reopen(request)
+                assertThrows(LocalCandidateConflict::class.java) { other.reopen(reopen(accepted, "competitor")) }
+                assertEquals(winner.version, other.batches(f.source).single().version)
+                assertEquals(ExcerptReview.PROPOSED, other.batches(f.source).single().items.single().review)
+            } finally { other.wipeKey() }
+        }
+    }
+    private fun reopen(batch: LocalCandidateBatch, mutation: String = "reopen") = ExcerptReopenRequest(
+        batch.id, batch.source, batch.sourceHash, batch.generation, batch.version, "excerpt-1",
+        batch.items.singleOrNull()?.review?.takeUnless { it == ExcerptReview.PROPOSED } ?: ExcerptReview.ACCEPTED, mutation, 40)
     @Test fun actualNineToTenMigrationPreservesOldRowsAndAddsOnlyEmptyCandidateStorage() = LocalCandidateFixture(false).use { f ->
         val remote = RemoteTextTransactions(f.db) { "legacy-job" }
         val priorSource = SourceVersion("other", 1)

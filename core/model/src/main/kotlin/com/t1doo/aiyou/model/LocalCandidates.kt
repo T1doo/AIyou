@@ -67,6 +67,18 @@ class CandidateCancelRequest(val batchId: String, val source: SourceVersion, val
     override fun toString() = "CandidateCancelRequest(redacted)"
 }
 
+/** Explicit correction of a persisted review; never restores an invalidated source. */
+class ExcerptReopenRequest(val batchId: String, val source: SourceVersion, val sourceHash: String,
+    val generation: Long, val expectedVersion: Long, val itemId: String, val previousReview: ExcerptReview,
+    val mutationId: String, val requestedAtMillis: Long) {
+    init {
+        ManualTags.identifier(batchId); ManualTags.identifier(itemId); ManualTags.identifier(mutationId)
+        require(expectedVersion in 1 until Long.MAX_VALUE && generation >= 0 && requestedAtMillis >= 0)
+        require(previousReview != ExcerptReview.PROPOSED)
+    }
+    override fun toString() = "ExcerptReopenRequest(redacted)"
+}
+
 object LocalCandidates {
     const val RULE_VERSION = 1
     const val MAX_ITEMS = 8

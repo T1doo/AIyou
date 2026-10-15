@@ -19,6 +19,63 @@ import org.junit.Test
 
 /** Actual VM IO actor, production parser/rules/SQL/AEAD; no Android or device claim. */
 class LocalCandidateViewModelTest {
+    @Test(timeout = 10_000) fun correctionRequiresFreshConfirmationAndNeverReusesAnOldAcceptOrReopenToken(): Unit = Harness().use { h -> runBlocking {
+        h.ready(); val generated = h.generate(h.open().session); val batch = generated.batches.single()
+        h.vm.candidates.requestAccept(generated.session, batch.id, batch.version, "excerpt-1")
+        val oldAccept = checkNotNull(h.vm.state.value.candidates!!.confirmation)
+        h.vm.candidates.confirm(generated.session, oldAccept)
+        val accepted = h.ui { it.pending == null && it.notice?.contains("已采纳") == true }.batches.single()
+        h.vm.candidates.requestReopen(generated.session, batch.id, accepted.version, "excerpt-1")
+        val oldCorrection = checkNotNull(h.vm.state.value.candidates!!.confirmation)
+        h.vm.candidates.cancelConfirmation(generated.session, oldCorrection)
+        assertTrue(h.reopens.isEmpty()); assertEquals(ExcerptReview.ACCEPTED, h.f.store.batches(h.f.source).single().items.single().review)
+        h.vm.candidates.requestReopen(generated.session, batch.id, accepted.version, "excerpt-1")
+        val fresh = checkNotNull(h.vm.state.value.candidates!!.confirmation)
+        h.vm.candidates.cancelConfirmation(generated.session, oldCorrection)
+        h.vm.candidates.confirm(generated.session, oldCorrection); h.vm.candidates.confirm(generated.session, oldAccept)
+        assertEquals(fresh, h.vm.state.value.candidates!!.confirmation); assertTrue(h.reopens.isEmpty())
+        h.vm.candidates.confirm(generated.session, fresh)
+        val pending = h.ui { it.pending == null && it.notice?.contains("重新待确认") == true }.batches.single()
+        assertEquals(ExcerptReview.PROPOSED, pending.items.single().review); assertEquals(3L, pending.version)
+        h.vm.candidates.confirm(generated.session, oldAccept); assertEquals(1, h.reviews.size)
+        h.vm.candidates.reject(generated.session, batch.id, pending.version, "excerpt-1")
+        val rejected = h.ui { it.pending == null && it.notice?.contains("已拒绝") == true }.batches.single()
+        h.vm.candidates.requestReopen(generated.session, batch.id, rejected.version, "excerpt-1")
+        h.vm.candidates.confirm(generated.session, checkNotNull(h.vm.state.value.candidates!!.confirmation))
+        h.ui { it.pending == null && it.notice?.contains("重新待确认") == true }
+        h.dispose(); h.f.reopen()
+        assertEquals(ExcerptReview.PROPOSED, h.f.store.batches(h.f.source).single().items.single().review)
+        assertTrue(h.f.db.read("SELECT * FROM manual_tasks").isEmpty()); assertTrue(h.f.db.read("SELECT * FROM entry_manual_tags").isEmpty())
+        assertEquals(0, h.remoteReads); assertEquals(0, h.remoteOpens)
+    } }
+    @Test(timeout = 10_000) fun correctionLostReadbackRetriesTheIdenticalImmutableRequestAndOnlyOneNewVersion(): Unit = Harness().use { h -> runBlocking {
+        h.ready(); val generated = h.generate(h.open().session); val batch = generated.batches.single()
+        h.vm.candidates.reject(generated.session, batch.id, batch.version, "excerpt-1")
+        val rejected = h.ui { it.pending == null && it.notice?.contains("已拒绝") == true }.batches.single()
+        h.loseReviewReadback = true
+        h.vm.candidates.requestReopen(generated.session, batch.id, rejected.version, "excerpt-1")
+        h.vm.candidates.confirm(generated.session, checkNotNull(h.vm.state.value.candidates!!.confirmation))
+        val unknown = h.ui { it.error != null && !it.busy }
+        assertNull(unknown.notice); assertTrue(unknown.batches.isEmpty()); assertTrue(unknown.pending is LocalCandidateIntent.Reopen)
+        val request = h.reopens.single()
+        h.loseReviewReadback = false; h.failRead = false
+        h.vm.candidates.retry(unknown.session, unknown.request)
+        h.ui { it.notice?.contains("重新待确认") == true && it.pending == null }
+        assertEquals(2, h.reopens.size); assertSame(request, h.reopens[1])
+        assertEquals(3L, h.f.store.batches(h.f.source).single().version)
+    } }
+    @Test(timeout = 10_000) fun sourceEditRetiresCorrectionConfirmationAndCannotReopenInvalidatedPayload(): Unit = Harness().use { h -> runBlocking {
+        h.ready(); val generated = h.generate(h.open().session); val batch = generated.batches.single()
+        h.vm.candidates.reject(generated.session, batch.id, batch.version, "excerpt-1")
+        val rejected = h.ui { it.pending == null && it.notice?.contains("已拒绝") == true }.batches.single()
+        h.vm.candidates.requestReopen(generated.session, batch.id, rejected.version, "excerpt-1")
+        val old = checkNotNull(h.vm.state.value.candidates!!.confirmation)
+        h.f.revise(); h.vm.refreshLocalSearch()
+        withTimeout(2_000) { h.vm.state.first { !it.opening && it.entries.any { e -> e.id == "source" && e.currentRevision == 2 } } }
+        assertNull(h.vm.state.value.candidates)
+        h.vm.candidates.confirm(generated.session, old); assertTrue(h.reopens.isEmpty())
+        assertTrue(h.f.store.batches(SourceVersion("source", 2)).all { it.state == LocalCandidateState.INVALIDATED && it.items.isEmpty() })
+    } }
     @Test(timeout = 10_000) fun syntheticJsonUsesActualParserVmSqlAndColdReopenWithoutRemoteAuthority(): Unit = Harness().use { h -> runBlocking {
         h.producer = { job ->
             val raw = buildJsonObject {
@@ -157,8 +214,13 @@ class LocalCandidateViewModelTest {
         @Volatile var loseReviewReadback = false
         @Volatile var producer: (LocalCandidateJob) -> ExcerptDocument = LocalExcerptRules::extract
         val reviews = CopyOnWriteArrayList<ExcerptReviewRequest>()
+        val reopens = CopyOnWriteArrayList<ExcerptReopenRequest>()
         var remoteReads = 0; var remoteOpens = 0
         private val port = object : LocalCandidateRepository by f.store {
+            override fun reopen(request: ExcerptReopenRequest): LocalCandidateBatch {
+                reopens.add(request)
+                return f.store.reopen(request).also { if (loseReviewReadback) failRead = true }
+            }
             override fun review(request: ExcerptReviewRequest): LocalCandidateBatch {
                 reviews.add(request)
                 return f.store.review(request).also { if (loseReviewReadback) failRead = true }

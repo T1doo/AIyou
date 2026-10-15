@@ -94,6 +94,29 @@ internal class SqlLocalCandidateRepository(private val database: RecordsSqlDatab
         }
     }
 
+    override fun reopen(request: ExcerptReopenRequest): LocalCandidateBatch = safe {
+        database.transaction { sql ->
+            val source = readSource(sql, request.source)
+            val old = row(sql, request.batchId) ?: throw LocalCandidateConflict()
+            bindRequest(old, source, request.sourceHash, request.generation)
+            if (old.state != LocalCandidateState.READY) throw LocalCandidateConflict()
+            val previous = payload(old, source)
+            val receipt = LocalCandidateCipher.Payload(previous.items, "REOPEN_" + request.previousReview.name,
+                request.expectedVersion, request.itemId, request.requestedAtMillis)
+            if (old.mutation == request.mutationId) {
+                if (old.version != request.expectedVersion + 1 || previous != receipt ||
+                    previous.items.singleOrNull { it.id == request.itemId }?.review != ExcerptReview.PROPOSED)
+                    throw LocalCandidateConflict()
+                return@transaction snapshot(old, previous.items)
+            }
+            if (old.version != request.expectedVersion ||
+                previous.items.singleOrNull { it.id == request.itemId }?.review != request.previousReview)
+                throw LocalCandidateConflict()
+            val items = previous.items.map { if (it.id == request.itemId) it.copy(review = ExcerptReview.PROPOSED) else it }
+            write(sql, old, LocalCandidateState.READY, request.mutationId, receipt.copy(items = items), source)
+        }
+    }
+
     override fun cancel(request: CandidateCancelRequest): LocalCandidateBatch = safe {
         database.transaction { sql ->
             val source = readSource(sql, request.source)
@@ -145,6 +168,8 @@ internal class SqlLocalCandidateRepository(private val database: RecordsSqlDatab
                 LocalExcerptRules.validate(ExcerptDocument(row.source, row.hash, p.items.map { it.proposal }), source.version, source.hash, source.original)
                 if (p.operation == "COMPLETE") require(row.version == 1L && row.mutation == row.id && p.itemId.isEmpty() &&
                     p.requestedAtMillis == row.created && p.items.all { it.review == ExcerptReview.PROPOSED })
+                else if (p.operation in setOf("REOPEN_ACCEPTED", "REOPEN_REJECTED"))
+                    require(p.items.singleOrNull { it.id == p.itemId }?.review == ExcerptReview.PROPOSED)
                 else require(p.operation in setOf("ACCEPTED", "REJECTED") &&
                     p.items.singleOrNull { it.id == p.itemId }?.review?.name == p.operation)
             }

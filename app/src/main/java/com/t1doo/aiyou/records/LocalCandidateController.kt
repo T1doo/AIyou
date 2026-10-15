@@ -10,9 +10,11 @@ import kotlinx.coroutines.*
 sealed interface LocalCandidateIntent {
     data class Generate(val request: LocalCandidateStart) : LocalCandidateIntent
     data class Review(val request: ExcerptReviewRequest) : LocalCandidateIntent
+    data class Reopen(val request: ExcerptReopenRequest) : LocalCandidateIntent
     data class Cancel(val request: CandidateCancelRequest) : LocalCandidateIntent
 }
-data class ExcerptConfirmation(val token: Long, val batchId: String, val version: Long, val itemId: String)
+data class ExcerptConfirmation(val token: Long, val batchId: String, val version: Long, val itemId: String,
+    val previousReview: ExcerptReview = ExcerptReview.PROPOSED)
 data class LocalCandidateUiState(val session: Long, val source: SourceVersion, val sourceHash: String,
     val loading: Boolean = true, val busy: Boolean = false, val computing: Boolean = false,
     val batches: List<LocalCandidateBatch> = emptyList(), val error: String? = null, val notice: String? = null,
@@ -91,11 +93,27 @@ class LocalCandidateController(
     fun cancelConfirmation(session: Long, expected: ExcerptConfirmation) {
         if (owns(session)) update(session) { if (it.busy || it.confirmation != expected) it else it.copy(confirmation = null) }
     }
+    fun requestReopen(session: Long, batchId: String, version: Long, itemId: String) {
+        val ui = current().candidates ?: return
+        if (!actionable(ui, session)) return
+        val batch = ui.batches.singleOrNull { it.id == batchId && it.version == version && it.state == LocalCandidateState.READY } ?: return
+        val item = batch.items.singleOrNull { it.id == itemId && it.review != ExcerptReview.PROPOSED } ?: return
+        update(session) { it.copy(confirmation = ExcerptConfirmation(confirmations.incrementAndGet(), batchId, version,
+            itemId, item.review), error = null, notice = null) }
+    }
     fun confirm(session: Long, expected: ExcerptConfirmation) {
         val ui = current().candidates ?: return
         val target = ui.confirmation ?: return
         if (target != expected) return
-        review(session, target.batchId, target.version, target.itemId, ExcerptReview.ACCEPTED)
+        if (target.previousReview == ExcerptReview.PROPOSED)
+            review(session, target.batchId, target.version, target.itemId, ExcerptReview.ACCEPTED)
+        else {
+            if (!actionable(ui, session)) return
+            val batch = ui.batches.singleOrNull { it.id == target.batchId && it.version == target.version && it.state == LocalCandidateState.READY } ?: return
+            if (batch.items.none { it.id == target.itemId && it.review == target.previousReview }) return
+            submit(session, LocalCandidateIntent.Reopen(ExcerptReopenRequest(batch.id, batch.source, batch.sourceHash,
+                batch.generation, batch.version, target.itemId, target.previousReview, UUID.randomUUID().toString(), clock.millis())))
+        }
     }
     fun reject(session: Long, batchId: String, version: Long, itemId: String) =
         review(session, batchId, version, itemId, ExcerptReview.REJECTED)
@@ -167,6 +185,8 @@ class LocalCandidateController(
                     is LocalCandidateIntent.Review -> acknowledge(session, request, ui.source, repository,
                         repository.review(intent.request), if (intent.request.decision == ExcerptReview.ACCEPTED)
                             "已采纳原文摘录。没有创建事实、标签或待办。" else "已拒绝摘录，原文未改变。")
+                    is LocalCandidateIntent.Reopen -> acknowledge(session, request, ui.source, repository,
+                        repository.reopen(intent.request), "已撤回原审阅结果，摘录重新待确认；没有自动采纳。")
                     is LocalCandidateIntent.Cancel -> acknowledge(session, request, ui.source, repository,
                         repository.cancel(intent.request), "本批候选已取消。")
                 }

@@ -8,6 +8,7 @@ interface LocalCandidateRepository {
     fun complete(job: LocalCandidateJob, document: ExcerptDocument): LocalCandidateBatch
     fun batches(source: SourceVersion): List<LocalCandidateBatch>
     fun review(request: ExcerptReviewRequest): LocalCandidateBatch
+    fun reopen(request: ExcerptReopenRequest): LocalCandidateBatch
     fun cancel(request: CandidateCancelRequest): LocalCandidateBatch
 }
 

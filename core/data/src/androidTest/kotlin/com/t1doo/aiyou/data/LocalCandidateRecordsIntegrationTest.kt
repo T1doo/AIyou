@@ -77,6 +77,17 @@ class LocalCandidateRecordsIntegrationTest {
         store.localCandidates.review(request); assertArrayEquals(bytes,payload(store))
         store.closeAndAwait(); store=open()
         assertEquals(ExcerptReview.ACCEPTED,store.localCandidates.batches(source).single().items.single().review)
+        val accepted = store.localCandidates.batches(source).single()
+        val correction = ExcerptReopenRequest(accepted.id, source, accepted.sourceHash, accepted.generation,
+            accepted.version, "excerpt-1", ExcerptReview.ACCEPTED, "correct-native", 95)
+        store.localCandidates.reopen(correction); val correctedBytes = payload(store)
+        store.localCandidates.reopen(correction); assertArrayEquals(correctedBytes, payload(store))
+        store.closeAndAwait(); store = open()
+        val pending = store.localCandidates.batches(source).single()
+        assertEquals(ExcerptReview.PROPOSED, pending.items.single().review)
+        assertThrows(LocalCandidateConflict::class.java) { store.localCandidates.review(request) }
+        store.localCandidates.review(review(pending, ExcerptReview.REJECTED, "reject-corrected"))
+        assertEquals(ExcerptReview.REJECTED, store.localCandidates.batches(source).single().items.single().review)
         assertEquals(text,store.entries().single { it.id=="local" }.originalText)
         assertTrue(store.manualTasks.snapshots().isEmpty()); assertTrue(store.manualTags.read("local").names.isEmpty())
         assertFalse(file.readBytes().toString(Charsets.UTF_8).contains(text))
