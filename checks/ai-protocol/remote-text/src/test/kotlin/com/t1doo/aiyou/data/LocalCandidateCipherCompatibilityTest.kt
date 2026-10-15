@@ -16,23 +16,27 @@ class LocalCandidateCipherCompatibilityTest {
         val hash = OriginalExports.hash(f.original)
         val aad = PackageWriter(4096).use { w ->
             w.string("AIyou/local-candidates/1",64); w.string("legacy",512); w.string("source",512)
-            w.i64(1); w.string(hash,64); w.i64(0); w.i32(1); w.i64(2)
+            w.i64(1); w.string(hash,64); w.i64(0); w.i32(1); w.i64(3)
             w.string("READY",16); w.string("legacy-accept",512); w.i64(20); w.bytes()
         }
-        val items = listOf(ReviewedExcerpt("excerpt-1", ExcerptProposal(0,
-            f.original.codePointCount(0,f.original.length),f.original),ExcerptReview.ACCEPTED))
-        val old = legacy(aad, LocalCandidateCipher.Payload(items,"ACCEPTED",1,"excerpt-1",30))
+        val items = listOf(
+            ReviewedExcerpt("excerpt-1", ExcerptProposal(0,f.original.codePointCount(0,f.original.length),f.original),ExcerptReview.ACCEPTED),
+            ReviewedExcerpt("excerpt-2", ExcerptProposal(0,1,"我"),ExcerptReview.REJECTED),
+            ReviewedExcerpt("excerpt-3", ExcerptProposal(1,2,"不"),ExcerptReview.PROPOSED))
+        val old = legacy(aad, LocalCandidateCipher.Payload(items,"ACCEPTED",2,"excerpt-1",30))
         f.db.transaction { it.execute("INSERT INTO local_candidate_batches VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-            listOf("legacy","source",1,hash,0,1,2,"READY","legacy-accept",20,old)) }
+            listOf("legacy","source",1,hash,0,1,3,"READY","legacy-accept",20,old)) }
         f.reopen()
-        assertEquals(ExcerptReview.ACCEPTED,f.store.batches(f.source).single().items.single().review)
-        val replay = ExcerptReviewRequest("legacy",f.source,hash,0,1,"excerpt-1",ExcerptReview.ACCEPTED,"legacy-accept",30)
+        assertEquals(items,f.store.batches(f.source).single().items)
+        val replay = ExcerptReviewRequest("legacy",f.source,hash,0,2,"excerpt-1",ExcerptReview.ACCEPTED,"legacy-accept",30)
         f.store.review(replay)
         fun bytes() = f.db.read("SELECT payload FROM local_candidate_batches WHERE id='legacy'").single().single() as ByteArray
         assertArrayEquals(old,bytes()); assertEquals(1,bytes()[0].toInt())
-        f.store.reopen(ExcerptReopenRequest("legacy",f.source,hash,0,2,"excerpt-1",ExcerptReview.ACCEPTED,"correct",40))
+        f.store.reopen(ExcerptReopenRequest("legacy",f.source,hash,0,3,"excerpt-1",ExcerptReview.ACCEPTED,"correct",40))
         assertEquals(2,bytes()[0].toInt()); f.reopen()
-        assertEquals(ExcerptReview.PROPOSED,f.store.batches(f.source).single().items.single().review)
+        val pending=f.store.batches(f.source).single()
+        assertEquals(4L,pending.version)
+        assertEquals(items.mapIndexed { i,item -> if(i==0) item.copy(review=ExcerptReview.PROPOSED) else item },pending.items)
         assertThrows(LocalCandidateConflict::class.java) { f.store.review(replay) }
     }
     @Test fun legacyWhitelistAndEofStayStrictAndEnvelopeRelabelingFailsAuthentication() {
@@ -49,12 +53,13 @@ class LocalCandidateCipherCompatibilityTest {
             assertThrows(AEADBadTagException::class.java) { cipher.open(aad,current.copyOf().also { it[0]=1 }) }
             assertThrows(IllegalArgumentException::class.java) { cipher.open(aad,legacy(aad,payload.copy(operation="REOPEN_ACCEPTED"))) }
             assertThrows(IllegalArgumentException::class.java) { cipher.open(aad,legacy(aad,payload,true)) }
+            assertThrows(IllegalArgumentException::class.java) { cipher.open(aad,legacy(aad,payload,envelope=2,bodyVersion=1)) }
             assertThrows(IllegalArgumentException::class.java) { cipher.open(aad,current.copyOf().also { it[0]=3 }) }
         } finally { cipher.wipe() }
     }
-    private fun legacy(aad:ByteArray,p:LocalCandidateCipher.Payload,trailing:Boolean=false):ByteArray {
+    private fun legacy(aad:ByteArray,p:LocalCandidateCipher.Payload,trailing:Boolean=false,envelope:Int=1,bodyVersion:Int=envelope):ByteArray {
         val plain=PackageWriter(32768).use { w ->
-            w.i32(1); w.string(p.operation,16); w.i64(p.expectedVersion); w.string(p.itemId,128); w.i64(p.requestedAtMillis)
+            w.i32(bodyVersion); w.string(p.operation,16); w.i64(p.expectedVersion); w.string(p.itemId,128); w.i64(p.requestedAtMillis)
             w.i32(p.items.size)
             p.items.forEach { w.string(it.id,128); w.i32(it.proposal.start); w.i32(it.proposal.end); w.string(it.proposal.quote,1280); w.string(it.review.name,16) }
             if(trailing) w.i32(0)
@@ -67,8 +72,9 @@ class LocalCandidateCipherCompatibilityTest {
         try {
             val nonce=ByteArray(12) { (it+7).toByte() } // Fixed synthetic legacy fixture, never a production nonce.
             val c=Cipher.getInstance("AES/GCM/NoPadding")
-            c.init(Cipher.ENCRYPT_MODE,SecretKeySpec(key,"AES"),GCMParameterSpec(128,nonce)); c.updateAAD(aad)
-            return byteArrayOf(1)+nonce+c.doFinal(plain)
+            c.init(Cipher.ENCRYPT_MODE,SecretKeySpec(key,"AES"),GCMParameterSpec(128,nonce))
+            c.updateAAD(if(envelope==1) aad else aad+"\u0000AIyou/local-candidates/envelope/2".toByteArray(Charsets.US_ASCII))
+            return byteArrayOf(envelope.toByte())+nonce+c.doFinal(plain)
         } finally { key.fill(0); plain.fill(0) }
     }
 }
