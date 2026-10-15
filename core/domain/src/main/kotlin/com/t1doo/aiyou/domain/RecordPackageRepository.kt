@@ -7,6 +7,8 @@ interface VerifiedRecordPackage {
     val manifest: RecordPackageManifest
     val records: List<RecordPackageOriginal>
     val digest: String
+    val images: List<com.t1doo.aiyou.model.RecordPackageImage> get() = emptyList()
+    fun release() {}
 }
 
 interface RecordPackageCipher {

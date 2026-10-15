@@ -84,7 +84,7 @@ class JcaRecordPackageCipher internal constructor(private val random: SecureRand
         }
     }
 
-    private fun encode(snapshot: OriginalExportSnapshot): ByteArray {
+    internal fun encode(snapshot: OriginalExportSnapshot): ByteArray {
         RecordPackages.uuid(snapshot.id)
         val originals = snapshot.records.map { r -> RecordPackageOriginal(r.entry.id, r.entry.currentRevision,
             r.entry.capturedAtMillis, r.entry.captureTimeZone, r.entry.originalText, r.contentHash, r.tags.version, r.tags.names) }
@@ -106,7 +106,7 @@ class JcaRecordPackageCipher internal constructor(private val random: SecureRand
         } finally { blocks.forEach { it.fill(0) } }
     }
 
-    private fun parse(plain: ByteArray): AuthenticatedRecordPackage {
+    internal fun parse(plain: ByteArray): AuthenticatedRecordPackage {
         val input = PackageReader(plain)
         require(input.string(64) == NAME && input.i32() == 1 && input.i32() == 1)
         val id = input.string(36); val created = input.i64()

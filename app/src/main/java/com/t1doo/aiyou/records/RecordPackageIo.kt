@@ -13,6 +13,36 @@ interface SelectedRecordPackageDocument {
 }
 class RecordPackageCancelled : IllegalStateException("Record package operation retired")
 object RecordPackageIo {
+    /** Compare streaming ciphertext digest + exact byte count, with a fixed 8 KiB readback buffer. */
+    suspend fun writeMediaAndVerify(document: SelectedRecordPackageDocument,
+        payload: com.t1doo.aiyou.domain.PreparedRecordMediaPackage, active: () -> Boolean) {
+        val written = MessageDigest.getInstance("SHA-256"); var size = 0L
+        if (!active()) throw RecordPackageCancelled()
+        document.openForWrite().use { destination ->
+            val output = object : OutputStream() {
+                override fun write(value: Int) { write(byteArrayOf(value.toByte()),0,1) }
+                override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                    if (!active()) throw RecordPackageCancelled()
+                    require(size + length <= RecordMediaPackages.MAX_FILE_BYTES)
+                    destination.write(bytes,offset,length); written.update(bytes,offset,length); size += length
+                }
+                override fun flush() = destination.flush()
+            }
+            payload.writeTo(output,active); output.flush()
+        }
+        val expected = written.digest(); val actual = MessageDigest.getInstance("SHA-256"); var read = 0L
+        val buffer = ByteArray(8192)
+        try {
+            document.openForRead().use { input ->
+                while (true) {
+                    if (!active()) throw RecordPackageCancelled()
+                    val n = input.read(buffer); if (n < 0) break; require(n > 0)
+                    read += n; require(read <= size && read <= RecordMediaPackages.MAX_FILE_BYTES); actual.update(buffer,0,n)
+                }
+            }
+            check(active() && read == size && MessageDigest.isEqual(expected,actual.digest()))
+        } finally { buffer.fill(0); expected.fill(0) }
+    }
     fun read(document: SelectedRecordPackageDocument, active: () -> Boolean): ByteArray {
         if (!active()) throw RecordPackageCancelled()
         val buffer = ByteArray(8192)

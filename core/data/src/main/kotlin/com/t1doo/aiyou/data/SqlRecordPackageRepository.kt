@@ -10,7 +10,12 @@ import java.util.concurrent.CancellationException
 internal class SqlRecordPackageRepository(private val database: RecordsSqlDatabase,
     private val tags: SqlManualTagRepository, private val maxGroups: Int = 4096) : RecordPackageRepository {
     init { require(maxGroups in 1..4096) }
-    override fun restore(verified: VerifiedRecordPackage, newIds: List<String>, importedAtMillis: Long): RecordPackageRestoreResult = safely {
+    override fun restore(verified: VerifiedRecordPackage, newIds: List<String>, importedAtMillis: Long): RecordPackageRestoreResult {
+        if (verified is AuthenticatedMediaPackage) throw RecordPackageInvalid()
+        return restoreWithFiles(verified,newIds,importedAtMillis) {}
+    }
+    internal fun restoreWithFiles(verified: VerifiedRecordPackage, newIds: List<String>, importedAtMillis: Long,
+        beforeReceipt: (RecordsSqlConnection) -> Unit): RecordPackageRestoreResult = safely {
         val pack = verified as? AuthenticatedRecordPackage ?: throw RecordPackageInvalid()
         require(newIds.size <= 20)
         val ids = newIds.toList()
@@ -57,6 +62,7 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
                 sql.execute("INSERT INTO local_jobs(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,'PACKAGE_ORIGIN',?)",
                     listOf(ORIGIN + id, id, originState(provenance)))
             }
+            beforeReceipt(sql)
             val group = Group(pack.manifest.backupId, pack.digest, pack.manifest.createdAtMillis,
                 importedAtMillis, ids, pack.recordDigests)
             sql.execute("INSERT INTO record_package_receipts(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,'PACKAGE_RESTORE',?)",

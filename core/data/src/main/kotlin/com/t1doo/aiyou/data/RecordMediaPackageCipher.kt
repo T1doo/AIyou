@@ -1,0 +1,197 @@
+package com.t1doo.aiyou.data
+
+import com.t1doo.aiyou.domain.*
+import com.t1doo.aiyou.model.*
+import java.io.*
+import java.nio.ByteBuffer
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.Collections
+import javax.crypto.Cipher
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.PBEKeySpec
+import javax.crypto.spec.SecretKeySpec
+
+/** v2 flat authenticated frames, not an archive: no names are ever interpreted as filesystem paths.
+ * Each image is independently bounded (16 MiB), with a 64 MiB cumulative bound. Metadata is <=2 MiB+32 KiB.
+ * Frame nonce = random 8-byte prefix + checked sequence; AAD binds header, metadata hash and frame index.
+ * An authenticated terminal frame and exact EOF prevent a valid prefix from becoming a valid package.
+ */
+internal class RecordMediaPackageCipher {
+    private val legacy = JcaRecordPackageCipher()
+    suspend fun seal(preview: RecordMediaPreview, password: CharArray,
+        read: suspend (RecordPackageImage) -> ByteArray, current: suspend () -> Boolean): PreparedRecordMediaPackage {
+        var key: ByteArray? = null
+        try {
+            RecordPackages.password(password)
+            val metadata = metadata(preview)
+            val salt = ByteArray(16).also(SecureRandom()::nextBytes)
+            val prefix = ByteArray(8).also(SecureRandom()::nextBytes)
+            val header = ByteBuffer.allocate(40).put(MAGIC).putInt(2).putInt(RecordPackages.ITERATIONS).put(salt).put(prefix).array()
+            key = derive(password, salt)
+            return Prepared(header, metadata, checkNotNull(key), preview.images, read, current).also { key = null }
+        } catch (_: Exception) { throw RecordPackageInvalid() }
+        finally { key?.fill(0); password.fill('\u0000') }
+    }
+
+    suspend fun open(source: () -> InputStream, password: CharArray): VerifiedRecordPackage {
+        var key: ByteArray? = null
+        try {
+            RecordPackages.password(password)
+            source().use { input ->
+                val magic = exact(input, 8)
+                if (!magic.contentEquals(MAGIC)) {
+                    // v1 remains bounded at its original 2 MiB and uses its unchanged parser/KDF.
+                    val buffer = ByteArray(RecordPackages.MAX_ENVELOPE + 1)
+                    magic.copyInto(buffer); var at = 8
+                    try {
+                        while (at < buffer.size) { val n = input.read(buffer, at, buffer.size-at); if (n < 0) break; require(n > 0); at += n }
+                        require(at <= RecordPackages.MAX_ENVELOPE)
+                        val bytes = buffer.copyOf(at)
+                        return try { legacy.open(bytes, password) } finally { bytes.fill(0) }
+                    } finally { buffer.fill(0) }
+                }
+                val header = magic + exact(input, 32)
+                val fields = ByteBuffer.wrap(header, 8, 32)
+                require(fields.int == 2 && fields.int == RecordPackages.ITERATIONS)
+                val salt = ByteArray(16).also(fields::get)
+                val firstLength = exact(input,4)
+                require(ByteBuffer.wrap(firstLength).int in 16..RecordMediaPackages.MAX_METADATA+16)
+                key = derive(password, salt)
+                val parsed = scan(SequenceInputStream(firstLength.inputStream(),input), header, checkNotNull(key), null, null)
+                return AuthenticatedMediaPackage(parsed.first, parsed.second, parsed.third, header, checkNotNull(key), source, this)
+                    .also { key = null }
+            }
+        } catch (_: Exception) { throw RecordPackageInvalid() }
+        finally { key?.fill(0); password.fill('\u0000') }
+    }
+
+    /** Re-authenticate the selected document on every import; substitution/truncation cannot commit a prefix. */
+    internal suspend fun consume(pack: AuthenticatedMediaPackage, each: suspend (Int, ByteArray) -> Unit) {
+        pack.withKey { key ->
+            pack.source().use { input ->
+                require(MessageDigest.isEqual(exact(input, 40), pack.header))
+                val parsed = scan(input, pack.header, key, pack.digest, each)
+                require(parsed.second == pack.images)
+            }
+        }
+    }
+
+    private suspend fun scan(input: InputStream, header: ByteArray, key: ByteArray, expected: String?,
+        each: (suspend (Int, ByteArray) -> Unit)?): Triple<AuthenticatedRecordPackage, List<RecordPackageImage>, String> {
+        val metadata = frameRead(input, header, key, 0, ZERO, RecordMediaPackages.MAX_METADATA)
+        val binding = packageHash(metadata)
+        try {
+            val reader = PackageReader(metadata)
+            require(reader.string(32) == "AIyou-images-v2" && reader.i32() == 2 && reader.i32() == 1)
+            require(reader.strings(3,32) == SCOPE && reader.strings(6,32) == EXCLUDED)
+            val originalBytes = reader.raw(reader.i32(), RecordPackages.MAX_PLAINTEXT)
+            val original = try { legacy.parse(originalBytes) } finally { originalBytes.fill(0) }
+            val images = List(reader.count(RecordMediaPackages.MAX_IMAGES)) {
+                RecordPackageImage(reader.string(512), reader.i32(), reader.string(36), reader.string(32), reader.i64(), packageHex(reader.raw(32)))
+            }
+            reader.end(); validate(original, images)
+            val digest = packageHex(binding)
+            if (expected != null) require(expected == digest)
+            for ((index, image) in images.withIndex()) {
+                val bytes = frameRead(input, header, key, index+1, binding, image.byteSize.toInt())
+                try { checkImage(image, bytes); each?.invoke(index, bytes) } finally { bytes.fill(0) }
+            }
+            val terminal = frameRead(input, header, key, images.size+1, binding, 32)
+            try { require(MessageDigest.isEqual(terminal, binding) && input.read() == -1) } finally { terminal.fill(0) }
+            return Triple(original, images, digest)
+        } finally { metadata.fill(0) }
+    }
+
+    private fun metadata(preview: RecordMediaPreview): ByteArray {
+        val original = legacy.encode(preview.snapshot)
+        return try { PackageWriter(RecordMediaPackages.MAX_METADATA).use { out ->
+            out.string("AIyou-images-v2", 32); out.i32(2); out.i32(1); out.strings(SCOPE,3,32); out.strings(EXCLUDED,6,32); out.i32(original.size); out.raw(original); out.i32(preview.images.size)
+            preview.images.forEach { i -> out.string(i.sourceId,512); out.i32(i.sourceRevision); out.string(i.attachmentId,36)
+                out.string(i.mediaType,32); out.i64(i.byteSize); out.raw(packageUnhex(i.sha256)) }
+            out.bytes()
+        } } finally { original.fill(0) }
+    }
+    private fun validate(original: AuthenticatedRecordPackage, images: List<RecordPackageImage>) {
+        require(images.map { it.attachmentId }.distinct().size == images.size)
+        require(images.sumOf { it.byteSize } <= RecordMediaPackages.MAX_IMAGE_TOTAL)
+        images.forEach { i -> require(original.records.any { it.sourceId == i.sourceId && it.sourceRevision == i.sourceRevision }) }
+    }
+    private inner class Prepared(private val header: ByteArray, private val metadata: ByteArray, private val key: ByteArray,
+        private val images: List<RecordPackageImage>, private val read: suspend (RecordPackageImage) -> ByteArray,
+        private val current: suspend () -> Boolean) : PreparedRecordMediaPackage {
+        private var used = false
+        private var released = false
+        override suspend fun writeTo(output: OutputStream, active: () -> Boolean) {
+            synchronized(this) { check(!used && !released); used = true }
+            try {
+                check(active() && current()); output.write(header)
+                val binding = packageHash(metadata)
+                frameWrite(output, header, key, 0, ZERO, metadata)
+                images.forEachIndexed { index, image ->
+                    check(active()); val bytes = read(image)
+                    try { checkImage(image, bytes); frameWrite(output, header, key, index+1, binding, bytes) } finally { bytes.fill(0) }
+                }
+                check(active() && current())
+                frameWrite(output, header, key, images.size+1, binding, binding); output.flush()
+            } finally { release() }
+        }
+        @Synchronized override fun release() { released = true; key.fill(0); metadata.fill(0) }
+    }
+    companion object {
+        private val MAGIC = "AIYOUPK2".toByteArray(Charsets.US_ASCII)
+        private val ZERO = ByteArray(32)
+        private val SCOPE = listOf("currentOriginals","manualTags","readyOriginalImages")
+        private val EXCLUDED = listOf("originalHistory","tasks","drafts","aiDerived","serviceKeys","deviceKeys")
+        private fun derive(password: CharArray, salt: ByteArray): ByteArray {
+            val spec = PBEKeySpec(password, salt, RecordPackages.ITERATIONS, 256)
+            val secret = try { SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec) } finally { spec.clearPassword() }
+            return try { secret.encoded } finally { try { secret.destroy() } catch (_: Exception) {} }
+        }
+        private fun crypt(mode: Int, header: ByteArray, key: ByteArray, index: Int, binding: ByteArray, input: ByteArray): ByteArray {
+            val nonce = header.copyOfRange(32,40) + ByteBuffer.allocate(4).putInt(index).array()
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(mode, SecretKeySpec(key,"AES"), GCMParameterSpec(128,nonce))
+            cipher.updateAAD(header); cipher.updateAAD(binding); cipher.updateAAD(ByteBuffer.allocate(4).putInt(index).array())
+            return cipher.doFinal(input)
+        }
+        private fun frameWrite(out: OutputStream, header: ByteArray, key: ByteArray, index: Int, binding: ByteArray, bytes: ByteArray) {
+            val encrypted = crypt(Cipher.ENCRYPT_MODE,header,key,index,binding,bytes)
+            try { out.write(ByteBuffer.allocate(4).putInt(encrypted.size).array()); out.write(encrypted) } finally { encrypted.fill(0) }
+        }
+        private fun frameRead(input: InputStream, header: ByteArray, key: ByteArray, index: Int, binding: ByteArray, max: Int): ByteArray {
+            val size = ByteBuffer.wrap(exact(input,4)).int
+            require(size in 16..max+16) // BEFORE allocation; cumulative metadata/image count bounds were checked.
+            val encrypted = exact(input,size)
+            return try { crypt(Cipher.DECRYPT_MODE,header,key,index,binding,encrypted) } finally { encrypted.fill(0) }
+        }
+        private fun exact(input: InputStream, size: Int): ByteArray {
+            val bytes = ByteArray(size)
+            try { var at = 0; while (at < size) { val n = input.read(bytes,at,size-at); require(n > 0); at += n }; return bytes }
+            catch (e: Exception) { bytes.fill(0); throw e }
+        }
+        internal fun checkImage(image: RecordPackageImage, bytes: ByteArray) {
+            require(bytes.size.toLong() == image.byteSize && packageHex(packageHash(bytes)) == image.sha256)
+            // MIME is allowlisted and must also agree with the original file signature.
+            require(if (image.mediaType == "image/png") bytes.size >= 8 && bytes.take(8).toByteArray().contentEquals(byteArrayOf(-119,80,78,71,13,10,26,10))
+                else bytes.size >= 3 && bytes[0] == 0xff.toByte() && bytes[1] == 0xd8.toByte() && bytes[2] == 0xff.toByte())
+        }
+    }
+}
+
+internal class AuthenticatedMediaPackage(private val original: AuthenticatedRecordPackage,
+    images: List<RecordPackageImage>, override val digest: String, internal val header: ByteArray,
+    private val key: ByteArray, internal val source: () -> InputStream, internal val cipher: RecordMediaPackageCipher) : AuthenticatedRecordPackage {
+    override val manifest get() = original.manifest
+    override val records get() = original.records
+    override val recordDigests get() = original.recordDigests
+    override val images = Collections.unmodifiableList(images.toList())
+    private var released = false
+    internal suspend fun <T> withKey(block: suspend (ByteArray) -> T): T {
+        val borrowed = synchronized(this) { check(!released); key.copyOf() }
+        return try { block(borrowed) } finally { borrowed.fill(0) }
+    }
+    @Synchronized override fun release() { released = true; key.fill(0) }
+    override fun toString() = "AuthenticatedMediaPackage(images=${images.size}, redacted)"
+}

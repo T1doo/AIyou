@@ -13,6 +13,7 @@ interface EntryRepository {
     val favorites: RecordFavoriteRepository? get() = null
     val permanentErasure: PermanentErasureRepository? get() = null
     val localSearch: LocalSearchRepository? get() = null
+    val mediaPackages: RecordMediaPackageRepository? get() = null
     val recordPackages: RecordPackageRepository? get() = null
     val recycleBin: RecycleBinRepository? get() = null
     val originalExport: OriginalExportRepository? get() = null

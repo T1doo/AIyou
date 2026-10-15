@@ -103,6 +103,50 @@ internal class EncryptedAttachmentStore(
 
     override suspend fun recover(): Unit = locked { recoverLocked() }
 
+    /** Package-owned durable intents exist before this call. Publish authenticated device ciphertext
+     * before one short DB commit inserts entries + READY rows + final package receipt together.
+     * No file IO is performed inside that transaction; the existing file -> DB lock order is kept.
+     */
+    internal suspend fun <T> importPackage(intents: List<AttachmentIntent>,
+        consume: suspend (suspend (Int, ByteArray) -> Unit) -> Unit, commit: () -> T): T = locked {
+        require(intents.size <= com.t1doo.aiyou.model.RecordMediaPackages.MAX_IMAGES)
+        intents.forEach { validate(it); check(ledger.find(it.id) == null && !erasureHooks.fenced(it.entryId)) }
+        var received = 0
+        consume { index, bytes ->
+            check(index == received && index < intents.size)
+            val intent = intents[index]
+            check(bytes.size.toLong() == intent.byteSize && hex(MessageDigest.getInstance("SHA-256").digest(bytes)) == intent.sha256)
+            if (file(intent,false).exists()) authenticated(file(intent,false),intent).fill(0)
+            else {
+                deleteOwnedPartial(intent)
+                writeEncrypted(intent) { bytes.inputStream() }
+                authenticated(file(intent,true),intent).fill(0)
+                publish(intent)
+            }
+            received++; checkpoint("package-image-published")
+        }
+        check(received == intents.size)
+        intents.forEach { check(!erasureHooks.fenced(it.entryId)); authenticated(file(it,false),it).fill(0) }
+        checkpoint("package-before-commit")
+        commit().also { checkpoint("package-committed") }
+    }
+
+    /** Reentrant cleanup only for a registered, uncommitted package mapping. Never enumerate/delete unknown files. */
+    internal suspend fun cleanupPackage(intents: List<AttachmentIntent>): Unit = locked {
+        intents.forEach { intent ->
+            validate(intent); check(ledger.find(intent.id) == null)
+            val target = file(intent,false)
+            val before = observeErasureFile(BUCKET,target)
+            if (before != null) {
+                authenticated(target,intent).fill(0)
+                check(observeErasureFile(BUCKET,target) == before)
+                Files.delete(target.toPath()); syncDirectory()
+            }
+            deleteOwnedPartial(intent)
+            checkpoint("package-cleaned")
+        }
+    }
+
     private suspend fun recoverLocked() {
         for (row in ledger.all()) {
             validate(row.intent)

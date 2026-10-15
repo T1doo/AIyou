@@ -36,7 +36,7 @@ import org.robolectric.annotation.Config
 @OptIn(ExperimentalFoundationApi::class)
 class RecordPackagePresentationTest {
     @get:Rule val compose = createComposeRule()
-    private val fixture = Fixture()
+    private var fixture = Fixture()
     private var saved: SaveableStateRegistry? = null
     private val navigation = AtomicReference<OriginalReadingCallbacks>()
     private val observer = object : OriginalReadingObserver {
@@ -59,6 +59,10 @@ class RecordPackagePresentationTest {
         compose.onNodeWithTag("package-list").performScrollToNode(hasTestTag(tag))
         compose.onNodeWithTag(tag).assertIsDisplayed().assertIsEnabled().performClick()
     }
+    private fun input(tag: String, value: String) {
+        compose.onNodeWithTag("package-list").performScrollToNode(hasTestTag(tag))
+        compose.onNodeWithTag(tag).performTextInput(value)
+    }
     private fun pump() { compose.runOnIdle { fixture.drain() } }
     private fun open() { compose.onNodeWithTag("package-open").performScrollTo().performClick() }
     private fun preview() { open(); click("package-export"); click("package-select:one"); click("package-preview"); pump() }
@@ -69,12 +73,12 @@ class RecordPackagePresentationTest {
         compose.onNodeWithTag("package-list").performScrollToNode(hasTestTag("package-encrypt"))
         compose.onNodeWithTag("package-encrypt").assertIsNotEnabled()
         click("package-scope")
-        compose.onNodeWithTag("package-password").performTextInput(PASSWORD)
-        compose.onNodeWithTag("package-password-again").performTextInput("another independent password")
+        input("package-password", PASSWORD)
+        input("package-password-again", "another independent password")
         click("package-encrypt"); pump()
         compose.runOnIdle { assertEquals(0, fixture.picker.launches); assertNotNull(fixture.ui.error) }
-        compose.onNodeWithTag("package-password").performTextInput(PASSWORD)
-        compose.onNodeWithTag("package-password-again").performTextInput(PASSWORD)
+        input("package-password", PASSWORD)
+        input("package-password-again", PASSWORD)
         click("package-encrypt"); pump()
         compose.runOnIdle { assertEquals(1, fixture.picker.launches); assertTrue(fixture.picker.export)
             assertEquals(RecordPackagePhase.PICKING_EXPORT, fixture.ui.phase) }
@@ -83,7 +87,7 @@ class RecordPackagePresentationTest {
         content(); open(); click("package-restore")
         compose.runOnIdle { fixture.picker.deliver(fixture.encryptedDocument()) }
         compose.onNodeWithTag("package-list").performScrollToNode(hasTestTag("package-password"))
-        compose.onNodeWithTag("package-password").performTextInput(PASSWORD); click("package-authenticate"); pump()
+        input("package-password", PASSWORD); click("package-authenticate"); pump()
         compose.runOnIdle { assertEquals(0, fixture.imports); assertEquals(RecordPackagePhase.RESTORE_PREVIEW, fixture.ui.phase) }
         compose.onNodeWithTag("package-list").performScrollToNode(hasText(fixture.original.originalText))
         compose.onNodeWithText(fixture.original.originalText).assertExists()
@@ -97,7 +101,7 @@ class RecordPackagePresentationTest {
         content(); open(); click("package-restore")
         compose.runOnIdle { fixture.picker.deliver(fixture.encryptedDocument()) }
         compose.onNodeWithTag("package-list").performScrollToNode(hasTestTag("package-password"))
-        compose.onNodeWithTag("package-password").performTextInput("wrong independent password")
+        input("package-password", "wrong independent password")
         click("package-authenticate"); pump()
         compose.onNodeWithTag("package-list").performScrollToNode(hasTestTag("package-error"))
         compose.onNodeWithTag("package-error").assertExists()
@@ -112,8 +116,8 @@ class RecordPackagePresentationTest {
                 recordPackages = fixture.controller, recordPackagePicker = fixture.picker, currentRecords = { fixture.state.value }) }
         }
         preview(); click("package-scope")
-        compose.onNodeWithTag("package-password").performTextInput(PASSWORD)
-        compose.onNodeWithTag("package-password-again").performTextInput(PASSWORD)
+        input("package-password", PASSWORD)
+        input("package-password-again", PASSWORD)
         compose.runOnIdle { assertPrivateAbsent(saved!!.performSave(), listOf(PASSWORD, "私密原文", "私密标签", fixture.ui.snapshot!!.id,
             "scopeAccepted", "content://", "recordPackage")) }
         restoration.emulateSavedInstanceStateRestore()
@@ -122,8 +126,8 @@ class RecordPackagePresentationTest {
         }
         click("package-encrypt"); pump()
         compose.runOnIdle { assertEquals(0, fixture.picker.launches); assertNotNull(fixture.ui.error) }
-        compose.onNodeWithTag("package-password").performTextInput(PASSWORD)
-        compose.onNodeWithTag("package-password-again").performTextInput(PASSWORD)
+        input("package-password", PASSWORD)
+        input("package-password-again", PASSWORD)
         click("package-encrypt"); pump()
         compose.runOnIdle {
             assertEquals(RecordPackagePhase.PICKING_EXPORT, fixture.ui.phase)
@@ -142,7 +146,7 @@ class RecordPackagePresentationTest {
             assertPrivateAbsent(saved!!.performSave(), listOf(PASSWORD, "content://", "私密原文"))
         }
         compose.onNodeWithTag("package-list").performScrollToNode(hasTestTag("package-password"))
-        compose.onNodeWithTag("package-password").performTextInput(PASSWORD); click("package-authenticate"); pump()
+        input("package-password", PASSWORD); click("package-authenticate"); pump()
         compose.runOnIdle {
             assertEquals(RecordPackagePhase.RESTORE_PREVIEW, fixture.ui.phase)
             assertPrivateAbsent(saved!!.performSave(), listOf(PASSWORD, fixture.ui.verified!!.manifest.backupId,
@@ -163,7 +167,7 @@ class RecordPackagePresentationTest {
         open(); click("package-restore")
         compose.runOnIdle { fixture.picker.deliver(fixture.encryptedDocument()) }
         compose.onNodeWithTag("package-list").performScrollToNode(hasTestTag("package-password"))
-        compose.onNodeWithTag("package-password").performTextInput(PASSWORD); click("package-authenticate"); pump()
+        input("package-password", PASSWORD); click("package-authenticate"); pump()
         compose.onNodeWithTag("package-list").performScrollToNode(hasTestTag("package-confirm"))
         val retainedConfirm = compose.onNodeWithTag("package-confirm").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
         compose.runOnIdle {
@@ -183,6 +187,28 @@ class RecordPackagePresentationTest {
         compose.onAllNodesWithTag("package-encrypt").assertCountEquals(0)
         click("package-cancel")
         compose.runOnIdle { assertEquals(RecordPackagePhase.CANCELLED, fixture.ui.phase); assertEquals("合成独立草稿", fixture.state.value.text) }
+    }
+    @Test @Config(sdk = [35], qualifiers = "w320dp-h640dp")
+    fun imageCountBytesAndConfirmationRemainReachableAtTwoHundredPercentFont() {
+        fixture = Fixture(true); content(true); preview()
+        compose.onNodeWithTag("package-list").performScrollToNode(hasTestTag("package-image-summary"))
+        compose.onNodeWithTag("package-image-summary").assertTextContains("1 张原图",substring=true).assertTextContains("1024 字节",substring=true)
+        click("package-scope")
+        input("package-password",PASSWORD); input("package-password-again",PASSWORD)
+        compose.onNodeWithTag("package-list").performScrollToNode(hasTestTag("package-encrypt"))
+        compose.onNodeWithTag("package-encrypt").assertIsDisplayed().assertHeightIsAtLeast(androidx.compose.ui.unit.Dp(48f))
+        click("package-cancel"); compose.runOnIdle { assertEquals(0,fixture.imports); assertNull(fixture.ui.snapshot) }
+    }
+    @Test @Config(sdk = [35], qualifiers = "w320dp-h640dp")
+    fun imageRestorePreviewRequiresSeparateExplicitConfirmationAtLargeFont() {
+        fixture = Fixture(true); content(true); open(); click("package-restore")
+        compose.runOnIdle { fixture.picker.deliver(fixture.encryptedDocument()) }
+        input("package-password",PASSWORD); click("package-authenticate"); pump()
+        compose.runOnIdle { assertEquals(1,fixture.ui.verified!!.images.size); assertEquals(0,fixture.imports) }
+        compose.onNodeWithTag("package-list").performScrollToNode(hasTestTag("package-confirm"))
+        compose.onNodeWithTag("package-confirm").assertIsDisplayed().assertHeightIsAtLeast(androidx.compose.ui.unit.Dp(48f))
+        click("package-confirm"); pump()
+        compose.runOnIdle { assertEquals(1,fixture.imports); assertEquals(RecordPackagePhase.DONE,fixture.ui.phase) }
     }
     private fun assertPrivateAbsent(value: Any?, forbidden: List<String>) {
         when (value) {
@@ -208,7 +234,7 @@ class RecordPackagePresentationTest {
         fun deliver(document: SelectedRecordPackageDocument?) { callback?.invoke(document); callback = null }
         fun retained() = checkNotNull(callback)
     }
-    private class Fixture {
+    private class Fixture(val mediaEnabled: Boolean = false) {
         val original = StoredEntry("one", 1, "合成私密原文😀".repeat(60) + "完整预览尾部", 42, "Asia/Shanghai", ProcessingPolicy.LOCAL_ONLY)
         val tags = ManualTagSnapshot("one", 1, listOf("合成私密标签"))
         val state = mutableStateOf(LocalRecordUiState(ready = true, opening = false, supportsRecordPackages = true,
@@ -220,6 +246,24 @@ class RecordPackagePresentationTest {
                 override fun capture(sources: List<SourceVersion>, snapshotId: String, createdAtMillis: Long, refreshCurrent: Boolean) =
                     OriginalExportSnapshot(snapshotId, createdAtMillis, listOf(OriginalExportRecord(original, OriginalExports.hash(original.originalText), tags)))
                 override fun isCurrent(snapshot: OriginalExportSnapshot) = snapshot.records.single().entry == original
+            }
+            override val mediaPackages: RecordMediaPackageRepository? = if (!mediaEnabled) null else object : RecordMediaPackageRepository {
+                private fun images() = listOf(RecordPackageImage("one",1,"00000000-0000-0000-0000-000000000001","image/png",1024,"a".repeat(64)))
+                override suspend fun preview(snapshot: OriginalExportSnapshot) = RecordMediaPreview(snapshot,images())
+                override suspend fun isCurrent(preview: RecordMediaPreview) = true
+                override suspend fun seal(preview: RecordMediaPreview,password: CharArray): PreparedRecordMediaPackage {
+                    password.fill('\u0000'); error("Not exercised by this preview-only UI port")
+                }
+                override suspend fun open(source: () -> InputStream,password: CharArray): VerifiedRecordPackage {
+                    val bytes = source().use { it.readBytes() }; val base = try { JcaRecordPackageCipher().open(bytes,password) } finally { bytes.fill(0) }
+                    return object : VerifiedRecordPackage {
+                        override val manifest = base.manifest; override val digest = base.digest; override val records = base.records
+                        override val images = images()
+                    }
+                }
+                override suspend fun restore(verified: VerifiedRecordPackage,newIds: List<String>,importedAtMillis: Long) =
+                    recordPackages.restore(verified,newIds,importedAtMillis)
+                override suspend fun recover() = Unit
             }
             override val manualTags = object : ManualTagRepository {
                 override fun read(entryId: String) = tags

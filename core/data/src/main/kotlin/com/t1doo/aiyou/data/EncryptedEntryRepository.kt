@@ -53,6 +53,8 @@ class EncryptedEntryRepository internal constructor(
     override val originalExport: com.t1doo.aiyou.domain.OriginalExportRepository =
         SqlOriginalExportRepository(borrowedSql, tagStorage)
     private val packageStorage = SqlRecordPackageRepository(borrowedSql, tagStorage)
+    override val mediaPackages: com.t1doo.aiyou.domain.RecordMediaPackageRepository =
+        SqlRecordMediaPackageRepository(borrowedSql, originalExport, attachmentStorage, packageStorage)
     override val recordPackages: com.t1doo.aiyou.domain.RecordPackageRepository get() = packageStorage
     override val permanentErasure: com.t1doo.aiyou.domain.PermanentErasureRepository =
         SqlPermanentErasureRepository(borrowedSql, attachmentStorage, originalEditStorage, packageStorage)
@@ -62,6 +64,7 @@ class EncryptedEntryRepository internal constructor(
     override suspend fun prepare() {
         // Bounded resume before ordinary media recovery. A failed deletion remains visible for retry.
         resumePermanentErasure(permanentErasure)
+        mediaPackages.recover()
         attachmentStorage.recover()
     }
 

@@ -16,7 +16,7 @@ class RecordPackageUiState(val session: Long, val phase: RecordPackagePhase = Re
     selection: List<SourceVersion> = emptyList(), val snapshot: OriginalExportSnapshot? = null,
     val verified: VerifiedRecordPackage? = null, val scopeAccepted: Boolean = false,
     val requestKey: String? = null, val pickerLaunched: Boolean = false,
-    val notice: String? = null, val error: String? = null, internal val epoch: Long = 0) {
+    val notice: String? = null, val error: String? = null, internal val epoch: Long = 0, val mediaPreview: RecordMediaPreview? = null) {
     val selection = Collections.unmodifiableList(selection.toList())
     val busy get() = phase in setOf(RecordPackagePhase.PREPARING, RecordPackagePhase.ENCRYPTING,
         RecordPackagePhase.WRITING, RecordPackagePhase.READING, RecordPackagePhase.IMPORTING)
@@ -24,8 +24,8 @@ class RecordPackageUiState(val session: Long, val phase: RecordPackagePhase = Re
         snapshot: OriginalExportSnapshot? = this.snapshot, verified: VerifiedRecordPackage? = this.verified,
         scopeAccepted: Boolean = this.scopeAccepted, requestKey: String? = this.requestKey,
         pickerLaunched: Boolean = this.pickerLaunched, notice: String? = this.notice, error: String? = this.error,
-        epoch: Long = this.epoch) = RecordPackageUiState(session, phase, selection, snapshot, verified, scopeAccepted,
-            requestKey, pickerLaunched, notice, error, epoch)
+        epoch: Long = this.epoch, mediaPreview: RecordMediaPreview? = this.mediaPreview) = RecordPackageUiState(session, phase, selection, snapshot, verified, scopeAccepted,
+            requestKey, pickerLaunched, notice, error, epoch, mediaPreview)
     override fun toString() = "RecordPackageUiState(phase=" + phase + ", redacted)"
 }
 
@@ -35,9 +35,10 @@ class RecordPackageController internal constructor(private val current: () -> Lo
     private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
     private val cipher: RecordPackageCipher, private val clock: Clock) {
     private class Work(val session: Long, val epoch: Long, val key: String = UUID.randomUUID().toString(),
-        val snapshot: OriginalExportSnapshot? = null) {
+        val snapshot: OriginalExportSnapshot? = null, val mediaPreview: RecordMediaPreview? = null) {
         val cancelled = AtomicBoolean()
         @Volatile var payload: EncryptedRecordPackage? = null
+        @Volatile var mediaPayload: PreparedRecordMediaPackage? = null
         @Volatile var document: SelectedRecordPackageDocument? = null
         @Volatile var verified: VerifiedRecordPackage? = null
         var ids: List<String> = emptyList()
@@ -48,10 +49,10 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             if (cancelled.get()) { value.release(); return false }; payload = value; return true
         }
         @Synchronized fun holdVerified(value: VerifiedRecordPackage): Boolean {
-            if (cancelled.get()) return false
+            if (cancelled.get()) { value.release(); return false }
             document = null; verified = value; ids = value.records.map { UUID.randomUUID().toString() }; return true
         }
-        @Synchronized fun retire() { cancelled.set(true); password?.fill('\u0000'); password = null; payload?.release(); payload = null; document = null; verified = null }
+        @Synchronized fun retire() { cancelled.set(true); password?.fill('\u0000'); password = null; payload?.release(); payload = null; mediaPayload?.release(); mediaPayload = null; document = null; verified?.release(); verified = null }
     }
     private val sessions = AtomicLong(); private val work = AtomicReference<Work?>()
     @Volatile private var disposed = false
@@ -103,8 +104,9 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             if (!owned(active, RecordPackagePhase.PREPARING)) return@enqueue
             try {
                 val snapshot = checkNotNull(store.originalExport).capture(ui.selection, UUID.randomUUID().toString(), clock.millis())
-                updateOwned(active, RecordPackagePhase.PREPARING) { it.copy(phase = RecordPackagePhase.EXPORT_PREVIEW, snapshot = snapshot) }
-            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { fail(active, "原文或标签读取失败，请重新选择。") }
+                val preview = store.mediaPackages?.preview(snapshot)
+                updateOwned(active, RecordPackagePhase.PREPARING) { it.copy(phase = RecordPackagePhase.EXPORT_PREVIEW, snapshot = snapshot, mediaPreview = preview) }
+            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { fail(active, "原文、标签或原图核对失败。缺失、损坏、未保存完成或超限的图片不会被跳过，请检查后重新选择。") }
             finally { if (work.compareAndSet(active, null)) active.retire() }
         }) fail(active, "本机操作暂不可用。")
     }
@@ -120,15 +122,25 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             if (!available() || ui.phase != RecordPackagePhase.EXPORT_PREVIEW || !ui.scopeAccepted || snapshot.id != snapshotId) return
             try { RecordPackages.password(password); require(password.contentEquals(again)) }
             catch (_: Exception) { update(session) { it.copy(error = "请输入两次一致的独立恢复口令：12–128 个可打印 ASCII 字符，空格原样保留。") }; return }
-            val active = Work(session, ui.epoch + 1, snapshot = snapshot); active.setPassword(password); retire(); work.set(active)
+            val active = Work(session, ui.epoch + 1, snapshot = snapshot, mediaPreview = ui.mediaPreview); active.setPassword(password); retire(); work.set(active)
             update(session) { it.copy(phase = RecordPackagePhase.ENCRYPTING, epoch = active.epoch, error = null) }
             if (!enqueue { store ->
                 try {
                     if (!owned(active, RecordPackagePhase.ENCRYPTING)) return@enqueue
                     if (!checkNotNull(store.originalExport).isCurrent(snapshot)) throw OriginalExportConflict()
-                    val payload = cipher.seal(snapshot, active.takePassword())
-                    if (!owned(active, RecordPackagePhase.ENCRYPTING)) { payload.release(); return@enqueue }
-                    if (!active.holdPayload(payload)) return@enqueue
+                    val media = store.mediaPackages
+                    if (media != null) {
+                        val preview = checkNotNull(active.mediaPreview)
+                        val prepared = media.seal(preview,active.takePassword())
+                        synchronized(active) {
+                            if (active.cancelled.get()) prepared.release() else active.mediaPayload = prepared
+                        }
+                        if (!owned(active, RecordPackagePhase.ENCRYPTING)) { prepared.release(); return@enqueue }
+                    } else {
+                        val payload = cipher.seal(snapshot, active.takePassword())
+                        if (!owned(active, RecordPackagePhase.ENCRYPTING)) { payload.release(); return@enqueue }
+                        if (!active.holdPayload(payload)) return@enqueue
+                    }
                     updateOwned(active, RecordPackagePhase.ENCRYPTING) { it.copy(phase = RecordPackagePhase.PICKING_EXPORT, requestKey = active.key, pickerLaunched = false) }
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (_: Exception) { fail(active, "加密或快照核对失败，请重新预览。") }
@@ -163,7 +175,12 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             try {
                 if (!owned(active, RecordPackagePhase.WRITING)) return@enqueue
                 if (!checkNotNull(store.originalExport).isCurrent(checkNotNull(active.snapshot))) throw OriginalExportConflict()
-                RecordPackageIo.writeAndVerify(document, checkNotNull(active.payload)) { owned(active, RecordPackagePhase.WRITING) }
+                if (active.mediaPayload != null) {
+                    val media = checkNotNull(store.mediaPackages); val preview = checkNotNull(active.mediaPreview)
+                    check(media.isCurrent(preview))
+                    RecordPackageIo.writeMediaAndVerify(document,checkNotNull(active.mediaPayload)) { owned(active, RecordPackagePhase.WRITING) }
+                    check(media.isCurrent(preview))
+                } else RecordPackageIo.writeAndVerify(document, checkNotNull(active.payload)) { owned(active, RecordPackagePhase.WRITING) }
                 updateOwned(active, RecordPackagePhase.WRITING) { it.copy(phase = RecordPackagePhase.DONE,
                     snapshot = null, scopeAccepted = false, notice = "加密包已写入并完整读回核对。它包含确认的有限快照，不保证文件服务的后续同步。") }
             } catch (cancelled: CancellationException) { throw cancelled }
@@ -178,13 +195,17 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             if (!owned(active, RecordPackagePhase.RESTORE_PASSWORD)) return
             try { RecordPackages.password(password) } catch (_: Exception) { update(session) { it.copy(error = "恢复口令须为 12–128 个可打印 ASCII 字符，空格原样保留。") }; return }
             active.setPassword(password); updateOwned(active, RecordPackagePhase.RESTORE_PASSWORD) { it.copy(phase = RecordPackagePhase.READING, error = null) }
-            if (!enqueue {
+            if (!enqueue { store ->
                 var bytes: ByteArray? = null
                 try {
                     if (!owned(active, RecordPackagePhase.READING)) return@enqueue
-                    bytes = RecordPackageIo.read(checkNotNull(active.document)) { owned(active, RecordPackagePhase.READING) }
-                    val verified = cipher.open(bytes, active.takePassword())
-                    if (!owned(active, RecordPackagePhase.READING)) return@enqueue
+                    val document = checkNotNull(active.document)
+                    val media = store.mediaPackages
+                    val verified = if (media != null) media.open({ document.openForRead() },active.takePassword()) else {
+                        bytes = RecordPackageIo.read(document) { owned(active, RecordPackagePhase.READING) }
+                        cipher.open(checkNotNull(bytes), active.takePassword())
+                    }
+                    if (!owned(active, RecordPackagePhase.READING)) { verified.release(); return@enqueue }
                     if (!active.holdVerified(verified)) return@enqueue
                     updateOwned(active, RecordPackagePhase.READING) { it.copy(phase = RecordPackagePhase.RESTORE_PREVIEW, verified = verified, requestKey = null) }
                 } catch (cancelled: CancellationException) { throw cancelled }
@@ -201,7 +222,8 @@ class RecordPackageController internal constructor(private val current: () -> Lo
         if (!enqueue { store ->
             try {
                 if (!owned(active, RecordPackagePhase.IMPORTING)) return@enqueue
-                val result = checkNotNull(store.recordPackages).restore(verified, active.ids, clock.millis())
+                val result = store.mediaPackages?.restore(verified, active.ids, clock.millis())
+                    ?: checkNotNull(store.recordPackages).restore(verified, active.ids, clock.millis())
                 val entries = store.entries(); val tags = checkNotNull(store.manualTags).snapshots()
                 val favorites = readFavoriteSource(store)
                 val origins = checkNotNull(store.recordPackages).origins()
@@ -213,7 +235,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                             recordPackage = if (!owned(active, RecordPackagePhase.IMPORTING, local)) panel else checkNotNull(panel).copy(phase = RecordPackagePhase.DONE, verified = null, notice =
                                 if (result.replayed) "已核对第一次恢复回执，没有新增、覆盖或复活记录。已永久删除 " + result.deletedCount +
                                     " 条，删除未完成 " + result.erasingCount + " 条；其余副本以当前本机状态为准。"
-                                else "已保存并读回 " + result.ids.size + " 条新副本；初始策略为不参与 AI。原有记录保持不变。"))
+                                else "已保存并读回 " + result.ids.size + " 条新副本（文本、标签及包内原图）；初始策略为不参与 AI。原有记录保持不变。"))
                             .withFavoriteSource(favorites)
                 }
                 if (work.compareAndSet(active, null)) active.retire()
@@ -230,13 +252,13 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             val ui = local.recordPackage
             if (disposed || active.cancelled.get() || work.get() !== active || ui?.session != active.session ||
                 ui.epoch != active.epoch || ui.phase != sourcePhase) local else local.copy(recordPackage =
-                ui.copy(phase = RecordPackagePhase.FAILED, snapshot = null, verified = null, scopeAccepted = false, error = message))
+                ui.copy(phase = RecordPackagePhase.FAILED, snapshot = null, verified = null, mediaPreview = null, scopeAccepted = false, error = message))
         }
         if (work.compareAndSet(active, null)) active.retire()
     }
     fun cancel(session: Long) {
         val ui = panel(session) ?: return; retire()
-        update(session) { if (it.epoch != ui.epoch || it.phase != ui.phase) it else it.copy(phase = RecordPackagePhase.CANCELLED, snapshot = null, verified = null, scopeAccepted = false,
+        update(session) { if (it.epoch != ui.epoch || it.phase != ui.phase) it else it.copy(phase = RecordPackagePhase.CANCELLED, snapshot = null, verified = null, mediaPreview = null, scopeAccepted = false,
             requestKey = null, epoch = ui.epoch + 1, error = null, notice =
                 if (ui.phase == RecordPackagePhase.IMPORTING || ui.phase == RecordPackagePhase.UNCERTAIN)
                     "已退出核对。已开始的事务可能完成；重新认证并确认同一包只核对稳定回执。"

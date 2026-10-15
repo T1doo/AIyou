@@ -42,8 +42,9 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
         verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         item("scope") {
             Text("加密原文包", style = MaterialTheme.typography.headlineSmall)
-            Text("仅包含选定的当前原文和手工标签。附件、历史、待办、草稿、AI 结果及所有密钥不包含在内；这不是整库备份。")
+            Text("包含选定的当前原文、手工标签和当前版本已完整保存的 JPEG/PNG 原图。历史、待办、草稿、AI 结果及所有密钥不包含在内；这不是整库备份。")
             Text("恢复会创建新副本，不覆盖旧记录；初始设置为不参与 AI。同一包重复恢复只核对第一次回执。")
+            Text("一次最多 20 条记录、20 张原图；单图最多 16 MiB，图片合计最多 64 MiB。旧 v1 包仅含文本和标签。")
             Text("独立恢复口令丢失无法解密。取消或失败可能留下空文件或部分密文，应用不会自动删除。")
         }
         if (!available) item("unavailable") {
@@ -73,30 +74,40 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                 RecordPackagePhase.EXPORT_PREVIEW -> {
                     itemsIndexed(ui.snapshot?.records.orEmpty(), key = { _, r -> "preview:" + r.entry.id }) { _, record ->
                         PackagePreview(originalMetadata(record.entry), record.entry.originalText, record.tags.names)
+                        PackageImages(ui.mediaPreview?.images.orEmpty().filter { it.sourceId == record.entry.id })
                     }
-                    item("export-password") {
-                        Column {
-                            Row {
-                                Checkbox(ui.scopeAccepted, onCheckedChange = { accepted ->
-                                    if (ownsRoute()) ui.snapshot?.let { controller.acceptScope(ui.session, it.id, accepted) }
-                                }, modifier = Modifier.testTag("package-scope"))
-                                Text("确认以上当前原文及标签的有限范围，并自行保管独立恢复口令。")
-                            }
-                            Text("口令：12–128 个可打印 ASCII 字符，大小写和首尾空格原样使用。")
-                            OutlinedSecureTextField(state = password, label = { Text("独立恢复口令") },
-                                textObfuscationMode = TextObfuscationMode.Hidden, inputTransformation = InputTransformation.maxLength(128),
-                                modifier = Modifier.fillMaxWidth().testTag("package-password"))
-                            OutlinedSecureTextField(state = again, label = { Text("再次输入恢复口令") },
-                                textObfuscationMode = TextObfuscationMode.Hidden, inputTransformation = InputTransformation.maxLength(128),
-                                modifier = Modifier.fillMaxWidth().testTag("package-password-again"))
-                            Button(onClick = {
-                                if (ownsRoute()) ui.snapshot?.let { snapshot -> controller.encrypt(ui.session, snapshot.id,
-                                    CharArray(password.text.length) { password.text[it] }, CharArray(again.text.length) { again.text[it] }) }
-                                clearPasswords()
-                            }, enabled = ui.scopeAccepted && picker != null, modifier = Modifier.testTag("package-encrypt")) { Text("加密并选择保存位置") }
+                    item("image-summary") {
+                        Text("本次范围：" + ui.snapshot?.records.orEmpty().size + " 条记录，" + ui.mediaPreview?.images.orEmpty().size +
+                            " 张原图，原图合计 " + (ui.mediaPreview?.imageBytes ?: 0L) + " 字节。", modifier = Modifier.testTag("package-image-summary"))
+                    }
+                    item("scope-confirm") {
+                        Row {
+                            Checkbox(ui.scopeAccepted, onCheckedChange = { accepted ->
+                                if (ownsRoute()) ui.snapshot?.let { controller.acceptScope(ui.session, it.id, accepted) }
+                            }, modifier = Modifier.testTag("package-scope"))
+                            Text("确认以上当前原文、标签及列出的原图范围，并自行保管独立恢复口令。")
                         }
                     }
+                    item("password-rule") { Text("口令：12–128 个可打印 ASCII 字符，大小写和首尾空格原样使用。") }
+                    item("export-password") {
+                        OutlinedSecureTextField(state = password, label = { Text("独立恢复口令") },
+                            textObfuscationMode = TextObfuscationMode.Hidden, inputTransformation = InputTransformation.maxLength(128),
+                            modifier = Modifier.fillMaxWidth().testTag("package-password"))
+                    }
+                    item("export-password-again") {
+                        OutlinedSecureTextField(state = again, label = { Text("再次输入恢复口令") },
+                            textObfuscationMode = TextObfuscationMode.Hidden, inputTransformation = InputTransformation.maxLength(128),
+                            modifier = Modifier.fillMaxWidth().testTag("package-password-again"))
+                    }
+                    item("export-confirm") {
+                        Button(onClick = {
+                            if (ownsRoute()) ui.snapshot?.let { snapshot -> controller.encrypt(ui.session, snapshot.id,
+                                CharArray(password.text.length) { password.text[it] }, CharArray(again.text.length) { again.text[it] }) }
+                            clearPasswords()
+                        }, enabled = ui.scopeAccepted && picker != null, modifier = Modifier.heightIn(min = androidx.compose.ui.unit.Dp(48f)).testTag("package-encrypt")) { Text("加密并选择保存位置") }
+                    }
                 }
+
                 RecordPackagePhase.RESTORE_PASSWORD -> item("restore-password") {
                     Column {
                         Text("先验证完整加密包。此步骤不会写入记录；认证成功后还有单独的恢复确认。")
@@ -113,11 +124,15 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                             .atZone(java.time.ZoneId.of(record.captureTimeZone))
                             .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm")) + " · " + record.captureTimeZone +
                             " · 原文版本 " + record.sourceRevision, record.originalText, record.tags)
+                        PackageImages(ui.verified?.images.orEmpty().filter { it.sourceId == record.sourceId })
+                    }
+                    item("restore-summary") {
+                        Text("将恢复 " + ui.verified?.records.orEmpty().size + " 条文本和标签、" + ui.verified?.images.orEmpty().size + " 张原图（" + ui.verified?.images.orEmpty().sumOf { it.byteSize } + " 字节），均分配新 ID 并使用本机密钥重新加密。")
+                        Text("已完成整个包的口令、完整性和格式认证。来源追溯由文件提供，认证不证明作者身份。")
                     }
                     item("confirm-restore") {
-                        Text("已完成整个包的口令、完整性和格式认证。来源追溯由文件提供，认证不证明作者身份。")
                         Button(onClick = { if (ownsRoute()) ui.verified?.let { controller.confirmRestore(ui.session, it.manifest.backupId, it.digest, ui.epoch) } },
-                            enabled = ui.verified != null, modifier = Modifier.testTag("package-confirm")) {
+                            enabled = ui.verified != null, modifier = Modifier.heightIn(min = androidx.compose.ui.unit.Dp(48f)).testTag("package-confirm")) {
                             Text(if (ui.phase == RecordPackagePhase.UNCERTAIN) "核对同一包恢复回执" else "确认恢复全部为新副本")
                         }
                     }
@@ -146,5 +161,16 @@ private fun PackagePreview(metadata: String, text: String, tags: List<String>) {
         Text("手工标签：" + if (tags.isEmpty()) "无" else tags.joinToString(" · "))
         SelectionContainer { Text(text, style = MaterialTheme.typography.bodyLarge) }
         HorizontalDivider()
+    }
+}
+
+@Composable
+private fun PackageImages(images: List<com.t1doo.aiyou.model.RecordPackageImage>) {
+    Column(Modifier.fillMaxWidth()) {
+        Text("原图：${images.size} 张 · ${images.sumOf { it.byteSize }} 字节")
+        images.forEachIndexed { index, image ->
+            Text("原图 ${index+1} · ${image.mediaType} · ${image.byteSize} 字节 · 来源版本 ${image.sourceRevision}")
+            Text("SHA-256 ${image.sha256}", style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
