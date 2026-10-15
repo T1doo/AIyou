@@ -161,7 +161,7 @@ class LocalCandidateSqlTest {
         val target = f.base.intent(id)
         assertThrows(LocalCandidateConflict::class.java) { store.complete(job, LocalExcerptRules.extract(job)) }
         assertTrue(f.db.read("SELECT payload FROM local_candidate_batches").all { (it.single() as ByteArray).isEmpty() })
-        assertTrue(f.base.erase.advance(target).complete)
+        assertTrue(kotlinx.coroutines.runBlocking { f.base.erase.erase(target) }.complete)
         assertTrue(f.db.read("SELECT * FROM local_candidate_batches").isEmpty())
         assertThrows(LocalCandidateConflict::class.java) { store.complete(job, LocalExcerptRules.extract(job)) }
         assertTrue(f.db.read("SELECT id FROM entries WHERE id=?", id).isEmpty()); store.wipeKey()

@@ -35,12 +35,14 @@ jobs:
           python3 scripts/verify-local-search-schema.py --capture
           python3 scripts/verify-permanent-erasure-schema.py --capture
           python3 scripts/verify-record-favorite-schema.py --capture
+          python3 scripts/verify-local-candidate-schema.py --capture
           scripts/gradle.sh :core:data:kspDebugKotlin
           python3 scripts/verify-manual-tag-schema.py --verify
           python3 scripts/verify-manual-task-schema.py --verify
           python3 scripts/verify-local-search-schema.py --verify
           python3 scripts/verify-permanent-erasure-schema.py --verify
           python3 scripts/verify-record-favorite-schema.py --verify
+          python3 scripts/verify-local-candidate-schema.py --verify
       - name: Run actual domain and D04 JVM wire contracts
         run: |
           python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test :remote-text:test

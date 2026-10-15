@@ -1,0 +1,39 @@
+# D05 本机原文摘录候选
+
+本片对应保留的主方案 §8.2、§9.3、§10.2、§11.5 和 D05。交付的是完整的本机摘录审阅闭环：已保存的当前原文 → 本机规则生成逐字摘录 → 持久化待确认候选 → 来源预览 → 用户明确采纳或拒绝 → 冷重开可见。采纳只表示用户确认保留该段原文说法；原文、人工标签、稳定事实、正式待办和系统提醒不因此变化。完整 D05 的摘要、标签、结构化事实/偏好、远端模型提取及复杂语义支持判断仍 OPEN。
+
+## 生产路径与处理资格
+
+实际 `EncryptedEntryRepository.localCandidates` 使用同一 Room/SQLCipher 数据库、`DrainingRecordsSqlDatabase` 和现有数据库 key 的独立用途子密钥。没有新 key alias、凭据、网络权限或真实模型调用。默认 `LOCAL_ONLY` 不改变；`AI_NONE`、回收站及任意永久删除收据均拒绝开始、完成、读取正文或采纳。远端连接/consent 不构成本机摘录的授权，也没有放宽原 `LocalRecordAiController` 的远端门禁。
+
+详情页“本机摘录候选”是真实入口。规则跳过原文开头空白后保留至多 320 个 code points，不改否定、引用、假设、第三方或未完成计划的文字，也不把它们改写成发生过的事实。计算在独立协程运行，保存原文的 IO 队列只执行必要的来源、事务和读回；慢的合成生产者不阻塞独立本地保存。没有后台自动生成、自动采纳或进程重启后自动恢复旧生产者。
+
+## 版本化合同与语义边界
+
+`schemas/extraction.schema.json` 定义本片 v1，只接受 `LOCAL_RULE_EXCERPT` / ruleVersion 1 / `EXCERPT`。固定深度解析器限制响应总长度、最多八项、严格整数/Unicode、未知字段和重复键。每项继承文档的固定 source ID/revision/hash，并有半开 code-point 范围和精确 quote；来源草稿、聊天、旧版本或别的记录不能替代当前已保存原文。
+
+模型自报的 reviewState、accepted、executed、confidence 或 assertionKind 都不进入此合同。PROPOSED/ACCEPTED/REJECTED 及 `excerpt-N` 项目 ID 由本机赋予。引用有效只证明来源，不证明任意生成句子的语义成立；本片只保留原文逐字说法，不能据此宣称完成了稳定事实抽取或消除了幻觉。合成 JSON 用于测试适配器/合同验证，不伪装成生产远端 AI 结果。
+
+## 持久化与确认
+
+Room v10 仅新增 `local_candidate_batches`，保留 v2–v9 原始 schema/asset 及旧 16 个实体。新表 FK 指向 entries 并 ON DELETE CASCADE，未把新的 revision FK 插入已有永久删除顺序。旧 `RemoteTextCodec`、旧注解 bytes、手工标签和待办密文格式不改、不因升级自动转成候选。
+
+RUNNING 由事务从真实来源构造固定 capability。完成时同一事务重新检查 ID、revision、hash、原文、capture 时间/时区、source epoch、处理政策和删除 fence，只有 RUNNING/version 0 可成为 READY/version 1。READY payload 是有独立 AAD 的 AEAD 封装，包含最多八个摘录、逐项审阅状态及完整最近操作回执。
+
+采纳先展示精确来源及摘录，再由“确认采纳摘录”提交。取消确认框不写数据库；拒绝摘录是明确的本地审阅动作。每项只允许 PROPOSED→ACCEPTED 或 REJECTED，所有项共用整批 version CAS。请求绑定批次、来源、epoch、版本、项 ID、操作、原请求时间和 mutation ID；回执丢失保留同一请求重试，最新精确重放不再改版本或重加密。不同项或不同内容的旧版本不能自动重新定位/重基。
+
+每次确认框有独立 token；同项取消后重开、换项、换源和旧页面确认都不能采纳新目标。仅真实事务与认证读回后显示成功，故障/未知状态与“没有候选”分开，读失败不显示假空。
+
+显式取消本批使用持久化 CAS，清除未采纳内容，迟到完成不能复活它；已有审阅结果的批次不能整批取消。关闭窗口只撤销 UI 会话，不撤回已经持久化的 READY 摘录。关闭或进程消失留下的 RUNNING 标为未完成，允许明确取消后重新生成；不会持续转圈或自动执行旧生产者。界面展示该来源最近 20 批。
+
+## 来源失效、撤回与删除
+
+源 revision、capture 时间/时区、处理政策变化，以及 source access 的 INSERT/UPDATE/DELETE 均使 RUNNING/READY 批次 INVALIDATED 并清除 payload。这里保守复用现有 source generation，远端授权变更也会使旧本机候选失效，但不会授予本机候选新的远端权限。失效本身不解析/解密，MAX version 也不能阻止保存新原文。
+
+这包括已经采纳的摘录：它们是依赖当前来源的审阅视图，不是独立永久事实。来源变更后保留失效批次元数据并清除正文及该批审阅 payload，界面明确显示失效；不会把新版本套用旧确认。回收站恢复和政策 ABA 不恢复旧候选。永久删除同时删除新表行并检查不存在，不留下候选私密副本或可用于迟到恢复的执行权。
+
+## 验证边界
+
+Host 以真实 v9 导出、产品 v9→v10 SQL、AEAD、独立文件 SQLite 连接和实际 ViewModel 队列验证来源、冷重开、精确重放、丢 ACK、取消/编辑/删除与迟到竞争及原子回滚。Compose 使用生产路由/controller 和受控回执端口，只证明交互与 UI 回执，不能替代 SQL 持久化。Native 方法补真实 Room/SQLCipher 迁移、冷重开、失效、删除和双 owner 断言；APK 编译与 DEX 收集仅证明存在，不等于设备通过。
+
+v10 必须由现有获许可 CI 工具链实际 KSP 生成：首轮 BOOTSTRAP 只保留实际字节，提交这些原始导出/asset 后再要求最终 SHA 的 CHECKED_IN CI；不手工合成 Room identityHash。最终结果另附同 SHA 的测试/工件凭据。设备、生产进程重启、Keystore、16 KB、TalkBack、OEM、性能以及 D02/D04/D06/D08 和完整 D07 系统提醒的未闭合项仍按原记录保留。

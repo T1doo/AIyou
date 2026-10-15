@@ -30,7 +30,7 @@ class ManualTaskRecordsIntegrationTest {
         System.loadLibrary("sqlcipher")
     }
     @After fun after() { try { stores.forEach { it.closeAndAwait() } } finally { key.fill(0); if (::directory.isInitialized) directory.deleteRecursively() } }
-    @Test fun freshVersionNinePersistsExplicitTaskAndTerminalStatesAcrossEncryptedReopen(): Unit = runBlocking {
+    @Test fun freshVersionTenPersistsExplicitTaskAndTerminalStatesAcrossEncryptedReopen(): Unit = runBlocking {
         val store = open(); NativeRecordsSchemaFixture.assertCurrentSchema(store.database.openHelper.writableDatabase)
         assertTrue(store.manualTasks.snapshots().isEmpty()); assertTrue(store.entries().isEmpty())
         val day = due("2042-11-19")

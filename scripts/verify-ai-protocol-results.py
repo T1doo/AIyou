@@ -27,6 +27,8 @@ def input_fingerprint():
     inputs.extend((root / "app/src/main/java/com/t1doo/aiyou/records").glob("*.kt"))
     inputs.extend(root / path for path in ("app/src/main/java/com/t1doo/aiyou/MainActivity.kt",
         "app/src/main/AndroidManifest.xml", "app/build.gradle.kts", "scripts/inspect-record-ai-permissions.py"))
+    inputs.extend((root / "schemas").glob("*.json"))
+    inputs.append(root / "scripts/verify-local-candidate-schema.py")
     fingerprint = hashlib.sha256()
     for path in sorted(set(inputs)):
         fingerprint.update(str(path.relative_to(root)).encode() + b"\0")

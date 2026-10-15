@@ -12,7 +12,7 @@ sealed interface LocalCandidateIntent {
     data class Review(val request: ExcerptReviewRequest) : LocalCandidateIntent
     data class Cancel(val request: CandidateCancelRequest) : LocalCandidateIntent
 }
-data class ExcerptConfirmation(val batchId: String, val version: Long, val itemId: String)
+data class ExcerptConfirmation(val token: Long, val batchId: String, val version: Long, val itemId: String)
 data class LocalCandidateUiState(val session: Long, val source: SourceVersion, val sourceHash: String,
     val loading: Boolean = true, val busy: Boolean = false, val computing: Boolean = false,
     val batches: List<LocalCandidateBatch> = emptyList(), val error: String? = null, val notice: String? = null,
@@ -30,6 +30,7 @@ class LocalCandidateController(
     private val extract: (LocalCandidateJob) -> ExcerptDocument = LocalExcerptRules::extract,
 ) {
     private val sessions = AtomicLong()
+    private val confirmations = AtomicLong()
     @Volatile private var disposed = false
     @Volatile private var worker: Job? = null
     private fun usable(ui: LocalCandidateUiState): Boolean {
@@ -85,7 +86,7 @@ class LocalCandidateController(
         if (!actionable(ui, session)) return
         val batch = ui.batches.singleOrNull { it.id == batchId && it.version == version && it.state == LocalCandidateState.READY } ?: return
         if (batch.items.none { it.id == itemId && it.review == ExcerptReview.PROPOSED }) return
-        update(session) { it.copy(confirmation = ExcerptConfirmation(batchId, version, itemId), error = null, notice = null) }
+        update(session) { it.copy(confirmation = ExcerptConfirmation(confirmations.incrementAndGet(), batchId, version, itemId), error = null, notice = null) }
     }
     fun cancelConfirmation(session: Long, expected: ExcerptConfirmation) {
         if (owns(session)) update(session) { if (it.busy || it.confirmation != expected) it else it.copy(confirmation = null) }

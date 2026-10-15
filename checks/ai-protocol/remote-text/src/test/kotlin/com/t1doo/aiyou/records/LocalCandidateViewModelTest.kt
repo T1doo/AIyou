@@ -13,11 +13,32 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
 
 /** Actual VM IO actor, production parser/rules/SQL/AEAD; no Android or device claim. */
 class LocalCandidateViewModelTest {
+    @Test(timeout = 10_000) fun syntheticJsonUsesActualParserVmSqlAndColdReopenWithoutRemoteAuthority(): Unit = Harness().use { h -> runBlocking {
+        h.producer = { job ->
+            val raw = buildJsonObject {
+                put("schemaVersion",1); put("ruleVersion",1); put("provenance","LOCAL_RULE_EXCERPT")
+                put("sourceId",job.start.source.sourceId); put("sourceRevision",job.start.source.revision); put("sourceHash",job.sourceHash)
+                putJsonArray("candidates") { add(buildJsonObject {
+                    put("kind","EXCERPT"); put("start",0); put("end",job.original.codePointCount(0,job.original.length)); put("quote",job.original)
+                }) }
+            }.toString()
+            ExcerptResponseParser.parse(raw)
+        }
+        h.ready(); val generated=h.generate(h.open().session); val batch=generated.batches.single()
+        h.vm.candidates.requestAccept(generated.session,batch.id,batch.version,"excerpt-1")
+        h.vm.candidates.confirm(generated.session,checkNotNull(h.vm.state.value.candidates!!.confirmation))
+        h.ui { it.pending==null && it.notice?.contains("已采纳")==true }
+        h.dispose(); h.f.reopen()
+        val cold=h.f.store.batches(h.f.source).single()
+        assertEquals(ExcerptReview.ACCEPTED,cold.items.single().review); assertEquals(h.f.original,cold.items.single().proposal.quote)
+        assertEquals(0,h.remoteReads); assertEquals(0,h.remoteOpens)
+    } }
     @Test(timeout = 10_000) fun localOnlyProductionPathPreviewsThenExplicitlyAcceptsAndReopensReview(): Unit = Harness().use { h -> runBlocking {
         h.ready(); val opened = h.open()
         assertTrue(opened.batches.isEmpty()); assertEquals("LOCAL_ONLY", h.f.db.read("SELECT privacyPolicy FROM entries WHERE id='source'").single().single())
@@ -85,6 +106,20 @@ class LocalCandidateViewModelTest {
             assertEquals(LocalCandidateState.CANCELLED, h.f.store.batches(h.f.source).single().state)
             assertEquals(0, h.remoteReads); assertEquals(0, h.remoteOpens)
         } finally { release.countDown() }
+    } }
+    @Test(timeout = 10_000) fun cancelledConfirmationCannotAuthorizeTheSameItemAfterReopeningIt(): Unit = Harness().use { h -> runBlocking {
+        h.ready(); val generated = h.generate(h.open().session); val batch = generated.batches.single()
+        h.vm.candidates.requestAccept(generated.session, batch.id, batch.version, "excerpt-1")
+        val old = checkNotNull(h.vm.state.value.candidates!!.confirmation)
+        h.vm.candidates.cancelConfirmation(generated.session, old)
+        h.vm.candidates.requestAccept(generated.session, batch.id, batch.version, "excerpt-1")
+        val fresh = checkNotNull(h.vm.state.value.candidates!!.confirmation)
+        assertNotEquals(old.token, fresh.token)
+        h.vm.candidates.cancelConfirmation(generated.session, old)
+        assertEquals(fresh, h.vm.state.value.candidates!!.confirmation)
+        h.vm.candidates.confirm(generated.session, old); assertTrue(h.reviews.isEmpty())
+        h.vm.candidates.confirm(generated.session, fresh)
+        h.ui { it.notice?.contains("已采纳") == true }; assertEquals(1, h.reviews.size)
     } }
     @Test(timeout = 10_000) fun sourceChangeDuringComputationRetiresTheSessionAndNeverPublishesLateCandidates(): Unit = Harness().use { h -> runBlocking {
         val entered = CountDownLatch(1); val release = CountDownLatch(1)
