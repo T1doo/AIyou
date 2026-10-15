@@ -43,7 +43,7 @@ class LocalCandidateSqlTest {
         assertEquals(ExcerptReview.ACCEPTED, f.store.batches(f.source).single().items.single().review)
         assertEquals(old, f.snapshotOld())
     }
-    @Test fun foreignSourceRevisionHashBoundsAndQuotesCannotCommitOrOverwriteOriginals() = LocalCandidateFixture().use { f ->
+    @Test fun foreignSourceRevisionHashBoundsAndQuotesCannotCommitOrOverwriteOriginals(): Unit = LocalCandidateFixture().use { f ->
         val job = f.store.begin(f.start())
         val valid = LocalExcerptRules.extract(job); val proposal = valid.proposals.single()
         val invalid = listOf(
@@ -68,7 +68,7 @@ class LocalCandidateSqlTest {
         forged.forEach { assertThrows(LocalCandidateConflict::class.java) { f.store.complete(it, document) } }
         assertEquals(0L, f.row()[0])
     }
-    @Test fun exactCompletionAndReviewReplayKeepOriginalCiphertextAndChangedTupleConflicts() = LocalCandidateFixture().use { f ->
+    @Test fun exactCompletionAndReviewReplayKeepOriginalCiphertextAndChangedTupleConflicts(): Unit = LocalCandidateFixture().use { f ->
         val job = f.store.begin(f.start()); val doc = LocalExcerptRules.extract(job)
         val batch = f.store.complete(job, doc); val bytes = (f.row()[3] as ByteArray).copyOf()
         assertEquals(1L, f.store.complete(job, doc).version); assertArrayEquals(bytes, f.row()[3] as ByteArray)
@@ -174,7 +174,7 @@ class LocalCandidateSqlTest {
         assertEquals("INVALIDATED", f.row()[1]); assertEquals(Long.MAX_VALUE, f.row()[0]); assertEquals(0, (f.row()[3] as ByteArray).size)
         assertEquals(2L, f.db.read("SELECT currentRevision FROM entries WHERE id='source'").single().single())
     }
-    @Test fun authenticatedCorruptionAndClosedOwnerAreFailuresRatherThanEmptyCandidates() = LocalCandidateFixture().use { f ->
+    @Test fun authenticatedCorruptionAndClosedOwnerAreFailuresRatherThanEmptyCandidates(): Unit = LocalCandidateFixture().use { f ->
         f.ready()
         f.db.transaction { sql -> sql.execute("DROP TRIGGER immutable_candidate_binding"); sql.execute("DROP TRIGGER candidate_state_guard")
             sql.execute("UPDATE local_candidate_batches SET payload=X'00' WHERE id='batch'") }

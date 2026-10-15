@@ -127,7 +127,8 @@ class LocalCandidateViewModelTest {
         try {
             h.ready(); val ui = h.open(); h.vm.candidates.generate(ui.session); assertTrue(entered.await(2, TimeUnit.SECONDS))
             fRevised(h)
-            h.vm.retry()
+            // retry() resumes capture saving; this production action rereads current records.
+            h.vm.refreshLocalSearch()
             withTimeout(2_000) { h.vm.state.first { !it.opening && it.entries.any { e -> e.id=="source" && e.currentRevision==2 } } }
             assertNull(h.vm.state.value.candidates)
             release.countDown()
