@@ -6,6 +6,24 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+@Entity(tableName = "local_candidate_batches", foreignKeys = [ForeignKey(
+    entity = EntryEntity::class, parentColumns = ["id"], childColumns = ["entryId"],
+    onDelete = ForeignKey.CASCADE,
+)], indices = [Index(value = ["entryId", "sourceRevision"])])
+internal data class LocalCandidateBatchEntity(
+    @PrimaryKey val id: String,
+    val entryId: String,
+    val sourceRevision: Long,
+    val sourceHash: String,
+    val generation: Long,
+    val ruleVersion: Int,
+    val version: Long,
+    val state: String,
+    val lastMutationId: String,
+    val createdAtMillis: Long,
+    val payload: ByteArray,
+)
+
 @Entity(tableName = "entries", foreignKeys = [ForeignKey(
     entity = RevisionEntity::class, parentColumns = ["entryId", "revision"],
     childColumns = ["id", "currentRevision"], deferred = true,

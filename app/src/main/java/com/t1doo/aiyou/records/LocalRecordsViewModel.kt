@@ -58,6 +58,8 @@ data class LocalRecordUiState(
     val editDraftIssueCount: Int = 0,
     val editDraftIndexAvailable: Boolean = true,
     val ai: RecordAiUiState? = null,
+    val supportsCandidates: Boolean = false,
+    val candidates: LocalCandidateUiState? = null,
     val manualTags: Map<String, com.t1doo.aiyou.model.ManualTagSnapshot> = emptyMap(),
     val manualTagsAvailable: Boolean = false,
     val manualTagsError: String? = null,
@@ -98,6 +100,7 @@ class LocalRecordsViewModel internal constructor(
     private val clock: Clock = Clock.systemUTC(),
     private val decodePng: (ByteArray) -> AttachmentPicture = PlatformImageDecoder::decode,
     private val bindAi: ((EntryRepository) -> RecordAiCapability)? = null,
+    private val extractLocalCandidates: (com.t1doo.aiyou.model.LocalCandidateJob) -> com.t1doo.aiyou.model.ExcerptDocument = com.t1doo.aiyou.domain.LocalExcerptRules::extract,
 ) : AndroidViewModel(application) {
     constructor(application: Application) : this(application, { EncryptedEntryRepository.open(application) })
     private val mutableState = MutableStateFlow(LocalRecordUiState())
@@ -114,6 +117,9 @@ class LocalRecordsViewModel internal constructor(
         enqueue = { action -> commands.trySend(Command.Favorites(action)).isSuccess })
     val tasks = ManualTaskController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.ManualTasks(action)).isSuccess }, clock = clock)
+    val candidates = LocalCandidateController(current = { mutableState.value }, publish = { change -> update(change) },
+        enqueue = { action -> commands.trySend(Command.LocalCandidates(action)).isSuccess },
+        scope = viewModelScope, clock = clock, extract = extractLocalCandidates)
     val exports = OriginalExportController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.OriginalExport(action)).isSuccess }, clock = clock)
     val recordPackages = RecordPackageController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -232,6 +238,7 @@ class LocalRecordsViewModel internal constructor(
                             is Command.ManualTags -> command.action(checkNotNull(repository))
                             is Command.Favorites -> command.action(checkNotNull(repository))
                             is Command.ManualTasks -> command.action(checkNotNull(repository))
+                            is Command.LocalCandidates -> command.action(checkNotNull(repository))
                             is Command.OriginalExport -> command.action(checkNotNull(repository))
                             is Command.RecordPackage -> command.action(checkNotNull(repository))
                             is Command.RecycleBin -> command.action(checkNotNull(repository))
@@ -255,6 +262,7 @@ class LocalRecordsViewModel internal constructor(
                 tags.dispose()
                 favorites.dispose()
                 tasks.dispose()
+                candidates.dispose()
                 exports.dispose()
                 recordPackages.dispose()
                 recycleBin.dispose()
@@ -281,10 +289,15 @@ class LocalRecordsViewModel internal constructor(
                 candidate.entries.any { !candidate.favorites.containsKey(it.id) }) candidate.copy(
                     favoritesAvailable = false, favoritesError = "记录列表已变化，请重新读取收藏状态。") else candidate
             val editor = transformed.manualTagEditor
-            val next = if (editor != null && (!transformed.ready || transformed.opening || transformed.error != null ||
+            val labelled = if (editor != null && (!transformed.ready || transformed.opening || transformed.error != null ||
                 transformed.entries.none { it.id == editor.entryId && it.currentRevision == editor.revision }))
                 transformed.copy(manualTagEditor = editor.copy(busy = false, conflict = true,
                     error = "原文已变化或不可用，输入已保留，请关闭后重新打开。")) else transformed
+            val review = labelled.candidates
+            val next = if (review != null && (editsDisposed || !labelled.ready || labelled.opening || labelled.error != null ||
+                labelled.entries.none { it.id == review.source.sourceId && it.currentRevision.toLong() == review.source.revision &&
+                    it.policy != ProcessingPolicy.AI_NONE && com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == review.sourceHash }))
+                labelled.copy(candidates = null) else labelled
             val selected = next.ai
             val entry = selected?.let { value -> next.entries.firstOrNull {
                 it.id == value.source.sourceId && it.currentRevision.toLong() == value.source.revision
@@ -977,6 +990,7 @@ class LocalRecordsViewModel internal constructor(
             val searchEpoch = try { store.localSearch?.epoch() }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
+                supportsCandidates = store.localCandidates != null,
                 entries = entries, manualTags = labels.orEmpty(), manualTagsAvailable = labels != null,
                 supportsFavorites = store.favorites != null, favorites = favoriteValues.orEmpty(),
                 favoritesAvailable = favoriteValues != null, favoritesLoading = false,
@@ -1084,6 +1098,7 @@ class LocalRecordsViewModel internal constructor(
         tags.dispose()
         favorites.dispose()
         tasks.dispose()
+        candidates.dispose()
         exports.dispose()
         recordPackages.dispose()
         recycleBin.dispose()
@@ -1105,6 +1120,7 @@ class LocalRecordsViewModel internal constructor(
         data class RecycleBin(val action: suspend (EntryRepository) -> Unit) : Command
         data class OriginalExport(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualTasks(val action: suspend (EntryRepository) -> Unit) : Command
+        data class LocalCandidates(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualTags(val action: suspend (EntryRepository) -> Unit) : Command
         data class Favorites(val action: suspend (EntryRepository) -> Unit) : Command
         data object RefreshEditDrafts : Command

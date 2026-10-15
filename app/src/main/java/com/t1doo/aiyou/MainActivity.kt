@@ -117,6 +117,7 @@ class MainActivity : ComponentActivity() {
                 onCloseAiSession = records::closeAiSession,
                 onOpenTags = records.tags::open, onTagEdit = records.tags::edit, onTagAdd = records.tags::add,
                 favorites = records.favorites,
+                candidates = records.candidates,
                 onTagRemove = records.tags::remove, onTagRetry = records.tags::retry, onTagClose = records.tags::close,
                 onTaskBegin = records.tasks::begin, onTaskEdit = records.tasks::edit, onTaskCreate = records.tasks::create,
                 onTaskChange = records.tasks::change, onTaskRetry = records.tasks::retry,
@@ -210,6 +211,7 @@ fun AIyouApp(
     onTagRetry: (Long) -> Unit = {},
     onTagClose: (Long) -> Unit = {},
     favorites: com.t1doo.aiyou.records.RecordFavoriteController? = null,
+    candidates: com.t1doo.aiyou.records.LocalCandidateController? = null,
     onTaskBegin: () -> Unit = {},
     onTaskEdit: (Long, String) -> Unit = { _, _ -> },
     onTaskCreate: (Long, String) -> Unit = { _, _ -> },
@@ -704,6 +706,16 @@ fun AIyouApp(
                 onStartAi = onStartAiSession, onStopAi = onStopAiSession, onCloseAi = onCloseAiSession,
                 onOpenTags = { id, revision -> if (canCopy(id, revision)) onOpenTags(id, revision) },
                 location = searchLocation,
+                candidateController = candidates,
+                canUseCandidates = canCopy,
+                onCandidateLocation = { location ->
+                    if (canCopy(location.entryId, location.revision)) {
+                        val live = currentRecords?.invoke() ?: local
+                        val entry = live.entries.singleOrNull { it.id == location.entryId && it.currentRevision == location.revision }
+                        if (entry != null && com.t1doo.aiyou.model.OriginalExports.hash(entry.originalText) == location.contentHash)
+                            searchLocation = location
+                    }
+                },
                 onSetFavorite = favorites?.let { controller -> { id, revision, hash, version, desired ->
                     if (canCopy(id, revision)) controller.set(id, revision, hash, version, desired)
                 } },

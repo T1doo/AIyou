@@ -99,6 +99,7 @@ internal class SqlPermanentErasureRepository(private val database: RecordsSqlDat
                     if (current.receipt.phase != PermanentErasurePhase.PLANNED || current.plan != stored.plan || current.packageProof != stored.packageProof ||
                         packages.prepareErasureProof(sql,intent.source.sourceId) != current.packageProof) throw PermanentErasureConflict()
                     mediaLease.verify(); editLease.verify()
+                    if (hasCandidates(sql)) sql.execute("DELETE FROM local_candidate_batches WHERE entryId=?",listOf(intent.source.sourceId))
                     for (table in listOf("text_annotations","remote_text_jobs","entry_manual_tags","remote_source_access","local_jobs","attachments","local_search_fts","local_search_documents"))
                         sql.execute("DELETE FROM $table WHERE entryId=?",listOf(intent.source.sourceId))
                     sql.execute("DELETE FROM record_package_receipts WHERE operation='PACKAGE_ORIGIN' AND entryId=?",listOf(intent.source.sourceId))
@@ -129,10 +130,15 @@ internal class SqlPermanentErasureRepository(private val database: RecordsSqlDat
     }
     private fun absent(sql: RecordsSqlConnection, id: String) {
         check(sql.query("SELECT id FROM entries WHERE id=?",listOf(id)).isEmpty())
+        if (hasCandidates(sql)) check(sql.query("SELECT entryId FROM local_candidate_batches WHERE entryId=? LIMIT 1",listOf(id)).isEmpty())
         for (table in listOf("entry_revisions","attachments","entry_manual_tags","remote_source_access","local_jobs","text_annotations","remote_text_jobs","local_search_fts","local_search_documents","owned_file_creations"))
             check(sql.query("SELECT entryId FROM $table WHERE entryId=? LIMIT 1",listOf(id)).isEmpty())
         check(sql.query("SELECT id FROM record_package_receipts WHERE operation='PACKAGE_ORIGIN' AND entryId=?",listOf(id)).isEmpty())
     }
+    // The shared transaction layer also verifies historical pre-v10 migration fixtures.
+    // A production v10 Room owner always supplies this table and its CASCADE foreign key.
+    private fun hasCandidates(sql: RecordsSqlConnection) = sql.query(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='local_candidate_batches'").isNotEmpty()
     private fun readWithin(sql: RecordsSqlConnection, id: String): Stored? {
         val row = sql.query("SELECT sourceRevision,generation,mutationId,phase,plan,packageProof FROM permanent_erasure_receipts WHERE entryId=?",listOf(id)).singleOrNull() ?: return null
         val phase = PermanentErasurePhase.valueOf(row[3] as String); val plan = row[4] as String

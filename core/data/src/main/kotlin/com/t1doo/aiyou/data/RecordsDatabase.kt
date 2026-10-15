@@ -42,7 +42,7 @@ internal interface RecordsDao {
     AttachmentEntity::class, RemoteSourceAccessEntity::class, RemoteTextJobEntity::class, TextAnnotationEntity::class, ManualTagEntity::class,
     ManualTaskEntity::class, LocalSearchFtsEntity::class, LocalSearchDocumentEntity::class,
     LocalSearchEpochEntity::class, PermanentErasureEntity::class, RecordPackageReceiptEntity::class,
-    OwnedFileCreationEntity::class], version = 9, exportSchema = true)
+    OwnedFileCreationEntity::class, LocalCandidateBatchEntity::class], version = 10, exportSchema = true)
 internal abstract class RecordsDatabase : RoomDatabase() {
     abstract fun records(): RecordsDao
 }
@@ -117,6 +117,11 @@ internal fun installPermanentErasureGuards(db: SupportSQLiteDatabase) { Permanen
 internal val recordsMigration8To9 = object : Migration(8, 9) {
     override fun migrate(db: SupportSQLiteDatabase) { RecordFavoriteSqlSchema.migration8To9.forEach(db::execSQL) }
 }
+
+internal val recordsMigration9To10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) { LocalCandidateSqlSchema.migration9To10.forEach(db::execSQL) }
+}
+internal fun installLocalCandidateGuards(db: SupportSQLiteDatabase) { LocalCandidateSqlSchema.guards.forEach(db::execSQL) }
 
 /** Atomically replace the legacy update trigger; another owner cannot write in a DDL gap. */
 internal fun installRecordFavoriteGuards(db: SupportSQLiteDatabase) {

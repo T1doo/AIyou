@@ -142,6 +142,9 @@ fun OriginalReadingScreen(
     onSetFavorite: ((String, Int, String, Long, Boolean) -> Unit)? = null,
     onRetryFavorite: (String) -> Unit = {},
     onRefreshFavorites: () -> Unit = {},
+    candidateController: LocalCandidateController? = null,
+    canUseCandidates: (String, Int) -> Boolean = { _, _ -> false },
+    onCandidateLocation: (OriginalReadingLocation) -> Unit = {},
 ) {
     // Resolve the current local source on every update; navigation never carries plaintext.
     val entry = local.entries.firstOrNull { it.id == entryId }
@@ -232,6 +235,17 @@ fun OriginalReadingScreen(
                             TextButton(onClick = { openAi(entry.id, entry.currentRevision) },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
                                     .testTag("original-reading-ai")) { Text("AI 整理") }
+                        }
+                        candidateController?.let { controller ->
+                            TextButton(enabled = local.supportsCandidates && !local.saving && !local.savePending &&
+                                entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
+                                onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-local-candidates")) { Text("本机摘录候选") }
+                        }
+                    }
+                    local.candidates?.takeIf { it.source.sourceId == entry.id && it.source.revision == entry.currentRevision.toLong() }?.let { ui ->
+                        candidateController?.let { controller ->
+                            LocalCandidateDialog(ui, controller, { canUseCandidates(entry.id, entry.currentRevision) }, onCandidateLocation)
                         }
                     }
                     local.ai?.takeIf { it.source.sourceId == entry.id &&
