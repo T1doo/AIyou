@@ -134,7 +134,7 @@ class ManualTaskRecordsIntegrationTest {
     private fun schedule(id: String, version: Long, operation: ManualTaskDateOperation, due: ManualTaskSchedule?) =
         ManualTaskScheduleMutation(id, version, operation, due, 99, "date-$id-$version-$operation")
     private fun ciphertext(store: EncryptedEntryRepository, id: String) =
-        store.database.openHelper.writableDatabase.query("SELECT ciphertext FROM manual_tasks WHERE id=?", arrayOf(id)).use {
-            check(it.moveToFirst()); it.getBlob(0).also { check(!it.moveToNext()) }
+        store.database.openHelper.writableDatabase.query("SELECT ciphertext FROM manual_tasks WHERE id=?", arrayOf(id)).use { cursor ->
+            check(cursor.moveToFirst()); cursor.getBlob(0).also { check(!cursor.moveToNext()) }
         }
 }
