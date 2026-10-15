@@ -14,6 +14,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class MixedCaptureControllerTest {
+    @Test fun incompleteUnicodeAndRejectedQueueDoNotFreezeOrLoseEditableInput():Unit=runBlocking {
+        Harness().use { h->
+            h.start();h.c.edit("合成\uD83D");h.drain();h.c.save();h.drain()
+            assertFalse(h.ui.uncertainSave);assertFalse(h.ui.busy);assertEquals("合成\uD83D",h.ui.text)
+            h.c.edit("合成完整😀");h.drain();h.acceptQueue=false;h.c.save()
+            assertFalse(h.ui.busy);assertEquals("合成完整😀",h.ui.text);assertTrue(h.f.db.read("SELECT id FROM entries").isEmpty())
+            h.acceptQueue=true;h.c.save();h.drain();assertEquals("合成完整😀",h.local.entries.single().originalText)
+        }
+    }
     @Test(timeout=15000) fun realVmCaptureCommandRefreshesFavoritesAndSchedulesImmediateLocalSearch():Unit=runBlocking {
         Harness().use { h->
             val closed=CountDownLatch(1)
@@ -95,7 +104,7 @@ class MixedCaptureControllerTest {
     internal class Harness:AutoCloseable {
         val f=MixedCaptureSqlTest.fixture();private val repo=MixedCaptureSqlTest.repo(f)
         var local=LocalRecordUiState(ready=true,opening=false,supportsMixedCapture=true,mixedCapture=MixedCaptureUiState())
-        val queue=ArrayDeque<suspend(EntryRepository)->Unit>();var failEntries=false;var failEdit=false
+        val queue=ArrayDeque<suspend(EntryRepository)->Unit>();var failEntries=false;var failEdit=false;var acceptQueue=true
         val store=object:EntryRepository {
             override val captureRecords=object:CaptureRepository by repo {
                 override suspend fun edit(expected:CaptureDraft,text:String):CaptureDraft {
@@ -114,7 +123,7 @@ class MixedCaptureControllerTest {
             override suspend fun revisions(entryId:String)=emptyList<OriginalRevision>()
             override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry=error("Unrelated edit")
         }
-        val c=MixedCaptureController({local},{local=it(local)},{queue.add(it);true},{object:AttachmentPicture{override val width=1;override val height=1}},Clock.systemUTC())
+        val c=MixedCaptureController({local},{local=it(local)},{if(acceptQueue){queue.add(it);true}else false},{object:AttachmentPicture{override val width=1;override val height=1}},Clock.systemUTC())
         val ui get()=checkNotNull(local.mixedCapture)
         suspend fun start(){c.initialize(store)}
         suspend fun drain(){while(queue.isNotEmpty())queue.removeFirst()(store)}

@@ -18,6 +18,9 @@ class RecordMediaPreview(val snapshot: OriginalExportSnapshot, images: List<Reco
         require(images.size <= RecordMediaPackages.MAX_IMAGES && imageBytes <= RecordMediaPackages.MAX_IMAGE_TOTAL)
         require(images.map { it.attachmentId }.distinct().size == images.size)
         images.forEach { image -> require(snapshot.records.any { it.entry.id == image.sourceId && it.entry.currentRevision == image.sourceRevision }) }
+        snapshot.records.filter { it.entry.originalText.isBlank() }.forEach { record ->
+            require(images.any { it.sourceId==record.entry.id && it.sourceRevision==record.entry.currentRevision })
+        }
     }
     override fun toString() = "RecordMediaPreview(images=${images.size}, redacted)"
 }

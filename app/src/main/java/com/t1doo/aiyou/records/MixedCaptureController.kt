@@ -11,7 +11,9 @@ import kotlinx.coroutines.CancellationException
 data class MixedCaptureUiState(val draft: CaptureDraft?=null,val text: String="",val busy: Boolean=false,
     val pendingEdits: Int=0,val selection: AttachmentSelection?=null,val pictures: Map<String,AttachmentPicture> = emptyMap(),
     val error: String?=null,val notice: String?=null,val confirmDiscard: Boolean=false,val uncertainSave: Boolean=false,
-    val retainJpegMetadata: Boolean=true)
+    val retainJpegMetadata: Boolean=true) {
+    override fun toString()="MixedCaptureUiState(busy=$busy, redacted)"
+}
 
 /** Production Now composer, using the existing serial records IO actor. No private Bundle/Saver. */
 class MixedCaptureController internal constructor(private val current: () -> LocalRecordUiState,
@@ -43,7 +45,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         if(!available() || ui()?.busy==true) return
         if(pendingSave!=null) { save();return }
         update { it.copy(busy=true,selection=null) }
-        enqueue { store -> try { store.captureRecords!!.recover();initialize(store) } finally { update { it.copy(busy=false) } } }
+        submit { store -> try { store.captureRecords!!.recover();initialize(store) } finally { update { it.copy(busy=false) } } }
     }
     fun edit(text: String) {
         val u=ui() ?: return
@@ -78,16 +80,16 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         if(!available() || s.requestId!=request || s.phase!=AttachmentImportPhase.PICKING) return
         if(source==null) { cancelSelection();return }
         update { it.copy(selection=s.copy(phase=AttachmentImportPhase.PREPARING)) }
-        enqueue { store ->
+        submit { store ->
             var bytes: ByteArray?=null
             try {
-                if(!owns(id,request)) return@enqueue
+                if(!owns(id,request)) return@submit
                 val mime=checkNotNull(source.mediaType());require(mime in LocalAttachmentController.IMAGE_TYPES)
                 bytes=source.open().use { LocalAttachmentController.bounded(it) { owns(id,request) } }
                 require(LocalAttachmentController.matchesHeader(bytes,mime))
                 if(mime=="image/jpeg") { val cleaned=JpegPayloadValidator.prepare(bytes,s.retainJpegMetadata);if(cleaned!==bytes){bytes.fill(0);bytes=cleaned} }
                 decode(bytes).releaseUnpublished()
-                if(!owns(id,request)) return@enqueue
+                if(!owns(id,request)) return@submit
                 val intent=AttachmentIntent(s.attachmentId,id,1,mime,LocalAttachmentController.hash(bytes),bytes.size.toLong())
                 require(s.expected==null || s.expected==intent)
                 clearPrepared();prepared=intent to bytes;bytes=null;commitImage(store,id,request)
@@ -100,7 +102,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         val u=ui() ?: return;val s=u.selection ?: return;val id=u.draft?.id ?: return
         if(!available() || s.phase!=AttachmentImportPhase.FAILED) return
         if(prepared==null) { cancelSelection();return }
-        enqueue { store ->try { commitImage(store,id,s.requestId) } catch(e:CancellationException){throw e} catch(_:Exception){reconcile(store);update { it.copy(selection=it.selection?.copy(phase=AttachmentImportPhase.FAILED),error="图片仍未确认保存，输入已保留，请重试。") }} }
+        submit { store ->try { commitImage(store,id,s.requestId) } catch(e:CancellationException){throw e} catch(_:Exception){reconcile(store);update { it.copy(selection=it.selection?.copy(phase=AttachmentImportPhase.FAILED),error="图片仍未确认保存，输入已保留，请重试。") }} }
     }
     private suspend fun commitImage(store: EntryRepository,id: String,request: Long) {
         if(!owns(id,request)) return
@@ -118,7 +120,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         val u=ui() ?: return
         if(!available() || u.busy || u.selection!=null || u.uncertainSave || u.pendingEdits>0) return
         update { it.copy(busy=true) }
-        enqueue { store ->
+        submit { store ->
             try { val result=operation(store,checkNotNull(binding));binding=result;clearPrepared()
                 update { it.copy(draft=result,text=if(resetText) result.text else it.text,confirmDiscard=false,error=null,notice=null) };thumbnails(store)
             } catch(e:CancellationException){throw e} catch(_:Exception){update { it.copy(error="草稿清理尚未完成，输入和清理身份已保留。请重试原操作。") }}
@@ -131,9 +133,12 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         if(pendingSave==null && (u.draft.discarding || u.draft.images.any { it.state!=CaptureImageState.READY })) {
             update { it.copy(error="图片尚未完整保存，请重试读取、重新选择同一图片或明确移除后再保存。") };return
         }
+        if(pendingSave==null) try { OriginalExports.hash(u.text) } catch(_:Exception) {
+            update { it.copy(error="文字输入尚未完成，草稿已保留。请完成输入后再保存。") };return
+        }
         if(pendingSave==null && u.text.isBlank() && u.draft.images.isEmpty()) { update { it.copy(error="请写下文字或添加至少一张图片。") };return }
         update { it.copy(busy=true,error=null) }
-        enqueue { store ->
+        submit { store ->
             try {
                 val repo=checkNotNull(store.captureRecords)
                 if(pendingSave==null) {
@@ -166,6 +171,10 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
     private suspend fun reconcile(store: EntryRepository) {
         try { val a=store.captureRecords!!.current();if(a.id==binding?.id) { binding=a;update { it.copy(draft=a) } } }
         catch(e:CancellationException){throw e} catch(_:Exception) { /* Preserve acknowledged binding and current input. */ }
+    }
+    private fun submit(action:suspend(EntryRepository)->Unit):Boolean {
+        if(enqueue(action)) return true
+        update { it.copy(busy=false,error="本机操作暂不可用，文字和已选图片已保留。请重试。") };return false
     }
     private fun owns(id: String,request: Long)=available() && ui()?.draft?.id==id && ui()?.selection?.requestId==request
     private fun clearPrepared() { prepared?.second?.fill(0);prepared=null }

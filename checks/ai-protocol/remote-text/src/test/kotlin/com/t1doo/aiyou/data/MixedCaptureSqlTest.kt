@@ -10,6 +10,33 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class MixedCaptureSqlTest {
+    @Test fun authenticatedV2EmptyBodyWithoutMatchingImageIsRejectedAndV1StillRejectsEmpty():Unit=runBlocking {
+        fixture().use { f->
+            val c=repo(f);val base=c.current();val full=c.add(base,intent(base),png);c.save(full,10,"UTC")
+            val snapshot=SqlOriginalExportRepository(f.gateway,f.tags).capture(listOf(SourceVersion(full.id,1)),uuid(),20)
+            assertThrows(IllegalArgumentException::class.java) { RecordMediaPreview(snapshot,emptyList()) }
+            val original=JcaRecordPackageCipher().encode(snapshot,true)
+            val metadata=PackageWriter(RecordMediaPackages.MAX_METADATA).use { w->
+                w.string("AIyou-images-v2",32);w.i32(2);w.i32(1)
+                w.strings(listOf("currentOriginals","manualTags","readyOriginalImages"),3,32)
+                w.strings(listOf("originalHistory","tasks","drafts","aiDerived","serviceKeys","deviceKeys"),6,32)
+                w.i32(original.size);w.raw(original);w.i32(0);w.bytes()
+            }
+            val salt=ByteArray(16){it.toByte()};val prefix=ByteArray(8){(it+16).toByte()}
+            val header="AIYOUPK2".toByteArray()+java.nio.ByteBuffer.allocate(8).putInt(2).putInt(RecordPackages.ITERATIONS).array()+salt+prefix
+            val key=RecordPackageCrypto.derive("synthetic package password".toCharArray(),salt);val hash=packageHash(metadata)
+            fun frame(index:Int,binding:ByteArray,bytes:ByteArray):ByteArray {
+                val seq=java.nio.ByteBuffer.allocate(4).putInt(index).array()
+                val encrypted=RecordPackageCrypto.crypt(javax.crypto.Cipher.ENCRYPT_MODE,key,prefix+seq,header+binding+seq,bytes)
+                return java.nio.ByteBuffer.allocate(4).putInt(encrypted.size).array()+encrypted
+            }
+            try {
+                val bad=header+frame(0,ByteArray(32),metadata)+frame(1,hash,hash)
+                fails { RecordMediaPackageCipher().open({bad.inputStream()},"synthetic package password".toCharArray()) }
+                assertThrows(RecordPackageInvalid::class.java) { JcaRecordPackageCipher().seal(snapshot,"synthetic package password".toCharArray()) }
+            } finally { key.fill(0);metadata.fill(0);original.fill(0) }
+        }
+    }
     @Test fun encryptedImageOnlyDraftReopensAndCommitsEmptyBodyOnlyAfterAllImagesAuthenticate(): Unit=runBlocking {
         fixture().use { f ->
             var c=repo(f);var d=c.current();val id=d.id;val i=intent(d)

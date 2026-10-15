@@ -17,7 +17,7 @@ persisted. The existing independently wrapped media key, AEAD, fsync, atomic ren
 reused. File ownership is recorded before IO and final creation proofs protect uncommitted cleanup.
 
 JPEG/PNG selection reuses the same platform picker and validators/metadata choice. Draft thumbnails
-are sampled to at most 160px in memory; encrypted originals are preserved. Selecting, canceling,
+are scaled to at most 160px in memory; encrypted originals are preserved. Selecting, canceling,
 removing, discarding and saving are separate actions. Picker results are bound to request and draft
 identity. Canceling a selection does not silently remove a durable failed image intent; it must be
 reselected, retried or explicitly removed. Failed images prevent a text-only fallback save.
