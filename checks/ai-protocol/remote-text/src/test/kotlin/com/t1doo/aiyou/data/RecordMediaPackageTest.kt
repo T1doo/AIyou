@@ -110,8 +110,21 @@ class RecordMediaPackageTest {
                 assertFalse(r.isCurrent(p)); fails { preview(f,id) }
             }
             f.db.write("UPDATE attachments SET state='READY' WHERE id=?",image.id)
-            OriginalExportSqlTest.revise(f.db,id,"后来原文",2); assertFalse(r.isCurrent(p))
-            f.mediaRoot.resolve(image.id+".aead").delete(); fails { preview(f,id) }
+            assertTrue(r.isCurrent(p))
+            assertEquals(1L,f.db.read("SELECT currentRevision FROM entries WHERE id=?",id).single().single())
+            assertTrue(f.mediaRoot.resolve(image.id+".aead").delete())
+            fails { preview(f,id) } // Still current revision1: this must fail on missing original bytes.
+            assertEquals("CORRUPT",f.db.read("SELECT state FROM attachments WHERE id=?",image.id).single().single())
+        }
+        PermanentErasureFixture().use { f ->
+            val id = f.entry(); f.media.save(f.attachment(id,png)) { png.inputStream() }
+            val r = repo(f); val p = preview(f,id)
+            OriginalExportSqlTest.revise(f.db,id,"后来原文",2)
+            assertFalse(r.isCurrent(p)); fails { r.seal(p,password()) }
+        }
+        PermanentErasureFixture().use { f ->
+            val id = f.entry(); f.media.save(f.attachment(id,png)) { png.inputStream() }
+            val r = repo(f); val p = preview(f,id)
             f.db.write("UPDATE remote_source_access SET deleted=1,generation=generation+1 WHERE entryId=?",id)
             assertFalse(r.isCurrent(p)); val pass = password(); fails { r.seal(p,pass) }; assertTrue(pass.all { it == '\u0000' })
         }
