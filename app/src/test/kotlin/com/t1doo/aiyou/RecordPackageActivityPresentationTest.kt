@@ -122,7 +122,7 @@ class RecordPackageActivityPresentationTest {
     @Test fun taskOnlySelectionAtDoubleFontPreviewsEveryKindAndKeepsExplicitScopeGateAndPrivateState() {
         content();open();click("package-export")
         node("package-preview").assertIsNotEnabled();click("package-include-activities");click("package-preview");pump()
-        node("package-activity-summary").assertTextContains("正式待办 1 条").assertTextContains("待确认草稿 1 条").assertTextContains("未映射来源 1 处")
+        node("package-activity-summary").assertTextEquals("v3 包内正式待办 1 条、待确认草稿 1 条；未映射来源 1 处。")
         node("package-task:synthetic-task").assertExists();node("package-draft:synthetic-proposal").assertExists()
         compose.onNodeWithTag("package-list").performScrollToNode(hasText("待确认草稿 · 原输入：2026-  · UTC"))
         compose.onNodeWithText("待确认草稿 · 原输入：2026-  · UTC").assertExists()
@@ -139,13 +139,14 @@ class RecordPackageActivityPresentationTest {
         content();open();click("package-restore")
         compose.runOnIdle {picked!!(object:SelectedRecordPackageDocument {override fun openForRead()=byteArrayOf(1).inputStream();override fun openForWrite():OutputStream=error("Not requested")})}
         node("package-password").performTextInput("synthetic UI recovery password");click("package-authenticate");pump()
-        node("package-activity-summary").assertTextContains("待确认草稿 1 条");assertEquals(0,imports)
+        node("package-activity-summary").assertTextEquals("v3 包内正式待办 1 条、待确认草稿 1 条；未映射来源 1 处。");assertEquals(0,imports)
         node("package-confirm").assertHeightIsAtLeast(androidx.compose.ui.unit.Dp(48f))
         failActivityRead=true;click("package-confirm");assertEquals(0,imports);pump()
         assertEquals(RecordPackagePhase.UNCERTAIN,state.value.recordPackage!!.phase);assertEquals(1,currentTasks.size);assertEquals(1,currentDrafts.size)
         click("package-confirm");pump();assertEquals(RecordPackagePhase.DONE,state.value.recordPackage!!.phase)
         assertEquals(2,imports);assertEquals(1,state.value.tasks.items.size);assertEquals(1,state.value.taskProposals.items.size)
         assertEquals(0,confirms);assertEquals("2026-",state.value.taskProposals.items.single().proposal.dateInput.date)
-        assertEquals("合成当前捕获输入",state.value.text);node("package-notice").assertTextContains("没有新增")
+        assertEquals("合成当前捕获输入",state.value.text);node("package-notice").assertTextEquals(
+            "已核对第一次恢复回执，没有新增、覆盖或复活记录、任务或草稿。已永久删除 0 条，删除未完成 0 条；其余副本以当前本机状态为准。")
     }
 }

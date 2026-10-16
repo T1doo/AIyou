@@ -109,3 +109,17 @@ SDK/模型调用、自建后台或部署。
 smartcast 与并发前置检查失败及其修复验证原件也全部保留。新提交只由普通开发
 分支 push 触发现有免费 CI；未通过本地 Actions 访问限制取结果，交付时本批 CI
 状态仍为 UNKNOWN，不能沿用 c883cdf 的 GREEN，也不能宣称 F08/真机整体验收完成。
+
+后续精确 CI（父级独立回传，非本机绕过访问限制取得）：`f0c2ccfb97af23eade4867a9eafdbecd42f776b9`
+的 [run 38878767475 / job 116900120139](https://github.com/T1doo/AIyou/actions/runs/38878767475/job/116900120139)
+于 2026-10-16 09:26:27 UTC 失败。APK 通过，Compose 210 项中 2 项失败；
+instrumentation 与 lint 跳过。两项均在新 RecordPackageActivityPresentationTest
+摘要断言处失败：`assertTextContains` 默认完整匹配，原测试传入了片段。实际完整
+摘要包含正确的 1 项正式待办、1 项草稿及 1 处未映射来源。
+
+最小修复将两处改为 `assertTextEquals` 完整摘要，并将后续同类重试回执断言改为
+完整回执文本（包括删除/删除中各 0 条），没有改生产代码、跳测、加 sleep 或删除
+任何逐项预览、范围/独立确认、UNCERTAIN 同包重试、草稿不提升与输入隐私断言。
+独立只读审查无阻断。原生产输入指纹及 706 项既有 XML 重新核验一致，只证明
+生产源码未变，不计为本次 Compose 实际执行。SDK/Actions 边界保持；修复提交
+的新精确 CI 结果仍待取得，在门通过前不推进下一批开放导出。
