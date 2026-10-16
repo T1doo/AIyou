@@ -18,15 +18,21 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
     private fun activeProfile(): String = runtimeProfile().also {
         require(Regex("v1:[0-9a-f]{64}").matches(it))
     }
-    private data class Binding(val entry: StoredEntry, val hash: String, val tagVersion: Long, val visibility: Long)
+    private data class ImageBinding(val id: String, val revision: Int, val mediaType: String,
+        val hash: String, val bytes: Long, val state: AttachmentState)
+    private data class Binding(val entry: StoredEntry, val hash: String, val tagVersion: Long, val visibility: Long,
+        val images: List<ImageBinding>? = null)
     private inner class Proof(val stamp: Stamp, val runtime: String, val bindings: List<Binding>,
         tagValues: Map<String, ManualTagSnapshot>, override val pending: Boolean,
         override val favorites: Map<String, RecordFavoriteSnapshot>? = null,
-        override val eventDates: Map<String, RecordEventDateSnapshot>? = null) : LocalSearchSnapshot {
+        override val eventDates: Map<String, RecordEventDateSnapshot>? = null,
+        val imageRequest: LocalSearchRequest? = null) : LocalSearchSnapshot {
         override val epoch = stamp.epoch
         val owner = this@SqlLocalSearchRepository
         override val entries = Collections.unmodifiableList(bindings.map { it.entry })
         override val tags = Collections.unmodifiableMap(HashMap(tagValues))
+        override val currentImageEntryIds = if (imageRequest != null)
+            Collections.unmodifiableSet(bindings.map { it.entry.id }.toSet()) else null
         override fun toString() = "LocalSearchSnapshot(redacted)"
     }
 
@@ -163,6 +169,8 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                 HashMap<String,RecordEventDateSnapshot>()
             } else null
             val favoriteCondition = if (request.onlyFavorites) " AND e.isFavorite=1" else ""
+            val imageCondition = if (request.onlyImages) " AND EXISTS(SELECT 1 FROM attachments p " +
+                "WHERE p.entryId=e.id AND p.revision=e.currentRevision AND p.mediaType IN ('image/png','image/jpeg'))" else ""
             val expression = LocalSearchTokenizer.query(request.query, request.exact)
             val condition = if (expression == null || stamp.version != 1 || stamp.profile != profile) "" else
                 " AND (" + valid(stamp.epoch, profile) + "=0 OR e.id IN (SELECT entryId FROM local_search_fts WHERE local_search_fts MATCH ?))"
@@ -173,7 +181,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             var scanned = 0
             while (true) {
                 val page = sql.query("SELECT e.id,e.capturedAtMillis,e.captureTimeZone" + sourceFrom +
-                    "WHERE " + live + favoriteCondition + condition + " ORDER BY e.id LIMIT 100 OFFSET " + scanned, args)
+                    "WHERE " + live + favoriteCondition + imageCondition + condition + " ORDER BY e.id LIMIT 100 OFFSET " + scanned, args)
                 if (page.isEmpty()) break
                 for (row in page) {
                     if (++scanned > 10_000) throw LocalSearchTooBroad()
@@ -186,7 +194,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                     val tag = tags.readWithin(sql, id)
                     tag.names.forEach(budget::add)
                     if (request.tag != null && request.tag !in tag.names) continue
-                    val bound = read(sql, id) ?: throw LocalSearchStale()
+                    val bound = read(sql, id, request.onlyImages) ?: throw LocalSearchStale()
                     budget.add(bound.entry.originalText)
                     bindings += bound
                     labels[id] = tag
@@ -199,7 +207,8 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             val pending = sql.query("SELECT e.id" + sourceFrom + "WHERE " + live + " AND " + dirty(stamp.epoch, profile) +
                 " LIMIT 1").isNotEmpty() || stamp.version != 1 || stamp.profile != profile
             Proof(stamp, profile, Collections.unmodifiableList(bindings.toList()), labels, pending,
-                favoriteValues?.let { Collections.unmodifiableMap(it) },eventValues?.let { Collections.unmodifiableMap(it) })
+                favoriteValues?.let { Collections.unmodifiableMap(it) },eventValues?.let { Collections.unmodifiableMap(it) },
+                request.takeIf { it.onlyImages })
         }
     }
 
@@ -215,9 +224,13 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             if (activeProfile() != proof.runtime) return@safely false
             database.transaction { sql ->
             if (epochWithin(sql) != proof.stamp) return@transaction false
+            // Attachment inserts/changes do not advance the text index epoch. Recompute this bounded
+            // candidate scope under the same write lease, including empty→nonempty membership.
+            if (proof.imageRequest != null && (candidates(proof.imageRequest) as Proof).bindings != proof.bindings)
+                return@transaction false
             var selected: StoredEntry? = null
             for (before in proof.bindings) {
-                val current = read(sql, before.entry.id) ?: return@transaction false
+                val current = read(sql, before.entry.id, before.images != null) ?: return@transaction false
                 if (current != before) return@transaction false
                 val tag = tags.readWithin(sql, before.entry.id)
                 val previousTag = proof.tags[before.entry.id] ?: return@transaction false
@@ -236,7 +249,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         } }
     }
 
-    private fun read(sql: RecordsSqlConnection, id: String): Binding? {
+    private fun read(sql: RecordsSqlConnection, id: String, onlyImages: Boolean = false): Binding? {
         val rows = sql.query("SELECT e.id,e.currentRevision,r.originalText,r.contentHash,e.capturedAtMillis," +
             "e.captureTimeZone,e.privacyPolicy,COALESCE(t.version,0),COALESCE(a.generation,0)" + sourceFrom +
             "WHERE e.id=? AND " + live, listOf(id))
@@ -245,13 +258,26 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         val row = rows.single()
         val text = row[2] as String; val hash = row[3] as String
         require(text.length <= 100_000 && OriginalExports.hash(text) == hash)
-        require(text.isNotBlank() || sql.query("SELECT id FROM attachments WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg') LIMIT 1",listOf(id,row[1])).isNotEmpty())
         val revision = Math.toIntExact(row[1] as Long)
+        val images = if (onlyImages) {
+            val rows = sql.query("SELECT id,revision,mediaType,sha256,byteSize,state FROM attachments " +
+                "WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg') ORDER BY id LIMIT 65",listOf(id,revision))
+            if (rows.isEmpty()) return null
+            if (rows.size > 64) throw LocalSearchTooBroad()
+            rows.map { image ->
+                val imageId = image[0] as String; ManualTags.identifier(imageId)
+                val imageHash = image[3] as String; val bytes = image[4] as Long
+                require(imageHash.matches(Regex("[0-9a-f]{64}")) && bytes in 1..16_777_216)
+                ImageBinding(imageId,Math.toIntExact(image[1] as Long),image[2] as String,imageHash,bytes,
+                    AttachmentState.valueOf(image[5] as String))
+            }
+        } else null
+        require(text.isNotBlank() || sql.query("SELECT id FROM attachments WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg') LIMIT 1",listOf(id,row[1])).isNotEmpty())
         val tagVersion = row[7] as Long; val visibility = row[8] as Long
         require(revision > 0 && tagVersion >= 0 && visibility >= 0)
         ZoneId.of(row[5] as String)
         return Binding(StoredEntry(row[0] as String, revision, text, row[4] as Long, row[5] as String,
-            ProcessingPolicy.valueOf(row[6] as String)), hash, tagVersion, visibility)
+            ProcessingPolicy.valueOf(row[6] as String)), hash, tagVersion, visibility,images)
     }
 
     private inline fun <T> safely(block: () -> T): T = try { block() }

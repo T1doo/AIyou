@@ -282,6 +282,7 @@ fun AIyouApp(
     var searchMode by remember { mutableStateOf(OriginalSearchMode.KEYWORDS) }
     var searchTag by remember { mutableStateOf<String?>(null) }
     var onlyFavorites by rememberSaveable { mutableStateOf(false) }
+    var onlyImages by remember { mutableStateOf(false) }
     var searchModeGeneration by remember { mutableLongStateOf(0L) }
     fun searchSource() = if (currentRecordsProvider != null) currentRecordsProvider?.invoke() else currentLocal
     fun searchInput(): OriginalSearchInput {
@@ -295,7 +296,7 @@ fun AIyouApp(
             onlyFavorites,
             if (onlyFavorites && tagsSource?.favoritesAvailable == true) tagsSource.favorites else null,
             searchDateBasis, if (searchDateBasis == com.t1doo.aiyou.model.RecordDateBasis.EVENT && tagsSource?.eventDatesAvailable == true)
-                tagsSource.eventDates else null)
+                tagsSource.eventDates else null,onlyImages = onlyImages)
     }
     val search = remember {
         LocalOriginalSearchController(
@@ -330,6 +331,7 @@ fun AIyouApp(
         searchTag = null
         searchDateBasis = com.t1doo.aiyou.model.RecordDateBasis.CAPTURED
         onlyFavorites = false
+        onlyImages = false
         searchModeGeneration++
         searchReturnAnchor = null
         searchReturnInput = null
@@ -861,6 +863,11 @@ fun AIyouApp(
                 onlyFavorites = onlyFavorites, onSearchFavorites = { value -> search.changeInput {
                     if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) {
                         onlyFavorites = value; searchModeGeneration++
+                    }
+                } },
+                onlyImages = onlyImages, onSearchImages = { value -> search.changeInput {
+                    if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) {
+                        onlyImages = value; searchModeGeneration++
                     }
                 } },
                 onRefreshFavorites = { if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) favorites?.refresh() },

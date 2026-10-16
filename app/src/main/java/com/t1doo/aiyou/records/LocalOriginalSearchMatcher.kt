@@ -19,7 +19,8 @@ data class OriginalSearchInput(val query: String = "", val from: String = "", va
     val onlyFavorites: Boolean = false,
     internal val favoriteSnapshot: Map<String, com.t1doo.aiyou.model.RecordFavoriteSnapshot>? = null,
     val dateBasis: RecordDateBasis = RecordDateBasis.CAPTURED,
-    internal val eventDateSnapshot: Map<String, RecordEventDateSnapshot>? = null) {
+    internal val eventDateSnapshot: Map<String, RecordEventDateSnapshot>? = null,
+    val onlyImages: Boolean = false, internal val currentImageEntryIds: Set<String>? = null) {
     override fun toString() = "OriginalSearchInput(redacted)"
 }
 
@@ -50,11 +51,13 @@ internal class OriginalSearchMatches(val stage: OriginalSearchStage, val hits: L
 internal object LocalOriginalSearchMatcher {
     suspend fun indexed(entries: List<StoredEntry>, input: OriginalSearchInput,
         owner: com.t1doo.aiyou.domain.LocalSearchRepository): OriginalSearchMatches {
-        val validation = match(emptyList(), input)
+        val validation = match(emptyList(), input.copy(currentImageEntryIds = if (input.onlyImages) emptySet() else null))
         if (validation.stage != OriginalSearchStage.READY) return validation
         return try {
             val proof = owner.candidates(com.t1doo.aiyou.domain.LocalSearchRequest(input.query,
-                input.mode == OriginalSearchMode.EXACT, input.from, input.through, input.tag, input.onlyFavorites, input.dateBasis))
+                input.mode == OriginalSearchMode.EXACT, input.from, input.through, input.tag, input.onlyFavorites, input.dateBasis,input.onlyImages))
+            if (input.onlyImages && proof.currentImageEntryIds != proof.entries.map { it.id }.toSet())
+                return OriginalSearchMatches(OriginalSearchStage.FAILED, message = "图片关联暂不可读取，请重试本机读取。")
             if (proof.entries.any { fresh -> entries.none { it == fresh } })
                 return OriginalSearchMatches(OriginalSearchStage.WAITING)
             if (input.tag != null && proof.tags.any { (id, fresh) ->
@@ -73,7 +76,7 @@ internal object LocalOriginalSearchMatcher {
                 input.eventDateSnapshot?.get(entry.id)?.let { fresh != null && it.version == fresh.version && it.date == fresh.date } != true
             }) return OriginalSearchMatches(OriginalSearchStage.WAITING)
             val result = match(proof.entries, input.copy(tagSnapshot = proof.tags, favoriteSnapshot = proof.favorites,
-                eventDateSnapshot = proof.eventDates))
+                eventDateSnapshot = proof.eventDates,currentImageEntryIds = proof.currentImageEntryIds))
             val whole = if (input.mode == OriginalSearchMode.KEYWORDS) fold(input.query).text else input.query
             val ranked = ArrayList<Pair<OriginalSearchHit, Boolean>>()
             for (hit in result.hits) {
@@ -120,13 +123,16 @@ internal object LocalOriginalSearchMatcher {
             message = "手工标签暂不可读取，请重试本机读取。")
         if (input.onlyFavorites && input.favoriteSnapshot == null) return OriginalSearchMatches(OriginalSearchStage.FAILED,
             message = "收藏状态暂不可读取，请重试本机读取。")
+        if (input.onlyImages && input.currentImageEntryIds == null) return OriginalSearchMatches(OriginalSearchStage.FAILED,
+            message = "图片关联暂不可读取，原文已保留。请重试本机读取。")
         if (input.dateBasis == RecordDateBasis.EVENT && input.eventDateSnapshot == null)
             return OriginalSearchMatches(OriginalSearchStage.FAILED, message = "事件日期暂不可读取，请重试本机读取。")
-        if (terms.isEmpty() && input.dateBasis == RecordDateBasis.CAPTURED && from == null && through == null && input.tag == null && !input.onlyFavorites) return OriginalSearchMatches(OriginalSearchStage.BROWSE)
+        if (terms.isEmpty() && input.dateBasis == RecordDateBasis.CAPTURED && from == null && through == null && input.tag == null && !input.onlyFavorites && !input.onlyImages) return OriginalSearchMatches(OriginalSearchStage.BROWSE)
         val needles = terms.map { compileNeedle(if (input.mode == OriginalSearchMode.KEYWORDS) fold(it).text else it) }
         val hits = ArrayList<OriginalSearchHit>()
         for (entry in entries) {
             currentCoroutineContext().ensureActive()
+            if (input.onlyImages && entry.id !in input.currentImageEntryIds.orEmpty()) continue
             if (input.onlyFavorites && input.favoriteSnapshot?.get(entry.id)?.isFavorite != true) continue
             if (input.tag != null && input.tag !in input.tagSnapshot?.get(entry.id)?.names.orEmpty()) continue
             if (input.dateBasis == RecordDateBasis.EVENT || from != null || through != null) {

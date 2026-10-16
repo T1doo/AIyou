@@ -64,7 +64,8 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     dateBasis: com.t1doo.aiyou.model.RecordDateBasis = com.t1doo.aiyou.model.RecordDateBasis.CAPTURED,
     onDateBasis: (com.t1doo.aiyou.model.RecordDateBasis) -> Unit = {},
     eventDatesAvailable: Boolean = true, eventDatesError: String? = null,
-    onRefreshEventDates: () -> Unit = {}) {
+    onRefreshEventDates: () -> Unit = {}, onlyImages: Boolean = false,
+    onImages: (Boolean) -> Unit = {}) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
@@ -153,9 +154,15 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 if (!favoritesAvailable) TextButton(onClick = onRefreshFavorites, enabled = enabled && !favoritesLoading,
                     modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-favorites-retry")) { Text("重试读取收藏") }
             }
+            TextButton(onClick = { onImages(!onlyImages) }, enabled = enabled,
+                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-images")) {
+                Text(if (onlyImages) "仅当前版本含图片 · 切换全部记录" else "仅看当前版本含图片记录")
+            }
+            Text("图片筛选只看当前版本的 PNG/JPEG 附件关联；不识别图片文字，历史版本有图不计入。",
+                style = MaterialTheme.typography.bodySmall)
             Text(if (dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED)
-                "记录日期按捕获时区，包含起止两天。关键词、日期、手工标签与收藏同时满足；仅查当前本机原文，不使用 AI。"
-                else "事件日期按手填的日历日期与 IANA 时区，包含起止两天。未补记不匹配，不回落记录日期；与关键词、手工标签和收藏同时满足。",
+                "记录日期按捕获时区，包含起止两天。关键词、日期、手工标签、收藏与图片条件同时满足；仅查当前本机原文，不使用 AI。"
+                else "事件日期按手填的日历日期与 IANA 时区，包含起止两天。未补记不匹配，不回落记录日期；与关键词、手工标签、收藏和图片条件同时满足。",
                 style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onClear, enabled = enabled,
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-clear")) { Text("清空查找条件") }

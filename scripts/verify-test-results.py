@@ -99,6 +99,9 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.CurrentImageSearchPresentationTest"] = (
+            "imageFilterStartsOffCombinesLiteralAndDatesAndClearResetsEveryCondition",
+            "narrowDoubleFontFilterIsReachableAndReadFailureCannotBecomeEmptySuccess")
         additional["com.t1doo.aiyou.RecordEventDatePresentationTest"] = (
             "narrowDoubleFontManualSetCorrectionAndClearEachRequireVisiblePreview",
             "uncertainSaveRetainsSameIntentAndStaleConfirmCannotWriteAfterNavigation",
