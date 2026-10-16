@@ -98,6 +98,11 @@ class TaskProposalPresentationTest {
         }
     }
     private fun click(tag:String) {compose.onNodeWithTag(tag).performScrollTo().performClick()}
+    private fun taskNode(tag:String):SemanticsNodeInteraction {
+        // Find and compose offscreen LazyColumn items before looking up their child nodes.
+        compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(tag))
+        return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
+    }
     private fun drain() {compose.runOnIdle {runBlocking {while(true) (queue.poll()?:break)(owner)}};compose.waitForIdle()}
     private fun reader() {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"))
@@ -112,14 +117,14 @@ class TaskProposalPresentationTest {
         val id=state.value.taskProposals.editor!!.id;click("task-proposal-close");drain()
         compose.onNodeWithText("返回列表").performClick();compose.onNodeWithText("待办").performClick()
         compose.runOnIdle {proposals.dispose();proposals=newController();proposals.initialize(owner)}
-        compose.onNodeWithTag("task-proposal-heading").performScrollTo().assertTextEquals("待确认草稿 1")
-        click("task-proposal-open-"+id);compose.onNodeWithTag("task-proposal-title").performScrollTo().assertTextContains("合成人工待确认标题")
+        taskNode("task-proposal-heading").assertTextEquals("待确认草稿 1")
+        taskNode("task-proposal-open-"+id).assertIsEnabled().performClick();compose.onNodeWithTag("task-proposal-title").performScrollTo().assertTextContains("合成人工待确认标题")
         click("task-proposal-prepare");compose.onNodeWithTag("task-proposal-confirm-title").performScrollTo().assertTextEquals("合成人工待确认标题")
         assertTrue(queue.isEmpty());click("task-proposal-cancel-confirm");assertTrue(tasks.isEmpty())
         click("task-proposal-prepare");click("task-proposal-confirm");assertTrue(tasks.isEmpty());drain()
         assertEquals(1,confirms.size);assertEquals("2026-10-20",tasks.values.single().schedule!!.date.toString());assertNull(tasks.values.single().schedule!!.time)
-        click("task-proposal-close");drain();compose.onNodeWithTag("task-proposal-heading").performScrollTo().assertTextEquals("待确认草稿 0")
-        compose.onNodeWithTag("manual-task-row-"+tasks.values.single().id).performScrollTo().assertIsDisplayed()
+        click("task-proposal-close");drain();taskNode("task-proposal-heading").assertTextEquals("待确认草稿 0")
+        taskNode("manual-task-row-"+tasks.values.single().id).assertIsDisplayed()
     }
     @Test fun uncertainReadbackRetainsExactConfirmationAndNeverShowsPrematureSuccess() {
         compose.setContent {Screen()};compose.runOnIdle {proposals.initialize(owner)};open();title();click("task-proposal-prepare")

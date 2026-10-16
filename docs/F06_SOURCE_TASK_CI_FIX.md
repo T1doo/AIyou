@@ -79,3 +79,43 @@ job `116837464919` 在 Android 编译时失败：`MainActivity.kt` 第 889 行�
 不安装 SDK 或接受协议、不修改 main。问题仅能由**新 SHA 的实际 Android 编译及
 Compose 结果**关闭；本批仍为“源码修正完成，实际验证待完成”。原始日志未在
 本地取得，本节精确定位来自父级提供的已核证据。
+
+## 1f15551 精确 CI：APK 通过，冷草稿按钮定位失败
+
+父级已独立核实 SHA `1f15551e495268cdee710444068960dbd946e756` 的
+run `38862463368` / job `116847653927` 于 2026-10-16 06:57:30 UTC 失败。
+debug APK 构建成功，原 `key` 编译阻塞已关闭；208 项 Compose 中 1 项失败，
+instrumentation 编译和 lint 跳过。因此编译通过不能表述为 Compose/整体验收通过。
+证据：https://github.com/T1doo/AIyou/actions/runs/38862463368/job/116847653927
+
+唯一给定失败为
+`TaskProposalPresentationTest.narrowDraftColdRestoresInPendingGroupThenActualButtonRequiresSeparateConfirmation`，
+第 116 行调用第 100 行 helper 的 `performScrollTo()`，找不到
+`task-proposal-open-144a3873-e7fe-41b8-a188-736cd1c4672f`。前面的“待确认草稿 1”
+标题断言已执行。本地未取得原始 XML/log，精确错误来自上述父级证据；对应原源码：
+https://github.com/T1doo/AIyou/blob/1f15551e495268cdee710444068960dbd946e756/app/src/test/kotlin/com/t1doo/aiyou/TaskProposalPresentationTest.kt#L116
+
+生产 `ManualTasksScreen` 将 proposal-heading、proposal-state、各草稿行分别放在
+`manual-task-list` 的独立 LazyColumn item。标题已经组合，不保证后面的按钮也
+已组合；测试直接对子节点 `performScrollTo()` 仍须先找到这个节点。这与给定
+离屏目标错误吻合，当前源码未发现需改产品行为的证据，也没有声称本地运行复现。
+
+测试新增与既有 `ManualTaskPresentationTest` 相同的 `taskNode` 定位 helper：先
+在 LazyColumn 上 `performScrollToNode(hasTestTag(tag))`，再查找、滚动并断言
+目标可见。仅同一冷恢复方法的列表标题、草稿打开按钮与最终正式任务行使用它；
+打开按钮另外断言启用并执行真实点击。末尾正式行同属该 LazyColumn，提前消除
+同一流程的下一个离屏定位问题。没有修改生产代码、controller 或存储。
+
+dispose/newController/initialize 冷恢复、恢复标题、实际 prepare/取消/再次 prepare/
+最终点击确认、确认前任务为空、确认次数/日期/无时刻、草稿数归零和正式行可见
+全部原断言保留，未增加 sleep、跳过、过滤或降低门槛。方法库存仍为原有方法，
+没有新增仅复述实现的测试。独立只读源码审查和 `git diff --check` 通过。
+
+SDK 只读预检仍因未设置已获许可的 ANDROID_HOME 失败；本地 Compose、Android
+构建/lint/instrumentation 和真机验收未运行，也未重跑不覆盖该定位的旧主机套件。
+本次修正需**新 SHA 的实际 Compose 与 Android 结果**，不能将 1f15551 的 APK
+或旧主机计数挪作新 SHA 的通过证据。正常开发分支推送匹配既有 25 分钟有界 CI，
+没有另行 dispatch、绕过 Actions 拒绝、安装 SDK、接受协议或改 main。
+
+本批证据：`/workspace/aiyou-evidence/f06-proposal-lazy-ci-20261016/`；旧 CI 失败、
+94/96 图片包 SQLite 初始化/退出超时及其余历史失败原件继续保留。
