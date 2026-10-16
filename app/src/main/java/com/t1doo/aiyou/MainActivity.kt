@@ -117,7 +117,7 @@ class MainActivity : ComponentActivity() {
                 onStartAiSession = records::startAiSession, onStopAiSession = records::stopAiSession,
                 onCloseAiSession = records::closeAiSession,
                 onOpenTags = records.tags::open, onTagEdit = records.tags::edit, onTagAdd = records.tags::add,
-                favorites = records.favorites,
+                favorites = records.favorites, eventDates = records.eventDates,
                 candidates = records.candidates,
                 sourceTags = records.sourceTags,
                 sourceMemories = records.sourceMemories,
@@ -221,6 +221,7 @@ fun AIyouApp(
     onTagRetry: (Long) -> Unit = {},
     onTagClose: (Long) -> Unit = {},
     favorites: com.t1doo.aiyou.records.RecordFavoriteController? = null,
+    eventDates: com.t1doo.aiyou.records.RecordEventDateController? = null,
     candidates: com.t1doo.aiyou.records.LocalCandidateController? = null,
     sourceTags: com.t1doo.aiyou.records.SourceTagController? = null,
     sourceMemories: com.t1doo.aiyou.records.SourceMemoryController? = null,
@@ -277,6 +278,7 @@ fun AIyouApp(
     var searchQuery by remember { mutableStateOf(TextFieldState()) }
     var searchFrom by remember { mutableStateOf(TextFieldState()) }
     var searchThrough by remember { mutableStateOf(TextFieldState()) }
+    var searchDateBasis by remember { mutableStateOf(com.t1doo.aiyou.model.RecordDateBasis.CAPTURED) }
     var searchMode by remember { mutableStateOf(OriginalSearchMode.KEYWORDS) }
     var searchTag by remember { mutableStateOf<String?>(null) }
     var onlyFavorites by rememberSaveable { mutableStateOf(false) }
@@ -291,7 +293,9 @@ fun AIyouApp(
             OriginalSearchInputOwnership(query, from, through, searchModeGeneration), searchTag,
             if (searchTag != null && tagsSource?.manualTagsAvailable == true) tagsSource.manualTags else null,
             onlyFavorites,
-            if (onlyFavorites && tagsSource?.favoritesAvailable == true) tagsSource.favorites else null)
+            if (onlyFavorites && tagsSource?.favoritesAvailable == true) tagsSource.favorites else null,
+            searchDateBasis, if (searchDateBasis == com.t1doo.aiyou.model.RecordDateBasis.EVENT && tagsSource?.eventDatesAvailable == true)
+                tagsSource.eventDates else null)
     }
     val search = remember {
         LocalOriginalSearchController(
@@ -324,6 +328,7 @@ fun AIyouApp(
         searchThrough = TextFieldState()
         searchMode = OriginalSearchMode.KEYWORDS
         searchTag = null
+        searchDateBasis = com.t1doo.aiyou.model.RecordDateBasis.CAPTURED
         onlyFavorites = false
         searchModeGeneration++
         searchReturnAnchor = null
@@ -434,6 +439,7 @@ fun AIyouApp(
     }
     val returnToList: () -> Unit = {
         if (ownsNavigation() && reading) {
+            currentLocal?.eventDateEditor?.let { eventDates?.close(it.session) }
             currentLocal?.manualTagEditor?.takeIf { it.entryId == detailEntryId }?.let { onTagClose(it.session) }
             val edit = currentLocal?.originalEdit?.takeIf { it.entryId == readerId }
             val activeHistory = currentLocal?.originalHistory?.takeIf { it.entryId == readerId }
@@ -466,6 +472,7 @@ fun AIyouApp(
             navigation.tryAdvance(generation)) {
             currentLocal?.recycleBin?.let { recycleBin?.close(it.session) }
             currentLocal?.recordPackage?.let { recordPackages?.close(it.session) }
+            currentLocal?.eventDateEditor?.let { eventDates?.close(it.session) }
             factRecaps?.close();recapRoute=false
             clearSearch()
             tailReturnRequest = null
@@ -745,6 +752,7 @@ fun AIyouApp(
                 requiredSource = if(recapRoute||taskSourceRoute) searchLocation else null,
                 requiredSourceTitle = if(taskSourceRoute) "待办来源版本已变化" else "回顾来源版本已变化",
                 requiredSourceMessage = if(taskSourceRoute) "请返回待办重新核对来源，没有将新版本冒充旧摘录。" else "请返回回顾并重新生成，没有将新版本冒充旧摘录。",
+                eventDateController = eventDates, canUseEventDate = canCopy,
                 candidateController = candidates,
                 sourceTagController = sourceTags,
                 sourceMemoryController = sourceMemories,
@@ -856,7 +864,12 @@ fun AIyouApp(
                     }
                 } },
                 onRefreshFavorites = { if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) favorites?.refresh() },
-                searchMode = searchMode, onSearchMode = { search.changeInput { if (ownsNavigation()) {
+                searchMode = searchMode,
+                searchDateBasis = searchDateBasis,
+                onRefreshEventDates = { if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo)
+                    onRefreshLocalSearch() },
+                onSearchDateBasis = { value -> if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo)
+                    search.changeInput { searchDateBasis = value; searchModeGeneration++ } }, onSearchMode = { search.changeInput { if (ownsNavigation()) {
                     searchModeGeneration++
                     searchMode = if (searchMode == OriginalSearchMode.KEYWORDS) OriginalSearchMode.EXACT else OriginalSearchMode.KEYWORDS
                 } } },

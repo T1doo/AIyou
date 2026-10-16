@@ -20,7 +20,8 @@ fun FactRecapScreen(local: LocalRecordUiState,controller: FactRecapController,li
     LazyColumn(modifier.fillMaxSize().testTag("recap-list"),state=list,contentPadding=PaddingValues(16.dp),
         verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item("intro") { Text("本机日／周回顾",style=MaterialTheme.typography.headlineSmall)
-            Text("按记录保存时间整理，不代表事件发生时间。只回看原文与手工标签，不生成 AI 叙事或心理判断。") }
+            Text("按记录保存时间整理，不代表事件发生时间。只回看原文与手工标签，不生成 AI 叙事或心理判断。")
+            Text("补记、纠正或清除事件日期不会移动这里的记录分组；按事件日找原文，请在回忆中选择“事件日期”检索。") }
         item("date") { OutlinedTextField(u.date,{controller.input(it,u.zone,u.period)},label={Text("日期 YYYY-MM-DD")},
             enabled=ready,modifier=Modifier.fillMaxWidth().testTag("recap-date")) }
         item("zone") { OutlinedTextField(u.zone,{controller.input(u.date,it,u.period)},label={Text("回顾时区，例如 Asia/Shanghai")},

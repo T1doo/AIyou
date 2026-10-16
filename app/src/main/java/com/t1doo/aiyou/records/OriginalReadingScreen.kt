@@ -79,7 +79,7 @@ internal fun originalPreview(text: String): String {
 internal fun originalMetadata(entry: StoredEntry): String {
     val date = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(
         Instant.ofEpochMilli(entry.capturedAtMillis).atZone(ZoneId.of(entry.captureTimeZone)))
-    return "$date · 原文版本 ${entry.currentRevision}"
+    return "记录日期：$date · ${entry.captureTimeZone} · 原文版本 ${entry.currentRevision}"
 }
 
 /** Copy occurs only on an explicit user action after the app validates the current ID/revision. */
@@ -147,6 +147,8 @@ fun OriginalReadingScreen(
     onSetFavorite: ((String, Int, String, Long, Boolean) -> Unit)? = null,
     onRetryFavorite: (String) -> Unit = {},
     onRefreshFavorites: () -> Unit = {},
+    eventDateController: RecordEventDateController? = null,
+    canUseEventDate: (String, Int) -> Boolean = { _, _ -> false },
     candidateController: LocalCandidateController? = null,
     sourceTagController: SourceTagController? = null,
     sourceMemoryController: SourceMemoryController? = null,
@@ -176,6 +178,13 @@ fun OriginalReadingScreen(
                     modifier=Modifier.verticalScroll(rememberScrollState()))
                 else -> {
                     Text(metadataText ?: originalMetadata(entry), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                    if (local.supportsEventDates) {
+                        val date = local.eventDates[entry.id]?.date
+                        Text(if (!local.eventDatesAvailable || !local.eventDates.containsKey(entry.id)) "事件日期：暂不可读取"
+                            else if (date == null) "事件日期：未补记（未知）"
+                            else "事件日期：${date.localDate} · ${date.timeZone} · 仅日期，无时刻",
+                            style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("original-event-date"))
+                    }
                     PrivacyChip(entry.policy)
                     local.packageOrigins[entry.id]?.takeIf { local.packageOriginsAvailable }?.let { origin ->
                         Text("加密包恢复副本 · 原文版本 " + origin.sourceRevision + " · 包创建于 " +
@@ -236,6 +245,12 @@ fun OriginalReadingScreen(
                             TextButton(onClick = { attachments(entry.id, entry.currentRevision) },
                                 enabled = !local.saving && !local.savePending,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("查看附件") }
+                        }
+                        eventDateController?.let { controller ->
+                            TextButton(onClick = { if (canUseEventDate(entry.id, entry.currentRevision))
+                                controller.open(entry.id, entry.currentRevision) { canUseEventDate(entry.id, entry.currentRevision) } },
+                                enabled = local.supportsEventDates && !local.saving && !local.savePending,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-event-date-open")) { Text("补记／纠正事件日期") }
                         }
                         onOpenTags?.let { openTags ->
                             TextButton(onClick = { openTags(entry.id, entry.currentRevision) },
@@ -360,6 +375,11 @@ fun OriginalReadingScreen(
                     }
                 }
             }
+        }
+    }
+    local.eventDateEditor?.takeIf { it.entryId == entryId }?.let { ui ->
+        eventDateController?.let { controller ->
+            RecordEventDateDialog(ui, local.eventDateWrites[ui.entryId], controller) { canUseEventDate(entryId, ui.revision) }
         }
     }
     local.sourceTask?.takeIf { it.binding.source.sourceId==entryId }?.let { ui ->

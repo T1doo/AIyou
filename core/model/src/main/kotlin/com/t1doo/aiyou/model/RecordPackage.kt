@@ -23,7 +23,7 @@ data class RecordPackageRevision(val revision: Int, val originalText: String, va
 class RecordPackageOriginal(val sourceId: String, val sourceRevision: Int,
     val capturedAtMillis: Long, val captureTimeZone: String, val originalText: String,
     val contentHash: String, val sourceTagVersion: Long, tags: List<String>, allowImageOnly: Boolean = false,
-    history: List<RecordPackageRevision> = emptyList()) {
+    history: List<RecordPackageRevision> = emptyList(), val eventDate: RecordEventDate? = null) {
     val tags = Collections.unmodifiableList(tags.toList())
     val history = Collections.unmodifiableList(history.toList())
     val restoredRevision get() = if (history.isEmpty()) 1 else sourceRevision

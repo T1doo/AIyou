@@ -7,6 +7,7 @@ dependencyLocking { lockAllConfigurations() }
 val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordHistoryPackageCodec.kt")
+    from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordEventDatePackageCodec.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/TaskProposalController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/TaskReminderController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/FactRecapController.kt")
@@ -22,6 +23,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/MixedCaptureController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/ManualTagController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/RecordFavoriteController.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/RecordEventDateController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/ManualTaskController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalExportController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalExportIo.kt")

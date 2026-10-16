@@ -6,6 +6,7 @@ kotlin { jvmToolchain(17) }
 val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordHistoryPackageCodec.kt")
+    from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordEventDatePackageCodec.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/TaskProposalCipher.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlTaskProposalRepository.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlSourceTaskRepository.kt")
@@ -39,6 +40,9 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     listOf("LocalCandidateSqlSchema.kt", "LocalCandidateCipher.kt", "SqlLocalCandidateRepository.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
+    listOf("RecordEventDateSqlSchema.kt", "SqlRecordEventDateRepository.kt").forEach {
+        from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
+    }
     into(production)
 }
 kotlin.sourceSets.getByName("main").kotlin.srcDir(production)
@@ -47,6 +51,7 @@ tasks.named("compileKotlin") { dependsOn(syncProduction) }
 // Actual ViewModel/controller code, with only Android opening/lifecycle/image platform shells.
 val vmProduction = layout.buildDirectory.dir("vm-production-test-sources")
 val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
+    from("../../../app/src/main/java/com/t1doo/aiyou/records/RecordEventDateController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/TaskProposalController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/TaskReminderController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/FactRecapController.kt")

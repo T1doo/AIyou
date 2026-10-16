@@ -33,7 +33,7 @@ class RecordMediaPreview(val snapshot: OriginalExportSnapshot, images: List<Reco
                 require(record.history.isNotEmpty() && record.sourceId == current.entry.id && record.sourceRevision == current.entry.currentRevision &&
                     record.originalText == current.entry.originalText && record.contentHash == current.contentHash &&
                     record.capturedAtMillis == current.entry.capturedAtMillis && record.captureTimeZone == current.entry.captureTimeZone &&
-                    record.sourceTagVersion == current.tags.version && record.tags == current.tags.names)
+                    record.sourceTagVersion == current.tags.version && record.tags == current.tags.names && record.eventDate == current.eventDate.date)
                 record.history.filter { it.originalText.isBlank() }.forEach { revision ->
                     require(images.any { it.sourceId == record.sourceId && it.sourceRevision == revision.revision })
                 }

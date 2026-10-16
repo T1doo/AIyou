@@ -6,6 +6,19 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+@Entity(tableName = "entry_event_dates", foreignKeys = [ForeignKey(
+    entity = EntryEntity::class, parentColumns = ["id"], childColumns = ["entryId"],
+    onDelete = ForeignKey.CASCADE,
+)])
+internal data class RecordEventDateEntity(
+    @PrimaryKey val entryId: String,
+    val version: Long,
+    val lastMutationId: String,
+    val lastSourceRevision: Int,
+    val localDate: String?,
+    val timeZone: String?,
+)
+
 @Entity(tableName = "local_candidate_batches", foreignKeys = [ForeignKey(
     entity = EntryEntity::class, parentColumns = ["id"], childColumns = ["entryId"],
     onDelete = ForeignKey.CASCADE,

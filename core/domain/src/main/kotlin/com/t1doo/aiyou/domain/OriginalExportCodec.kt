@@ -15,7 +15,7 @@ class OriginalExportPayload internal constructor(val format: OriginalExportForma
 }
 
 object OriginalExportCodec {
-    const val FORMAT_VERSION = 1
+    const val FORMAT_VERSION = 2
     fun render(snapshot: OriginalExportSnapshot, format: OriginalExportFormat): OriginalExportPayload {
         val text = when (format) {
             OriginalExportFormat.JSONL -> jsonl(snapshot)
@@ -28,15 +28,16 @@ object OriginalExportCodec {
             return OriginalExportPayload(format, bytes)
         } finally { bytes.fill(0) }
     }
-    private fun manifest(snapshot: OriginalExportSnapshot) = "{\"type\":\"manifest\",\"format\":\"AIyou-current-originals\",\"formatVersion\":1,\"snapshotId\":" +
+    private fun manifest(snapshot: OriginalExportSnapshot) = "{\"type\":\"manifest\",\"format\":\"AIyou-current-originals\",\"formatVersion\":2,\"snapshotId\":" +
         quoted(snapshot.id) + ",\"createdAtMillis\":" + snapshot.createdAtMillis + ",\"recordCount\":" + snapshot.records.size +
-        ",\"encrypted\":false,\"scope\":[\"currentOriginals\",\"manualTags\"],\"excluded\":[\"attachments\",\"history\",\"tasks\",\"keys\"]}"
+        ",\"encrypted\":false,\"scope\":[\"currentOriginals\",\"manualTags\",\"eventDates\"],\"excluded\":[\"attachments\",\"history\",\"tasks\",\"keys\"]}"
     internal fun record(value: OriginalExportRecord): String {
         val e = value.entry
         return "{\"type\":\"currentOriginal\",\"entryId\":" + quoted(e.id) + ",\"revision\":" + e.currentRevision +
             ",\"capturedAtMillis\":" + e.capturedAtMillis + ",\"captureTimeZone\":" + quoted(e.captureTimeZone) +
             ",\"contentHash\":" + quoted(value.contentHash) + ",\"originalText\":" + quoted(e.originalText) +
-            ",\"manualTagVersion\":" + value.tags.version + ",\"manualTags\":[" + value.tags.names.joinToString(",") { quoted(it) } + "]}"
+            ",\"manualTagVersion\":" + value.tags.version + ",\"manualTags\":[" + value.tags.names.joinToString(",") { quoted(it) } + "],\"eventDateVersion\":" + value.eventDate.version +
+            ",\"eventDate\":" + (value.eventDate.date?.let { "{\"localDate\":" + quoted(it.localDate) + ",\"timeZone\":" + quoted(it.timeZone) + "}" } ?: "null") + "}"
     }
     private fun jsonl(snapshot: OriginalExportSnapshot): String {
         val body = snapshot.records.joinToString("") { record(it) + "\n" }
@@ -45,7 +46,7 @@ object OriginalExportCodec {
             ",\"recordsSha256\":" + quoted(OriginalExports.hash(body)) + "}\n"
     }
     private fun markdown(snapshot: OriginalExportSnapshot): String = buildString {
-        append("# 爱忆当前原文导出\n\n普通明文导出，非完整备份。仅含选定当前原文与手工标签；不含附件、历史版本、待办或密钥。\n\n")
+        append("# 爱忆当前原文导出\n\n普通明文导出，非完整备份。仅含选定当前原文、手工标签与手填事件日期及 IANA 时区；事件日期为空表示未知或已清除，不推测时刻。不含附件、历史版本、待办或密钥。\n\n")
         append(fenced("json", manifest(snapshot))); append("\n")
         snapshot.records.forEachIndexed { index, value ->
             append("## 原文 "); append(index + 1); append("\n\n")

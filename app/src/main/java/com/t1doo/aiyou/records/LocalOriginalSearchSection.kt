@@ -60,7 +60,11 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     onRebuild: () -> Unit = {},
     favoritesSupported: Boolean = false, favoritesAvailable: Boolean = false, favoritesLoading: Boolean = false,
     favoritesError: String? = null, onlyFavorites: Boolean = false,
-    onFavorites: (Boolean) -> Unit = {}, onRefreshFavorites: () -> Unit = {}) {
+    onFavorites: (Boolean) -> Unit = {}, onRefreshFavorites: () -> Unit = {},
+    dateBasis: com.t1doo.aiyou.model.RecordDateBasis = com.t1doo.aiyou.model.RecordDateBasis.CAPTURED,
+    onDateBasis: (com.t1doo.aiyou.model.RecordDateBasis) -> Unit = {},
+    eventDatesAvailable: Boolean = true, eventDatesError: String? = null,
+    onRefreshEventDates: () -> Unit = {}) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
@@ -101,6 +105,18 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-mode")) {
                 Text(if (mode == OriginalSearchMode.EXACT) "精确片段 · 区分大小写和空白" else "关键词 · 全部包含，忽略大小写")
             }
+            TextButton(onClick = { onDateBasis(if (dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED)
+                com.t1doo.aiyou.model.RecordDateBasis.EVENT else com.t1doo.aiyou.model.RecordDateBasis.CAPTURED) }, enabled = enabled,
+                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-date-basis")) {
+                Text(if (dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED) "日期依据：记录日期 · 切换事件日期" else "日期依据：事件日期 · 切换记录日期")
+            }
+            if (dateBasis == com.t1doo.aiyou.model.RecordDateBasis.EVENT && !eventDatesAvailable) {
+                Text(eventDatesError ?: "事件日期暂不可读取，未显示不完整结果。", color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = onRefreshEventDates, enabled = enabled,
+                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-event-date-retry")) {
+                    Text("重试读取事件日期")
+                }
+            }
             key(from) { CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
             OutlinedTextField(state = from,
                 enabled = enabled, label = { Text("开始日期（YYYY-MM-DD，可留空）") },
@@ -137,7 +153,9 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 if (!favoritesAvailable) TextButton(onClick = onRefreshFavorites, enabled = enabled && !favoritesLoading,
                     modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-favorites-retry")) { Text("重试读取收藏") }
             }
-            Text("日期按记录保存的时区，包含起止两天。仅查当前本机原文，不使用 AI。",
+            Text(if (dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED)
+                "记录日期按捕获时区，包含起止两天。关键词、日期、手工标签与收藏同时满足；仅查当前本机原文，不使用 AI。"
+                else "事件日期按手填的日历日期与 IANA 时区，包含起止两天。未补记不匹配，不回落记录日期；与关键词、手工标签和收藏同时满足。",
                 style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onClear, enabled = enabled,
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-clear")) { Text("清空查找条件") }

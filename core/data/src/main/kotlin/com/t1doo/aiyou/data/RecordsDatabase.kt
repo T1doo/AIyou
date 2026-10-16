@@ -42,7 +42,7 @@ internal interface RecordsDao {
     AttachmentEntity::class, RemoteSourceAccessEntity::class, RemoteTextJobEntity::class, TextAnnotationEntity::class, ManualTagEntity::class,
     ManualTaskEntity::class, LocalSearchFtsEntity::class, LocalSearchDocumentEntity::class,
     LocalSearchEpochEntity::class, PermanentErasureEntity::class, RecordPackageReceiptEntity::class,
-    OwnedFileCreationEntity::class, LocalCandidateBatchEntity::class], version = 10, exportSchema = true)
+    OwnedFileCreationEntity::class, LocalCandidateBatchEntity::class, RecordEventDateEntity::class], version = 11, exportSchema = true)
 internal abstract class RecordsDatabase : RoomDatabase() {
     abstract fun records(): RecordsDao
 }
@@ -122,6 +122,11 @@ internal val recordsMigration9To10 = object : Migration(9, 10) {
     override fun migrate(db: SupportSQLiteDatabase) { LocalCandidateSqlSchema.migration9To10.forEach(db::execSQL) }
 }
 internal fun installLocalCandidateGuards(db: SupportSQLiteDatabase) { LocalCandidateSqlSchema.guards.forEach(db::execSQL) }
+
+internal val recordsMigration10To11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) { RecordEventDateSqlSchema.migration10To11.forEach(db::execSQL) }
+}
+internal fun installRecordEventDateGuards(db: SupportSQLiteDatabase) { RecordEventDateSqlSchema.guards.forEach(db::execSQL) }
 
 /** Atomically replace the legacy update trigger; another owner cannot write in a DDL gap. */
 internal fun installRecordFavoriteGuards(db: SupportSQLiteDatabase) {

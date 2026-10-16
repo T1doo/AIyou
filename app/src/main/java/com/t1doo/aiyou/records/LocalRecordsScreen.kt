@@ -81,6 +81,9 @@ fun LocalRecordsScreen(
     searchFrom: TextFieldState? = null,
     searchThrough: TextFieldState? = null,
     searchMode: OriginalSearchMode = OriginalSearchMode.KEYWORDS,
+    searchDateBasis: com.t1doo.aiyou.model.RecordDateBasis = com.t1doo.aiyou.model.RecordDateBasis.CAPTURED,
+    onSearchDateBasis: (com.t1doo.aiyou.model.RecordDateBasis) -> Unit = {},
+    onRefreshEventDates: () -> Unit = {},
     searchTag: String? = null,
     onSearchTag: (String?) -> Unit = {},
     onSearchMode: () -> Unit = {},
@@ -121,7 +124,7 @@ fun LocalRecordsScreen(
             } },
         )
     }
-    val requestedSearch = searchState?.input?.let { it.onlyFavorites || it.tag != null || it.from.isNotEmpty() || it.through.isNotEmpty() ||
+    val requestedSearch = searchState?.input?.let { it.onlyFavorites || it.dateBasis == com.t1doo.aiyou.model.RecordDateBasis.EVENT || it.tag != null || it.from.isNotEmpty() || it.through.isNotEmpty() ||
         (if (it.mode == OriginalSearchMode.EXACT) it.query.isNotEmpty() else it.query.isNotBlank()) } == true
     // Keep the durable index in memory; a restored record immediately reveals its existing edit draft again.
     val visiblePendingEdits = if (local.supportsRecycleBin) local.pendingEdits.filter { draft -> local.entries.any { it.id == draft.entryId } } else local.pendingEdits
@@ -291,7 +294,10 @@ fun LocalRecordsScreen(
                             indexError = local.localIndexError, onRebuild = onRebuildLocalSearch,
                             favoritesSupported = local.supportsFavorites, favoritesAvailable = local.favoritesAvailable,
                             favoritesLoading = local.favoritesLoading, favoritesError = local.favoritesError,
-                            onlyFavorites = onlyFavorites, onFavorites = onSearchFavorites, onRefreshFavorites = onRefreshFavorites)
+                            onlyFavorites = onlyFavorites, onFavorites = onSearchFavorites, onRefreshFavorites = onRefreshFavorites,
+                            dateBasis = searchDateBasis, onDateBasis = onSearchDateBasis,
+                            eventDatesAvailable = local.eventDatesAvailable, eventDatesError = local.eventDatesError,
+                            onRefreshEventDates = onRefreshEventDates)
                     else SearchSection(demo = false)
                 }
                 if (filtered) item("search-status") {

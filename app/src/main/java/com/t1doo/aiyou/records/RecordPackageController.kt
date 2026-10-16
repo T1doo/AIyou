@@ -247,6 +247,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                     ?: checkNotNull(store.recordPackages).restore(verified, active.ids, clock.millis())
                 val entries = store.entries(); val tags = checkNotNull(store.manualTags).snapshots()
                 val favorites = readFavoriteSource(store)
+                val eventDates = readEventDateSource(store)
                 val origins = checkNotNull(store.recordPackages).origins()
                 val tasks=if(verified.activities!=null) checkNotNull(store.manualTasks).snapshots() else null
                 val proposals=if(verified.activities!=null) checkNotNull(store.taskProposals).list() else null
@@ -266,7 +267,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                                     " 条，删除未完成 " + result.erasingCount + " 条；其余副本以当前本机状态为准。"
                                 else "已核对恢复回执：首次导入 " + result.ids.size + " 条记录新副本、"+result.taskIds.size+" 条正式待办和 "+result.proposalIds.size+
                                     " 条待确认草稿；当前内容与状态以本机清单为准。记录初始不参与 AI。本次恢复没有自动确认草稿、安排提醒或恢复联网授权。"))
-                            .withFavoriteSource(favorites)
+                            .withFavoriteSource(favorites).withEventDateSource(eventDates)
                 }
                 if (work.compareAndSet(active, null)) active.retire()
             } catch (cancelled: CancellationException) { throw cancelled }

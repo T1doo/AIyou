@@ -155,6 +155,7 @@ class RecycleBinController internal constructor(
                 } else bin.apply(intent.mutation)
                 val entries = store.entries()
                 val favorites = readFavoriteSource(store)
+                val eventDates = readEventDateSource(store)
                 val tags = store.manualTags?.snapshots()
                 val recycled = if (ui.browsing) bin.records() else emptyList()
                 val erasures = recycled.mapNotNull { r -> store.permanentErasure?.read(r.entry.id)?.let { r.entry.id to it } }.toMap()
@@ -180,11 +181,14 @@ class RecycleBinController internal constructor(
                             manualTagEditor = local.manualTagEditor?.takeUnless { (intent.permanent || !intent.record.deleted) && it.entryId == intent.record.entry.id },
                             originalHistory = local.originalHistory?.takeUnless { (intent.permanent || !intent.record.deleted) && it.entryId == intent.record.entry.id },
                             originalEdit = local.originalEdit?.takeUnless { (intent.permanent || !intent.record.deleted) && it.entryId == intent.record.entry.id },
+                            eventDates = if (intent.permanent) local.eventDates - intent.record.entry.id else local.eventDates,
+                            eventDateWrites = if (intent.permanent) local.eventDateWrites - intent.record.entry.id else local.eventDateWrites,
+                            eventDateEditor = local.eventDateEditor?.takeUnless { (intent.permanent || !intent.record.deleted) && it.entryId == intent.record.entry.id },
                             favoriteWrites = if (intent.permanent) local.favoriteWrites - intent.record.entry.id else local.favoriteWrites,
                             favoriteNotice = local.favoriteNotice?.takeUnless { intent.permanent && local.favoriteNoticeEntryId == intent.record.entry.id },
                             favoriteNoticeEntryId = local.favoriteNoticeEntryId?.takeUnless { intent.permanent && it == intent.record.entry.id },
                             favoriteNoticeReceipt = local.favoriteNoticeReceipt?.takeUnless { intent.permanent && it.entryId == intent.record.entry.id })
-                            .withFavoriteSource(favorites)
+                            .withFavoriteSource(favorites).withEventDateSource(eventDates)
                         if (latest?.session != session || latest.confirmation?.id != id) confirmed
                         else confirmed.copy(recycleBin = if (!ui.browsing) null else latest.copy(records = recycled,
                             selectedId = null, confirmation = null, error = null, notice = notice, erasures = erasures))

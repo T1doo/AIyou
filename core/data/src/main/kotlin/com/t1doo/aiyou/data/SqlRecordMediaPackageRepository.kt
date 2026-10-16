@@ -100,14 +100,14 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
             }
             RecordPackageOriginal(record.entry.id, record.entry.currentRevision, record.entry.capturedAtMillis,
                 record.entry.captureTimeZone, record.entry.originalText, record.contentHash, record.tags.version,
-                record.tags.names, true, chain)
+                record.tags.names, true, chain, record.eventDate.date)
         }
     }
     private fun sameHistory(a: List<RecordPackageOriginal>, b: List<RecordPackageOriginal>): Boolean = a.size == b.size &&
         a.zip(b).all { (old, now) -> old.sourceId == now.sourceId && old.sourceRevision == now.sourceRevision &&
             old.capturedAtMillis == now.capturedAtMillis && old.captureTimeZone == now.captureTimeZone &&
             old.originalText == now.originalText && old.contentHash == now.contentHash && old.sourceTagVersion == now.sourceTagVersion &&
-            old.tags == now.tags && old.history.size == now.history.size && old.history.zip(now.history).all { (a, b) ->
+            old.tags == now.tags && old.eventDate == now.eventDate && old.history.size == now.history.size && old.history.zip(now.history).all { (a, b) ->
                 a.revision == b.revision && a.originalText == b.originalText && a.contentHash == b.contentHash && a.createdAtMillis == b.createdAtMillis } }
 
     private fun inventory(snapshot: OriginalExportSnapshot, history: List<RecordPackageOriginal>? = null): List<RecordPackageImage> = database.transaction { sql ->

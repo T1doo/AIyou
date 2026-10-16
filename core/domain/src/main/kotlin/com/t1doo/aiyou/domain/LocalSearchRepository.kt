@@ -6,12 +6,14 @@ import com.t1doo.aiyou.model.StoredEntry
 /** Memory-only user lookup. No query or document may be logged or saved by the caller. */
 class LocalSearchRequest(val query: String, val exact: Boolean = false,
     val from: String = "", val through: String = "", val tag: String? = null,
-    val onlyFavorites: Boolean = false) {
+    val onlyFavorites: Boolean = false,
+    val dateBasis: com.t1doo.aiyou.model.RecordDateBasis = com.t1doo.aiyou.model.RecordDateBasis.CAPTURED) {
     override fun toString() = "LocalSearchRequest(redacted)"
 }
 
 /** Actual implementations carry a private proof and records owner, never an unchecked ID list. */
 interface LocalSearchSnapshot {
+    val eventDates: Map<String, com.t1doo.aiyou.model.RecordEventDateSnapshot>? get() = null
     val favorites: Map<String, com.t1doo.aiyou.model.RecordFavoriteSnapshot>? get() = null
     val epoch: Long
     val entries: List<StoredEntry>

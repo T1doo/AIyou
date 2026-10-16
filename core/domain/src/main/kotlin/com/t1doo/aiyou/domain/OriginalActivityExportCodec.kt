@@ -16,7 +16,7 @@ object OriginalActivityExportCodec {
         val manifest = "{\"type\":\"manifest\",\"format\":\"AIyou-originals-and-activities\",\"formatVersion\":$FORMAT_VERSION,\"schemaVersion\":1," +
             "\"snapshotId\":${q(snapshot.id)},\"createdAtMillis\":${snapshot.createdAtMillis},\"encrypted\":false," +
             "\"recordCount\":${records.size},\"taskCount\":${tasks.size},\"proposalCount\":${drafts.size}," +
-            "\"scope\":[\"currentOriginals\",\"manualTags\",\"allSavedFormalTasks\",\"savedDraftProposals\"]," +
+            "\"scope\":[\"currentOriginals\",\"manualTags\",\"eventDates\",\"allSavedFormalTasks\",\"savedDraftProposals\"]," +
             "\"excluded\":[\"attachments\",\"history\",\"proposalHistory\",\"unsavedForms\",\"aiDerived\",\"reminders\",\"keys\",\"consents\"]," +
             "\"sourceAssociation\":\"exactSelectedCurrentOriginal\",\"hashAlgorithm\":\"SHA-256\"}"
         val end = "{\"type\":\"end\",\"snapshotId\":${q(snapshot.id)},\"recordCount\":${records.size}," +
@@ -25,7 +25,7 @@ object OriginalActivityExportCodec {
             OriginalExportFormat.JSONL -> "$manifest\n$body$end\n"
             OriginalExportFormat.MARKDOWN -> buildString {
                 append("# 爱忆原文、正式待办与待确认草稿导出\n\n")
-                append("明文开放格式，非完整备份。正式待办与待确认草稿分列；草稿仍是未确认的原始输入，不代表已创建任务或已安排提醒。未保存表单、附件、历史、密钥与联网授权不在范围内。\n\n")
+                append("明文开放格式，非完整备份。原文保留手填事件日期与 IANA 时区，未知或清除为 null，不补时刻。正式待办与待确认草稿分列；草稿仍是未确认的原始输入，不代表已创建任务或已安排提醒。未保存表单、附件、历史、密钥与联网授权不在范围内。\n\n")
                 append(OriginalExportCodec.fenced("json", manifest))
                 append("\n## 当前原文与手工标签\n\n")
                 snapshot.records.forEachIndexed { i, record ->

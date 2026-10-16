@@ -149,10 +149,11 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
                 val p=checkNotNull(pendingSave);val result=repo.save(p.first,p.second,p.third)
                 val entries=store.entries();val labels=store.manualTags?.snapshots().orEmpty()
                 val favorites=readFavoriteSource(store)
+                val eventDates=readEventDateSource(store)
                 val epoch=store.localSearch?.epoch()
                 val fresh=repo.current();binding=fresh;pendingSave=null;clearPrepared()
                 publish { local ->if(disposed) local else local.copy(entries=entries,manualTags=labels,manualTagsAvailable=store.manualTags!=null,localSearchEpoch=epoch,
-                    mixedCapture=MixedCaptureUiState(draft=fresh,text=fresh.text,notice=if(result.deleted) "已核对先前保存；记录已删除，没有恢复。" else "已保存在本机 · 文字和全部图片已持久认证。")).withFavoriteSource(favorites) }
+                    mixedCapture=MixedCaptureUiState(draft=fresh,text=fresh.text,notice=if(result.deleted) "已核对先前保存；记录已删除，没有恢复。" else "已保存在本机 · 文字和全部图片已持久认证。")).withFavoriteSource(favorites).withEventDateSource(eventDates) }
                 thumbnails(store)
             } catch(e:CancellationException){throw e} catch(_:Exception){update { it.copy(error="保存结果尚未确认，文字及全部图片保留。请核对同一次保存，不会另建记录。",uncertainSave=pendingSave!=null) }}
             finally { update { it.copy(busy=false) } }

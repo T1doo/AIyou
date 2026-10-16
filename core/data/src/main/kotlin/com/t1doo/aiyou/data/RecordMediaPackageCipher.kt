@@ -25,8 +25,8 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
             val metadata = metadata(preview).also {ownedMetadata=it}
             val salt = ByteArray(16).also(random::nextBytes)
             val prefix = ByteArray(8).also(random::nextBytes)
-            val version=if(preview.history!=null) 4 else if(preview.activities==null) 2 else 3
-            val header = ByteBuffer.allocate(40).put(when(version) { 2 -> MAGIC; 3 -> MAGIC3; else -> MAGIC4 }).putInt(version).putInt(RecordPackages.ITERATIONS).put(salt).put(prefix).array()
+            val version=if(preview.snapshot.records.any { it.eventDate.date != null }) 5 else if(preview.history!=null) 4 else if(preview.activities==null) 2 else 3
+            val header = ByteBuffer.allocate(40).put(when(version) { 2 -> MAGIC; 3 -> MAGIC3; 4 -> MAGIC4; else -> MAGIC5 }).putInt(version).putInt(RecordPackages.ITERATIONS).put(salt).put(prefix).array()
             key = RecordPackageCrypto.derive(password, salt,beforeKdf)
             return Prepared(header, metadata, checkNotNull(key), preview.images, read, current).also { key = null;ownedMetadata=null }
         } catch (_: Exception) { throw RecordPackageInvalid() }
@@ -39,7 +39,7 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
             RecordPackages.password(password)
             val opened=source().use { input ->
                 val magic = exact(input, 8)
-                if (!magic.contentEquals(MAGIC) && !magic.contentEquals(MAGIC3) && !magic.contentEquals(MAGIC4)) {
+                if (!magic.contentEquals(MAGIC) && !magic.contentEquals(MAGIC3) && !magic.contentEquals(MAGIC4) && !magic.contentEquals(MAGIC5)) {
                     // v1 remains bounded at its original 2 MiB and uses its unchanged parser/KDF.
                     val buffer = ByteArray(RecordPackages.MAX_ENVELOPE + 1)
                     magic.copyInto(buffer); var at = 8
@@ -52,7 +52,7 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
                 }
                 val header = magic + exact(input, 32)
                 val fields = ByteBuffer.wrap(header, 8, 32)
-                require(fields.int == (if(magic.contentEquals(MAGIC)) 2 else if(magic.contentEquals(MAGIC3)) 3 else 4) && fields.int == RecordPackages.ITERATIONS)
+                require(fields.int == (if(magic.contentEquals(MAGIC)) 2 else if(magic.contentEquals(MAGIC3)) 3 else if(magic.contentEquals(MAGIC4)) 4 else 5) && fields.int == RecordPackages.ITERATIONS)
                 val salt = ByteArray(16).also(fields::get)
                 val firstLength = exact(input,4)
                 require(ByteBuffer.wrap(firstLength).int in 16..RecordMediaPackages.MAX_METADATA+16)
@@ -81,8 +81,9 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
         val metadata = frameRead(input, header, key, 0, ZERO, RecordMediaPackages.MAX_METADATA)
         val binding = packageHash(metadata)
         try {
-            val original = if(ByteBuffer.wrap(header,8,4).int==4) RecordHistoryPackageCodec.parse(metadata)
-                else parseCurrentMetadata(metadata, ByteBuffer.wrap(header,8,4).int==3)
+            val version = ByteBuffer.wrap(header,8,4).int
+            val original = if (version == 5) RecordEventDatePackageCodec.parse(metadata, ::parseMetadata)
+                else parseMetadata(metadata, version)
             val images = original.images
             val digest = packageHex(binding)
             if (expected != null) require(expected == digest)
@@ -96,7 +97,16 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
         } finally { metadata.fill(0) }
     }
 
+    private fun parseMetadata(metadata: ByteArray, version: Int): AuthenticatedRecordPackage =
+        if (version == 4) RecordHistoryPackageCodec.parse(metadata) else {
+            require(version in 2..3); parseCurrentMetadata(metadata, version == 3)
+        }
     private fun metadata(preview: RecordMediaPreview): ByteArray {
+        if (preview.snapshot.records.any { it.eventDate.date != null }) {
+            val baseVersion = if (preview.history != null) 4 else if (preview.activities != null) 3 else 2
+            val base = metadata(RecordEventDatePackageCodec.legacyPreview(preview))
+            return try { RecordEventDatePackageCodec.encode(preview, baseVersion, base) } finally { base.fill(0) }
+        }
         if(preview.history!=null) return RecordHistoryPackageCodec.encode(preview)
         val v3=preview.activities!=null
         val original = legacy.encode(preview.snapshot,true,v3)
@@ -162,6 +172,7 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
         private val MAGIC = "AIYOUPK2".toByteArray(Charsets.US_ASCII)
         private val MAGIC3 = "AIYOUPK3".toByteArray(Charsets.US_ASCII)
         private val MAGIC4 = "AIYOUPK4".toByteArray(Charsets.US_ASCII)
+        private val MAGIC5 = "AIYOUPK5".toByteArray(Charsets.US_ASCII)
         private val ZERO = ByteArray(32)
         private val SCOPE = listOf("currentOriginals","manualTags","readyOriginalImages")
         private val EXCLUDED = listOf("originalHistory","tasks","drafts","aiDerived","serviceKeys","deviceKeys")

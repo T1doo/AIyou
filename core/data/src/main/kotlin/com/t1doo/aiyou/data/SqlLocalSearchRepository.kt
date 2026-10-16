@@ -14,13 +14,15 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
     private val runtimeProfile: () -> String = { LocalSearchTokenizer.profile }) : LocalSearchRepository {
     private data class Stamp(val epoch: Long, val version: Int, val profile: String)
     private val favorites = SqlRecordFavoriteRepository(database)
+    private val eventDateStorage = SqlRecordEventDateRepository(database)
     private fun activeProfile(): String = runtimeProfile().also {
         require(Regex("v1:[0-9a-f]{64}").matches(it))
     }
     private data class Binding(val entry: StoredEntry, val hash: String, val tagVersion: Long, val visibility: Long)
     private inner class Proof(val stamp: Stamp, val runtime: String, val bindings: List<Binding>,
         tagValues: Map<String, ManualTagSnapshot>, override val pending: Boolean,
-        override val favorites: Map<String, RecordFavoriteSnapshot>? = null) : LocalSearchSnapshot {
+        override val favorites: Map<String, RecordFavoriteSnapshot>? = null,
+        override val eventDates: Map<String, RecordEventDateSnapshot>? = null) : LocalSearchSnapshot {
         override val epoch = stamp.epoch
         val owner = this@SqlLocalSearchRepository
         override val entries = Collections.unmodifiableList(bindings.map { it.entry })
@@ -154,6 +156,12 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             if (request.onlyFavorites) try { favorites.validateWithin(sql) }
                 catch (_: RecordFavoriteTooBroad) { throw LocalSearchFavoriteLimit() }
             val favoriteValues = if (request.onlyFavorites) HashMap<String,RecordFavoriteSnapshot>() else null
+            // Unknown event dates are excluded, never replaced with the captured calendar day.
+            val eventValues = if (request.dateBasis == RecordDateBasis.EVENT) {
+                try { eventDateStorage.validateWithin(sql) }
+                    catch (_: RecordEventDateTooBroad) { throw LocalSearchTooBroad() }
+                HashMap<String,RecordEventDateSnapshot>()
+            } else null
             val favoriteCondition = if (request.onlyFavorites) " AND e.isFavorite=1" else ""
             val expression = LocalSearchTokenizer.query(request.query, request.exact)
             val condition = if (expression == null || stamp.version != 1 || stamp.profile != profile) "" else
@@ -169,9 +177,11 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                 if (page.isEmpty()) break
                 for (row in page) {
                     if (++scanned > 10_000) throw LocalSearchTooBroad()
-                    val captured = Instant.ofEpochMilli(row[1] as Long).atZone(ZoneId.of(row[2] as String)).toLocalDate()
-                    if ((from != null && captured < from) || (through != null && captured > through)) continue
                     val id = row[0] as String
+                    val event = if (eventValues != null) eventDateStorage.readWithin(sql,id) else null
+                    val selectedDate = if (eventValues != null) event?.date?.let { LocalDate.parse(it.localDate) } ?: continue
+                        else Instant.ofEpochMilli(row[1] as Long).atZone(ZoneId.of(row[2] as String)).toLocalDate()
+                    if ((from != null && selectedDate < from) || (through != null && selectedDate > through)) continue
                     // Authenticate real tags even for body-only queries; corrupted rows are never skipped as misses.
                     val tag = tags.readWithin(sql, id)
                     tag.names.forEach(budget::add)
@@ -181,6 +191,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                     bindings += bound
                     labels[id] = tag
                     if (favoriteValues != null) favoriteValues[id] = favorites.readWithin(sql,id)
+                    if (eventValues != null) eventValues[id] = checkNotNull(event)
                     if (bindings.size > 1000) throw LocalSearchTooBroad()
                 }
                 if (page.size < 100) break
@@ -188,7 +199,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             val pending = sql.query("SELECT e.id" + sourceFrom + "WHERE " + live + " AND " + dirty(stamp.epoch, profile) +
                 " LIMIT 1").isNotEmpty() || stamp.version != 1 || stamp.profile != profile
             Proof(stamp, profile, Collections.unmodifiableList(bindings.toList()), labels, pending,
-                favoriteValues?.let { Collections.unmodifiableMap(it) })
+                favoriteValues?.let { Collections.unmodifiableMap(it) },eventValues?.let { Collections.unmodifiableMap(it) })
         }
     }
 
@@ -212,6 +223,11 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                 val previousTag = proof.tags[before.entry.id] ?: return@transaction false
                 if (tag.entryId != previousTag.entryId || tag.version != previousTag.version ||
                     tag.names != previousTag.names) return@transaction false
+                proof.eventDates?.let { values ->
+                    val previous = values[before.entry.id] ?: return@transaction false
+                    val currentEvent = eventDateStorage.readWithin(sql,before.entry.id)
+                    if (previous.version != currentEvent.version || previous.date != currentEvent.date) return@transaction false
+                }
                 if (entryId == before.entry.id) selected = current.entry
             }
             // The actual owner/CAS callback executes before releasing this counted write transaction.

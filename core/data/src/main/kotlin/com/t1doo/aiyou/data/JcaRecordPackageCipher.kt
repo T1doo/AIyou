@@ -30,6 +30,7 @@ class JcaRecordPackageCipher internal constructor(private val random: SecureRand
     constructor() : this(SecureRandom(), {})
     override fun seal(snapshot: OriginalExportSnapshot, password: CharArray): EncryptedRecordPackage = sanitized(password) {
         RecordPackages.password(password)
+        require(snapshot.records.none { it.eventDate.date != null }) // v1 cannot represent event dates; never silently drop them.
         val plain = encode(snapshot)
         var encrypted: ByteArray? = null
         var envelope: ByteArray? = null

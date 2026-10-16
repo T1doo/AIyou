@@ -29,6 +29,7 @@ def input_fingerprint():
         "app/src/main/AndroidManifest.xml", "app/build.gradle.kts", "scripts/inspect-record-ai-permissions.py"))
     inputs.extend((root / "schemas").glob("*.json"))
     inputs.append(root / "scripts/verify-local-candidate-schema.py")
+    inputs.append(root / "scripts/verify-record-event-date-schema.py")
     fingerprint = hashlib.sha256()
     for path in sorted(set(inputs)):
         fingerprint.update(str(path.relative_to(root)).encode() + b"\0")

@@ -55,7 +55,7 @@ object OpenRecordZipCodec {
                     try { if (jsonl.size > OriginalExports.MAX_BYTES) throw OriginalExportTooLarge(); writeFile("records.jsonl", jsonl) }
                     finally { jsonl.fill(0) }
                     val markdown = OriginalExports.utf8(buildString {
-                        append("# 爱忆选定图文资料包\n\n明文开放格式资料包，非完整备份。原图保留原始元数据，可能含位置等隐私。\n\n")
+                        append("# 爱忆选定图文资料包\n\n明文开放格式资料包，非完整备份。保留手填事件日期与 IANA 时区；未知或已清除为 null，不补时刻。原图保留原始元数据，可能含位置等隐私。\n\n")
                         preview.snapshot.records.forEachIndexed { index, record ->
                             append("## 记录 ${index + 1}\n\n")
                             append(OriginalExportCodec.fenced("json", OriginalExportCodec.record(record)))
@@ -83,7 +83,7 @@ object OpenRecordZipCodec {
                     val manifest = OriginalExports.utf8("{\"format\":\"AIyou-open-records\",\"formatVersion\":1,\"schemaVersion\":1," +
                         "\"snapshotId\":" + q(preview.snapshot.id) + ",\"createdAtMillis\":" + preview.snapshot.createdAtMillis +
                         ",\"encrypted\":false,\"recordCount\":" + preview.snapshot.records.size + ",\"imageCount\":" + preview.images.size +
-                        ",\"scope\":[\"currentOriginals\",\"manualTags\",\"originalImages\"],\"excluded\":[\"history\",\"tasks\",\"keys\",\"aiDerived\"]," +
+                        ",\"scope\":[\"currentOriginals\",\"manualTags\",\"eventDates\",\"originalImages\"],\"excluded\":[\"history\",\"tasks\",\"keys\",\"aiDerived\"]," +
                         "\"hashAlgorithm\":\"SHA-256\",\"manifestSelfHash\":false,\"images\":[" + preview.images.joinToString(",") { imageJson(it) } +
                         "],\"files\":[" + files.joinToString(",") + "]}\n")
                     try { writeFile("manifest.json", manifest) } finally { manifest.fill(0) }

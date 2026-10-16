@@ -1,6 +1,8 @@
 package com.t1doo.aiyou.records
 
 import com.t1doo.aiyou.model.StoredEntry
+import com.t1doo.aiyou.model.RecordDateBasis
+import com.t1doo.aiyou.model.RecordEventDateSnapshot
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -15,7 +17,9 @@ data class OriginalSearchInput(val query: String = "", val from: String = "", va
     val mode: OriginalSearchMode = OriginalSearchMode.KEYWORDS, internal val ownership: Any? = null, val tag: String? = null,
     internal val tagSnapshot: Map<String, com.t1doo.aiyou.model.ManualTagSnapshot>? = null,
     val onlyFavorites: Boolean = false,
-    internal val favoriteSnapshot: Map<String, com.t1doo.aiyou.model.RecordFavoriteSnapshot>? = null) {
+    internal val favoriteSnapshot: Map<String, com.t1doo.aiyou.model.RecordFavoriteSnapshot>? = null,
+    val dateBasis: RecordDateBasis = RecordDateBasis.CAPTURED,
+    internal val eventDateSnapshot: Map<String, RecordEventDateSnapshot>? = null) {
     override fun toString() = "OriginalSearchInput(redacted)"
 }
 
@@ -50,7 +54,7 @@ internal object LocalOriginalSearchMatcher {
         if (validation.stage != OriginalSearchStage.READY) return validation
         return try {
             val proof = owner.candidates(com.t1doo.aiyou.domain.LocalSearchRequest(input.query,
-                input.mode == OriginalSearchMode.EXACT, input.from, input.through, input.tag, input.onlyFavorites))
+                input.mode == OriginalSearchMode.EXACT, input.from, input.through, input.tag, input.onlyFavorites, input.dateBasis))
             if (proof.entries.any { fresh -> entries.none { it == fresh } })
                 return OriginalSearchMatches(OriginalSearchStage.WAITING)
             if (input.tag != null && proof.tags.any { (id, fresh) ->
@@ -62,7 +66,14 @@ internal object LocalOriginalSearchMatcher {
                 val fresh = proof.favorites?.get(entry.id)
                 input.favoriteSnapshot?.get(entry.id)?.let { fresh != null && it.version == fresh.version && it.isFavorite == fresh.isFavorite } != true
             }) return OriginalSearchMatches(OriginalSearchStage.WAITING)
-            val result = match(proof.entries, input.copy(tagSnapshot = proof.tags, favoriteSnapshot = proof.favorites))
+            if (input.dateBasis == RecordDateBasis.EVENT && proof.eventDates == null)
+                return OriginalSearchMatches(OriginalSearchStage.FAILED, message = "事件日期暂不可读取，请重试本机读取。")
+            if (input.dateBasis == RecordDateBasis.EVENT && proof.entries.any { entry ->
+                val fresh = proof.eventDates?.get(entry.id)
+                input.eventDateSnapshot?.get(entry.id)?.let { fresh != null && it.version == fresh.version && it.date == fresh.date } != true
+            }) return OriginalSearchMatches(OriginalSearchStage.WAITING)
+            val result = match(proof.entries, input.copy(tagSnapshot = proof.tags, favoriteSnapshot = proof.favorites,
+                eventDateSnapshot = proof.eventDates))
             val whole = if (input.mode == OriginalSearchMode.KEYWORDS) fold(input.query).text else input.query
             val ranked = ArrayList<Pair<OriginalSearchHit, Boolean>>()
             for (hit in result.hits) {
@@ -89,7 +100,7 @@ internal object LocalOriginalSearchMatcher {
         fun date(value: String): LocalDate? {
             if (value.isEmpty()) return null
             require(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(value))
-            return LocalDate.parse(value)
+            return LocalDate.parse(value).also { require(it.year in 1..9999) }
         }
         val from: LocalDate?
         val through: LocalDate?
@@ -109,15 +120,24 @@ internal object LocalOriginalSearchMatcher {
             message = "手工标签暂不可读取，请重试本机读取。")
         if (input.onlyFavorites && input.favoriteSnapshot == null) return OriginalSearchMatches(OriginalSearchStage.FAILED,
             message = "收藏状态暂不可读取，请重试本机读取。")
-        if (terms.isEmpty() && from == null && through == null && input.tag == null && !input.onlyFavorites) return OriginalSearchMatches(OriginalSearchStage.BROWSE)
+        if (input.dateBasis == RecordDateBasis.EVENT && input.eventDateSnapshot == null)
+            return OriginalSearchMatches(OriginalSearchStage.FAILED, message = "事件日期暂不可读取，请重试本机读取。")
+        if (terms.isEmpty() && input.dateBasis == RecordDateBasis.CAPTURED && from == null && through == null && input.tag == null && !input.onlyFavorites) return OriginalSearchMatches(OriginalSearchStage.BROWSE)
         val needles = terms.map { compileNeedle(if (input.mode == OriginalSearchMode.KEYWORDS) fold(it).text else it) }
         val hits = ArrayList<OriginalSearchHit>()
         for (entry in entries) {
             currentCoroutineContext().ensureActive()
             if (input.onlyFavorites && input.favoriteSnapshot?.get(entry.id)?.isFavorite != true) continue
             if (input.tag != null && input.tag !in input.tagSnapshot?.get(entry.id)?.names.orEmpty()) continue
-            if (from != null || through != null) {
-                val captured = try { Instant.ofEpochMilli(entry.capturedAtMillis).atZone(ZoneId.of(entry.captureTimeZone)).toLocalDate() }
+            if (input.dateBasis == RecordDateBasis.EVENT || from != null || through != null) {
+                val captured = try {
+                    if (input.dateBasis == RecordDateBasis.EVENT) {
+                        val snapshot = input.eventDateSnapshot?.get(entry.id)
+                            ?: return OriginalSearchMatches(OriginalSearchStage.FAILED, message = "事件日期不完整，请重试本机读取。")
+                        val event = snapshot.date ?: continue
+                        LocalDate.parse(event.localDate)
+                    } else Instant.ofEpochMilli(entry.capturedAtMillis).atZone(ZoneId.of(entry.captureTimeZone)).toLocalDate()
+                }
                 catch (_: java.time.DateTimeException) { return OriginalSearchMatches(OriginalSearchStage.FAILED,
                     message = "记录日期暂不可读取，请返回原文核对。") }
                 if ((from != null && captured < from) || (through != null && captured > through)) continue

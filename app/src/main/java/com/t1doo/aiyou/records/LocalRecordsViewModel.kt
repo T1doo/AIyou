@@ -80,6 +80,13 @@ data class LocalRecordUiState(
     val manualTagsAvailable: Boolean = false,
     val manualTagsError: String? = null,
     val manualTagEditor: ManualTagEditor? = null,
+    val supportsEventDates: Boolean = false,
+    val eventDates: Map<String, com.t1doo.aiyou.model.RecordEventDateSnapshot> = emptyMap(),
+    val eventDatesAvailable: Boolean = false,
+    val eventDatesError: String? = null,
+    val eventDateEditor: RecordEventDateEditor? = null,
+    val eventDateWrites: Map<String, RecordEventDateWrite> = emptyMap(),
+    val eventDateControllerRetired: Boolean = false,
     val supportsFavorites: Boolean = false,
     val favorites: Map<String, com.t1doo.aiyou.model.RecordFavoriteSnapshot> = emptyMap(),
     val favoritesAvailable: Boolean = false,
@@ -143,6 +150,8 @@ class LocalRecordsViewModel internal constructor(
         enqueue = { action -> commands.trySend(Command.ManualTags(action)).isSuccess })
     val favorites = RecordFavoriteController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.Favorites(action)).isSuccess })
+    val eventDates = RecordEventDateController(current = { mutableState.value }, publish = { change -> update(change) },
+        enqueue = { action -> commands.trySend(Command.EventDates(action)).isSuccess })
     val tasks = ManualTaskController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.ManualTasks(action)).isSuccess }, clock = clock)
     val reminders = TaskReminderController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -241,12 +250,13 @@ class LocalRecordsViewModel internal constructor(
                                 store.saveDraft(draft, clock.millis(), ZoneId.systemDefault().id)
                                 val entries = store.entries()
                                 val favoriteValues = readFavoriteSource(store)
+                                val eventDateValues = readEventDateSource(store)
                                 pendingCommit = null
                                 persistedDraft = null
                                 captureDraftMayBeConsumed = false
                                 pendingIntent.compareAndSet(command.intent, null)
                                 // Success follows commit; the list is read from the database.
-                                update { it.copy(text = "", saving = false, savePending = false, entries = entries, draftNotice = "没有未保存的草稿", saveNotice = "已保存在本机", saveFeedbackId = it.saveFeedbackId + 1, error = null).withFavoriteSource(favoriteValues) }
+                                update { it.copy(text = "", saving = false, savePending = false, entries = entries, draftNotice = "没有未保存的草稿", saveNotice = "已保存在本机", saveFeedbackId = it.saveFeedbackId + 1, error = null).withFavoriteSource(favoriteValues).withEventDateSource(eventDateValues) }
                             }
                             is Command.DiscardCapture -> discardCapture(command.intent)
                             is Command.RestoreCapture -> restoreCapture(command.intent)
@@ -290,6 +300,7 @@ class LocalRecordsViewModel internal constructor(
                                 try { command.action(store) } finally { factRecaps.checkCurrent(store) }
                             }
                             is Command.Favorites -> command.action(checkNotNull(repository))
+                            is Command.EventDates -> command.action(checkNotNull(repository))
                             is Command.ManualTasks -> command.action(checkNotNull(repository))
                             is Command.LocalCandidates -> command.action(checkNotNull(repository))
                             is Command.OriginalExport -> command.action(checkNotNull(repository))
@@ -321,6 +332,7 @@ class LocalRecordsViewModel internal constructor(
                 attachments.markDisposed()
                 tags.dispose()
                 favorites.dispose()
+                eventDates.dispose()
                 tasks.dispose()
                 reminders.dispose()
                 candidates.dispose()
@@ -359,11 +371,20 @@ class LocalRecordsViewModel internal constructor(
             val transformed = if (candidate.supportsFavorites && candidate.favoritesAvailable &&
                 candidate.entries.any { !candidate.favorites.containsKey(it.id) }) candidate.copy(
                     favoritesAvailable = false, favoritesError = "记录列表已变化，请重新读取收藏状态。") else candidate
-            val editor = transformed.manualTagEditor
-            val labelled = if (editor != null && (!transformed.ready || transformed.opening || transformed.error != null ||
-                transformed.entries.none { it.id == editor.entryId && it.currentRevision == editor.revision }))
-                transformed.copy(manualTagEditor = editor.copy(busy = false, conflict = true,
-                    error = "原文已变化或不可用，输入已保留，请关闭后重新打开。")) else transformed
+            val eventSource = if (transformed.supportsEventDates && transformed.eventDatesAvailable &&
+                transformed.entries.any { !transformed.eventDates.containsKey(it.id) }) transformed.copy(
+                    eventDatesAvailable = false, eventDatesError = "记录列表已变化，请重新读取事件日期。") else transformed
+            val eventEditor = eventSource.eventDateEditor
+            val dated = if (eventEditor != null && (!eventSource.ready || eventSource.opening || eventSource.error != null ||
+                eventSource.entries.none { it.id == eventEditor.entryId && it.currentRevision == eventEditor.revision &&
+                    com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == eventEditor.sourceHash }))
+                eventSource.copy(eventDateEditor = eventEditor.copy(preview = null, conflict = true,
+                    error = "原文已变化或不可用，输入已保留。请关闭后重新打开。")) else eventSource
+            val editor = dated.manualTagEditor
+            val labelled = if (editor != null && (!dated.ready || dated.opening || dated.error != null ||
+                dated.entries.none { it.id == editor.entryId && it.currentRevision == editor.revision }))
+                dated.copy(manualTagEditor = editor.copy(busy = false, conflict = true,
+                    error = "原文已变化或不可用，输入已保留，请关闭后重新打开。")) else dated
             val review = labelled.candidates
             val next = if (review != null && (editsDisposed || !labelled.ready || labelled.opening || labelled.error != null ||
                 labelled.entries.none { it.id == review.source.sourceId && it.currentRevision.toLong() == review.source.revision &&
@@ -1064,6 +1085,7 @@ class LocalRecordsViewModel internal constructor(
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             val favoriteValues = try { store.favorites?.snapshots() }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
+            val eventDateValues = readEventDateSource(store)
             val origins = try { store.recordPackages?.origins() ?: emptyMap() }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             val pending = try { store.editDrafts?.pending() ?: OriginalEditDraftIndex(emptyList()) }
@@ -1087,6 +1109,9 @@ class LocalRecordsViewModel internal constructor(
                 supportsSourceTags = store.sourceTags != null,
                 supportsSourceMemories = store.sourceMemories != null,
                 entries = entries, manualTags = labels.orEmpty(), manualTagsAvailable = labels != null,
+                supportsEventDates = store.eventDates != null, eventDates = eventDateValues?.values.orEmpty(),
+                eventDatesAvailable = eventDateValues?.values != null,
+                eventDatesError = if (store.eventDates != null && eventDateValues?.values == null) "事件日期暂不可读取，请重试。" else null,
                 supportsFavorites = store.favorites != null, favorites = favoriteValues.orEmpty(),
                 favoritesAvailable = favoriteValues != null, favoritesLoading = false,
                 favoritesError = if (store.favorites != null && favoriteValues == null) "收藏状态暂不可读取，请重试。" else null,
@@ -1208,13 +1233,14 @@ class LocalRecordsViewModel internal constructor(
             catch (_: Exception) { null }
         val favoriteValues = try { store.favorites?.snapshots() } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { null }
+        val eventDateValues = readEventDateSource(store)
         val epoch = try { store.localSearch?.epoch() } catch (_: Exception) { null }
         refreshProcessingVersions(entries)
         update { if (!it.ready || editsDisposed) it else it.copy(entries = entries,
             manualTags = labels.orEmpty(), manualTagsAvailable = labels != null, localSearchEpoch = epoch,
             favorites = favoriteValues.orEmpty(), favoritesAvailable = favoriteValues != null,
             favoritesError = if (store.favorites != null && favoriteValues == null) "收藏状态暂不可读取，请重试。" else null,
-            manualTagsError = if (store.manualTags != null && labels == null) "手工标签暂不可读取，请重试。" else null) }
+            manualTagsError = if (store.manualTags != null && labels == null) "手工标签暂不可读取，请重试。" else null).withEventDateSource(eventDateValues) }
     }
 
     private fun failed(failure: Exception, preserveQueuedSave: Boolean = false) {
@@ -1235,6 +1261,7 @@ class LocalRecordsViewModel internal constructor(
         attachments.markDisposed()
         tags.dispose()
         favorites.dispose()
+        eventDates.dispose()
         tasks.dispose()
         reminders.dispose()
         candidates.dispose()
@@ -1266,6 +1293,7 @@ class LocalRecordsViewModel internal constructor(
         data class LocalCandidates(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualTags(val action: suspend (EntryRepository) -> Unit) : Command
         data class Favorites(val action: suspend (EntryRepository) -> Unit) : Command
+        data class EventDates(val action: suspend (EntryRepository) -> Unit) : Command
         data object RefreshEditDrafts : Command
         data class OpenEdit(val edit: OriginalEditUiState, val replace: Boolean, val expectedDraftId: String? = null) : Command
         data class PersistEdit(val sessionId: Long, val text: String) : Command

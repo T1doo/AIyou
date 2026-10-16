@@ -46,9 +46,10 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
         verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         item("scope") {
             Text("加密原文包", style = MaterialTheme.typography.headlineSmall)
-            Text("默认包含选定的当前原文、手工标签和当前版本已完整保存的 JPEG/PNG 原图；可另选这些记录的完整历史，或勾选本机全部正式待办与待确认草稿。记录编辑草稿、AI 结果及所有密钥不包含在内；这不是整库备份。")
+            Text("默认包含选定的当前原文、手工标签、手填事件日期及 IANA 时区和当前版本已完整保存的 JPEG/PNG 原图；可另选这些记录的完整历史，或勾选本机全部正式待办与待确认草稿。记录编辑草稿、AI 结果及所有密钥不包含在内；这不是整库备份。")
+            Text("事件日期只迁移当前值，不迁移日期修改历史或操作回执；未知与已清除在新副本中都为未补记。")
             Text("恢复会创建新副本，不覆盖旧记录；初始设置为不参与 AI。同一包重复恢复只核对第一次回执。")
-            Text("一次最多 20 条记录、20 张原图；单图最多 16 MiB，图片合计最多 64 MiB。任务和待确认草稿各最多 256 条，超限整体失败，不会少带。旧 v1/v2/v3 包仍可恢复。")
+            Text("一次最多 20 条记录、20 张原图；单图最多 16 MiB，图片合计最多 64 MiB。任务和待确认草稿各最多 256 条，超限整体失败，不会少带。旧 v1/v2/v3/v4 包仍可恢复；缺少事件日期时保持未知。")
             Text("文字总量也有上限；内容过多时本次整体失败，不会静默截断。")
             Text("恢复的草稿仍须另行确认；不安排提醒、不恢复联网授权。未随包完整匹配的来源保持不可用。")
             Text("独立恢复口令丢失无法解密。取消或失败可能留下空文件或部分密文，应用不会自动删除。")
@@ -100,6 +101,7 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                         val history = ui.mediaPreview?.history?.singleOrNull { it.sourceId == record.entry.id }
                         if (history == null) {
                             PackagePreview(originalMetadata(record.entry), record.entry.originalText, record.tags.names)
+                            Text(packageEventDateText(record.eventDate.date), Modifier.testTag("package-event-date-" + record.entry.id))
                             PackageImages(ui.mediaPreview?.images.orEmpty().filter { it.sourceId == record.entry.id })
                         } else PackageHistoryPreview(history, ui.mediaPreview?.images.orEmpty())
                     }
@@ -107,14 +109,15 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                         Text("本次范围：" + ui.snapshot?.records.orEmpty().size + " 条记录，" + ui.mediaPreview?.images.orEmpty().size +
                             " 张原图，原图合计 " + (ui.mediaPreview?.imageBytes ?: 0L) + " 字节。", modifier = Modifier.testTag("package-image-summary"))
                     }
-                    packageActivities(ui.mediaPreview?.activities, ui.mediaPreview?.history != null)
+                    packageActivities(ui.mediaPreview?.activities, ui.mediaPreview?.history != null,
+                        ui.snapshot?.records.orEmpty().any { it.eventDate.date != null })
                     item("scope-confirm") {
                         Row {
                             Checkbox(ui.scopeAccepted, onCheckedChange = { accepted ->
                                 if (ownsRoute()) ui.snapshot?.let { controller.acceptScope(ui.session, it.id, accepted) }
                             }, modifier = Modifier.testTag("package-scope"))
-                            Text(if (ui.includeHistory) "确认以上完整历史（含后来删掉的文字）、当前标签、各版原图及列出的任务和草稿范围，并自行保管独立恢复口令。"
-                                else "确认以上原文、标签、原图及明确列出的任务和草稿范围，并自行保管独立恢复口令。")
+                            Text(if (ui.includeHistory) "确认以上完整历史（含后来删掉的文字）、当前标签、事件日期及 IANA 时区、各版原图及列出的任务和草稿范围，并自行保管独立恢复口令。"
+                                else "确认以上原文、标签、事件日期及 IANA 时区、原图及明确列出的任务和草稿范围，并自行保管独立恢复口令。")
                         }
                     }
                     item("password-rule") { Text("口令：12–128 个可打印 ASCII 字符，大小写和首尾空格原样使用。") }
@@ -160,6 +163,7 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                             .atZone(java.time.ZoneId.of(record.captureTimeZone))
                             .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm")) + " · " + record.captureTimeZone +
                             " · 原文版本 " + record.sourceRevision, record.originalText, record.tags)
+                            Text(packageEventDateText(record.eventDate), Modifier.testTag("package-restore-event-date-" + record.sourceId))
                             PackageImages(ui.verified?.images.orEmpty().filter { it.sourceId == record.sourceId })
                         }
                     }
@@ -167,7 +171,8 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                         Text("将恢复 " + ui.verified?.records.orEmpty().size + " 条文本和标签、" + ui.verified?.images.orEmpty().size + " 张原图（" + ui.verified?.images.orEmpty().sumOf { it.byteSize } + " 字节），均分配新 ID 并使用本机密钥重新加密。")
                         Text("已完成整个包的口令、完整性和格式认证。来源追溯由文件提供，认证不证明作者身份。")
                     }
-                    packageActivities(ui.verified?.activities, ui.verified?.includesHistory == true)
+                    packageActivities(ui.verified?.activities, ui.verified?.includesHistory == true,
+                        ui.verified?.records.orEmpty().any { it.eventDate != null })
                     item("confirm-restore") {
                         Button(onClick = { if (ownsRoute()) ui.verified?.let { controller.confirmRestore(ui.session, it.manifest.backupId, it.digest, ui.epoch) } },
                             enabled = ui.verified != null, modifier = Modifier.heightIn(min = androidx.compose.ui.unit.Dp(48f)).testTag("package-confirm")) {
@@ -192,10 +197,10 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
     }
 }
 
-private fun LazyListScope.packageActivities(a:RecordPackageActivities?, history: Boolean = false) {
+private fun LazyListScope.packageActivities(a:RecordPackageActivities?, history: Boolean = false, eventDates: Boolean = false) {
     if(a==null) return
     item("activity-summary") {
-        Text((if (history) "v4" else "v3") + " 包内正式待办 ${a.tasks.size} 条、待确认草稿 ${a.drafts.size} 条；未映射来源 ${a.unavailableSources} 处。",modifier=Modifier.testTag("package-activity-summary"))
+        Text((if (eventDates) "v5" else if (history) "v4" else "v3") + " 包内正式待办 ${a.tasks.size} 条、待确认草稿 ${a.drafts.size} 条；未映射来源 ${a.unavailableSources} 处。",modifier=Modifier.testTag("package-activity-summary"))
         Text("每条内容分配新身份；完整匹配包内原文的来源将映射到新副本，其余来源不可用。草稿不会自动变成正式待办，也没有系统提醒。")
     }
     itemsIndexed(a.tasks,key={i,_->"activity-task:$i"}) {_,item -> Column(Modifier.testTag("package-task:"+item.task.id)) {
@@ -231,6 +236,7 @@ private fun PackageHistoryPreview(record: com.t1doo.aiyou.model.RecordPackageOri
     Column {
         Text("原捕获时间 " + java.time.Instant.ofEpochMilli(record.capturedAtMillis)
             .atZone(java.time.ZoneId.of(record.captureTimeZone)) + " · 当前原文版本 ${record.sourceRevision}")
+        Text(packageEventDateText(record.eventDate), Modifier.testTag("package-history-event-date-" + record.sourceId))
         Text("当前手工标签：" + record.tags.joinToString(" · ").ifEmpty { "无" })
         record.history.forEach { version ->
             Column(Modifier.testTag("package-history-record:${record.sourceId}:${version.revision}")) {
@@ -265,3 +271,6 @@ private fun PackageImages(images: List<com.t1doo.aiyou.model.RecordPackageImage>
         }
     }
 }
+
+private fun packageEventDateText(date: com.t1doo.aiyou.model.RecordEventDate?): String =
+    date?.let { "事件日期 ${it.localDate} · ${it.timeZone}（仅日期，无时刻）" } ?: "事件日期未知或已清除；旧包不会从记录时间推测"

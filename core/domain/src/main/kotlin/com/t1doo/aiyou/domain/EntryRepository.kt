@@ -16,6 +16,7 @@ interface EntryRepository {
     val sourceMemories: SourceMemoryRepository? get() = null
     val localCandidates: LocalCandidateRepository? get() = null
     val favorites: RecordFavoriteRepository? get() = null
+    val eventDates: RecordEventDateRepository? get() = null
     val permanentErasure: PermanentErasureRepository? get() = null
     val localSearch: LocalSearchRepository? get() = null
     val mediaPackages: RecordMediaPackageRepository? get() = null
