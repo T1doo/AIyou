@@ -14,6 +14,10 @@ interface RecordMediaPackageRepository {
     suspend fun previewActivities(snapshot: OriginalExportSnapshot): RecordMediaPreview {
         throw UnsupportedOperationException("Task migration unavailable")
     }
+    /** Explicit history scope; missing versions or media refuse the entire snapshot. */
+    suspend fun previewHistory(snapshot: OriginalExportSnapshot, includeActivities: Boolean = false): RecordMediaPreview {
+        throw UnsupportedOperationException("Original history migration unavailable")
+    }
     suspend fun previewOpenZip(snapshot: OriginalExportSnapshot, active: () -> Boolean): RecordMediaPreview = preview(snapshot)
     suspend fun isCurrent(preview: RecordMediaPreview): Boolean
     suspend fun seal(preview: RecordMediaPreview, password: CharArray): PreparedRecordMediaPackage

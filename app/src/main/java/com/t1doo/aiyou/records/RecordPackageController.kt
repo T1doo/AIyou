@@ -17,7 +17,7 @@ class RecordPackageUiState(val session: Long, val phase: RecordPackagePhase = Re
     val verified: VerifiedRecordPackage? = null, val scopeAccepted: Boolean = false,
     val requestKey: String? = null, val pickerLaunched: Boolean = false,
     val notice: String? = null, val error: String? = null, internal val epoch: Long = 0, val mediaPreview: RecordMediaPreview? = null,
-    val includeActivities:Boolean = false) {
+    val includeActivities:Boolean = false, val includeHistory: Boolean = false) {
     val selection = Collections.unmodifiableList(selection.toList())
     val busy get() = phase in setOf(RecordPackagePhase.PREPARING, RecordPackagePhase.ENCRYPTING,
         RecordPackagePhase.WRITING, RecordPackagePhase.READING, RecordPackagePhase.IMPORTING)
@@ -26,8 +26,8 @@ class RecordPackageUiState(val session: Long, val phase: RecordPackagePhase = Re
         scopeAccepted: Boolean = this.scopeAccepted, requestKey: String? = this.requestKey,
         pickerLaunched: Boolean = this.pickerLaunched, notice: String? = this.notice, error: String? = this.error,
         epoch: Long = this.epoch, mediaPreview: RecordMediaPreview? = this.mediaPreview,
-        includeActivities:Boolean = this.includeActivities) = RecordPackageUiState(session, phase, selection, snapshot, verified, scopeAccepted,
-            requestKey, pickerLaunched, notice, error, epoch, mediaPreview,includeActivities)
+        includeActivities:Boolean = this.includeActivities, includeHistory: Boolean = this.includeHistory) = RecordPackageUiState(session, phase, selection, snapshot, verified, scopeAccepted,
+            requestKey, pickerLaunched, notice, error, epoch, mediaPreview,includeActivities,includeHistory)
     override fun toString() = "RecordPackageUiState(phase=" + phase + ", redacted)"
 }
 
@@ -94,6 +94,10 @@ class RecordPackageController internal constructor(private val current: () -> Lo
         val ui=panel(session) ?: return
         if(available() && ui.phase==RecordPackagePhase.SELECTING) update(session) {it.copy(includeActivities=include,error=null)}
     }
+    fun includeHistory(session: Long, include: Boolean) {
+        val ui = panel(session) ?: return
+        if (available() && ui.phase == RecordPackagePhase.SELECTING) update(session) { it.copy(includeHistory = include, error = null) }
+    }
     fun toggle(session: Long, id: String, revision: Int) {
         val ui = panel(session) ?: return
         if (!available() || ui.phase != RecordPackagePhase.SELECTING || current().entries.none { it.id == id && it.currentRevision == revision }) return
@@ -105,6 +109,9 @@ class RecordPackageController internal constructor(private val current: () -> Lo
     fun prepare(session: Long) {
         val ui = panel(session) ?: return
         if (!available() || ui.phase != RecordPackagePhase.SELECTING || ui.selection.isEmpty()&&!ui.includeActivities) return
+        if (ui.includeHistory && ui.selection.isEmpty()) {
+            update(session) { it.copy(error = "完整历史范围至少需要选择一条原文；只迁移任务时请关闭历史选项。") }; return
+        }
         val active = Work(session, ui.epoch + 1); retire(); work.set(active)
         update(session) { it.copy(phase = RecordPackagePhase.PREPARING, epoch = active.epoch, error = null) }
         if (!enqueue { store ->
@@ -112,9 +119,14 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             try {
                 val snapshot = if(ui.selection.isEmpty()) OriginalExportSnapshot(UUID.randomUUID().toString(),clock.millis(),emptyList(),true)
                     else checkNotNull(store.originalExport).capture(ui.selection, UUID.randomUUID().toString(), clock.millis())
-                val preview = if(ui.includeActivities) checkNotNull(store.mediaPackages).previewActivities(snapshot) else store.mediaPackages?.preview(snapshot)
+                val preview = when {
+                    ui.includeHistory -> checkNotNull(store.mediaPackages).previewHistory(snapshot, ui.includeActivities)
+                    ui.includeActivities -> checkNotNull(store.mediaPackages).previewActivities(snapshot)
+                    else -> store.mediaPackages?.preview(snapshot)
+                }
+                check((preview?.history != null) == ui.includeHistory)
                 updateOwned(active, RecordPackagePhase.PREPARING) { it.copy(phase = RecordPackagePhase.EXPORT_PREVIEW, snapshot = snapshot, mediaPreview = preview) }
-            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { fail(active, "原文、原图、任务或草稿核对失败，也可能没有选择任何已保存内容或超限。缺失、损坏、未保存完成或超限的内容不会被跳过，请检查后重新选择。") }
+            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { fail(active, "原文、历史、原图、任务或草稿核对失败，也可能没有选择任何已保存内容或超限。缺失、损坏、未保存完成或超限的内容不会被跳过，请检查后重新选择。") }
             finally { if (work.compareAndSet(active, null)) active.retire() }
         }) fail(active, "本机操作暂不可用。")
     }
@@ -127,7 +139,8 @@ class RecordPackageController internal constructor(private val current: () -> Lo
     fun encrypt(session: Long, snapshotId: String, password: CharArray, again: CharArray) {
         try {
             val ui = panel(session) ?: return; val snapshot = ui.snapshot ?: return
-            if (!available() || ui.phase != RecordPackagePhase.EXPORT_PREVIEW || !ui.scopeAccepted || snapshot.id != snapshotId) return
+            if (!available() || ui.phase != RecordPackagePhase.EXPORT_PREVIEW || !ui.scopeAccepted || snapshot.id != snapshotId ||
+                ui.includeHistory != (ui.mediaPreview?.history != null)) return
             try { RecordPackages.password(password); require(password.contentEquals(again)) }
             catch (_: Exception) { update(session) { it.copy(error = "请输入两次一致的独立恢复口令：12–128 个可打印 ASCII 字符，空格原样保留。") }; return }
             val active = Work(session, ui.epoch + 1, snapshot = snapshot, mediaPreview = ui.mediaPreview); active.setPassword(password); retire(); work.set(active)

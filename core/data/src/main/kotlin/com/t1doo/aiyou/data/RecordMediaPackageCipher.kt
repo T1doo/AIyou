@@ -25,8 +25,8 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
             val metadata = metadata(preview).also {ownedMetadata=it}
             val salt = ByteArray(16).also(random::nextBytes)
             val prefix = ByteArray(8).also(random::nextBytes)
-            val version=if(preview.activities==null) 2 else 3
-            val header = ByteBuffer.allocate(40).put(if(version==2) MAGIC else MAGIC3).putInt(version).putInt(RecordPackages.ITERATIONS).put(salt).put(prefix).array()
+            val version=if(preview.history!=null) 4 else if(preview.activities==null) 2 else 3
+            val header = ByteBuffer.allocate(40).put(when(version) { 2 -> MAGIC; 3 -> MAGIC3; else -> MAGIC4 }).putInt(version).putInt(RecordPackages.ITERATIONS).put(salt).put(prefix).array()
             key = RecordPackageCrypto.derive(password, salt,beforeKdf)
             return Prepared(header, metadata, checkNotNull(key), preview.images, read, current).also { key = null;ownedMetadata=null }
         } catch (_: Exception) { throw RecordPackageInvalid() }
@@ -39,7 +39,7 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
             RecordPackages.password(password)
             val opened=source().use { input ->
                 val magic = exact(input, 8)
-                if (!magic.contentEquals(MAGIC) && !magic.contentEquals(MAGIC3)) {
+                if (!magic.contentEquals(MAGIC) && !magic.contentEquals(MAGIC3) && !magic.contentEquals(MAGIC4)) {
                     // v1 remains bounded at its original 2 MiB and uses its unchanged parser/KDF.
                     val buffer = ByteArray(RecordPackages.MAX_ENVELOPE + 1)
                     magic.copyInto(buffer); var at = 8
@@ -52,7 +52,7 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
                 }
                 val header = magic + exact(input, 32)
                 val fields = ByteBuffer.wrap(header, 8, 32)
-                require(fields.int == (if(magic.contentEquals(MAGIC)) 2 else 3) && fields.int == RecordPackages.ITERATIONS)
+                require(fields.int == (if(magic.contentEquals(MAGIC)) 2 else if(magic.contentEquals(MAGIC3)) 3 else 4) && fields.int == RecordPackages.ITERATIONS)
                 val salt = ByteArray(16).also(fields::get)
                 val firstLength = exact(input,4)
                 require(ByteBuffer.wrap(firstLength).int in 16..RecordMediaPackages.MAX_METADATA+16)
@@ -81,20 +81,9 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
         val metadata = frameRead(input, header, key, 0, ZERO, RecordMediaPackages.MAX_METADATA)
         val binding = packageHash(metadata)
         try {
-            val reader = PackageReader(metadata)
-            val v3=ByteBuffer.wrap(header,8,4).int==3
-            require(reader.string(32) == (if(v3) "AIyou-activities-v3" else "AIyou-images-v2") && reader.i32() == (if(v3) 3 else 2) && reader.i32() == 1)
-            require(reader.strings(5,32) == (if(v3) SCOPE3 else SCOPE) && reader.strings(8,32) == (if(v3) EXCLUDED3 else EXCLUDED))
-            val originalBytes = reader.raw(reader.i32(), RecordPackages.MAX_PLAINTEXT)
-            val original = try { legacy.parse(originalBytes,true,v3) } finally { originalBytes.fill(0) }
-            val images = List(reader.count(RecordMediaPackages.MAX_IMAGES)) {
-                RecordPackageImage(reader.string(512), reader.i32(), reader.string(36), reader.string(32), reader.i64(), packageHex(reader.raw(32)))
-            }
-            val activities=if(v3) {
-                val raw=reader.raw(reader.i32(),RecordMediaPackages.MAX_METADATA)
-                try {RecordPackageActivityCodec.decode(raw).also {RecordPackageActivityCodec.validate(it,original.records)}} finally {raw.fill(0)}
-            } else null
-            reader.end(); validate(original, images)
+            val original = if(ByteBuffer.wrap(header,8,4).int==4) RecordHistoryPackageCodec.parse(metadata)
+                else parseCurrentMetadata(metadata, ByteBuffer.wrap(header,8,4).int==3)
+            val images = original.images
             val digest = packageHex(binding)
             if (expected != null) require(expected == digest)
             for ((index, image) in images.withIndex()) {
@@ -103,11 +92,12 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
             }
             val terminal = frameRead(input, header, key, images.size+1, binding, 32)
             try { require(MessageDigest.isEqual(terminal, binding) && input.read() == -1) } finally { terminal.fill(0) }
-            return Triple(if(activities==null) original else ActivitiesOriginal(original,activities), images, digest)
+            return Triple(original, images, digest)
         } finally { metadata.fill(0) }
     }
 
     private fun metadata(preview: RecordMediaPreview): ByteArray {
+        if(preview.history!=null) return RecordHistoryPackageCodec.encode(preview)
         val v3=preview.activities!=null
         val original = legacy.encode(preview.snapshot,true,v3)
         return try { PackageWriter(RecordMediaPackages.MAX_METADATA).use { out ->
@@ -122,6 +112,22 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
             }
             out.bytes()
         } } finally { original.fill(0) }
+    }
+    private fun parseCurrentMetadata(metadata:ByteArray,v3:Boolean):AuthenticatedRecordPackage {
+        val reader=PackageReader(metadata)
+        require(reader.string(32) == (if(v3) "AIyou-activities-v3" else "AIyou-images-v2") && reader.i32() == (if(v3) 3 else 2) && reader.i32() == 1)
+        require(reader.strings(5,32) == (if(v3) SCOPE3 else SCOPE) && reader.strings(8,32) == (if(v3) EXCLUDED3 else EXCLUDED))
+        val originalBytes=reader.raw(reader.i32(),RecordPackages.MAX_PLAINTEXT)
+        val original=try {legacy.parse(originalBytes,true,v3)} finally {originalBytes.fill(0)}
+        val images=List(reader.count(RecordMediaPackages.MAX_IMAGES)) {
+            RecordPackageImage(reader.string(512),reader.i32(),reader.string(36),reader.string(32),reader.i64(),packageHex(reader.raw(32)))
+        }
+        val activities=if(v3) {
+            val raw=reader.raw(reader.i32(),RecordMediaPackages.MAX_METADATA)
+            try {RecordPackageActivityCodec.decode(raw).also {RecordPackageActivityCodec.validate(it,original.records)}} finally {raw.fill(0)}
+        } else null
+        reader.end();validate(original,images)
+        return CurrentMediaOriginal(original,images,activities)
     }
     private fun validate(original: AuthenticatedRecordPackage, images: List<RecordPackageImage>) {
         require(images.map { it.attachmentId }.distinct().size == images.size)
@@ -155,6 +161,7 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
     companion object {
         private val MAGIC = "AIYOUPK2".toByteArray(Charsets.US_ASCII)
         private val MAGIC3 = "AIYOUPK3".toByteArray(Charsets.US_ASCII)
+        private val MAGIC4 = "AIYOUPK4".toByteArray(Charsets.US_ASCII)
         private val ZERO = ByteArray(32)
         private val SCOPE = listOf("currentOriginals","manualTags","readyOriginalImages")
         private val EXCLUDED = listOf("originalHistory","tasks","drafts","aiDerived","serviceKeys","deviceKeys")
@@ -190,8 +197,10 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
     }
 }
 
-private class ActivitiesOriginal(private val original:AuthenticatedRecordPackage, override val activities:RecordPackageActivities):
-    AuthenticatedRecordPackage by original
+private class CurrentMediaOriginal(private val original:AuthenticatedRecordPackage, images:List<RecordPackageImage>,
+    override val activities:RecordPackageActivities?): AuthenticatedRecordPackage by original {
+    override val images=Collections.unmodifiableList(images.toList())
+}
 
 internal class AuthenticatedMediaPackage(private val original: AuthenticatedRecordPackage,
     images: List<RecordPackageImage>, override val digest: String, internal val header: ByteArray,
@@ -200,6 +209,7 @@ internal class AuthenticatedMediaPackage(private val original: AuthenticatedReco
     override val records get() = original.records
     override val recordDigests get() = original.recordDigests
     override val activities get() = original.activities
+    override val includesHistory get() = original.includesHistory
     override val images = Collections.unmodifiableList(images.toList())
     private var released = false
     internal suspend fun <T> withKey(block: suspend (ByteArray) -> T): T {

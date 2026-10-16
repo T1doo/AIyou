@@ -25,6 +25,9 @@
 选定原图；所有开放格式均须确认明文风险并自行选择系统文件目的地。
 独立口令加密记录包已支持所选原文/原图及可选正式待办/DRAFT 的有限新副本恢复，
 恢复不重连模型、不授予远端权限，也不执行草稿；这仍不是全库备份或完整迁移。
+加密包默认仍只带当前版本；可明确选择所选记录的完整原文历史链及各版原图，逐版
+预览并确认可能包含后来删掉的文字后，恢复为保留当前版本指针的新副本。历史范围
+缺失、损坏或累计超限时整包拒绝；见 [原文历史加密迁移](docs/F08_ORIGINAL_HISTORY_PACKAGE_STATUS.md)。
 范围与残件处理见 [活动开放导出](docs/F08_OPEN_ACTIVITY_EXPORT_STATUS.md)、
 [图文 ZIP](docs/F08_OPEN_MEDIA_EXPORT_STATUS.md) 和 [加密活动迁移](docs/F08_TASK_PROPOSAL_PACKAGE_STATUS.md)。
 真机 SAF、全新安装恢复到原文/附件、重连密钥和提醒原生演练仍为 **NOT RUN**。

@@ -22,6 +22,20 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
             check(isCurrent(it))
         }
     }
+    override suspend fun previewHistory(snapshot: OriginalExportSnapshot, includeActivities: Boolean): RecordMediaPreview = safely {
+        require(snapshot.records.isNotEmpty())
+        check(originals.isCurrent(snapshot))
+        val history = history(snapshot)
+        val images = inventory(snapshot, history)
+        for (image in images) {
+            val bytes = media.read(image.attachmentId)
+            try { RecordMediaPackageCipher.checkImage(image, bytes) } finally { bytes.fill(0) }
+        }
+        val preview = RecordMediaPreview(snapshot, images,
+            if (includeActivities) checkNotNull(activities).capture(snapshot) else null, history)
+        check(isCurrent(preview))
+        preview
+    }
     override suspend fun previewOpenZip(snapshot: OriginalExportSnapshot, active: () -> Boolean): RecordMediaPreview = checkedPreview(snapshot, active)
     private suspend fun checkedPreview(snapshot: OriginalExportSnapshot, active: () -> Boolean): RecordMediaPreview = safely {
         if (!active()) throw OpenRecordZipCancelled()
@@ -37,7 +51,9 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         RecordMediaPreview(snapshot,images)
     }
     override suspend fun isCurrent(preview: RecordMediaPreview): Boolean = try {
-        originals.isCurrent(preview.snapshot) && preview.images == inventory(preview.snapshot) &&
+        originals.isCurrent(preview.snapshot) &&
+            (preview.history?.let { sameHistory(it, history(preview.snapshot)) } ?: true) &&
+            preview.images == inventory(preview.snapshot, preview.history) &&
             (preview.activities?.let {checkNotNull(activities).current(preview.snapshot,it)} ?: true)
     } catch (e: CancellationException) { throw e } catch (_: Exception) { false }
     override suspend fun seal(preview: RecordMediaPreview, password: CharArray): PreparedRecordMediaPackage {
@@ -47,7 +63,7 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         } finally { password.fill('\u0000') }
     }
     override suspend fun exportOpenZip(preview: RecordMediaPreview): PreparedRecordMediaPackage {
-        if (!isCurrent(preview)) throw OriginalExportConflict()
+        if (preview.history != null || !isCurrent(preview)) throw OriginalExportConflict()
         return OpenRecordZipCodec.prepare(preview, { image ->
             val bytes = media.read(image.attachmentId)
             try { RecordMediaPackageCipher.checkImage(image, bytes); bytes }
@@ -55,7 +71,7 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         }, { isCurrent(preview) })
     }
     override suspend fun readOpenImage(preview: RecordMediaPreview, image: RecordPackageImage): ByteArray {
-        if (image !in preview.images || !isCurrent(preview)) throw OriginalExportConflict()
+        if (preview.history != null || image !in preview.images || !isCurrent(preview)) throw OriginalExportConflict()
         val bytes = media.read(image.attachmentId)
         try {
             RecordMediaPackageCipher.checkImage(image, bytes)
@@ -65,17 +81,48 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
     }
     override suspend fun open(source: () -> InputStream, password: CharArray): VerifiedRecordPackage = cipher.open(source,password)
 
-    private fun inventory(snapshot: OriginalExportSnapshot): List<RecordPackageImage> = database.transaction { sql ->
+    /** Snapshot the entire chain in one SQL transaction. Bounds are checked before reading text rows. */
+    private fun history(snapshot: OriginalExportSnapshot): List<RecordPackageOriginal> = database.transaction { sql ->
+        var revisions = 0L; var textBytes = 0L
+        snapshot.records.map { record ->
+            val size = sql.query("SELECT count(*),COALESCE(SUM(length(CAST(originalText AS BLOB))),0) FROM entry_revisions WHERE entryId=?",
+                listOf(record.entry.id)).single()
+            val count = size[0] as Long
+            revisions = Math.addExact(revisions, count); textBytes = Math.addExact(textBytes, size[1] as Long)
+            require(count in 1..RecordHistoryPackages.MAX_REVISIONS_PER_RECORD.toLong() && count == record.entry.currentRevision.toLong() &&
+                revisions <= RecordHistoryPackages.MAX_REVISIONS && textBytes <= RecordHistoryPackages.MAX_TEXT_BYTES)
+            val pointer = sql.query("SELECT currentRevision,capturedAtMillis,captureTimeZone FROM entries WHERE id=?",
+                listOf(record.entry.id)).single()
+            require(pointer == listOf(record.entry.currentRevision.toLong(), record.entry.capturedAtMillis, record.entry.captureTimeZone))
+            val chain = sql.query("SELECT revision,originalText,contentHash,createdAtMillis FROM entry_revisions WHERE entryId=? ORDER BY revision LIMIT ?",
+                listOf(record.entry.id, RecordHistoryPackages.MAX_REVISIONS_PER_RECORD + 1)).map {
+                RecordPackageRevision(Math.toIntExact(it[0] as Long), it[1] as String, it[2] as String, it[3] as Long)
+            }
+            RecordPackageOriginal(record.entry.id, record.entry.currentRevision, record.entry.capturedAtMillis,
+                record.entry.captureTimeZone, record.entry.originalText, record.contentHash, record.tags.version,
+                record.tags.names, true, chain)
+        }
+    }
+    private fun sameHistory(a: List<RecordPackageOriginal>, b: List<RecordPackageOriginal>): Boolean = a.size == b.size &&
+        a.zip(b).all { (old, now) -> old.sourceId == now.sourceId && old.sourceRevision == now.sourceRevision &&
+            old.capturedAtMillis == now.capturedAtMillis && old.captureTimeZone == now.captureTimeZone &&
+            old.originalText == now.originalText && old.contentHash == now.contentHash && old.sourceTagVersion == now.sourceTagVersion &&
+            old.tags == now.tags && old.history.size == now.history.size && old.history.zip(now.history).all { (a, b) ->
+                a.revision == b.revision && a.originalText == b.originalText && a.contentHash == b.contentHash && a.createdAtMillis == b.createdAtMillis } }
+
+    private fun inventory(snapshot: OriginalExportSnapshot, history: List<RecordPackageOriginal>? = null): List<RecordPackageImage> = database.transaction { sql ->
         val images = mutableListOf<RecordPackageImage>()
-        snapshot.records.forEach { record ->
+        val versions = history?.flatMap { record -> record.history.map { record.sourceId to it.revision } }
+            ?: snapshot.records.map { it.entry.id to it.entry.currentRevision }
+        versions.forEach { (sourceId, revision) ->
             val rows = sql.query("SELECT id,mediaType,sha256,byteSize,state FROM attachments WHERE entryId=? AND revision=? ORDER BY id LIMIT 22",
-                listOf(record.entry.id,record.entry.currentRevision))
+                listOf(sourceId,revision))
             require(rows.size <= 21)
             rows.forEach { row ->
                 // Every image in the selected current version must be READY. Never silently drop a damaged original.
                 if (row[1] in setOf("image/jpeg","image/png")) {
                     require(row[4] == "READY")
-                    images += RecordPackageImage(record.entry.id,record.entry.currentRevision,row[0] as String,row[1] as String,row[3] as Long,row[2] as String)
+                    images += RecordPackageImage(sourceId,revision,row[0] as String,row[1] as String,row[3] as Long,row[2] as String)
                     require(images.size <= RecordMediaPackages.MAX_IMAGES && images.sumOf { it.byteSize } <= RecordMediaPackages.MAX_IMAGE_TOTAL)
                 } else throw RecordPackageConflict() // This batch cannot promise a complete copy of unsupported media.
             }
@@ -105,21 +152,24 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
                     require(pack.records.none { it.sourceId == id } && sql.query("SELECT id FROM entries WHERE id=?",listOf(id)).isEmpty() && !SqlErasureFileHooks.fenced(sql,id)) }
                 val intents = pack.images.map { image ->
                     val index = pack.records.indexOfFirst { it.sourceId == image.sourceId }
-                    AttachmentIntent(UUID.randomUUID().toString(),newIds[index],1,image.mediaType,image.sha256,image.byteSize)
+                    require(index >= 0)
+                    AttachmentIntent(UUID.randomUUID().toString(),newIds[index],if (pack.includesHistory) image.sourceRevision else 1,
+                        image.mediaType,image.sha256,image.byteSize)
                 }
-                val value = Plan(pack.manifest.backupId,pack.digest,newIds.toList(),importedAtMillis,intents,"PENDING")
+                val value = Plan(pack.manifest.backupId,pack.digest,newIds.toList(),importedAtMillis,intents,"PENDING",
+                    if (pack.includesHistory) 4 else if (newIds.isEmpty()) 3 else 2)
                 sql.execute("INSERT INTO record_package_receipts(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,?,?)",
                     listOf(PREFIX+value.backupId,value.ids.firstOrNull() ?: SqlRecordPackageActivities.anchor(value.backupId),OP,encode(value)))
                 value
             }
         }
-        if (plan.phase == "DONE") return@safely packages.restoreWithFiles(pack,plan.ids,plan.imported) {}
+        if (plan.phase == "DONE") return@safely replay(pack, plan)
         val committed=database.transaction { sql ->
             val complete=sql.query("SELECT id FROM record_package_receipts WHERE id=?",listOf("PACKAGE_RESTORE:"+plan.backupId)).isNotEmpty()
             if(!complete) plan.ids.forEach { id -> require(sql.query("SELECT id FROM entries WHERE id=?",listOf(id)).isEmpty() && !SqlErasureFileHooks.fenced(sql,id)) }
             complete
         }
-        if(committed) return@safely packages.restoreWithFiles(pack,plan.ids,plan.imported) {}
+        if(committed) return@safely replay(pack, plan)
         val commit = {
             packages.restoreWithFiles(pack,plan.ids,plan.imported) { sql ->
                 require(journal(sql,plan.backupId) == encode(plan))
@@ -136,6 +186,33 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
             pack.cipher.consume(pack) {_,_->throw RecordPackageInvalid()}
             commit()
         } else media.importPackage(plan.intents,{ consume -> pack.cipher.consume(pack,consume) },commit)
+    }
+
+    /** History replay verifies the originally imported media without replacing missing files.
+     * Erasure receipts remain authoritative; deleted members must never be recreated for this check. */
+    private suspend fun replay(pack: AuthenticatedMediaPackage, plan: Plan): RecordPackageRestoreResult {
+        val result = packages.restoreWithFiles(pack, plan.ids, plan.imported) {}
+        if (!pack.includesHistory) return result
+        plan.intents.forEachIndexed { index, intent ->
+            val live = database.transaction { sql ->
+                if (SqlErasureFileHooks.fenced(sql, intent.entryId)) false else {
+                    require(sql.query("SELECT entryId,revision,mediaType,sha256,byteSize,state FROM attachments WHERE id=?",
+                        listOf(intent.id)).single() == listOf(intent.entryId, intent.revision.toLong(), intent.mediaType,
+                        intent.sha256, intent.byteSize, "READY"))
+                    true
+                }
+            }
+            if (live) {
+                try {
+                    val bytes = media.read(intent.id)
+                    try { RecordMediaPackageCipher.checkImage(pack.images[index], bytes) } finally { bytes.fill(0) }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (failure: Exception) {
+                    if (!database.transaction { SqlErasureFileHooks.fenced(it, intent.entryId) }) throw failure
+                }
+            }
+        }
+        return packages.restoreWithFiles(pack, plan.ids, plan.imported) {}
     }
 
     override suspend fun recover(): Unit = safely {
@@ -161,15 +238,18 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         require(plan.backupId == pack.manifest.backupId && plan.digest == pack.digest && plan.ids.size == pack.records.size && plan.intents.size == pack.images.size)
         pack.images.forEachIndexed { index,image ->
             val i = plan.intents[index]; val record = pack.records.indexOfFirst { it.sourceId == image.sourceId }
-            require(i.entryId == plan.ids[record] && i.revision == 1 && i.mediaType == image.mediaType && i.sha256 == image.sha256 && i.byteSize == image.byteSize)
+            require(record >= 0 && i.entryId == plan.ids[record] && i.revision == (if (pack.includesHistory) image.sourceRevision else 1) &&
+                i.mediaType == image.mediaType && i.sha256 == image.sha256 && i.byteSize == image.byteSize)
         }
     }
     private data class Plan(val backupId: String, val digest: String, val ids: List<String>, val imported: Long,
-        val intents: List<AttachmentIntent>, val phase: String)
+        val intents: List<AttachmentIntent>, val phase: String, val version: Int = 4)
     private fun encode(p: Plan): String = PackageWriter(32768).use { out ->
-        out.i32(if(p.ids.isEmpty()) 3 else 2); out.string(p.backupId,36); out.raw(packageUnhex(p.digest)); out.i64(p.imported)
+        out.i32(p.version); out.string(p.backupId,36); out.raw(packageUnhex(p.digest)); out.i64(p.imported)
         out.string(p.phase,16); out.strings(p.ids,20,36); out.i32(p.intents.size)
-        p.intents.forEach { i -> out.string(i.id,36); out.string(i.entryId,36); out.string(i.mediaType,32); out.i64(i.byteSize); out.raw(packageUnhex(i.sha256)) }
+        p.intents.forEach { i -> out.string(i.id,36); out.string(i.entryId,36)
+            if (p.version >= 4) out.i32(i.revision)
+            out.string(i.mediaType,32); out.i64(i.byteSize); out.raw(packageUnhex(i.sha256)) }
         val raw = out.bytes(); try { Base64.getEncoder().encodeToString(raw) } finally { raw.fill(0) }
     }
     private fun decode(value: String): Plan {
@@ -177,16 +257,19 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         val bytes = Base64.getDecoder().decode(value)
         try {
             require(bytes.size <= 32768 && Base64.getEncoder().encodeToString(bytes) == value)
-            val r = PackageReader(bytes); val version=r.i32(); require(version in listOf(2,3))
+            val r = PackageReader(bytes); val version=r.i32(); require(version in listOf(2,3,4))
             val id = r.string(36).also(RecordPackages::uuid); val digest = packageHex(r.raw(32)); val imported = r.i64(); require(imported >= 0)
             val phase = r.string(16); require(phase in setOf("PENDING","ABORTED","DONE"))
-            val ids = r.strings(20,36); require((ids.isNotEmpty() || version==3) && ids.distinct().size == ids.size); ids.forEach(RecordPackages::uuid)
+            val ids = r.strings(20,36); require((ids.isNotEmpty() || version>=3) && ids.distinct().size == ids.size); ids.forEach(RecordPackages::uuid)
             val intents = List(r.count(RecordMediaPackages.MAX_IMAGES)) {
-                val attachment = r.string(36); val entry = r.string(36); val mime = r.string(32); val size = r.i64(); val hash = packageHex(r.raw(32))
-                AttachmentIntent(attachment,entry,1,mime,hash,size).also { EncryptedAttachmentStore.validate(it); require(entry in ids && mime.startsWith("image/")) }
+                val attachment = r.string(36); val entry = r.string(36)
+                val revision = if (version >= 4) r.i32() else 1
+                require(revision in 1..RecordHistoryPackages.MAX_REVISIONS_PER_RECORD)
+                val mime = r.string(32); val size = r.i64(); val hash = packageHex(r.raw(32))
+                AttachmentIntent(attachment,entry,revision,mime,hash,size).also { EncryptedAttachmentStore.validate(it); require(entry in ids && mime.startsWith("image/")) }
             }
             require(intents.map { it.id }.distinct().size == intents.size && intents.sumOf { it.byteSize } <= RecordMediaPackages.MAX_IMAGE_TOTAL)
-            r.end(); return Plan(id,digest,ids,imported,intents,phase)
+            r.end(); return Plan(id,digest,ids,imported,intents,phase,version)
         } finally { bytes.fill(0) }
     }
     private fun journal(sql: RecordsSqlConnection, id: String): String? = sql.query(

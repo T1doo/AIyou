@@ -1,5 +1,8 @@
 # F08：任务与待确认草稿加密迁移
 
+后续可选 v4 原文完整历史范围见 [历史加密迁移](F08_ORIGINAL_HISTORY_PACKAGE_STATUS.md)；
+本文 v1/v2/v3 及默认当前版本范围保持原契约，未把旧包解释成带历史。
+
 2026-10-16，分支 `codex/f08-task-proposal-package-20261016`，从已核本地及远端
 `c883cdffa49a38f899a32fd82570c7645a957d79` 正常建立。开始前唯一活动写入者为
 本任务，工作区干净、单一 worktree、ahead/behind 0/0；不恢复 UNKNOWN 旧任务。

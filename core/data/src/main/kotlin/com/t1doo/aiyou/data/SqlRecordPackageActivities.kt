@@ -61,7 +61,7 @@ internal class SqlRecordPackageActivities(private val database:RecordsSqlDatabas
         return row[2] as String
     }
     private fun mapped(pack:AuthenticatedRecordPackage,ids:List<String>,b:TaskSourceBinding,index:Int):TaskSourceBinding =
-        if(index>=0) b.copy(source=SourceVersion(ids[index],1),generation=1)
+        if(index>=0) b.copy(source=SourceVersion(ids[index],pack.records[index].restoredRevision.toLong()),generation=1)
         else b.copy(source=SourceVersion(RecordPackageActivities.UNAVAILABLE_PREFIX+hash("missing",pack.manifest.backupId,b.source.sourceId),b.source.revision))
     private fun taskId(p:AuthenticatedRecordPackage,id:String)="PACKAGE_TASK:"+hash("task",p.manifest.backupId,id)
     private fun draftId(p:AuthenticatedRecordPackage,id:String)="PACKAGE_PROPOSAL:"+hash("draft",p.manifest.backupId,id)

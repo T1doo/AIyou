@@ -8,7 +8,8 @@ import java.util.UUID
 import kotlinx.coroutines.runBlocking
 
 /** Exact checked-in v7, actual additive migration, SQL, AEAD and private lock protocol. */
-internal class PermanentErasureFixture : AutoCloseable {
+internal class PermanentErasureFixture(databaseKey: ByteArray = KEY) : AutoCloseable {
+    private val key = databaseKey.copyOf().also { require(it.size == 32) }
     val root = Files.createTempDirectory("aiyou-erasure-")
     val databaseFile = root.resolve("records.sqlite")
     val bridge = root.resolve("sqlite_bridge.py")
@@ -41,11 +42,11 @@ internal class PermanentErasureFixture : AutoCloseable {
     private fun openAdapters() {
         gateway = DrainingRecordsSqlDatabase(db)
         val hooks = SqlErasureFileHooks(gateway)
-        tags = SqlManualTagRepository(gateway,KEY); tasks = SqlManualTaskRepository(gateway,KEY)
+        tags = SqlManualTagRepository(gateway,key); tasks = SqlManualTaskRepository(gateway,key)
         packages = SqlRecordPackageRepository(gateway,tags)
         bin = SqlRecycleBinRepository(gateway,tags,SqlErasureFileHooks::fenced)
-        media = EncryptedAttachmentStore(mediaRoot,Ledger(gateway),KEY.copyOf()) { mediaCheckpoint(it) }.also { it.installErasureHooks(hooks) }
-        edits = EncryptedOriginalEditStore(editRoot,KEY.copyOf()) { editCheckpoint(it) }.also { it.installErasureHooks(hooks) }
+        media = EncryptedAttachmentStore(mediaRoot,Ledger(gateway),key.copyOf()) { mediaCheckpoint(it) }.also { it.installErasureHooks(hooks) }
+        edits = EncryptedOriginalEditStore(editRoot,key.copyOf()) { editCheckpoint(it) }.also { it.installErasureHooks(hooks) }
         erase = SqlPermanentErasureRepository(gateway,media,edits,packages) { checkpoint(it) }
     }
     fun reopen() { retire(); db = PythonSqliteDatabase(databaseFile,bridge,false,7); openAdapters() }
@@ -72,7 +73,7 @@ internal class PermanentErasureFixture : AutoCloseable {
         tags.wipeKey(); tasks.wipeKey(); db.close()
     }
     override fun close() {
-        try { retire() } finally { Files.walk(root).use { it.sorted(Comparator.reverseOrder()).forEach(Files::delete) } }
+        try { retire() } finally { key.fill(0); Files.walk(root).use { it.sorted(Comparator.reverseOrder()).forEach(Files::delete) } }
     }
     internal class Ledger(private val database: RecordsSqlDatabase) : AttachmentLedger {
         override suspend fun find(id: String): LocalAttachment? = database.transaction { sql ->

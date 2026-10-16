@@ -23,6 +23,8 @@ import com.t1doo.aiyou.model.RecordPackageActivities
 fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, controller: RecordPackageController,
     picker: RecordPackagePicker?, ownsRoute: () -> Boolean, modifier: Modifier = Modifier) {
     val available = ownsRoute() && local.ready && !local.opening && local.error == null && local.supportsRecordPackages
+    val historyRecords = ui.mediaPreview?.history
+    val historyRestore = ui.verified?.takeIf { it.includesHistory }
     // Explicit remember, never rememberTextFieldState / saveable: secrets retire at every epoch/phase.
     val password = remember(ui.session, ui.epoch, ui.phase) { TextFieldState() }
     val again = remember(ui.session, ui.epoch, ui.phase) { TextFieldState() }
@@ -44,9 +46,9 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
         verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         item("scope") {
             Text("加密原文包", style = MaterialTheme.typography.headlineSmall)
-            Text("包含选定的当前原文、手工标签和当前版本已完整保存的 JPEG/PNG 原图；可明确勾选本机全部正式待办与待确认草稿，也可只迁移任务。历史、记录编辑草稿、AI 结果及所有密钥不包含在内；这不是整库备份。")
+            Text("默认包含选定的当前原文、手工标签和当前版本已完整保存的 JPEG/PNG 原图；可另选这些记录的完整历史，或勾选本机全部正式待办与待确认草稿。记录编辑草稿、AI 结果及所有密钥不包含在内；这不是整库备份。")
             Text("恢复会创建新副本，不覆盖旧记录；初始设置为不参与 AI。同一包重复恢复只核对第一次回执。")
-            Text("一次最多 20 条记录、20 张原图；单图最多 16 MiB，图片合计最多 64 MiB。任务和待确认草稿各最多 256 条，超限整体失败，不会少带。旧 v1/v2 包仍可恢复。")
+            Text("一次最多 20 条记录、20 张原图；单图最多 16 MiB，图片合计最多 64 MiB。任务和待确认草稿各最多 256 条，超限整体失败，不会少带。旧 v1/v2/v3 包仍可恢复。")
             Text("文字总量也有上限；内容过多时本次整体失败，不会静默截断。")
             Text("恢复的草稿仍须另行确认；不安排提醒、不恢复联网授权。未随包完整匹配的来源保持不可用。")
             Text("独立恢复口令丢失无法解密。取消或失败可能留下空文件或部分密文，应用不会自动删除。")
@@ -64,6 +66,15 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                     }
                 }
                 RecordPackagePhase.SELECTING -> {
+                    item("history-choice") {
+                        Row {
+                            Checkbox(ui.includeHistory, onCheckedChange = { if (ownsRoute()) controller.includeHistory(ui.session, it) },
+                                modifier = Modifier.testTag("package-include-history"))
+                            Text("包含所选记录从版本1到当前版本的全部历史及对应原图；默认关闭。")
+                        }
+                        if (ui.includeHistory) HistoryWarning()
+                        Text("完整历史最多每条128版、合计256版，历史文字UTF-8合计最多约2 MiB；媒体仍受同一总量限制，超限整包拒绝。")
+                    }
                     item("activity-choice") { Row {
                         Checkbox(ui.includeActivities,onCheckedChange={if(ownsRoute()) controller.includeActivities(ui.session,it)},modifier=Modifier.testTag("package-include-activities"))
                         Text("包含全部已保存正式待办与待确认草稿（各最多256条）；未保存的表单输入不在包内。")
@@ -80,21 +91,30 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                         enabled = ui.selection.isNotEmpty()||ui.includeActivities, modifier = Modifier.testTag("package-preview")) { Text("预览完整内容与范围") } }
                 }
                 RecordPackagePhase.EXPORT_PREVIEW -> {
+                    if (historyRecords != null) item("history-summary") {
+                        HistoryWarning()
+                        Text("本次完整历史范围：${historyRecords.size} 条记录，${historyRecords.sumOf { it.history.size }} 个原文版本；恢复时保留当前版本指针。",
+                            modifier = Modifier.testTag("package-history-summary"))
+                    }
                     itemsIndexed(ui.snapshot?.records.orEmpty(), key = { _, r -> "preview:" + r.entry.id }) { _, record ->
-                        PackagePreview(originalMetadata(record.entry), record.entry.originalText, record.tags.names)
-                        PackageImages(ui.mediaPreview?.images.orEmpty().filter { it.sourceId == record.entry.id })
+                        val history = ui.mediaPreview?.history?.singleOrNull { it.sourceId == record.entry.id }
+                        if (history == null) {
+                            PackagePreview(originalMetadata(record.entry), record.entry.originalText, record.tags.names)
+                            PackageImages(ui.mediaPreview?.images.orEmpty().filter { it.sourceId == record.entry.id })
+                        } else PackageHistoryPreview(history, ui.mediaPreview?.images.orEmpty())
                     }
                     item("image-summary") {
                         Text("本次范围：" + ui.snapshot?.records.orEmpty().size + " 条记录，" + ui.mediaPreview?.images.orEmpty().size +
                             " 张原图，原图合计 " + (ui.mediaPreview?.imageBytes ?: 0L) + " 字节。", modifier = Modifier.testTag("package-image-summary"))
                     }
-                    packageActivities(ui.mediaPreview?.activities)
+                    packageActivities(ui.mediaPreview?.activities, ui.mediaPreview?.history != null)
                     item("scope-confirm") {
                         Row {
                             Checkbox(ui.scopeAccepted, onCheckedChange = { accepted ->
                                 if (ownsRoute()) ui.snapshot?.let { controller.acceptScope(ui.session, it.id, accepted) }
                             }, modifier = Modifier.testTag("package-scope"))
-                            Text("确认以上原文、标签、原图及明确列出的任务和草稿范围，并自行保管独立恢复口令。")
+                            Text(if (ui.includeHistory) "确认以上完整历史（含后来删掉的文字）、当前标签、各版原图及列出的任务和草稿范围，并自行保管独立恢复口令。"
+                                else "确认以上原文、标签、原图及明确列出的任务和草稿范围，并自行保管独立恢复口令。")
                         }
                     }
                     item("password-rule") { Text("口令：12–128 个可打印 ASCII 字符，大小写和首尾空格原样使用。") }
@@ -128,18 +148,26 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                     }
                 }
                 RecordPackagePhase.RESTORE_PREVIEW, RecordPackagePhase.UNCERTAIN -> {
+                    if (historyRestore != null) item("restore-history-summary") {
+                        HistoryWarning()
+                        Text("将以新身份恢复 ${historyRestore.records.size} 条记录、${historyRestore.records.sumOf { it.history.size }} 个原文版本，保持包内当前版本指针；不会覆盖本机原文。",
+                            modifier = Modifier.testTag("package-restore-history-summary"))
+                    }
                     itemsIndexed(ui.verified?.records.orEmpty(), key = { i, _ -> "restore-preview:" + i }) { _, record ->
-                        PackagePreview("原捕获时间 " + java.time.Instant.ofEpochMilli(record.capturedAtMillis)
+                        if (historyRestore != null) PackageHistoryPreview(record, historyRestore.images)
+                        else {
+                            PackagePreview("原捕获时间 " + java.time.Instant.ofEpochMilli(record.capturedAtMillis)
                             .atZone(java.time.ZoneId.of(record.captureTimeZone))
                             .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm")) + " · " + record.captureTimeZone +
                             " · 原文版本 " + record.sourceRevision, record.originalText, record.tags)
-                        PackageImages(ui.verified?.images.orEmpty().filter { it.sourceId == record.sourceId })
+                            PackageImages(ui.verified?.images.orEmpty().filter { it.sourceId == record.sourceId })
+                        }
                     }
                     item("restore-summary") {
                         Text("将恢复 " + ui.verified?.records.orEmpty().size + " 条文本和标签、" + ui.verified?.images.orEmpty().size + " 张原图（" + ui.verified?.images.orEmpty().sumOf { it.byteSize } + " 字节），均分配新 ID 并使用本机密钥重新加密。")
                         Text("已完成整个包的口令、完整性和格式认证。来源追溯由文件提供，认证不证明作者身份。")
                     }
-                    packageActivities(ui.verified?.activities)
+                    packageActivities(ui.verified?.activities, ui.verified?.includesHistory == true)
                     item("confirm-restore") {
                         Button(onClick = { if (ownsRoute()) ui.verified?.let { controller.confirmRestore(ui.session, it.manifest.backupId, it.digest, ui.epoch) } },
                             enabled = ui.verified != null, modifier = Modifier.heightIn(min = androidx.compose.ui.unit.Dp(48f)).testTag("package-confirm")) {
@@ -164,10 +192,10 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
     }
 }
 
-private fun LazyListScope.packageActivities(a:RecordPackageActivities?) {
+private fun LazyListScope.packageActivities(a:RecordPackageActivities?, history: Boolean = false) {
     if(a==null) return
     item("activity-summary") {
-        Text("v3 包内正式待办 ${a.tasks.size} 条、待确认草稿 ${a.drafts.size} 条；未映射来源 ${a.unavailableSources} 处。",modifier=Modifier.testTag("package-activity-summary"))
+        Text((if (history) "v4" else "v3") + " 包内正式待办 ${a.tasks.size} 条、待确认草稿 ${a.drafts.size} 条；未映射来源 ${a.unavailableSources} 处。",modifier=Modifier.testTag("package-activity-summary"))
         Text("每条内容分配新身份；完整匹配包内原文的来源将映射到新副本，其余来源不可用。草稿不会自动变成正式待办，也没有系统提醒。")
     }
     itemsIndexed(a.tasks,key={i,_->"activity-task:$i"}) {_,item -> Column(Modifier.testTag("package-task:"+item.task.id)) {
@@ -189,6 +217,32 @@ private fun LazyListScope.packageActivities(a:RecordPackageActivities?) {
         })
         Text(if(item.sourceRecord>=0) "来源完整匹配包内原文，仍需另行预览和确认" else "来源未完整包含，保留输入但不能确认")
     } }
+}
+
+@Composable
+private fun HistoryWarning() {
+    Text("完整历史可能包含你后来修改或删掉的文字及旧版图片。请逐版核对后再确认，恢复会重新保存这些历史内容。",
+        modifier = Modifier.testTag("package-history-warning"), color = AIyouColors.error)
+}
+
+@Composable
+private fun PackageHistoryPreview(record: com.t1doo.aiyou.model.RecordPackageOriginal,
+    images: List<com.t1doo.aiyou.model.RecordPackageImage>) {
+    Column {
+        Text("原捕获时间 " + java.time.Instant.ofEpochMilli(record.capturedAtMillis)
+            .atZone(java.time.ZoneId.of(record.captureTimeZone)) + " · 当前原文版本 ${record.sourceRevision}")
+        Text("当前手工标签：" + record.tags.joinToString(" · ").ifEmpty { "无" })
+        record.history.forEach { version ->
+            Column(Modifier.testTag("package-history-record:${record.sourceId}:${version.revision}")) {
+                Text("原文版本 ${version.revision}" + if (version.revision == record.sourceRevision) " · 当前版本" else " · 历史版本")
+                Text("版本保存时间：" + java.time.Instant.ofEpochMilli(version.createdAtMillis)
+                    .atZone(java.time.ZoneId.of(record.captureTimeZone)), style = MaterialTheme.typography.bodySmall)
+                SelectionContainer { Text(version.originalText.ifEmpty { "此版本没有文字正文。" }) }
+                PackageImages(images.filter { it.sourceId == record.sourceId && it.sourceRevision == version.revision })
+                HorizontalDivider()
+            }
+        }
+    }
 }
 
 @Composable

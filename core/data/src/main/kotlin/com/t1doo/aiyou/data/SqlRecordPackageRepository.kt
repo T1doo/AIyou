@@ -19,6 +19,7 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
         beforeReceipt: (RecordsSqlConnection) -> Unit): RecordPackageRestoreResult = safely {
         val pack = verified as? AuthenticatedRecordPackage ?: throw RecordPackageInvalid()
         require(pack.activities==null || activities!=null)
+        require(!pack.includesHistory || pack.records.isNotEmpty())
         require(newIds.size <= 20)
         val ids = newIds.toList()
         database.transaction { sql ->
@@ -50,24 +51,32 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
             }
             for (index in ids.indices) {
                 val id = ids[index]; val record = pack.records[index]
-                sql.execute("INSERT INTO entries(id,currentRevision,capturedAtMillis,captureTimeZone,privacyPolicy) VALUES(?,1,?,?,'AI_NONE')",
-                    listOf(id, record.capturedAtMillis, record.captureTimeZone))
-                sql.execute("INSERT INTO entry_revisions(entryId,revision,originalText,contentHash,createdAtMillis) VALUES(?,1,?,?,?)",
-                    listOf(id, record.originalText, record.contentHash, importedAtMillis))
+                val restoredRevision = record.restoredRevision
+                sql.execute("INSERT INTO entries(id,currentRevision,capturedAtMillis,captureTimeZone,privacyPolicy) VALUES(?,?,?,?,'AI_NONE')",
+                    listOf(id, restoredRevision, record.capturedAtMillis, record.captureTimeZone))
+                if (record.history.isEmpty()) {
+                    // Frozen v1/v2/v3 current-only contract: the new copy starts at revision 1.
+                    sql.execute("INSERT INTO entry_revisions(entryId,revision,originalText,contentHash,createdAtMillis) VALUES(?,1,?,?,?)",
+                        listOf(id, record.originalText, record.contentHash, importedAtMillis))
+                } else record.history.forEach { revision ->
+                    sql.execute("INSERT INTO entry_revisions(entryId,revision,originalText,contentHash,createdAtMillis) VALUES(?,?,?,?,?)",
+                        listOf(id, revision.revision, revision.originalText, revision.contentHash, revision.createdAtMillis))
+                }
                 sql.execute("INSERT INTO remote_source_access(entryId,generation,deleted,connection,consent) VALUES(?,1,0,NULL,NULL)", listOf(id))
                 tags.createWithin(sql, id, record.tags, "PACKAGE_TAG:" + id)
-                sql.execute("INSERT INTO local_jobs(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,'LOCAL_INDEX','PENDING')",
-                    listOf("PACKAGE_INDEX:" + id, id))
+                sql.execute("INSERT INTO local_jobs(id,entryId,sourceRevision,operation,state) VALUES(?,?,?,'LOCAL_INDEX','PENDING')",
+                    listOf("PACKAGE_INDEX:" + id, id, restoredRevision))
                 val provenance = expectedOrigin(pack, index, id, importedAtMillis)
-                sql.execute("INSERT INTO record_package_receipts(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,'PACKAGE_ORIGIN',?)",
-                    listOf(ORIGIN + id, id, originState(provenance)))
-                sql.execute("INSERT INTO local_jobs(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,'PACKAGE_ORIGIN',?)",
-                    listOf(ORIGIN + id, id, originState(provenance)))
+                sql.execute("INSERT INTO record_package_receipts(id,entryId,sourceRevision,operation,state) VALUES(?,?,?,'PACKAGE_ORIGIN',?)",
+                    listOf(ORIGIN + id, id, restoredRevision, originState(provenance)))
+                sql.execute("INSERT INTO local_jobs(id,entryId,sourceRevision,operation,state) VALUES(?,?,?,'PACKAGE_ORIGIN',?)",
+                    listOf(ORIGIN + id, id, restoredRevision, originState(provenance)))
             }
             activities?.importWithin(sql,pack,ids)
             beforeReceipt(sql)
             val group = Group(pack.manifest.backupId, pack.digest, pack.manifest.createdAtMillis,
-                importedAtMillis, ids, pack.recordDigests,pack.activities!=null)
+                importedAtMillis, ids, pack.recordDigests,pack.activities!=null,pack.includesHistory,
+                pack.records.map { it.restoredRevision }, if(pack.includesHistory) pack.records.map { recordHistoryDigest(it.history) } else emptyList())
             sql.execute("INSERT INTO record_package_receipts(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,'PACKAGE_RESTORE',?)",
                 listOf(GROUP + group.id, ids.firstOrNull() ?: SqlRecordPackageActivities.anchor(group.id), groupState(group)))
             if(ids.isNotEmpty()) sql.execute("INSERT INTO local_jobs(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,'PACKAGE_RESTORE',?)",
@@ -86,7 +95,7 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
                 val group = group(checkNotNull(job(sql, GROUP + value.backupId)))
                 val index = group.ids.indexOf(value.newId); require(index >= 0)
                 require(group.digest == value.packageDigest && group.created == value.packageCreatedAtMillis &&
-                    group.imported == value.importedAtMillis && group.hashes[index] == value.recordDigest)
+                    group.imported == value.importedAtMillis && group.hashes[index] == value.recordDigest && historyMatches(group,index,value))
                 immutable(sql, value, null)
                 if (SqlErasureFileHooks.fenced(sql, value.newId)) null else value.newId to value
             }.toMap())
@@ -97,7 +106,9 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
         replayed: Boolean = true): RecordPackageRestoreResult {
         val group = group(row)
         if (group.id != pack.manifest.backupId || group.digest != pack.digest || group.created != pack.manifest.createdAtMillis ||
-            group.ids.size != pack.records.size || group.hashes != pack.recordDigests || group.activities!=(pack.activities!=null)) throw RecordPackageConflict()
+            group.ids.size != pack.records.size || group.hashes != pack.recordDigests || group.activities!=(pack.activities!=null) ||
+            group.history != pack.includesHistory || group.revisionCounts != pack.records.map { it.restoredRevision } ||
+            group.historyDigests != (if(pack.includesHistory) pack.records.map { recordHistoryDigest(it.history) } else emptyList())) throw RecordPackageConflict()
         var deleted = 0; var erasing = 0
         group.ids.forEachIndexed { index, id ->
             require(pack.records.none { it.sourceId == id })
@@ -132,8 +143,26 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
         return RecordPackageRestoreResult(group.ids, group.imported, replayed, deleted, erasing,activityIds.first,activityIds.second)
     }
 
-    /** Raw SQL deliberately includes trashed rows and the immutable first imported revision. */
+    /** Raw SQL includes trashed rows and authenticates the complete immutable imported prefix. */
     private fun immutable(sql: RecordsSqlConnection, origin: RecordPackageOrigin, original: RecordPackageOriginal?) {
+        if (origin.historyDigest != null) {
+            val entry = sql.query("SELECT currentRevision,capturedAtMillis,captureTimeZone FROM entries WHERE id=?",listOf(origin.newId)).single()
+            if ((entry[0] as Long) < origin.restoredRevisionCount || entry[1] != origin.capturedAtMillis || entry[2] != origin.captureTimeZone)
+                throw RecordPackageConflict()
+            val rows = sql.query("SELECT revision,originalText,contentHash,createdAtMillis FROM entry_revisions WHERE entryId=? AND revision<=? ORDER BY revision",
+                listOf(origin.newId,origin.restoredRevisionCount))
+            if (rows.size != origin.restoredRevisionCount) throw RecordPackageConflict()
+            val history = rows.mapIndexed { index,row ->
+                if (row[0] != (index+1).toLong()) throw RecordPackageConflict()
+                RecordPackageRevision(index+1,row[1] as String,row[2] as String,row[3] as Long)
+            }
+            if (recordHistoryDigest(history) != origin.historyDigest ||
+                (original != null && (original.restoredRevision != origin.restoredRevisionCount ||
+                    recordHistoryDigest(original.history) != origin.historyDigest))) throw RecordPackageConflict()
+            // A later valid append is deliberately untouched; the restore receipt owns only its prefix.
+            require(sql.query("SELECT revision FROM entry_revisions WHERE entryId=? AND revision=?",listOf(origin.newId,entry[0])).size==1)
+            return
+        }
         val row = sql.query("SELECT e.currentRevision,e.capturedAtMillis,e.captureTimeZone,r.originalText,r.contentHash,r.createdAtMillis FROM entries e JOIN entry_revisions r ON r.entryId=e.id AND r.revision=1 WHERE e.id=?",
             listOf(origin.newId)).single()
         require((row[0] as Long) >= 1 && row[1] == origin.capturedAtMillis && row[2] == origin.captureTimeZone &&
@@ -145,40 +174,57 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
     private fun expectedOrigin(pack: AuthenticatedRecordPackage, index: Int, id: String, imported: Long): RecordPackageOrigin {
         val r = pack.records[index]
         return RecordPackageOrigin(id, pack.manifest.backupId, pack.digest, pack.manifest.createdAtMillis, imported,
-            r.sourceId, r.sourceRevision, r.sourceTagVersion, pack.recordDigests[index], r.capturedAtMillis, r.captureTimeZone)
+            r.sourceId, r.sourceRevision, r.sourceTagVersion, pack.recordDigests[index], r.capturedAtMillis, r.captureTimeZone,
+            r.restoredRevision,if(pack.includesHistory) recordHistoryDigest(r.history) else null)
     }
     private class Group(val id: String, val digest: String, val created: Long, val imported: Long,
-        val ids: List<String>, val hashes: List<String>,val activities:Boolean=false)
+        val ids: List<String>, val hashes: List<String>,val activities:Boolean=false,val history:Boolean=false,
+        val revisionCounts:List<Int> = ids.map {1},val historyDigests:List<String> = emptyList())
     private fun groupState(group: Group): String = receipt { out ->
-        out.i32(if(group.activities) 3 else 1); out.i32(1); out.string(group.id, 36); out.raw(packageUnhex(group.digest))
+        out.i32(if(group.history) 4 else if(group.activities) 3 else 1); out.i32(1); out.string(group.id, 36); out.raw(packageUnhex(group.digest))
         out.i64(group.created); out.i64(group.imported); out.i32(group.ids.size)
-        group.ids.forEachIndexed { index, id -> out.string(id, 36); out.raw(packageUnhex(group.hashes[index])) }
+        if(group.history) out.i32(if(group.activities) 1 else 0)
+        group.ids.forEachIndexed { index, id ->
+            out.string(id, 36); out.raw(packageUnhex(group.hashes[index]))
+            if(group.history) {out.i32(group.revisionCounts[index]);out.raw(packageUnhex(group.historyDigests[index]))}
+        }
     }
     private fun originState(value: RecordPackageOrigin): String = receipt { out ->
-        out.i32(1); out.i32(2); out.string(value.backupId, 36); out.raw(packageUnhex(value.packageDigest))
+        out.i32(if(value.historyDigest==null) 1 else 4); out.i32(2); out.string(value.backupId, 36); out.raw(packageUnhex(value.packageDigest))
         out.i64(value.packageCreatedAtMillis); out.i64(value.importedAtMillis); out.string(value.newId, 36)
         out.string(value.sourceId, 512); out.i32(value.sourceRevision); out.i64(value.sourceTagVersion)
         out.raw(packageUnhex(value.recordDigest)); out.i64(value.capturedAtMillis); out.string(value.captureTimeZone, 128)
+        value.historyDigest?.let {out.i32(value.restoredRevisionCount);out.raw(packageUnhex(it))}
     }
     private fun group(row: List<Any?>): Group = readReceipt(row[4] as String) { input ->
-        val version=input.i32();require(version in listOf(1,3) && input.i32() == 1)
+        val version=input.i32();require(version in listOf(1,3,4) && input.i32() == 1)
         val id = input.string(36); RecordPackages.uuid(id); val digest = packageHex(input.raw(32))
         val created = input.i64(); val imported = input.i64(); require(created >= 0 && imported >= 0)
-        val count = input.count(20); require(count > 0 || version==3)
+        val count = input.count(20)
+        val activities = if(version==4) input.i32().also {require(it in 0..1)}==1 else version==3
+        require(count > 0 || activities)
         val ids = mutableListOf<String>(); val hashes = mutableListOf<String>()
-        repeat(count) { ids += input.string(36).also(RecordPackages::uuid); hashes += packageHex(input.raw(32)) }
+        val revisionCounts = mutableListOf<Int>(); val historyDigests=mutableListOf<String>()
+        repeat(count) {
+            ids += input.string(36).also(RecordPackages::uuid); hashes += packageHex(input.raw(32))
+            revisionCounts += if(version==4) input.i32().also {require(it in 1..128)} else 1
+            if(version==4) historyDigests+=packageHex(input.raw(32))
+        }
+        require(revisionCounts.sum() <= 256)
         require(ids.distinct().size == count && row[0] == GROUP + id && row[1] == (ids.firstOrNull() ?: SqlRecordPackageActivities.anchor(id)) &&
             row[2] == 1L && row[3] == "PACKAGE_RESTORE")
-        Group(id, digest, created, imported, ids, hashes,version==3)
+        Group(id, digest, created, imported, ids, hashes,activities,version==4,revisionCounts,historyDigests)
     }
     private fun origin(row: List<Any?>): RecordPackageOrigin = readReceipt(row[4] as String) { input ->
-        require(input.i32() == 1 && input.i32() == 2)
+        val version=input.i32();require(version in listOf(1,4) && input.i32() == 2)
         val backupId = input.string(36); val digest = packageHex(input.raw(32))
         val created = input.i64(); val imported = input.i64(); val id = input.string(36)
         val source = input.string(512); val revision = input.i32(); val tagVersion = input.i64()
         val recordHash = packageHex(input.raw(32)); val captured = input.i64(); val zone = input.string(128)
-        require(row[0] == ORIGIN + id && row[1] == id && row[2] == 1L && row[3] == "PACKAGE_ORIGIN")
-        RecordPackageOrigin(id, backupId, digest, created, imported, source, revision, tagVersion, recordHash, captured, zone)
+        val restoredCount=if(version==4) input.i32() else 1
+        val historyDigest=if(version==4) packageHex(input.raw(32)) else null
+        require(row[0] == ORIGIN + id && row[1] == id && row[2] == restoredCount.toLong() && row[3] == "PACKAGE_ORIGIN")
+        RecordPackageOrigin(id, backupId, digest, created, imported, source, revision, tagVersion, recordHash, captured, zone,restoredCount,historyDigest)
     }
     private fun receipt(write: (PackageWriter) -> Unit): String = PackageWriter(8192).use { out ->
         write(out); val raw = out.bytes()
@@ -206,7 +252,7 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
         validateMembers(sql,group)
         val index = group.ids.indexOf(entryId); require(index >= 0)
         require(group.digest == value.packageDigest && group.created == value.packageCreatedAtMillis &&
-            group.imported == value.importedAtMillis && group.hashes[index] == value.recordDigest)
+            group.imported == value.importedAtMillis && group.hashes[index] == value.recordDigest && historyMatches(group,index,value))
         immutable(sql, value, null)
         return erasureProof(group, index, entryId)
     }
@@ -232,19 +278,25 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
             }
             val value = origin(checkNotNull(job(sql,ORIGIN+id)))
             require(value.newId == id && value.backupId == group.id && value.packageDigest == group.digest &&
-                value.packageCreatedAtMillis == group.created && value.importedAtMillis == group.imported && value.recordDigest == group.hashes[index])
+                value.packageCreatedAtMillis == group.created && value.importedAtMillis == group.imported && value.recordDigest == group.hashes[index] &&
+                historyMatches(group,index,value))
             immutable(sql,value,null)
         }
     }
+    private fun historyMatches(group:Group,index:Int,value:RecordPackageOrigin):Boolean =
+        value.restoredRevisionCount==group.revisionCounts[index] &&
+            value.historyDigest==(if(group.history) group.historyDigests[index] else null)
     private fun erasureProof(group: Group, index: Int, entryId: String): String = receipt { out ->
-        out.i32(1); out.i32(3); out.string(group.id,36); out.raw(packageUnhex(group.digest))
+        out.i32(if(group.history) 4 else 1); out.i32(3); out.string(group.id,36); out.raw(packageUnhex(group.digest))
         out.i32(index); out.string(entryId,36); out.raw(packageUnhex(group.hashes[index]))
+        if(group.history) {out.i32(group.revisionCounts[index]);out.raw(packageUnhex(group.historyDigests[index]))}
     }
     private fun proofBackupId(state: String, entryId: String): String = readReceipt(state) { input ->
-        require(input.i32() == 1 && input.i32() == 3)
+        val version=input.i32();require(version in listOf(1,4) && input.i32() == 3)
         val backupId = input.string(36).also(RecordPackages::uuid)
         input.raw(32); require(input.i32() in 0..19)
         require(input.string(36).also(RecordPackages::uuid) == entryId); input.raw(32)
+        if(version==4) {require(input.i32() in 1..128);input.raw(32)}
         backupId
     }
     private inline fun <T> safely(block: () -> T): T = try { block() }
