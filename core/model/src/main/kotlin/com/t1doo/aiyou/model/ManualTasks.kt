@@ -14,12 +14,14 @@ data class ManualTaskSnapshot(
     val createdAtMillis: Long, val creationTimeZone: String, val updatedAtMillis: Long,
     val schedule: ManualTaskSchedule? = null,
     val sourceReceipt: SourceTaskReceipt? = null,
+    val reminder: TaskReminderSnapshot? = null,
 ) {
     init {
         ManualTags.identifier(id)
         require(version > 0 && title == ManualTasks.title(title))
         require(createdAtMillis >= 0 && updatedAtMillis >= createdAtMillis)
         ManualTasks.timeZone(creationTimeZone)
+        reminder?.let { TaskReminders.validate(id, it) }
     }
     override fun toString() = "ManualTaskSnapshot(version=$version, status=$status, redacted)"
 }

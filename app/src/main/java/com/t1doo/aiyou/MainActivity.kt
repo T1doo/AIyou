@@ -123,6 +123,7 @@ class MainActivity : ComponentActivity() {
                 sourceMemories = records.sourceMemories,
                 sourceTasks = records.sourceTasks,
                 taskProposals = records.taskProposals,
+                reminders = records.reminders,
                 localProcessing = records.localProcessing,
                 onTagRemove = records.tags::remove, onTagRetry = records.tags::retry, onTagClose = records.tags::close,
                 onTaskBegin = records.tasks::begin, onTaskEdit = records.tasks::edit, onTaskCreate = records.tasks::create,
@@ -224,6 +225,7 @@ fun AIyouApp(
     sourceMemories: com.t1doo.aiyou.records.SourceMemoryController? = null,
     sourceTasks: com.t1doo.aiyou.records.SourceTaskController? = null,
     taskProposals: com.t1doo.aiyou.records.TaskProposalController? = null,
+    reminders: com.t1doo.aiyou.records.TaskReminderController? = null,
     localProcessing: com.t1doo.aiyou.records.LocalProcessingController? = null,
     onTaskBegin: () -> Unit = {},
     onTaskEdit: (Long, String) -> Unit = { _, _ -> },
@@ -653,6 +655,10 @@ fun AIyouApp(
     SideEffect {
         if (exportUi != null && !ownsExportRoute()) exports?.close(exportUi.session)
     }
+    SideEffect {
+        if (!ownsNavigation() || selectedName != Destination.TASKS.name || showSettings || demo)
+            local?.reminders?.editor?.let { reminders?.close(it.session) }
+    }
     if (exports != null && exportUi != null && ownsExportRoute()) {
         com.t1doo.aiyou.records.OriginalExportPicker(exports, exportUi,
             canLaunch = local?.ready == true && local.error == null && !local.opening, ::ownsExportRoute)
@@ -795,6 +801,7 @@ fun AIyouApp(
                 onCloseDate = { session -> if (ownsTasks()) onTaskCloseDate(session) },
                 onProposalOpen = {id,version -> if(ownsTasks()) taskProposals?.openExisting(id,version)},
                 onProposalRefresh = {if(ownsTasks()) taskProposals?.refresh()},
+                reminders = reminders, ownsReminderRoute = ::ownsTasks,
                 onSource = { id,version -> if(ownsTasks()) {
                     val token=generation
                     sourceTasks?.locate(id,version) { binding -> navigation.publish(token) {

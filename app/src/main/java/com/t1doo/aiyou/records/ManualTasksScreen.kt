@@ -44,12 +44,13 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     onEditDate: (Long, ManualTaskDateInput) -> Unit = { _, _ -> },
     onSaveDate: (Long, ManualTaskDateInput) -> Unit = { _, _ -> },
     onCloseDate: (Long) -> Unit = {}, onSource: (String, Long) -> Unit = { _, _ -> }, clock: Clock = Clock.systemUTC(),
-    onProposalOpen:(String,Long)->Unit={_,_->},onProposalRefresh:()->Unit={}) {
+    onProposalOpen:(String,Long)->Unit={_,_->},onProposalRefresh:()->Unit={},
+    reminders: TaskReminderController? = null, ownsReminderRoute: () -> Boolean = { true }) {
     val tasks = local.tasks
     val storageReady = local.ready && !local.opening && local.error == null
     val available = storageReady && tasks.available && !tasks.loading
-    val canWrite = available && !tasks.busy && tasks.pending == null
-    val canChoose = canWrite && tasks.editor == null && tasks.dateEditor == null
+    val canWrite = available && !tasks.busy && tasks.pending == null && !local.reminders.busy && local.reminders.pending == null
+    val canChoose = canWrite && tasks.editor == null && tasks.dateEditor == null && local.reminders.editor == null
     val now by produceState(clock.instant(), clock) {
         // Display classification only, never a scheduler or a persisted inferred deadline.
         while (true) { delay(30_000); value = clock.instant() }
@@ -81,6 +82,10 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                         local.taskSourceNotice?.let { Text(it,modifier=Modifier.testTag("manual-task-source-notice")) }
                         tasks.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                         tasks.notice?.takeIf { available }?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                        local.reminders.notice?.takeIf { available }?.let { Text(it) }
+                        local.reminders.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                        if (local.reminders.supported && local.reminders.error != null) TextButton(enabled = available && !local.reminders.busy,
+                            onClick = { if (ownsReminderRoute()) reminders?.retry() }, modifier = Modifier.testTag("reminder-retry")) { Text("核对提醒状态") }
                         if (tasks.error != null && storageReady) TextButton(onClick = onRetry,
                             enabled = !tasks.busy && !tasks.loading, modifier = Modifier.testTag("manual-task-retry")) {
                             Text(if (tasks.conflict) "重新读取待办" else if (tasks.pending != null) "重试确认" else "重试读取")
@@ -134,12 +139,21 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                                     Text(task.title, style = MaterialTheme.typography.bodyLarge)
                                     Text(manualTaskDateLabel(task), style = MaterialTheme.typography.bodySmall,
                                         modifier = Modifier.testTag("manual-task-date-" + task.id))
+                                    task.reminder?.let { Text(taskReminderLabel(it), Modifier.testTag("reminder-status-" + task.id)) }
                                     task.sourceReceipt?.let { receipt ->
                                         Text("原文字面摘录 · 人工确认 · 原文版本 " + receipt.binding.source.revision)
                                         TextButton(enabled=canChoose,onClick={onSource(task.id,task.version)},
                                             modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("manual-task-source-"+task.id)) { Text("查看来源原文") }
                                     }
                                     if (task.status == ManualTaskStatus.OPEN) FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                                        if (local.reminders.supported && reminders != null) {
+                                            TextButton(enabled = canChoose && task.schedule?.instant() != null,
+                                                onClick = { if (ownsReminderRoute()) reminders.begin(task.id, task.version) },
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("reminder-open-" + task.id)) { Text("确认提醒计划") }
+                                            if (task.reminder?.phase?.let { it != TaskReminderPhase.REVOKED } == true) TextButton(enabled = canChoose,
+                                                onClick = { if (ownsReminderRoute()) reminders.begin(task.id, task.version, cancelling = true) },
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("reminder-cancel-" + task.id)) { Text("撤销提醒计划") }
+                                        }
                                         TextButton(onClick = { onBeginDate(task.id, task.version, ManualTaskDateOperation.SET) }, enabled = canChoose,
                                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-task-date-open-" + task.id)) {
                                             Text(if (task.schedule == null) "设置日期时间" else "修改日期时间") }
@@ -167,6 +181,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
         ManualTaskDialog(editor, tasks, storageReady, onEdit, onCreate, onRetry, onClose, onCreationDate)
     }
     tasks.dateEditor?.let { editor -> ManualTaskDateDialog(editor, tasks, storageReady, onEditDate, onSaveDate, onCloseDate, onRetry) }
+    if (reminders != null) TaskReminderDialog(local, reminders, ownsReminderRoute)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -286,6 +301,7 @@ private fun ManualTaskDateDialog(editor: ManualTaskDateEditor, tasks: ManualTask
                     Text(target.title, style = MaterialTheme.typography.bodyLarge)
                     Text(manualTaskDateLabel(target), style = MaterialTheme.typography.bodySmall)
                 } else Text("当前待办暂不可确认，请重新读取。编辑输入已保留，不会自动套到其他版本。")
+                if (target?.reminder != null) Text("变更或清除日期时间会撤销旧提醒计划；新时间需要再次单独确认提醒。")
                 if (editor.operation == ManualTaskDateOperation.CLEAR) Text("确认后移除计划日期和时刻，保留待办及当前状态。没有系统提醒。")
                 else {
                     if (editor.operation == ManualTaskDateOperation.POSTPONE)

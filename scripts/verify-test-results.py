@@ -99,6 +99,10 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.TaskReminderPresentationTest"] = (
+            "explicitReminderAndRevocationRequireRealConfirmationWithoutSavingPrivatePlan",
+            "dateOnlyAndGlobalReadFailureDisableReminderWithoutChangingOriginalInput",
+            "staleDialogAndRouteCallbacksCannotWriteAnotherTaskWithTheSameTitle")
         additional["com.t1doo.aiyou.OriginalActivityExportPresentationTest"] = (
             "taskOnlyDoubleFontPreviewSeparatesKindsAndRequiresPlaintextConsentBeforeSafWithoutSavingPrivateState",
             "formatScopeChangesRetireConsentAndChangedActivitiesNeverLaunchDestinationOrPromoteDraft",

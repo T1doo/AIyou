@@ -54,6 +54,7 @@ class EncryptedEntryRepository internal constructor(
         SqlLocalSearchRepository(borrowedSql, tagStorage)
     private val taskStorage = SqlManualTaskRepository(borrowedSql, keyBytes)
     override val manualTasks: com.t1doo.aiyou.domain.ManualTaskRepository get() = taskStorage
+    override val reminders: com.t1doo.aiyou.domain.TaskReminderRepository get() = taskStorage
     private val proposalStorage = SqlTaskProposalRepository(borrowedSql,keyBytes,taskStorage)
     override val taskProposals: com.t1doo.aiyou.domain.TaskProposalRepository get() = proposalStorage
     private val packageActivities=SqlRecordPackageActivities(borrowedSql,taskStorage,proposalStorage)

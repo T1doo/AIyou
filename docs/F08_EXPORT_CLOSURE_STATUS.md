@@ -106,3 +106,11 @@ ACTION_CREATE_DOCUMENT/MIME，再读取 key/code；没有直接调用 registry.o
 修复批本地结果：Python 123/123、三项 Compose 源码方法与必需清单静态比对、
 `git diff --check` 均 PASS；720 项旧主机 XML/输入指纹再核验 PASS，明确为复用证据。
 SDK 前置 FAIL，修复后的 Compose/Android 编译执行 NOT RUN；不计为本批通过。
+
+父级后续独立核实：修复提交 `7e8c2168e524ce4123046739727e6eafb32ac881` 的
+[run 38901288626 / job 116973907479](https://github.com/T1doo/AIyou/actions/runs/38901288626/job/116973907479)
+于 12:49:32 UTC 完成，45 步成功；Compose 213 项零失败/错误/跳过，失败的 SAF
+方法实际 1 次通过；Preview 394 tests/394 PNG、lint 0 错误/0 警告/1 hint、APK
+及 instrumentation 编译通过。此前 6f68806 失败记录继续保留。该来源只接受为
+父级已读日志核实的 JVM 模拟与编译门，不是真机、视觉或对另存 host 归档的独立
+核验；本机未查询 Actions。新 F06/D07 提醒模型另按新源码执行及独立 CI 验证。

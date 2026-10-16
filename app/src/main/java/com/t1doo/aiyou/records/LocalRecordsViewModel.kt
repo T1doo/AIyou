@@ -107,6 +107,7 @@ data class LocalRecordUiState(
     val localSearchEpoch: Long? = null,
     val localIndexBusy: Boolean = false,
     val localIndexError: String? = null,
+    val reminders: TaskRemindersUiState = TaskRemindersUiState(),
 )
 
 /** All draft writes and saves share one queue, preserving edits around a save boundary. */
@@ -143,6 +144,8 @@ class LocalRecordsViewModel internal constructor(
     val favorites = RecordFavoriteController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.Favorites(action)).isSuccess })
     val tasks = ManualTaskController(current = { mutableState.value }, publish = { change -> update(change) },
+        enqueue = { action -> commands.trySend(Command.ManualTasks(action)).isSuccess }, clock = clock)
+    val reminders = TaskReminderController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.ManualTasks(action)).isSuccess }, clock = clock)
     val candidates = LocalCandidateController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.LocalCandidates(action)).isSuccess },
@@ -319,6 +322,7 @@ class LocalRecordsViewModel internal constructor(
                 tags.dispose()
                 favorites.dispose()
                 tasks.dispose()
+                reminders.dispose()
                 candidates.dispose()
                 sourceTags.dispose()
                 sourceMemories.dispose()
@@ -1101,6 +1105,7 @@ class LocalRecordsViewModel internal constructor(
                 editDraftError = if (pending == null) "编辑草稿目录暂不可读取，恢复列表尚未确认。已保留加密数据；请重试本机读取，未自动删除或替换。" else indexNotice(pending)) }
             mixedCapture.initialize(store)
             tasks.initialize(store)
+            reminders.initialize(store)
             taskProposals.initialize(store)
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) { failed(failure) }
@@ -1231,6 +1236,7 @@ class LocalRecordsViewModel internal constructor(
         tags.dispose()
         favorites.dispose()
         tasks.dispose()
+        reminders.dispose()
         candidates.dispose()
         sourceTags.dispose()
         sourceMemories.dispose()

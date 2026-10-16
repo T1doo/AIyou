@@ -12,7 +12,9 @@
 已提供同一加密库中的持久化中文词法索引、捕获日期与手工标签组合筛选、原文核验与定位高亮、失效和有界重建；工程合同见 [LOCAL_PERSISTENT_INDEX_CONTRACT.md](docs/LOCAL_PERSISTENT_INDEX_CONTRACT.md)。完整 D06 与设备性能验收仍开放。
 手工正式待办支持明确创建、加密保存、查看、完成、取消及明确日期/可选时刻、时区和
 重复时刻选择；来源摘录可另存为待确认 DRAFT，只有用户明确确认才能成为正式待办。
-系统提醒尚未实现，完整 D07 仍未完成。范围见 [待办时间合同](docs/MANUAL_TASK_DATES_CONTRACT.md)
+明确时刻的正式待办现可单独确认精确/大约提醒计划；已接通加密状态、版本化命令、
+撤销/重排与迟到触发拒绝。当前系统调度未接入，保存计划不会发送通知或申请权限，
+设备通知与 AlarmManager 仍未验，完整 D07 未完成。范围见 [提醒模型闭环](docs/F06_REMINDER_MODEL_STATUS.md)、[待办时间合同](docs/MANUAL_TASK_DATES_CONTRACT.md)
 与 [持久化待确认草稿](docs/F06_PERSISTENT_TASK_PROPOSALS_STATUS.md)。默认 `LOCAL_ONLY`，没有
 联网权限、真实模型调用、服务端或已授权角色素材。
 用户可主动导出当前原文与手工标签为 Markdown/JSONL，另可明确勾选全部正式待办与

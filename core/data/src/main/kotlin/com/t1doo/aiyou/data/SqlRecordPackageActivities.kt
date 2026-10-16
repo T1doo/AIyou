@@ -17,7 +17,7 @@ internal class SqlRecordPackageActivities(private val database:RecordsSqlDatabas
             if(index<0) return -1
             return try {source.quoteWithin(sql,b,true);index} catch(_:SourceTaskConflict) {-1}
         }
-        return RecordPackageActivities(tasks.exportWithin(sql).map {RecordPackageTask(it,index(it.sourceReceipt?.binding))},
+        return RecordPackageActivities(tasks.exportWithin(sql).map {RecordPackageTask(it.copy(reminder=null),index(it.sourceReceipt?.binding))},
             proposals.exportWithin(sql).map {RecordPackageDraft(it,index(it.binding))},snapshot.records.map {it.sourceGeneration})
     }
     fun current(snapshot:OriginalExportSnapshot,a:RecordPackageActivities):Boolean {
@@ -31,7 +31,7 @@ internal class SqlRecordPackageActivities(private val database:RecordsSqlDatabas
         a.tasks.forEach {item ->
             val old=item.task
             val receipt=old.sourceReceipt?.let {SourceTaskReceipt(mapped(pack,ids,it.binding,item.sourceRecord),hash("source",pack.digest,it.requestHash))}
-            tasks.importWithin(sql,old.copy(id=taskId(pack,old.id),version=1,sourceReceipt=receipt),mutation)
+            tasks.importWithin(sql,old.copy(id=taskId(pack,old.id),version=1,sourceReceipt=receipt,reminder=null),mutation)
         }
         a.drafts.forEach {item ->
             val old=item.proposal

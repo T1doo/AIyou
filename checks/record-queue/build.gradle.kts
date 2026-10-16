@@ -7,6 +7,7 @@ dependencyLocking { lockAllConfigurations() }
 val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/TaskProposalController.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/TaskReminderController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/FactRecapController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalProcessingController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/SourceTaskController.kt")

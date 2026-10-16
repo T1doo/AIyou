@@ -50,6 +50,7 @@ class ManualTaskController internal constructor(
     private val sessions = AtomicLong()
     @Volatile private var disposed = false
     private fun usable(local: LocalRecordUiState = current()) = !disposed && local.ready && !local.opening && local.error == null
+    private fun reminderBlocksWrite() = current().reminders.let { it.editor != null || it.busy || it.pending != null }
     private fun update(change: (ManualTasksUiState) -> ManualTasksUiState) =
         publish { local -> if (disposed) local else local.copy(tasks = change(local.tasks)) }
     suspend fun initialize(store: EntryRepository) {
@@ -70,7 +71,7 @@ class ManualTaskController internal constructor(
     }
     fun begin() {
         val tasks = current().tasks
-        if (!usable() || !tasks.supported || !tasks.available || tasks.loading || tasks.busy || tasks.pending != null || tasks.editor != null || tasks.dateEditor != null) return
+        if (!usable() || reminderBlocksWrite() || !tasks.supported || !tasks.available || tasks.loading || tasks.busy || tasks.pending != null || tasks.editor != null || tasks.dateEditor != null) return
         val editor = ManualTaskEditor(sessions.incrementAndGet(), dateInput = ManualTaskDateInput(timeZone = timeZone()))
         update { it.copy(editor = editor, error = null, notice = null, conflict = false) }
     }
@@ -93,7 +94,7 @@ class ManualTaskController internal constructor(
     fun create(session: Long, raw: String) {
         edit(session, raw)
         val tasks = current().tasks
-        if (!usable() || tasks.editor?.session != session || !tasks.available || tasks.busy || tasks.loading || tasks.pending != null) return
+        if (!usable() || reminderBlocksWrite() || tasks.editor?.session != session || !tasks.available || tasks.busy || tasks.loading || tasks.pending != null) return
         val schedule = try { tasks.editor.dateInput.parse() }
         catch (failure: ManualTaskDateInvalid) { update { it.copy(error = dateError(failure.reason)) }; return }
         val request = try { ManualTaskCreate(UUID.randomUUID().toString(), raw, clock.millis(), timeZone(), UUID.randomUUID().toString(), schedule) }
@@ -102,7 +103,7 @@ class ManualTaskController internal constructor(
     }
     fun beginDate(id: String, version: Long, operation: ManualTaskDateOperation) {
         val tasks = current().tasks
-        if (!usable() || !tasks.supported || !tasks.available || tasks.loading || tasks.busy ||
+        if (!usable() || reminderBlocksWrite() || !tasks.supported || !tasks.available || tasks.loading || tasks.busy ||
             tasks.pending != null || tasks.editor != null || tasks.dateEditor != null) return
         val task = tasks.items.singleOrNull { it.id == id && it.version == version && it.status == ManualTaskStatus.OPEN } ?: return
         if (operation != ManualTaskDateOperation.SET && task.schedule == null) return
@@ -123,7 +124,7 @@ class ManualTaskController internal constructor(
     fun saveDate(session: Long, input: ManualTaskDateInput) {
         editDate(session, input)
         val tasks = current().tasks; val editor = tasks.dateEditor
-        if (!usable() || editor?.session != session || !tasks.available || tasks.loading || tasks.busy || tasks.pending != null) return
+        if (!usable() || reminderBlocksWrite() || editor?.session != session || !tasks.available || tasks.loading || tasks.busy || tasks.pending != null) return
         val target = tasks.items.singleOrNull { it.id == editor.taskId && it.version == editor.version && it.status == ManualTaskStatus.OPEN }
         if (target == null) { update { it.copy(error = "待办已变化，请关闭编辑，重新读取后再选择。", conflict = true) }; return }
         val due = try {
@@ -136,7 +137,7 @@ class ManualTaskController internal constructor(
     }
     fun change(id: String, version: Long, status: ManualTaskStatus) {
         val tasks = current().tasks
-        if (!usable() || !tasks.available || tasks.busy || tasks.loading || tasks.pending != null || status == ManualTaskStatus.OPEN ||
+        if (!usable() || reminderBlocksWrite() || !tasks.available || tasks.busy || tasks.loading || tasks.pending != null || status == ManualTaskStatus.OPEN ||
             tasks.editor != null || tasks.dateEditor != null ||
             tasks.items.none { it.id == id && it.version == version && it.status == ManualTaskStatus.OPEN }) return
         submit(ManualTaskIntent.Change(ManualTaskMutation(id, version, status, clock.millis(), UUID.randomUUID().toString())))

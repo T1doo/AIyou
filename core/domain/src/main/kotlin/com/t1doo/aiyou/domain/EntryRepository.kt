@@ -23,6 +23,7 @@ interface EntryRepository {
     val recycleBin: RecycleBinRepository? get() = null
     val originalExport: OriginalExportRepository? get() = null
     val manualTasks: ManualTaskRepository? get() = null
+    val reminders: TaskReminderRepository? get() = null
     val manualTags: ManualTagRepository? get() = null
     /** Borrowed capability over the same records database; it never enables remote processing. */
     val sourceBoundText: SourceBoundTextRepository? get() = null
