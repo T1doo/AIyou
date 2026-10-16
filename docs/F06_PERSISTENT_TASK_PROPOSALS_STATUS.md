@@ -81,5 +81,9 @@ vararg 被误传 List，1 项为 Integer/Long 断言类型；修正只涉及测�
 SDK 预检仍失败：ANDROID_HOME 没有指向已接受条款的安装；未安装 SDK、接受新
 协议或绕过已知访问拒绝。AAR metadata、assembleDebug、lint、Compose、Preview、
 原生/SAF/Keystore/SQLCipher/设备重启/TalkBack/真机视觉与性能本地均未运行，
-没有新 APK。本分支正常推送只使用现有有界 CI，Actions 拒绝未绕过，精确新 SHA
-结果仍未知。仅合成数据，无真实模型调用、自建后台、费用、凭据、权限变更或部署。
+没有新 APK。本分支正常推送只使用现有有界 CI，Actions 拒绝未绕过。后续已独立
+核实修正 SHA `5c5b6b932df45ac3bb8c5f424a88507da9468a1e` 的 run `38855242541` /
+job `116825118552` 在 Compose 第 18 步失败，原日志 `BlobNotFound`，具体新用例
+未知；该修正 SHA 不能称通过。功能 SHA `89949bb26dc581ba6b18408569622a341baf2586`
+的精确结果仍未知。详见 [CI 证据更正与缺失材料](F06_SOURCE_TASK_CI_FIX.md)。仅合成
+数据，无真实模型调用、自建后台、费用、凭据、权限变更或部署。
