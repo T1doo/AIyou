@@ -115,7 +115,9 @@ class SourceTaskPresentationTest {
         // Closing the source form keeps the reader open; its bottom navigation is intentionally absent.
         compose.onNodeWithText("返回列表").performClick()
         compose.onNodeWithText("待办").assertIsDisplayed().performClick()
-        click("manual-task-source-"+task!!.id);drain()
+        val sourceTag="manual-task-source-"+task!!.id
+        compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(sourceTag))
+        compose.onNodeWithTag(sourceTag).performScrollTo().assertIsDisplayed().assertIsEnabled().performClick();drain()
         compose.onNodeWithTag("original-text").assertTextEquals(original)
         compose.runOnIdle {entry=entry.copy(currentRevision=2,originalText="合成不同新版本");state.value=state.value.copy(entries=listOf(entry))}
         compose.onNodeWithText("待办来源版本已变化").assertIsDisplayed();compose.onAllNodesWithTag("original-text").assertCountEquals(0)

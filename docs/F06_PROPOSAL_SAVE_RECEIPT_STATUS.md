@@ -62,3 +62,10 @@ run `38855242541` / job `116825118552` 已知 Compose 第 18 步失败，原日�
 证据目录：`/workspace/aiyou-evidence/f06-proposal-save-receipt-20261016/`。
 仅合成 LOCAL_ONLY/AI_NONE 数据；原始两份方案未改，没有真实模型调用、自建
 后台、费用、凭据、权限变更或部署。
+
+后续 CI 状态更正：父级已核 `c8e05bc…` 的 run `38859223699` / job
+`116837464919` Android 编译失败（MainActivity 第 889 行 `key` 未解析）；
+`5c5b6b9…` 的 Compose 第 118 行也已定位为 LazyColumn 离屏来源按钮查找问题。
+上述“根因未知”保留为当时状态；两处最新定位、修正及验证限制详见
+[后续 CI 定位与修正](F06_SOURCE_TASK_CI_FIX.md)。P2 保存提示的源码审查通过不能
+替代 Android 编译/Compose，新修正仍需新 SHA 实际结果。

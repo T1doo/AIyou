@@ -52,3 +52,30 @@ SDK 只读预检仍因缺少 ANDROID_HOME 失败，未安装或接受协议，�
 
 在取得这些材料前，不修改生产代码、测试断言、用例门槛或截图原件，不额外重跑
 已通过的无关 JVM 合约，也不把主机 691/149/123 结果用于解释这次 Compose 失败。
+
+## 2026-10-16 后续定位与两处修正
+
+父级提供的新证据已将上述 `5c5b6b932df45ac3bb8c5f424a88507da9468a1e`
+失败定位到同一来源流程测试第 118 行：跳到待办页后直接查找离屏来源按钮，
+LazyColumn 尚未 compose 对应项目，所以 `onNodeWithTag(...).performScrollTo()`
+找不到该节点。此前 `BlobNotFound` 和“根因未知”是当时的证据状态，原记录保留；
+现在不再将此项称为根因未知，也不据此归为偶发故障。
+
+同批新证据确认保存回执修复
+`c8e05bc0a721ac58c2f67346522644c8cc5d9caa` 的 run `38859223699` /
+job `116837464919` 在 Android 编译时失败：`MainActivity.kt` 第 889 行的
+`key` 未解析。P2 保存提示源码已独审闭合，仍不能因此声称 Android 构建通过。
+证据：https://github.com/T1doo/AIyou/actions/runs/38859223699/job/116837464919
+
+当前修正仅补 `androidx.compose.runtime.key` import，并让来源测试先在现有
+`manual-task-list` 上调用 `performScrollToNode(hasTestTag(sourceTag))`，待项目
+进入组合后再核对按钮可见、启用并点击。沿用 `ManualTaskPresentationTest`
+已有模式，创建/日期/AI_NONE/精确原文相等/改版撤下旧原文等全部原断言保留，
+没有 sleep、过滤测试或降低门槛。
+
+独立只读源码审查通过；SDK 只读预检仍失败，本地 Android 构建及 Compose 未运行。
+本轮没有重跑不覆盖这两处的旧主机合约，也不将 c8e05bc 的主机计数用于证明本批
+编译/Compose 通过。正常开发分支推送使用既有有界 CI，不绕过 Actions 拒绝、
+不安装 SDK 或接受协议、不修改 main。问题仅能由**新 SHA 的实际 Android 编译及
+Compose 结果**关闭；本批仍为“源码修正完成，实际验证待完成”。原始日志未在
+本地取得，本节精确定位来自父级提供的已核证据。
