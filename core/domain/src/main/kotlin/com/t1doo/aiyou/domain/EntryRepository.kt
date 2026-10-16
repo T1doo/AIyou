@@ -7,6 +7,7 @@ import com.t1doo.aiyou.model.OriginalEditDraft
 
 /** Successful completion means a durable transaction, never an optimistic UI insert. */
 interface EntryRepository {
+    val taskProposals: TaskProposalRepository? get() = null
     val sourceTasks: SourceTaskRepository? get() = null
     val localProcessing: LocalProcessingRepository? get() = null
     val factRecaps: FactRecapRepository? get() = null

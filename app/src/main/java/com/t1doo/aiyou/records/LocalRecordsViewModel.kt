@@ -37,6 +37,7 @@ data class CaptureDiscardUiState(val requestId: Long, val busy: Boolean = false,
     val recovering: Boolean = false, val recoveryFailed: Boolean = false)
 
 data class LocalRecordUiState(
+    val taskProposals: TaskProposalsUiState = TaskProposalsUiState(),
     val supportsSourceTasks: Boolean = false,
     val sourceTask: SourceTaskUiState? = null,
     val taskSourceNotice: String? = null,
@@ -123,6 +124,8 @@ class LocalRecordsViewModel internal constructor(
     val state = mutableState.asStateFlow()
     private val commands = Channel<Command>(Channel.UNLIMITED)
     val sourceTasks = SourceTaskController({ mutableState.value }, { change -> update(change) },
+        { action -> commands.trySend(Command.ManualTasks(action)).isSuccess },clock, { tasks.refresh() },{taskProposals.open(it)})
+    val taskProposals = TaskProposalController({ mutableState.value }, { change -> update(change) },
         { action -> commands.trySend(Command.ManualTasks(action)).isSuccess },clock, { tasks.refresh() })
     val localProcessing = LocalProcessingController({ mutableState.value }, { change -> update(change) },
         { action -> commands.trySend(Command.LocalProcessing(action)).isSuccess }, ::retireDerived)
@@ -307,6 +310,7 @@ class LocalRecordsViewModel internal constructor(
             } finally {
                 editsDisposed = true
                 sourceTasks.dispose()
+                taskProposals.dispose()
                 localProcessing.dispose()
                 factRecaps.dispose()
                 mixedCapture.dispose()
@@ -1069,6 +1073,7 @@ class LocalRecordsViewModel internal constructor(
             val searchEpoch = try { store.localSearch?.epoch() }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
+                taskProposals = it.taskProposals.copy(supported=store.taskProposals!=null,available=false,loading=store.taskProposals!=null),
                 supportsSourceTasks = store.sourceTasks != null && store.localProcessing != null && store.manualTasks != null,
                 supportsLocalProcessing = store.localProcessing != null,
                 localProcessingVersions = processingVersions.orEmpty(), localProcessingAvailable = processingVersions != null,
@@ -1096,6 +1101,7 @@ class LocalRecordsViewModel internal constructor(
                 editDraftError = if (pending == null) "编辑草稿目录暂不可读取，恢复列表尚未确认。已保留加密数据；请重试本机读取，未自动删除或替换。" else indexNotice(pending)) }
             mixedCapture.initialize(store)
             tasks.initialize(store)
+            taskProposals.initialize(store)
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) { failed(failure) }
         catch (_: LinkageError) { failed(IllegalStateException()) }
@@ -1157,6 +1163,7 @@ class LocalRecordsViewModel internal constructor(
     }
     /** Retires memory-only authority before a policy write or after observing a generation change. */
     private fun retireDerived(id: String) {
+        taskProposals.invalidateSource(id)
         sourceTasks.invalidateSource(id)
         mutableState.value.candidates?.takeIf { it.source.sourceId == id }?.let { candidates.close(it.session) }
         mutableState.value.sourceTags?.takeIf { it.source.sourceId == id }?.let { sourceTags.close(it.session) }
@@ -1215,6 +1222,7 @@ class LocalRecordsViewModel internal constructor(
     override fun onCleared() {
         editsDisposed = true
         sourceTasks.dispose()
+        taskProposals.dispose()
         localProcessing.dispose()
         factRecaps.dispose()
         mixedCapture.dispose()

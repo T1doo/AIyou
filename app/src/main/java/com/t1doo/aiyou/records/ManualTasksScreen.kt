@@ -43,7 +43,8 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     onBeginDate: (String, Long, ManualTaskDateOperation) -> Unit = { _, _, _ -> },
     onEditDate: (Long, ManualTaskDateInput) -> Unit = { _, _ -> },
     onSaveDate: (Long, ManualTaskDateInput) -> Unit = { _, _ -> },
-    onCloseDate: (Long) -> Unit = {}, onSource: (String, Long) -> Unit = { _, _ -> }, clock: Clock = Clock.systemUTC()) {
+    onCloseDate: (Long) -> Unit = {}, onSource: (String, Long) -> Unit = { _, _ -> }, clock: Clock = Clock.systemUTC(),
+    onProposalOpen:(String,Long)->Unit={_,_->},onProposalRefresh:()->Unit={}) {
     val tasks = local.tasks
     val storageReady = local.ready && !local.opening && local.error == null
     val available = storageReady && tasks.available && !tasks.loading
@@ -88,6 +89,35 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                             modifier = Modifier.testTag("manual-task-refresh")) { Text("重新读取待办") }
                     }
                 }
+                if(local.taskProposals.supported) {
+                    val proposals=local.taskProposals
+                    item("proposal-heading") {Text("待确认草稿"+(if(storageReady&&proposals.available&&!proposals.loading) " "+proposals.items.count {it.proposal.state==TaskProposalState.DRAFT} else " · 待核对"),
+                        style=MaterialTheme.typography.titleLarge,modifier=Modifier.testTag("task-proposal-heading"))}
+                    item("proposal-state") {
+                        Column {
+                            Text("人工草稿与正式待办分开计数；没有语义 AI 建议。")
+                            if(proposals.loading) Text("正在读取加密草稿…")
+                            proposals.error?.let {Text(it,color=MaterialTheme.colorScheme.error)}
+                            TextButton(enabled=storageReady&&!proposals.loading,onClick=onProposalRefresh,modifier=Modifier.testTag("task-proposal-refresh")) {Text("重新读取待确认草稿")}
+                        }
+                    }
+                    if(storageReady&&proposals.available&&!proposals.loading) {
+                        val drafts=proposals.items.filter {it.proposal.state==TaskProposalState.DRAFT}
+                        if(drafts.isEmpty()) item("proposal-empty") {Text("没有待确认草稿；可从原文摘录主动发起。")}
+                        items(drafts,key={"proposal-"+it.proposal.id}) {item ->
+                            val p=item.proposal
+                            Surface(shape=MaterialTheme.shapes.medium) {Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd).testTag("task-proposal-row-"+p.id),
+                                verticalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                                Text(p.titleInput.ifEmpty {"尚未填写标题"})
+                                Text("人工待确认 · 原文版本 "+p.binding.source.revision+" · "+p.dateInput.date.ifEmpty {"未设日期"})
+                                if(!item.sourceAvailable||!local.canUseTaskSource(p.binding)) Text("来源已失效或暂不可核对，不能确认。")
+                                TextButton(enabled=proposals.editor==null,onClick={onProposalOpen(p.id,p.version)},
+                                    modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("task-proposal-open-"+p.id)) {Text("查看、修改或拒绝")}
+                            }}
+                        }
+                        item("proposal-rejected") {Text("已拒绝草稿 "+proposals.items.count {it.proposal.state==TaskProposalState.REJECTED}+" · 不计入正式待办")}
+                    }
+                }
                 if (available) {
                     if (tasks.items.isEmpty()) item("empty") { StatusNotice("还没有正式待办", "点击“创建待办”并确认保存后，才会加入清单。", state = ComponentState.EMPTY) }
                     for ((bucket, title) in listOf(ManualTaskGroup.PAST to "过去 · 未完成", ManualTaskGroup.TODAY to "今天",
@@ -129,7 +159,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                         }
                     }
                 }
-                item("proposals") { StatusNotice("没有待确认建议", if(local.supportsSourceTasks) "可从原文摘录手工创建待办；语义 AI 建议尚未开放，原文和草稿不会自动变成待办。" else "AI 候选确认尚未开放；原文与草稿不会自动变成正式待办。", state = ComponentState.EMPTY) }
+                if(!local.taskProposals.supported) item("proposals") { StatusNotice("没有待确认建议", if(local.supportsSourceTasks) "可从原文摘录手工创建待办；语义 AI 建议尚未开放，原文和草稿不会自动变成待办。" else "AI 候选确认尚未开放；原文与草稿不会自动变成正式待办。", state = ComponentState.EMPTY) }
             }
         }
     }

@@ -28,7 +28,7 @@ internal fun LocalRecordUiState.canUseTaskSource(binding:TaskSourceBinding):Bool
 class SourceTaskController(private val current:()->LocalRecordUiState,
     private val publish:((LocalRecordUiState)->LocalRecordUiState)->Unit,
     private val enqueue:(suspend(EntryRepository)->Unit)->Boolean,private val clock:Clock,
-    private val afterClose:()->Unit = {}) {
+    private val afterClose:()->Unit = {},private val proposalOpen:(TaskSourceBinding)->Unit = {}) {
     private val sessions=AtomicLong()
     @Volatile private var disposed=false
     private fun usable()=!disposed && current().let { it.ready&&!it.opening&&it.error==null }
@@ -44,7 +44,9 @@ class SourceTaskController(private val current:()->LocalRecordUiState,
         open(TaskSourceBinding(SourceVersion(id,revision.toLong()),OriginalExports.hash(entry.originalText),version.generation,0,points))
     }
     fun open(binding:TaskSourceBinding) {
+        if(disposed) return
         val local=current()
+        if(local.taskProposals.supported) {proposalOpen(binding);return}
         if(!usable()||!local.supportsSourceTasks||local.sourceTask!=null||local.originalEdit!=null||local.originalHistory!=null||
             local.recycleBin!=null||local.recordPackage!=null||local.localProcessing!=null||local.saving||local.savePending||local.tasks.busy||local.tasks.pending!=null) return
         val entry=local.entries.singleOrNull { it.id==binding.source.sourceId&&it.currentRevision.toLong()==binding.source.revision } ?: return

@@ -121,6 +121,7 @@ class MainActivity : ComponentActivity() {
                 sourceTags = records.sourceTags,
                 sourceMemories = records.sourceMemories,
                 sourceTasks = records.sourceTasks,
+                taskProposals = records.taskProposals,
                 localProcessing = records.localProcessing,
                 onTagRemove = records.tags::remove, onTagRetry = records.tags::retry, onTagClose = records.tags::close,
                 onTaskBegin = records.tasks::begin, onTaskEdit = records.tasks::edit, onTaskCreate = records.tasks::create,
@@ -221,6 +222,7 @@ fun AIyouApp(
     sourceTags: com.t1doo.aiyou.records.SourceTagController? = null,
     sourceMemories: com.t1doo.aiyou.records.SourceMemoryController? = null,
     sourceTasks: com.t1doo.aiyou.records.SourceTaskController? = null,
+    taskProposals: com.t1doo.aiyou.records.TaskProposalController? = null,
     localProcessing: com.t1doo.aiyou.records.LocalProcessingController? = null,
     onTaskBegin: () -> Unit = {},
     onTaskEdit: (Long, String) -> Unit = { _, _ -> },
@@ -790,6 +792,8 @@ fun AIyouApp(
                 onEditDate = { session, input -> if (ownsTasks()) onTaskEditDate(session, input) },
                 onSaveDate = { session, input -> if (ownsTasks()) onTaskSaveDate(session, input) },
                 onCloseDate = { session -> if (ownsTasks()) onTaskCloseDate(session) },
+                onProposalOpen = {id,version -> if(ownsTasks()) taskProposals?.openExisting(id,version)},
+                onProposalRefresh = {if(ownsTasks()) taskProposals?.refresh()},
                 onSource = { id,version -> if(ownsTasks()) {
                     val token=generation
                     sourceTasks?.locate(id,version) { binding -> navigation.publish(token) {
@@ -879,6 +883,13 @@ fun AIyouApp(
                 destination = selected, demo = demo, modifier = modifier, companion = companion,
                 state = if (demo) ComponentState.valueOf(stateName) else ComponentState.NORMAL,
             )
+        }
+    }
+    if(!demo&&!showSettings&&local?.taskProposals?.editor!=null&&taskProposals!=null) {
+        key(generation,local.taskProposals.editor.session) {
+            com.t1doo.aiyou.records.TaskProposalDialog(local,taskProposals) {
+                ownsNavigation()&&!demo&&!showSettings&&(selectedName==Destination.TASKS.name||detailEntryId==local.taskProposals.editor.binding.source.sourceId)
+            }
         }
     }
     if (companionVisible && companionPanel) CompanionDialog(onClose = { companionPanel = false }, motionAllowed = motionAllowed)

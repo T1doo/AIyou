@@ -10,7 +10,9 @@ import java.util.concurrent.CancellationException
 /** SQL and files are deliberately separate durable phases. Both real file leases cover final SQL. */
 internal class SqlPermanentErasureRepository(private val database: RecordsSqlDatabase,
     private val attachments: EncryptedAttachmentStore, private val edits: EncryptedOriginalEditStore,
-    private val packages: SqlRecordPackageRepository, private val checkpoint: (String) -> Unit = {}) : PermanentErasureRepository {
+    private val packages: SqlRecordPackageRepository,
+    private val proposalAccess: ((RecordsSqlConnection)->List<TaskProposal>)? = null,
+    private val checkpoint: (String) -> Unit = {}) : PermanentErasureRepository {
     private class Stored(val receipt: PermanentErasureReceipt, val plan: String, val packageProof: String)
     override fun read(entryId: String): PermanentErasureReceipt? = safe {
         ManualTags.identifier(entryId); database.transaction { sql ->
@@ -99,6 +101,9 @@ internal class SqlPermanentErasureRepository(private val database: RecordsSqlDat
                     if (current.receipt.phase != PermanentErasurePhase.PLANNED || current.plan != stored.plan || current.packageProof != stored.packageProof ||
                         packages.prepareErasureProof(sql,intent.source.sourceId) != current.packageProof) throw PermanentErasureConflict()
                     mediaLease.verify(); editLease.verify()
+                    proposalRows(sql).filter {it.binding.source.sourceId==intent.source.sourceId}.forEach {p ->
+                        check(sql.execute("DELETE FROM manual_tasks WHERE id=? AND version=?",listOf(TaskProposals.storageId(p.id),p.version))==1)
+                    }
                     if (hasCandidates(sql)) sql.execute("DELETE FROM local_candidate_batches WHERE entryId=?",listOf(intent.source.sourceId))
                     for (table in listOf("text_annotations","remote_text_jobs","entry_manual_tags","remote_source_access","local_jobs","attachments","local_search_fts","local_search_documents"))
                         sql.execute("DELETE FROM $table WHERE entryId=?",listOf(intent.source.sourceId))
@@ -129,11 +134,19 @@ internal class SqlPermanentErasureRepository(private val database: RecordsSqlDat
         if (row != listOf(intent.source.revision,intent.generation,1L)) throw PermanentErasureConflict()
     }
     private fun absent(sql: RecordsSqlConnection, id: String) {
+        check(proposalRows(sql).none {it.binding.source.sourceId==id})
         check(sql.query("SELECT id FROM entries WHERE id=?",listOf(id)).isEmpty())
         if (hasCandidates(sql)) check(sql.query("SELECT entryId FROM local_candidate_batches WHERE entryId=? LIMIT 1",listOf(id)).isEmpty())
         for (table in listOf("entry_revisions","attachments","entry_manual_tags","remote_source_access","local_jobs","text_annotations","remote_text_jobs","local_search_fts","local_search_documents","owned_file_creations"))
             check(sql.query("SELECT entryId FROM $table WHERE entryId=? LIMIT 1",listOf(id)).isEmpty())
         check(sql.query("SELECT id FROM record_package_receipts WHERE operation='PACKAGE_ORIGIN' AND entryId=?",listOf(id)).isEmpty())
+    }
+    private fun proposalRows(sql:RecordsSqlConnection):List<TaskProposal> {
+        proposalAccess?.let {return it(sql)}
+        // Legacy fixtures have no proposal owner. Never skip unknown encrypted drafts.
+        if(sql.query("SELECT name FROM sqlite_master WHERE type='table' AND name='manual_tasks'").isEmpty()) return emptyList()
+        check(sql.query("SELECT id FROM manual_tasks WHERE substr(id,1,14)='TASK_PROPOSAL:' LIMIT 1").isEmpty())
+        return emptyList()
     }
     // The shared transaction layer also verifies historical pre-v10 migration fixtures.
     // A production v10 Room owner always supplies this table and its CASCADE foreign key.

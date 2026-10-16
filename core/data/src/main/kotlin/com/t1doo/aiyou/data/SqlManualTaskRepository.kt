@@ -10,11 +10,12 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
     private val cipher = ManualTaskCipher(key)
     override fun snapshots(): List<ManualTaskSnapshot> = safely {
         database.transaction { sql ->
-            Collections.unmodifiableList(sql.query("SELECT id,version,lastMutationId,ciphertext FROM manual_tasks ORDER BY id")
+            Collections.unmodifiableList(sql.query("SELECT id,version,lastMutationId,ciphertext FROM manual_tasks WHERE substr(id,1,14)!='TASK_PROPOSAL:' ORDER BY id")
                 .map { decode(it).payload.task }.sortedWith(compareByDescending<ManualTaskSnapshot> { it.createdAtMillis }.thenBy { it.id }))
         }
     }
     override fun create(request: ManualTaskCreate): ManualTaskSnapshot = safely {
+        if(request.id.startsWith(TaskProposals.PREFIX)||request.id.startsWith("TASK_FROM_PROPOSAL:")) throw ManualTaskConflict()
         database.transaction { sql -> createWithin(sql,request) }
     }
     internal fun readWithin(sql: RecordsSqlConnection,id: String): ManualTaskSnapshot? = row(sql,id)?.payload?.task
@@ -76,8 +77,11 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
             }
         }
     }
-    private fun row(sql: RecordsSqlConnection, id: String): Row? = sql.query(
+    private fun row(sql: RecordsSqlConnection, id: String): Row? {
+        if(id.startsWith(TaskProposals.PREFIX)) throw ManualTaskConflict()
+        return sql.query(
         "SELECT id,version,lastMutationId,ciphertext FROM manual_tasks WHERE id=?", listOf(id)).singleOrNull()?.let(::decode)
+    }
     private fun decode(cells: List<Any?>): Row {
         val id = cells[0] as String; val version = cells[1] as Long; val mutation = cells[2] as String
         ManualTags.identifier(mutation)

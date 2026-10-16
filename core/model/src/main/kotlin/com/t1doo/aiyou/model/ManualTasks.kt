@@ -50,7 +50,7 @@ data class ManualTaskSchedule(val date: LocalDate, val time: LocalTime?, val tim
     override fun toString() = "ManualTaskSchedule(redacted)"
 }
 
-/** Private unfinished input, never persisted, logged or saved to an Android Bundle. */
+/** Private explicit input; durable proposal drafts encrypt it, ordinary forms keep it in memory. Never an Android Bundle. */
 data class ManualTaskDateInput(val date: String = "", val time: String = "", val timeZone: String = "UTC",
     val occurrence: ManualTaskOccurrence? = null) {
     init { require(date.length <= 10 && time.length <= 5 && timeZone.length <= 128) }

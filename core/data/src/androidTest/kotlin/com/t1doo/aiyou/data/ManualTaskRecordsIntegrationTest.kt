@@ -19,6 +19,26 @@ import org.junit.runner.RunWith
 /** Formal Room/SQLCipher contracts; compilation/DEX inventory is never device acceptance. */
 @RunWith(AndroidJUnit4::class)
 class ManualTaskRecordsIntegrationTest {
+    @Test fun nativeTaskProposalColdDraftEditRejectAndAtomicConfirmationStaySeparate():Unit=runBlocking {
+        val store=open();val entry=store.saveDraft(store.updateDraft("合成原文：明天三点只是引用"),50,"UTC")
+        val source=SourceVersion(entry.id,1)
+        val policy=store.localProcessing.change(LocalProcessingChange(store.localProcessing.read(source),LocalProcessingChoice.AI_NONE,"none"))
+        val b=TaskSourceBinding(source,policy.sourceHash,policy.generation,0,5)
+        val initial=TaskProposalWrite("native-proposal",0,b,"",ManualTaskDateInput("2026-"),60,"UTC",60,"draft")
+        store.taskProposals.write(initial);assertTrue(store.manualTasks.snapshots().isEmpty());store.closeAndAwait()
+        val cold=open();val restored=cold.taskProposals.list().single().proposal
+        assertEquals("2026-",restored.dateInput.date);assertEquals("",restored.titleInput)
+        val edited=cold.taskProposals.write(initial.copy(expectedVersion=1,titleInput="合成人工明确标题",dateInput=ManualTaskDateInput(),atMillis=70,mutationId="edit"))
+        val confirm=TaskProposalConfirm(edited,80,"confirm");val saved=cold.taskProposals.confirm(confirm)
+        assertTrue(cold.taskProposals.list().isEmpty());assertNull(saved.schedule);cold.closeAndAwait()
+        val reopened=open();assertEquals(saved,reopened.taskProposals.confirm(confirm))
+        assertThrows(TaskProposalConflict::class.java) {reopened.taskProposals.write(initial)}
+        val other=reopened.taskProposals.write(initial.copy(id="native-other",titleInput="合成不同人工意图",dateInput=ManualTaskDateInput()))
+        val rejected=reopened.taskProposals.write(initial.copy(id=other.id,expectedVersion=1,titleInput=other.titleInput,dateInput=other.dateInput,
+            atMillis=90,mutationId="reject",action=TaskProposalAction.REJECT))
+        assertEquals(TaskProposalState.REJECTED,rejected.state);assertEquals(1,reopened.manualTasks.snapshots().size)
+        assertEquals(ProcessingPolicy.AI_NONE,reopened.entries().single().policy)
+    }
     @Test fun nativeSourceTaskReceiptSurvivesCompletionColdReopenAndRejectsChangedSourceLocation():Unit=runBlocking {
         val store=open();val text="合成原文：明天三点只是引用，不推断日期。"
         val entry=store.saveDraft(store.updateDraft(text),50,"UTC");val source=SourceVersion(entry.id,1)

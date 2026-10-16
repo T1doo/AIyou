@@ -54,6 +54,8 @@ class EncryptedEntryRepository internal constructor(
         SqlLocalSearchRepository(borrowedSql, tagStorage)
     private val taskStorage = SqlManualTaskRepository(borrowedSql, keyBytes)
     override val manualTasks: com.t1doo.aiyou.domain.ManualTaskRepository get() = taskStorage
+    private val proposalStorage = SqlTaskProposalRepository(borrowedSql,keyBytes,taskStorage)
+    override val taskProposals: com.t1doo.aiyou.domain.TaskProposalRepository get() = proposalStorage
     override val originalExport: com.t1doo.aiyou.domain.OriginalExportRepository =
         SqlOriginalExportRepository(borrowedSql, tagStorage)
     private val packageStorage = SqlRecordPackageRepository(borrowedSql, tagStorage)
@@ -61,7 +63,7 @@ class EncryptedEntryRepository internal constructor(
         SqlRecordMediaPackageRepository(borrowedSql, originalExport, attachmentStorage, packageStorage)
     override val recordPackages: com.t1doo.aiyou.domain.RecordPackageRepository get() = packageStorage
     override val permanentErasure: com.t1doo.aiyou.domain.PermanentErasureRepository =
-        SqlPermanentErasureRepository(borrowedSql, attachmentStorage, originalEditStorage, packageStorage)
+        SqlPermanentErasureRepository(borrowedSql, attachmentStorage, originalEditStorage, packageStorage, proposalStorage::readAllWithin)
     override val recycleBin: com.t1doo.aiyou.domain.RecycleBinRepository =
         SqlRecycleBinRepository(borrowedSql, tagStorage, SqlErasureFileHooks::fenced)
 
@@ -155,7 +157,7 @@ class EncryptedEntryRepository internal constructor(
     }
 
     private val lifetime = DrainingRecordsStorage(borrowedSql,attachmentStorage,originalEditStorage,
-        { database.close() }, { tagStorage.wipeKey(); taskStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); keyBytes.fill(0) })
+        { database.close() }, { tagStorage.wipeKey(); taskStorage.wipeKey(); proposalStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); keyBytes.fill(0) })
     override fun close() = lifetime.close()
     override fun awaitClosed() = lifetime.awaitClosed()
     /** Known external IO owner convenience, including native cold-reopen fixtures. */

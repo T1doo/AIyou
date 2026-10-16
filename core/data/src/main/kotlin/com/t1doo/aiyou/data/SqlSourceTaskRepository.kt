@@ -8,7 +8,7 @@ import kotlinx.coroutines.CancellationException
 internal class SqlSourceTaskRepository(private val database: RecordsSqlDatabase,
     private val tasks: SqlManualTaskRepository) : SourceTaskRepository {
     override fun preview(binding: TaskSourceBinding): SourceTaskPreview = safely { database.transaction { sql ->
-        val quote=quote(sql,binding,true)
+        val quote=quoteWithin(sql,binding,true)
         val old=tasks.readWithin(sql,SourceTasks.id(binding))
         if(old!=null && old.sourceReceipt?.binding!=binding) throw SourceTaskConflict()
         SourceTaskPreview(binding,quote,old)
@@ -21,17 +21,17 @@ internal class SqlSourceTaskRepository(private val database: RecordsSqlDatabase,
             if(old.sourceReceipt!=receipt) throw SourceTaskConflict()
             return@transaction old
         }
-        if(quote(sql,request.preview.binding,true)!=request.preview.quote) throw SourceTaskConflict()
+        if(quoteWithin(sql,request.preview.binding,true)!=request.preview.quote) throw SourceTaskConflict()
         tasks.createWithin(sql,request.task,receipt)
     } }
     override fun locate(taskId: String,version: Long,publish:(TaskSourceBinding)->Unit): Boolean = safely { database.transaction { sql ->
         val task=tasks.readWithin(sql,taskId) ?: throw SourceTaskConflict()
         val binding=task.sourceReceipt?.binding ?: throw SourceTaskConflict()
         if(task.version!=version) throw SourceTaskConflict()
-        quote(sql,binding,false)
+        quoteWithin(sql,binding,false)
         publish(binding);true
     } }
-    private fun quote(sql:RecordsSqlConnection,b:TaskSourceBinding,creating:Boolean):String {
+    internal fun quoteWithin(sql:RecordsSqlConnection,b:TaskSourceBinding,creating:Boolean):String {
         if(SqlErasureFileHooks.fenced(sql,b.source.sourceId)) throw SourceTaskConflict()
         val row=sql.query("SELECT e.currentRevision,r.originalText,r.contentHash,e.privacyPolicy,COALESCE(a.generation,0),COALESCE(a.deleted,0) FROM entries e JOIN entry_revisions r ON r.entryId=e.id AND r.revision=e.currentRevision LEFT JOIN remote_source_access a ON a.entryId=e.id WHERE e.id=?",
             listOf(b.source.sourceId)).singleOrNull() ?: throw SourceTaskConflict()
