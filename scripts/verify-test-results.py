@@ -102,7 +102,9 @@ for label, folder, minimum in targets:
         additional["com.t1doo.aiyou.TaskProposalPresentationTest"] = (
             "narrowDraftColdRestoresInPendingGroupThenActualButtonRequiresSeparateConfirmation",
             "uncertainReadbackRetainsExactConfirmationAndNeverShowsPrematureSuccess",
-            "changedSourceHidesQuoteAndOldConfirmationThenAllowsExplicitRejectionWithoutBundleInput")
+            "changedSourceHidesQuoteAndOldConfirmationThenAllowsExplicitRejectionWithoutBundleInput",
+            "refreshedSourceReadFailureAndOtherOwnerVersionChangeKeepInputsButRevokeUnqualifiedRecoveryReceipt",
+            "otherOwnerConfirmationAndSourceRemovalWithdrawRecoveryReceiptInActualDialogWithoutReplacingInput")
         additional["com.t1doo.aiyou.SourceTaskPresentationTest"] = (
             "narrowDoubleFontLiteralFlowRequiresSeparateConfirmationAndJumpsToExactOriginal",
             "unknownReadbackHasNoSuccessAndRetriesSameRequestWithoutDuplicatingTask",

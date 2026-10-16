@@ -30,6 +30,24 @@ internal fun LocalRecordUiState.canUseProposalSource(e:TaskProposalEditor):Boole
         taskProposals.items.singleOrNull {it.proposal.id==e.id}?.let {
             it.sourceAvailable&&it.proposal==e.saved&&it.proposal.state==TaskProposalState.DRAFT}==true
 
+internal enum class TaskProposalSaveState { SAVING, UNKNOWN, MISSING, CHANGED, SAVED, SAVED_SOURCE_UNAVAILABLE, PROCESSED }
+
+/** A local write acknowledgement alone cannot promise that another owner kept this draft. */
+internal fun LocalRecordUiState.proposalSaveState(e:TaskProposalEditor):TaskProposalSaveState {
+    if(e.notice!=null) return TaskProposalSaveState.PROCESSED
+    if(!ready||opening||error!=null||!taskProposals.available||taskProposals.loading||taskProposals.error!=null||
+        e.pending!=null&&e.error!=null) return TaskProposalSaveState.UNKNOWN
+    if(e.busy||e.pending!=null||e.epoch!=e.savedEpoch) return TaskProposalSaveState.SAVING
+    val saved=e.saved ?: return TaskProposalSaveState.UNKNOWN
+    val matches=taskProposals.items.filter {it.proposal.id==e.id}
+    if(matches.isEmpty()) return TaskProposalSaveState.MISSING
+    if(matches.size!=1) return TaskProposalSaveState.UNKNOWN
+    if(matches.single().proposal!=saved||saved.id!=e.id||saved.binding!=e.binding||
+        saved.createdAtMillis!=e.created||saved.creationTimeZone!=e.zone) return TaskProposalSaveState.CHANGED
+    if(e.title!=saved.titleInput||e.date!=saved.dateInput) return TaskProposalSaveState.SAVING
+    return if(canUseProposalSource(e)) TaskProposalSaveState.SAVED else TaskProposalSaveState.SAVED_SOURCE_UNAVAILABLE
+}
+
 /** Serialized, coalesced encrypted autosave. Only a separately confirmed request creates a task. */
 class TaskProposalController(private val current:()->LocalRecordUiState,
     private val publish:((LocalRecordUiState)->LocalRecordUiState)->Unit,

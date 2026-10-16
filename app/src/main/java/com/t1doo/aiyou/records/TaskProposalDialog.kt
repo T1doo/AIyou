@@ -24,6 +24,7 @@ internal fun TaskProposalDialog(local:LocalRecordUiState,controller:TaskProposal
     val e=local.taskProposals.editor ?: return
     DisposableEffect(controller,e.session) {onDispose {controller.close(e.session)}}
     val available=local.canUseProposalSource(e)
+    val saveState=local.proposalSaveState(e)
     val confirmation=e.confirmation.takeIf {available&&!e.closing}
     val actions=TaskProposalActions({if(canUse()&&confirmation!=null) controller.confirm(e.session,confirmation)},
         {if(canUse()&&confirmation!=null) controller.cancel(e.session,confirmation)})
@@ -45,10 +46,15 @@ internal fun TaskProposalDialog(local:LocalRecordUiState,controller:TaskProposal
                         if(text.codePointCount(0,text.length)>=e.binding.end) Text(text.substring(text.offsetByCodePoints(0,e.binding.start),text.offsetByCodePoints(0,e.binding.end)),
                             modifier=Modifier.testTag("task-proposal-quote"))
                     } else Text(if(e.notice!=null) "草稿已处理；请从待办清单查看当前状态和来源。"
-                        else "来源或草稿版本已变化、已删除或暂不可核对；未展示旧摘录，不能确认。可拒绝已保存草稿。",modifier=Modifier.testTag("task-proposal-source-conflict"))
-                    when {
-                        e.busy||e.epoch!=e.savedEpoch -> Text("正在保存或等待核对；尚不能保证最新输入可冷恢复。",modifier=Modifier.testTag("task-proposal-saving"))
-                        e.error==null&&e.notice==null -> Text("草稿已加密保存在本机，可从待确认清单恢复。",modifier=Modifier.testTag("task-proposal-saved"))
+                        else "来源或草稿暂不可核对；未展示旧摘录，不能确认。",modifier=Modifier.testTag("task-proposal-source-conflict"))
+                    when(saveState) {
+                        TaskProposalSaveState.SAVING -> Text("正在保存或等待核对；尚不能保证最新输入可冷恢复。",modifier=Modifier.testTag("task-proposal-saving"))
+                        TaskProposalSaveState.UNKNOWN -> Text("草稿读取状态待核对；当前输入仍保留，尚不能保证可从清单恢复。请重新读取。",modifier=Modifier.testTag("task-proposal-save-unknown"))
+                        TaskProposalSaveState.MISSING -> Text("清单中已没有这条草稿；当前输入仍保留，不能保证可从草稿清单恢复。请核对清单和正式待办。",modifier=Modifier.testTag("task-proposal-save-missing"))
+                        TaskProposalSaveState.CHANGED -> Text("清单中的草稿快照已变化；当前输入仍保留，不能保证恢复为当前内容。请关闭后重新打开清单中的版本。",modifier=Modifier.testTag("task-proposal-save-changed"))
+                        TaskProposalSaveState.SAVED -> Text("草稿已加密保存在本机，可从待确认清单恢复。",modifier=Modifier.testTag("task-proposal-saved"))
+                        TaskProposalSaveState.SAVED_SOURCE_UNAVAILABLE -> Text("草稿仍在本机清单，可从待确认清单恢复；来源已失效或待核对，不能确认。",modifier=Modifier.testTag("task-proposal-saved-source-unavailable"))
+                        TaskProposalSaveState.PROCESSED -> Unit
                     }
                     e.error?.let {Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("task-proposal-error"))}
                     e.notice?.let {Text(it,modifier=Modifier.testTag("task-proposal-notice"))}
@@ -73,7 +79,8 @@ internal fun TaskProposalDialog(local:LocalRecordUiState,controller:TaskProposal
                         modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("task-proposal-retry")) {Text("重试同一请求")}
                     if(e.error!=null) Text("未确认保存的输入可能无法冷恢复；关闭后请从清单核对已保存草稿与正式待办。")
                     TextButton(enabled=!e.closing,onClick={controller.close(e.session)},modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("task-proposal-close")) {
-                        Text(if(e.closing) "正在核对后关闭…" else if(e.error!=null) "关闭并核对已保存内容" else "关闭并保留草稿")}
+                        Text(if(e.closing) "正在核对后关闭…" else if(saveState==TaskProposalSaveState.SAVED||saveState==TaskProposalSaveState.SAVED_SOURCE_UNAVAILABLE)
+                            "关闭并保留草稿" else "关闭并核对已保存内容")}
                 }
             }
         }

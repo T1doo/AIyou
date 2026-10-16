@@ -149,4 +149,68 @@ class TaskProposalPresentationTest {
         click("task-proposal-close");drain();restoration.emulateSavedInstanceStateRestore();compose.waitForIdle()
         compose.runOnIdle {old();assertTrue(queue.isEmpty())};assertTrue(tasks.isEmpty())
     }
+    @Test fun refreshedSourceReadFailureAndOtherOwnerVersionChangeKeepInputsButRevokeUnqualifiedRecoveryReceipt() {
+        compose.setContent {Screen()};compose.runOnIdle {proposals.initialize(owner)};open();title()
+        compose.onNodeWithTag("manual-task-date-input").performScrollTo().performTextReplacement("2026-10-20");drain()
+        compose.onNodeWithTag("task-proposal-saved").performScrollTo().assertIsDisplayed()
+        click("task-proposal-prepare");val old=actions.get().confirm
+        val p1=state.value.taskProposals.editor!!.saved!!;val writeCount=writes.size
+        compose.runOnIdle {sourceMetadataAvailable=false;proposals.refresh()}
+        compose.onNodeWithTag("task-proposal-save-unknown").performScrollTo().assertIsDisplayed()
+        compose.onAllNodesWithTag("task-proposal-saved").assertCountEquals(0);drain()
+        compose.onNodeWithTag("task-proposal-saved-source-unavailable").performScrollTo().assertIsDisplayed()
+        compose.onAllNodesWithTag("task-proposal-confirm").assertCountEquals(0)
+        compose.runOnIdle {failReadback=true;proposals.refresh()};drain()
+        compose.onNodeWithTag("task-proposal-save-unknown").performScrollTo().assertIsDisplayed()
+        compose.onAllNodesWithTag("task-proposal-saved").assertCountEquals(0)
+        compose.onAllNodesWithTag("task-proposal-saved-source-unavailable").assertCountEquals(0)
+        compose.runOnIdle {
+            failReadback=false;sourceMetadataAvailable=true
+            drafts[p1.id]=p1.copy(version=p1.version+1,titleInput="合成另一 owner 的标题",dateInput=p1.dateInput.copy(date="2026-10-21"),updatedAtMillis=110)
+            proposals.refresh()
+        };drain()
+        compose.onNodeWithTag("task-proposal-save-changed").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("task-proposal-title").performScrollTo().assertTextContains(p1.titleInput)
+        compose.onNodeWithTag("manual-task-date-input").performScrollTo().assertTextContains(p1.dateInput.date)
+        compose.onAllNodesWithTag("task-proposal-saved").assertCountEquals(0)
+        compose.onAllNodesWithTag("task-proposal-saved-source-unavailable").assertCountEquals(0)
+        compose.onAllNodesWithText("关闭并保留草稿").assertCountEquals(0)
+        compose.runOnIdle {
+            val e=state.value.taskProposals.editor!!;assertEquals(p1,e.saved);assertEquals(p1.titleInput,e.title);assertEquals(p1.dateInput,e.date)
+            old();assertTrue(queue.isEmpty())
+        }
+        assertEquals(writeCount,writes.size);assertTrue(confirms.isEmpty());assertTrue(tasks.isEmpty())
+    }
+    @Test fun otherOwnerConfirmationAndSourceRemovalWithdrawRecoveryReceiptInActualDialogWithoutReplacingInput() {
+        compose.setContent {Screen()};compose.runOnIdle {proposals.initialize(owner)};open();title();click("task-proposal-prepare")
+        val old=actions.get().confirm;val p1=state.value.taskProposals.editor!!.saved!!
+        compose.runOnIdle {port.confirm(TaskProposalConfirm(p1,110,"other-owner-confirm"));proposals.refresh()};drain()
+        compose.onNodeWithTag("task-proposal-save-missing").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("task-proposal-title").performScrollTo().assertTextContains(p1.titleInput)
+        compose.onAllNodesWithTag("task-proposal-saved").assertCountEquals(0)
+        compose.onAllNodesWithTag("task-proposal-saved-source-unavailable").assertCountEquals(0)
+        compose.onAllNodesWithText("关闭并保留草稿").assertCountEquals(0)
+        compose.runOnIdle {
+            val e=state.value.taskProposals.editor!!;assertEquals(e.epoch,e.savedEpoch);assertNull(e.error);assertNull(e.notice)
+            assertEquals(p1.titleInput,e.title);assertEquals(p1.dateInput,e.date);old();assertTrue(queue.isEmpty())
+        }
+        assertEquals(1,confirms.size);assertEquals(1,tasks.size)
+        click("task-proposal-close");drain();click("original-source-task");drain();title("合成删除前的当前输入")
+        compose.onNodeWithTag("manual-task-date-input").performScrollTo().performTextReplacement("2026-10-22");drain()
+        compose.onNodeWithTag("task-proposal-saved").performScrollTo().assertIsDisplayed()
+        val p2=state.value.taskProposals.editor!!.saved!!;val writeCount=writes.size
+        // This controlled presentation port publishes deletion; the host regression runs actual permanent erasure.
+        compose.runOnIdle {drafts.remove(p2.id);state.value=state.value.copy(entries=emptyList());proposals.refresh()};drain()
+        compose.onNodeWithTag("task-proposal-save-missing").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("task-proposal-title").performScrollTo().assertTextContains(p2.titleInput)
+        compose.onNodeWithTag("manual-task-date-input").performScrollTo().assertTextContains(p2.dateInput.date)
+        compose.onAllNodesWithTag("task-proposal-saved").assertCountEquals(0)
+        compose.onAllNodesWithTag("task-proposal-saved-source-unavailable").assertCountEquals(0)
+        compose.onAllNodesWithText("关闭并保留草稿").assertCountEquals(0)
+        compose.runOnIdle {
+            val e=state.value.taskProposals.editor!!;assertEquals(p2,e.saved);assertEquals(e.epoch,e.savedEpoch)
+            assertNull(e.error);assertNull(e.notice);assertEquals(p2.titleInput,e.title);assertEquals(p2.dateInput,e.date)
+        }
+        assertEquals(writeCount,writes.size);assertEquals(1,tasks.size)
+    }
 }

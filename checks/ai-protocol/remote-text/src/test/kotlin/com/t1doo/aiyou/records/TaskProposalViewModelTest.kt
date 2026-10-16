@@ -8,6 +8,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.first
@@ -17,15 +18,84 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TaskProposalViewModelTest {
+    @Test(timeout=15_000) fun otherOwnerUpdateAndConfirmationRevokeOldDraftRecoveryReceiptWithoutChangingInputsOrCas():Unit=Harness().use {h ->runBlocking {
+        h.ready();val opened=h.open();h.vm.taskProposals.editTitle(opened.session,"合成当前会话输入");h.saved()
+        h.vm.taskProposals.prepare(opened.session);val before=h.editor();val p1=before.saved!!
+        assertEquals(TaskProposalSaveState.SAVED,h.vm.state.value.proposalSaveState(before))
+        // Same ID and version are insufficient when a complete saved snapshot differs.
+        val changedDate=h.vm.state.value.copy(taskProposals=h.vm.state.value.taskProposals.copy(items=listOf(
+            TaskProposalItem(p1.copy(dateInput=ManualTaskDateInput("2026-11-20")),true))))
+        assertEquals(TaskProposalSaveState.CHANGED,changedDate.proposalSaveState(before))
+        val other=SqlTaskProposalRepository(h.f.gateway,LocalCandidateFixture.KEY,h.tasks)
+        try {
+            val p2=other.write(TaskProposalWrite(p1.id,p1.version,p1.binding,"合成另一owner的新输入",ManualTaskDateInput("2026-10-20"),
+                p1.createdAtMillis,p1.creationTimeZone,110,"other-edit"))
+            h.vm.taskProposals.refresh();h.barrier()
+            val changed=h.editor();assertEquals(TaskProposalSaveState.CHANGED,h.vm.state.value.proposalSaveState(changed))
+            assertEquals(before.title,changed.title);assertEquals(before.date,changed.date);assertEquals(p1,changed.saved)
+            h.vm.taskProposals.confirm(changed.session,before.confirmation!!);assertTrue(h.confirms.isEmpty())
+            val writes=h.writes.size;h.vm.taskProposals.close(changed.session);h.closed();h.barrier()
+            assertEquals(writes,h.writes.size);assertEquals(p2,other.list().single().proposal)
+            h.vm.taskProposals.openExisting(p2.id,p2.version);h.vm.taskProposals.prepare(h.editor().session)
+            val reopened=h.editor();val retained=reopened.confirmation!!
+            other.confirm(TaskProposalConfirm(p2,120,"other-confirm"));h.vm.taskProposals.refresh();h.barrier()
+            val missing=h.editor();assertEquals(TaskProposalSaveState.MISSING,h.vm.state.value.proposalSaveState(missing))
+            assertEquals(reopened.title,missing.title);assertEquals(reopened.date,missing.date)
+            assertEquals(missing.epoch,missing.savedEpoch);assertNull(missing.error);assertNull(missing.notice)
+            h.vm.taskProposals.confirm(missing.session,retained);assertTrue(h.confirms.isEmpty());assertEquals(1,h.tasks.snapshots().size)
+            // A stale explicit rejection still meets the full SQL version/snapshot CAS.
+            h.vm.taskProposals.reject(missing.session);h.ui {it.conflict&&!it.busy}
+            assertEquals(reopened.title,h.editor().title);assertTrue(other.list().isEmpty());assertEquals(1,h.tasks.snapshots().size);h.noAi()
+        } finally {other.wipeKey()}
+    }}
+    @Test(timeout=15_000) fun actualPermanentErasureRevokesControllerRecoveryReceiptEvenBeforeEntriesCacheRefresh():Unit=PermanentErasureFixture().use {f ->runBlocking {
+        val text="合成原文与待确认输入";val id=f.entry(text=text)
+        val access=SqlLocalProcessingRepository(f.gateway).read(SourceVersion(id,1))
+        val binding=TaskSourceBinding(access.source,access.sourceHash,access.generation,0,5)
+        val port=SqlTaskProposalRepository(f.gateway,PermanentErasureFixture.KEY,f.tasks)
+        var local=LocalRecordUiState(ready=true,opening=false,entries=listOf(StoredEntry(id,1,text,5,"UTC",ProcessingPolicy.LOCAL_ONLY)),
+            supportsLocalProcessing=true,localProcessingVersions=mapOf(id to LocalProcessingVersion(access.source,access.generation)))
+        val queue=ConcurrentLinkedQueue<suspend(EntryRepository)->Unit>()
+        val owner=object:EntryRepository {
+            override val taskProposals=port
+            override val manualTasks=f.tasks
+            override suspend fun readDraft()=null
+            override suspend fun updateDraft(text:String)=error("Not requested")
+            override suspend fun saveDraft(expected:TextDraft,capturedAtMillis:Long,captureTimeZone:String)=error("Not requested")
+            override suspend fun entries()=local.entries
+            override suspend fun revisions(entryId:String)=emptyList<OriginalRevision>()
+            override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long)=error("Not requested")
+        }
+        suspend fun drain() {while(true) (queue.poll()?:break)(owner)}
+        val controller=TaskProposalController({local},{local=it(local)},{queue.add(it);true},Clock.fixed(Instant.ofEpochMilli(200),ZoneOffset.UTC))
+        try {
+            controller.initialize(owner);assertTrue(controller.open(binding));drain()
+            val session=local.taskProposals.editor!!.session
+            controller.editTitle(session,"合成保留在会话的输入");controller.editDate(session,ManualTaskDateInput("2026-10-22"));drain()
+            controller.prepare(session);val before=local.taskProposals.editor!!
+            assertEquals(TaskProposalSaveState.SAVED,local.proposalSaveState(before))
+            val erase=SqlPermanentErasureRepository(f.gateway,f.media,f.edits,f.packages,port::readAllWithin)
+            assertTrue(erase.erase(f.intent(id)).complete);controller.refresh();drain()
+            val after=local.taskProposals.editor!!
+            assertTrue(local.canUseTaskSource(binding));assertEquals(TaskProposalSaveState.MISSING,local.proposalSaveState(after))
+            assertEquals(before.title,after.title);assertEquals(before.date,after.date);assertEquals(before.saved,after.saved)
+            assertEquals(after.epoch,after.savedEpoch);assertNull(after.error);assertNull(after.notice)
+            controller.confirm(session,before.confirmation!!);drain()
+            assertTrue(f.tasks.snapshots().isEmpty());assertTrue(port.list().isEmpty())
+            assertTrue(f.db.read("SELECT id FROM entries WHERE id=?",id).isEmpty())
+        } finally {controller.dispose();port.wipeKey()}
+    }}
     @Test(timeout=15_000) fun freshMetadataRevocationAndReadFailureHideAuthorityBeforeEntriesRefreshAndCannotReviveRetiredForm():Unit=Harness().use {h ->runBlocking {
         h.ready();val e=h.open();h.vm.taskProposals.editTitle(e.session,"合成授权待核对草稿");h.saved()
         h.vm.taskProposals.prepare(e.session);val old=h.editor().confirmation!!
         assertTrue(h.vm.state.value.canUseTaskSource(e.binding));assertTrue(h.vm.state.value.canUseProposalSource(h.editor()))
         h.unavailableSource=true;h.vm.taskProposals.refresh();h.barrier()
         assertTrue(h.vm.state.value.canUseTaskSource(e.binding));assertFalse(h.vm.state.value.canUseProposalSource(h.editor()))
+        assertEquals(TaskProposalSaveState.SAVED_SOURCE_UNAVAILABLE,h.vm.state.value.proposalSaveState(h.editor()))
         h.vm.taskProposals.confirm(e.session,old);assertTrue(h.confirms.isEmpty())
         h.unavailableSource=false;h.failList=true;h.vm.taskProposals.refresh();h.barrier()
         assertFalse(h.vm.state.value.canUseProposalSource(h.editor()));h.vm.taskProposals.confirm(e.session,old)
+        assertEquals(TaskProposalSaveState.UNKNOWN,h.vm.state.value.proposalSaveState(h.editor()))
         assertTrue(h.confirms.isEmpty());h.failList=false
         h.vm.taskProposals.invalidateSource("source");h.vm.taskProposals.refresh();h.barrier()
         assertTrue(h.vm.state.value.taskProposals.available);assertFalse(h.vm.state.value.canUseProposalSource(h.editor()))
