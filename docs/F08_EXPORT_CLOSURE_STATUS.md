@@ -70,3 +70,39 @@ BYOK 无后台边界保持；无真实模型、SDK 接受、权限/凭据改动�
 来源说明在 `provenance-initial.json`，最终汇总在 `final-results.json`，逐文件
 SHA-256 和交付 Git 核对在证据目录内。旧环境原件缺口保留，不以新测覆盖旧失败。
 本批正常推送后的精确 CI 状态为 UNKNOWN；没有查询 Actions，也未借用基线 GREEN。
+
+## 后续精确 CI 失败与 launch 同步修复
+
+父级独立回传已读原日志：`6f68806fb605d7ecf789989ca1721f2d22f07e8c` 的
+[run 38895472312 / job 116954786680](https://github.com/T1doo/AIyou/actions/runs/38895472312/job/116954786680)
+于 2026-10-16 11:59:51 UTC 失败。Compose 213 项中 1 项失败，新增
+`activitySafCancelReselectRetiresOldUuidAndDuplicateResultWritesAndReadsOnlyOnce`
+在原第 128 行 `registry.codes.single()` 抛出 `NoSuchElementException: List is empty`。
+此前已读到 requestKey；取消、重选、旧 UUID、重复回调和一次写读断言尚未达到，
+不能将这些后续断言计为 CI 通过。APK 通过；instrumentation 编译与 lint 跳过。
+这取代上节交付时的 CI UNKNOWN，不取代主机原始 XML，也不关联旧环境附件缺口。
+本机没有抓取该 CI 原始日志或 XML；精确失败来源是父级日志核实，不绕 Actions 拒绝。
+
+源码检查发现：`pump()` 在 `runOnIdle` 回调内排空 IO 队列并发布 `PICKING`，
+回调返回不构成这次状态变化后的新 idle 屏障。真实注册和 launch 仍在生产
+`OriginalExportPicker` 的 `DisposableEffect` / `LaunchedEffect` 中；读取 requestKey
+本身不能证明 registry 已收到 launch。旧已通过方法在 pump 后第二个 runOnIdle
+中观察 intent/code。本次同步诊断与失败位置一致，但没有本机 Compose 重现证据，
+不由静态线索断言生产必然没有缺陷。
+
+最小修复只调整该新增测试：两次 pump 后均在第二个 `compose.runOnIdle` 中
+同时检查 PICKING、pickerLaunched、准确的 registry codes/intents 数量和真实
+ACTION_CREATE_DOCUMENT/MIME，再读取 key/code；没有直接调用 registry.onLaunch
+或绕过生产 picker。保留取消后撤回确认、重新确认、不同 UUID、旧 code 不写入、
+重复结果只入队一次、实际 provider 一次 wt/r、完整分类正文、零自动删除及输入/
+任务/DRAFT 不变的全部断言。未改 pump、生产代码、必需方法清单或质量门，未加 sleep。
+
+本机 SDK 前置仍失败，新 Compose 方法修复后的执行仍为 NOT RUN。生产输入指纹
+与上节相同，现有 720 项原始主机 XML 再核验一致，只证明相关主机输入未改；
+不计作新 Compose 执行。可用本地检查、父级失败来源和独审结果分别归档到
+`/workspace/aiyou-evidence/f08-saf-launch-ci-fix-20261016/`，旧证据目录保留。
+本修复正常推送后的精确 CI 门仍待新 SHA 执行证据；不能据静态修复宣告关闭。
+
+修复批本地结果：Python 123/123、三项 Compose 源码方法与必需清单静态比对、
+`git diff --check` 均 PASS；720 项旧主机 XML/输入指纹再核验 PASS，明确为复用证据。
+SDK 前置 FAIL，修复后的 Compose/Android 编译执行 NOT RUN；不计为本批通过。

@@ -125,15 +125,26 @@ class OriginalActivityExportPresentationTest {
         ShadowContentResolver.registerProviderInternal(providerAuthority,provider)
         try {
             content();preview();click("export-risk");click("export-choose");pump()
-            val oldKey=ui().requestKey!!;val oldCode=registry.codes.single()
+            // pump publishes PICKING inside its idle callback; settle that recomposition and
+            // both picker effects before observing the actual registry launch.
+            val (oldKey,oldCode)=compose.runOnIdle {
+                assertEquals(OriginalExportPhase.PICKING,ui().phase);assertTrue(ui().pickerLaunched)
+                assertEquals(1,registry.codes.size);assertEquals(1,registry.intents.size)
+                assertEquals(Intent.ACTION_CREATE_DOCUMENT,registry.intents.single().action)
+                assertEquals("text/markdown",registry.intents.single().type)
+                checkNotNull(ui().requestKey) to registry.codes.single()
+            }
             compose.runOnIdle {registry.dispatchResult(oldCode,null as Uri?)}
             node("export-choose").assertIsNotEnabled()
             assertFalse(ui().riskAccepted);assertEquals(OriginalExportPhase.PREVIEW,ui().phase);assertTrue(provider.modes.isEmpty())
             click("export-format-JSONL");node("export-choose").assertIsNotEnabled()
             click("export-risk");click("export-choose");pump()
-            val key=ui().requestKey!!;assertNotEquals(oldKey,key)
             compose.runOnIdle {
-                assertEquals(2,registry.codes.size);assertEquals("application/x-ndjson",registry.intents.last().type)
+                assertEquals(OriginalExportPhase.PICKING,ui().phase);assertTrue(ui().pickerLaunched)
+                assertEquals(2,registry.codes.size);assertEquals(2,registry.intents.size)
+                val key=checkNotNull(ui().requestKey);assertNotEquals(oldKey,key)
+                assertEquals(Intent.ACTION_CREATE_DOCUMENT,registry.intents.last().action)
+                assertEquals("application/x-ndjson",registry.intents.last().type)
                 registry.dispatchResult(oldCode,Uri.parse("content://$providerAuthority/old"))
                 assertEquals(OriginalExportPhase.PICKING,ui().phase);assertEquals(key,ui().requestKey)
                 assertTrue(queue.isEmpty());assertTrue(provider.modes.isEmpty())
