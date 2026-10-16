@@ -26,11 +26,11 @@ class OriginalExportRecord(val entry: StoredEntry, val contentHash: String, val 
     override fun toString() = "OriginalExportRecord(redacted)"
 }
 
-class OriginalExportSnapshot(val id: String, val createdAtMillis: Long, records: List<OriginalExportRecord>) {
+class OriginalExportSnapshot(val id: String, val createdAtMillis: Long, records: List<OriginalExportRecord>, allowEmpty: Boolean = false) {
     val records = Collections.unmodifiableList(records.toList())
     init {
         ManualTags.identifier(id); require(createdAtMillis >= 0)
-        require(records.size in 1..OriginalExports.MAX_RECORDS && records.map { it.entry.id }.distinct().size == records.size)
+        require(records.size in (if(allowEmpty) 0 else 1)..OriginalExports.MAX_RECORDS && records.map { it.entry.id }.distinct().size == records.size)
         require(records.sumOf { it.entry.originalText.length.toLong() } <= OriginalExports.MAX_TEXT_UNITS)
     }
     override fun toString() = "OriginalExportSnapshot(count=" + records.size + ", redacted)"

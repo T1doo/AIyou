@@ -32,6 +32,7 @@ internal class SqlSourceTaskRepository(private val database: RecordsSqlDatabase,
         publish(binding);true
     } }
     internal fun quoteWithin(sql:RecordsSqlConnection,b:TaskSourceBinding,creating:Boolean):String {
+        if(b.source.sourceId.startsWith(RecordPackageActivities.UNAVAILABLE_PREFIX)) throw SourceTaskConflict()
         if(SqlErasureFileHooks.fenced(sql,b.source.sourceId)) throw SourceTaskConflict()
         val row=sql.query("SELECT e.currentRevision,r.originalText,r.contentHash,e.privacyPolicy,COALESCE(a.generation,0),COALESCE(a.deleted,0) FROM entries e JOIN entry_revisions r ON r.entryId=e.id AND r.revision=e.currentRevision LEFT JOIN remote_source_access a ON a.entryId=e.id WHERE e.id=?",
             listOf(b.source.sourceId)).singleOrNull() ?: throw SourceTaskConflict()

@@ -19,6 +19,15 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
         database.transaction { sql -> createWithin(sql,request) }
     }
     internal fun readWithin(sql: RecordsSqlConnection,id: String): ManualTaskSnapshot? = row(sql,id)?.payload?.task
+    internal fun exportWithin(sql:RecordsSqlConnection):List<ManualTaskSnapshot> =
+        sql.query("SELECT id,version,lastMutationId,ciphertext FROM manual_tasks WHERE substr(id,1,14)!='TASK_PROPOSAL:' ORDER BY id LIMIT 257")
+            .map {decode(it).payload.task}.also {require(it.size<=RecordPackageActivities.MAX_ITEMS)}
+    internal fun importWithin(sql:RecordsSqlConnection,t:ManualTaskSnapshot,mutation:String) {
+        require(t.version==1L && row(sql,t.id)==null)
+        val bytes=cipher.seal(t,mutation,t.updatedAtMillis,"IMPORT")
+        sql.execute("INSERT INTO manual_tasks(id,version,lastMutationId,ciphertext) VALUES(?,?,?,?)",listOf(t.id,1,mutation,bytes))
+        check(readWithin(sql,t.id)==t)
+    }
     internal fun createWithin(sql: RecordsSqlConnection,request: ManualTaskCreate,receipt: SourceTaskReceipt? = null): ManualTaskSnapshot {
         val expected = ManualTaskSnapshot(request.id, 1, request.title, ManualTaskStatus.OPEN,
             request.createdAtMillis, request.creationTimeZone, request.createdAtMillis, request.schedule, receipt)

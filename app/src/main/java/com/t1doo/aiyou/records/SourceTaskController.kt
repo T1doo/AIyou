@@ -17,7 +17,7 @@ data class SourceTaskUiState(val session:Long,val binding:TaskSourceBinding,
 
 /** UI authority is checked against both current plaintext and its processing generation. */
 internal fun LocalRecordUiState.canUseTaskSource(binding:TaskSourceBinding):Boolean =
-    ready&&!opening&&error==null&&hasLocalProcessingProof(binding.source)&&
+    ready&&!opening&&error==null&&!binding.source.sourceId.startsWith(RecordPackageActivities.UNAVAILABLE_PREFIX)&&hasLocalProcessingProof(binding.source)&&
         localProcessingVersions[binding.source.sourceId]?.generation==binding.generation&&
         entries.singleOrNull { it.id==binding.source.sourceId }?.let {
             it.currentRevision.toLong()==binding.source.revision&&

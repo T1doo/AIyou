@@ -16,7 +16,8 @@ class RecordPackageUiState(val session: Long, val phase: RecordPackagePhase = Re
     selection: List<SourceVersion> = emptyList(), val snapshot: OriginalExportSnapshot? = null,
     val verified: VerifiedRecordPackage? = null, val scopeAccepted: Boolean = false,
     val requestKey: String? = null, val pickerLaunched: Boolean = false,
-    val notice: String? = null, val error: String? = null, internal val epoch: Long = 0, val mediaPreview: RecordMediaPreview? = null) {
+    val notice: String? = null, val error: String? = null, internal val epoch: Long = 0, val mediaPreview: RecordMediaPreview? = null,
+    val includeActivities:Boolean = false) {
     val selection = Collections.unmodifiableList(selection.toList())
     val busy get() = phase in setOf(RecordPackagePhase.PREPARING, RecordPackagePhase.ENCRYPTING,
         RecordPackagePhase.WRITING, RecordPackagePhase.READING, RecordPackagePhase.IMPORTING)
@@ -24,8 +25,9 @@ class RecordPackageUiState(val session: Long, val phase: RecordPackagePhase = Re
         snapshot: OriginalExportSnapshot? = this.snapshot, verified: VerifiedRecordPackage? = this.verified,
         scopeAccepted: Boolean = this.scopeAccepted, requestKey: String? = this.requestKey,
         pickerLaunched: Boolean = this.pickerLaunched, notice: String? = this.notice, error: String? = this.error,
-        epoch: Long = this.epoch, mediaPreview: RecordMediaPreview? = this.mediaPreview) = RecordPackageUiState(session, phase, selection, snapshot, verified, scopeAccepted,
-            requestKey, pickerLaunched, notice, error, epoch, mediaPreview)
+        epoch: Long = this.epoch, mediaPreview: RecordMediaPreview? = this.mediaPreview,
+        includeActivities:Boolean = this.includeActivities) = RecordPackageUiState(session, phase, selection, snapshot, verified, scopeAccepted,
+            requestKey, pickerLaunched, notice, error, epoch, mediaPreview,includeActivities)
     override fun toString() = "RecordPackageUiState(phase=" + phase + ", redacted)"
 }
 
@@ -78,14 +80,19 @@ class RecordPackageController internal constructor(private val current: () -> Lo
     fun open() {
         val local = current()
         if (!available(local) || local.recordPackage != null || local.originalExport != null || local.recycleBin != null ||
-            local.originalEdit != null || local.originalHistory != null || local.manualTagEditor != null || local.saving || local.savePending) return
+            local.originalEdit != null || local.originalHistory != null || local.manualTagEditor != null || local.saving || local.savePending ||
+            local.taskProposals.editor!=null || local.sourceTask!=null || local.tasks.editor!=null || local.tasks.dateEditor!=null) return
         retire(); val ui = RecordPackageUiState(sessions.incrementAndGet())
         publish { if (available(it) && it.recordPackage == null) it.copy(recordPackage = ui) else it }
     }
     fun selectExport(session: Long) {
         val ui = panel(session) ?: return
-        if (!available() || ui.busy || current().entries.isEmpty()) return
+        if (!available() || ui.busy) return
         retire(); update(session) { RecordPackageUiState(session, RecordPackagePhase.SELECTING, epoch = it.epoch + 1) }
+    }
+    fun includeActivities(session:Long,include:Boolean) {
+        val ui=panel(session) ?: return
+        if(available() && ui.phase==RecordPackagePhase.SELECTING) update(session) {it.copy(includeActivities=include,error=null)}
     }
     fun toggle(session: Long, id: String, revision: Int) {
         val ui = panel(session) ?: return
@@ -97,16 +104,17 @@ class RecordPackageController internal constructor(private val current: () -> Lo
     }
     fun prepare(session: Long) {
         val ui = panel(session) ?: return
-        if (!available() || ui.phase != RecordPackagePhase.SELECTING || ui.selection.isEmpty()) return
+        if (!available() || ui.phase != RecordPackagePhase.SELECTING || ui.selection.isEmpty()&&!ui.includeActivities) return
         val active = Work(session, ui.epoch + 1); retire(); work.set(active)
         update(session) { it.copy(phase = RecordPackagePhase.PREPARING, epoch = active.epoch, error = null) }
         if (!enqueue { store ->
             if (!owned(active, RecordPackagePhase.PREPARING)) return@enqueue
             try {
-                val snapshot = checkNotNull(store.originalExport).capture(ui.selection, UUID.randomUUID().toString(), clock.millis())
-                val preview = store.mediaPackages?.preview(snapshot)
+                val snapshot = if(ui.selection.isEmpty()) OriginalExportSnapshot(UUID.randomUUID().toString(),clock.millis(),emptyList(),true)
+                    else checkNotNull(store.originalExport).capture(ui.selection, UUID.randomUUID().toString(), clock.millis())
+                val preview = if(ui.includeActivities) checkNotNull(store.mediaPackages).previewActivities(snapshot) else store.mediaPackages?.preview(snapshot)
                 updateOwned(active, RecordPackagePhase.PREPARING) { it.copy(phase = RecordPackagePhase.EXPORT_PREVIEW, snapshot = snapshot, mediaPreview = preview) }
-            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { fail(active, "原文、标签或原图核对失败。缺失、损坏、未保存完成或超限的图片不会被跳过，请检查后重新选择。") }
+            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { fail(active, "原文、原图、任务或草稿核对失败，也可能没有选择任何已保存内容或超限。缺失、损坏、未保存完成或超限的内容不会被跳过，请检查后重新选择。") }
             finally { if (work.compareAndSet(active, null)) active.retire() }
         }) fail(active, "本机操作暂不可用。")
     }
@@ -227,15 +235,24 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                 val entries = store.entries(); val tags = checkNotNull(store.manualTags).snapshots()
                 val favorites = readFavoriteSource(store)
                 val origins = checkNotNull(store.recordPackages).origins()
+                val tasks=if(verified.activities!=null) checkNotNull(store.manualTasks).snapshots() else null
+                val proposals=if(verified.activities!=null) checkNotNull(store.taskProposals).list() else null
+                val versions=if(verified.activities!=null) store.localProcessing?.versions() else null
                 publish { local ->
                     val panel = local.recordPackage
                     if (disposed || !available(local)) local else
                         local.copy(entries = entries, manualTags = tags, manualTagsAvailable = true, manualTagsError = null,
                             packageOrigins = origins, packageOriginsAvailable = true, packageOriginsError = null,
+                            tasks=if(tasks!=null && !local.tasks.busy && local.tasks.pending==null && !local.tasks.loading && local.tasks.editor==null && local.tasks.dateEditor==null)
+                                local.tasks.copy(items=tasks,available=true,error=null) else local.tasks,
+                            taskProposals=if(proposals!=null && local.taskProposals.editor==null) local.taskProposals.copy(items=proposals,available=true,loading=false,error=null) else local.taskProposals,
+                            localProcessingVersions=versions ?: local.localProcessingVersions,
+                            localProcessingAvailable=if(versions!=null) true else local.localProcessingAvailable,
                             recordPackage = if (!owned(active, RecordPackagePhase.IMPORTING, local)) panel else checkNotNull(panel).copy(phase = RecordPackagePhase.DONE, verified = null, notice =
-                                if (result.replayed) "已核对第一次恢复回执，没有新增、覆盖或复活记录。已永久删除 " + result.deletedCount +
+                                if (result.replayed) "已核对第一次恢复回执，没有新增、覆盖或复活记录、任务或草稿。已永久删除 " + result.deletedCount +
                                     " 条，删除未完成 " + result.erasingCount + " 条；其余副本以当前本机状态为准。"
-                                else "已保存并读回 " + result.ids.size + " 条新副本（文本、标签及包内原图）；初始策略为不参与 AI。原有记录保持不变。"))
+                                else "已核对恢复回执：首次导入 " + result.ids.size + " 条记录新副本、"+result.taskIds.size+" 条正式待办和 "+result.proposalIds.size+
+                                    " 条待确认草稿；当前内容与状态以本机清单为准。记录初始不参与 AI。本次恢复没有自动确认草稿、安排提醒或恢复联网授权。"))
                             .withFavoriteSource(favorites)
                 }
                 if (work.compareAndSet(active, null)) active.retire()

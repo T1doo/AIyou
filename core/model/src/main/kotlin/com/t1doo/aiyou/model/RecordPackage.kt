@@ -6,7 +6,7 @@ import java.util.UUID
 
 /** Portable limited scope, never a device database or authorization backup. */
 class RecordPackageManifest(val backupId: String, val createdAtMillis: Long, val recordCount: Int) {
-    init { RecordPackages.uuid(backupId); require(createdAtMillis >= 0 && recordCount in 1..20) }
+    init { RecordPackages.uuid(backupId); require(createdAtMillis >= 0 && recordCount in 0..20) }
     override fun toString() = "RecordPackageManifest(count=" + recordCount + ", redacted)"
 }
 
@@ -40,9 +40,12 @@ class RecordPackageOrigin(val newId: String, val backupId: String, val packageDi
 }
 
 class RecordPackageRestoreResult(ids: List<String>, val importedAtMillis: Long, val replayed: Boolean,
-    val deletedCount: Int = 0, val erasingCount: Int = 0) {
+    val deletedCount: Int = 0, val erasingCount: Int = 0,
+    taskIds: List<String> = emptyList(), proposalIds: List<String> = emptyList()) {
     val ids = Collections.unmodifiableList(ids.toList())
-    init { require(ids.size in 1..20 && ids.distinct().size == ids.size); ids.forEach(RecordPackages::uuid); require(importedAtMillis >= 0)
+    val taskIds = Collections.unmodifiableList(taskIds.toList())
+    val proposalIds = Collections.unmodifiableList(proposalIds.toList())
+    init { require(ids.size in 0..20 && ids.distinct().size == ids.size); ids.forEach(RecordPackages::uuid); require(importedAtMillis >= 0)
         require(deletedCount >= 0 && erasingCount >= 0 && deletedCount + erasingCount <= ids.size)
         require(replayed || deletedCount + erasingCount == 0)
     }

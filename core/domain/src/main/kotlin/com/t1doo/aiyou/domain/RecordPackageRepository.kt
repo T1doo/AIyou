@@ -8,6 +8,7 @@ interface VerifiedRecordPackage {
     val records: List<RecordPackageOriginal>
     val digest: String
     val images: List<com.t1doo.aiyou.model.RecordPackageImage> get() = emptyList()
+    val activities: RecordPackageActivities? get() = null
     fun release() {}
 }
 

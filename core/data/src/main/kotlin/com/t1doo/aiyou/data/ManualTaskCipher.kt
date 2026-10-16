@@ -104,6 +104,7 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
     }
     private fun validateOperation(task: ManualTaskSnapshot, operation: String) {
         when (operation) {
+            "IMPORT" -> require(task.version == 1L)
             "CREATE" -> require(task.version == 1L && task.status == ManualTaskStatus.OPEN)
             "STATUS" -> require(task.version > 1 && task.status != ManualTaskStatus.OPEN)
             "SET", "POSTPONE" -> require(task.version > 1 && task.status == ManualTaskStatus.OPEN && task.schedule != null)

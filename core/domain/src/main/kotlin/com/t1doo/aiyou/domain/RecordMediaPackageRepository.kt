@@ -11,6 +11,9 @@ interface PreparedRecordMediaPackage {
 }
 interface RecordMediaPackageRepository {
     suspend fun preview(snapshot: OriginalExportSnapshot): RecordMediaPreview
+    suspend fun previewActivities(snapshot: OriginalExportSnapshot): RecordMediaPreview {
+        throw UnsupportedOperationException("Task migration unavailable")
+    }
     suspend fun previewOpenZip(snapshot: OriginalExportSnapshot, active: () -> Boolean): RecordMediaPreview = preview(snapshot)
     suspend fun isCurrent(preview: RecordMediaPreview): Boolean
     suspend fun seal(preview: RecordMediaPreview, password: CharArray): PreparedRecordMediaPackage

@@ -119,3 +119,16 @@ SDK 只读预检仍因未设置已获许可的 ANDROID_HOME 失败；本地 Comp
 
 本批证据：`/workspace/aiyou-evidence/f06-proposal-lazy-ci-20261016/`；旧 CI 失败、
 94/96 图片包 SQLite 初始化/退出超时及其余历史失败原件继续保留。
+
+## c883cdf 精确门已关闭
+
+父级已从独立原日志核实 `c883cdffa49a38f899a32fd82570c7645a957d79` 的
+run `38868596891` / job `116867098844` 于 2026-10-16 07:53:52 UTC 成功，
+45 步成功。208 项 Compose 零失败/错误/跳过，包含全部 5 项 TaskProposal 和
+4 项 SourceTask；debug APK、instrumentation 编译、394 项 Preview、lint 均通过
+（lint 0 错误、0 警告、1 提示）。编译和 Compose 门现已关闭，未重复触发确认。
+证据：https://github.com/T1doo/AIyou/actions/runs/38868596891/job/116867098844
+
+本地未获取原始 CI 文件，证据来源归属单独记录在
+`f08-task-proposal-package-20261016/baseline-ci-evidence.json`。该精确成功不覆盖
+后续 F08 改动，不代表真机执行、重启、视觉或性能验收。先前失败原件继续保留。

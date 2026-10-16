@@ -71,8 +71,9 @@ class JcaRecordPackageCipher internal constructor(private val random: SecureRand
         return try { RecordPackageCrypto.crypt(mode,key,nonce,aad,input) } finally { key.fill(0) }
     }
 
-    internal fun encode(snapshot: OriginalExportSnapshot, allowImageOnly: Boolean = false): ByteArray {
+    internal fun encode(snapshot: OriginalExportSnapshot, allowImageOnly: Boolean = false, allowEmpty: Boolean = false): ByteArray {
         RecordPackages.uuid(snapshot.id)
+        require(allowEmpty || snapshot.records.isNotEmpty())
         val originals = snapshot.records.map { r -> RecordPackageOriginal(r.entry.id, r.entry.currentRevision,
             r.entry.capturedAtMillis, r.entry.captureTimeZone, r.entry.originalText, r.contentHash, r.tags.version, r.tags.names, allowImageOnly) }
         require(originals.sumOf { it.originalText.length.toLong() } <= OriginalExports.MAX_TEXT_UNITS)
@@ -93,7 +94,7 @@ class JcaRecordPackageCipher internal constructor(private val random: SecureRand
         } finally { blocks.forEach { it.fill(0) } }
     }
 
-    internal fun parse(plain: ByteArray, allowImageOnly: Boolean = false): AuthenticatedRecordPackage {
+    internal fun parse(plain: ByteArray, allowImageOnly: Boolean = false, allowEmpty: Boolean = false): AuthenticatedRecordPackage {
         val input = PackageReader(plain)
         require(input.string(64) == NAME && input.i32() == 1 && input.i32() == 1)
         val id = input.string(36); val created = input.i64()
@@ -101,6 +102,7 @@ class JcaRecordPackageCipher internal constructor(private val random: SecureRand
         listOf(RecordPackages.ITERATIONS, 256, 16, 12, 128).forEach { require(input.i32() == it) }
         require(input.strings(2, 32) == SCOPE && input.strings(7, 32) == EXCLUDED)
         val count = input.count(20); val manifest = RecordPackageManifest(id, created, count)
+        require(allowEmpty || count>0)
         val descriptors = List(count) { index ->
             require(input.string(64) == path(index))
             val length = input.i32(); require(length in 1..420_000)

@@ -19,6 +19,46 @@ import org.junit.runner.RunWith
 /** Formal Room/SQLCipher contracts; compilation/DEX inventory is never device acceptance. */
 @RunWith(AndroidJUnit4::class)
 class ManualTaskRecordsIntegrationTest {
+    @Test fun nativeV3PackageTransfersTasksAndDraftsAcrossEncryptedOwnersWithoutConfirmingOrRestoringConsent():Unit=runBlocking {
+        val source=open();val entry=source.saveDraft(source.updateDraft("合成加密迁移原文与草稿"),50,"UTC")
+        val choice=source.localProcessing.change(LocalProcessingChange(source.localProcessing.read(SourceVersion(entry.id,1)),LocalProcessingChoice.AI_NONE,"package-none"))
+        val b=TaskSourceBinding(choice.source,choice.sourceHash,choice.generation,0,5)
+        source.manualTasks.create(ManualTaskCreate("portable-native-task","合成迁移正式待办",60,"UTC","create",due("2026-11-01","01:30","America/New_York",ManualTaskOccurrence.SECOND)))
+        source.taskProposals.write(TaskProposalWrite("portable-native-draft",0,b,"合成迁移待确认输入",ManualTaskDateInput("2026-"),60,"UTC",60,"draft"))
+        val snapshot=source.originalExport.capture(listOf(SourceVersion(entry.id,1)),UUID.randomUUID().toString(),70)
+        val out=java.io.ByteArrayOutputStream();val prepared=source.mediaPackages.seal(source.mediaPackages.previewActivities(snapshot),"synthetic native portable tasks".toCharArray())
+        try {prepared.writeTo(out) {true}} finally {prepared.release()};source.closeAndAwait()
+        val targetKey=ByteArray(32) {(it+87).toByte()};val targetFile=File(directory,"package-target.db")
+        fun target()=EncryptedEntryRepository.openWithKey(context,targetFile,targetKey.copyOf()).also(stores::add)
+        try {
+            val first=target();val bytes=out.toByteArray();val copyId=UUID.randomUUID().toString()
+            val verified=first.mediaPackages.open({bytes.inputStream()},"synthetic native portable tasks".toCharArray())
+            try {
+                assertTrue(first.manualTasks.snapshots().isEmpty());assertTrue(first.taskProposals.list().isEmpty())
+                val result=first.mediaPackages.restore(verified,listOf(copyId),100)
+                assertEquals(1,result.taskIds.size);assertEquals(1,result.proposalIds.size)
+                assertEquals(ProcessingPolicy.AI_NONE,first.entries().single().policy)
+                val draft=first.taskProposals.list().single();assertTrue(draft.sourceAvailable)
+                assertEquals(SourceVersion(copyId,1),draft.proposal.binding.source);assertEquals(1L,draft.proposal.binding.generation)
+                assertEquals("2026-",draft.proposal.dateInput.date);assertEquals(1,first.manualTasks.snapshots().size)
+                assertEquals(-18000,first.manualTasks.snapshots().single().schedule!!.offsetSeconds)
+                val task=first.manualTasks.snapshots().single();first.manualTasks.change(ManualTaskMutation(task.id,task.version,ManualTaskStatus.COMPLETED,110,"finish"))
+            } finally {verified.release()};first.closeAndAwait()
+            val cold=target();val reopened=cold.mediaPackages.open({bytes.inputStream()},"synthetic native portable tasks".toCharArray())
+            try {assertTrue(cold.mediaPackages.restore(reopened,listOf(UUID.randomUUID().toString()),200).replayed)} finally {reopened.release()}
+            assertEquals(ManualTaskStatus.COMPLETED,cold.manualTasks.snapshots().single().status);assertEquals(1,cold.taskProposals.list().size)
+            val taskOnly=OriginalExportSnapshot(UUID.randomUUID().toString(),210,emptyList(),true)
+            val tasksOut=java.io.ByteArrayOutputStream();val tasksPrepared=cold.mediaPackages.seal(cold.mediaPackages.previewActivities(taskOnly),"synthetic native portable tasks".toCharArray())
+            try {tasksPrepared.writeTo(tasksOut) {true}} finally {tasksPrepared.release()}
+            val third=EncryptedEntryRepository.openWithKey(context,File(directory,"task-only-target.db"),ByteArray(32) {(it+99).toByte()}).also(stores::add)
+            val tasksPack=third.mediaPackages.open({tasksOut.toByteArray().inputStream()},"synthetic native portable tasks".toCharArray())
+            try {
+                assertTrue(third.mediaPackages.restore(tasksPack,emptyList(),220).ids.isEmpty())
+                assertTrue(third.entries().isEmpty());assertEquals(1,third.manualTasks.snapshots().size)
+                assertFalse(third.taskProposals.list().single().sourceAvailable)
+            } finally {tasksPack.release()}
+        } finally {targetKey.fill(0)}
+    }
     @Test fun nativeTaskProposalColdDraftEditRejectAndAtomicConfirmationStaySeparate():Unit=runBlocking {
         val store=open();val entry=store.saveDraft(store.updateDraft("合成原文：明天三点只是引用"),50,"UTC")
         val source=SourceVersion(entry.id,1)

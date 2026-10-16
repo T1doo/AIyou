@@ -58,9 +58,10 @@ class EncryptedEntryRepository internal constructor(
     override val taskProposals: com.t1doo.aiyou.domain.TaskProposalRepository get() = proposalStorage
     override val originalExport: com.t1doo.aiyou.domain.OriginalExportRepository =
         SqlOriginalExportRepository(borrowedSql, tagStorage)
-    private val packageStorage = SqlRecordPackageRepository(borrowedSql, tagStorage)
+    private val packageActivities=SqlRecordPackageActivities(borrowedSql,taskStorage,proposalStorage)
+    private val packageStorage = SqlRecordPackageRepository(borrowedSql, tagStorage,activities=packageActivities)
     override val mediaPackages: com.t1doo.aiyou.domain.RecordMediaPackageRepository =
-        SqlRecordMediaPackageRepository(borrowedSql, originalExport, attachmentStorage, packageStorage)
+        SqlRecordMediaPackageRepository(borrowedSql, originalExport, attachmentStorage, packageStorage,packageActivities)
     override val recordPackages: com.t1doo.aiyou.domain.RecordPackageRepository get() = packageStorage
     override val permanentErasure: com.t1doo.aiyou.domain.PermanentErasureRepository =
         SqlPermanentErasureRepository(borrowedSql, attachmentStorage, originalEditStorage, packageStorage, proposalStorage::readAllWithin)

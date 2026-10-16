@@ -61,6 +61,17 @@ internal class SqlTaskProposalRepository(private val database:RecordsSqlDatabase
         val rows=sql.query("SELECT id,version,lastMutationId,ciphertext FROM manual_tasks WHERE substr(id,1,14)='TASK_PROPOSAL:' ORDER BY id")
         return rows.map {decode(it).proposal}
     }
+    internal fun exportWithin(sql:RecordsSqlConnection):List<TaskProposal> =
+        sql.query("SELECT id,version,lastMutationId,ciphertext FROM manual_tasks WHERE substr(id,1,14)='TASK_PROPOSAL:' ORDER BY id LIMIT 4097")
+            .also {require(it.size<=4096)}.map {decode(it).proposal}.filter {it.state==TaskProposalState.DRAFT}
+            .also {require(it.size<=RecordPackageActivities.MAX_ITEMS)}
+    internal fun importWithin(sql:RecordsSqlConnection,p:TaskProposal,hash:String) {
+        require(p.version==1L && p.state==TaskProposalState.DRAFT && row(sql,p.id)==null)
+        require(readAllWithin(sql).count {it.state==TaskProposalState.DRAFT}<TaskProposals.MAX_DRAFTS)
+        val bytes=cipher.seal(p,hash)
+        sql.execute("INSERT INTO manual_tasks(id,version,lastMutationId,ciphertext) VALUES(?,?,?,?)",listOf(TaskProposals.storageId(p.id),1,hash,bytes))
+        check(row(sql,p.id)?.proposal==p)
+    }
     private fun row(sql:RecordsSqlConnection,id:String)=sql.query("SELECT id,version,lastMutationId,ciphertext FROM manual_tasks WHERE id=?",
         listOf(TaskProposals.storageId(id))).singleOrNull()?.let(::decode)
     private fun decode(r:List<Any?>):Row {

@@ -11,7 +11,7 @@ data class RecordPackageImage(val sourceId: String, val sourceRevision: Int, val
         require(byteSize in 1..RecordMediaPackages.MAX_IMAGE_BYTES); RecordPackages.digest(sha256)
     }
 }
-class RecordMediaPreview(val snapshot: OriginalExportSnapshot, images: List<RecordPackageImage>) {
+class RecordMediaPreview(val snapshot: OriginalExportSnapshot, images: List<RecordPackageImage>, val activities: RecordPackageActivities? = null) {
     val images = Collections.unmodifiableList(images.toList())
     val imageBytes = images.sumOf { it.byteSize }
     init {
