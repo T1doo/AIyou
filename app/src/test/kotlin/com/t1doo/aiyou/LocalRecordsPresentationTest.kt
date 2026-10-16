@@ -22,10 +22,12 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasText
@@ -50,6 +52,13 @@ import androidx.compose.ui.unit.height
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.records.LocalRecordUiState
+import com.t1doo.aiyou.records.RecordAiPhase
+import com.t1doo.aiyou.records.RecordAiSection
+import com.t1doo.aiyou.records.RecordAiUiState
+import com.t1doo.aiyou.model.DerivedTextCandidate
+import com.t1doo.aiyou.model.OriginalTextReference
+import com.t1doo.aiyou.model.SourceVersion
+import com.t1doo.aiyou.model.StoredTextAnnotation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -64,6 +73,55 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35], qualifiers = "w360dp-h1000dp")
 class LocalRecordsPresentationTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test
+    @Config(sdk = [35], qualifiers = "w320dp-h1000dp")
+    fun aiCommitConfirmationUsesPendingLabelAndStoppedSnapshotHidesPreviewAtLargeFont() {
+        val preview = "合成整理预览"
+        val state = mutableStateOf(RecordAiUiState(7, SourceVersion("synthetic-source", 1),
+            RecordAiPhase.RUNNING, "正在整理，预览尚未保存。", preview = preview))
+        val stops = mutableListOf<Long>()
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+                AIyouTheme { RecordAiSection(state.value, onStart = {}, onStop = { stops.add(it) }, onClose = {}) }
+            }
+        }
+        compose.onNodeWithTag("record-ai-content-status").assertTextEquals("预览 · 尚未保存").assertIsDisplayed()
+        compose.onNodeWithText(preview).assertIsDisplayed()
+        // Mirrors the actual VM snapshot while SQL commit/ACK is held by the host contract.
+        // This test renders the production component; it does not simulate database correctness.
+        compose.runOnIdle { state.value = state.value.copy(phase = RecordAiPhase.CONFIRMING,
+            notice = "正在确认整理结果的本机保存状态。") }
+        compose.onNodeWithTag("record-ai-content-status").assertTextEquals("预览 · 保存状态待确认").assertIsDisplayed()
+        compose.onAllNodesWithText("预览 · 尚未保存").assertCountEquals(0)
+        compose.onNodeWithText(preview).assertIsDisplayed()
+        compose.onNodeWithTag("record-ai-stop").performClick()
+        compose.runOnIdle {
+            assertEquals(listOf(7L), stops)
+            state.value = state.value.copy(phase = RecordAiPhase.CANCELLED, preview = "",
+                notice = "已请求停止整理；已完成本机保存的候选不会撤回。")
+        }
+        compose.onAllNodesWithTag("record-ai-content-status").assertCountEquals(0)
+        compose.onAllNodesWithText(preview).assertCountEquals(0)
+        compose.onAllNodesWithTag("record-ai-stop").assertCountEquals(0)
+    }
+
+    @Test fun aiStoredAnnotationUsesCandidateHeadingWithoutUnsavedOrPendingLabel() {
+        val source = SourceVersion("synthetic-source", 1)
+        val annotation = StoredTextAnnotation("synthetic-job", source, 1,
+            DerivedTextCandidate("合成已保存整理", listOf(OriginalTextReference(source, 0, 4, "合成原文"))), 20)
+        compose.setContent {
+            AIyouTheme { RecordAiSection(RecordAiUiState(8, source, RecordAiPhase.SUCCEEDED,
+                "整理候选已保存在本机，尚未确认为事实或待办。", annotation = annotation),
+                onStart = {}, onStop = {}, onClose = {}) }
+        }
+        compose.onNodeWithTag("record-ai-content-status").assertTextEquals("AI 整理候选").assertIsDisplayed()
+        compose.onNodeWithText("合成已保存整理").assertIsDisplayed()
+        compose.onAllNodesWithText("预览 · 尚未保存").assertCountEquals(0)
+        compose.onAllNodesWithText("预览 · 保存状态待确认").assertCountEquals(0)
+        compose.onAllNodesWithTag("record-ai-stop").assertCountEquals(0)
+    }
 
     @Test
     @Config(sdk = [35], qualifiers = "w840dp-h1000dp")

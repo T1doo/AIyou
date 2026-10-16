@@ -15,5 +15,12 @@ data class RecordAiUiState(
     val annotation: StoredTextAnnotation? = null,
 ) {
     val running get() = phase == RecordAiPhase.RUNNING || phase == RecordAiPhase.CONFIRMING
+    // Displayed RUNNING previews precede wire completion and SQL commit. Once confirming,
+    // an absent annotation means the receipt is unknown, not proof that no write happened.
+    val contentLabel get() = when {
+        annotation != null -> "AI 整理候选"
+        phase == RecordAiPhase.RUNNING -> "预览 · 尚未保存"
+        else -> "预览 · 保存状态待确认"
+    }
     override fun toString() = "RecordAiUiState(sessionId=$sessionId, phase=$phase, <redacted>)"
 }

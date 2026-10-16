@@ -397,6 +397,8 @@ for label, folder, minimum in targets:
         required = (
             "narrowLargeFontSaveFailureRetryScrollsIntoViewAndPreservesPendingDraft",
             "narrowLargeFontReadFailureRetryScrollsIntoViewAndPreservesKnownDraft",
+            "aiCommitConfirmationUsesPendingLabelAndStoppedSnapshotHidesPreviewAtLargeFont",
+            "aiStoredAnnotationUsesCandidateHeadingWithoutUnsavedOrPendingLabel",
         )
         for name in required:
             matches = [case for case in observed_cases if case.get("classname") == owner

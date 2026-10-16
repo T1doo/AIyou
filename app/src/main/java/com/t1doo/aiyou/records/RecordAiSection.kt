@@ -29,7 +29,7 @@ internal fun RecordAiSection(
         if (text.isNotEmpty()) {
             Column(Modifier.fillMaxWidth().heightIn(max = AIyouDimensions.composerTextMinHeight * 2)
                 .verticalScroll(rememberScrollState())) {
-                Text(if (selected.annotation == null) "预览 · 尚未保存" else "AI 整理候选",
+                Text(selected.contentLabel, modifier = Modifier.testTag("record-ai-content-status"),
                     style = MaterialTheme.typography.labelMedium)
                 Text(text, style = MaterialTheme.typography.bodyMedium)
             }

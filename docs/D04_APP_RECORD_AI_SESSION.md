@@ -74,3 +74,38 @@ SUCCEEDED，也不影响关闭、换页、改版、撤权或销毁的失效规�
 Android SDK 条款仍待答复，本批未安装或接受；Compose、assembleDebug、lint、
 原生 SAF / Keystore / SQLCipher、设备重启、TalkBack、视觉与性能验收均未在
 本地执行。祖先 CI 成功不能替代本批同 SHA CI，更不能替代真机验收。
+
+## 2026-10-16 确认阶段的实际 UI 标签补正
+
+父级对 `c6fdbe86263613f6ccc2bc19a54697a960514e04` 的只读审查指出直接相关
+漏点：虽然 controller notice 已表达待确认，`RecordAiSection` 仍根据
+`annotation == null` 固定显示“预览 · 尚未保存”。真实 SQL 已提交但 ACK 暂停
+时，`CONFIRMING` 仍有预览正文、尚无返回的 annotation，标签因此与事实矛盾。
+本批从上述精确祖先建立 `codex/fix-ai-confirming-label-20261016`。
+
+先将原标签表达式无行为变化地提取到实际 `RecordAiUiState.contentLabel`，让
+生产 Compose 直接使用；真实 VM / SQL 提交前暂停及提交后 ACK 暂停两个契约
+据此实际 **2/2 红测失败**，原日志、XML、红测源码及差异保留。修复后，有真实
+annotation 显示“AI 整理候选”；仅有正文的 RUNNING 流式阶段显示“预览 · 尚未
+保存”；CONFIRMING 以及其他无回执状态统一显示“预览 · 保存状态待确认”。
+生产新作业先同步发布 Completed / CONFIRMING，之后才调用 SQL commit；已提交
+结果重放不产生预览正文。因此标签不以“annotation 尚未返回”推断“尚未写入”。
+
+新增 2 项纯 JVM 生产映射测试，强化实际 VM 的流式、wire 完成、SQL 已提交 ACK
+暂停和已返回 annotation 断言。现有 `LocalRecordsPresentationTest` 新增两项
+真实 `RecordAiSection` 渲染测试：320dp / 2 倍字号的待确认标签及停止快照隐藏，
+以及已保存 annotation 的候选标题。没有用假组件替代实际 UI；合成状态只验证
+展示，持久化和停止门禁继续由真实 VM / SQL 契约证明。controller、停止后预览
+清空、session / Run / owner / 版本 / 策略及销毁门禁不改。
+既有 `verify-test-results.py --ui` 逐项门禁要求这两项新 Compose 方法的真实
+成功 XML，不用合成 XML 冒充执行或以总数通过替代新增用例。
+
+本地 Android SDK 及协议状态不变，新增 Compose 测试、assembleDebug、AAR
+metadata、lint 和原生设备验收均 **NOT RUN**，无本批新 APK。两项 Compose
+用例已编写但未在本地运行；实际可执行范围与新 SHA CI 状态以交付证据为准。
+
+最终实际离线全量 **634/634**：AI 178、domain 42、remote / 实际 VM / UI 映射
+414，0 failure / error / skip。逐项 XML、源码方法清单及本批输入指纹校验通过，
+包含既有 16 项会话门禁契约与本批 2 项映射方法；Python **123/123**。
+只读独审无阻塞意见。上述计数不包含未执行的两项新增 Compose 渲染测试，也不
+把祖先的 191 Compose、394 Preview 或旧队列 148 项算作本次重跑。

@@ -89,9 +89,11 @@ class LocalRecordsAiContractTest {
                 assertTrue(f.records.annotations().isEmpty())
                 localSave(h)
                 assertEquals(RecordAiPhase.RUNNING, h.vm.state.value.ai!!.phase)
+                assertEquals("预览 · 尚未保存", h.vm.state.value.ai!!.contentLabel)
                 assertEquals(1L, f.selectedBody!!.release.count)
                 f.selectedBody!!.release.countDown()
                 val ui = h.phase(RecordAiPhase.SUCCEEDED).ai!!
+                assertEquals("AI 整理候选", ui.contentLabel)
                 assertTrue(ui.preview.isEmpty())
                 assertEquals(f.records.source, ui.annotation!!.source)
                 assertEquals(SourceBoundLoopbackFixture.TEXT + SourceBoundLoopbackFixture.LATE_TEXT, ui.annotation!!.candidate.text)
@@ -221,6 +223,7 @@ class LocalRecordsAiContractTest {
                     val id = h.open(); h.vm.startAiSession(id); await(entered)
                     val confirming = h.phase(RecordAiPhase.CONFIRMING).ai!!
                     assertNull(confirming.annotation)
+                    assertEquals("预览 · 保存状态待确认", confirming.contentLabel)
                     assertTrue(f.records.annotations().isEmpty())
                     assertEquals("ADMITTED", f.records.jobs().single()[1])
                     if (failCommit) f.records.db.write("CREATE TRIGGER owned_vm_commit_abort BEFORE UPDATE ON remote_text_jobs WHEN OLD.state='ADMITTED' AND NEW.state='COMMITTED' BEGIN SELECT RAISE(ABORT,'owned VM commit fault'); END")
@@ -429,6 +432,9 @@ class LocalRecordsAiContractTest {
                 val confirming = h.phase(RecordAiPhase.CONFIRMING).ai!!
                 assertEquals(1, f.records.annotations().size)
                 assertEquals("COMMITTED", f.records.jobs().single()[1])
+                assertTrue(confirming.preview.isNotEmpty()); assertNull(confirming.annotation)
+                assertEquals("Committed SQL with held ACK must not be labelled unsaved",
+                    "预览 · 保存状态待确认", confirming.contentLabel)
                 h.vm.stopAiSession(id)
                 val stopped = h.vm.state.value.ai!!
                 assertEquals(RecordAiPhase.CANCELLED, stopped.phase)
