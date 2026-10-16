@@ -164,6 +164,7 @@ jobs:
         if: always() && steps.preview_guard.outcome == 'success'
         run: python3 scripts/package-visual-previews.py
       - name: Preserve visual delivery manifest
+        id: visual_index
         if: always() && steps.visual_packs.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -171,80 +172,9 @@ jobs:
           path: app/build/outputs/d01-visual-packs/INDEX.json
           if-no-files-found: error
           retention-days: 14
-      - name: Preserve visual review ZIP - 此刻
-        if: always() && steps.visual_packs.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: d01-visual-now
-          path: app/build/outputs/d01-visual-packs/d01-visual-now.zip
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 14
-      - name: Preserve visual review ZIP - 回忆
-        if: always() && steps.visual_packs.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: d01-visual-memories
-          path: app/build/outputs/d01-visual-packs/d01-visual-memories.zip
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 14
-      - name: Preserve visual review ZIP - 待办
-        if: always() && steps.visual_packs.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: d01-visual-tasks
-          path: app/build/outputs/d01-visual-packs/d01-visual-tasks.zip
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 14
-      - name: Preserve visual review ZIP - 组件
-        if: always() && steps.visual_packs.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: d01-visual-components
-          path: app/build/outputs/d01-visual-packs/d01-visual-components.zip
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 14
-      - name: Preserve visual review ZIP - 主导航
-        if: always() && steps.visual_packs.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: d01-visual-shell
-          path: app/build/outputs/d01-visual-packs/d01-visual-shell.zip
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 14
-      - name: Preserve visual review ZIP - 完整长文本
-        if: always() && steps.visual_packs.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: d01-visual-complete
-          path: app/build/outputs/d01-visual-packs/d01-visual-complete.zip
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 14
-      - name: Preserve complete white-blue phone pages for user review
-        if: always() && steps.visual_packs.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: aiyou-white-blue-pages
-          path: |
-            app/build/outputs/d01-visual-packs/d01-visual-review.zip
-            app/build/outputs/d01-visual-packs/d01-visual-drafts.zip
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 14
-      - name: Preserve unchanged local attachment state images
-        if: always() && steps.visual_packs.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: d02-visual-attachments
-          path: app/build/outputs/d01-visual-packs/d01-visual-attachments.zip
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 14
+      - name: Upload each unchanged bounded PNG ZIP independently
+        if: always() && steps.visual_packs.outcome == 'success' && steps.visual_index.outcome == 'success'
+        uses: ./.github/actions/upload-visual-packs
       - name: Print complete lint findings
         if: always()
         run: |

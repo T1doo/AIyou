@@ -12,6 +12,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*

@@ -1,0 +1,5 @@
+name: Upload each bounded visual ZIP
+description: Upload each verified original PNG package as an independent artifact.
+runs:
+  using: node20
+  main: index.js

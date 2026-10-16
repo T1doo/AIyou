@@ -4,6 +4,8 @@ import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
+import tempfile
+from png_integrity import verified_dimensions
 import zipfile
 
 GROUPS = {"now": ("此刻", 28), "memories": ("回忆", 28), "tasks": ("待办", 28),
@@ -40,72 +42,147 @@ def group_for(file):
     return matches[0]
 
 
+def read_png(reference, item, maximum):
+    path = reference / item["file"]
+    if path.stat().st_size > maximum:
+        raise ValueError(f"single PNG exceeds {maximum} bytes: {item['file']}")
+    with path.open("rb") as stream:
+        data = stream.read(maximum + 1)
+    if len(data) > maximum:
+        raise ValueError(f"single PNG exceeds {maximum} bytes: {item['file']}")
+    if hashlib.sha256(data).hexdigest() != item["sha256"]:
+        raise ValueError(f"PNG changed since render verification: {item['file']}")
+    dimensions = verified_dimensions(data)
+    if any(type(item[key]) is not int for key in ("width", "height")) or dimensions != (item["width"], item["height"]):
+        raise ValueError(f"PNG dimensions differ from render manifest: {item['file']}")
+    if "bytes" in item and len(data) != item["bytes"]:
+        raise ValueError("PNG changed during packaging")
+    return data
+
+
+def metadata(group, label, pngs, part, parts, source_kind="unspecified source; no render acceptance"):
+    manifest = {"group": group, "label": label, "part": part, "parts": parts,
+                "group_count": GROUPS[group][1], "source_count": 394, "source_kind": source_kind,
+                "count": len(pngs), "pngs": pngs,
+                "visual_inspection": "NOT RUN", "approved_goldens": False}
+    readme = (f"D01 {label}：第 {part}/{parts} 包，本包 {len(pngs)} 张，本组 {GROUPS[group][1]} 张原始 PNG。\n"
+              "无缩放、重编码或降质。全套394张的完整清单与分包对应见INDEX.json。\n"
+              f"来源：{source_kind}。尚未视觉验收，也不是已批准 golden。\n"
+              "MANIFEST.json 保留原文件名、尺寸、字节数、SHA-256及本组分包序号。\n"
+              "每个ZIP独立上传；请核查截断、重叠、可读性和内容分区。\n")
+    return [("README.txt", readme.encode("utf-8")),
+            ("MANIFEST.json", (json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))]
+
+
+def zip_size(group, label, pngs, part, parts, source_kind="unspecified source; no render acceptance"):
+    # Seekable ZIP_STORED without comments/extras/ZIP64: local headers + central directory + EOCD.
+    entries = [(name, len(data)) for name, data in metadata(group, label, pngs, part, parts, source_kind)]
+    entries += [("pngs/" + item["file"], item["bytes"]) for item in pngs]
+    return 22 + sum(30 + 46 + 2 * len(name.encode("utf-8")) + size for name, size in entries)
+
+
+def partition(group, label, pngs, maximum, source_kind="unspecified source; no render acceptance"):
+    parts = 1
+    while True:
+        batches, current = [], []
+        for item in pngs:
+            if zip_size(group, label, current + [item], len(batches) + 1, parts, source_kind) > maximum:
+                if current:
+                    batches.append(current)
+                    current = []
+                if zip_size(group, label, [item], len(batches) + 1, parts, source_kind) > maximum:
+                    raise ValueError(f"single PNG plus manifest/README/ZIP exceeds {maximum}: {item['file']}")
+            current.append(item)
+        if current:
+            batches.append(current)
+        if len(batches) == parts:
+            return batches
+        # Starting at one, increasing the count can only increase its encoded byte length.
+        if len(batches) < parts or len(batches) > len(pngs):
+            raise ValueError("unstable ZIP partition")
+        parts = len(batches)
+
+
+def write_member(archive, name, data):
+    entry = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+    entry.compress_type = zipfile.ZIP_STORED
+    entry.create_system = 3
+    entry.external_attr = 0o600 << 16
+    archive.writestr(entry, data)
+
+
 def package(root, max_zip_bytes=MAX_ZIP_BYTES):
+    if type(max_zip_bytes) is not int or not 0 < max_zip_bytes <= MAX_ZIP_BYTES:
+        raise ValueError("invalid ZIP bound; the original maximum cannot be raised")
     reference = root / "app/src/screenshotTestDebug/reference"
     report = root / "app/build/reports/d01-preview-manifest.json"
-    source = json.loads(report.read_text())
+    source_bytes = report.read_bytes()
+    source = json.loads(source_bytes)
     expected = sum(count for _, count in GROUPS.values())
     if source.get("count") != expected or len(source.get("pngs", [])) != expected:
         raise ValueError(f"require the actual passing {expected}-image render manifest")
+    source_kind = source.get("kind", "unspecified source; no render acceptance")
+    if not isinstance(source_kind, str) or len(source_kind) > 256 or any(ord(c) < 32 for c in source_kind):
+        raise ValueError("invalid source manifest kind")
     grouped = {group: [] for group in GROUPS}
     seen = set()
     for item in source["pngs"]:
         file = item["file"]
         relative = PurePosixPath(file)
-        if relative.is_absolute() or ".." in relative.parts or "\\" in file or file in seen:
+        if relative.is_absolute() or ".." in relative.parts or "\\" in file or file in seen or relative.suffix != ".png":
             raise ValueError(f"unsafe or duplicate PNG path: {file}")
         path = reference / file
         if not path.resolve().is_relative_to(reference.resolve()):
             raise ValueError(f"PNG escapes reference directory: {file}")
-        data = path.read_bytes()
-        if hashlib.sha256(data).hexdigest() != item["sha256"]:
-            raise ValueError(f"PNG changed since render verification: {file}")
+        data = read_png(reference, item, max_zip_bytes)
         seen.add(file)
         grouped[group_for(file)].append({**item, "bytes": len(data)})
-    for group, (_, count) in GROUPS.items():
-        if len(grouped[group]) != count:
-            raise ValueError(f"{group}: expected {count} images, found {len(grouped[group])}")
+    plans = []
+    for group, (label, count) in GROUPS.items():
+        pngs = sorted(grouped[group], key=lambda item: item["file"])
+        if len(pngs) != count:
+            raise ValueError(f"{group}: expected {count} images, found {len(pngs)}")
+        batches = partition(group, label, pngs, max_zip_bytes, source_kind)
+        plans.extend((group, label, pngs, part, len(batches)) for part, pngs in enumerate(batches, 1))
     output = root / "app/build/outputs/d01-visual-packs"
     output.mkdir(parents=True, exist_ok=True)
-    index = {"kind": "unchanged PNG delivery; visual inspection NOT RUN",
+    staging = Path(tempfile.mkdtemp(prefix=".pack-", dir=output))
+    index = {"kind": "unchanged PNG delivery; visual inspection NOT RUN", "count": expected, "source_kind": source_kind,
+             "source_manifest_sha256": hashlib.sha256(source_bytes).hexdigest(),
+             "pngs": sorted((item for values in grouped.values() for item in values), key=lambda item: item["file"]),
              "max_inner_zip_bytes": max_zip_bytes, "packs": []}
-    for group, (label, _) in GROUPS.items():
-        pngs = sorted(grouped[group], key=lambda item: item["file"])
-        name = f"d01-visual-{group}.zip"
-        target = output / name
-        manifest = {"group": group, "label": label, "count": len(pngs), "pngs": pngs,
-                    "visual_inspection": "NOT RUN", "approved_goldens": False}
-        readme = (f"D01 {label}：{len(pngs)} 张原始 PNG，无缩放、重编码或降质。\n"
-                  "这是初始渲染结果，尚未视觉验收，也不是已批准 golden。\n"
-                  "页面包含七种状态 × 四种尺寸；组件包含八组件 × 七状态 × 两尺寸。\n"
-                  "七状态：正常、禁用、加载、错误、长文本、空、离线。\n"
-                  "页面尺寸：360dp、320dp/fontScale2、800dp横屏、840dp大屏。\n"
-                  "组件尺寸：360dp、320dp/fontScale2；主导航包仅两个尺寸。\n"
-                  "完整长文本包：七组件 × 常规1600dp高/窄屏大字体4000dp高，保留完整内容结束标记。\n"
-                  "正式本机页面：二十六状态/路由；附件包：十五状态/路由，各有常规、320dp大字体、横屏、大屏；使用合成状态，无数据库/网络调用。\n"
-                  "请核查 PNG 截断、重叠、可读性、原文/派生/提案/正式任务分区。\n"
-                  "MANIFEST.json 列出精确原始文件名、尺寸、字节数和 SHA-256。\n"
-                  "从 GitHub 正常下载；若外层 ZIP 内还有此 ZIP，可直接上传内层 ZIP。\n")
-        with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_STORED) as archive:
-            archive.writestr("README.txt", readme)
-            archive.writestr("MANIFEST.json", json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+    for group, label, pngs, part, parts in plans:
+        name = f"d01-visual-{group}-{part:03}.zip"
+        target = staging / name
+        with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_STORED, allowZip64=False) as archive:
+            for member, data in metadata(group, label, pngs, part, parts, source_kind):
+                write_member(archive, member, data)
             for item in pngs:
-                data = (reference / item["file"]).read_bytes()
-                if hashlib.sha256(data).hexdigest() != item["sha256"]:
-                    raise ValueError("PNG changed during packaging")
-                archive.writestr("pngs/" + item["file"], data)
+                write_member(archive, "pngs/" + item["file"], read_png(reference, item, max_zip_bytes))
         size = target.stat().st_size
-        if size > max_zip_bytes:
-            target.unlink()  # Remove only the just-created oversized output, never input images.
-            raise ValueError(f"{name}: {size} bytes exceeds {max_zip_bytes}; do not upload")
+        if size != zip_size(group, label, pngs, part, parts, source_kind) or size > max_zip_bytes:
+            raise ValueError(f"{name}: ZIP size {size} exceeds planned bound; staged bytes preserved")
         with zipfile.ZipFile(target) as archive:
             if archive.testzip() is not None:
                 raise ValueError(f"ZIP integrity failed: {name}")
-        entry = {"file": name, "group": group, "count": len(pngs), "bytes": size,
-                 "sha256": hashlib.sha256(target.read_bytes()).hexdigest(), "pngs": pngs}
-        index["packs"].append(entry)
-        print(f"PASS: {name} bytes={size} PNGs={len(pngs)} <= {max_zip_bytes}")
-    (output / "INDEX.json").write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n")
+        index["packs"].append({"file": name, "group": group, "part": part, "parts": parts,
+            "count": len(pngs), "bytes": size, "sha256": hashlib.sha256(target.read_bytes()).hexdigest(), "pngs": pngs})
+    # Publish only after all files validate. Existing different outputs remain available for inspection.
+    for entry in index["packs"]:
+        target = output / entry["file"]
+        if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() != entry["sha256"]:
+            raise ValueError(f"existing ZIP differs: {entry['file']}; preserved original and staging")
+    for entry in index["packs"]:
+        target = output / entry["file"]
+        if target.exists():
+            (staging / entry["file"]).unlink()  # Only this run's identical staged copy.
+        else:
+            (staging / entry["file"]).replace(target)
+        print(f"PASS: {entry['file']} bytes={entry['bytes']} PNGs={entry['count']} <= {max_zip_bytes}")
+    index_path = staging / "INDEX.json"
+    index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n")
+    index_path.replace(output / "INDEX.json")
+    staging.rmdir()
     print("D01_VISUAL_PACK_INDEX=" + json.dumps(index, ensure_ascii=False, separators=(",", ":")))
     print("VISUAL INSPECTION / USER ACCEPTANCE / DEVICE: NOT RUN")
     return index
