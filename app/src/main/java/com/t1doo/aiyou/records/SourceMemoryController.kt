@@ -29,7 +29,7 @@ class SourceMemoryController(private val current:()->LocalRecordUiState,
     @Volatile private var disposed=false
     private fun owns(session:Long,request:Long?=null):Boolean {
         val local=current();val ui=local.sourceMemories ?: return false
-        return !disposed && ui.session==session && (request==null || ui.request==request) && local.ready && !local.opening && local.error==null &&
+        return !disposed && ui.session==session && (request==null || ui.request==request) && local.ready && !local.opening && local.error==null && local.hasLocalProcessingProof(ui.source) &&
             local.entries.any { it.id==ui.source.sourceId && it.currentRevision.toLong()==ui.source.revision && it.policy!=ProcessingPolicy.AI_NONE && OriginalExports.hash(it.originalText)==ui.sourceHash }
     }
     private fun update(session:Long,change:(SourceMemoryUiState)->SourceMemoryUiState)=publish { local ->
@@ -39,6 +39,7 @@ class SourceMemoryController(private val current:()->LocalRecordUiState,
         val local=current()
         if(disposed || !local.ready || local.opening || local.error!=null || !local.supportsSourceMemories || local.saving || local.savePending ||
             local.sourceMemories!=null || local.sourceTags!=null || local.candidates!=null || local.manualTagEditor!=null || local.recordPackage!=null || local.recycleBin!=null) return
+        if(!local.hasLocalProcessingProof(SourceVersion(id,revision.toLong())) || local.localProcessing!=null) return
         val entry=local.entries.singleOrNull { it.id==id && it.currentRevision==revision && it.policy!=ProcessingPolicy.AI_NONE } ?: return
         val ui=SourceMemoryUiState(sessions.incrementAndGet(),SourceVersion(id,revision.toLong()),OriginalExports.hash(entry.originalText))
         publish { it.copy(sourceMemories=ui) };execute(ui,null)

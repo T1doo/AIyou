@@ -16,6 +16,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SourceMemoryViewModelTest {
+    @Test(timeout=10_000) fun unobservedSameRevisionPolicyAbaRetiresOldMemoryPreviewAndConfirmation():Unit=Harness().use { h -> runBlocking {
+        h.ready();val ui=h.open();h.vm.sourceMemories.prepareSave(ui.session);val old=h.value().confirmation!!
+        val policy=SqlLocalProcessingRepository(h.f.base.gateway)
+        h.f.db.transaction {
+            val none=policy.change(LocalProcessingChange(policy.read(h.f.source),LocalProcessingChoice.AI_NONE,"aba-off"))
+            policy.change(LocalProcessingChange(none,LocalProcessingChoice.LOCAL_ONLY,"aba-on"))
+        }
+        h.vm.refreshLocalSearch()
+        // The serial draft command is a barrier after RefreshSearch, even though entries compare equal.
+        h.vm.changeText("合成队列屏障")
+        withTimeout(2_000) { h.vm.state.first { it.draftNotice=="草稿已保存在本机" } }
+        assertNull(h.vm.state.value.sourceMemories)
+        h.vm.sourceMemories.confirm(ui.session,old);assertTrue(h.creates.isEmpty());assertEquals(0,h.remoteCalls)
+    } }
     @Test(timeout=10_000) fun actualVmPersistsOnlyAfterSeparateConfirmationThenColdReopensAcceptedContext():Unit=Harness().use { h -> runBlocking {
         h.ready();val ui=h.open();h.vm.sourceMemories.prepareSave(ui.session);val old=h.value().confirmation!!
         h.vm.sourceMemories.cancelConfirmation(ui.session,old);assertTrue(h.creates.isEmpty());assertTrue(h.f.store.memories(h.f.source).isEmpty())
@@ -71,6 +85,7 @@ class SourceMemoryViewModelTest {
         }
         private val base=SqliteVmEntryRepository(f.db,f.base.gateway,RemoteTextTransactions(f.base.gateway)) { f.base.gateway.stopAndAwaitIdle();f.store.wipeKey();f.base.store.wipeKey() }
         private val owner=object:EntryRepository by base,AutoCloseable {
+            override val localProcessing=SqlLocalProcessingRepository(f.base.gateway)
             override val sourceMemories=port
             override val sourceBoundText:SourceBoundTextRepository? get() { remoteCalls++;error("No remote authority") }
             override suspend fun prepare() { check(f.db.read("PRAGMA user_version").single().single()==10L) }

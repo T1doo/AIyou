@@ -97,6 +97,11 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.LocalProcessingPresentationTest"] = (
+            "actualNarrowDoubleFontDetailRequiresSeparateChoiceAndConfirmationForBothLocalScopes",
+            "unknownReadbackHasNoSuccessAndRetryUsesTheIdenticalRequestWithoutAnotherGeneration",
+            "cancelRestorationAndNavigationRetirePrivateConfirmationsAndSavedStateContainsNoSource",
+            "pictureOnlyOriginalCanChooseNoInferenceWithoutInventingTextOrRemoteOption")
         additional["com.t1doo.aiyou.SourceMemoryPresentationTest"] = (
             "explicitPendingAndAcceptanceAreReachableAtDoubleFontAndSourceJumpPreservesOriginal",
             "rejectionCorrectionHistoryAndRevocationSurviveReopeningWithoutAutomaticAcceptance",

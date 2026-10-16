@@ -19,7 +19,7 @@ class FactRecapController internal constructor(private val current: ()->LocalRec
     private val ownershipGate=Any()
     @Volatile private var disposed=false
     private fun ui()=current().factRecap
-    private fun available()=!disposed && current().let { it.ready && !it.opening && it.error==null && it.supportsFactRecaps }
+    private fun available()=!disposed && current().let { it.ready && !it.opening && it.error==null && it.supportsFactRecaps && (!it.supportsLocalProcessing || it.localProcessingAvailable) }
     private fun change(action:(FactRecapUiState)->FactRecapUiState)=publish { if(disposed) it else it.copy(factRecap=action(it.factRecap ?: FactRecapUiState())) }
     fun open():Unit=synchronized(ownershipGate) { if(!available()) return;generation.incrementAndGet();change { FactRecapUiState(LocalDate.now(clock).toString(),clock.zone.id) } }
     fun input(date: String,zone: String,period: FactRecapPeriod):Unit=synchronized(ownershipGate) {

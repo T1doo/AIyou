@@ -37,7 +37,7 @@ class LocalCandidateController(
     @Volatile private var worker: Job? = null
     private fun usable(ui: LocalCandidateUiState): Boolean {
         val local = current()
-        return !disposed && local.ready && !local.opening && local.error == null &&
+        return !disposed && local.ready && !local.opening && local.error == null && local.hasLocalProcessingProof(ui.source) &&
             local.entries.any { it.id == ui.source.sourceId && it.currentRevision.toLong() == ui.source.revision &&
                 it.policy != ProcessingPolicy.AI_NONE && OriginalExports.hash(it.originalText) == ui.sourceHash }
     }
@@ -52,6 +52,7 @@ class LocalCandidateController(
     fun open(id: String, revision: Int) {
         val local = current()
         if (disposed || !local.ready || local.opening || local.error != null || !local.supportsCandidates || local.sourceTags != null || local.sourceMemories != null) return
+        if (!local.hasLocalProcessingProof(SourceVersion(id, revision.toLong())) || local.localProcessing != null) return
         val entry = local.entries.singleOrNull { it.id == id && it.currentRevision == revision && it.policy != ProcessingPolicy.AI_NONE } ?: return
         worker?.cancel()
         val ui = LocalCandidateUiState(sessions.incrementAndGet(), SourceVersion(id, revision.toLong()), OriginalExports.hash(entry.originalText))

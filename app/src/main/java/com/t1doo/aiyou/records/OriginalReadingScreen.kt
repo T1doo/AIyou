@@ -148,6 +148,7 @@ fun OriginalReadingScreen(
     candidateController: LocalCandidateController? = null,
     sourceTagController: SourceTagController? = null,
     sourceMemoryController: SourceMemoryController? = null,
+    localProcessingController: LocalProcessingController? = null,
     canUseCandidates: (String, Int) -> Boolean = { _, _ -> false },
     onCandidateLocation: (OriginalReadingLocation) -> Unit = {},
 ) {
@@ -242,6 +243,11 @@ fun OriginalReadingScreen(
                                 enabled = local.supportsRecycleBin && !local.saving && !local.savePending && local.recycleBin == null,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-recycle-move")) { Text("移入回收站") }
                         }
+                        localProcessingController?.let { controller ->
+                            TextButton(enabled = local.supportsLocalProcessing && !local.saving && !local.savePending,
+                                onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-local-processing")) { Text("处理范围") }
+                        }
                         onOpenAi?.let { openAi ->
                             TextButton(onClick = { openAi(entry.id, entry.currentRevision) },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
@@ -263,6 +269,11 @@ fun OriginalReadingScreen(
                             TextButton(enabled = local.supportsSourceMemories && !local.saving && !local.savePending && entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
                                 onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-memories")) { Text("事件与当次情绪") }
+                        }
+                    }
+                    local.localProcessing?.takeIf { it.source.sourceId == entry.id && it.source.revision == entry.currentRevision.toLong() }?.let { ui ->
+                        localProcessingController?.let { controller ->
+                            LocalProcessingDialog(ui, entry, controller) { canUseCandidates(entry.id, entry.currentRevision) }
                         }
                     }
                     local.candidates?.takeIf { it.source.sourceId == entry.id && it.source.revision == entry.currentRevision.toLong() }?.let { ui ->

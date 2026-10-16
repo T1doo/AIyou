@@ -34,6 +34,7 @@ class EncryptedEntryRepository internal constructor(
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) : EntryRepository, AwaitableRecordStorage {
     private val dao get() = database.records()
+    override val localProcessing: com.t1doo.aiyou.domain.LocalProcessingRepository = SqlLocalProcessingRepository(borrowedSql)
     override val attachments: AttachmentStore get() = attachmentStorage
     override val editDrafts: EncryptedOriginalEditStore get() = originalEditStorage
     /** Blocking IO; shares the existing encrypted database and never enables remote processing. */

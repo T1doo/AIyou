@@ -37,6 +37,10 @@ data class CaptureDiscardUiState(val requestId: Long, val busy: Boolean = false,
     val recovering: Boolean = false, val recoveryFailed: Boolean = false)
 
 data class LocalRecordUiState(
+    val supportsLocalProcessing: Boolean = false,
+    val localProcessingVersions: Map<String, com.t1doo.aiyou.domain.LocalProcessingVersion> = emptyMap(),
+    val localProcessingAvailable: Boolean = true,
+    val localProcessing: LocalProcessingUiState? = null,
     val supportsFactRecaps: Boolean = false,
     val factRecap: FactRecapUiState? = null,
     val supportsMixedCapture: Boolean = false,
@@ -115,6 +119,8 @@ class LocalRecordsViewModel internal constructor(
     private val mutableState = MutableStateFlow(LocalRecordUiState())
     val state = mutableState.asStateFlow()
     private val commands = Channel<Command>(Channel.UNLIMITED)
+    val localProcessing = LocalProcessingController({ mutableState.value }, { change -> update(change) },
+        { action -> commands.trySend(Command.LocalProcessing(action)).isSuccess }, ::retireDerived)
     val factRecaps = FactRecapController({ mutableState.value }, { change -> update(change) },
         { action -> commands.trySend(Command.FactRecap(action)).isSuccess },clock.withZone(ZoneId.systemDefault()))
     val mixedCapture = MixedCaptureController({ mutableState.value },{ change -> update(change) },
@@ -157,7 +163,7 @@ class LocalRecordsViewModel internal constructor(
     private var storageOwnership: RecordsStorageOwnership? = null // Local IO queue publishes one immutable owner.
     private val ai = LocalRecordAiController(
         currentPolicy = { source -> mutableState.value.let { local ->
-            if (editsDisposed || !local.ready || local.opening || local.error != null) null
+            if (editsDisposed || !local.ready || local.opening || local.error != null || !local.hasLocalProcessingProof(source)) null
             else local.entries.firstOrNull { it.id == source.sourceId && it.currentRevision.toLong() == source.revision }?.policy
         } },
         publish = { selected -> update { local ->
@@ -200,11 +206,13 @@ class LocalRecordsViewModel internal constructor(
                 ai.reconcileRecords()
                 scheduleLocalIndex()
                 for (command in commands) {
+                    val previousEntries = mutableState.value.entries
                     try {
                         if(command is Command.Save || command is Command.Revise ||
                             command is Command.RecordPackage || command is Command.RecycleBin ||
                             command is Command.MixedCapture || command is Command.Retry || command is Command.RefreshSearch) factRecaps.invalidate()
                         when (command) {
+                            is Command.LocalProcessing -> command.action(checkNotNull(repository))
                             is Command.FactRecap -> command.action(checkNotNull(repository))
                             is Command.Edit -> {
                                 persistedDraft = checkNotNull(repository).updateDraft(command.text)
@@ -283,14 +291,17 @@ class LocalRecordsViewModel internal constructor(
                     } catch (failure: CancellationException) { throw failure }
                     catch (failure: Exception) { failed(failure, preserveQueuedSave = command is Command.Edit) }
                     finally {
+                        if (previousEntries != mutableState.value.entries || command is Command.LocalProcessing ||
+                            command is Command.Retry || command is Command.RefreshSearch) refreshProcessingVersions()
                         ai.reconcileRecords()
                         if (command is Command.Save || command is Command.Revise || command is Command.ManualTags ||
                             command is Command.RecordPackage || command is Command.RecycleBin ||
-                            command is Command.Retry || command is Command.RefreshSearch) scheduleLocalIndex()
+                            command is Command.Retry || command is Command.RefreshSearch || command is Command.LocalProcessing) scheduleLocalIndex()
                     }
                 }
             } finally {
                 editsDisposed = true
+                localProcessing.dispose()
                 factRecaps.dispose()
                 mixedCapture.dispose()
                 ai.markDisposed()
@@ -323,7 +334,14 @@ class LocalRecordsViewModel internal constructor(
     /** Local and AI writers validate the selected source in the same state CAS. */
     private inline fun update(transform: (LocalRecordUiState) -> LocalRecordUiState) {
         mutableState.update { previous ->
-            val candidate = reconcileFactRecap(previous,transform(previous))
+            val proposed = transform(previous)
+            val panel = proposed.localProcessing
+            val scoped = if (panel != null && (editsDisposed || !proposed.ready || proposed.opening || proposed.error != null ||
+                proposed.entries.none { it.id == panel.source.sourceId && it.currentRevision.toLong() == panel.source.revision &&
+                    com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == panel.sourceHash })) proposed.copy(localProcessing = null) else proposed
+            val safe = if (scoped.supportsLocalProcessing && !scoped.localProcessingAvailable) scoped.copy(
+                candidates = null, sourceTags = null, sourceMemories = null, ai = null, factRecap = null) else scoped
+            val candidate = reconcileFactRecap(previous,safe)
             val transformed = if (candidate.supportsFavorites && candidate.favoritesAvailable &&
                 candidate.entries.any { !candidate.favorites.containsKey(it.id) }) candidate.copy(
                     favoritesAvailable = false, favoritesError = "记录列表已变化，请重新读取收藏状态。") else candidate
@@ -1036,9 +1054,13 @@ class LocalRecordsViewModel internal constructor(
                 { factory(store) }
             }).also { storageOwnership = it }
             ai.bind(ownership)
+            val processingVersions = try { store.localProcessing?.versions() ?: emptyMap() }
+                catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             val searchEpoch = try { store.localSearch?.epoch() }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
+                supportsLocalProcessing = store.localProcessing != null,
+                localProcessingVersions = processingVersions.orEmpty(), localProcessingAvailable = processingVersions != null,
                 supportsFactRecaps = store.factRecaps != null,
                 supportsMixedCapture = store.captureRecords != null,
                 supportsCandidates = store.localCandidates != null,
@@ -1122,6 +1144,38 @@ class LocalRecordsViewModel internal constructor(
                 it.copy(localIndexBusy = false, localIndexError = "本机查找重新整理失败。原文与现有数据已保留，可以重试。") }
         }
     }
+    /** Retires memory-only authority before a policy write or after observing a generation change. */
+    private fun retireDerived(id: String) {
+        mutableState.value.candidates?.takeIf { it.source.sourceId == id }?.let { candidates.close(it.session) }
+        mutableState.value.sourceTags?.takeIf { it.source.sourceId == id }?.let { sourceTags.close(it.session) }
+        mutableState.value.sourceMemories?.takeIf { it.source.sourceId == id }?.let { sourceMemories.close(it.session) }
+        mutableState.value.ai?.takeIf { it.source.sourceId == id }?.let { ai.leave(it.sessionId) }
+        factRecaps.close()
+        mutableState.value.originalExport?.takeIf { it.selection.any { source -> source.sourceId == id } }?.let { exports.close(it.session) }
+        mutableState.value.recordPackage?.takeIf { it.selection.any { source -> source.sourceId == id } }?.let { recordPackages.close(it.session) }
+    }
+    private suspend fun refreshProcessingVersions(observedEntries: List<StoredEntry>? = null) {
+        val store = repository ?: return
+        val port = store.localProcessing ?: return
+        if (editsDisposed) return
+        val before = mutableState.value
+        val entries = try { observedEntries ?: store.entries() }
+            catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
+        val versions = try { if (entries == null) null else port.versions() }
+            catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
+        val changed = if (versions == null || !before.localProcessingAvailable) before.entries.map { it.id }.toSet()
+            else (before.localProcessingVersions.keys + versions.keys).filter { before.localProcessingVersions[it] != versions[it] }.toSet()
+        changed.forEach(::retireDerived)
+        update { local ->
+            val panel = local.localProcessing
+            val stale = panel?.snapshot?.let { snapshot -> versions?.get(snapshot.source.sourceId) !=
+                com.t1doo.aiyou.domain.LocalProcessingVersion(snapshot.source, snapshot.generation) } == true
+            local.copy(entries = entries ?: local.entries, localProcessingVersions = versions.orEmpty(), localProcessingAvailable = versions != null,
+                localProcessing = if (stale && !panel.busy && panel.pending == null) panel.copy(
+                    snapshot = null, confirmation = null, notice = null, error = "处理范围已变化，请重新读取后确认。") else panel)
+        }
+    }
+
     private suspend fun refreshSearchSource() {
         val store = repository ?: return
         if (editsDisposed || !mutableState.value.ready) return
@@ -1131,6 +1185,7 @@ class LocalRecordsViewModel internal constructor(
         val favoriteValues = try { store.favorites?.snapshots() } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { null }
         val epoch = try { store.localSearch?.epoch() } catch (_: Exception) { null }
+        refreshProcessingVersions(entries)
         update { if (!it.ready || editsDisposed) it else it.copy(entries = entries,
             manualTags = labels.orEmpty(), manualTagsAvailable = labels != null, localSearchEpoch = epoch,
             favorites = favoriteValues.orEmpty(), favoritesAvailable = favoriteValues != null,
@@ -1147,6 +1202,7 @@ class LocalRecordsViewModel internal constructor(
 
     override fun onCleared() {
         editsDisposed = true
+        localProcessing.dispose()
         factRecaps.dispose()
         mixedCapture.dispose()
         ai.markDisposed()
@@ -1171,6 +1227,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     private sealed interface Command {
+        data class LocalProcessing(val action: suspend (EntryRepository) -> Unit) : Command
         data class FactRecap(val action: suspend (EntryRepository) -> Unit) : Command
         data object IndexBatch : Command
         data object RebuildIndex : Command
