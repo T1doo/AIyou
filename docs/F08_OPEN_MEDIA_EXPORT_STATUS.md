@@ -132,3 +132,20 @@ Python **123/123**，`git diff --check` 通过。未把祖先的全量 628 项�
 lint 与原生验收均 **NOT RUN**，无本次新 APK，推送后的 CI 结果尚待验证。
 旧 94/96 两项 SQLite 初始化 / 退出超时及 c43561f 的未知步骤 CI 失败仍保留，
 本次结果不意味着它们已经解决。
+
+## 2026-10-16 补充的精确提交 CI 证据
+
+用户转交独立已授权检查结果：精确提交
+`46a880834b02706d5073bfee3e23fb7870394c12` 的
+[run 38824976592 / job 116730221582](https://github.com/T1doo/AIyou/actions/runs/38824976592/job/116730221582)
+于 `00:00:58 UTC` 完成 success，45 steps 成功；191 Compose 测试零失败 /
+错误 / 跳过，原 imageOnlyZip 失败用例及 8 项 OriginalExportPresentationTest
+均通过。debug APK、instrumentation 编译、lint（0 error / 0 warning / 1 hint）、
+394 Preview 与无 INTERNET 权限检查通过。APK artifact `12015486937` 有效至
+Oct 30，reports artifact `12015481954`；此处保留用户提供的日期粒度。
+
+这是转交的独立证据，本任务没有重新运行 CI、读取 Actions API、下载 artifact
+或另换路径绕过此前的访问拒绝，也未自行核验 APK 原始字节哈希。它补足前文
+修正提交当时尚未知的 CI 结果，不抹去之前的失败；只覆盖上述精确祖先提交，
+不代表后续新提交已经通过。SDK 条款仍待用户答复，真机 / TalkBack / 性能 /
+视觉及原生保存、加密恢复与设备重启仍未验收。

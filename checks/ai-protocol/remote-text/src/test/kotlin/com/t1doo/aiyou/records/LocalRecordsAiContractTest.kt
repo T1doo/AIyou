@@ -408,6 +408,159 @@ class LocalRecordsAiContractTest {
         } }
     }
 
+    @Test(timeout = 10_000) fun stopAfterActualCommitAcknowledgesSavedCandidateWithoutRestoringLateContent() {
+        protocols { protocol -> SourceBoundLoopbackFixture(protocol).use { f ->
+            val entered = CountDownLatch(1); val release = CountDownLatch(1)
+            val h = Harness(f, wrapRepository = { actual ->
+                object : SourceBoundTextRepository by actual {
+                    override fun commit(job: SourceBoundTextJob, candidate: DerivedTextCandidate,
+                                        clock: () -> java.time.Instant): SourceCommitOutcome {
+                        val result = actual.commit(job, candidate, clock)
+                        assertTrue(result is SourceCommitOutcome.Committed)
+                        entered.countDown(); await(release)
+                        return result
+                    }
+                }
+            })
+            try {
+                h.ready(); val original = f.records.db.read(
+                    "SELECT originalText,contentHash FROM entry_revisions WHERE entryId=? ORDER BY revision", f.records.source.sourceId)
+                val id = h.open(); h.vm.startAiSession(id); await(entered)
+                val confirming = h.phase(RecordAiPhase.CONFIRMING).ai!!
+                assertEquals(1, f.records.annotations().size)
+                assertEquals("COMMITTED", f.records.jobs().single()[1])
+                h.vm.stopAiSession(id)
+                val stopped = h.vm.state.value.ai!!
+                assertEquals(RecordAiPhase.CANCELLED, stopped.phase)
+                assertTrue(stopped.preview.isEmpty()); assertNull(stopped.annotation)
+                assertFalse("Stop cannot deny an already durable candidate", stopped.notice.contains("未保存"))
+                assertFalse("Commit ACK can lag actual persistence", confirming.notice.contains("尚未保存"))
+                // Local saving must remain independent of the held AI acknowledgement.
+                localSave(h)
+                release.countDown()
+                val final = h.waitState { it.ai?.notice?.contains("候选已保存在本机") == true }.ai!!
+                assertEquals(id, final.sessionId); assertEquals(RecordAiPhase.CANCELLED, final.phase)
+                assertTrue(final.preview.isEmpty()); assertNull(final.annotation)
+                assertEquals(1, f.records.annotations().size)
+                assertEquals("COMMITTED", f.records.jobs().single()[1])
+                assertEquals(original, f.records.db.read(
+                    "SELECT originalText,contentHash FROM entry_revisions WHERE entryId=? ORDER BY revision", f.records.source.sourceId))
+                h.vm.stopAiSession(id); assertEquals(final, h.vm.state.value.ai)
+                f.selectedRequestReleased()
+            } finally { release.countDown(); h.finish() }
+        } }
+    }
+
+    @Test(timeout = 10_000) fun stopBeforeCommitCancelsTheOwnedJobWithoutLateCandidateOrPreview() {
+        protocols { protocol -> SourceBoundLoopbackFixture(protocol).use { f ->
+            val entered = CountDownLatch(1); val release = CountDownLatch(1); val cancelled = CountDownLatch(1)
+            val h = Harness(f, wrapRepository = { actual ->
+                object : SourceBoundTextRepository by actual {
+                    override fun commit(job: SourceBoundTextJob, candidate: DerivedTextCandidate,
+                                        clock: () -> java.time.Instant): SourceCommitOutcome {
+                        entered.countDown(); await(release)
+                        return actual.commit(job, candidate, clock)
+                    }
+                    override fun cancel(job: SourceBoundTextJob) { actual.cancel(job); cancelled.countDown() }
+                }
+            })
+            try {
+                h.ready(); val id = h.open(); h.vm.startAiSession(id); await(entered)
+                h.vm.stopAiSession(id); await(cancelled)
+                val stopped = h.vm.state.value.ai!!
+                assertEquals(RecordAiPhase.CANCELLED, stopped.phase)
+                assertTrue(stopped.preview.isEmpty()); assertNull(stopped.annotation)
+                assertTrue(f.records.annotations().isEmpty())
+                assertEquals("CANCELLED", f.records.jobs().single()[1])
+                release.countDown(); h.awaitAiRun()
+                assertEquals(stopped, h.vm.state.value.ai)
+                assertTrue(f.records.annotations().isEmpty())
+                assertNull(h.outcomes.single().annotation)
+                f.selectedRequestReleased()
+            } finally { release.countDown(); h.finish() }
+        } }
+    }
+
+    @Test(timeout = 20_000) fun stoppedCommittedAcknowledgementCannotReportIntoRetiredOrChangedSessions() {
+        protocols { protocol -> repeat(6) { retirement -> SourceBoundLoopbackFixture(protocol).use { f ->
+            val entered = CountDownLatch(1); val release = CountDownLatch(1)
+            val h = Harness(f, wrapRepository = { actual ->
+                object : SourceBoundTextRepository by actual {
+                    override fun commit(job: SourceBoundTextJob, candidate: DerivedTextCandidate,
+                                        clock: () -> java.time.Instant): SourceCommitOutcome {
+                        val result = actual.commit(job, candidate, clock)
+                        assertTrue(result is SourceCommitOutcome.Committed)
+                        entered.countDown(); await(release)
+                        return result
+                    }
+                }
+            })
+            val monitor = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+            val late = AtomicInteger()
+            try {
+                h.ready(); val persisted = f.records.second()
+                val old = h.open(); h.vm.startAiSession(old); await(entered)
+                h.vm.stopAiSession(old)
+                when (retirement) {
+                    0 -> h.vm.closeAiSession(old)
+                    1 -> assertTrue(h.open() > old)
+                    2 -> {
+                        h.vm.beginOriginalEdit(f.records.source.sourceId, 3)
+                        val edit = h.vm.state.value.originalEdit!!
+                        h.vm.changeOriginalEdit(edit.sessionId, "synthetic source changed after commit")
+                        h.vm.saveOriginalEdit(edit.sessionId)
+                        h.waitState { it.originalEdit == null && it.entries.any { e ->
+                            e.id == f.records.source.sourceId && e.currentRevision == 4 } }
+                        assertTrue(f.records.annotations().isEmpty())
+                    }
+                    3 -> h.vm.clearForHostTest()
+                    4, 5 -> {
+                        f.records.approve(ProcessingPolicy.AI_NONE, null, null)
+                        h.vm.refreshLocalSearch()
+                        h.waitState { it.ai == null && it.entries.any { e ->
+                            e.id == f.records.source.sourceId && e.policy == ProcessingPolicy.AI_NONE } }
+                        if (retirement == 5) {
+                            // Drain a later local command before requesting the next refresh;
+                            // observing its state alone need not finish the refresh's queue flag.
+                            localSave(h)
+                            // The same source/revision is allowed again, but the retired run is not.
+                            f.records.approve()
+                            h.vm.refreshLocalSearch()
+                            h.waitState { it.entries.any { e -> e.id == f.records.source.sourceId &&
+                                e.policy == ProcessingPolicy.REMOTE_ALLOWED } }
+                        }
+                        assertTrue(f.records.annotations().isEmpty())
+                    }
+                }
+                val retired = h.vm.state.value.ai
+                monitor.launch(start = CoroutineStart.UNDISPATCHED) {
+                    h.vm.state.collect { if (it.ai?.sessionId == old) late.incrementAndGet() }
+                }
+                release.countDown(); h.awaitAiRun()
+                assertEquals("Retired AI receipt must not reappear", 0, late.get())
+                assertEquals(retired, h.vm.state.value.ai)
+                assertEquals(if (retirement == 2 || retirement >= 4) 0 else 1,
+                    persisted.read("SELECT jobId FROM text_annotations").size)
+                f.selectedRequestReleased()
+            } finally { monitor.cancel(); release.countDown(); h.finish() }
+        } } }
+    }
+
+    @Test(timeout = 10_000) fun stopAfterSuccessRetainsTheAcceptedCandidateAndItsDurableJob() {
+        protocols { protocol -> SourceBoundLoopbackFixture(protocol).use { f ->
+            val h = Harness(f)
+            try {
+                h.ready(); val id = h.open(); h.vm.startAiSession(id)
+                val saved = h.phase(RecordAiPhase.SUCCEEDED).ai!!
+                h.vm.stopAiSession(id)
+                assertEquals(saved, h.vm.state.value.ai)
+                assertEquals(1, f.records.annotations().size)
+                assertEquals("COMMITTED", f.records.jobs().single()[1])
+                f.selectedRequestReleased()
+            } finally { h.finish() }
+        } }
+    }
+
     private class Harness(
         val f: SourceBoundLoopbackFixture,
         enabled: Boolean = true,
@@ -477,6 +630,15 @@ class LocalRecordsAiContractTest {
         fun ready() = waitState { it.ready && !it.opening }
         fun open() = vm.openAiSession(f.records.source.sourceId, f.records.source.revision.toInt())
         fun phase(phase: RecordAiPhase) = waitState { it.ai?.phase == phase }
+        /** Test-only scheduling barrier: join the actual run before disposing the VM can mask it.
+         * Read private jobs only; no production hook, job cancellation or state mutation.
+         */
+        fun awaitAiRun() {
+            val controller = LocalRecordsViewModel::class.java.getDeclaredField("ai").apply { isAccessible = true }.get(vm)
+            val run = LocalRecordAiController::class.java.getDeclaredField("previousRun").apply { isAccessible = true }
+                .get(controller) as Job
+            runBlocking { withTimeout(2_000) { run.join() } }
+        }
         fun waitState(predicate: (LocalRecordUiState) -> Boolean): LocalRecordUiState = runBlocking {
             withTimeout(2_000) { vm.state.first(predicate) }
         }

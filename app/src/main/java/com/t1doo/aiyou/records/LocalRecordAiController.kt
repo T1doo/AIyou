@@ -43,6 +43,7 @@ internal class LocalRecordAiController(
     private class Run(val session: Session) {
         var exchange: SourceBoundStreamingExchange? = null
         var accepting = true
+        var stopRequested = false
     }
 
     /** Called only after local preparation. Retry with the same owner cannot replace its transport. */
@@ -113,7 +114,7 @@ internal class LocalRecordAiController(
                             selected.current = when (event) {
                                 is StreamEvent.TextDelta -> selected.current.copy(preview = selected.current.preview + event.text)
                                 StreamEvent.Completed -> selected.current.copy(phase = RecordAiPhase.CONFIRMING,
-                                    notice = "正在确认整理结果，尚未保存。")
+                                    notice = "正在确认整理结果的本机保存状态。")
                                 else -> selected.current
                             }
                             // No SQL, arbitrary consumer or queued Main callback inside this gate.
@@ -121,7 +122,18 @@ internal class LocalRecordAiController(
                         }
                     }
                     synchronized(lock) {
-                        if (!ownsLocked(running)) return@synchronized
+                        if (!ownsLocked(running)) {
+                            // Stop retires preview admission, but cannot roll back an accepted SQL
+                            // commit. Reconcile only its status, never late content or another session.
+                            if (running.stopRequested && ownsSessionLocked(running) &&
+                                outcome.terminal == StreamEvent.Completed &&
+                                outcome.annotation?.source == selected.current.source) {
+                                selected.current = selected.current.copy(notice =
+                                    "整理已停止；停止生效前，整理候选已保存在本机，尚未确认为事实或待办。")
+                                publish(selected.current)
+                            }
+                            return@synchronized
+                        }
                         running.accepting = false
                         val annotation = outcome.annotation
                         selected.current = when {
@@ -130,7 +142,7 @@ internal class LocalRecordAiController(
                                 phase = RecordAiPhase.SUCCEEDED, notice = "整理候选已保存在本机，尚未确认为事实或待办。",
                                 preview = "", annotation = annotation)
                             outcome.terminal == StreamEvent.Cancelled -> selected.current.copy(
-                                phase = RecordAiPhase.CANCELLED, notice = "整理已停止，预览未保存。", preview = "", annotation = null)
+                                phase = RecordAiPhase.CANCELLED, notice = "整理已停止，原文保存不受影响。", preview = "", annotation = null)
                             else -> selected.current.copy(phase = RecordAiPhase.FAILED,
                                 notice = "整理未完成，原文保存不受影响。", preview = "", annotation = null)
                         }
@@ -142,7 +154,7 @@ internal class LocalRecordAiController(
                             running.accepting = false
                             selected.current = selected.current.copy(
                                 phase = if (failure is CancellationException) RecordAiPhase.CANCELLED else RecordAiPhase.FAILED,
-                                notice = if (failure is CancellationException) "整理已停止，预览未保存。"
+                                notice = if (failure is CancellationException) "整理已停止，原文保存不受影响。"
                                     else "整理未完成，原文保存不受影响。", preview = "", annotation = null)
                             publish(selected.current)
                         }
@@ -170,9 +182,15 @@ internal class LocalRecordAiController(
     fun stop(sessionId: Long): Unit = synchronized(lock) {
         val selected = session ?: return
         if (disposed || selected.current.sessionId != sessionId) return
-        invalidateLocked(selected)
-        if (selected.current.phase != RecordAiPhase.SUCCEEDED) selected.current = selected.current.copy(
-            phase = RecordAiPhase.CANCELLED, notice = "整理已停止，预览未保存。", preview = "", annotation = null)
+        if (selected.current.phase == RecordAiPhase.SUCCEEDED || selected.run?.stopRequested == true) return
+        val running = selected.run
+        if (selected.live && running?.accepting == true) {
+            running.stopRequested = true
+            running.accepting = false
+            cancelLocked(running)
+        } else invalidateLocked(selected)
+        selected.current = selected.current.copy(phase = RecordAiPhase.CANCELLED,
+            notice = "已请求停止整理；已完成本机保存的候选不会撤回。", preview = "", annotation = null)
         publish(selected.current)
     }
 
@@ -229,13 +247,17 @@ internal class LocalRecordAiController(
         selected.live = false
         selected.run?.let { running ->
             running.accepting = false
-            running.exchange?.let { exchange ->
-                val cancel = scope.launch(start = CoroutineStart.LAZY) {
-                    try { exchange.cancel() } catch (failure: Throwable) { rethrowFatal(failure) }
-                }
-                registerLocked(cancel)
-                cancel.start()
+            cancelLocked(running)
+        }
+    }
+
+    private fun cancelLocked(running: Run) {
+        running.exchange?.let { exchange ->
+            val cancel = scope.launch(start = CoroutineStart.LAZY) {
+                try { exchange.cancel() } catch (failure: Throwable) { rethrowFatal(failure) }
             }
+            registerLocked(cancel)
+            cancel.start()
         }
     }
 
@@ -248,7 +270,8 @@ internal class LocalRecordAiController(
     }
 
     private fun owns(running: Run) = synchronized(lock) { ownsLocked(running) }
-    private fun ownsLocked(running: Run): Boolean = !disposed && firstFatal == null && running.accepting && running.session.live &&
+    private fun ownsLocked(running: Run): Boolean = running.accepting && ownsSessionLocked(running)
+    private fun ownsSessionLocked(running: Run): Boolean = !disposed && firstFatal == null && running.session.live &&
         session === running.session && running.session.run === running && running.session.owner === owner &&
         currentPolicy(running.session.current.source) == ProcessingPolicy.REMOTE_ALLOWED
 
