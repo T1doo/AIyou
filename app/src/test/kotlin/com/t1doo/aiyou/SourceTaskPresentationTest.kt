@@ -109,7 +109,12 @@ class SourceTaskPresentationTest {
         assertTrue(confirm.getUnclippedBoundsInRoot().height>=48.dp);confirm.performClick();assertNull(task);drain()
         assertEquals(1,creates.size);assertEquals("2026-10-20",task!!.schedule!!.date.toString());assertNull(task!!.schedule!!.time)
         assertEquals(original,state.value.entries.single().originalText);assertEquals(ProcessingPolicy.AI_NONE,state.value.entries.single().policy)
-        click("source-task-close");compose.onNodeWithText("待办").performClick()
+        click("source-task-close")
+        compose.onAllNodesWithTag("source-task-dialog").assertCountEquals(0)
+        compose.onNodeWithTag("original-text").assertTextEquals(original)
+        // Closing the source form keeps the reader open; its bottom navigation is intentionally absent.
+        compose.onNodeWithText("返回列表").performClick()
+        compose.onNodeWithText("待办").assertIsDisplayed().performClick()
         click("manual-task-source-"+task!!.id);drain()
         compose.onNodeWithTag("original-text").assertTextEquals(original)
         compose.runOnIdle {entry=entry.copy(currentRevision=2,originalText="合成不同新版本");state.value=state.value.copy(entries=listOf(entry))}
