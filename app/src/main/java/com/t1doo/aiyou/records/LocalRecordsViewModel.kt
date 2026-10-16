@@ -783,6 +783,10 @@ class LocalRecordsViewModel internal constructor(
         }
     }
 
+    // AI_NONE excludes AI participation, not the user's manual original and draft operations.
+    private fun mayManuallyEditOriginal(policy: ProcessingPolicy) =
+        policy == ProcessingPolicy.AI_NONE || policy == ProcessingPolicy.LOCAL_ONLY
+
     private suspend fun openOriginalDraft(command: Command.OpenEdit) {
         val sessionId = command.edit.sessionId
         if (mutableState.value.originalEdit?.let { it.sessionId == sessionId && it.loadingDraft } != true) return
@@ -813,7 +817,7 @@ class LocalRecordsViewModel internal constructor(
             val missing = current == null || base == null || source == null
             if (!missing && base.originalText != snapshot.originalText) throw com.t1doo.aiyou.domain.RecordIntegrityFailure()
             val committed = if (restore) store.committedEdit(snapshot) else null
-            val conflict = missing || before != entries || current.policy != ProcessingPolicy.LOCAL_ONLY ||
+            val conflict = missing || before != entries || !mayManuallyEditOriginal(current.policy) ||
                 committed == null && current.currentRevision != snapshot.baseRevision
             if (committed != null && !conflict) committedOriginal = sessionId to committed
             originalDraft = DraftBinding(sessionId, snapshot, previous, restore)
@@ -863,8 +867,8 @@ class LocalRecordsViewModel internal constructor(
         val source = entries.firstOrNull { it.id == binding.snapshot.entryId }
         update { local -> if (local.originalEdit?.sessionId != sessionId) local else local.copy(entries = entries,
             originalEdit = local.originalEdit.copy(conflict = local.originalEdit.conflict || source == null ||
-                source.currentRevision != binding.snapshot.baseRevision || source.policy != ProcessingPolicy.LOCAL_ONLY)) }
-        if (source == null || source.policy != ProcessingPolicy.LOCAL_ONLY) throw RecordConflict()
+                source.currentRevision != binding.snapshot.baseRevision || !mayManuallyEditOriginal(source.policy))) }
+        if (source == null || !mayManuallyEditOriginal(source.policy)) throw RecordConflict()
         val store = checkNotNull(records.editDrafts)
         reconcileDraftAttempt(binding)
         if (binding.snapshot.state != OriginalEditDraftState.ACTIVE) throw OriginalEditDraftConflict()

@@ -75,8 +75,9 @@ class OriginalEditRecoveryPresentationTest {
         root.deleteRecursively()
     }
 
-    private class FormalFixture(override val editDrafts: EncryptedOriginalEditStore, base: String) : EntryRepository {
-        var record: StoredEntry? = StoredEntry("original", 1, base, 1000, "Etc/UTC", ProcessingPolicy.LOCAL_ONLY)
+    private class FormalFixture(override val editDrafts: EncryptedOriginalEditStore, base: String,
+        policy: ProcessingPolicy = ProcessingPolicy.LOCAL_ONLY) : EntryRepository {
+        var record: StoredEntry? = StoredEntry("original", 1, base, 1000, "Etc/UTC", policy)
         var capture = TextDraft("capture-independent", 3, "合成此刻独立草稿")
         var writes = 0
         val history = mutableListOf(revision(1, base))
@@ -115,6 +116,10 @@ class OriginalEditRecoveryPresentationTest {
                         onBeginOriginalEdit = vm::beginOriginalEdit, onOriginalEditChange = vm::changeOriginalEdit,
                         onOriginalEditSave = vm::saveOriginalEdit, onOriginalEditCancel = vm::cancelOriginalEdit,
                         onOriginalEditKeep = vm::keepOriginalEdit,
+                        onBeginOriginalHistory = vm::beginOriginalHistory, onSelectOriginalRevision = vm::selectOriginalRevision,
+                        onBackOriginalHistory = vm::backOriginalHistory, onRetryOriginalHistory = vm::retryOriginalHistory,
+                        onEditOriginalHistory = vm::editOriginalHistory, onConfirmHistoryReplacement = vm::confirmHistoryReplacement,
+                        onCancelHistoryReplacement = vm::cancelHistoryReplacement,
                         onResumeOriginalEdit = vm::resumeOriginalEdit)
                 } }
             }
@@ -138,6 +143,49 @@ class OriginalEditRecoveryPresentationTest {
         button.performClick()
         compose.waitUntil(5000) { vm.state.value.originalEdit?.loadingDraft == false }
         compose.onNodeWithTag("original-edit-text").assertTextContains(input)
+    }
+
+    @Test fun aiNoneColdDraftRecoveryAllowsExplicitManualSaveWithoutChangingPolicy() {
+        seed(); cipher = EncryptedOriginalEditStore(root, key.copyOf())
+        val repo = FormalFixture(cipher, base, ProcessingPolicy.AI_NONE)
+        val capture = repo.capture
+        start(repo); resume()
+        assertFalse(vm.state.value.originalEdit!!.conflict)
+        compose.onNodeWithText("基于原文版本 1 · 不要据此推断 · 人工编辑").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("original-edit-keep").performScrollTo().assertIsEnabled().performClick()
+        compose.waitUntil(5000) { vm.state.value.originalEdit == null }
+        assertEquals(0, repo.writes); assertEquals(ProcessingPolicy.AI_NONE, repo.record!!.policy)
+        compose.onNodeWithText("返回列表").performClick(); resume()
+        compose.onNodeWithTag("original-edit-save").performScrollTo().assertIsEnabled().performClick()
+        compose.waitUntil(5000) { vm.state.value.originalEdit == null }
+        assertEquals(1, repo.writes); assertEquals(listOf(base, input), repo.history.map { it.originalText })
+        assertEquals(ProcessingPolicy.AI_NONE, repo.record!!.policy); assertEquals(capture, repo.capture)
+        assertTrue(vm.state.value.tasks.items.isEmpty()); assertNull(vm.state.value.ai)
+    }
+
+    @Test fun aiNoneHistoryRouteCreatesOnlyAnExplicitNewVersionAndKeepsNoInferencePolicy() {
+        cipher = EncryptedOriginalEditStore(root, key.copyOf())
+        val repo = FormalFixture(cipher, base, ProcessingPolicy.AI_NONE)
+        runBlocking { repo.revise("original", 1, "合成当前第二版", 2000) }
+        val capture = repo.capture
+        start(repo)
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-original"))
+        compose.onNodeWithText("阅读全文").performClick()
+        compose.onNodeWithText("历史版本").performScrollTo().performClick()
+        compose.waitUntil(5000) { vm.state.value.originalHistory?.loading == false }
+        compose.onNodeWithTag("history-list").performScrollToNode(hasText("阅读版本 1"))
+        compose.onNodeWithText("阅读版本 1").performClick()
+        compose.waitUntil(5000) { vm.state.value.originalHistory?.let { !it.loading && it.selectedRevision == 1 } == true }
+        assertEquals(1, repo.writes); assertNull(runBlocking { cipher.read("original") })
+        compose.onNodeWithTag("original-reading-edit").performScrollTo().performClick()
+        compose.waitUntil(5000) { vm.state.value.originalEdit?.loadingDraft == false }
+        assertFalse(vm.state.value.originalEdit!!.conflict)
+        compose.onNodeWithText("来源：历史版本 1 · 基于原文版本 2 · 不要据此推断 · 人工编辑").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("original-edit-save").performScrollTo().assertIsEnabled().performClick()
+        compose.waitUntil(5000) { vm.state.value.originalEdit == null }
+        assertEquals(2, repo.writes); assertEquals(listOf(base, "合成当前第二版", base), repo.history.map { it.originalText })
+        assertEquals(ProcessingPolicy.AI_NONE, repo.record!!.policy); assertEquals(capture, repo.capture)
+        assertNull(vm.state.value.ai); assertTrue(vm.state.value.tasks.items.isEmpty())
     }
 
     @Test fun narrowLargeFontExplicitKeepReturnsToOriginalAndResumesWithoutFormalWrite() {

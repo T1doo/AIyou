@@ -47,6 +47,8 @@ for label, folder, minimum in targets:
     print(f"PASS: {label} tests={total} actual={cases} failures=0 errors=0 skipped=0")
     additional = {}
     if label == "host queue":
+        additional["OriginalEditRecoveryTest"] = (
+            "aiNoneSourceAllowsManualAutosaveAndNewVersionWithoutChangingItsPolicy",)
         additional["com.t1doo.aiyou.records.LocalOriginalSearchTest"] = (
             "manualTagOnlyAndCombinedFiltersFenceTagChangesAndReadFailureBeforeComposition",
             "keywordAndIsLiteralUnicodeLocaleIndependentAndPreservesSnapshotOrderAndPolicy",
@@ -97,6 +99,9 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.OriginalEditRecoveryPresentationTest"] = (
+            "aiNoneColdDraftRecoveryAllowsExplicitManualSaveWithoutChangingPolicy",
+            "aiNoneHistoryRouteCreatesOnlyAnExplicitNewVersionAndKeepsNoInferencePolicy")
         additional["com.t1doo.aiyou.LocalProcessingPresentationTest"] = (
             "actualNarrowDoubleFontDetailRequiresSeparateChoiceAndConfirmationForBothLocalScopes",
             "unknownReadbackHasNoSuccessAndRetryUsesTheIdenticalRequestWithoutAnotherGeneration",

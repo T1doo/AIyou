@@ -370,7 +370,7 @@ class OriginalEditRecoveryTest {
                 val prior = encrypted.read("original")!!
                 val target = root.listFiles()!!.single { it.name.endsWith(".edit") }
                 val bytes = target.readBytes()
-                if (removed) repo.remove("original") else repo.seed(original().copy(policy = ProcessingPolicy.AI_NONE))
+                if (removed) repo.remove("original") else repo.seed(original().copy(policy = ProcessingPolicy.REMOTE_ALLOWED))
                 controller.changeOriginalEdit(id, "合成删除后迟到修改")
                 controller.state.first { it.originalEdit?.conflict == true && it.originalEdit.error != null }
                 assertEquals("合成删除后迟到修改", controller.state.value.originalEdit!!.text)
@@ -379,6 +379,25 @@ class OriginalEditRecoveryTest {
             } finally { stop(controller); encrypted.close() }
         }
     }
+
+    @Test fun aiNoneSourceAllowsManualAutosaveAndNewVersionWithoutChangingItsPolicy() = runBlocking { exercise { root ->
+        val encrypted = storage(root)
+        val repo = EncryptedEntryRepository(editDrafts = encrypted).also { it.seed(original()) }
+        val controller = vm(repo)
+        try {
+            val capture = repo.readDraft()
+            val id = edit(controller)
+            controller.changeOriginalEdit(id, "合成切换前草稿"); saved(controller, "合成切换前草稿")
+            repo.seed(original().copy(policy = ProcessingPolicy.AI_NONE))
+            controller.changeOriginalEdit(id, "合成禁止AI后人工补充"); saved(controller, "合成禁止AI后人工补充")
+            assertFalse(controller.state.value.originalEdit!!.conflict)
+            assertEquals("合成禁止AI后人工补充", encrypted.read("original")!!.text)
+            controller.saveOriginalEdit(id); controller.state.first { it.originalEdit == null }
+            assertEquals(1, repo.revisionSubmissions.size)
+            assertEquals(ProcessingPolicy.AI_NONE, repo.entries().single().policy)
+            assertEquals(capture, repo.readDraft()); assertNull(controller.state.value.ai)
+        } finally { stop(controller); encrypted.close() }
+    } }
 
     @Test fun dormantRecoveredDraftIsNotReplacedByHistoryUntilExplicitDiscardConfirmation() = runBlocking { exercise { root ->
         val encrypted = storage(root)

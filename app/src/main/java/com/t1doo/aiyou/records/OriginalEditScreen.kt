@@ -47,8 +47,9 @@ fun OriginalEditScreen(
             Column(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize()
                 .verticalScroll(rememberScrollState()).padding(AIyouDimensions.pageNarrow),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                Text(if (edit.sourceRevision == edit.baseRevision) "基于原文版本 ${edit.baseRevision} · 仅本机"
-                    else "来源：历史版本 ${edit.sourceRevision} · 基于原文版本 ${edit.baseRevision} · 仅本机", style = MaterialTheme.typography.bodySmall,
+                val scopeLabel = if (current?.policy == com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE) "不要据此推断 · 人工编辑" else "仅本机"
+                Text(if (edit.sourceRevision == edit.baseRevision) "基于原文版本 ${edit.baseRevision} · $scopeLabel"
+                    else "来源：历史版本 ${edit.sourceRevision} · 基于原文版本 ${edit.baseRevision} · $scopeLabel", style = MaterialTheme.typography.bodySmall,
                     color = AIyouColors.textSecondary)
                 Text("保存创建新版本，旧原文仍保留。", style = MaterialTheme.typography.bodySmall,
                     color = AIyouColors.textSecondary)

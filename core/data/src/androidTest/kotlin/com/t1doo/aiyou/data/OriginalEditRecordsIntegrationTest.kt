@@ -4,8 +4,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.t1doo.aiyou.domain.OriginalEditDraftConflict
 import com.t1doo.aiyou.domain.RecordConflict
+import com.t1doo.aiyou.domain.LocalProcessingChange
+import com.t1doo.aiyou.domain.LocalProcessingChoice
 import com.t1doo.aiyou.model.OriginalEditDraft
 import com.t1doo.aiyou.model.OriginalEditDraftState
+import com.t1doo.aiyou.model.ProcessingPolicy
+import com.t1doo.aiyou.model.SourceVersion
 import java.io.File
 import java.security.SecureRandom
 import java.util.UUID
@@ -17,6 +21,45 @@ import org.junit.runner.RunWith
 /** Native Room/SQLCipher + actual edit cipher adapter. Compile does not establish device PASS. */
 @RunWith(AndroidJUnit4::class)
 class OriginalEditRecordsIntegrationTest {
+    @Test fun aiNoneManualAndHistoricalDraftReceiptsPreservePolicyAcrossNativeColdReopen() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val directory = File(context.noBackupFilesDir, "edit-ai-none-native-${UUID.randomUUID()}").also { check(it.mkdirs()) }
+        val secret = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        var owner: EncryptedEntryRepository? = null
+        try {
+            val file = File(directory, "records.db")
+            fun open() = EncryptedEntryRepository.openWithKey(context, file, secret.copyOf()).also { owner = it }
+            var store = open()
+            val first = store.saveDraft(store.updateDraft("合成第一版原文"), 1000, "Etc/UTC")
+            val source = SourceVersion(first.id, 1)
+            val policy = store.localProcessing.change(LocalProcessingChange(store.localProcessing.read(source), LocalProcessingChoice.AI_NONE, UUID.randomUUID().toString()))
+            val capture = store.updateDraft("合成独立此刻草稿")
+            val edit = OriginalEditDraft(UUID.randomUUID().toString(), first.id, 1, 1, 1, first.originalText, "合成人工第二版")
+            store.editDrafts.write(null, edit)
+            store.closeAndAwait(); store = open()
+            assertEquals(edit, store.editDrafts.read(first.id)); assertEquals(capture, store.readDraft())
+            val saved = store.reviseFromDraft(edit, 2000)
+            assertEquals(ProcessingPolicy.AI_NONE, saved.policy)
+            assertEquals(policy.generation + 1, store.localProcessing.read(SourceVersion(first.id, 2)).generation)
+            store.closeAndAwait(); store = open()
+            assertEquals(saved, store.committedEdit(edit))
+            assertEquals(saved, store.reviseFromDraft(edit, 3000))
+            assertEquals(2, store.revisions(first.id).size)
+            assertEquals(policy.generation + 1, store.localProcessing.read(SourceVersion(first.id, 2)).generation)
+            try { store.revise(first.id, 1, "合成过期写入", 3000); fail("Expected version CAS conflict") } catch (_: RecordConflict) { }
+            val historical = OriginalEditDraft(UUID.randomUUID().toString(), first.id, 2, 1, 1, saved.originalText, first.originalText)
+            store.editDrafts.write(edit, historical)
+            assertEquals(2, store.revisions(first.id).size)
+            val restored = store.reviseFromDraft(historical, 4000)
+            assertEquals(ProcessingPolicy.AI_NONE, restored.policy); assertEquals(3, restored.currentRevision)
+            assertEquals(listOf(first.originalText, saved.originalText, first.originalText), store.revisions(first.id).map { it.originalText })
+            assertEquals(policy.generation + 2, store.localProcessing.read(SourceVersion(first.id, 3)).generation)
+            assertEquals(capture, store.readDraft())
+            store.database.openHelper.writableDatabase.query("SELECT count(*) FROM local_candidate_batches UNION ALL SELECT count(*) FROM remote_text_jobs").use { rows ->
+                assertTrue(rows.moveToFirst()); assertEquals(0L, rows.getLong(0)); assertTrue(rows.moveToNext()); assertEquals(0L, rows.getLong(0)); assertFalse(rows.moveToNext())
+            }
+        } finally { owner?.closeAndAwait(); secret.fill(0); directory.deleteRecursively() }
+    }
     @Test fun encryptedEditAndCaptureSurviveReopenWithoutChangingFormalOriginal() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val directory = File(context.noBackupFilesDir, "edit-native-${UUID.randomUUID()}").also { check(it.mkdirs()) }

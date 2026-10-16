@@ -33,7 +33,7 @@ def main():
         parser.error("budget must be 90..2100 seconds; cannot extend existing ceiling")
     inventory = collect_source(ROOT)
     if args.collect_source:
-        print(json.dumps({"result": "PASS: 31 source methods collected (legacy 19 + source-bound 8 + manual tags 4); APK/device collection NOT RUN", "native_cases": inventory}, indent=2))
+        print(json.dumps({"result": f"PASS: {NATIVE_METHOD_COUNT} source methods collected; APK/device collection NOT RUN", "native_cases": inventory}, indent=2))
         return
     if not all((args.serial, args.expected_sha, args.apk_manifest, args.output)):
         parser.error("require --serial --expected-sha --apk-manifest --output; see docs/D02_DEVICE_ACCEPTANCE.md")
@@ -136,7 +136,7 @@ def main():
                 raise RuntimeError("Application phases did not prove distinct PIDs")
             pids.add(result["pid"]); report["app_phases"].append(result)
         report["apks"] = manifest["apks"]
-        report["result"] = "PASS: exact 31 native methods (legacy 19 + source-bound 8 + manual tags 4), 4 external storage phases and 2 production Activity/VM phases; separate 16KB/physical-performance gates remain OPEN"
+        report["result"] = f"PASS: exact {NATIVE_METHOD_COUNT} native methods, 4 external storage phases and 2 production Activity/VM phases; separate 16KB/physical-performance gates remain OPEN"
         # Fresh test installation and synthetic library deliberately retained for review. No uninstall/reset.
     except Exception as error:
         report["result"] = "FAIL: " + str(error) + "; unrecorded device gates NOT RUN; all evidence retained"
