@@ -45,12 +45,13 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     onSaveDate: (Long, ManualTaskDateInput) -> Unit = { _, _ -> },
     onCloseDate: (Long) -> Unit = {}, onSource: (String, Long) -> Unit = { _, _ -> }, clock: Clock = Clock.systemUTC(),
     onProposalOpen:(String,Long)->Unit={_,_->},onProposalRefresh:()->Unit={},
-    reminders: TaskReminderController? = null, ownsReminderRoute: () -> Boolean = { true }) {
+    reminders: TaskReminderController? = null, ownsReminderRoute: () -> Boolean = { true },
+    titles: ManualTaskController? = null, ownsTitleRoute: () -> Boolean = { true }) {
     val tasks = local.tasks
     val storageReady = local.ready && !local.opening && local.error == null
     val available = storageReady && tasks.available && !tasks.loading
     val canWrite = available && !tasks.busy && tasks.pending == null && !local.reminders.busy && local.reminders.pending == null
-    val canChoose = canWrite && tasks.editor == null && tasks.dateEditor == null && local.reminders.editor == null
+    val canChoose = canWrite && tasks.editor == null && tasks.dateEditor == null && tasks.titleEditor == null && local.reminders.editor == null
     val now by produceState(clock.instant(), clock) {
         // Display classification only, never a scheduler or a persisted inferred deadline.
         while (true) { delay(30_000); value = clock.instant() }
@@ -141,11 +142,14 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                                         modifier = Modifier.testTag("manual-task-date-" + task.id))
                                     task.reminder?.let { Text(taskReminderLabel(it), Modifier.testTag("reminder-status-" + task.id)) }
                                     task.sourceReceipt?.let { receipt ->
-                                        Text("原文字面摘录 · 人工确认 · 原文版本 " + receipt.binding.source.revision)
+                                        Text("由原文摘录创建 · 人工确认 · 原文版本 " + receipt.binding.source.revision)
                                         TextButton(enabled=canChoose,onClick={onSource(task.id,task.version)},
                                             modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("manual-task-source-"+task.id)) { Text("查看来源原文") }
                                     }
                                     if (task.status == ManualTaskStatus.OPEN) FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                                        if (titles != null) TextButton(enabled = canChoose && task.version < Long.MAX_VALUE,
+                                            onClick = { if (ownsTitleRoute()) titles.beginTitle(task.id, task.version) },
+                                            modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-task-title-open-" + task.id)) { Text("修改标题") }
                                         if (local.reminders.supported && reminders != null) {
                                             TextButton(enabled = canChoose && task.schedule?.instant() != null,
                                                 onClick = { if (ownsReminderRoute()) reminders.begin(task.id, task.version) },
@@ -182,6 +186,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     }
     tasks.dateEditor?.let { editor -> ManualTaskDateDialog(editor, tasks, storageReady, onEditDate, onSaveDate, onCloseDate, onRetry) }
     if (reminders != null) TaskReminderDialog(local, reminders, ownsReminderRoute)
+    if (titles != null) ManualTaskTitleDialog(local, titles, ownsTitleRoute)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

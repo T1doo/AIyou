@@ -455,6 +455,7 @@ class TaskReminderControllerTest {
                     is ManualTaskIntent.Change -> h.actual.change(pending.request)
                     is ManualTaskIntent.Schedule -> h.actual.reschedule(pending.request)
                     is ManualTaskIntent.Create -> error("This test never creates an implicit task")
+                    is ManualTaskIntent.Rename -> error("This test does not edit task titles")
                 }
                 val committed = replay()
                 val before = h.blob(task.id)

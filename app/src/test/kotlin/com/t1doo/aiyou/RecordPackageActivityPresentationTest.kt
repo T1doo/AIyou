@@ -84,6 +84,7 @@ class RecordPackageActivityPresentationTest {
             override fun snapshots():List<ManualTaskSnapshot> {if(failActivityRead) {failActivityRead=false;error("Synthetic readback failure")};return currentTasks}
             override fun create(request:ManualTaskCreate)=error("No new task confirmation requested")
             override fun change(request:ManualTaskMutation)=error("Not requested")
+            override fun rename(request: com.t1doo.aiyou.model.ManualTaskRename): ManualTaskSnapshot = error("Title editing not requested by this test")
             override fun reschedule(request:ManualTaskScheduleMutation)=error("Not requested")
         }
         override val taskProposals=object:TaskProposalRepository {

@@ -184,6 +184,7 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
                 (reminder == null || reminder.phase == TaskReminderPhase.REVOKED))
             "CLEAR" -> require(task.version > 1 && task.status == ManualTaskStatus.OPEN && task.schedule == null &&
                 (reminder == null || reminder.phase == TaskReminderPhase.REVOKED))
+            "RENAME" -> require(task.version > 1 && task.status == ManualTaskStatus.OPEN)
             "REMIND" -> require(format == 4 && task.version > 1 && task.status == ManualTaskStatus.OPEN &&
                 (reminder == null || reminder.phase in setOf(TaskReminderPhase.PENDING, TaskReminderPhase.REVOKED)))
             "RM_ACK" -> require(format == 4 && task.version > 1 && reminder != null)

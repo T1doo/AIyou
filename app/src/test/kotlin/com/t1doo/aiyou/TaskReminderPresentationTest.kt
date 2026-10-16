@@ -52,6 +52,7 @@ class TaskReminderPresentationTest {
         override fun snapshots() = persisted.values.toList()
         override fun create(request: ManualTaskCreate): ManualTaskSnapshot = error("Reminder UI must not create tasks")
         override fun change(request: ManualTaskMutation): ManualTaskSnapshot = error("Reminder UI must not change task status")
+        override fun rename(request: com.t1doo.aiyou.model.ManualTaskRename): ManualTaskSnapshot = error("Title editing not requested by this test")
         override fun reschedule(request: ManualTaskScheduleMutation): ManualTaskSnapshot = error("Reminder UI must not change task dates")
     }
     private val reminderPort = object : TaskReminderRepository {

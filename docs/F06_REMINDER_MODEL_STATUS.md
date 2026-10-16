@@ -86,3 +86,11 @@ actor finally 释放，未在 onCleared 同序释放且重复释放再发布。�
 路径；对应真实控制器测试已实际通过。`host-2/`、`queue-1/` 为最终原件，来源说明
 在 `provenance.json`。Library 交付结果与最终 Git/文件哈希另随证据包记录，未冒称
 不可访问的旧环境 716 项原件已经找回。
+
+2026-10-16 父级补充独立验收：Library 包内 1356 文件、573 源码与 e5399c2 的
+27 项 Git 变更精确一致，772/149/123 原始证据通过且两次初始失败保留。e5399c2
+精确 CI [run38912346570/job117011048734](https://github.com/T1doo/AIyou/actions/runs/38912346570/job/117011048734)
+于 14:18:19 UTC 完成，45 步成功；Compose 216 零失败/错误/跳过，新增三个提醒
+展示方法各 actual 1；Preview 394/394 PNG、lint 0 错 0 警告 1 hint、APK 和
+instrumentation 编译通过。以上来自父级原日志核实，本任务未自行查询 Actions。
+此结果仅覆盖 e5399c2 的模型/构建门，不证明通知、AlarmManager、重启/时区或真机。

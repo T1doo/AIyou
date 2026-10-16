@@ -75,6 +75,7 @@ class ManualTaskPresentationTest {
             return old.copy(version = old.version + 1, status = request.status,
                 updatedAtMillis = maxOf(old.updatedAtMillis, request.requestedAtMillis)).also { persisted[it.id] = it }
         }
+        override fun rename(request: com.t1doo.aiyou.model.ManualTaskRename): ManualTaskSnapshot = error("Title editing not requested by this test")
         override fun reschedule(request: ManualTaskScheduleMutation): ManualTaskSnapshot {
             identities.add(request.id to request.mutationId); dateRequests.add(request)
             if (failWrite) throw ManualTaskStorageFailure()

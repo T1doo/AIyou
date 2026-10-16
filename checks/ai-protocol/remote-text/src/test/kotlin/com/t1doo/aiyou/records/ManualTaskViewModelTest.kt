@@ -214,6 +214,7 @@ class ManualTaskViewModelTest {
                 if (failWrite) throw ManualTaskStorageFailure()
                 return actual.change(request)
             }
+            override fun rename(request: com.t1doo.aiyou.model.ManualTaskRename): ManualTaskSnapshot = error("Title editing not requested by this test")
             override fun reschedule(request: ManualTaskScheduleMutation): ManualTaskSnapshot {
                 identities.add(request.id to request.mutationId); dateRequests.add(request)
                 if (failWrite) throw ManualTaskStorageFailure()

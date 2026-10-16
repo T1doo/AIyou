@@ -88,6 +88,24 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
             }
         }
     }
+    override fun rename(request: ManualTaskRename): ManualTaskSnapshot = safely {
+        database.transaction { sql ->
+            val old = row(sql, request.id) ?: throw ManualTaskConflict()
+            val current = old.payload.task
+            if (current.status != ManualTaskStatus.OPEN) throw ManualTaskConflict()
+            if (old.mutationId == request.mutationId) {
+                if (old.payload.operation != "RENAME" || current.version != request.expectedVersion + 1 ||
+                    current.title != request.title || old.payload.requestedAtMillis != request.requestedAtMillis)
+                    throw ManualTaskConflict()
+                current
+            } else {
+                if (current.version != request.expectedVersion || current.title == request.title) throw ManualTaskConflict()
+                val next = current.copy(version = Math.addExact(current.version, 1), title = request.title,
+                    updatedAtMillis = maxOf(current.updatedAtMillis, request.requestedAtMillis))
+                writeWithin(sql, current, next, request.mutationId, request.requestedAtMillis, "RENAME")
+            }
+        }
+    }
     override fun changeReminder(request: TaskReminderMutation): ManualTaskSnapshot = safely {
         database.transaction { sql ->
             val old = row(sql, request.task.id) ?: throw ManualTaskConflict()

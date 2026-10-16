@@ -16,10 +16,15 @@ class ManualTaskDateEditor(val session: Long, val taskId: String, val version: L
     val operation: ManualTaskDateOperation, val input: ManualTaskDateInput) {
     override fun toString() = "ManualTaskDateEditor(redacted)"
 }
+class ManualTaskTitleEditor(val session: Long, val task: ManualTaskSnapshot, val input: String,
+    val confirmation: ManualTaskRename? = null) {
+    override fun toString() = "ManualTaskTitleEditor(redacted)"
+}
 internal sealed interface ManualTaskIntent {
     class Create(val session: Long, val request: ManualTaskCreate) : ManualTaskIntent
     class Change(val request: ManualTaskMutation) : ManualTaskIntent
     class Schedule(val session: Long, val request: ManualTaskScheduleMutation) : ManualTaskIntent
+    class Rename(val session: Long, val request: ManualTaskRename) : ManualTaskIntent
 }
 class ManualTasksUiState internal constructor(
     val supported: Boolean = false, val loading: Boolean = false, val available: Boolean = false,
@@ -28,14 +33,15 @@ class ManualTasksUiState internal constructor(
     val conflict: Boolean = false, internal val pending: ManualTaskIntent? = null,
     internal val generation: Long = 0,
     val dateEditor: ManualTaskDateEditor? = null,
+    val titleEditor: ManualTaskTitleEditor? = null,
 ) {
     val items = Collections.unmodifiableList(items.toList())
     internal fun copy(supported: Boolean = this.supported, loading: Boolean = this.loading, available: Boolean = this.available,
         items: List<ManualTaskSnapshot> = this.items, editor: ManualTaskEditor? = this.editor, busy: Boolean = this.busy,
         error: String? = this.error, notice: String? = this.notice, conflict: Boolean = this.conflict,
         pending: ManualTaskIntent? = this.pending, generation: Long = this.generation,
-        dateEditor: ManualTaskDateEditor? = this.dateEditor) =
-        ManualTasksUiState(supported, loading, available, items, editor, busy, error, notice, conflict, pending, generation, dateEditor)
+        dateEditor: ManualTaskDateEditor? = this.dateEditor, titleEditor: ManualTaskTitleEditor? = this.titleEditor) =
+        ManualTasksUiState(supported, loading, available, items, editor, busy, error, notice, conflict, pending, generation, dateEditor, titleEditor)
     override fun toString() = "ManualTasksUiState(available=$available, busy=$busy, redacted)"
 }
 
@@ -71,7 +77,7 @@ class ManualTaskController internal constructor(
     }
     fun begin() {
         val tasks = current().tasks
-        if (!usable() || reminderBlocksWrite() || !tasks.supported || !tasks.available || tasks.loading || tasks.busy || tasks.pending != null || tasks.editor != null || tasks.dateEditor != null) return
+        if (!usable() || reminderBlocksWrite() || !tasks.supported || !tasks.available || tasks.loading || tasks.busy || tasks.pending != null || tasks.editor != null || tasks.dateEditor != null || tasks.titleEditor != null) return
         val editor = ManualTaskEditor(sessions.incrementAndGet(), dateInput = ManualTaskDateInput(timeZone = timeZone()))
         update { it.copy(editor = editor, error = null, notice = null, conflict = false) }
     }
@@ -104,7 +110,7 @@ class ManualTaskController internal constructor(
     fun beginDate(id: String, version: Long, operation: ManualTaskDateOperation) {
         val tasks = current().tasks
         if (!usable() || reminderBlocksWrite() || !tasks.supported || !tasks.available || tasks.loading || tasks.busy ||
-            tasks.pending != null || tasks.editor != null || tasks.dateEditor != null) return
+            tasks.pending != null || tasks.editor != null || tasks.dateEditor != null || tasks.titleEditor != null) return
         val task = tasks.items.singleOrNull { it.id == id && it.version == version && it.status == ManualTaskStatus.OPEN } ?: return
         if (operation != ManualTaskDateOperation.SET && task.schedule == null) return
         update { it.copy(dateEditor = ManualTaskDateEditor(sessions.incrementAndGet(), id, version, operation,
@@ -138,10 +144,62 @@ class ManualTaskController internal constructor(
     fun change(id: String, version: Long, status: ManualTaskStatus) {
         val tasks = current().tasks
         if (!usable() || reminderBlocksWrite() || !tasks.available || tasks.busy || tasks.loading || tasks.pending != null || status == ManualTaskStatus.OPEN ||
-            tasks.editor != null || tasks.dateEditor != null ||
+            tasks.editor != null || tasks.dateEditor != null || tasks.titleEditor != null ||
             tasks.items.none { it.id == id && it.version == version && it.status == ManualTaskStatus.OPEN }) return
         submit(ManualTaskIntent.Change(ManualTaskMutation(id, version, status, clock.millis(), UUID.randomUUID().toString())))
     }
+    fun beginTitle(id: String, version: Long) {
+        val tasks = current().tasks
+        if (!usable() || reminderBlocksWrite() || !tasks.supported || !tasks.available || tasks.loading || tasks.busy ||
+            tasks.pending != null || tasks.editor != null || tasks.dateEditor != null || tasks.titleEditor != null) return
+        val task = tasks.items.singleOrNull { it.id == id && it.version == version && it.version < Long.MAX_VALUE && it.status == ManualTaskStatus.OPEN } ?: return
+        update { it.copy(titleEditor = ManualTaskTitleEditor(sessions.incrementAndGet(), task, task.title),
+            error = null, notice = null, conflict = false) }
+    }
+    fun editTitle(session: Long, input: String) {
+        if (!usable() || input.length > ManualTasks.MAX_RAW_LENGTH) return
+        update { state -> val editor = state.titleEditor
+            if (editor?.session != session || editor.confirmation != null || state.busy || state.pending != null) state
+            else state.copy(titleEditor = ManualTaskTitleEditor(session, editor.task, input), error = null, notice = null) }
+    }
+    fun prepareTitle(session: Long) {
+        val tasks = current().tasks; val editor = tasks.titleEditor
+        if (!usable() || reminderBlocksWrite() || editor?.session != session || editor.confirmation != null ||
+            !tasks.available || tasks.loading || tasks.busy || tasks.pending != null) return
+        if (tasks.items.singleOrNull { it.id == editor.task.id } != editor.task) {
+            titleConflict(); return
+        }
+        val title = try { ManualTasks.title(editor.input) }
+        catch (_: IllegalArgumentException) {
+            update { it.copy(error = "待办标题需为 1–240 个字符，不可包含控制字符。输入已保留。") }; return
+        }
+        if (title == editor.task.title) {
+            update { it.copy(error = null, notice = "标题没有变化，无需保存。") }; return
+        }
+        val request = ManualTaskRename(editor.task.id, editor.task.version, title, clock.millis(), UUID.randomUUID().toString())
+        update { it.copy(titleEditor = ManualTaskTitleEditor(session, editor.task, editor.input, request), error = null, notice = null) }
+    }
+    fun cancelTitleConfirmation(session: Long, request: ManualTaskRename) {
+        if (!usable()) return
+        update { state -> val editor = state.titleEditor
+            if (editor?.session != session || editor.confirmation !== request || state.busy || state.pending != null) state
+            else state.copy(titleEditor = ManualTaskTitleEditor(session, editor.task, editor.input), error = null, notice = null) }
+    }
+    fun saveTitle(session: Long, request: ManualTaskRename) {
+        val tasks = current().tasks; val editor = tasks.titleEditor
+        if (!usable() || reminderBlocksWrite() || editor?.session != session || editor.confirmation !== request ||
+            !tasks.available || tasks.loading || tasks.busy || tasks.pending != null) return
+        if (tasks.items.singleOrNull { it.id == editor.task.id } != editor.task) {
+            titleConflict(); return
+        }
+        submit(ManualTaskIntent.Rename(session, request))
+    }
+    fun closeTitle(session: Long) {
+        if (disposed) return
+        update { if (it.titleEditor?.session == session && !it.busy && it.pending == null) it.copy(titleEditor = null) else it }
+    }
+    private fun titleConflict() = update { it.copy(conflict = true,
+        error = "待办或提醒状态已变化。输入已保留，请关闭编辑，重新读取后再选择。", notice = null) }
     fun retry() {
         val tasks = current().tasks
         if (!usable() || !tasks.supported || tasks.loading || tasks.busy) return
@@ -179,6 +237,7 @@ class ManualTaskController internal constructor(
                     is ManualTaskIntent.Create -> tasks.create(intent.request)
                     is ManualTaskIntent.Change -> tasks.change(intent.request)
                     is ManualTaskIntent.Schedule -> tasks.reschedule(intent.request)
+                    is ManualTaskIntent.Rename -> tasks.rename(intent.request)
                 }
                 val all = tasks.snapshots()
                 check(all.singleOrNull { it.id == saved.id } == saved)
@@ -187,7 +246,8 @@ class ManualTaskController internal constructor(
                     state.copy(items = all, available = true, busy = false, pending = null, conflict = false, error = null,
                         editor = if (intent is ManualTaskIntent.Create && editor?.session == intent.session) null else editor,
                         dateEditor = if (intent is ManualTaskIntent.Schedule && state.dateEditor?.session == intent.session) null else state.dateEditor,
-                        notice = when (saved.status) {
+                        titleEditor = if (intent is ManualTaskIntent.Rename && state.titleEditor?.session == intent.session) null else state.titleEditor,
+                        notice = if (intent is ManualTaskIntent.Rename) "标题修改已保存在本机" else when (saved.status) {
                             ManualTaskStatus.OPEN -> "待办已保存在本机"
                             ManualTaskStatus.COMPLETED -> "待办已完成，状态已保存在本机"
                             ManualTaskStatus.CANCELLED -> "待办已取消，状态已保存在本机"

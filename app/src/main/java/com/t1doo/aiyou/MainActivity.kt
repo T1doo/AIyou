@@ -124,6 +124,7 @@ class MainActivity : ComponentActivity() {
                 sourceTasks = records.sourceTasks,
                 taskProposals = records.taskProposals,
                 reminders = records.reminders,
+                manualTasks = records.tasks,
                 localProcessing = records.localProcessing,
                 onTagRemove = records.tags::remove, onTagRetry = records.tags::retry, onTagClose = records.tags::close,
                 onTaskBegin = records.tasks::begin, onTaskEdit = records.tasks::edit, onTaskCreate = records.tasks::create,
@@ -246,6 +247,7 @@ fun AIyouApp(
     recordPackagePicker: com.t1doo.aiyou.records.RecordPackagePicker? = null,
     onRefreshLocalSearch: () -> Unit = {},
     onRebuildLocalSearch: () -> Unit = {},
+    manualTasks: com.t1doo.aiyou.records.ManualTaskController? = null,
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -658,6 +660,8 @@ fun AIyouApp(
     SideEffect {
         if (!ownsNavigation() || selectedName != Destination.TASKS.name || showSettings || demo)
             local?.reminders?.editor?.let { reminders?.close(it.session) }
+        if (!ownsNavigation() || selectedName != Destination.TASKS.name || showSettings || demo)
+            local?.tasks?.titleEditor?.let { manualTasks?.closeTitle(it.session) }
     }
     if (exports != null && exportUi != null && ownsExportRoute()) {
         com.t1doo.aiyou.records.OriginalExportPicker(exports, exportUi,
@@ -802,6 +806,7 @@ fun AIyouApp(
                 onProposalOpen = {id,version -> if(ownsTasks()) taskProposals?.openExisting(id,version)},
                 onProposalRefresh = {if(ownsTasks()) taskProposals?.refresh()},
                 reminders = reminders, ownsReminderRoute = ::ownsTasks,
+                titles = manualTasks, ownsTitleRoute = ::ownsTasks,
                 onSource = { id,version -> if(ownsTasks()) {
                     val token=generation
                     sourceTasks?.locate(id,version) { binding -> navigation.publish(token) {

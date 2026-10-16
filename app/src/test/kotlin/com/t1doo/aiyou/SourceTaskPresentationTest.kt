@@ -51,6 +51,7 @@ class SourceTaskPresentationTest {
         override fun snapshots():List<ManualTaskSnapshot> {if(failReadback) throw ManualTaskStorageFailure();return listOfNotNull(task)}
         override fun create(request:ManualTaskCreate)=error("Manual creation not requested")
         override fun change(request:ManualTaskMutation)=error("Status not requested")
+        override fun rename(request: com.t1doo.aiyou.model.ManualTaskRename): ManualTaskSnapshot = error("Title editing not requested by this test")
         override fun reschedule(request:ManualTaskScheduleMutation)=error("Date mutation not requested")
     }
     private fun checkSource() {if(entry.currentRevision!=1||OriginalExports.hash(entry.originalText)!=binding.sourceHash) throw SourceTaskConflict()}

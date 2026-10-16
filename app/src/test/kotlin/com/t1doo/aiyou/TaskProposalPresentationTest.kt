@@ -73,6 +73,7 @@ class TaskProposalPresentationTest {
             override fun snapshots()=tasks.values.toList()
             override fun create(request:ManualTaskCreate)=error("Not requested")
             override fun change(request:ManualTaskMutation)=error("Not requested")
+            override fun rename(request: com.t1doo.aiyou.model.ManualTaskRename): ManualTaskSnapshot = error("Title editing not requested by this test")
             override fun reschedule(request:ManualTaskScheduleMutation)=error("Not requested")
         }
         override suspend fun readDraft()=null

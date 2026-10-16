@@ -51,7 +51,7 @@ class TaskReminderController internal constructor(private val current: () -> Loc
     fun begin(id: String, version: Long, cancelling: Boolean = false) {
         val local = current(); val state = local.reminders; val tasks = local.tasks
         if (!available(local) || !state.supported || state.busy || state.pending != null || state.editor != null ||
-            !tasks.available || tasks.loading || tasks.busy || tasks.pending != null || tasks.editor != null || tasks.dateEditor != null) return
+            !tasks.available || tasks.loading || tasks.busy || tasks.pending != null || tasks.editor != null || tasks.dateEditor != null || tasks.titleEditor != null) return
         val task = tasks.items.singleOrNull { it.id == id && it.version == version && it.status == ManualTaskStatus.OPEN } ?: return
         val reminder = task.reminder
         if (cancelling && (reminder == null || reminder.phase == TaskReminderPhase.REVOKED)) return

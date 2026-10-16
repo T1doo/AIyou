@@ -33,6 +33,17 @@ class ManualTaskCreate(val id: String, title: String, val createdAtMillis: Long,
     override fun toString() = "ManualTaskCreate(redacted)"
 }
 
+/** Explicit correction of one confirmed open task; no date or reminder intent is implied. */
+class ManualTaskRename(val id: String, val expectedVersion: Long, title: String,
+    val requestedAtMillis: Long, val mutationId: String) {
+    val title = ManualTasks.title(title)
+    init {
+        ManualTags.identifier(id); ManualTags.identifier(mutationId)
+        require(expectedVersion in 1 until Long.MAX_VALUE && requestedAtMillis >= 0)
+    }
+    override fun toString() = "ManualTaskRename(redacted)"
+}
+
 enum class ManualTaskDateOperation { SET, POSTPONE, CLEAR }
 enum class ManualTaskOccurrence { FIRST, SECOND }
 enum class ManualTaskDateError { DATE, TIME_WITHOUT_DATE, TIME, ZONE, GAP, OVERLAP, OFFSET, NO_DATE, NOT_LATER, PRECISION }
