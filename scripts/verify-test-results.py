@@ -101,7 +101,8 @@ for label, folder, minimum in targets:
     if label == "Compose JVM interaction":
         additional["com.t1doo.aiyou.OriginalActivityExportPresentationTest"] = (
             "taskOnlyDoubleFontPreviewSeparatesKindsAndRequiresPlaintextConsentBeforeSafWithoutSavingPrivateState",
-            "formatScopeChangesRetireConsentAndChangedActivitiesNeverLaunchDestinationOrPromoteDraft")
+            "formatScopeChangesRetireConsentAndChangedActivitiesNeverLaunchDestinationOrPromoteDraft",
+            "activitySafCancelReselectRetiresOldUuidAndDuplicateResultWritesAndReadsOnlyOnce")
         additional["com.t1doo.aiyou.RecordPackageActivityPresentationTest"] = (
             "taskOnlySelectionAtDoubleFontPreviewsEveryKindAndKeepsExplicitScopeGateAndPrivateState",
             "taskRestoreRequiresActualSeparateConfirmationThenUnknownReadbackRetriesWithoutPromotingDraft")

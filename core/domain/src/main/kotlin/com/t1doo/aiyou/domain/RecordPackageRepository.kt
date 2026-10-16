@@ -27,3 +27,8 @@ interface RecordPackageRepository {
 class RecordPackageInvalid : IllegalArgumentException("Record package authentication or format failed")
 class RecordPackageConflict : IllegalStateException("Record package identity conflicts")
 class RecordPackageStorageFailure : IllegalStateException("Record package local storage unavailable")
+
+/** A bounded inventory was refused in full; no item was silently omitted. */
+enum class RecordPackageActivityBound { FORMAL_TASKS, SAVED_DRAFTS, PROPOSAL_LEDGER }
+class RecordPackageActivityLimit(val bound: RecordPackageActivityBound) :
+    IllegalStateException("Saved activity inventory exceeds $bound bound")

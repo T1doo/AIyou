@@ -63,8 +63,9 @@ internal class SqlTaskProposalRepository(private val database:RecordsSqlDatabase
     }
     internal fun exportWithin(sql:RecordsSqlConnection):List<TaskProposal> =
         sql.query("SELECT id,version,lastMutationId,ciphertext FROM manual_tasks WHERE substr(id,1,14)='TASK_PROPOSAL:' ORDER BY id LIMIT 4097")
-            .also {require(it.size<=4096)}.map {decode(it).proposal}.filter {it.state==TaskProposalState.DRAFT}
-            .also {require(it.size<=RecordPackageActivities.MAX_ITEMS)}
+            .also {if(it.size>4096) throw RecordPackageActivityLimit(RecordPackageActivityBound.PROPOSAL_LEDGER)}
+            .map {decode(it).proposal}.filter {it.state==TaskProposalState.DRAFT}
+            .also {if(it.size>RecordPackageActivities.MAX_ITEMS) throw RecordPackageActivityLimit(RecordPackageActivityBound.SAVED_DRAFTS)}
     internal fun importWithin(sql:RecordsSqlConnection,p:TaskProposal,hash:String) {
         require(p.version==1L && p.state==TaskProposalState.DRAFT && row(sql,p.id)==null)
         require(readAllWithin(sql).count {it.state==TaskProposalState.DRAFT}<TaskProposals.MAX_DRAFTS)

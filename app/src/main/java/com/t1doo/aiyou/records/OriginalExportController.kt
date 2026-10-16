@@ -260,7 +260,9 @@ class OriginalExportController internal constructor(
                 } else OriginalExportIo.writeAndVerify(target.document, checkNotNull(active.payload)) { writing(active) }
                 if (!writing(active)) throw OriginalExportCancelled()
                 val fresh = try { snapshotCurrent(store,active.snapshot,active.activities) }
-                    catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (limit: RecordPackageActivityLimit) { throw limit }
+                    catch (_: Exception) { null }
                 if (active.activities != null && fresh == null) throw OriginalExportStorageFailure()
                 if ((active.zip != null || active.activities != null) && fresh != true) throw OriginalExportConflict()
                 updateOwned(session, ui.epoch, OriginalExportPhase.WRITING) { state -> if (state.requestKey != key || active.cancelled.get()) state else state.copy(
@@ -336,6 +338,12 @@ class OriginalExportController internal constructor(
                 is OriginalExportConflict -> "所选原文、标签、图片、正式待办或待确认草稿已变化，未自动改用新内容。请重新预览最新内容后再确认。" +
                     if (ui.hasFile) "所选文件可能不完整，请检查或明确删除。" else ""
                 is OriginalExportTooLarge -> "选择的数据较多，请关闭后减少选择，再重新预览。"
+                is RecordPackageActivityLimit -> (when (failure.bound) {
+                    RecordPackageActivityBound.FORMAL_TASKS -> "正式待办超过 256 条，当前版本无法完整导出活动。"
+                    RecordPackageActivityBound.SAVED_DRAFTS -> "已保存待确认草稿超过 256 条，当前版本无法完整导出活动。"
+                    RecordPackageActivityBound.PROPOSAL_LEDGER -> "待确认草稿及处理历史台账超过 4096 条，当前版本无法完整核对活动。"
+                }) + "本次活动导出整体拒绝，不会截断。请关闭后取消“包含全部正式待办与已保存待确认草稿”，选择原文单独导出。" +
+                    if (ui.hasFile) "所选文件尚未确认，请检查或明确删除。" else "尚未创建导出文件。"
                 is OriginalExportEmptyScope -> "本次范围内没有已保存的原文、正式待办或待确认草稿，未创建导出文件。"
                 else -> if (ui.hasFile) "导出写入尚未确认。所选文件可能为空或不完整，请检查或明确删除后重试。"
                     else "导出准备或选择失败。原文与标签已保留，请重新预览。"

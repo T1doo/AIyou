@@ -53,6 +53,7 @@ internal class SqlOriginalExportRepository(private val database: RecordsSqlDatab
         catch (cancelled: CancellationException) { throw cancelled }
         catch (conflict: OriginalExportConflict) { throw conflict }
         catch (large: OriginalExportTooLarge) { throw large }
+        catch (limit: RecordPackageActivityLimit) { throw limit }
         catch (empty: OriginalExportEmptyScope) { throw empty }
         catch (_: Exception) { throw OriginalExportStorageFailure() }
 }

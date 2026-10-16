@@ -21,7 +21,8 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
     internal fun readWithin(sql: RecordsSqlConnection,id: String): ManualTaskSnapshot? = row(sql,id)?.payload?.task
     internal fun exportWithin(sql:RecordsSqlConnection):List<ManualTaskSnapshot> =
         sql.query("SELECT id,version,lastMutationId,ciphertext FROM manual_tasks WHERE substr(id,1,14)!='TASK_PROPOSAL:' ORDER BY id LIMIT 257")
-            .map {decode(it).payload.task}.also {require(it.size<=RecordPackageActivities.MAX_ITEMS)}
+            .also {if(it.size>RecordPackageActivities.MAX_ITEMS) throw RecordPackageActivityLimit(RecordPackageActivityBound.FORMAL_TASKS)}
+            .map {decode(it).payload.task}
     internal fun importWithin(sql:RecordsSqlConnection,t:ManualTaskSnapshot,mutation:String) {
         require(t.version==1L && row(sql,t.id)==null)
         val bytes=cipher.seal(t,mutation,t.updatedAtMillis,"IMPORT")

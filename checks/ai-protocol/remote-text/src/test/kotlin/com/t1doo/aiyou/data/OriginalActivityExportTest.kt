@@ -76,7 +76,6 @@ class OriginalActivityExportTest {
         assertEquals("FAILED",h.f.db.read("SELECT state FROM attachments").single().single());assertEquals(0,h.tasks.snapshots().size)
     }
     @Test fun oversizedFormalInventoryAndCorruptDraftFailWholeSnapshotAndEncodedSizeIsBounded() {
-        H().use {h ->repeat(257) {h.task("task-$it")};assertThrows(OriginalExportStorageFailure::class.java) {h.originals.captureActivities(h.snapshot(false))}}
         H().use {h ->h.draft();h.f.db.transaction {it.execute("UPDATE manual_tasks SET version=2,lastMutationId='synthetic-corrupt',ciphertext=? WHERE id=?",listOf(byteArrayOf(1,2,3),TaskProposals.storageId("draft")))}
             assertThrows(OriginalExportStorageFailure::class.java) {h.originals.captureActivities(h.snapshot(false))};assertEquals(1L,h.f.db.read("SELECT count(*) FROM manual_tasks").single().single())}
         val s=OriginalExportSnapshot("size",1,emptyList(),true)
@@ -85,6 +84,64 @@ class OriginalActivityExportTest {
         val drafts=(0 until 256).map {RecordPackageDraft(TaskProposal("draft-$it",1,binding,"\u0001".repeat(960),ManualTaskDateInput(),1,"UTC",1))}
         val a=RecordPackageActivities(tasks,drafts)
         assertThrows(OriginalExportTooLarge::class.java) {OriginalActivityExportCodec.render(s,a,OriginalExportFormat.MARKDOWN)}
+    }
+    @Test fun formalInventoryAt256IsCompleteAnd257RejectsWholePreviewWithActionableLimitWithoutWrites()=H().use {h ->
+        repeat(256) {h.task("task-$it")};val snapshot=h.snapshot(false)
+        assertEquals(256,h.originals.captureActivities(snapshot).tasks.size)
+        h.task("task-256");val before=h.f.snapshotOld()
+        val limit=assertThrows(RecordPackageActivityLimit::class.java) {h.originals.captureActivities(snapshot)}
+        assertEquals(RecordPackageActivityBound.FORMAL_TASKS,limit.bound)
+        h.controller.open();h.controller.includeActivities(h.ui().session,true);h.controller.prepare(h.ui().session);h.drain()
+        assertEquals(OriginalExportPhase.FAILED,h.ui().phase);assertNull(h.ui().snapshot);assertNull(h.ui().activities)
+        assertNull(h.ui().requestKey);assertFalse(h.ui().hasFile);assertFalse(h.ui().riskAccepted)
+        assertTrue(h.ui().error!!.contains("正式待办超过 256 条"));assertTrue(h.ui().error!!.contains("取消“包含全部正式待办与已保存待确认草稿”"))
+        assertEquals(before,h.f.snapshotOld());assertEquals(257,h.tasks.snapshots().size);assertTrue(h.queue.isEmpty())
+    }
+    @Test fun authenticatedDraftAndPhysicalHistoryBoundsAreDistinctAndNeverTruncate():Unit {
+        H().use {h ->
+            h.seedProposals(0,256,TaskProposalState.DRAFT)
+            assertEquals(256,h.originals.captureActivities(h.snapshot(false)).drafts.size)
+            h.seedProposals(256,1,TaskProposalState.DRAFT);val before=h.f.snapshotOld()
+            assertEquals(RecordPackageActivityBound.SAVED_DRAFTS,
+                assertThrows(RecordPackageActivityLimit::class.java) {h.originals.captureActivities(h.snapshot(false))}.bound)
+            assertEquals(before,h.f.snapshotOld())
+        }
+        H().use {h ->
+            h.task();h.seedProposals(0,4096,TaskProposalState.REJECTED)
+            val a=h.originals.captureActivities(h.snapshot(false));assertEquals(1,a.tasks.size);assertTrue(a.drafts.isEmpty())
+            h.seedProposals(4096,1,TaskProposalState.REJECTED);val before=h.f.snapshotOld()
+            assertEquals(RecordPackageActivityBound.PROPOSAL_LEDGER,
+                assertThrows(RecordPackageActivityLimit::class.java) {h.originals.captureActivities(h.snapshot(false))}.bound)
+            assertEquals(before,h.f.snapshotOld())
+        }
+    }
+    @Test fun activityPickerCancelReselectIgnoresOldKeyAndDuplicatePickedWritesExactlyOnce():Unit {
+        for(format in listOf(OriginalExportFormat.MARKDOWN,OriginalExportFormat.JSONL)) H().use {h ->
+            h.task();h.draft();h.preview();h.controller.format(h.ui().session,format);h.ready()
+            val session=h.ui().session;val oldKey=h.ui().requestKey!!;val oldFile=Document()
+            h.controller.picked(session,oldKey,null)
+            assertEquals(OriginalExportPhase.PREVIEW,h.ui().phase);assertFalse(h.ui().riskAccepted);assertNull(h.ui().requestKey)
+            h.choose();assertTrue(h.queue.isEmpty());h.ready();val key=h.ui().requestKey!!;assertNotEquals(oldKey,key)
+            h.controller.picked(session,oldKey,oldFile);h.controller.picked(session,oldKey,null)
+            assertEquals(OriginalExportPhase.PICKING,h.ui().phase);assertEquals(key,h.ui().requestKey);assertTrue(h.queue.isEmpty())
+            val file=Document();val duplicate=Document();h.controller.picked(session,key,file);h.controller.picked(session,key,duplicate)
+            assertEquals(1,h.queue.size);h.drain();h.controller.picked(session,key,duplicate);h.drain()
+            assertEquals(OriginalExportPhase.DONE,h.ui().phase);assertEquals(1,file.opens);assertEquals(1,file.reads)
+            assertEquals(0,oldFile.opens);assertEquals(0,duplicate.opens);assertEquals(0,file.deletes)
+            val text=file.bytes().toString(Charsets.UTF_8);assertTrue(text.contains("\"type\":\"manualTask\""));assertTrue(text.contains("\"type\":\"taskProposal\""))
+            assertEquals(1,h.tasks.snapshots().size);assertEquals(TaskProposalState.DRAFT,h.proposals.list().single().proposal.state)
+            assertEquals("合成未保存输入",h.local.text)
+        }
+    }
+    @Test fun activityLimitReachedDuringWriteKeepsTypedFailureAfterReadbackAndPreservesSelectedFile()=H().use {h ->
+        repeat(256) {h.task("task-$it")};h.preview();h.ready();val file=Document()
+        file.onWrite={file.onWrite=null;h.task("task-256")}
+        h.controller.picked(h.ui().session,h.ui().requestKey!!,file);h.drain()
+        assertEquals(OriginalExportPhase.FAILED,h.ui().phase);assertNull(h.ui().notice)
+        assertTrue(h.ui().error!!.contains("正式待办超过 256 条"));assertTrue(h.ui().error!!.contains("所选文件尚未确认"))
+        assertTrue(h.ui().hasFile);assertTrue(file.closed);assertTrue(file.inputClosed)
+        assertEquals(1,file.opens);assertEquals(1,file.reads);assertEquals(0,file.deletes)
+        assertEquals(257,h.tasks.snapshots().size)
     }
     @Test fun actualControllerRequiresExplicitScopeAndConsentAndRejectsStaleScopeCallbacks()=H().use {h ->
         h.task();h.draft();h.controller.open();assertFalse(h.ui().includeActivities);h.controller.prepare(h.ui().session);assertTrue(h.queue.isEmpty())
@@ -153,6 +210,15 @@ class OriginalActivityExportTest {
         fun binding():TaskSourceBinding {val p=SqlLocalProcessingRepository(f.gateway).read(f.source);return TaskSourceBinding(p.source,p.sourceHash,p.generation,0,5)}
         fun task(id:String="task")=tasks.create(ManualTaskCreate(id,FORMAL,50,"UTC","create-$id"))
         fun draft(id:String="draft")=proposals.write(TaskProposalWrite(id,0,binding(),RAW,ManualTaskDateInput("2026-","03:","UTC",ManualTaskOccurrence.SECOND),50,"UTC",50,"save-$id"))
+        // Authenticate oversized persisted inventories without weakening the normal 256-DRAFT write guard.
+        fun seedProposals(start:Int,count:Int,state:TaskProposalState) {
+            val cipher=TaskProposalCipher(LocalCandidateFixture.KEY);val binding=binding();val hash="a".repeat(64)
+            try {f.db.transaction {sql ->repeat(count) {offset ->
+                val p=TaskProposal("inventory-${start+offset}",1,binding,RAW,ManualTaskDateInput(),50,"UTC",50,state)
+                sql.execute("INSERT INTO manual_tasks(id,version,lastMutationId,ciphertext) VALUES(?,?,?,?)",
+                    listOf(TaskProposals.storageId(p.id),1,hash,cipher.seal(p,hash)))
+            }}} finally {cipher.wipe()}
+        }
         fun snapshot(records:Boolean=true)=if(records) originals.capture(listOf(f.source),"synthetic-open-activities",100) else OriginalExportSnapshot("synthetic-task-only",100,emptyList(),true)
         fun ui()=checkNotNull(local.originalExport)
         fun drain()=runBlocking {while(queue.isNotEmpty()) queue.removeFirst()(store)}

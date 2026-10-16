@@ -1,7 +1,10 @@
 package com.t1doo.aiyou
 
-import android.content.Intent
+import android.content.*
+import android.content.pm.ProviderInfo
+import android.database.Cursor
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.*
 import androidx.activity.result.contract.ActivityResultContract
@@ -19,6 +22,7 @@ import com.t1doo.aiyou.model.*
 import com.t1doo.aiyou.records.*
 import com.t1doo.aiyou.ui.Destination
 import java.time.Clock
+import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.*
@@ -28,6 +32,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowContentResolver
 
 /** Actual App, dialog, controller, codec and SAF intent; controlled read-only storage ports. */
 @RunWith(RobolectricTestRunner::class)
@@ -97,8 +102,12 @@ class OriginalActivityExportPresentationTest {
     @Test fun formatScopeChangesRetireConsentAndChangedActivitiesNeverLaunchDestinationOrPromoteDraft() {
         content();preview();click("export-risk");val old=ui()
         click("export-format-JSONL");assertFalse(ui().riskAccepted)
+        node("export-choose").assertIsNotEnabled()
         compose.runOnIdle {controller.choose(old.session,old.snapshot!!.id,old.format,old.epoch)}
         pump();assertTrue(registry.intents.isEmpty())
+        click("export-format-MARKDOWN")
+        compose.runOnIdle {controller.acceptRisk(old.session,old.snapshot!!.id,old.format,old.epoch,true)}
+        assertFalse(ui().riskAccepted);node("export-choose").assertIsNotEnabled()
         click("export-format-MEDIA_ZIP")
         compose.runOnIdle {assertFalse(ui().includeActivities);assertNull(ui().activities);assertNull(ui().snapshot)}
         node("export-prepare").assertIsNotEnabled();click("export-format-MARKDOWN")
@@ -108,6 +117,52 @@ class OriginalActivityExportPresentationTest {
         assertEquals(OriginalExportPhase.CHANGED,ui().phase);assertTrue(registry.intents.isEmpty())
         assertEquals(TaskProposalState.DRAFT,draft.state);assertEquals(ManualTaskStatus.COMPLETED,task.status)
         assertEquals("合成尚未保存输入",state.value.text)
+    }
+    @Test fun activitySafCancelReselectRetiresOldUuidAndDuplicateResultWritesAndReadsOnlyOnce() {
+        val app=RuntimeEnvironment.getApplication();val file=File.createTempFile("synthetic-activity-export-",".jsonl",app.cacheDir)
+        val providerAuthority="aiyou.synthetic.activityexport";val provider=Provider(file)
+        provider.attachInfo(app,ProviderInfo().apply {authority=providerAuthority})
+        ShadowContentResolver.registerProviderInternal(providerAuthority,provider)
+        try {
+            content();preview();click("export-risk");click("export-choose");pump()
+            val oldKey=ui().requestKey!!;val oldCode=registry.codes.single()
+            compose.runOnIdle {registry.dispatchResult(oldCode,null as Uri?)}
+            node("export-choose").assertIsNotEnabled()
+            assertFalse(ui().riskAccepted);assertEquals(OriginalExportPhase.PREVIEW,ui().phase);assertTrue(provider.modes.isEmpty())
+            click("export-format-JSONL");node("export-choose").assertIsNotEnabled()
+            click("export-risk");click("export-choose");pump()
+            val key=ui().requestKey!!;assertNotEquals(oldKey,key)
+            compose.runOnIdle {
+                assertEquals(2,registry.codes.size);assertEquals("application/x-ndjson",registry.intents.last().type)
+                registry.dispatchResult(oldCode,Uri.parse("content://$providerAuthority/old"))
+                assertEquals(OriginalExportPhase.PICKING,ui().phase);assertEquals(key,ui().requestKey)
+                assertTrue(queue.isEmpty());assertTrue(provider.modes.isEmpty())
+                val code=registry.codes.last();val uri=Uri.parse("content://$providerAuthority/current")
+                registry.dispatchResult(code,uri);registry.dispatchResult(code,uri)
+                assertEquals(OriginalExportPhase.WRITING,ui().phase);assertEquals(1,queue.size)
+            }
+            pump()
+            assertEquals(OriginalExportPhase.DONE,ui().phase);assertEquals(listOf("wt","r"),provider.modes)
+            assertTrue(provider.paths.all {it=="/current"});assertEquals(0,provider.deletes)
+            val text=file.readText();assertEquals(1,text.lines().count {it.startsWith("{\"type\":\"manualTask\"")})
+            assertEquals(1,text.lines().count {it.startsWith("{\"type\":\"taskProposal\"")})
+            assertEquals(TaskProposalState.DRAFT,draft.state);assertEquals(ManualTaskStatus.COMPLETED,task.status)
+            assertEquals("合成尚未保存输入",state.value.text)
+        } finally {if(file.exists()) check(file.delete())}
+    }
+    private class Provider(private val file:File):ContentProvider() {
+        val modes=mutableListOf<String>();val paths=mutableListOf<String?>();var deletes=0
+        override fun onCreate()=true
+        override fun getType(uri:Uri)="application/x-ndjson"
+        override fun openFile(uri:Uri,mode:String):ParcelFileDescriptor {
+            modes.add(mode);paths.add(uri.path)
+            return ParcelFileDescriptor.open(file,if(mode=="r") ParcelFileDescriptor.MODE_READ_ONLY
+                else ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_WRITE_ONLY or ParcelFileDescriptor.MODE_TRUNCATE)
+        }
+        override fun query(uri:Uri,projection:Array<out String>?,selection:String?,selectionArgs:Array<out String>?,sortOrder:String?):Cursor?=null
+        override fun insert(uri:Uri,values:ContentValues?):Uri?=error("No inserts")
+        override fun delete(uri:Uri,selection:String?,selectionArgs:Array<out String>?):Int {deletes++;error("No automatic deletion")}
+        override fun update(uri:Uri,values:ContentValues?,selection:String?,selectionArgs:Array<out String>?):Int=error("No updates")
     }
     private class Registry:ActivityResultRegistry() {
         val codes=mutableListOf<Int>();val intents=mutableListOf<Intent>()
