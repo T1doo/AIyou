@@ -7,7 +7,8 @@ import java.util.Base64
 /** Borrows existing key owners; final import and immutable replay receipt share the records transaction. */
 internal class SqlRecordPackageActivities(private val database:RecordsSqlDatabase,
     private val tasks:SqlManualTaskRepository,private val proposals:SqlTaskProposalRepository) {
-    fun capture(snapshot:OriginalExportSnapshot):RecordPackageActivities=database.transaction {sql ->
+    fun capture(snapshot:OriginalExportSnapshot):RecordPackageActivities=database.transaction {sql -> captureWithin(sql,snapshot) }
+    fun captureWithin(sql:RecordsSqlConnection,snapshot:OriginalExportSnapshot):RecordPackageActivities {
         val source=SqlSourceTaskRepository(database,tasks)
         fun index(b:TaskSourceBinding?):Int {
             if(b==null) return -1
@@ -16,7 +17,7 @@ internal class SqlRecordPackageActivities(private val database:RecordsSqlDatabas
             if(index<0) return -1
             return try {source.quoteWithin(sql,b,true);index} catch(_:SourceTaskConflict) {-1}
         }
-        RecordPackageActivities(tasks.exportWithin(sql).map {RecordPackageTask(it,index(it.sourceReceipt?.binding))},
+        return RecordPackageActivities(tasks.exportWithin(sql).map {RecordPackageTask(it,index(it.sourceReceipt?.binding))},
             proposals.exportWithin(sql).map {RecordPackageDraft(it,index(it.binding))},snapshot.records.map {it.sourceGeneration})
     }
     fun current(snapshot:OriginalExportSnapshot,a:RecordPackageActivities):Boolean {

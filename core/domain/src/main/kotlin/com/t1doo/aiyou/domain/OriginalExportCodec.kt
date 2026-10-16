@@ -3,7 +3,7 @@ package com.t1doo.aiyou.domain
 import com.t1doo.aiyou.model.*
 import java.security.MessageDigest
 
-/** Immutable bounded UTF-8 payload; no plaintext file/cache and no keys/attachments/tasks/history. */
+/** Immutable bounded UTF-8 payload; no plaintext file/cache. Each codec declares its exact scope. */
 class OriginalExportPayload internal constructor(val format: OriginalExportFormat, bytes: ByteArray) {
     private val bytes = bytes.copyOf()
     @Volatile private var released = false

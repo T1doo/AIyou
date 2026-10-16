@@ -22,6 +22,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.t1doo.aiyou.model.OriginalExportFormat
 import com.t1doo.aiyou.model.OriginalExports
+import com.t1doo.aiyou.model.RecordPackageActivities
+import com.t1doo.aiyou.model.ManualTaskStatus
+import com.t1doo.aiyou.model.ManualTaskOccurrence
 
 private class ExportPickerHandle { var launcher: ActivityResultLauncher<String>? = null }
 private class ExportDocumentContract(mimeType: String) : ActivityResultContracts.CreateDocument(mimeType) {
@@ -52,7 +55,7 @@ fun OriginalExportPicker(controller: OriginalExportController, ui: OriginalExpor
         }
         LaunchedEffect(requestKey, canLaunch) {
             if (canLaunch && currentOwner() && controller.claimPicker(ui.session, requestKey)) try {
-                checkNotNull(handle.launcher).launch("AIyou-current-originals." + ui.format.extension)
+                checkNotNull(handle.launcher).launch((if(ui.includeActivities) "AIyou-originals-and-activities." else "AIyou-current-originals.") + ui.format.extension)
             } catch (_: Exception) { controller.pickerFailed(ui.session, requestKey) }
         }
     }
@@ -74,17 +77,26 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
                 modifier = Modifier.heightIn(min = 48.dp).testTag("export-confirm-delete")) { Text("确认删除所选文件") } },
             dismissButton = { TextButton(onClick = { deletionKey = null }) { Text("保留文件") } })
     }
-    AlertDialog(onDismissRequest = { act { controller.close(ui.session) } }, title = { Text("导出选定原文") },
+    AlertDialog(onDismissRequest = { act { controller.close(ui.session) } }, title = { Text("开放格式导出") },
         text = { Column(Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(if (ui.format == OriginalExportFormat.MEDIA_ZIP)
                 "图文 ZIP 含选定当前原文、手工标签、原图、Markdown、JSONL 和哈希清单。不含历史版本、待办或密钥，不能用于完整恢复。最多 20 张图，单图 16 MiB，原图合计 64 MiB；缺图或损坏会使整个导出失败。"
+                else if(ui.includeActivities) "导出选定当前原文、手工标签，以及本机全部已保存正式待办和待确认草稿。正式待办包含未完成、已完成、已取消；草稿只含已保存 DRAFT，不含未保存表单或已处理历史。各最多 256 条，超限整体失败。不含附件、提醒、密钥或联网授权，不能用于完整恢复。"
                 else "仅导出选定当前原文和手工标签。不含附件、历史版本、待办或密钥，不能用于完整恢复。")
             Text("文件是明文。目的地可能是云盘，访问该文件的人可以读取内容。请自行选择可信位置；写入可能覆盖所选已有文件，建议创建新文件。")
+            Text("需要保密或跨设备恢复时，建议使用独立口令加密包。")
             if (ui.format == OriginalExportFormat.MEDIA_ZIP) Text("原图包含原始元数据，可能含拍摄位置等隐私。需要加密时请使用加密记录包。")
             if (!available) Text("本机记录暂不可读取，预览已隐藏；恢复记录后再继续。")
             when (ui.phase) {
                 OriginalExportPhase.SELECTING -> {
+                    if(ui.format != OriginalExportFormat.MEDIA_ZIP && local.tasks.supported && local.taskProposals.supported)
+                        Row(Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("export-include-activities")
+                            .toggleable(ui.includeActivities,role=Role.Checkbox,onValueChange={included -> act {controller.includeActivities(ui.session,included)}}),
+                            verticalAlignment=Alignment.CenterVertically) {
+                            Checkbox(ui.includeActivities,onCheckedChange=null)
+                            Text("包含全部正式待办与已保存待确认草稿（可不选原文）",Modifier.weight(1f))
+                        }
                     Text("请选择原文，最多 ${OriginalExports.MAX_RECORDS} 条；默认不选中。")
                     if (available) local.entries.forEach { entry ->
                         val checked = ui.selection.any { it.sourceId == entry.id }
@@ -142,6 +154,7 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
                     if (record.entry.originalText.codePointCount(0, record.entry.originalText.length) > 300)
                         Text("这里只预览前 300 字符，导出包含完整正文。")
                 }
+                ui.activities?.let { OpenActivityPreview(it) }
             }
             ui.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("export-error")) }
             ui.notice?.let { Text(it, Modifier.testTag("export-notice")) }
@@ -160,10 +173,12 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
                 } }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("export-choose")) { Text("选择导出目的地") }
             }
             if (!ui.busy && ui.phase != OriginalExportPhase.PICKING && !ui.hasFile && ui.phase != OriginalExportPhase.DONE && available)
-                OutlinedButton(enabled = ui.selection.isNotEmpty(), onClick = { act {
+                OutlinedButton(enabled = ui.selection.isNotEmpty() || ui.includeActivities, onClick = { act {
                     controller.prepare(ui.session, refreshCurrent = ui.phase != OriginalExportPhase.SELECTING)
                 } }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("export-prepare")) {
-                    Text(if (ui.phase == OriginalExportPhase.SELECTING) "预览选定原文" else "重新预览最新原文")
+                    Text(if(ui.includeActivities) {
+                        if(ui.phase == OriginalExportPhase.SELECTING) "预览选定内容" else "重新预览最新内容"
+                    } else if (ui.phase == OriginalExportPhase.SELECTING) "预览选定原文" else "重新预览最新原文")
                 }
             if (ui.hasFile && !ui.busy && ui.phase != OriginalExportPhase.DONE && ui.requestKey != null)
                 TextButton(onClick = { deletionKey = ui.requestKey }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
@@ -176,6 +191,31 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
             enabled = ui.phase != OriginalExportPhase.CLEANING, modifier = Modifier.heightIn(min = 48.dp).testTag("export-close")) {
             Text(if (ui.phase == OriginalExportPhase.WRITING || ui.phase == OriginalExportPhase.CANCELLING) "停止写入" else "关闭")
         } })
+}
+
+@Composable
+private fun OpenActivityPreview(a: RecordPackageActivities) {
+    Text("正式待办 ${a.tasks.size} 条；待确认草稿 ${a.drafts.size} 条；未完整包含来源 ${a.unavailableSources} 处。",Modifier.testTag("export-activity-summary"))
+    Text("草稿保留原始输入，不会自动确认或执行。未完整包含的来源只导出关联信息，不表示原文已删除或可在此文件中找到。")
+    a.tasks.forEach { item ->
+        val t=item.task
+        Column(Modifier.testTag("export-task:"+t.id)) {
+            Text(t.title)
+            Text("正式待办 · "+when(t.status) {ManualTaskStatus.OPEN->"未完成";ManualTaskStatus.COMPLETED->"已完成";ManualTaskStatus.CANCELLED->"已取消"})
+            Text(t.schedule?.let { s -> s.date.toString()+(s.time?.let {" $it"} ?: " · 仅日期")+" · "+s.timeZone+
+                s.offsetSeconds?.let {" · 偏移 "+java.time.ZoneOffset.ofTotalSeconds(it).id}.orEmpty()} ?: "未设日期和时刻")
+            Text(if(t.sourceReceipt==null) "独立手工待办，没有来源" else if(item.sourceRecord>=0) "来源完整匹配本次原文序号 ${item.sourceRecord}" else "来源未完整包含，仅保留关联信息")
+        }
+    }
+    a.drafts.forEach { item ->
+        val p=item.proposal
+        Column(Modifier.testTag("export-draft:"+p.id)) {
+            Text(p.titleInput.ifEmpty {"尚未填写标题"})
+            Text("待确认草稿 · 原输入："+p.dateInput.date+" "+p.dateInput.time+" · "+p.dateInput.timeZone)
+            Text("重复时刻选择："+when(p.dateInput.occurrence) {ManualTaskOccurrence.FIRST->"第一次";ManualTaskOccurrence.SECOND->"第二次";null->"未选择"})
+            Text(if(item.sourceRecord>=0) "来源完整匹配本次原文序号 ${item.sourceRecord}，仍未确认" else "来源未完整包含，仅保留关联信息")
+        }
+    }
 }
 
 private fun String.takeCodePoints(maximum: Int): String = substring(0, offsetByCodePoints(0, minOf(maximum, codePointCount(0, length))))

@@ -231,8 +231,8 @@ fun LocalRecordsScreen(
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("package-open")) { Text("加密原文包与恢复") }
                             NotebookPageHeader(destination.label, "${local.entries.size} 条本机记录", stackSummary, companion)
                             if (onBeginExport != null && local.supportsOriginalExport) OutlinedButton(onClick = onBeginExport, enabled = local.ready && !local.opening && local.error == null &&
-                                local.entries.isNotEmpty() && !local.saving && !local.savePending,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("export-open")) { Text("导出选定原文") }
+                                !local.saving && !local.savePending,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("export-open")) { Text("导出原文、待办与草稿") }
                             if (onOpenRecycleBin != null && local.supportsRecycleBin) TextButton(onClick = onOpenRecycleBin,
                                 enabled = local.ready && !local.opening && local.error == null && !local.saving && !local.savePending && local.originalExport == null,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("recycle-open")) { Text("回收站") }
