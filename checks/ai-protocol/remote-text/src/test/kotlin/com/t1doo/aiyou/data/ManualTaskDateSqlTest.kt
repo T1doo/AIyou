@@ -49,7 +49,8 @@ class ManualTaskDateSqlTest {
             val blob = f.blob("one")
             val forgedV2 = authenticatedTail(blob, "one", 1, "create-one")
             assertThrows(IllegalArgumentException::class.java) { cipher.open("one", 1, "create-one", forgedV2) }
-            assertThrows(IllegalArgumentException::class.java) { cipher.open("one", 1, "create-one", blob.copyOf().also { it[0] = 3 }) }
+            assertThrows(javax.crypto.AEADBadTagException::class.java) { cipher.open("one", 1, "create-one", blob.copyOf().also { it[0] = 3 }) }
+            assertThrows(IllegalArgumentException::class.java) { cipher.open("one", 1, "create-one", blob.copyOf().also { it[0] = 4 }) }
             assertThrows(Exception::class.java) { cipher.open("one", 1, "create-one", blob.copyOf().also { it[0] = 1 }) }
             f.db.write("UPDATE manual_tasks SET version=version+1,ciphertext=? WHERE id=?", forgedV2, created.id)
             assertThrows(ManualTaskStorageFailure::class.java) { f.store.snapshots() }

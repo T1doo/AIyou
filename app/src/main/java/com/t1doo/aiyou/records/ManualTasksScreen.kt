@@ -43,7 +43,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     onBeginDate: (String, Long, ManualTaskDateOperation) -> Unit = { _, _, _ -> },
     onEditDate: (Long, ManualTaskDateInput) -> Unit = { _, _ -> },
     onSaveDate: (Long, ManualTaskDateInput) -> Unit = { _, _ -> },
-    onCloseDate: (Long) -> Unit = {}, clock: Clock = Clock.systemUTC()) {
+    onCloseDate: (Long) -> Unit = {}, onSource: (String, Long) -> Unit = { _, _ -> }, clock: Clock = Clock.systemUTC()) {
     val tasks = local.tasks
     val storageReady = local.ready && !local.opening && local.error == null
     val available = storageReady && tasks.available && !tasks.loading
@@ -77,6 +77,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                             local.opening || tasks.loading -> Text("正在读取本机待办…")
                             tasks.busy -> Text("正在保存待办，尚未确认…")
                         }
+                        local.taskSourceNotice?.let { Text(it,modifier=Modifier.testTag("manual-task-source-notice")) }
                         tasks.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                         tasks.notice?.takeIf { available }?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
                         if (tasks.error != null && storageReady) TextButton(onClick = onRetry,
@@ -103,6 +104,11 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                                     Text(task.title, style = MaterialTheme.typography.bodyLarge)
                                     Text(manualTaskDateLabel(task), style = MaterialTheme.typography.bodySmall,
                                         modifier = Modifier.testTag("manual-task-date-" + task.id))
+                                    task.sourceReceipt?.let { receipt ->
+                                        Text("原文字面摘录 · 人工确认 · 原文版本 " + receipt.binding.source.revision)
+                                        TextButton(enabled=canChoose,onClick={onSource(task.id,task.version)},
+                                            modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("manual-task-source-"+task.id)) { Text("查看来源原文") }
+                                    }
                                     if (task.status == ManualTaskStatus.OPEN) FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                                         TextButton(onClick = { onBeginDate(task.id, task.version, ManualTaskDateOperation.SET) }, enabled = canChoose,
                                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-task-date-open-" + task.id)) {
@@ -123,7 +129,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                         }
                     }
                 }
-                item("proposals") { StatusNotice("没有待确认建议", "AI 候选确认尚未开放；原文与草稿不会自动变成正式待办。", state = ComponentState.EMPTY) }
+                item("proposals") { StatusNotice("没有待确认建议", if(local.supportsSourceTasks) "可从原文摘录手工创建待办；语义 AI 建议尚未开放，原文和草稿不会自动变成待办。" else "AI 候选确认尚未开放；原文与草稿不会自动变成正式待办。", state = ComponentState.EMPTY) }
             }
         }
     }
@@ -182,7 +188,7 @@ internal fun manualTaskDateLabel(task: ManualTaskSnapshot): String {
         " · " + due.timeZone + " · 没有系统提醒"
 }
 
-private class TaskDateFields(input: ManualTaskDateInput) {
+internal class TaskDateFields(input: ManualTaskDateInput) {
     val date = TextFieldState(input.date)
     val time = TextFieldState(input.time)
     val zone = TextFieldState(input.timeZone)
@@ -198,7 +204,7 @@ private class TaskDateFields(input: ManualTaskDateInput) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TaskDateFieldsView(fields: TaskDateFields, enabled: Boolean, onChanged: (ManualTaskDateInput) -> Unit) {
+internal fun TaskDateFieldsView(fields: TaskDateFields, enabled: Boolean, onChanged: (ManualTaskDateInput) -> Unit) {
     val changed by rememberUpdatedState(onChanged)
     LaunchedEffect(fields) { snapshotFlow { fields.current() }.collect { changed(it) } }
     // Foundation input, selection and Undo histories for all private fields stay memory-only.

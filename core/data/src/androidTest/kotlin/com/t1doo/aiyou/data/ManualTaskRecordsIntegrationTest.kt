@@ -19,6 +19,25 @@ import org.junit.runner.RunWith
 /** Formal Room/SQLCipher contracts; compilation/DEX inventory is never device acceptance. */
 @RunWith(AndroidJUnit4::class)
 class ManualTaskRecordsIntegrationTest {
+    @Test fun nativeSourceTaskReceiptSurvivesCompletionColdReopenAndRejectsChangedSourceLocation():Unit=runBlocking {
+        val store=open();val text="合成原文：明天三点只是引用，不推断日期。"
+        val entry=store.saveDraft(store.updateDraft(text),50,"UTC");val source=SourceVersion(entry.id,1)
+        val p=store.localProcessing.change(LocalProcessingChange(store.localProcessing.read(source),LocalProcessingChoice.AI_NONE,"none"))
+        val binding=TaskSourceBinding(source,p.sourceHash,p.generation,0,text.codePointCount(0,text.length))
+        val preview=store.sourceTasks.preview(binding)
+        val request=SourceTaskCreate(preview,ManualTaskCreate(SourceTasks.id(binding),"合成用户明确创建的任务",60,"UTC","create"))
+        val created=store.sourceTasks.create(request);assertNull(created.schedule)
+        val completed=store.manualTasks.change(ManualTaskMutation(created.id,1,ManualTaskStatus.COMPLETED,70,"complete"))
+        store.closeAndAwait();val cold=open()
+        assertEquals(completed,cold.sourceTasks.create(request));assertEquals(1,cold.manualTasks.snapshots().size)
+        var located:TaskSourceBinding?=null
+        assertTrue(cold.sourceTasks.locate(created.id,completed.version) { located=it });assertEquals(binding,located)
+        cold.revise(entry.id,1,"合成第二版，与旧来源不同",80)
+        assertThrows(SourceTaskConflict::class.java) { cold.sourceTasks.locate(created.id,completed.version) { fail("changed source") } }
+        assertEquals(completed,cold.sourceTasks.create(request))
+        assertEquals(ProcessingPolicy.AI_NONE,cold.entries().single().policy)
+        assertEquals(listOf(text,"合成第二版，与旧来源不同"),cold.revisions(entry.id).map { it.originalText })
+    }
     private lateinit var context: Context
     private lateinit var directory: File
     private val key = ByteArray(32) { (it + 43).toByte() }

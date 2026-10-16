@@ -142,6 +142,8 @@ fun OriginalReadingScreen(
     onMoveToRecycleBin: ((String, Int) -> Unit)? = null,
     location: OriginalReadingLocation? = null,
     requiredSource: OriginalReadingLocation? = null,
+    requiredSourceTitle: String = "回顾来源版本已变化",
+    requiredSourceMessage: String = "请返回回顾并重新生成，没有将新版本冒充旧摘录。",
     onSetFavorite: ((String, Int, String, Long, Boolean) -> Unit)? = null,
     onRetryFavorite: (String) -> Unit = {},
     onRefreshFavorites: () -> Unit = {},
@@ -149,6 +151,8 @@ fun OriginalReadingScreen(
     sourceTagController: SourceTagController? = null,
     sourceMemoryController: SourceMemoryController? = null,
     localProcessingController: LocalProcessingController? = null,
+    sourceTaskController: SourceTaskController? = null,
+    canUseSourceTask: () -> Boolean = { false },
     canUseCandidates: (String, Int) -> Boolean = { _, _ -> false },
     onCandidateLocation: (OriginalReadingLocation) -> Unit = {},
 ) {
@@ -167,8 +171,8 @@ fun OriginalReadingScreen(
                 entry == null -> StatusNotice("这条记录已不可用", local.recycleNotice ?: "它可能已被移除。返回列表查看当前记录。", state = ComponentState.EMPTY,
                     modifier = Modifier.verticalScroll(rememberScrollState()))
                 requiredSource!=null && (entry.id!=requiredSource.entryId || entry.currentRevision!=requiredSource.revision ||
-                    OriginalExports.hash(entry.originalText)!=requiredSource.contentHash) -> StatusNotice("回顾来源版本已变化",
-                    "请返回回顾并重新生成，没有将新版本冒充旧摘录。",state=ComponentState.ERROR,
+                    OriginalExports.hash(entry.originalText)!=requiredSource.contentHash) -> StatusNotice(requiredSourceTitle,
+                    requiredSourceMessage,state=ComponentState.ERROR,
                     modifier=Modifier.verticalScroll(rememberScrollState()))
                 else -> {
                     Text(metadataText ?: originalMetadata(entry), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
@@ -243,6 +247,11 @@ fun OriginalReadingScreen(
                                 enabled = local.supportsRecycleBin && !local.saving && !local.savePending && local.recycleBin == null,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-recycle-move")) { Text("移入回收站") }
                         }
+                        sourceTaskController?.let { controller ->
+                            TextButton(enabled=local.supportsSourceTasks&&!local.saving&&!local.savePending&&entry.originalText.isNotBlank(),
+                                onClick={if(canUseSourceTask()) controller.openOriginal(entry.id,entry.currentRevision)},
+                                modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("original-source-task")) { Text("从原文摘录创建待办") }
+                        }
                         localProcessingController?.let { controller ->
                             TextButton(enabled = local.supportsLocalProcessing && !local.saving && !local.savePending,
                                 onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
@@ -278,7 +287,10 @@ fun OriginalReadingScreen(
                     }
                     local.candidates?.takeIf { it.source.sourceId == entry.id && it.source.revision == entry.currentRevision.toLong() }?.let { ui ->
                         candidateController?.let { controller ->
-                            LocalCandidateDialog(ui, controller, { canUseCandidates(entry.id, entry.currentRevision) }, onCandidateLocation)
+                            LocalCandidateDialog(ui, controller, { canUseCandidates(entry.id, entry.currentRevision) }, onCandidateLocation,
+                                onTask = if(sourceTaskController==null||!local.supportsSourceTasks) null else { binding ->
+                                    if(canUseSourceTask()) { controller.close(ui.session);sourceTaskController.open(binding) }
+                                })
                         }
                     }
                     local.sourceTags?.takeIf { it.source.sourceId == entry.id && it.source.revision == entry.currentRevision.toLong() }?.let { ui ->
@@ -350,4 +362,8 @@ fun OriginalReadingScreen(
             }
         }
     }
+    local.sourceTask?.takeIf { it.binding.source.sourceId==entryId }?.let { ui ->
+        sourceTaskController?.let { SourceTaskDialog(ui,it,local.canUseTaskSource(ui.binding),canUseSourceTask) }
+    }
+
 }

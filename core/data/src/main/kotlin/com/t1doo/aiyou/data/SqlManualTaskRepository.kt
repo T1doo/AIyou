@@ -15,21 +15,23 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
         }
     }
     override fun create(request: ManualTaskCreate): ManualTaskSnapshot = safely {
-        database.transaction { sql ->
-            val expected = ManualTaskSnapshot(request.id, 1, request.title, ManualTaskStatus.OPEN,
-                request.createdAtMillis, request.creationTimeZone, request.createdAtMillis, request.schedule)
-            val old = row(sql, request.id)
-            if (old != null) {
-                if (old.mutationId != request.mutationId || old.payload.task != expected ||
-                    old.payload.requestedAtMillis != request.createdAtMillis ||
-                    old.payload.operation != null && old.payload.operation != "CREATE") throw ManualTaskConflict()
-                old.payload.task
-            } else {
-                val bytes = cipher.seal(expected, request.mutationId, request.createdAtMillis)
-                sql.execute("INSERT INTO manual_tasks(id,version,lastMutationId,ciphertext) VALUES(?,?,?,?)",
-                    listOf(request.id, 1, request.mutationId, bytes))
-                checkNotNull(row(sql, request.id)).payload.task.also { check(it == expected) }
-            }
+        database.transaction { sql -> createWithin(sql,request) }
+    }
+    internal fun readWithin(sql: RecordsSqlConnection,id: String): ManualTaskSnapshot? = row(sql,id)?.payload?.task
+    internal fun createWithin(sql: RecordsSqlConnection,request: ManualTaskCreate,receipt: SourceTaskReceipt? = null): ManualTaskSnapshot {
+        val expected = ManualTaskSnapshot(request.id, 1, request.title, ManualTaskStatus.OPEN,
+            request.createdAtMillis, request.creationTimeZone, request.createdAtMillis, request.schedule, receipt)
+        val old = row(sql, request.id)
+        return if (old != null) {
+            if (old.mutationId != request.mutationId || old.payload.task != expected ||
+                old.payload.requestedAtMillis != request.createdAtMillis ||
+                old.payload.operation != null && old.payload.operation != "CREATE") throw ManualTaskConflict()
+            old.payload.task
+        } else {
+            val bytes = cipher.seal(expected, request.mutationId, request.createdAtMillis)
+            sql.execute("INSERT INTO manual_tasks(id,version,lastMutationId,ciphertext) VALUES(?,?,?,?)",
+                listOf(request.id, 1, request.mutationId, bytes))
+            checkNotNull(row(sql, request.id)).payload.task.also { check(it == expected) }
         }
     }
     override fun change(request: ManualTaskMutation): ManualTaskSnapshot = safely {

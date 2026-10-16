@@ -120,6 +120,7 @@ class MainActivity : ComponentActivity() {
                 candidates = records.candidates,
                 sourceTags = records.sourceTags,
                 sourceMemories = records.sourceMemories,
+                sourceTasks = records.sourceTasks,
                 localProcessing = records.localProcessing,
                 onTagRemove = records.tags::remove, onTagRetry = records.tags::retry, onTagClose = records.tags::close,
                 onTaskBegin = records.tasks::begin, onTaskEdit = records.tasks::edit, onTaskCreate = records.tasks::create,
@@ -219,6 +220,7 @@ fun AIyouApp(
     candidates: com.t1doo.aiyou.records.LocalCandidateController? = null,
     sourceTags: com.t1doo.aiyou.records.SourceTagController? = null,
     sourceMemories: com.t1doo.aiyou.records.SourceMemoryController? = null,
+    sourceTasks: com.t1doo.aiyou.records.SourceTaskController? = null,
     localProcessing: com.t1doo.aiyou.records.LocalProcessingController? = null,
     onTaskBegin: () -> Unit = {},
     onTaskEdit: (Long, String) -> Unit = { _, _ -> },
@@ -260,6 +262,7 @@ fun AIyouApp(
     val memoriesList = rememberLazyListState()
     val recapList = remember { LazyListState() }
     var recapRoute by remember { mutableStateOf(false) }
+    var taskSourceRoute by remember { mutableStateOf(false) }
     DisposableEffect(factRecaps) { onDispose { factRecaps?.close() } }
     val currentLocal by rememberUpdatedState(local)
     val currentRecordsProvider by rememberUpdatedState(currentRecords)
@@ -304,6 +307,7 @@ fun AIyouApp(
     var readerFromSearch by remember { mutableStateOf(false) }
     var searchLocation by remember { mutableStateOf<com.t1doo.aiyou.records.OriginalReadingLocation?>(null) }
     fun clearSearch() {
+        taskSourceRoute=false
         search.clear()
         searchQuery.edit { replace(0, length, "") }
         searchFrom.edit { replace(0, length, "") }
@@ -465,6 +469,7 @@ fun AIyouApp(
     val openEntry: (String) -> Unit = { id ->
         if (ownsNavigation() && selectedName == origin.name && !showSettings && !demo && detailEntryId == null &&
             navigation.tryAdvance(generation)) {
+            taskSourceRoute=false
             readerFromSearch = origin == Destination.MEMORIES && searchState.stage == OriginalSearchStage.READY
             search.pause()
             tailReturnRequest = null
@@ -724,11 +729,15 @@ fun AIyouApp(
                 onStartAi = onStartAiSession, onStopAi = onStopAiSession, onCloseAi = onCloseAiSession,
                 onOpenTags = { id, revision -> if (canCopy(id, revision)) onOpenTags(id, revision) },
                 location = searchLocation,
-                requiredSource = if(recapRoute) searchLocation else null,
+                requiredSource = if(recapRoute||taskSourceRoute) searchLocation else null,
+                requiredSourceTitle = if(taskSourceRoute) "待办来源版本已变化" else "回顾来源版本已变化",
+                requiredSourceMessage = if(taskSourceRoute) "请返回待办重新核对来源，没有将新版本冒充旧摘录。" else "请返回回顾并重新生成，没有将新版本冒充旧摘录。",
                 candidateController = candidates,
                 sourceTagController = sourceTags,
                 sourceMemoryController = sourceMemories,
                 localProcessingController = localProcessing,
+                sourceTaskController = sourceTasks,
+                canUseSourceTask = { ownsNavigation() && detailEntryId == readerId && selectedName == origin.name && !showSettings && !demo },
                 canUseCandidates = canCopy,
                 onCandidateLocation = { location ->
                     if (canCopy(location.entryId, location.revision)) {
@@ -780,7 +789,17 @@ fun AIyouApp(
                 onBeginDate = { id, version, operation -> if (ownsTasks()) onTaskBeginDate(id, version, operation) },
                 onEditDate = { session, input -> if (ownsTasks()) onTaskEditDate(session, input) },
                 onSaveDate = { session, input -> if (ownsTasks()) onTaskSaveDate(session, input) },
-                onCloseDate = { session -> if (ownsTasks()) onTaskCloseDate(session) }, clock = taskClock)
+                onCloseDate = { session -> if (ownsTasks()) onTaskCloseDate(session) },
+                onSource = { id,version -> if(ownsTasks()) {
+                    val token=generation
+                    sourceTasks?.locate(id,version) { binding -> navigation.publish(token) {
+                        if(ownsTasks() && detailEntryId==null) {
+                            navigation.advance();clearSearch();recapRoute=false;selectedName=Destination.MEMORIES.name
+                            searchLocation=com.t1doo.aiyou.records.OriginalReadingLocation(binding.source.sourceId,binding.source.revision.toInt(),binding.sourceHash,binding.start,binding.end)
+                            taskSourceRoute=true;detailEntryId=binding.source.sourceId
+                        }
+                    } }
+                } }, clock = taskClock)
         } else if (!demo && local != null && selected==Destination.NOW && local.supportsMixedCapture && mixedCapture!=null) {
             com.t1doo.aiyou.records.MixedCapturePicker(mixedCapture,local.mixedCapture?.selection)
             com.t1doo.aiyou.records.MixedCaptureScreen(local,mixedCapture,modifier)

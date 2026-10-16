@@ -37,6 +37,9 @@ data class CaptureDiscardUiState(val requestId: Long, val busy: Boolean = false,
     val recovering: Boolean = false, val recoveryFailed: Boolean = false)
 
 data class LocalRecordUiState(
+    val supportsSourceTasks: Boolean = false,
+    val sourceTask: SourceTaskUiState? = null,
+    val taskSourceNotice: String? = null,
     val supportsLocalProcessing: Boolean = false,
     val localProcessingVersions: Map<String, com.t1doo.aiyou.domain.LocalProcessingVersion> = emptyMap(),
     val localProcessingAvailable: Boolean = true,
@@ -119,6 +122,8 @@ class LocalRecordsViewModel internal constructor(
     private val mutableState = MutableStateFlow(LocalRecordUiState())
     val state = mutableState.asStateFlow()
     private val commands = Channel<Command>(Channel.UNLIMITED)
+    val sourceTasks = SourceTaskController({ mutableState.value }, { change -> update(change) },
+        { action -> commands.trySend(Command.ManualTasks(action)).isSuccess },clock, { tasks.refresh() })
     val localProcessing = LocalProcessingController({ mutableState.value }, { change -> update(change) },
         { action -> commands.trySend(Command.LocalProcessing(action)).isSuccess }, ::retireDerived)
     val factRecaps = FactRecapController({ mutableState.value }, { change -> update(change) },
@@ -301,6 +306,7 @@ class LocalRecordsViewModel internal constructor(
                 }
             } finally {
                 editsDisposed = true
+                sourceTasks.dispose()
                 localProcessing.dispose()
                 factRecaps.dispose()
                 mixedCapture.dispose()
@@ -1063,6 +1069,7 @@ class LocalRecordsViewModel internal constructor(
             val searchEpoch = try { store.localSearch?.epoch() }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             update { it.copy(ready = true, opening = false, text = persistedDraft?.text.orEmpty(),
+                supportsSourceTasks = store.sourceTasks != null && store.localProcessing != null && store.manualTasks != null,
                 supportsLocalProcessing = store.localProcessing != null,
                 localProcessingVersions = processingVersions.orEmpty(), localProcessingAvailable = processingVersions != null,
                 supportsFactRecaps = store.factRecaps != null,
@@ -1150,6 +1157,7 @@ class LocalRecordsViewModel internal constructor(
     }
     /** Retires memory-only authority before a policy write or after observing a generation change. */
     private fun retireDerived(id: String) {
+        sourceTasks.invalidateSource(id)
         mutableState.value.candidates?.takeIf { it.source.sourceId == id }?.let { candidates.close(it.session) }
         mutableState.value.sourceTags?.takeIf { it.source.sourceId == id }?.let { sourceTags.close(it.session) }
         mutableState.value.sourceMemories?.takeIf { it.source.sourceId == id }?.let { sourceMemories.close(it.session) }
@@ -1206,6 +1214,7 @@ class LocalRecordsViewModel internal constructor(
 
     override fun onCleared() {
         editsDisposed = true
+        sourceTasks.dispose()
         localProcessing.dispose()
         factRecaps.dispose()
         mixedCapture.dispose()

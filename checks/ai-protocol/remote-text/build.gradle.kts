@@ -5,6 +5,7 @@ kotlin { jvmToolchain(17) }
 // Compile the product transaction/codec/schema, with only the platform SQL adapter replaced.
 val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
+    from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlSourceTaskRepository.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlLocalProcessingRepository.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlFactRecapRepository.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RemoteTextTransactions.kt")
@@ -45,6 +46,7 @@ val vmProduction = layout.buildDirectory.dir("vm-production-test-sources")
 val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
     from("../../../app/src/main/java/com/t1doo/aiyou/records/FactRecapController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalProcessingController.kt")
+    from("../../../app/src/main/java/com/t1doo/aiyou/records/SourceTaskController.kt")
     listOf("MixedCaptureController.kt", "LocalOriginalSearchController.kt", "LocalOriginalSearchMatcher.kt", "RecordPackageController.kt", "RecordPackageIo.kt", "RecycleBinController.kt", "OriginalExportController.kt", "OriginalExportIo.kt", "ManualTaskController.kt", "ManualTagController.kt", "RecordFavoriteController.kt", "LocalRecordsViewModel.kt", "OriginalEditUiState.kt", "OriginalHistoryUiState.kt",
         "LocalAttachmentController.kt", "PngPayloadValidator.kt", "JpegPayloadValidator.kt",
         "LocalRecordAiController.kt", "RecordAiCapability.kt", "RecordAiUiState.kt", "LocalCandidateController.kt", "SourceTagController.kt", "SourceMemoryController.kt").forEach { name ->

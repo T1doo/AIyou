@@ -23,6 +23,7 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
     fun seal(task: ManualTaskSnapshot, mutationId: String, requestedAtMillis: Long,
         operation: String = if (task.version == 1L) "CREATE" else "STATUS"): ByteArray {
         validateOperation(task, operation)
+        val format=if(task.sourceReceipt==null) 2 else 3
         val plain = ByteArrayOutputStream().use { bytes ->
             DataOutputStream(bytes).use { out ->
                 writeText(out, task.title); writeText(out, task.status.name)
@@ -35,6 +36,12 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
                     out.writeByte(if (due.time == null) 0 else 1)
                     due.time?.let { writeText(out, it.toString()); out.writeInt(checkNotNull(due.offsetSeconds)) }
                 }
+                if(format==3) out.writeBoolean(true)
+                task.sourceReceipt?.let { receipt ->
+                    val b = receipt.binding
+                    writeText(out,b.source.sourceId);out.writeLong(b.source.revision);writeText(out,b.sourceHash)
+                    out.writeLong(b.generation);out.writeInt(b.start);out.writeInt(b.end);writeText(out,receipt.requestHash)
+                }
             }
             bytes.toByteArray()
         }
@@ -42,13 +49,13 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
         return try {
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, nonce))
-            cipher.updateAAD(aad(task.id, task.version, mutationId, 2))
-            byteArrayOf(2) + nonce + cipher.doFinal(plain)
+            cipher.updateAAD(aad(task.id, task.version, mutationId, format))
+            byteArrayOf(format.toByte()) + nonce + cipher.doFinal(plain)
         } finally { plain.fill(0) }
     }
     fun open(id: String, version: Long, mutationId: String, bytes: ByteArray): Payload {
         require(bytes.size in 29..4096)
-        val format = bytes[0].toInt(); require(format == 1 || format == 2)
+        val format = bytes[0].toInt(); require(format in 1..3)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, bytes.copyOfRange(1, 13)))
         cipher.updateAAD(aad(id, version, mutationId, format))
@@ -59,7 +66,7 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
                     input.readLong(), readText(input, 128), input.readLong())
                 val requested = input.readLong()
                 val operation = if (format == 1) null else readText(input, 8)
-                if (format == 2) {
+                if (format >= 2) {
                     val hasSchedule = input.readUnsignedByte(); require(hasSchedule in 0..1)
                     if (hasSchedule == 1) {
                         val date = java.time.LocalDate.parse(readText(input, 10))
@@ -70,6 +77,14 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
                         task = task.copy(schedule = ManualTaskSchedule(date, time, zone, offset))
                     }
                     validateOperation(task, checkNotNull(operation))
+                }
+                if (format == 3) {
+                    val hasSource=input.readUnsignedByte();require(hasSource in 0..1)
+                    if(hasSource==1) {
+                        val source=SourceVersion(readText(input,512),input.readLong())
+                        val b=TaskSourceBinding(source,readText(input,64),input.readLong(),input.readInt(),input.readInt())
+                        task=task.copy(sourceReceipt=SourceTaskReceipt(b,readText(input,64)))
+                    }
                 }
                 require(requested in 0..task.updatedAtMillis && input.available() == 0)
                 Payload(task, requested, operation)
@@ -98,7 +113,7 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
     }
     private fun aad(id: String, version: Long, mutationId: String, format: Int) = ByteArrayOutputStream().use { bytes ->
         DataOutputStream(bytes).use { out ->
-            out.writeUTF(if (format == 1) "AIyou manual tasks v1" else "AIyou manual tasks v2")
+            out.writeUTF("AIyou manual tasks v" + format)
             out.writeUTF(id); out.writeLong(version); out.writeUTF(mutationId)
         }
         bytes.toByteArray()

@@ -13,6 +13,7 @@ data class ManualTaskSnapshot(
     val id: String, val version: Long, val title: String, val status: ManualTaskStatus,
     val createdAtMillis: Long, val creationTimeZone: String, val updatedAtMillis: Long,
     val schedule: ManualTaskSchedule? = null,
+    val sourceReceipt: SourceTaskReceipt? = null,
 ) {
     init {
         ManualTags.identifier(id)

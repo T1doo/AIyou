@@ -22,7 +22,7 @@ internal val LocalCandidateDialogObserver = staticCompositionLocalOf<CandidateDi
 
 @Composable
 internal fun LocalCandidateDialog(ui: LocalCandidateUiState, controller: LocalCandidateController,
-    canUse: () -> Boolean, onLocate: (OriginalReadingLocation) -> Unit) {
+    canUse: () -> Boolean, onLocate: (OriginalReadingLocation) -> Unit, onTask: ((TaskSourceBinding) -> Unit)? = null) {
     val windowHeight = LocalWindowInfo.current.containerSize.height
     val maxHeight = with(LocalDensity.current) { windowHeight.toDp() * 0.9f }
     DisposableEffect(controller, ui.session) { onDispose { controller.close(ui.session) } }
@@ -85,6 +85,13 @@ internal fun LocalCandidateDialog(ui: LocalCandidateUiState, controller: LocalCa
                                                 ExcerptReview.ACCEPTED -> "已采纳摘录"
                                                 ExcerptReview.REJECTED -> "已拒绝摘录"
                                             }, modifier = Modifier.testTag("local-candidate-review-" + suffix))
+                                            onTask?.let { task ->
+                                                TextButton(enabled=!ui.busy&&ui.pending==null,onClick={
+                                                    if(allowed()) controller.sourceReference(ui.session,batch.id,batch.version,item.id)?.let { ref ->
+                                                        task(TaskSourceBinding(ref.source,batch.sourceHash,batch.generation,ref.start,ref.end))
+                                                    }
+                                                },modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("local-candidate-task-"+suffix)) { Text("据此手工创建待办") }
+                                            }
                                             TextButton(enabled = !ui.busy && ui.pending == null,
                                                 onClick = {
                                                     if (allowed()) controller.sourceReference(ui.session, batch.id, batch.version, item.id)?.let { reference ->

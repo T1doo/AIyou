@@ -99,6 +99,11 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.SourceTaskPresentationTest"] = (
+            "narrowDoubleFontLiteralFlowRequiresSeparateConfirmationAndJumpsToExactOriginal",
+            "unknownReadbackHasNoSuccessAndRetriesSameRequestWithoutDuplicatingTask",
+            "sourceReadFailureAndRevisionRefreshHideQuoteAndConfirmationButRetainInput",
+            "cancelledRestoredAndNavigatedConfirmationsCannotReusePrivateSourceOrInput")
         additional["com.t1doo.aiyou.OriginalEditRecoveryPresentationTest"] = (
             "aiNoneColdDraftRecoveryAllowsExplicitManualSaveWithoutChangingPolicy",
             "aiNoneHistoryRouteCreatesOnlyAnExplicitNewVersionAndKeepsNoInferencePolicy")
