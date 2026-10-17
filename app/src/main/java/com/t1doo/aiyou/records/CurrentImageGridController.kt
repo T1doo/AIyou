@@ -18,7 +18,8 @@ class ImageGridState internal constructor(internal val owner: OriginalSearchStat
 }
 
 /** Uses the existing records IO queue and authenticated AttachmentStore.read path.
- * One queued/in-flight read, no prefetch, no retry loop and no full-result image cache.
+ * One queued/in-flight read, no prefetch or retry loop while a tile stays visible.
+ * Leaving the visible set evicts its tile; reentry can read it again. No full-result image cache.
  * A request retains at most 12 visible 256px ARGB thumbnails (3 MiB); a decoder may
  * additionally own one 256 KiB unpublished thumbnail. The reused 16 MiB source
  * bound and PNG validator's bounded workspace are separate from the bitmap budget.

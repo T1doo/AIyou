@@ -16,6 +16,7 @@ class CurrentImageGridControllerTest {
         h.enter(listOf(h.ids[2], h.ids[0])); assertEquals(1, h.queue.size)
         h.drain()
         assertEquals(listOf(h.ids[0], h.ids[2]), h.reads.map { h.rows.getValue(it).intent.entryId })
+        assertEquals(listOf("10000000-0000-4000-8000-000000000000", "10000000-0000-4000-8000-000000000004"), h.reads)
         assertEquals(setOf(h.ids[0], h.ids[2]), h.controller.visible(h.search).tiles.keys)
         assertTrue(h.delivered.all { bytes -> bytes.all { it == 0.toByte() } })
         assertTrue(h.controller.visible(h.search).tiles.values.all { it.picture != null })
@@ -35,6 +36,29 @@ class CurrentImageGridControllerTest {
         assertTrue(h.reads.isEmpty()); assertEquals(0, h.decodes)
         assertEquals(h.ids.toSet(), h.controller.state.value.tiles.keys)
         assertTrue(h.controller.state.value.tiles.values.all { it.failed && it.picture == null })
+    }
+
+    @Test fun smallestCorruptOrFailedImageIsNotReplacedByHealthyLargerId(): Unit = runBlocking {
+        for (state in listOf("CORRUPT", "FAILED")) Harness(attachmentState = state, healthySecond = true).use { h ->
+            assertEquals(AttachmentState.READY, h.rows.getValue("10000000-0000-4000-8000-000000000001").state)
+            assertEquals(AttachmentState.valueOf(state), h.rows.getValue("10000000-0000-4000-8000-000000000000").state)
+            h.enter(h.ids); h.drain()
+            assertTrue(h.controller.state.value.tiles.values.single().failed)
+            assertNull(h.controller.state.value.tiles.values.single().picture)
+            assertTrue(h.reads.isEmpty()); assertEquals(0, h.decodes)
+        }
+    }
+
+    @Test fun failedVisibleTileDoesNotLoopButLeavingAndReenteringRetriesOnce(): Unit = Harness().use { h ->
+        h.failRead = true
+        h.enter(h.ids); h.drain()
+        repeat(10) { h.enter(h.ids); h.drain() }
+        assertEquals(listOf("10000000-0000-4000-8000-000000000000"), h.reads)
+        h.enter(emptyList()); assertTrue(h.controller.state.value.tiles.isEmpty())
+        h.enter(h.ids); h.drain()
+        repeat(10) { h.enter(h.ids); h.drain() }
+        assertEquals(List(2) { "10000000-0000-4000-8000-000000000000" }, h.reads)
+        assertTrue(h.controller.state.value.tiles.values.single().failed)
     }
 
     @Test fun inputChangeBeforeNextSyncRejectsLateDecodedPictureAndReleasesIt(): Unit = Harness().use { h ->
@@ -130,7 +154,7 @@ class CurrentImageGridControllerTest {
         override fun releaseUnpublished() { check(!released); released = true }
     }
 
-    private class Harness(count: Int = 1, attachmentState: String = "READY") : AutoCloseable {
+    private class Harness(count: Int = 1, attachmentState: String = "READY", healthySecond: Boolean = false) : AutoCloseable {
         val f = RecordEventDateFixture()
         val ids = (1..count).map { "00000000-0000-4000-8000-${it.toString().padStart(12, '0')}" }
         val rows = linkedMapOf<String, LocalAttachment>()
@@ -174,11 +198,12 @@ class CurrentImageGridControllerTest {
             ids.forEachIndexed { index, id ->
                 f.entry(id, if (index == 0) "" else "合成图片原文")
                 // Two same-version pictures; only the stable smaller ID may be read.
-                for (extra in 0..1) {
+                for (extra in listOf(1, 0)) {
                     val image = "10000000-0000-4000-8000-${(index * 2 + extra).toString().padStart(12, '0')}"
-                    val item = LocalAttachment(AttachmentIntent(image, id, 1, "image/png", LocalAttachmentController.hash(payload), payload.size.toLong()), AttachmentState.valueOf(attachmentState))
+                    val state = if (healthySecond && extra == 1) "READY" else attachmentState
+                    val item = LocalAttachment(AttachmentIntent(image, id, 1, "image/png", LocalAttachmentController.hash(payload), payload.size.toLong()), AttachmentState.valueOf(state))
                     rows[image] = item
-                    f.db.write("INSERT INTO attachments VALUES(?,?,1,'image/png',?,?,?)", image, id, item.intent.sha256, item.intent.byteSize, attachmentState)
+                    f.db.write("INSERT INTO attachments VALUES(?,?,1,'image/png',?,?,?)", image, id, item.intent.sha256, item.intent.byteSize, state)
                 }
             }
             f.drain()
