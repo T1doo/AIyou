@@ -13,6 +13,34 @@ import org.junit.Test
 
 /** Actual controllers/VM and product encrypted capture SQL, on owned host fixtures. */
 class CaptureDiscardRecoveryTest {
+    @Test fun rejectedClearRetryReportsUnknownResultWhilePreservingOriginalIdentityAndANewerDraft():Unit=runBlocking {
+        Harness().use { h ->
+            h.start();h.c.edit(OLD);h.drain();h.add()
+            val old=h.ui.draft!!.id
+            h.loseDiscardAck=true;h.c.requestDiscard();h.c.confirmDiscard();h.drain()
+            assertTrue(h.ui.discardPending);assertNotNull(h.ui.error)
+            val fresh=h.repo.current();assertNotEquals(old,fresh.id)
+            val text=h.repo.edit(fresh,OTHER)
+            val newer=h.repo.add(text,MixedCaptureSqlTest.intent(text),MixedCaptureSqlTest.png)
+            val image=newer.images.single().intent
+            h.acceptQueue=false;h.c.confirmDiscard()
+            assertTrue(h.ui.discardPending);assertFalse(h.ui.busy)
+            assertTrue("An unacknowledged clear must remain unknown after queue rejection",h.ui.error.orEmpty().contains("清空结果仍待核对"))
+            assertFalse("A rejected retry cannot promise the cleared text/images were retained",h.ui.error.orEmpty().contains("已保留"))
+            h.c.cancelDiscard();h.c.edit(NEW);h.c.select();h.c.remove(image.id);h.c.metadata(false);h.c.save();h.drain()
+            assertEquals(OLD,h.ui.text);assertNull(h.ui.selection);assertTrue(h.ui.retainJpegMetadata)
+            assertEquals(0,h.removes);assertEquals(0,h.saves);assertEquals(listOf(old),h.discards)
+            assertDraft(newer,h.repo.current());assertArrayEquals(MixedCaptureSqlTest.png,h.repo.image(newer,image.id))
+            h.acceptQueue=true;h.c.refresh();h.drain()
+            assertEquals(listOf(old,old),h.discards)
+            assertFalse(h.ui.discardPending);assertNull(h.ui.error)
+            assertEquals(newer.id,h.ui.draft!!.id);assertEquals(OTHER,h.ui.text)
+            assertDraft(newer,h.repo.current());assertArrayEquals(MixedCaptureSqlTest.png,h.repo.image(newer,image.id))
+            h.c.confirmDiscard();h.drain();assertEquals(listOf(old,old),h.discards)
+            assertDraft(newer,h.repo.current());assertArrayEquals(MixedCaptureSqlTest.png,h.repo.image(newer,image.id))
+        }
+    }
+
     @Test(timeout=20_000) fun realVmLostDiscardAckPausesNewInputAndRefreshVerifiesOriginalClearBeforeAnotherSave():Unit=runBlocking {
         Harness().use { h ->
             val vm=LocalRecordsViewModel(Application(),{h.store})

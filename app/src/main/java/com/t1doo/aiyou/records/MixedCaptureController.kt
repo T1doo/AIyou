@@ -133,7 +133,8 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         val u=ui() ?: return
         if(!available() || u.busy || u.selection!=null || u.uncertainSave || u.pendingEdits>0 || (u.discardPending && !resetText)) return
         update { it.copy(busy=true,discardPending=it.discardPending || resetText) }
-        val accepted=submit { store ->
+        val accepted=submit(if(resetText && u.discardPending)
+            "本机队列暂不可用，清空结果仍待核对。请稍后核对同一次清空，再继续记录。" else null) { store ->
             try {
                 val expected=if(resetText) pendingDiscard ?: checkNotNull(binding).also { pendingDiscard=it } else checkNotNull(binding)
                 val result=operation(store,expected);binding=result;clearPrepared()
@@ -194,9 +195,9 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         try { val a=store.captureRecords!!.current();if(a.id==binding?.id) { binding=a;update { it.copy(draft=a) } } }
         catch(e:CancellationException){throw e} catch(_:Exception) { /* Preserve acknowledged binding and current input. */ }
     }
-    private fun submit(action:suspend(EntryRepository)->Unit):Boolean {
+    private fun submit(rejectionMessage:String?=null,action:suspend(EntryRepository)->Unit):Boolean {
         if(enqueue(action)) return true
-        update { it.copy(busy=false,error="本机操作暂不可用，文字和已选图片已保留。请重试。") };return false
+        update { it.copy(busy=false,error=rejectionMessage ?: "本机操作暂不可用，文字和已选图片已保留。请重试。") };return false
     }
     private fun owns(id: String,request: Long)=available() && ui()?.draft?.id==id && ui()?.selection?.requestId==request
     private fun clearPrepared() { prepared?.second?.fill(0);prepared=null }
