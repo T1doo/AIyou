@@ -139,7 +139,7 @@ fun OriginalReadingScreen(
     onStopAi: (Long) -> Unit = {},
     onCloseAi: (Long) -> Unit = {},
     onOpenTags: ((String, Int) -> Unit)? = null,
-    onOpenPeople: ((String, Int) -> Unit)? = null,
+    onOpenPeople: ((ManualPeopleReadingSource) -> Unit)? = null,
     onMoveToRecycleBin: ((String, Int) -> Unit)? = null,
     location: OriginalReadingLocation? = null,
     requiredSource: OriginalReadingLocation? = null,
@@ -256,8 +256,10 @@ fun OriginalReadingScreen(
                         if (local.supportsManualPeople) {
                             Text(if (local.manualPeopleAvailable) local.manualPeople[entry.id]?.names?.takeIf { it.isNotEmpty() }
                                 ?.joinToString("、", prefix = "关联人物：") ?: "尚未关联人物" else "人物关联暂不可读取")
-                            onOpenPeople?.let { open -> TextButton(onClick = { open(entry.id, entry.currentRevision) },
-                                enabled = !local.saving && !local.savePending,
+                            val peopleSource = local.manualPeopleReadingSource(entry.id, entry.currentRevision)
+                            if (peopleSource == null) Text("人物编辑来源暂不可核对，请返回列表重试本机读取。")
+                            onOpenPeople?.let { open -> TextButton(onClick = { peopleSource?.let(open) },
+                                enabled = peopleSource != null && !local.saving && !local.savePending,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-manual-people")) { Text("关联／移除人物") } }
                         }
                         onOpenTags?.let { openTags ->

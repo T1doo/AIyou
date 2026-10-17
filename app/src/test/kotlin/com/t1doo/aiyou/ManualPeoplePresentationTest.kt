@@ -47,6 +47,11 @@ class ManualPeoplePresentationTest {
     }
     private val store=object:EntryRepository {
         override val manualPeople=people
+        override val localProcessing:LocalProcessingRepository=object:LocalProcessingRepository {
+            override fun read(source:SourceVersion):LocalProcessingSnapshot {val entry=entries.single{it.id==source.sourceId};return LocalProcessingSnapshot(source,OriginalExports.hash(entry.originalText),0,entry.policy)}
+            override fun versions()=entries.associate{it.id to LocalProcessingVersion(SourceVersion(it.id,it.currentRevision.toLong()),0)}
+            override fun change(request:LocalProcessingChange)=error("Outside presentation contract")
+        }
         override suspend fun entries()=entries
         override suspend fun readDraft()=TextDraft("capture",1,"合成独立草稿")
         override suspend fun updateDraft(text:String)=error("Outside presentation contract")
@@ -103,7 +108,8 @@ class ManualPeoplePresentationTest {
         assertNull(state.value.manualPeopleEditor)
     }
     private fun content(large:Boolean=false){
-        state.value=state.value.copy(supportsManualPeople=true,manualPeopleOwner=people,manualPeopleAvailable=true,manualPeople=persisted.toMap())
+        state.value=state.value.copy(supportsManualPeople=true,manualPeopleOwner=people,manualPeopleAvailable=true,manualPeople=persisted.toMap(),
+            localProcessingAvailable=true,localProcessingVersions=store.localProcessing.versions())
         compose.setContent{
             registry=LocalSaveableStateRegistry.current;val density=LocalDensity.current
             CompositionLocalProvider(LocalOriginalSearchObserver provides observer,LocalOriginalReadingObserver provides reader,LocalDensity provides if(large)Density(density.density,2f)else density){

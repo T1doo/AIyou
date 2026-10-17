@@ -78,11 +78,12 @@ class ManualPeopleViewModelTest {
     @Test fun accountOwnerSwapAndRetainedCallbacksCannotWriteOrBackfillAnotherOwner(): Unit = runBlocking {
         ManualPeopleFixture().use { f ->
             val id=f.base.entry();var local=LocalRecordUiState(ready=true,opening=false,entries=f.base.search.candidates(LocalSearchRequest("")).entries,
-                supportsManualPeople=true,manualPeopleOwner=f.people)
+                supportsManualPeople=true,manualPeopleOwner=f.people,localProcessingAvailable=true,
+                localProcessingVersions=SqlLocalProcessingRepository(f.base.gateway).versions())
             val queue=ArrayDeque<suspend(EntryRepository)->Unit>()
             val controller=ManualPeopleController({local},{local=it(local)},{queue.add(it);true})
             val base=SqliteVmEntryRepository(f.base.db,f.base.gateway,RemoteTextTransactions(f.base.gateway)){}
-            val store=object:EntryRepository by base {override val manualPeople=f.people}
+            val store=object:EntryRepository by base {override val manualPeople=f.people;override val localProcessing=SqlLocalProcessingRepository(f.base.gateway)}
             controller.open(id,1);queue.removeFirst()(store)
             val editor=checkNotNull(local.manualPeopleEditor);controller.add(editor.session,0,"旧账号输入")
             val foreign=object:ManualPeopleRepository by f.people{}
@@ -150,20 +151,113 @@ class ManualPeopleViewModelTest {
         assertEquals(listOf("恢复后新会话明确添加"),h.f.people.read(h.id).names)
     } }
 
+    @Test(timeout=15_000) fun firstReadQueuedBeforeTrashRestoreCannotGrantAnEmptyEditorNewSourceAuthority(): Unit = Harness().use { h -> runBlocking {
+        h.ready();assertTrue(h.vm.state.value.supportsLocalProcessing)
+        val before=h.vm.state.value.localProcessingVersions.getValue(h.id).generation
+        val entered=CountDownLatch(1);val release=CountDownLatch(1)
+        h.holdRead={entered.countDown();check(release.await(5,TimeUnit.SECONDS))}
+        h.vm.people.open(h.id,1)
+        try {assertTrue(entered.await(5,TimeUnit.SECONDS));h.trashRestoreIndependently()}finally{release.countDown()}
+        val loaded=h.editor{!it.busy};h.holdRead=null
+        h.vm.people.add(loaded.session,loaded.snapshot?.version ?: 0,"首次读回后才输入的名称")
+        h.refreshToRevision(1)
+        assertTrue("First read must not obtain the restored generation",h.f.people.read(h.id).names.isEmpty())
+        assertTrue(h.mutations.isEmpty());assertTrue(loaded.conflict);assertNull(loaded.snapshot)
+        h.vm.people.close(loaded.session);val fresh=h.open()
+        assertTrue(fresh.snapshot!!.generation>before)
+        h.vm.people.add(fresh.session,0,"刷新后新会话明确添加");h.editor{it.notice!=null&&!it.busy}
+        assertEquals(listOf("刷新后新会话明确添加"),h.f.people.read(h.id).names)
+    } }
+
+    @Test(timeout=15_000) fun firstReadQueuedBeforeTrashRestoreCannotRemovePreviouslyPreservedNames(): Unit = Harness().use { h -> runBlocking {
+        h.ready();h.f.people.replace(h.f.mutation(h.id,listOf("原先手工关联")));h.refreshToRevision(1)
+        val entered=CountDownLatch(1);val release=CountDownLatch(1)
+        h.holdRead={entered.countDown();check(release.await(5,TimeUnit.SECONDS))};h.vm.people.open(h.id,1)
+        try{assertTrue(entered.await(5,TimeUnit.SECONDS));h.trashRestoreIndependently()}finally{release.countDown()}
+        val loaded=h.editor{!it.busy};h.holdRead=null
+        h.vm.people.remove(loaded.session,loaded.snapshot?.version ?: 1,"原先手工关联","")
+        h.refreshToRevision(1)
+        assertEquals("Old first-read session must not remove names after restore",listOf("原先手工关联"),h.f.people.read(h.id).names)
+        assertTrue(h.mutations.isEmpty());assertTrue(loaded.conflict)
+        h.vm.people.close(loaded.session);val fresh=h.open()
+        h.vm.people.remove(fresh.session,1,"原先手工关联","");h.editor{it.notice!=null&&!it.busy}
+        assertTrue(h.f.people.read(h.id).names.isEmpty())
+    } }
+
+    @Test(timeout=15_000) fun firstReadFailureThenTrashRestoreRetryCannotAcquireAnotherGeneration(): Unit = Harness().use { h -> runBlocking {
+        h.ready();h.failRead=true;h.vm.people.open(h.id,1)
+        val failed=h.editor{!it.busy&&it.error!=null};assertNull(failed.snapshot)
+        h.trashRestoreIndependently();h.failRead=false;h.vm.people.retry(failed.session)
+        val loaded=h.editor{!it.busy};h.vm.people.add(loaded.session,loaded.snapshot?.version ?: 0,"重试读回后才输入")
+        h.refreshToRevision(1)
+        assertTrue("Read failure must not discard the session's original generation",h.f.people.read(h.id).names.isEmpty())
+        assertTrue(h.mutations.isEmpty());assertTrue(loaded.conflict);assertNull(loaded.snapshot)
+        h.vm.people.close(loaded.session);val fresh=h.open()
+        h.vm.people.add(fresh.session,0,"确认恢复来源后新添加");h.editor{it.notice!=null&&!it.busy}
+        assertEquals(listOf("确认恢复来源后新添加"),h.f.people.read(h.id).names)
+    } }
+
+    @Test(timeout=15_000) fun firstReadCapturedBeforeTrashRestoreCannotPublishAfterTheSourceChanges(): Unit = Harness().use { h -> runBlocking {
+        h.ready();val entered=CountDownLatch(1);val release=CountDownLatch(1)
+        h.holdSnapshotRead={entered.countDown();check(release.await(5,TimeUnit.SECONDS))};h.vm.people.open(h.id,1)
+        try{assertTrue(entered.await(5,TimeUnit.SECONDS));h.trashRestoreIndependently()}finally{release.countDown()}
+        val loaded=h.editor{!it.busy};h.holdSnapshotRead=null
+        assertTrue("Late initial readback must be rejected",loaded.conflict);assertNull(loaded.snapshot)
+        assertTrue(h.mutations.isEmpty());assertTrue(h.f.people.read(h.id).names.isEmpty())
+        h.refreshToRevision(1);h.vm.people.close(loaded.session);assertTrue(h.open().snapshot!!.generation>1)
+    } }
+
+    @Test(timeout=15_000) fun firstReadWithoutAvailableSourceVersionsCannotAuthorizeEditingAndRefreshRecovers(): Unit = Harness().use { h -> runBlocking {
+        h.ready();h.failSourceVersions=true;h.vm.refreshLocalSearch()
+        withTimeout(5_000){h.vm.state.first{!it.localProcessingAvailable}}
+        val reads=h.readCalls.get();h.vm.people.open(h.id,1)
+        assertNull("Missing source proof must not be replaced with generation zero",h.vm.state.value.manualPeopleEditor)
+        assertEquals(reads,h.readCalls.get());assertTrue(h.mutations.isEmpty())
+        h.failSourceVersions=false;h.vm.refreshLocalSearch()
+        withTimeout(5_000){h.vm.state.first{it.localProcessingAvailable&&it.localProcessingVersions.containsKey(h.id)}}
+        val fresh=h.open();h.vm.people.add(fresh.session,0,"可用来源上的正常保存");h.editor{it.notice!=null&&!it.busy}
+        assertEquals(listOf("可用来源上的正常保存"),h.f.people.read(h.id).names)
+    } }
+
+    @Test(timeout=15_000) fun retainedReadingButtonCannotAdoptRefreshedSourceGenerationAndFreshButtonWorks(): Unit = Harness().use { h -> runBlocking {
+        h.ready();val rendered=checkNotNull(h.vm.state.value.manualPeopleReadingSource(h.id,1))
+        h.trashRestoreIndependently();h.refreshToRevision(1)
+        val refreshed=checkNotNull(h.vm.state.value.manualPeopleReadingSource(h.id,1));assertTrue(refreshed.generation>rendered.generation)
+        val reads=h.readCalls.get();h.vm.people.open(rendered)
+        assertNull(h.vm.state.value.manualPeopleEditor);assertEquals(reads,h.readCalls.get());assertTrue(h.mutations.isEmpty())
+        h.vm.people.open(refreshed);val editor=h.editor{!it.busy&&it.snapshot!=null}
+        assertEquals(refreshed.generation,editor.sourceGeneration);assertEquals(refreshed.contentHash,editor.sourceHash)
+        h.vm.people.add(editor.session,0,"当前阅读来源明确添加");h.editor{it.notice!=null&&!it.busy}
+        assertEquals(listOf("当前阅读来源明确添加"),h.f.people.read(h.id).names)
+    } }
+
     private class Harness:AutoCloseable {
         val f=ManualPeopleFixture();val id=f.base.entry()
+        @Volatile var failRead=false
+        @Volatile var failSourceVersions=false
+        @Volatile var holdRead:(()->Unit)?=null
+        @Volatile var holdSnapshotRead:(()->Unit)?=null
+        val readCalls=java.util.concurrent.atomic.AtomicInteger()
         @Volatile var failWrite=false
         @Volatile var failReadback=false
         @Volatile var holdWrite:(()->Unit)?=null
         @Volatile var holdReadback:(()->Unit)?=null
         private var wrote=false
         val mutations=CopyOnWriteArrayList<String>()
+        private val actualSource=SqlLocalProcessingRepository(f.base.gateway)
+        private val source:LocalProcessingRepository=object:LocalProcessingRepository by actualSource {
+            override fun versions():Map<String,LocalProcessingVersion>{if(failSourceVersions)throw LocalProcessingStorageFailure();return actualSource.versions()}
+        }
         val people:ManualPeopleRepository=object:ManualPeopleRepository by f.people {
+            override fun read(entryId:String):ManualPeopleSnapshot {
+                readCalls.incrementAndGet();holdRead?.invoke();if(failRead)throw ManualPeopleStorageFailure();return f.people.read(entryId)
+            }
             override fun replace(mutation:ManualPeopleMutation):ManualPeopleSnapshot {
                 mutations+=mutation.mutationId;holdWrite?.invoke();if(failWrite)throw ManualPeopleStorageFailure()
                 return f.people.replace(mutation).also{wrote=true}
             }
             override fun snapshots():Map<String,ManualPeopleSnapshot> {
+                if(readCalls.get()>0)holdSnapshotRead?.invoke()
                 if(wrote){holdReadback?.invoke();if(failReadback)throw ManualPeopleStorageFailure()}
                 return f.people.snapshots()
             }
@@ -174,11 +268,19 @@ class ManualPeopleViewModelTest {
         private val store=object:EntryRepository by original,AutoCloseable {
             override val manualPeople=people
             override val localSearch=f.search
+            override val localProcessing=source
             override suspend fun prepare(){check(f.base.db.read("PRAGMA user_version").single().single()==12L)}
             override fun close()=original.close()
         }
         init{runBlocking{original.updateDraft("合成独立草稿")}}
         val vm=LocalRecordsViewModel(Application(),{store})
+        fun trashRestoreIndependently(){f.base.second().use{other->
+            val labels=SqlManualTagRepository(other,ManualPeopleFixture.KEY)
+            try{val bin=SqlRecycleBinRepository(other,labels);val before=bin.read(id);val version=SourceVersion(id,before.entry.currentRevision.toLong())
+                val trash=bin.apply(RecycleMutation(version,before.generation,false,UUID.randomUUID().toString()))
+                bin.apply(RecycleMutation(version,trash.generation,true,UUID.randomUUID().toString()))
+            }finally{labels.wipeKey()}
+        }}
         fun reviseIndependently(){f.base.second().use{other->other.transaction{sql->
             val text="合成独立所有者改写后的原文"
             sql.execute("INSERT INTO entry_revisions VALUES(?,2,?,?,17)",listOf(id,text,OriginalExports.hash(text)))
@@ -190,6 +292,6 @@ class ManualPeopleViewModelTest {
         suspend fun ready()=withTimeout(5_000){vm.state.first{it.ready&&!it.opening}}
         suspend fun editor(p:(ManualPeopleEditor)->Boolean)=withTimeout(5_000){checkNotNull(vm.state.first{it.manualPeopleEditor?.let(p)==true}.manualPeopleEditor)}
         suspend fun open():ManualPeopleEditor {vm.people.open(id,vm.state.value.entries.single().currentRevision);return editor{!it.busy&&it.snapshot!=null}}
-        override fun close(){holdWrite=null;holdReadback=null;failReadback=false;vm.clearForHostTest();check(original.closed.await(5,TimeUnit.SECONDS));f.close()}
+        override fun close(){holdRead=null;holdSnapshotRead=null;failRead=false;failSourceVersions=false;holdWrite=null;holdReadback=null;failReadback=false;vm.clearForHostTest();check(original.closed.await(5,TimeUnit.SECONDS));f.close()}
     }
 }

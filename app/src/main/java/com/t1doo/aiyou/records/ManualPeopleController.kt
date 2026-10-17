@@ -6,15 +6,36 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 
+/** Rendered reading authority. Generation comes from the source ledger, never a missing people row. */
+class ManualPeopleReadingSource internal constructor(val version: SourceVersion, val contentHash: String,
+    val generation: Long, internal val owner: ManualPeopleRepository) {
+    init { require(version.revision <= Int.MAX_VALUE && generation >= 0 && contentHash.matches(Regex("[0-9a-f]{64}"))) }
+    internal fun same(other: ManualPeopleReadingSource?) = other != null && version == other.version &&
+        contentHash == other.contentHash && generation == other.generation && owner === other.owner
+    override fun toString() = "ManualPeopleReadingSource(redacted)"
+}
+
+internal fun LocalRecordUiState.manualPeopleReadingSource(id: String, revision: Int): ManualPeopleReadingSource? {
+    if (!ready || opening || error != null || !supportsManualPeople || !localProcessingAvailable) return null
+    val owner = manualPeopleOwner ?: return null
+    val entry = entries.singleOrNull { it.id == id && it.currentRevision == revision } ?: return null
+    val source = localProcessingVersions[id]?.takeIf { it.source == SourceVersion(id, revision.toLong()) } ?: return null
+    return ManualPeopleReadingSource(source.source, OriginalExports.hash(entry.originalText), source.generation, owner)
+}
+internal fun LocalRecordUiState.hasManualPeopleReadingSource(editor: ManualPeopleEditor): Boolean {
+    val source = manualPeopleReadingSource(editor.entryId, editor.revision) ?: return false
+    return source.owner === editor.owner && source.contentHash == editor.sourceHash && source.generation == editor.sourceGeneration
+}
+
 class ManualPeopleEditor(val session: Long, val entryId: String, val revision: Int,
     val snapshot: ManualPeopleSnapshot? = null, val input: String = "", val busy: Boolean = false,
     val error: String? = null, val notice: String? = null, val conflict: Boolean = false,
     internal val pending: ManualPeopleMutation? = null, internal val adding: Boolean = false,
-    internal val owner: ManualPeopleRepository? = null, internal val sourceHash: String? = null) {
+    internal val owner: ManualPeopleRepository? = null, internal val sourceHash: String? = null, internal val sourceGeneration: Long? = null) {
     fun copy(snapshot: ManualPeopleSnapshot? = this.snapshot, input: String = this.input, busy: Boolean = this.busy,
         error: String? = this.error, notice: String? = this.notice, conflict: Boolean = this.conflict,
         pending: ManualPeopleMutation? = this.pending, adding: Boolean = this.adding) =
-        ManualPeopleEditor(session, entryId, revision, snapshot, input, busy, error, notice, conflict, pending, adding, owner, sourceHash)
+        ManualPeopleEditor(session, entryId, revision, snapshot, input, busy, error, notice, conflict, pending, adding, owner, sourceHash, sourceGeneration)
     override fun toString() = "ManualPeopleEditor(busy=$busy, redacted)"
 }
 
@@ -28,20 +49,22 @@ class ManualPeopleController internal constructor(
     @Volatile private var disposed = false
     private fun live(editor: ManualPeopleEditor, local: LocalRecordUiState = current()) = !disposed &&
         editor.owner != null && local.manualPeopleOwner === editor.owner && local.ready && !local.opening && local.error == null && local.manualPeopleEditor?.session == editor.session &&
-        local.entries.any { it.id == editor.entryId && it.currentRevision == editor.revision }
+        local.hasManualPeopleReadingSource(editor)
     private fun update(editor: ManualPeopleEditor, change: (ManualPeopleEditor) -> ManualPeopleEditor) = publish { local ->
         if (live(editor, local)) local.copy(manualPeopleEditor = change(checkNotNull(local.manualPeopleEditor))) else local
     }
-    fun open(id: String, revision: Int) {
+    fun open(id: String, revision: Int) { current().manualPeopleReadingSource(id, revision)?.let(::open) }
+    /** The actual reading button passes its rendered source, so a retained click cannot adopt a newer generation. */
+    fun open(source: ManualPeopleReadingSource) {
+        val id = source.version.sourceId; val revision = source.version.revision.toInt()
         val local = current()
-        if (disposed || !local.supportsManualPeople || local.manualPeopleOwner == null || !local.ready || local.opening || local.error != null || local.recordPackage != null || local.recycleBin != null || local.sourceMemories != null || local.saving || local.savePending ||
-            local.entries.none { it.id == id && it.currentRevision == revision }) return
-        val source = local.entries.first { it.id == id && it.currentRevision == revision }
-        val editor = ManualPeopleEditor(sessions.incrementAndGet(), id, revision, busy = true, owner = local.manualPeopleOwner,
-            sourceHash = OriginalExports.hash(source.originalText))
-        publish { latest -> if (!disposed && latest.manualPeopleOwner === editor.owner && latest.ready && !latest.opening && latest.error == null &&
-            latest.entries.any { it.id == id && it.currentRevision == revision }) latest.copy(manualPeopleEditor = editor) else latest }
-        if (current().manualPeopleEditor?.session == editor.session) enqueue { store -> load(editor, store) }
+        if (disposed || !source.same(local.manualPeopleReadingSource(id, revision)) || local.recordPackage != null ||
+            local.recycleBin != null || local.sourceMemories != null || local.saving || local.savePending) return
+        val editor = ManualPeopleEditor(sessions.incrementAndGet(), id, revision, busy = true, owner = source.owner,
+            sourceHash = source.contentHash, sourceGeneration = source.generation)
+        publish { latest -> if (!disposed && source.same(latest.manualPeopleReadingSource(id, revision)))
+            latest.copy(manualPeopleEditor = editor) else latest }
+        if (live(editor)) enqueue { store -> load(editor, store) }
     }
     fun edit(session: Long, version: Long, input: String) {
         val editor = current().manualPeopleEditor?.takeIf { it.session == session && it.snapshot?.version == version && !it.busy && live(it) } ?: return
@@ -78,24 +101,36 @@ class ManualPeopleController internal constructor(
         try {
             val tags = checkNotNull(store.manualPeople)
             if (tags !== editor.owner) throw ManualPeopleUnavailable()
+            val sources = checkNotNull(store.localProcessing)
+            if (!sourceMatches(editor, sources.read(SourceVersion(editor.entryId, editor.revision.toLong())))) {
+                failed(editor, conflict = true, sourceChanged = true); return
+            }
             val snapshot = tags.read(editor.entryId)
             // Loading newer metadata must not grant a stale reader authority over a
             // different original or a restored/revoked source generation. Metadata
             // version conflicts on the same source can still be explicitly reloaded.
             if (snapshot.entryId != editor.entryId || snapshot.sourceRevision != editor.revision ||
                 snapshot.sourceHash != editor.sourceHash ||
-                editor.snapshot?.let { it.generation != snapshot.generation } == true) {
+                snapshot.generation != editor.sourceGeneration) {
                 failed(editor, conflict = true, sourceChanged = true)
                 return
             }
             val all = tags.snapshots()
             val epoch = store.localSearch?.epoch()
+            // Recheck after the separate metadata reads; even an empty people map carries no source generation.
+            if (!sourceMatches(editor, sources.read(SourceVersion(editor.entryId, editor.revision.toLong())))) {
+                failed(editor, conflict = true, sourceChanged = true); return
+            }
             publish { local -> if (!live(editor, local)) local else local.copy(manualPeople = all,
                 manualPeopleAvailable = true, manualPeopleError = null, localSearchEpoch = epoch ?: local.localSearchEpoch, manualPeopleEditor = local.manualPeopleEditor?.copy(
                     snapshot = snapshot, busy = false, pending = null, conflict = false, error = null, notice = null)) }
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { failed(editor, conflict = false, reading = true) }
+        catch (failure: Exception) { val changed = failure is LocalProcessingConflict || failure is ManualPeopleUnavailable
+            failed(editor, conflict = changed, reading = true, sourceChanged = changed) }
     }
+    private fun sourceMatches(editor: ManualPeopleEditor, actual: LocalProcessingSnapshot) =
+        actual.source == SourceVersion(editor.entryId, editor.revision.toLong()) &&
+            actual.sourceHash == editor.sourceHash && actual.generation == editor.sourceGeneration
     private fun submit(editor: ManualPeopleEditor, mutation: ManualPeopleMutation, adding: Boolean) {
         update(editor) { it.copy(busy = true, pending = mutation, adding = adding, error = null, notice = null) }
         enqueue { store ->

@@ -63,6 +63,7 @@ import com.t1doo.aiyou.records.OriginalSearchMode
 import com.t1doo.aiyou.records.OriginalSearchStage
 import com.t1doo.aiyou.records.OriginalSearchReturnAnchor
 import com.t1doo.aiyou.records.LocalOriginalSearchObserver
+import com.t1doo.aiyou.records.hasManualPeopleReadingSource
 import com.t1doo.aiyou.records.LocalRecordsViewModel
 import com.t1doo.aiyou.records.OpenSourceLicenses
 import com.t1doo.aiyou.records.OriginalReadingScreen
@@ -674,7 +675,7 @@ fun AIyouApp(
                 onRemove = { session, version, name, input -> if (ownsNavigation()) controller.remove(session, version, name, input) },
                 onRetry = { if (ownsNavigation()) controller.retry(it) }, onClose = { if (ownsNavigation()) controller.close(it) },
                 sourceAvailable = local.ready && !local.opening && local.error == null && local.manualPeopleOwner === editor.owner &&
-                    local.entries.any { it.id == editor.entryId && it.currentRevision == editor.revision })
+                    local.hasManualPeopleReadingSource(editor))
         }
     }
     local?.manualTagEditor?.takeIf { reading && it.entryId == detailEntryId }?.let { editor ->
@@ -798,7 +799,7 @@ fun AIyouApp(
                 onOpenAi = { id, revision -> if (canCopy(id, revision)) onOpenAiSession(id, revision) },
                 onStartAi = onStartAiSession, onStopAi = onStopAiSession, onCloseAi = onCloseAiSession,
                 onOpenTags = { id, revision -> if (canCopy(id, revision)) onOpenTags(id, revision) },
-                onOpenPeople = people?.let { controller -> { id, revision -> if (canCopy(id, revision)) controller.open(id, revision) } },
+                onOpenPeople = people?.let { controller -> { source -> if (canCopy(source.version.sourceId, source.version.revision.toInt())) controller.open(source) } },
                 location = searchLocation,
                 requiredSource = if(recapRoute||taskSourceRoute) searchLocation else null,
                 requiredSourceTitle = if(taskSourceRoute) "待办来源版本已变化" else "回顾来源版本已变化",

@@ -399,9 +399,9 @@ class LocalRecordsViewModel internal constructor(
             val personEditor = dated.manualPeopleEditor
             val personScoped = if (personEditor != null && dated.manualPeopleOwner !== personEditor.owner) dated.copy(manualPeopleEditor = null)
                 else if (personEditor != null && (!dated.ready || dated.opening || dated.error != null ||
-                dated.manualPeopleOwner !== personEditor.owner || dated.entries.none { it.id == personEditor.entryId && it.currentRevision == personEditor.revision }))
+                !dated.hasManualPeopleReadingSource(personEditor)))
                 dated.copy(manualPeopleEditor = personEditor.copy(busy = false, conflict = true,
-                    error = "原文或账号已变化，输入已保留，请关闭后重新打开。")) else dated
+                    error = "原文、账号或来源范围已变化，输入已保留，请刷新原文后重新打开。")) else dated
             val editor = personScoped.manualTagEditor
             val labelled = if (editor != null && (!personScoped.ready || personScoped.opening || personScoped.error != null ||
                 personScoped.entries.none { it.id == editor.entryId && it.currentRevision == editor.revision }))
