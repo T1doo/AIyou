@@ -3,6 +3,7 @@ package com.t1doo.aiyou.records
 import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
 import java.time.Clock
+import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
@@ -14,6 +15,8 @@ data class MixedCaptureUiState(val draft: CaptureDraft?=null,val text: String=""
     val retainJpegMetadata: Boolean=true) {
     override fun toString()="MixedCaptureUiState(busy=$busy, redacted)"
 }
+
+internal data class CaptureDay(val date: LocalDate, val zone: ZoneId)
 
 /** Production Now composer, using the existing serial records IO actor. No private Bundle/Saver. */
 class MixedCaptureController internal constructor(private val current: () -> LocalRecordUiState,
@@ -27,6 +30,14 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
     @Volatile private var disposed=false
     private fun ui()=current().mixedCapture
     private fun available()=!disposed && current().ready && !current().opening && current().error==null
+    internal fun today(zone: ZoneId = ZoneId.systemDefault()) = CaptureDay(LocalDate.now(clock.withZone(zone)), zone)
+    /** Same current-source order as Memories; capture date, not a manually assigned event date. */
+    internal fun recentEntries(day: CaptureDay = today()): List<StoredEntry> {
+        if (!available()) return emptyList()
+        val start = day.date.atStartOfDay(day.zone).toInstant().toEpochMilli()
+        val end = day.date.plusDays(1).atStartOfDay(day.zone).toInstant().toEpochMilli()
+        return current().entries.asSequence().filter { it.capturedAtMillis >= start && it.capturedAtMillis < end }.take(5).toList()
+    }
     private fun update(change:(MixedCaptureUiState)->MixedCaptureUiState)=publish { local ->
         if(disposed) local else local.copy(mixedCapture=change(local.mixedCapture ?: MixedCaptureUiState()))
     }
@@ -74,7 +85,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         update { it.copy(selection=s.copy(launched=true)) };return true
     }
     fun pickerFailed(request: Long) { if(ui()?.selection?.requestId==request) update { it.copy(selection=null,error="未能选择图片，草稿已保留。") } }
-    fun cancelSelection() { if(ui()?.selection?.phase==AttachmentImportPhase.SAVING) return;update { it.copy(selection=null,error=null) };enqueue { clearPrepared() } }
+    fun cancelSelection() { val selection=ui()?.selection ?: return;if(selection.phase==AttachmentImportPhase.SAVING) return;update { it.copy(selection=null,error=null) };enqueue { clearPrepared() } }
     fun selected(request: Long,source: SelectedImageSource?) {
         val u=ui() ?: return;val s=u.selection ?: return;val id=u.draft?.id ?: return
         if(!available() || s.requestId!=request || s.phase!=AttachmentImportPhase.PICKING) return

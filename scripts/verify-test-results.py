@@ -181,6 +181,7 @@ for label, folder, minimum in targets:
             "actualNowPurePictureHasThumbnailCountRemovalAndSeparateDurableSaveAtLargeFont",
             "removingLastImageRejectsEmptyRecordAndCancelKeepsDraftAndRetiresPicker",
             "failedSaveRetainsTextAndImagesAndPrivateComposerNeverEntersSavedState",
+            "newSaveWhileComposerIsScrolledOnlyOffersExplicitJumpAndReaderReturnKeepsNextDraft",
         )
         additional["com.t1doo.aiyou.FactRecapPresentationTest"] = (
             "actualNarrowDoubleFontRouteShowsOriginalExcerptThenFullTextAndReturnsToSameCard",

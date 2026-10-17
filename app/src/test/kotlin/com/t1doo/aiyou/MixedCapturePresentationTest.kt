@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
@@ -52,6 +53,12 @@ class MixedCapturePresentationTest {
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-save"));compose.onNodeWithTag("mixed-save").assertHeightIsAtLeast(48.dp)
         click("mixed-save");compose.runOnIdle { assertEquals(0,f.saves) };drain()
         compose.runOnIdle { assertEquals(1,f.saves);assertEquals("",f.local.value.entries.single().originalText);assertTrue(f.ui.draft!!.images.isEmpty()) }
+        val saved=f.local.value.entries.single().id
+        click("entry-$saved")
+        compose.onNodeWithText("记录原文").assertExists()
+        compose.onNodeWithText("图片记录 · 无文字正文；请打开附件查看原图。").assertExists()
+        compose.onNodeWithText("返回列表").performClick()
+        compose.onNodeWithTag("mixed-list").assertExists()
     }
     @Test fun removingLastImageRejectsEmptyRecordAndCancelKeepsDraftAndRetiresPicker() {
         content();add();val id=f.ui.draft!!.images.single().intent.id
@@ -67,8 +74,26 @@ class MixedCapturePresentationTest {
         compose.onNodeWithTag("mixed-text").performTextInput("合成私密图文输入");drain();add()
         f.failSave=true;click("mixed-save");drain()
         compose.runOnIdle { assertEquals("合成私密图文输入",f.ui.text);assertEquals(1,f.ui.draft!!.images.size);assertTrue(f.ui.uncertainSave)
+            assertTrue(f.c.recentEntries().isEmpty())
             val saved=registry!!.performSave().toString();assertFalse(saved.contains("合成私密图文输入"));assertFalse(saved.contains(f.ui.draft!!.id));assertFalse(saved.contains("content://")) }
         f.failSave=false;click("mixed-save");drain();compose.runOnIdle { assertEquals(1,f.saves);assertEquals("合成私密图文输入",f.local.value.entries.single().originalText) }
+    }
+    @Test fun newSaveWhileComposerIsScrolledOnlyOffersExplicitJumpAndReaderReturnKeepsNextDraft() {
+        content();compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").performTextInput("合成今天可直接阅读的原文");drain()
+        click("mixed-save");drain()
+        val scroll=compose.onNodeWithTag("mixed-list").fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        assertTrue("Saving must not jump the scrolled composer to the top",scroll.value()>0f)
+        compose.onNodeWithTag("mixed-new-records").assertIsDisplayed().performClick()
+        compose.waitForIdle()
+        assertEquals(0f,compose.onNodeWithTag("mixed-list").fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value(),0f)
+        compose.onNodeWithTag("mixed-jump-composer").assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithTag("mixed-text").performTextInput("下一份合成草稿");drain()
+        val id=f.local.value.entries.single().id;click("entry-$id")
+        compose.onNodeWithTag("original-text").assertTextContains("合成今天可直接阅读的原文")
+        compose.onNodeWithText("返回列表").performClick()
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").assertTextContains("下一份合成草稿")
     }
     private class Fixture {
         private var draft=CaptureDraft(uuid(),1,"",emptyList());private val bytes=mutableMapOf<String,ByteArray>()
