@@ -151,48 +151,59 @@ class LocalEvidenceController internal constructor(
             value.selection.cards, value.selection.id))
         mutable.value = request
         reviewJob = scope.launch {
+            var checked = false
             val accepted = try {
-                // This local packet is never returned by the preparation or confirmation API.
                 LocalEvidencePacket.reviewed(request)
                 val source = checkNotNull(request.source)
                 checkNotNull(source.owner).publishCurrent(checkNotNull(source.proof)) {
-                    synchronized(lock) {
-                        if (mutable.value === request && owns(request)) {
-                            val receipt = LocalEvidenceConfirmation(request.selection.id)
-                            confirmation = receipt
-                            mutable.value = request.selecting(LocalEvidenceSelection(LocalEvidenceSelectionStage.CONFIRMED,
-                                request.selection.cards, request.selection.id, receipt))
-                        }
-                    }
+                    // Phase one may mark eligibility, but cannot publish authority before COMMIT.
+                    synchronized(lock) { checked = mutable.value === request && owns(request) }
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { false }
+            if (accepted && checked) synchronized(lock) {
+                if (mutable.value === request && owns(request)) {
+                    val receipt = LocalEvidenceConfirmation(request.selection.id)
+                    confirmation = receipt
+                    mutable.value = request.selecting(LocalEvidenceSelection(LocalEvidenceSelectionStage.CONFIRMED,
+                        request.selection.cards, request.selection.id, receipt))
+                }
+            }
             if (!accepted) expire(request)
         }
     }
 
     /**
-     * IO-only, local nonblocking inspection. There is no production model consumer. An old selection ID,
-     * an ordinary source reference or a single-source ConsentGrant cannot authorize this operation.
-     * Recheck the same whole private proof and owned receipt at the actual publication boundary.
-     * The callback runs under the counted SQL lease; it must never perform network or blocking work.
+     * Two-phase, IO-only local inspection. Phase one retains the packet privately and only marks
+     * eligibility under SQL. Phase two rechecks the owned receipt and cancellation after successful
+     * COMMIT, then consumes it in memory. false always means the consumer was never called.
+     * Consumer exceptions propagate; consumption cannot be undone or reported as rejection afterward.
+     *
+     * This is a point-in-time local read, never permission for network/file side effects. Withdrawal
+     * after consumption cannot retract bytes; future remote work needs its own multi-source authority,
+     * cancellation and admission protocol. The callback must be nonblocking and memory-only.
      */
     internal fun inspectConfirmed(value: LocalEvidenceState, receipt: LocalEvidenceConfirmation?,
-        publish: (LocalEvidencePacket) -> Unit): Boolean {
-        fun admitted() = mutable.value === value && owns(value) && value.stage == LocalEvidenceStage.READY &&
+        cancelled: () -> Boolean = { false }, consumeLocal: (LocalEvidencePacket) -> Unit): Boolean {
+        fun admitted() = mutable.value === value && owns(value) && !cancelled() && value.stage == LocalEvidenceStage.READY &&
             value.selection.stage == LocalEvidenceSelectionStage.CONFIRMED && receipt != null &&
             confirmation === receipt && value.selection.confirmation === receipt && receipt.selectionId == value.selection.id
         if (!synchronized(lock) { admitted() }) return false
-        var published = false
+        val packet: LocalEvidencePacket
+        var checked = false
         val accepted = try {
-            val packet = LocalEvidencePacket.reviewed(value)
+            packet = LocalEvidencePacket.reviewed(value)
             val source = checkNotNull(value.source)
             checkNotNull(source.owner).publishCurrent(checkNotNull(source.proof)) {
-                synchronized(lock) { if (admitted()) { publish(packet); published = true } }
+                synchronized(lock) { checked = admitted() }
             }
-        } catch (_: Exception) { false }
-        if (!accepted) expire(value)
-        return accepted && published
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { expire(value); return false }
+        if (!accepted) { expire(value); return false }
+        return synchronized(lock) {
+            if (!checked || !admitted()) false
+            else { consumeLocal(packet); true }
+        }
     }
 
     private fun expire(value: LocalEvidenceState) {

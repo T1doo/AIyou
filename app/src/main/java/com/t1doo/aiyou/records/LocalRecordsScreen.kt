@@ -122,6 +122,11 @@ fun LocalRecordsScreen(
     onOpenEvidence: (LocalEvidenceCard) -> Unit = {},
     onToggleEvidence: (LocalEvidenceCard) -> Unit = {},
     onConfirmEvidence: () -> Unit = {},
+    evidenceAnswerState: LocalEvidenceAnswerState = LocalEvidenceAnswerState(LocalEvidenceAnswerStage.UNAVAILABLE),
+    evidenceAnswerAvailable: Boolean = false,
+    onEvidenceAnswer: () -> Unit = {},
+    onCancelEvidenceAnswer: () -> Unit = {},
+    onOpenAnswerSource: (com.t1doo.aiyou.model.OriginalTextReference) -> Unit = {},
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -375,7 +380,11 @@ fun LocalRecordsScreen(
                 }
                 if (evidenceMode) {
                     item("local-evidence-status") {
-                        LocalEvidenceNotice(evidenceState, onConfirmEvidence)
+                        Column {
+                            LocalEvidenceNotice(evidenceState, onConfirmEvidence)
+                            LocalEvidenceAnswerSection(evidenceState, evidenceAnswerState, evidenceAnswerAvailable,
+                                onEvidenceAnswer, onCancelEvidenceAnswer, onOpenAnswerSource)
+                        }
                     }
                     items(evidenceState.cards, key = { it.reference.source.sourceId }) { card ->
                         Column {

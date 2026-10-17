@@ -251,6 +251,7 @@ fun AIyouApp(
     onRebuildLocalSearch: () -> Unit = {},
     manualTasks: com.t1doo.aiyou.records.ManualTaskController? = null,
     imageGrid: com.t1doo.aiyou.records.CurrentImageGridController? = null,
+    evidenceAnswerFixture: com.t1doo.aiyou.records.SyntheticEvidenceAnswerProvider? = null,
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -358,11 +359,26 @@ fun AIyouApp(
     val recycleUi = local?.recycleBin
     val browsingRecycle = recycleUi?.browsing == true && selected == Destination.MEMORIES && detailEntryId == null && !showSettings && !demo
     val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS && !browsingRecycle
+    val currentAnswerFixture by rememberUpdatedState(evidenceAnswerFixture)
+    val evidenceAnswers = remember(evidence, evidenceAnswerFixture) {
+        com.t1doo.aiyou.records.LocalEvidenceAnswerController(evidence,
+            currentEvidence = { evidence.visible(search.visible(searchSource(), searchInput())) },
+            ownsSession = { currentAnswerFixture === evidenceAnswerFixture && evidenceMode &&
+                selectedName == Destination.MEMORIES.name && detailEntryId == null && !recapRoute &&
+                !showSettings && !demo && searchSource()?.ready == true && searchSource()?.opening == false &&
+                searchSource()?.originalEdit == null && searchSource()?.originalHistory == null &&
+                searchSource()?.recycleBin?.browsing != true && searchSource()?.recordPackage == null },
+            fixture = evidenceAnswerFixture)
+    }
+    DisposableEffect(evidenceAnswers) { onDispose { evidenceAnswers.close() } }
+    val evidenceAnswerEmission by evidenceAnswers.state.collectAsState()
+    val evidenceAnswerState = evidenceAnswerEmission.let { evidenceAnswers.visible() }
     SideEffect {
         search.sync(selected == Destination.MEMORIES && !recapRoute && !reading && !browsingRecycle && !browsingPackage && !showSettings && !demo &&
             local != null && local.originalEdit == null && local.originalHistory == null)
         evidence.sync(evidenceMode && selected == Destination.MEMORIES && !recapRoute && !reading && !browsingRecycle &&
             !browsingPackage && !showSettings && !demo && local != null && local.originalEdit == null && local.originalHistory == null, searchState)
+        evidenceAnswers.sync()
         if (!reading && searchReturnAnchor != null &&
             (renderedSearchInput.copy(tagSnapshot = null) != searchReturnInput?.copy(tagSnapshot = null) || searchSource()?.entries !== searchReturnSource)) {
             searchReturnAnchor = null; searchReturnInput = null; searchReturnSource = null
@@ -888,6 +904,13 @@ fun AIyouApp(
                 } },
                 imageGrid = imageGrid, imageGridMode = imageGridMode,
                 evidenceMode = evidenceMode, evidenceState = evidenceState,
+                evidenceAnswerState = evidenceAnswerState, evidenceAnswerAvailable = evidenceAnswers.available,
+                onEvidenceAnswer = { evidenceAnswers.ask(evidenceState) }, onCancelEvidenceAnswer = evidenceAnswers::cancel,
+                onOpenAnswerSource = { reference ->
+                    evidenceAnswers.sourceFor(evidenceAnswerState, reference)?.let { card ->
+                        if (evidence.canOpen(evidenceState, card)) openSearchResultAt(card.hit, card.reference)
+                    }
+                },
                 onEvidenceMode = { value -> if (ownsNavigation() && detailEntryId == null &&
                     selectedName == Destination.MEMORIES.name && !showSettings && !demo) {
                     evidence.clear(); evidenceMode = value; if (value) imageGridMode = false

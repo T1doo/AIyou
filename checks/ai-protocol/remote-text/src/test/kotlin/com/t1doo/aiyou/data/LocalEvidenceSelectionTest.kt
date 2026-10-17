@@ -194,6 +194,43 @@ class LocalEvidenceSelectionTest {
         assertEquals(LocalEvidenceStage.STALE, h.value.stage)
     }
 
+    @Test fun inspectionCommitFailureNeverHandsPacketToConsumerOrLeavesValidConfirmation(): Unit = Harness().use { h ->
+        h.ready(); h.select(0, 1); val confirmed = h.confirmed()
+        val commits = AtomicInteger()
+        h.f.db.beforeCommit = {
+            assertEquals(0, h.provider.calls.get()); assertNull(h.provider.packet.get())
+            commits.incrementAndGet(); error("Synthetic inspection COMMIT failure")
+        }
+        assertFalse(h.provider.inspect(h, confirmed)); assertEquals(1, commits.get())
+        assertEquals(0, h.provider.calls.get()); assertNull(h.provider.packet.get())
+        assertEquals(LocalEvidenceStage.STALE, h.value.stage); assertNull(h.value.selection.confirmation)
+    }
+
+    @Test fun cancellationOrClearAtCommitBoundaryPreventsTheSecondConsumptionPhase(): Unit = Harness().use { h ->
+        h.ready(); h.select(0); val confirmed = h.confirmed()
+        val cancelled = java.util.concurrent.atomic.AtomicBoolean()
+        h.f.db.beforeCommit = { cancelled.set(true) }
+        assertFalse(h.controller.inspectConfirmed(confirmed, confirmed.selection.confirmation, cancelled::get) {
+            fail("Cancelled local packet must stay private")
+        })
+        h.f.db.beforeCommit = { h.controller.clear() }
+        assertFalse(h.provider.inspect(h, confirmed)); assertEquals(0, h.provider.calls.get())
+        assertTrue(h.value.selection.cards.isEmpty())
+    }
+
+    @Test fun inspectionConsumerRunsAfterCommitAndItsExceptionCannotBecomeFalseRejection(): Unit = Harness().use { h ->
+        h.ready(); h.select(0); val confirmed = h.confirmed()
+        val committed = java.util.concurrent.atomic.AtomicBoolean()
+        h.f.db.afterSql = { if (it == "COMMIT") committed.set(true) }
+        try {
+            h.controller.inspectConfirmed(confirmed, confirmed.selection.confirmation) {
+                assertTrue(committed.get()); throw UnsupportedOperationException("Synthetic consumer failure")
+            }
+            fail("Consumed callback exceptions must propagate")
+        } catch (_: UnsupportedOperationException) { }
+        assertSame(confirmed, h.value)
+    }
+
     @Test fun foreignOrAlteredCardCannotBeSelectedOrReplaceAnExactCitation(): Unit = Harness().use { h ->
         val ready = h.ready(); val card = ready.cards[0]
         val altered = LocalEvidenceCard(card.reference.copy(quote = "forged"), card.capturedAtMillis, card.captureTimeZone, card.hit)

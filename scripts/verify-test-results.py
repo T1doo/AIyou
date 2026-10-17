@@ -102,6 +102,9 @@ for label, folder, minimum in targets:
         additional["com.t1doo.aiyou.CurrentImageSearchPresentationTest"] = (
             "localEvidenceCardsUseCurrentSourceAndReturnWithoutChangingQuestion",
             "localEvidenceRequiresExplicitSelectionAndReconfirmationAfterExclusion",
+            "syntheticSelectedAnswerCitationsOpenOriginalAndReturningRequiresNewConfirmation",
+            "narrowDoubleFontSyntheticNoEvidenceKeepsOriginalCardsAndNeverInventsAnswer",
+            "syntheticAnswerStopCancelsRequestAndSuppressesLateText",
             "narrowDoubleFontLocalEvidenceSelectionAndConfirmationRemainReachable",
             "narrowDoubleFontEvidenceShowsExplicitNoEvidenceAndKeepsManualListReachable",
             "imageFilterStartsOffCombinesLiteralAndDatesAndClearResetsEveryCondition",

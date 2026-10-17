@@ -57,12 +57,12 @@ class CurrentImageSearchPresentationTest {
     private val observer=object:OriginalSearchObserver {
         override fun onResults(state:OriginalSearchState,open:(OriginalSearchHit)->Unit){results.set(state)}
     }
-    @Composable private fun Screen(large:Boolean=false){
+    @Composable private fun Screen(large:Boolean=false,fixture:SyntheticEvidenceAnswerProvider?=null){
         val density=LocalDensity.current
         CompositionLocalProvider(LocalOriginalSearchObserver provides observer,
             LocalDensity provides if(large)Density(density.density,2f)else density){
             AIyouTheme{Box(if(large)Modifier.size(320.dp,640.dp)else Modifier){
-                AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},imageGrid=grid)
+                AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},imageGrid=grid,evidenceAnswerFixture=fixture)
             }}
         }
     }
@@ -176,6 +176,53 @@ class CurrentImageSearchPresentationTest {
         assertTrue(confirm.getUnclippedBoundsInRoot().height>=48.dp);confirm.performClick()
         compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-confirmed").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithTag("local-evidence-confirmed").performScrollTo().assertIsDisplayed()
+    }
+
+    private fun selectPictureForAnswer(){
+        compose.onNodeWithTag("original-search-query").performScrollTo().performTextReplacement("needle")
+        await{it.stage==OriginalSearchStage.READY}
+        compose.onNodeWithTag("local-evidence-mode").performScrollTo().performClick()
+        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-select-picture").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("local-evidence-select-picture").performScrollTo().performClick()
+        compose.onNodeWithTag("local-evidence-confirm").performScrollTo().performClick()
+        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-confirmed").fetchSemanticsNodes().isNotEmpty()}
+    }
+    @Test fun syntheticSelectedAnswerCitationsOpenOriginalAndReturningRequiresNewConfirmation(){
+        val fixture=SyntheticEvidenceAnswerProvider { r -> LocalEvidenceAnswerResponse(r.id,r.packet.selectionId,
+            r.packet.citations.map { LocalEvidenceAnswerParagraph("合成引用："+it.reference.quote,listOf(it.reference)) }) }
+        compose.setContent{Screen(fixture=fixture)};selectPictureForAnswer()
+        compose.onNodeWithTag("local-answer-ask").performScrollTo().performClick()
+        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-answer-paragraph-0").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("local-answer-paragraph-0").performScrollTo().assertTextContains(picture.originalText)
+        compose.onNode(hasText("查看原文") and hasAnyAncestor(hasTestTag("local-answer-source-0-picture")))
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("original-text").assertTextContains(picture.originalText)
+        compose.onNodeWithText("返回列表").performClick();await{it.stage==OriginalSearchStage.READY}
+        compose.onAllNodesWithTag("local-answer-paragraph-0").assertCountEquals(0)
+    }
+    @Test fun narrowDoubleFontSyntheticNoEvidenceKeepsOriginalCardsAndNeverInventsAnswer(){
+        val fixture=SyntheticEvidenceAnswerProvider { r -> LocalEvidenceAnswerResponse(r.id,r.packet.selectionId,noEvidence=true) }
+        compose.setContent{Screen(true,fixture)};selectPictureForAnswer()
+        val ask=compose.onNodeWithTag("local-answer-ask").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        assertTrue(ask.getUnclippedBoundsInRoot().height>=48.dp);ask.performClick()
+        compose.waitUntil(3_000){compose.onAllNodesWithText("选定出处不足以回答").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("选定出处不足以回答").performScrollTo().assertIsDisplayed()
+        compose.onAllNodesWithTag("local-answer-paragraph-0").assertCountEquals(0)
+        compose.onNodeWithTag("local-evidence-picture").performScrollTo().assertIsDisplayed()
+    }
+    @Test fun syntheticAnswerStopCancelsRequestAndSuppressesLateText(){
+        val request=AtomicReference<LocalEvidenceAnswerRequest>()
+        val reply=kotlinx.coroutines.CompletableDeferred<LocalEvidenceAnswerResponse>()
+        val fixture=SyntheticEvidenceAnswerProvider { r -> request.set(r);reply.await() }
+        compose.setContent{Screen(fixture=fixture)};selectPictureForAnswer()
+        compose.onNodeWithTag("local-answer-ask").performScrollTo().performClick()
+        compose.waitUntil(3_000){request.get()!=null}
+        compose.onNodeWithTag("local-answer-stop").performScrollTo().performClick()
+        compose.waitUntil(3_000){request.get().cancelled}
+        val r=request.get();reply.complete(LocalEvidenceAnswerResponse(r.id,r.packet.selectionId,
+            listOf(LocalEvidenceAnswerParagraph("合成迟到响应",listOf(r.packet.citations[0].reference)))))
+        compose.onNodeWithText("回答已停止").performScrollTo().assertIsDisplayed()
+        compose.onAllNodesWithTag("local-answer-paragraph-0").assertCountEquals(0)
     }
 
 }
