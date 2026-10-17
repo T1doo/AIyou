@@ -114,9 +114,11 @@ class RecordFavoriteController internal constructor(
             try {
                 val entries = store.entries()
                 val all = checkNotNull(store.favorites).snapshots()
+                val versions = checkNotNull(store.localProcessing).versions()
                 val epoch = store.localSearch?.epoch()
                 publish { local -> if (!usable(local) || reads.get() != generation) local else local.copy(
                     entries = entries, favorites = all, favoritesAvailable = true, favoritesLoading = false,
+                    localProcessingVersions = versions, localProcessingAvailable = true,
                     favoritesError = null, localSearchEpoch = epoch,
                     // A read alone does not confirm an uncertain intent; keep its stable retry.
                     favoriteWrites = local.favoriteWrites.filterValues { !it.conflict }) }

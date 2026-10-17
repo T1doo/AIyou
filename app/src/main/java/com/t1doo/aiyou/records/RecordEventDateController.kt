@@ -143,20 +143,23 @@ class RecordEventDateController internal constructor(
             val entries = store.entries()
             val all = checkNotNull(store.eventDates).snapshots()
             val snapshot = all[editor.entryId] ?: throw RecordEventDateUnavailable()
+            val versions = checkNotNull(store.localProcessing).versions()
             val epoch = store.localSearch?.epoch()
             publish { local ->
                 if (!live(editor, local)) local else {
                     val pending = local.eventDateWrites[editor.entryId]
                     val initialDate = if (pending != null && !pending.conflict) pending.intent.date else snapshot.date
                     val freshEntry = entries.singleOrNull { it.id == editor.entryId }
-                    val fresh = freshEntry?.let { it.currentRevision == editor.revision && OriginalExports.hash(it.originalText) == editor.sourceHash } == true
+                    val fresh = freshEntry?.let { it.currentRevision == editor.revision && OriginalExports.hash(it.originalText) == editor.sourceHash } == true &&
+                        versions[editor.entryId]?.let { it.source == SourceVersion(editor.entryId, editor.revision.toLong()) && it.generation == editor.sourceGeneration } == true
                     local.copy(entries = entries, eventDates = all, eventDatesAvailable = true, eventDatesError = null,
+                        localProcessingVersions = versions, localProcessingAvailable = true,
                         localSearchEpoch = epoch, eventDateWrites = if (pending?.conflict == true) local.eventDateWrites - editor.entryId else local.eventDateWrites,
                         eventDateEditor = local.eventDateEditor?.copy(snapshot = snapshot, busy = pending?.busy == true,
                             dateInput = if (editor.snapshot == null) initialDate?.localDate.orEmpty() else local.eventDateEditor.dateInput,
                             zoneInput = if (editor.snapshot == null) initialDate?.timeZone.orEmpty() else local.eventDateEditor.zoneInput,
                             preview = null, conflict = !fresh, notice = null,
-                            error = if (!fresh) "原文已变化，输入已保留。请关闭后重新打开。" else pending?.error))
+                            error = if (!fresh) "原文或来源范围已变化，输入已保留。请关闭后重新打开。" else pending?.error))
                 }
             }
         } catch (cancelled: CancellationException) { throw cancelled }

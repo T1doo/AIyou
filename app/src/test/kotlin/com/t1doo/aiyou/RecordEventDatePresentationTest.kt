@@ -57,6 +57,11 @@ class RecordEventDatePresentationTest {
         }
     }
     private val store=object:EntryRepository {
+        override val localProcessing:LocalProcessingRepository=object:LocalProcessingRepository {
+            override fun versions()=state.value.entries.associate{it.id to LocalProcessingVersion(SourceVersion(it.id,it.currentRevision.toLong()),0)}
+            override fun read(source:SourceVersion):LocalProcessingSnapshot {val e=state.value.entries.single{it.id==source.sourceId};return LocalProcessingSnapshot(source,OriginalExports.hash(e.originalText),0,e.policy)}
+            override fun change(request:LocalProcessingChange)=error("Outside presentation source contract")
+        }
         override val eventDates=port
         override suspend fun readDraft()=null
         override suspend fun updateDraft(text:String)=error("Outside UI contract")

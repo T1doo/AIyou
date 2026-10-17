@@ -122,6 +122,41 @@ class MetadataSourceGenerationViewModelTest {
         assertEquals(refreshed.generation,h.dateCalls.single().sourceGeneration)
     } }
 
+    @Test(timeout=15_000) fun visibleFavoriteRereadAfterGenerationOnlyAbaAllowsANewChoiceWithoutPrivateRefresh(): Unit = Harness().use { h -> runBlocking {
+        h.ready();val original=h.vm.state.value.entries
+        val entered=CountDownLatch(1);val release=CountDownLatch(1)
+        h.holdFavorite={entered.countDown();check(release.await(5,TimeUnit.SECONDS))};h.favorite(true)
+        try{assertTrue(entered.await(5,TimeUnit.SECONDS));h.independentPolicyAba()}finally{release.countDown()}
+        h.await{it.favoriteWrites[h.id]?.let{w->!w.busy&&w.conflict}==true};h.holdFavorite=null
+        assertFalse(h.f.base.favorites.read(h.id).isFavorite);assertEquals(original,h.vm.state.value.entries)
+        // Actual "重新读取收藏" callback. No refreshLocalSearch/private helper is used here.
+        h.vm.favorites.retry(h.id);h.await{it.favoritesAvailable&&!it.favoritesLoading&&it.favoriteWrites.isEmpty()}
+        h.favorite(true);h.await{it.favoriteWrites[h.id]?.busy==false || it.favoriteNotice!=null}
+        assertTrue("Visible reread must refresh source authority for a new explicit favorite choice",h.f.base.favorites.read(h.id).isFavorite)
+        assertEquals(3L,h.vm.state.value.localProcessingVersions.getValue(h.id).generation)
+        assertEquals(1L,h.favoriteCalls.first().sourceGeneration);assertEquals(3L,h.favoriteCalls.last().sourceGeneration)
+    } }
+
+    @Test(timeout=15_000) fun visibleDateRereadAfterGenerationOnlyAbaAllowsNewPreviewWithoutPrivateRefresh(): Unit = Harness().use { h -> runBlocking {
+        h.ready();val original=h.vm.state.value.entries;val editor=h.openDate();h.prepareDate(editor)
+        val entered=CountDownLatch(1);val release=CountDownLatch(1)
+        h.holdDate={entered.countDown();check(release.await(5,TimeUnit.SECONDS))}
+        h.vm.eventDates.confirm(editor.session,checkNotNull(h.vm.state.value.eventDateEditor?.preview).id)
+        try{assertTrue(entered.await(5,TimeUnit.SECONDS));h.independentPolicyAba()}finally{release.countDown()}
+        h.await{it.eventDateWrites[h.id]?.let{w->!w.busy&&w.conflict}==true};h.holdDate=null
+        assertNull(h.f.base.dates.read(h.id).date);assertEquals(original,h.vm.state.value.entries)
+        // Actual "重新读取事件日期" callback; a new preview+confirmation is still required.
+        h.vm.eventDates.retry(editor.session)
+        val loaded=checkNotNull(h.await{it.eventDateWrites.isEmpty()&&it.eventDateEditor?.let{e->!e.busy&&e.snapshot!=null}==true}.eventDateEditor)
+        // The old editor keeps its immutable authority. Use its visible close/open actions, then re-enter and preview.
+        h.vm.eventDates.close(loaded.session);val reopened=h.openDate()
+        h.prepareDate(reopened);h.vm.eventDates.confirm(reopened.session,checkNotNull(h.vm.state.value.eventDateEditor?.preview).id)
+        h.await{it.eventDateWrites[h.id]?.busy==false || it.eventDateEditor?.notice!=null}
+        assertEquals("Visible reread must refresh source authority before the new date confirmation",DAY,h.f.base.dates.read(h.id).date)
+        assertEquals(3L,h.vm.state.value.localProcessingVersions.getValue(h.id).generation)
+        assertEquals(1L,h.dateCalls.first().sourceGeneration);assertEquals(3L,h.dateCalls.last().sourceGeneration)
+    } }
+
     private class Harness:AutoCloseable {
         val f=ManualPeopleFixture();val id=f.base.entry()
         @Volatile var failFavorite=false
@@ -180,6 +215,13 @@ class MetadataSourceGenerationViewModelTest {
                 val trashed=otherBin.apply(RecycleMutation(source,before.generation,false,UUID.randomUUID().toString()))
                 assertEquals(3L,otherBin.apply(RecycleMutation(source,trashed.generation,true,UUID.randomUUID().toString())).generation)
             }finally{tags.wipeKey()}}}
+        fun independentPolicyAba(){f.base.second().use{other->
+            val port=SqlLocalProcessingRepository(other);val before=port.read(SourceVersion(id,1))
+            val middle=port.change(LocalProcessingChange(before,LocalProcessingChoice.AI_NONE,UUID.randomUUID().toString()))
+            val after=port.change(LocalProcessingChange(middle,LocalProcessingChoice.LOCAL_ONLY,UUID.randomUUID().toString()))
+            assertEquals(1L,before.generation);assertEquals(3L,after.generation)
+            assertEquals(before.copy(generation=3),after)
+        }}
         suspend fun actualTrashRestore(){
             assertEquals(1L,bin.read(id).generation)
             vm.recycleBin.requestMove(id,1);var ui=checkNotNull(await{it.recycleBin?.confirmation!=null&&!it.recycleBin.busy}.recycleBin)
