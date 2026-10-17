@@ -248,6 +248,8 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                 val entries = store.entries(); val tags = checkNotNull(store.manualTags).snapshots()
                 val favorites = readFavoriteSource(store)
                 val eventDates = readEventDateSource(store)
+                val people = try { store.manualPeople?.snapshots() }
+                    catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
                 val origins = checkNotNull(store.recordPackages).origins()
                 val tasks=if(verified.activities!=null) checkNotNull(store.manualTasks).snapshots() else null
                 val proposals=if(verified.activities!=null) checkNotNull(store.taskProposals).list() else null
@@ -256,6 +258,8 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                     val panel = local.recordPackage
                     if (disposed || !available(local)) local else
                         local.copy(entries = entries, manualTags = tags, manualTagsAvailable = true, manualTagsError = null,
+                            manualPeople = people.orEmpty(), manualPeopleAvailable = people != null,
+                            manualPeopleError = if (store.manualPeople != null && people == null) "手工人物关联暂不可读取，请重试。" else null,
                             packageOrigins = origins, packageOriginsAvailable = true, packageOriginsError = null,
                             tasks=if(tasks!=null && !local.tasks.busy && local.tasks.pending==null && !local.tasks.loading && local.tasks.editor==null && local.tasks.dateEditor==null)
                                 local.tasks.copy(items=tasks,available=true,error=null) else local.tasks,
