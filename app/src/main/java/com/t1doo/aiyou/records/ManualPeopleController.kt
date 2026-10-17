@@ -10,11 +10,11 @@ class ManualPeopleEditor(val session: Long, val entryId: String, val revision: I
     val snapshot: ManualPeopleSnapshot? = null, val input: String = "", val busy: Boolean = false,
     val error: String? = null, val notice: String? = null, val conflict: Boolean = false,
     internal val pending: ManualPeopleMutation? = null, internal val adding: Boolean = false,
-    internal val owner: ManualPeopleRepository? = null) {
+    internal val owner: ManualPeopleRepository? = null, internal val sourceHash: String? = null) {
     fun copy(snapshot: ManualPeopleSnapshot? = this.snapshot, input: String = this.input, busy: Boolean = this.busy,
         error: String? = this.error, notice: String? = this.notice, conflict: Boolean = this.conflict,
         pending: ManualPeopleMutation? = this.pending, adding: Boolean = this.adding) =
-        ManualPeopleEditor(session, entryId, revision, snapshot, input, busy, error, notice, conflict, pending, adding, owner)
+        ManualPeopleEditor(session, entryId, revision, snapshot, input, busy, error, notice, conflict, pending, adding, owner, sourceHash)
     override fun toString() = "ManualPeopleEditor(busy=$busy, redacted)"
 }
 
@@ -36,7 +36,9 @@ class ManualPeopleController internal constructor(
         val local = current()
         if (disposed || !local.supportsManualPeople || local.manualPeopleOwner == null || !local.ready || local.opening || local.error != null || local.recordPackage != null || local.recycleBin != null || local.sourceMemories != null || local.saving || local.savePending ||
             local.entries.none { it.id == id && it.currentRevision == revision }) return
-        val editor = ManualPeopleEditor(sessions.incrementAndGet(), id, revision, busy = true, owner = local.manualPeopleOwner)
+        val source = local.entries.first { it.id == id && it.currentRevision == revision }
+        val editor = ManualPeopleEditor(sessions.incrementAndGet(), id, revision, busy = true, owner = local.manualPeopleOwner,
+            sourceHash = OriginalExports.hash(source.originalText))
         publish { latest -> if (!disposed && latest.manualPeopleOwner === editor.owner && latest.ready && !latest.opening && latest.error == null &&
             latest.entries.any { it.id == id && it.currentRevision == revision }) latest.copy(manualPeopleEditor = editor) else latest }
         if (current().manualPeopleEditor?.session == editor.session) enqueue { store -> load(editor, store) }
@@ -77,6 +79,15 @@ class ManualPeopleController internal constructor(
             val tags = checkNotNull(store.manualPeople)
             if (tags !== editor.owner) throw ManualPeopleUnavailable()
             val snapshot = tags.read(editor.entryId)
+            // Loading newer metadata must not grant a stale reader authority over a
+            // different original or a restored/revoked source generation. Metadata
+            // version conflicts on the same source can still be explicitly reloaded.
+            if (snapshot.entryId != editor.entryId || snapshot.sourceRevision != editor.revision ||
+                snapshot.sourceHash != editor.sourceHash ||
+                editor.snapshot?.let { it.generation != snapshot.generation } == true) {
+                failed(editor, conflict = true, sourceChanged = true)
+                return
+            }
             val all = tags.snapshots()
             val epoch = store.localSearch?.epoch()
             publish { local -> if (!live(editor, local)) local else local.copy(manualPeople = all,
@@ -112,11 +123,12 @@ class ManualPeopleController internal constructor(
             catch (failure: Exception) { failed(editor, failure is ManualPeopleConflict || failure is ManualPeopleUnavailable) }
         }
     }
-    private fun failed(editor: ManualPeopleEditor, conflict: Boolean, reading: Boolean = false) = publish { local ->
+    private fun failed(editor: ManualPeopleEditor, conflict: Boolean, reading: Boolean = false, sourceChanged: Boolean = false) = publish { local ->
         if (disposed || local.manualPeopleOwner !== editor.owner) local else local.copy(manualPeople = emptyMap(), manualPeopleAvailable = false,
             manualPeopleError = "手工人物关联暂不可读取，请重试。", manualPeopleEditor = if (!live(editor, local)) local.manualPeopleEditor else local.manualPeopleEditor?.copy(
                 busy = false, conflict = conflict, notice = null,
-                error = if (conflict) "人物关联已由另一操作变化。输入已保留，请重新读取后再保存。"
+                error = if (sourceChanged) "原文版本或可用范围已变化。输入已保留，请返回列表刷新原文后重新打开。"
+                    else if (conflict) "人物关联已由另一操作变化。输入已保留，请重新读取后再保存。"
                     else if (reading) "手工人物关联读取失败，输入与加密数据已保留，请重试。"
                     else "人物关联保存状态待确认，输入已保留，请重试确认。"))
     }

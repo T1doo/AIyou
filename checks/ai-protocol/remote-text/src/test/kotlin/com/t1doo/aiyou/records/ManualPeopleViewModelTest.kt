@@ -106,6 +106,50 @@ class ManualPeopleViewModelTest {
         val reopened=h.open();assertEquals(listOf("小林"),reopened.snapshot!!.names)
     } }
 
+    @Test(timeout=12_000) fun staleReaderCannotAdoptNewOriginalAuthorityWhileOpeningPeopleEditor(): Unit = Harness().use { h -> runBlocking {
+        h.ready();h.reviseIndependently()
+        assertEquals(1,h.vm.state.value.entries.single().currentRevision)
+        h.vm.people.open(h.id,1);val editor=h.editor{!it.busy}
+        h.vm.people.add(editor.session,editor.snapshot?.version ?: 0,"旧页面添加的人物")
+        h.refreshToRevision(2)
+        assertTrue("Old reader must never acquire the new original's mutation authority",h.f.people.read(h.id).names.isEmpty())
+        assertTrue(h.mutations.isEmpty());assertTrue(editor.conflict);assertNull(editor.notice)
+        h.vm.people.close(editor.session)
+        val fresh=h.open();h.vm.people.add(fresh.session,0,"看过新原文后明确添加")
+        h.editor{it.notice!=null&&!it.busy};assertEquals(listOf("看过新原文后明确添加"),h.f.people.read(h.id).names)
+    } }
+
+    @Test(timeout=12_000) fun staleRetryCannotRetargetRetainedInputToAnUnseenNewOriginal(): Unit = Harness().use { h -> runBlocking {
+        h.ready();val editor=h.open();h.vm.people.edit(editor.session,0,"仍待确认的私密输入")
+        h.reviseIndependently();h.vm.people.retry(editor.session);val retry=h.editor{!it.busy}
+        h.vm.people.add(editor.session,retry.snapshot?.version ?: 0,retry.input)
+        h.refreshToRevision(2)
+        assertTrue("Reload must not silently bind an existing editor to an unseen original",h.f.people.read(h.id).names.isEmpty())
+        assertTrue(h.mutations.isEmpty());assertTrue(retry.conflict);assertNull(retry.notice)
+        assertEquals("仍待确认的私密输入",retry.input);assertEquals("合成独立草稿",h.vm.state.value.text)
+    } }
+
+    @Test(timeout=12_000) fun staleRetryAfterTrashRestoreAbaCannotAdoptNewGenerationOrLoseInput(): Unit = Harness().use { h -> runBlocking {
+        h.ready();val editor=h.open();val old=checkNotNull(editor.snapshot)
+        h.vm.people.edit(editor.session,0,"删除前保留的人物输入")
+        val bin=SqlRecycleBinRepository(h.f.base.gateway,h.f.base.tags)
+        val first=bin.read(h.id);val source=SourceVersion(h.id,1)
+        val trashed=bin.apply(RecycleMutation(source,first.generation,false,UUID.randomUUID().toString()))
+        bin.apply(RecycleMutation(source,trashed.generation,true,UUID.randomUUID().toString()))
+        assertTrue(h.f.people.read(h.id).generation>old.generation)
+        h.vm.people.retry(editor.session);val retry=h.editor{!it.busy}
+        h.vm.people.add(editor.session,retry.snapshot?.version ?: 0,retry.input)
+        h.refreshToRevision(1)
+        assertTrue("Old editor must not acquire restored source generation",h.f.people.read(h.id).names.isEmpty())
+        assertTrue(h.mutations.isEmpty());assertTrue(retry.conflict);assertEquals(old.generation,retry.snapshot!!.generation)
+        assertEquals("删除前保留的人物输入",retry.input)
+        h.vm.people.retry(editor.session);val repeat=h.editor{!it.busy};assertTrue(repeat.conflict)
+        assertEquals(old.generation,repeat.snapshot!!.generation)
+        h.vm.people.close(editor.session);val fresh=h.open()
+        h.vm.people.add(fresh.session,0,"恢复后新会话明确添加");h.editor{it.notice!=null&&!it.busy}
+        assertEquals(listOf("恢复后新会话明确添加"),h.f.people.read(h.id).names)
+    } }
+
     private class Harness:AutoCloseable {
         val f=ManualPeopleFixture();val id=f.base.entry()
         @Volatile var failWrite=false
@@ -135,6 +179,14 @@ class ManualPeopleViewModelTest {
         }
         init{runBlocking{original.updateDraft("合成独立草稿")}}
         val vm=LocalRecordsViewModel(Application(),{store})
+        fun reviseIndependently(){f.base.second().use{other->other.transaction{sql->
+            val text="合成独立所有者改写后的原文"
+            sql.execute("INSERT INTO entry_revisions VALUES(?,2,?,?,17)",listOf(id,text,OriginalExports.hash(text)))
+            sql.execute("UPDATE entries SET currentRevision=2 WHERE id=?",listOf(id))
+        }}}
+        suspend fun refreshToRevision(revision:Int){val before=vm.state.value.entries;vm.refreshLocalSearch();withTimeout(5_000){
+            vm.state.first{it.entries!==before&&it.entries.singleOrNull()?.currentRevision==revision&&it.manualPeopleAvailable}
+        }}
         suspend fun ready()=withTimeout(5_000){vm.state.first{it.ready&&!it.opening}}
         suspend fun editor(p:(ManualPeopleEditor)->Boolean)=withTimeout(5_000){checkNotNull(vm.state.first{it.manualPeopleEditor?.let(p)==true}.manualPeopleEditor)}
         suspend fun open():ManualPeopleEditor {vm.people.open(id,vm.state.value.entries.single().currentRevision);return editor{!it.busy&&it.snapshot!=null}}
