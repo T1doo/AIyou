@@ -63,4 +63,10 @@ python3 scripts/verify-ai-protocol-results.py
 SQL 适配、生命周期、附件字节与图像解码使用明确的主机测试边界，查找证明与回收站
 事务为生产 SQL。它不证明 Android、Room／SQLCipher、Compose、真机、多行原文返回
 位置、窄屏大字体或快速滚动内存峰值。SDK／通知权限未批准，不配置；无新 APK。
-CI 状态未知，未访问 Actions。新证据交上层独立运行签核。
+本轮提交的 CI 状态未知，未访问 Actions。新证据交上层独立运行签核。
+
+据上层从 GitHub 通知原邮件核实，旧提交
+`01584dd7df71d9ffa3754ffa2555fe4580c6abc0` 的 D01 run `38980866184` 于
+2026-10-16 23:43:47 UTC 失败，4 annotations，未给出原因。该结果不属于
+`cd7108e06a96650f64da135a69e78f267d4c7b59` 或本轮提交；不归因于旧 height／分包
+问题，不据此盲改或重跑，也不访问被拒绝的 Actions／日志／artifact 或替代路径。

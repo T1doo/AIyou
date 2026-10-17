@@ -93,3 +93,10 @@ SQL/controller662），零失败／错误／跳过；精确方法与 capture 指
 [可离线核验的完整证据与命令](evidence/F05_IMAGE_GRID_HOST_EVIDENCE.md)随本分支交付。
 原始 XML、capture、方法清单、verified report 和完整源码输入快照已分别核验，当前
 checkout 与本轮捕获输入逐字节一致；四种篡改探针均拒绝。签核仍交上层独审。
+
+上层补充的提交范围明确的 CI 事实：根据 GitHub 通知原邮件，
+`01584dd7df71d9ffa3754ffa2555fe4580c6abc0` 的 D01 run `38980866184` 于
+2026-10-16 23:43:47 UTC 失败，4 annotations，原因未给出；不是 `cd7108e` 或本轮提交
+的结果。不得归因于旧 height／分包问题。本轮未据此盲改或重跑，未访问 Actions、
+日志、artifact 或替代路径。收到断连通知后的自然检查点，文件／Git 命令仍可执行；
+继续原指定环境、原唯一写入者，未知锁保持。
