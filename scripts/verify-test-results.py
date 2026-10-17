@@ -100,6 +100,8 @@ for label, folder, minimum in targets:
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
         additional["com.t1doo.aiyou.CurrentImageSearchPresentationTest"] = (
+            "localEvidenceCardsUseCurrentSourceAndReturnWithoutChangingQuestion",
+            "narrowDoubleFontEvidenceShowsExplicitNoEvidenceAndKeepsManualListReachable",
             "imageFilterStartsOffCombinesLiteralAndDatesAndClearResetsEveryCondition",
             "narrowDoubleFontFilterIsReachableAndReadFailureCannotBecomeEmptySuccess",
             "gridRequiresExplicitToggleKeepsFailureCardAndOpensOriginalSource",

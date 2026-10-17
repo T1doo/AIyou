@@ -52,6 +52,7 @@ import com.t1doo.aiyou.designsystem.CaptureComposer
 import com.t1doo.aiyou.designsystem.ComponentState
 import com.t1doo.aiyou.designsystem.MemoryCard
 import com.t1doo.aiyou.designsystem.StatusNotice
+import com.t1doo.aiyou.designsystem.SourceCitationCard
 import com.t1doo.aiyou.data.EncryptedEntryRepository
 import com.t1doo.aiyou.ui.Destination
 import com.t1doo.aiyou.ui.SearchSection
@@ -112,6 +113,10 @@ fun LocalRecordsScreen(
     imageGridMode: Boolean = false,
     onImageGridMode: (Boolean) -> Unit = {},
     ownsImageGrid: () -> Boolean = { false },
+    evidenceMode: Boolean = false,
+    evidenceState: LocalEvidenceState = LocalEvidenceState(LocalEvidenceStage.WAITING),
+    onEvidenceMode: (Boolean) -> Unit = {},
+    onOpenEvidence: (LocalEvidenceCard) -> Unit = {},
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -141,8 +146,9 @@ fun LocalRecordsScreen(
     val filtered = destination == Destination.MEMORIES && requestedSearch && searchState?.stage != OriginalSearchStage.BROWSE
     val searchHits = remember(searchState) { searchState?.hits?.associateBy { it.entry.id }.orEmpty() }
     val displayedEntries = if (destination == Destination.NOW) local.entries.take(5)
+        else if (evidenceMode) evidenceState.cards.map { it.hit.entry }
         else if (filtered) searchState?.hits?.map { it.entry }.orEmpty() else local.entries
-    val gridEnabled = destination == Destination.MEMORIES && onlyImages && imageGridMode && imageGrid != null &&
+    val gridEnabled = destination == Destination.MEMORIES && !evidenceMode && onlyImages && imageGridMode && imageGrid != null &&
         searchState?.stage == OriginalSearchStage.READY
     val columns = if (LocalDensity.current.fontScale >= 1.5f) 1 else 2
     val gridRows = remember(displayedEntries, columns, gridEnabled) { if (gridEnabled) displayedEntries.chunked(columns) else emptyList() }
@@ -179,14 +185,16 @@ fun LocalRecordsScreen(
         if (filtered) add("search-status")
         if (destination == Destination.NOW) add("recent")
         if (local.ready && local.entries.isEmpty()) add("empty")
+        if (evidenceMode) add("local-evidence-status")
         addAll(if (gridEnabled) gridRows.map { it.first().id } else displayedEntries.map { it.id })
     }
-    LaunchedEffect(searchReturnAnchor, searchState, attachedViewport, contentKeys, returnViewportReady, expectedReturnHeightPx) {
+    LaunchedEffect(searchReturnAnchor, searchState, evidenceState, attachedViewport, contentKeys, returnViewportReady, expectedReturnHeightPx) {
         val anchor = searchReturnAnchor ?: return@LaunchedEffect
         fun observe(stage: String) = returnObserver?.onListReturnStage("search-anchor-$stage",
             searchState?.generation, attachedViewport.height, expectedReturnHeightPx, returnViewportReady, listState)
         observe("evaluate")
         if (destination != Destination.MEMORIES || searchState?.stage != OriginalSearchStage.READY ||
+            evidenceMode && evidenceState.stage != LocalEvidenceStage.READY ||
             !ownsSearchReturn() || !returnViewportReady || attachedViewport.height == 0 ||
             (expectedReturnHeightPx != null && attachedViewport.height != expectedReturnHeightPx)) { observe("waiting"); return@LaunchedEffect }
         snapshotFlow { listState.layoutInfo }.first { it.viewportSize == attachedViewport && it.totalItemsCount == contentKeys.size }
@@ -331,6 +339,11 @@ fun LocalRecordsScreen(
                             eventDatesAvailable = local.eventDatesAvailable, eventDatesError = local.eventDatesError,
                             onRefreshEventDates = onRefreshEventDates)
                     else SearchSection(demo = false)
+                    if (local.localSearch != null) TextButton(onClick = { onEvidenceMode(!evidenceMode) },
+                        enabled = local.ready && !local.opening && local.error == null,
+                        modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("local-evidence-mode")) {
+                        Text(if (evidenceMode) "本机出处候选 · 返回原文列表" else "为当前问题选取本机出处候选")
+                    }
                     if (onlyImages && imageGrid != null) TextButton(onClick = { onImageGridMode(!imageGridMode) },
                         enabled = local.ready && !local.opening && local.error == null,
                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-grid")) {
@@ -340,12 +353,12 @@ fun LocalRecordsScreen(
                 if (filtered) item("search-status") {
                     when (searchState?.stage) {
                         OriginalSearchStage.RUNNING -> StatusNotice("正在查找本机原文", "查找在后台进行。", state = ComponentState.LOADING)
-                        OriginalSearchStage.READY -> StatusNotice(if (displayedEntries.isEmpty()) {
+                        OriginalSearchStage.READY -> StatusNotice(if (searchState.hits.isEmpty()) {
                             if (onlyFavorites && !onlyImages && searchState.input.dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED && searchState.input.query.isEmpty() && searchState.input.tag == null && searchState.input.from.isEmpty() && searchState.input.through.isEmpty()) "还没有收藏记录" else "没有匹配的原文"
-                        } else "找到 ${displayedEntries.size} 条原文",
-                            if (displayedEntries.isEmpty()) { if (onlyImages) "可以关闭图片筛选，或调整其他查找条件。" else if (onlyFavorites) "可以切换全部记录，或在原文页收藏记录。" else "试试更短的关键词或调整日期。" } else
+                        } else "找到 ${searchState.hits.size} 条原文",
+                            if (searchState.hits.isEmpty()) { if (onlyImages) "可以关闭图片筛选，或调整其他查找条件。" else if (onlyFavorites) "可以切换全部记录，或在原文页收藏记录。" else "试试更短的关键词或调整日期。" } else
                                 searchState.message ?: "摘录来自当前版本，可以打开全文。",
-                            state = if (displayedEntries.isEmpty()) ComponentState.EMPTY else ComponentState.NORMAL)
+                            state = if (searchState.hits.isEmpty()) ComponentState.EMPTY else ComponentState.NORMAL)
                         OriginalSearchStage.INVALID -> StatusNotice("请检查查找条件", searchState.message.orEmpty(), state = ComponentState.ERROR)
                         OriginalSearchStage.FAILED -> StatusNotice("本机查找需要处理", searchState.message.orEmpty(), state = ComponentState.ERROR)
                         else -> StatusNotice("等待本机原文", "原文可读取后再显示查找结果。", state = ComponentState.LOADING)
@@ -355,7 +368,17 @@ fun LocalRecordsScreen(
                 if (local.ready && local.entries.isEmpty()) item("empty") {
                     StatusNotice(if (destination == Destination.NOW) "从一句话开始" else "还没有回忆", "文字保存在本机，无需配置模型。", state = ComponentState.EMPTY)
                 }
-                if (gridEnabled) items(gridRows, key = { it.first().id }) { row ->
+                if (evidenceMode) {
+                    item("local-evidence-status") {
+                        LocalEvidenceNotice(evidenceState)
+                    }
+                    items(evidenceState.cards, key = { it.reference.source.sourceId }) { card ->
+                        SourceCitationCard(originalMetadata(card.hit.entry), card.reference.quote,
+                            "原文版本 ${card.reference.source.revision} · Unicode 码点 [${card.reference.start}, ${card.reference.end})",
+                            modifier = Modifier.testTag("local-evidence-${card.reference.source.sourceId}"),
+                            onOpen = { onOpenEvidence(card) })
+                    }
+                } else if (gridEnabled) items(gridRows, key = { it.first().id }) { row ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                         row.forEach { entry ->
                             val hit = searchHits.getValue(entry.id)

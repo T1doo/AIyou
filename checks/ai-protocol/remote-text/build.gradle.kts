@@ -53,6 +53,7 @@ val vmProduction = layout.buildDirectory.dir("vm-production-test-sources")
 val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
     from("../../../app/src/main/java/com/t1doo/aiyou/records/RecordEventDateController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/CurrentImageGridController.kt")
+    from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalEvidenceController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/TaskProposalController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/TaskReminderController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/FactRecapController.kt")

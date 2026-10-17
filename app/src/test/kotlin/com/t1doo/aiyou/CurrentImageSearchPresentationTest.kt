@@ -123,4 +123,31 @@ class CurrentImageSearchPresentationTest {
         compose.onAllNodesWithTag("image-grid-entry-picture").assertCountEquals(0)
         assertTrue(grid.state.value.tiles.isEmpty())
     }
+    @Test fun localEvidenceCardsUseCurrentSourceAndReturnWithoutChangingQuestion(){
+        compose.setContent{Screen()}
+        compose.onNodeWithTag("original-search-query").performScrollTo().performTextReplacement("needle")
+        await{it.stage==OriginalSearchStage.READY}
+        compose.onNodeWithTag("local-evidence-mode").performScrollTo().performClick()
+        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-picture").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("local-evidence-picture").performScrollTo().assertExists()
+        compose.onNode(hasText("查看原文") and hasAnyAncestor(hasTestTag("local-evidence-picture")))
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("original-text").assertTextContains(picture.originalText)
+        compose.onNodeWithText("返回列表").performClick()
+        await{it.stage==OriginalSearchStage.READY&&it.input.query=="needle"}
+        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-picture").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("local-evidence-picture").assertExists()
+    }
+    @Test fun narrowDoubleFontEvidenceShowsExplicitNoEvidenceAndKeepsManualListReachable(){
+        compose.setContent{Screen(true)}
+        compose.onNodeWithTag("original-search-query").performScrollTo().performTextReplacement("missing")
+        await{it.stage==OriginalSearchStage.READY&&it.hits.isEmpty()}
+        val toggle=compose.onNodeWithTag("local-evidence-mode").performScrollTo().assertIsEnabled()
+        assertTrue(toggle.getUnclippedBoundsInRoot().height>=48.dp);toggle.performClick()
+        compose.waitUntil(3_000){compose.onAllNodesWithText("没有可引用的证据").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("没有可引用的证据").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("local-evidence-mode").performScrollTo().performClick()
+        compose.onAllNodesWithTag("local-evidence-status").assertCountEquals(0)
+        assertEquals("missing",results.get().input.query)
+    }
 }

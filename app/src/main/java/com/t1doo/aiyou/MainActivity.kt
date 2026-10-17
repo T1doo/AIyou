@@ -286,6 +286,7 @@ fun AIyouApp(
     var onlyFavorites by rememberSaveable { mutableStateOf(false) }
     var onlyImages by remember { mutableStateOf(false) }
     var imageGridMode by remember { mutableStateOf(false) }
+    var evidenceMode by remember { mutableStateOf(false) }
     var searchModeGeneration by remember { mutableLongStateOf(0L) }
     fun searchSource() = if (currentRecordsProvider != null) currentRecordsProvider?.invoke() else currentLocal
     fun searchInput(): OriginalSearchInput {
@@ -316,6 +317,11 @@ fun AIyouApp(
     val searchEmission by search.state.collectAsState()
     val renderedSearchInput = searchInput()
     val searchState = searchEmission.let { search.visible(local, renderedSearchInput) }
+    val evidence = remember { com.t1doo.aiyou.records.LocalEvidenceController(
+        currentSearch = { search.visible(searchSource(), searchInput()) }, onInvalidated = onRefreshLocalSearch) }
+    DisposableEffect(evidence) { onDispose { evidence.close() } }
+    val evidenceEmission by evidence.state.collectAsState()
+    val evidenceState = evidenceEmission.let { evidence.visible(searchState) }
     var searchReturnAnchor by remember { mutableStateOf<OriginalSearchReturnAnchor?>(null) }
     var searchReturnInput by remember { mutableStateOf<OriginalSearchInput?>(null) }
     var searchReturnSource by remember { mutableStateOf<List<com.t1doo.aiyou.model.StoredEntry>?>(null) }
@@ -324,6 +330,7 @@ fun AIyouApp(
     fun clearSearch() {
         taskSourceRoute=false
         search.clear()
+        evidence.clear()
         searchQuery.edit { replace(0, length, "") }
         searchFrom.edit { replace(0, length, "") }
         searchThrough.edit { replace(0, length, "") }
@@ -336,6 +343,7 @@ fun AIyouApp(
         onlyFavorites = false
         onlyImages = false
         imageGridMode = false
+        evidenceMode = false
         searchModeGeneration++
         searchReturnAnchor = null
         searchReturnInput = null
@@ -353,6 +361,8 @@ fun AIyouApp(
     SideEffect {
         search.sync(selected == Destination.MEMORIES && !recapRoute && !reading && !browsingRecycle && !browsingPackage && !showSettings && !demo &&
             local != null && local.originalEdit == null && local.originalHistory == null)
+        evidence.sync(evidenceMode && selected == Destination.MEMORIES && !recapRoute && !reading && !browsingRecycle &&
+            !browsingPackage && !showSettings && !demo && local != null && local.originalEdit == null && local.originalHistory == null, searchState)
         if (!reading && searchReturnAnchor != null &&
             (renderedSearchInput.copy(tagSnapshot = null) != searchReturnInput?.copy(tagSnapshot = null) || searchSource()?.entries !== searchReturnSource)) {
             searchReturnAnchor = null; searchReturnInput = null; searchReturnSource = null
@@ -498,7 +508,8 @@ fun AIyouApp(
             detailEntryId = id
         }
     }
-    val openSearchResult: (com.t1doo.aiyou.records.OriginalSearchHit) -> Unit = { hit ->
+    fun openSearchResultAt(hit: com.t1doo.aiyou.records.OriginalSearchHit,
+        reference: com.t1doo.aiyou.model.OriginalTextReference? = null) {
         if (ownsNavigation() && selected == Destination.MEMORIES && !reading && !showSettings && !demo &&
             search.canOpen(searchState, hit)) {
             var locationToken: com.t1doo.aiyou.records.OriginalReadingLocation? = null
@@ -524,7 +535,7 @@ fun AIyouApp(
                     if (detailEntryId == hit.entry.id) {
                         locationToken = com.t1doo.aiyou.records.OriginalReadingLocation(
                             hit.entry.id, hit.entry.currentRevision, com.t1doo.aiyou.model.OriginalExports.hash(hit.entry.originalText),
-                            hit.matchStartCodePoint, hit.matchEndCodePoint)
+                            reference?.start ?: hit.matchStartCodePoint, reference?.end ?: hit.matchEndCodePoint)
                         searchLocation = locationToken
                         locationGeneration = navigation.generation
                     }
@@ -532,6 +543,7 @@ fun AIyouApp(
             }
         }
     }
+    val openSearchResult: (com.t1doo.aiyou.records.OriginalSearchHit) -> Unit = { openSearchResultAt(it) }
     LocalOriginalSearchObserver.current?.let { observer ->
         SideEffect {
             observer.onResults(searchState, openSearchResult)
@@ -875,9 +887,16 @@ fun AIyouApp(
                     }
                 } },
                 imageGrid = imageGrid, imageGridMode = imageGridMode,
+                evidenceMode = evidenceMode, evidenceState = evidenceState,
+                onEvidenceMode = { value -> if (ownsNavigation() && detailEntryId == null &&
+                    selectedName == Destination.MEMORIES.name && !showSettings && !demo) {
+                    evidence.clear(); evidenceMode = value; if (value) imageGridMode = false
+                } },
+                onOpenEvidence = { card -> if (evidence.canOpen(evidenceState, card)) openSearchResultAt(card.hit, card.reference) },
                 onImageGridMode = { value -> if (ownsNavigation() && detailEntryId == null &&
                     selectedName == Destination.MEMORIES.name && !showSettings && !demo && onlyImages) {
                     imageGridMode = value
+                    if (value) { evidence.clear(); evidenceMode = false }
                 } },
                 ownsImageGrid = { ownsNavigation() && detailEntryId == null &&
                     selectedName == Destination.MEMORIES.name && !showSettings && !demo && imageGridMode && onlyImages &&
