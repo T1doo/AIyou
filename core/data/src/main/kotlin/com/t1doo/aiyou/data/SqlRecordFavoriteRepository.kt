@@ -58,6 +58,11 @@ internal class SqlRecordFavoriteRepository(private val database: RecordsSqlDatab
             } else {
                 if (before.currentRevision != mutation.sourceRevision || before.version != mutation.expectedVersion)
                     throw RecordFavoriteConflict()
+                // New writes require the source authority captured by the reading button.
+                // A known receipt above only acknowledges an existing write; it never writes again.
+                val generation = sql.query("SELECT COALESCE(a.generation,0) FROM entries e LEFT JOIN remote_source_access a ON a.entryId=e.id WHERE e.id=?",
+                    listOf(mutation.entryId)).single().single() as Long
+                if (generation != mutation.sourceGeneration) throw RecordFavoriteConflict()
                 source(sql, mutation)
                 val next = Math.addExact(before.version, 1)
                 val affected = sql.execute("UPDATE entries SET isFavorite=?,favoriteVersion=?,lastFavoriteMutationId=?,lastFavoriteSourceRevision=? " +

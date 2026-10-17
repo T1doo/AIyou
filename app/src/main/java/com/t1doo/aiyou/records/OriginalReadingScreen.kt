@@ -145,7 +145,7 @@ fun OriginalReadingScreen(
     requiredSource: OriginalReadingLocation? = null,
     requiredSourceTitle: String = "回顾来源版本已变化",
     requiredSourceMessage: String = "请返回回顾并重新生成，没有将新版本冒充旧摘录。",
-    onSetFavorite: ((String, Int, String, Long, Boolean) -> Unit)? = null,
+    onSetFavorite: ((RecordMetadataReadingSource, Long, Boolean) -> Unit)? = null,
     onRetryFavorite: (String) -> Unit = {},
     onRefreshFavorites: () -> Unit = {},
     eventDateController: RecordEventDateController? = null,
@@ -200,11 +200,11 @@ fun OriginalReadingScreen(
                     if (local.supportsFavorites) {
                         val favorite = local.favorites[entry.id]
                         val writing = local.favoriteWrites[entry.id]
-                        val sourceHash = remember(entry.originalText) { OriginalExports.hash(entry.originalText) }
+                        val favoriteSource = local.metadataReadingSource(entry.id, entry.currentRevision)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                             TextButton(onClick = {
-                                favorite?.let { onSetFavorite?.invoke(entry.id, entry.currentRevision, sourceHash, it.version, !it.isFavorite) }
-                            }, enabled = onSetFavorite != null && local.favoritesAvailable && favorite != null &&
+                                favorite?.let { favoriteSource?.let { source -> onSetFavorite?.invoke(source, it.version, !it.isFavorite) } }
+                            }, enabled = onSetFavorite != null && favoriteSource != null && local.favoritesAvailable && favorite != null &&
                                 !local.favoritesLoading && writing == null && !local.saving && !local.savePending,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-favorite-set")) {
                                 Text(if (favorite?.isFavorite == true && local.favoritesAvailable) "取消收藏" else "收藏")
@@ -248,9 +248,10 @@ fun OriginalReadingScreen(
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("查看附件") }
                         }
                         eventDateController?.let { controller ->
+                            val dateSource = local.metadataReadingSource(entry.id, entry.currentRevision)
                             TextButton(onClick = { if (canUseEventDate(entry.id, entry.currentRevision))
-                                controller.open(entry.id, entry.currentRevision) { canUseEventDate(entry.id, entry.currentRevision) } },
-                                enabled = local.supportsEventDates && !local.saving && !local.savePending,
+                                dateSource?.let { controller.open(it) { canUseEventDate(entry.id, entry.currentRevision) } } },
+                                enabled = local.supportsEventDates && dateSource != null && !local.saving && !local.savePending,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-event-date-open")) { Text("补记／纠正事件日期") }
                         }
                         if (local.supportsManualPeople) {

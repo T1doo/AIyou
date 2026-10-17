@@ -27,7 +27,7 @@ internal class RecordFavoriteFixture(upgrade: Boolean = true) : AutoCloseable {
     fun current(id: String) = base.bin.read(id).entry
     fun intent(id: String, value: Boolean, mutation: String = PermanentErasureFixture.uuid()): RecordFavoriteMutation {
         val entry = current(id); val state = favorites.read(id)
-        return RecordFavoriteMutation(id,entry.currentRevision,OriginalExports.hash(entry.originalText),state.version,value,mutation)
+        return RecordFavoriteMutation(id,entry.currentRevision,OriginalExports.hash(entry.originalText),state.version,value,mutation,SqlLocalProcessingRepository(base.gateway).versions().getValue(id).generation)
     }
     fun revise(id: String, text: String = "合成改写 needle 原文") {
         val old = current(id)

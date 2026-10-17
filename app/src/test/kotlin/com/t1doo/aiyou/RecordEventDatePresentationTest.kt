@@ -35,7 +35,7 @@ class RecordEventDatePresentationTest {
     private val one=StoredEntry("one",1,"合成 coffee needle 原文🙂",0,"UTC",ProcessingPolicy.LOCAL_ONLY)
     private val two=one.copy(id="two",originalText="合成 coffee needle 未知日期")
     private val state=mutableStateOf(LocalRecordUiState(ready=true,opening=false,text="synthetic-private-draft",
-        entries=listOf(one,two),supportsEventDates=true,eventDatesAvailable=true,
+        entries=listOf(one,two),localProcessingVersions=listOf(one,two).associate{it.id to LocalProcessingVersion(SourceVersion(it.id,it.currentRevision.toLong()),0)},supportsEventDates=true,eventDatesAvailable=true,
         eventDates=mapOf("one" to RecordEventDateSnapshot("one",0,null),"two" to RecordEventDateSnapshot("two",0,null)),
         supportsFavorites=true,favoritesAvailable=true,favorites=mapOf("one" to RecordFavoriteSnapshot("one",1,true),"two" to RecordFavoriteSnapshot("two",0,false)),
         manualTagsAvailable=true,manualTags=mapOf("one" to ManualTagSnapshot("one",1,listOf("手工")),"two" to ManualTagSnapshot("two",0,emptyList()))))

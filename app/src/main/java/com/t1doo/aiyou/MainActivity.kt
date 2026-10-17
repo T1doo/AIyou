@@ -820,8 +820,8 @@ fun AIyouApp(
                             searchLocation = location
                     }
                 },
-                onSetFavorite = favorites?.let { controller -> { id, revision, hash, version, desired ->
-                    if (canCopy(id, revision)) controller.set(id, revision, hash, version, desired)
+                onSetFavorite = favorites?.let { controller -> { source, version, desired ->
+                    if (canCopy(source.version.sourceId, source.version.revision.toInt())) controller.set(source, version, desired)
                 } },
                 onRetryFavorite = { id -> if (ownsNavigation() && detailEntryId == id && !showSettings && !demo) favorites?.retry(id) },
                 onRefreshFavorites = { if (ownsNavigation() && !showSettings && !demo) favorites?.refresh() },

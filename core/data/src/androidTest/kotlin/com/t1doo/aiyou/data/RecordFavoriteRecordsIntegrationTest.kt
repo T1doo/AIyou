@@ -55,7 +55,7 @@ class RecordFavoriteRecordsIntegrationTest {
         var batches=0
         do{check(++batches<=100);val batch=store.localSearch.batch()}while(batch.remaining)
         val held=store.localSearch.candidates(LocalSearchRequest("needle"))
-        val first=intent(record,0,true,"synthetic-favorite")
+        val first=intent(store,record,0,true,"synthetic-favorite")
         assertTrue(store.favorites.set(first).isFavorite)
         assertFalse(store.localSearch.resolve(held,record.id){fail("Old proof opened")})
         val query=LocalSearchRequest("needle",from="1970-01-01",through="1970-01-01",tag="合成标签",onlyFavorites=true)
@@ -69,7 +69,7 @@ class RecordFavoriteRecordsIntegrationTest {
         store.recycleBin.apply(RecycleMutation(SourceVersion(record.id,2),access.generation,true,"synthetic-restore"))
         store.closeAndAwait();val cold=open()
         assertTrue(cold.favorites.read(record.id).isFavorite);assertEquals(revised,cold.entries().single())
-        assertTrue(cold.favorites.set(intent(revised,1,false,"synthetic-unfavorite")).let{!it.isFavorite})
+        assertTrue(cold.favorites.set(intent(cold,revised,1,false,"synthetic-unfavorite")).let{!it.isFavorite})
         assertTrue(cold.localSearch.candidates(query).entries.isEmpty())
     }
 
@@ -77,15 +77,15 @@ class RecordFavoriteRecordsIntegrationTest {
         val first=open();val record=first.saveDraft(first.updateDraft("合成并发原文"),55,"UTC");val second=open()
         val sql=first.database.openHelper.writableDatabase
         sql.execSQL("CREATE TRIGGER synthetic_favorite_abort BEFORE UPDATE OF favoriteVersion ON entries BEGIN SELECT RAISE(ABORT,'synthetic abort'); END")
-        assertThrows(RecordFavoriteStorageFailure::class.java){first.favorites.set(intent(record,0,true,"synthetic-abort"))}
+        assertThrows(RecordFavoriteStorageFailure::class.java){first.favorites.set(intent(first,record,0,true,"synthetic-abort"))}
         assertEquals(0L,second.favorites.read(record.id).version)
         sql.execSQL("DROP TRIGGER synthetic_favorite_abort")
-        val winner=intent(record,0,true,"synthetic-winner");first.favorites.set(winner)
-        assertThrows(RecordFavoriteConflict::class.java){second.favorites.set(intent(record,0,false,"synthetic-stale"))}
+        val winner=intent(first,record,0,true,"synthetic-winner");first.favorites.set(winner)
+        assertThrows(RecordFavoriteConflict::class.java){second.favorites.set(intent(second,record,0,false,"synthetic-stale"))}
         assertTrue(second.favorites.set(winner).isFavorite);assertEquals(record,second.entries().single())
         first.closeAndAwait();second.closeAndAwait();assertEquals(1L,open().favorites.read(record.id).version)
     }
-    private fun intent(record:StoredEntry,version:Long,value:Boolean,id:String)=RecordFavoriteMutation(record.id,
-        record.currentRevision,OriginalExports.hash(record.originalText),version,value,id)
+    private fun intent(store:EncryptedEntryRepository,record:StoredEntry,version:Long,value:Boolean,id:String)=RecordFavoriteMutation(record.id,
+        record.currentRevision,OriginalExports.hash(record.originalText),version,value,id,store.localProcessing.versions().getValue(record.id).generation)
     private fun open()=EncryptedEntryRepository.openWithKey(context,file,key.copyOf()).also(stores::add)
 }

@@ -22,14 +22,14 @@ class RecordEventDatePreview internal constructor(val id: Long, val date: Record
     override fun toString() = "RecordEventDatePreview(redacted)"
 }
 class RecordEventDateEditor internal constructor(val session: Long, val entryId: String, val revision: Int,
-    internal val sourceHash: String, val snapshot: RecordEventDateSnapshot? = null,
+    internal val sourceHash: String, internal val sourceGeneration: Long, val snapshot: RecordEventDateSnapshot? = null,
     val dateInput: String = "", val zoneInput: String = "", val busy: Boolean = true,
     val preview: RecordEventDatePreview? = null, val conflict: Boolean = false,
     val error: String? = null, val notice: String? = null) {
     fun copy(snapshot: RecordEventDateSnapshot? = this.snapshot, dateInput: String = this.dateInput,
         zoneInput: String = this.zoneInput, busy: Boolean = this.busy, preview: RecordEventDatePreview? = this.preview,
         conflict: Boolean = this.conflict, error: String? = this.error, notice: String? = this.notice) =
-        RecordEventDateEditor(session, entryId, revision, sourceHash, snapshot, dateInput, zoneInput,
+        RecordEventDateEditor(session, entryId, revision, sourceHash, sourceGeneration, snapshot, dateInput, zoneInput,
             busy, preview, conflict, error, notice)
     override fun toString() = "RecordEventDateEditor(busy=$busy, redacted)"
 }
@@ -53,8 +53,8 @@ class RecordEventDateController internal constructor(
     private fun usable(local: LocalRecordUiState = current()) = !disposed && !local.eventDateControllerRetired &&
         local.ready && !local.opening && local.error == null && local.supportsEventDates
     private fun source(editor: RecordEventDateEditor, local: LocalRecordUiState = current()) =
-        local.entries.any { it.id == editor.entryId && it.currentRevision == editor.revision &&
-            OriginalExports.hash(it.originalText) == editor.sourceHash }
+        local.metadataReadingSource(editor.entryId, editor.revision)?.let {
+            it.contentHash == editor.sourceHash && it.generation == editor.sourceGeneration } == true
     private fun live(editor: RecordEventDateEditor, local: LocalRecordUiState = current()) = usable(local) &&
         local.eventDateEditor?.session == editor.session && editorGate()
     private fun owns(write: RecordEventDateWrite, local: LocalRecordUiState = current()) = usable(local) &&
@@ -64,11 +64,15 @@ class RecordEventDateController internal constructor(
     }
 
     fun open(id: String, revision: Int, allowed: () -> Boolean = { true }) {
+        current().metadataReadingSource(id, revision)?.let { open(it, allowed) }
+    }
+    fun open(source: RecordMetadataReadingSource, allowed: () -> Boolean = { true }) {
+        val id = source.version.sourceId; val revision = source.version.revision.toInt()
         val local = current()
         if (!allowed() || !usable(local) || local.saving || local.savePending || local.recordPackage != null ||
             local.recycleBin != null || local.captureDiscard != null || local.eventDateEditor != null) return
-        val entry = local.entries.firstOrNull { it.id == id && it.currentRevision == revision } ?: return
-        val editor = RecordEventDateEditor(tokens.incrementAndGet(), id, revision, OriginalExports.hash(entry.originalText))
+        if (!source.same(local.metadataReadingSource(id, revision))) return
+        val editor = RecordEventDateEditor(tokens.incrementAndGet(), id, revision, source.contentHash, source.generation)
         editorGate = allowed
         publish { if (!usable(it) || !allowed() || it.eventDateEditor != null || !source(editor, it)) it else it.copy(eventDateEditor = editor) }
         if (live(editor) && !enqueue { store -> load(editor, store) }) readFailed(editor)
@@ -110,7 +114,7 @@ class RecordEventDateController internal constructor(
         if (!local.eventDatesAvailable || local.eventDates[editor.entryId]?.let {
             it.version == snapshot.version && it.date == snapshot.date } != true) return stale(editor)
         val write = RecordEventDateWrite(tokens.incrementAndGet(), RecordEventDateMutation(editor.entryId,
-            editor.revision, editor.sourceHash, snapshot.version, editor.preview!!.date, UUID.randomUUID().toString()))
+            editor.revision, editor.sourceHash, snapshot.version, editor.preview!!.date, UUID.randomUUID().toString(), editor.sourceGeneration))
         publish { if (!live(editor, it) || !source(editor, it) || it.eventDateWrites[editor.entryId] != null ||
             it.eventDateEditor?.preview?.id != preview) it else it.copy(
                 eventDateWrites = it.eventDateWrites + (editor.entryId to write),

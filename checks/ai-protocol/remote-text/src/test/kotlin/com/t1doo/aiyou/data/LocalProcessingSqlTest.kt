@@ -11,7 +11,7 @@ class LocalProcessingSqlTest {
         val p=f.preview();val adopted=f.store.apply(f.request(p))
         val staleTag=f.request(index=1,mutation="late-tag")
         val favorites=SqlRecordFavoriteRepository(f.base.gateway)
-        favorites.set(RecordFavoriteMutation("source",2,OriginalExports.hash(f.original),0,true,"favorite"))
+        favorites.set(RecordFavoriteMutation("source",2,OriginalExports.hash(f.original),0,true,"favorite",port.versions().getValue("source").generation))
         val tasks=SqlManualTaskRepository(f.base.gateway,LocalCandidateFixture.KEY)
         try {
             tasks.create(ManualTaskCreate("manual-task","合成人工待办",10,"UTC","create-task"))

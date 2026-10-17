@@ -185,6 +185,7 @@ class RecordEventDateControllerTest {
     private class Harness : AutoCloseable {
         val entry = StoredEntry("one",1,"synthetic original",0,"UTC",ProcessingPolicy.LOCAL_ONLY)
         var state = LocalRecordUiState(ready=true,opening=false,entries=listOf(entry),text="private-draft",
+            localProcessingVersions=mapOf("one" to LocalProcessingVersion(SourceVersion("one",1),0)),
             supportsEventDates=true,eventDatesAvailable=true,eventDates=mapOf("one" to RecordEventDateSnapshot("one",0,null)))
         val durable = state.eventDates.toMutableMap(); val calls=mutableListOf<RecordEventDateMutation>()
         val receipts=mutableMapOf<String,RecordEventDateSnapshot>()
@@ -206,6 +207,11 @@ class RecordEventDateControllerTest {
             }
         }
         val store=object:EntryRepository {
+            override val localProcessing:LocalProcessingRepository=object:LocalProcessingRepository {
+                override fun versions()=state.entries.associate{it.id to LocalProcessingVersion(SourceVersion(it.id,it.currentRevision.toLong()),0)}
+                override fun read(source:SourceVersion):LocalProcessingSnapshot {val e=state.entries.single{it.id==source.sourceId};return LocalProcessingSnapshot(source,OriginalExports.hash(e.originalText),0,e.policy)}
+                override fun change(request:LocalProcessingChange)=error("Outside synthetic source contract")
+            }
             override val eventDates=port
             override suspend fun readDraft()=null
             override suspend fun updateDraft(text:String)=error("Outside contract")

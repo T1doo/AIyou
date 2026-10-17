@@ -11,10 +11,11 @@ class RecordFavoriteSnapshot(val entryId: String, val version: Long, val isFavor
 
 /** Explicit target value: replaying this intent never toggles the acknowledged state again. */
 class RecordFavoriteMutation(val entryId: String, val sourceRevision: Int, val sourceHash: String,
-    val expectedVersion: Long, val isFavorite: Boolean, val mutationId: String) {
+    val expectedVersion: Long, val isFavorite: Boolean, val mutationId: String, val sourceGeneration: Long) {
     init {
         RecordFavorites.identifier(entryId); RecordFavorites.identifier(mutationId)
         require(sourceRevision > 0 && expectedVersion in 0 until Long.MAX_VALUE) { "Invalid favorite intent" }
+        require(sourceGeneration >= 0) { "Invalid favorite source generation" }
         require(Regex("[0-9a-f]{64}").matches(sourceHash)) { "Invalid favorite source" }
     }
     override fun toString() = "RecordFavoriteMutation(redacted)"

@@ -26,10 +26,11 @@ class RecordEventDateSnapshot(val entryId: String, val version: Long, val date: 
 
 /** Explicit set/clear intent. Reusing an acknowledged intent never toggles or overwrites a newer choice. */
 class RecordEventDateMutation(val entryId: String, val sourceRevision: Int, val sourceHash: String,
-    val expectedVersion: Long, val date: RecordEventDate?, val mutationId: String) {
+    val expectedVersion: Long, val date: RecordEventDate?, val mutationId: String, val sourceGeneration: Long) {
     init {
         RecordFavorites.identifier(entryId); RecordFavorites.identifier(mutationId)
         require(sourceRevision > 0 && expectedVersion in 0 until Long.MAX_VALUE)
+        require(sourceGeneration >= 0)
         require(Regex("[0-9a-f]{64}").matches(sourceHash))
     }
     override fun toString() = "RecordEventDateMutation(redacted)"

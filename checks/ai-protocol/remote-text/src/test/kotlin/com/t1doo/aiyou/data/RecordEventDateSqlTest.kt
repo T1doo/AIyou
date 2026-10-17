@@ -64,7 +64,7 @@ class RecordEventDateSqlTest {
         assertThrows(RecordEventDateStorageFailure::class.java){f.dates.set(f.intent(id,DATE))}
         assertTrue(f.metadata().isEmpty());assertEquals(before,f.originalState());assertEquals(epoch,f.search.epoch())
         f.db.write("DROP TRIGGER synthetic_date_abort")
-        assertThrows(RecordEventDateConflict::class.java){f.dates.set(RecordEventDateMutation(id,1,"0".repeat(64),0,DATE,uuid()))}
+        assertThrows(RecordEventDateConflict::class.java){f.dates.set(RecordEventDateMutation(id,1,"0".repeat(64),0,DATE,uuid(),SqlLocalProcessingRepository(f.gateway).versions().getValue(id).generation))}
         assertTrue(f.metadata().isEmpty())
     }
 
@@ -220,10 +220,10 @@ internal class RecordEventDateFixture(upgrade: Boolean = true):AutoCloseable {
     }
     fun intent(id:String,date:RecordEventDate?):RecordEventDateMutation {
         val row=db.read("SELECT e.currentRevision,r.contentHash FROM entries e JOIN entry_revisions r ON r.entryId=e.id AND r.revision=e.currentRevision WHERE e.id=?",id).single()
-        return RecordEventDateMutation(id,(row[0] as Long).toInt(),row[1] as String,dates.read(id).version,date,RecordEventDateSqlTest.uuid())
+        return RecordEventDateMutation(id,(row[0] as Long).toInt(),row[1] as String,dates.read(id).version,date,RecordEventDateSqlTest.uuid(),SqlLocalProcessingRepository(gateway).versions().getValue(id).generation)
     }
     fun favorite(id:String,value:Boolean):RecordFavoriteMutation {
-        val i=intent(id,null);return RecordFavoriteMutation(id,i.sourceRevision,i.sourceHash,favorites.read(id).version,value,RecordEventDateSqlTest.uuid())
+        val i=intent(id,null);return RecordFavoriteMutation(id,i.sourceRevision,i.sourceHash,favorites.read(id).version,value,RecordEventDateSqlTest.uuid(),i.sourceGeneration)
     }
     fun append(id:String){
         val next=(db.read("SELECT currentRevision FROM entries WHERE id=?",id).single().single() as Long)+1

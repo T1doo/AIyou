@@ -29,7 +29,7 @@ class RecordEventDatesTest {
         assertNull(unknown.date); assertNull(clear.date)
         assertThrows(IllegalArgumentException::class.java) { RecordEventDateSnapshot("synthetic-entry", 0,
             RecordEventDate("2026-10-16", "Asia/Shanghai")) }
-        val intent = RecordEventDateMutation("synthetic-entry", 1, OriginalExports.hash("合成原文"), 1, null, "synthetic-clear")
+        val intent = RecordEventDateMutation("synthetic-entry", 1, OriginalExports.hash("合成原文"), 1, null, "synthetic-clear", 7)
         assertNull(intent.date); assertEquals(1L, intent.expectedVersion)
         assertFalse(intent.toString().contains("synthetic-entry"))
         assertFalse(RecordEventDate("2026-10-16", "Asia/Shanghai").toString().contains("2026"))

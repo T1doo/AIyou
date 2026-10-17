@@ -40,12 +40,12 @@ class RecordEventDateRecordsIntegrationTest {
         val store=open();NativeRecordsSchemaFixture.assertCurrentSchema(store.database.openHelper.writableDatabase)
         val original=store.entries().single();val revisions=store.revisions(original.id)
         assertNull(store.eventDates.read(original.id).date);assertEquals(0L,store.eventDates.read(original.id).version)
-        val first=intent(original,0,RecordEventDate("2024-02-29","Pacific/Kiritimati"),"synthetic-first")
+        val first=intent(store,original,0,RecordEventDate("2024-02-29","Pacific/Kiritimati"),"synthetic-first")
         store.eventDates.set(first);store.closeAndAwait()
         val cold=open();assertEquals(first.date,cold.eventDates.read(original.id).date)
         assertEquals(1L,cold.eventDates.set(first).version)
-        cold.eventDates.set(intent(original,1,RecordEventDate("2001-01-01","Asia/Shanghai"),"synthetic-correct"))
-        val clear=intent(original,2,null,"synthetic-clear");cold.eventDates.set(clear);cold.closeAndAwait()
+        cold.eventDates.set(intent(cold,original,1,RecordEventDate("2001-01-01","Asia/Shanghai"),"synthetic-correct"))
+        val clear=intent(cold,original,2,null,"synthetic-clear");cold.eventDates.set(clear);cold.closeAndAwait()
         val cleared=open();assertEquals(3L,cleared.eventDates.set(clear).version);assertNull(cleared.eventDates.read(original.id).date)
         assertEquals(original,cleared.entries().single());assertEquals(revisions,cleared.revisions(original.id))
         assertEquals(TextDraft("draft",7,"合成独立草稿"),cleared.readDraft())
@@ -55,11 +55,11 @@ class RecordEventDateRecordsIntegrationTest {
         val first=open();val original=first.saveDraft(first.updateDraft("合成 needle 原文"),55,"UTC");val second=open()
         val sql=first.database.openHelper.writableDatabase
         sql.execSQL("CREATE TEMP TRIGGER synthetic_date_abort BEFORE INSERT ON entry_event_dates BEGIN SELECT RAISE(ABORT,'synthetic abort'); END")
-        val winner=intent(original,0,RecordEventDate("2000-01-01","UTC"),"synthetic-winner")
+        val winner=intent(first,original,0,RecordEventDate("2000-01-01","UTC"),"synthetic-winner")
         assertThrows(RecordEventDateStorageFailure::class.java){first.eventDates.set(winner)}
         assertNull(second.eventDates.read(original.id).date);sql.execSQL("DROP TRIGGER synthetic_date_abort")
         first.eventDates.set(winner)
-        assertThrows(RecordEventDateConflict::class.java){second.eventDates.set(intent(original,0,null,"synthetic-stale"))}
+        assertThrows(RecordEventDateConflict::class.java){second.eventDates.set(intent(second,original,0,null,"synthetic-stale"))}
         assertEquals(winner.date,second.eventDates.set(winner).date)
         val event=second.localSearch.candidates(LocalSearchRequest("needle",from="2000-01-01",through="2000-01-01",dateBasis=RecordDateBasis.EVENT))
         assertEquals(listOf(original.id),event.entries.map{it.id});assertEquals(winner.date,event.eventDates!!.getValue(original.id).date)
@@ -67,7 +67,7 @@ class RecordEventDateRecordsIntegrationTest {
         assertEquals(ProcessingPolicy.LOCAL_ONLY,second.entries().single().policy)
         first.closeAndAwait();second.closeAndAwait();assertEquals(original,open().entries().single())
     }
-    private fun intent(record:StoredEntry,version:Long,date:RecordEventDate?,id:String)=RecordEventDateMutation(record.id,
-        record.currentRevision,OriginalExports.hash(record.originalText),version,date,id)
+    private fun intent(store:EncryptedEntryRepository,record:StoredEntry,version:Long,date:RecordEventDate?,id:String)=RecordEventDateMutation(record.id,
+        record.currentRevision,OriginalExports.hash(record.originalText),version,date,id,store.localProcessing.versions().getValue(record.id).generation)
     private fun open()=EncryptedEntryRepository.openWithKey(context,file,key.copyOf()).also(stores::add)
 }

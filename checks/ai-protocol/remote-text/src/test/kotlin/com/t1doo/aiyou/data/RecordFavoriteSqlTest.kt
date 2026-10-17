@@ -35,17 +35,17 @@ class RecordFavoriteSqlTest {
         assertThrows(RecordFavoriteStorageFailure::class.java){port.set(intent)}
         val committed=f.favoriteColumns(id); val epoch=f.epoch()
         assertTrue(port.set(intent).isFavorite); assertEquals(committed,f.favoriteColumns(id)); assertEquals(epoch,f.epoch())
-        assertThrows(RecordFavoriteConflict::class.java){port.set(RecordFavoriteMutation(id,1,intent.sourceHash,0,false,intent.mutationId))}
+        assertThrows(RecordFavoriteConflict::class.java){port.set(RecordFavoriteMutation(id,1,intent.sourceHash,0,false,intent.mutationId,intent.sourceGeneration))}
         assertEquals(committed,f.favoriteColumns(id))
     }
 
     @Test fun knownReceiptSurvivesTextEditButStaleSourceAndLaterChoiceNeverOverwrite(): Unit = RecordFavoriteFixture().use { f ->
         val id=f.entry(); val first=f.intent(id,true); f.favorites.set(first); f.revise(id)
         assertTrue(f.favorites.set(first).isFavorite); assertEquals(1L,f.favorites.read(id).version)
-        assertThrows(RecordFavoriteConflict::class.java){f.favorites.set(RecordFavoriteMutation(id,1,first.sourceHash,1,false,PermanentErasureFixture.uuid()))}
+        assertThrows(RecordFavoriteConflict::class.java){f.favorites.set(RecordFavoriteMutation(id,1,first.sourceHash,1,false,PermanentErasureFixture.uuid(),first.sourceGeneration))}
         val second=f.intent(id,false); f.favorites.set(second)
         assertThrows(RecordFavoriteConflict::class.java){f.favorites.set(first)}
-        assertThrows(RecordFavoriteConflict::class.java){f.favorites.set(RecordFavoriteMutation(id,2,"0".repeat(64),1,false,second.mutationId))}
+        assertThrows(RecordFavoriteConflict::class.java){f.favorites.set(RecordFavoriteMutation(id,2,"0".repeat(64),1,false,second.mutationId,second.sourceGeneration))}
         assertFalse(f.favorites.read(id).isFavorite); assertEquals(2L,f.favorites.read(id).version)
     }
 

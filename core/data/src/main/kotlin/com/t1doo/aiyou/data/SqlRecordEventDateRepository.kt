@@ -70,6 +70,11 @@ internal class SqlRecordEventDateRepository(private val database: RecordsSqlData
             } else {
                 if (before.current != mutation.sourceRevision || before.version != mutation.expectedVersion)
                     throw RecordEventDateConflict()
+                // Compare inside the same transaction as the metadata CAS; separate reads leave an ABA window.
+                // The receipt branch above can acknowledge an already committed intent without a new write.
+                val generation = sql.query("SELECT COALESCE(a.generation,0) FROM entries e LEFT JOIN remote_source_access a ON a.entryId=e.id WHERE e.id=?",
+                    listOf(mutation.entryId)).single().single() as Long
+                if (generation != mutation.sourceGeneration) throw RecordEventDateConflict()
                 source(sql,mutation)
                 val next = Math.addExact(before.version,1)
                 if (before.version == 0L) sql.execute("INSERT INTO entry_event_dates(entryId,version,lastMutationId,lastSourceRevision,localDate,timeZone) VALUES(?,?,?,?,?,?)",

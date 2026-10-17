@@ -153,7 +153,7 @@ class RecordEventDatePackageSqlTest {
     private fun set(f: PermanentErasureFixture, id: String, revision: Int, expected: Long, date: RecordEventDate?) =
         SqlRecordEventDateRepository(f.gateway).set(RecordEventDateMutation(id, revision,
             f.db.read("SELECT contentHash FROM entry_revisions WHERE entryId=? AND revision=?", id, revision).single().single() as String,
-            expected, date, uuid()))
+            expected, date, uuid(),SqlLocalProcessingRepository(f.gateway).versions().getValue(id).generation))
     private fun eventRows(f: PermanentErasureFixture) = f.db.read("SELECT * FROM entry_event_dates ORDER BY entryId")
     private fun assertRolledBack(f: PermanentErasureFixture, includesEventTable: Boolean) {
         val tables = listOf("entries", "entry_revisions", "entry_manual_tags", "remote_source_access", "local_jobs", "attachments") +

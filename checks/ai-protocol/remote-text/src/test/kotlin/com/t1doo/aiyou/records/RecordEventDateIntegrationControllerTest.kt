@@ -85,7 +85,8 @@ class RecordEventDateIntegrationControllerTest {
                 ui=h.local.recycleBin!!;controller.select(ui.session,id)
                 controller.requestErasure(ui.session,id,ui.records.single{it.entry.id==id}.generation)
                 val editorId=if(targetEditor)id else other
-                val editor=RecordEventDateEditor(81,editorId,1,h.intent(editorId,null).sourceHash,busy=false)
+                val editorIntent=if(targetEditor)targetPending.intent else otherPending.intent
+                val editor=RecordEventDateEditor(81,editorId,1,editorIntent.sourceHash,editorIntent.sourceGeneration,busy=false)
                 h.local=h.local.copy(eventDateEditor=editor)
                 ui=h.local.recycleBin!!;controller.confirm(ui.session,ui.confirmation!!.id);h.drain()
                 assertTrue(h.f.erase.read(id)!!.complete);assertFalse(h.local.eventDateWrites.containsKey(id))
@@ -147,6 +148,7 @@ class RecordEventDateIntegrationControllerTest {
             supportsRecordPackages=true,supportsRecycleBin=true,supportsPermanentErasure=true)
         val queue=ArrayDeque<suspend(EntryRepository)->Unit>()
         val store=object:EntryRepository {
+            override val localProcessing:LocalProcessingRepository=SqlLocalProcessingRepository(f.gateway)
             override val eventDates=object:RecordEventDateRepository by dates {
                 override fun snapshots():Map<String,RecordEventDateSnapshot>{if(failRead)throw RecordEventDateStorageFailure();return dates.snapshots()}
                 override fun set(mutation:RecordEventDateMutation):RecordEventDateSnapshot {
@@ -183,9 +185,9 @@ class RecordEventDateIntegrationControllerTest {
         fun intent(id:String,date:RecordEventDate?):RecordEventDateMutation {
             val row=f.db.read("SELECT r.contentHash FROM entry_revisions r WHERE r.entryId=? AND r.revision=1",id).single().single() as String
             val version=f.db.read("SELECT version FROM entry_event_dates WHERE entryId=?",id).singleOrNull()?.single() as Long? ?: 0L
-            return RecordEventDateMutation(id,1,row,version,date,uuid())
+            return RecordEventDateMutation(id,1,row,version,date,uuid(),SqlLocalProcessingRepository(f.gateway).versions().getValue(id).generation)
         }
-        fun refresh(){local=local.copy(entries=rows(),eventDates=dates.snapshots(),eventDatesAvailable=true,localSearch=search,localSearchEpoch=search.epoch())}
+        fun refresh(){local=local.copy(entries=rows(),eventDates=dates.snapshots(),eventDatesAvailable=true,localSearch=search,localSearchEpoch=search.epoch(),localProcessingVersions=SqlLocalProcessingRepository(f.gateway).versions())}
         fun drain()=runBlocking{while(queue.isNotEmpty())queue.removeFirst()(store)}
         override fun close(){f.close()}
     }

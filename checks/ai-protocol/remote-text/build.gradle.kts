@@ -52,6 +52,7 @@ tasks.named("compileKotlin") { dependsOn(syncProduction) }
 // Actual ViewModel/controller code, with only Android opening/lifecycle/image platform shells.
 val vmProduction = layout.buildDirectory.dir("vm-production-test-sources")
 val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
+    from("../../../app/src/main/java/com/t1doo/aiyou/records/RecordMetadataReadingSource.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/RecordEventDateController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/CurrentImageGridController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalEvidenceController.kt")

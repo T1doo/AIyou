@@ -263,6 +263,9 @@ class LocalRecordsViewModel internal constructor(
                                 val entries = store.entries()
                                 val favoriteValues = readFavoriteSource(store)
                                 val eventDateValues = readEventDateSource(store)
+                                // Publish the saved source ledger before enabling immediate metadata actions.
+                                // Its optional read failure must not change the acknowledged record save.
+                                refreshProcessingVersions(entries)
                                 pendingCommit = null
                                 persistedDraft = null
                                 captureDraftMayBeConsumed = false
@@ -392,8 +395,8 @@ class LocalRecordsViewModel internal constructor(
                     eventDatesAvailable = false, eventDatesError = "记录列表已变化，请重新读取事件日期。") else transformed
             val eventEditor = eventSource.eventDateEditor
             val dated = if (eventEditor != null && (!eventSource.ready || eventSource.opening || eventSource.error != null ||
-                eventSource.entries.none { it.id == eventEditor.entryId && it.currentRevision == eventEditor.revision &&
-                    com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == eventEditor.sourceHash }))
+                eventSource.metadataReadingSource(eventEditor.entryId, eventEditor.revision)?.let {
+                    it.contentHash == eventEditor.sourceHash && it.generation == eventEditor.sourceGeneration } != true))
                 eventSource.copy(eventDateEditor = eventEditor.copy(preview = null, conflict = true,
                     error = "原文已变化或不可用，输入已保留。请关闭后重新打开。")) else eventSource
             val personEditor = dated.manualPeopleEditor

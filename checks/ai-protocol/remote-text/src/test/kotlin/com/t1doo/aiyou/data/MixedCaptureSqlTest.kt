@@ -133,7 +133,7 @@ class MixedCaptureSqlTest {
         fixture().use { f ->
             val c=repo(f);val base=c.current();val d=c.add(base,intent(base),png)
             c.save(d,10,"UTC");val favorites=SqlRecordFavoriteRepository(f.gateway)
-            assertTrue(favorites.set(RecordFavoriteMutation(d.id,1,OriginalExports.hash(""),0,true,uuid())).isFavorite)
+            assertTrue(favorites.set(RecordFavoriteMutation(d.id,1,OriginalExports.hash(""),0,true,uuid(),SqlLocalProcessingRepository(f.gateway).versions().getValue(d.id).generation)).isFavorite)
             assertEquals(0L, f.tags.read(d.id).version)
             f.tags.replace(ManualTagMutation(d.id,0,listOf("合成照片"),uuid()))
             val search=SqlLocalSearchRepository(f.gateway,f.tags);var n=0;while(search.batch().remaining) check(++n<100)

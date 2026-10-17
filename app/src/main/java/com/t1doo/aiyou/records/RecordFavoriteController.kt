@@ -41,19 +41,26 @@ class RecordFavoriteController internal constructor(
         local.favoriteWrites[write.intent.entryId]?.token == write.token
 
     fun set(id: String, revision: Int, hash: String, version: Long, favorite: Boolean) {
+        val source = current().metadataReadingSource(id, revision)?.takeIf { it.contentHash == hash } ?: return
+        set(source, version, favorite)
+    }
+    fun set(source: RecordMetadataReadingSource, version: Long, favorite: Boolean) {
+        val id = source.version.sourceId; val revision = source.version.revision.toInt(); val hash = source.contentHash
         val local = current()
         if (!usable(local) || !local.favoritesAvailable || local.favoritesLoading || local.saving || local.savePending ||
             local.recycleBin != null || local.recordPackage != null || local.captureDiscard != null ||
             local.favoriteWrites[id] != null) return
         val entry = local.entries.firstOrNull { it.id == id && it.currentRevision == revision } ?: return
+        if (!source.same(local.metadataReadingSource(id, revision))) return
         val snapshot = local.favorites[id] ?: return
         if (snapshot.version != version || OriginalExports.hash(entry.originalText) != hash || snapshot.isFavorite == favorite) return
         val write = RecordFavoriteWrite(tokens.incrementAndGet(),
-            RecordFavoriteMutation(id, revision, hash, version, favorite, UUID.randomUUID().toString()))
+            RecordFavoriteMutation(id, revision, hash, version, favorite, UUID.randomUUID().toString(), source.generation))
         publish { latest ->
             if (!usable(latest) || !latest.favoritesAvailable || latest.favoritesLoading || latest.saving || latest.savePending ||
                 latest.recycleBin != null || latest.recordPackage != null || latest.captureDiscard != null || latest.favoriteWrites[id] != null ||
-                latest.entries.none { it == entry } || latest.favorites[id]?.let { it.version == version && it.isFavorite == snapshot.isFavorite } != true) latest
+                !source.same(latest.metadataReadingSource(id, revision)) || latest.entries.none { it == entry } ||
+                latest.favorites[id]?.let { it.version == version && it.isFavorite == snapshot.isFavorite } != true) latest
             else latest.copy(favoriteWrites = latest.favoriteWrites + (id to write), favoriteNotice = null, favoriteNoticeEntryId = null, favoriteNoticeReceipt = null)
         }
         if (owns(write)) submit(write)

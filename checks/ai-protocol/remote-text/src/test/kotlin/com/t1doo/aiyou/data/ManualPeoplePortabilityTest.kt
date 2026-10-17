@@ -52,7 +52,7 @@ class ManualPeoplePortabilityTest {
             val id=source.seed();source.revise(id)
             source.people!!.replace(ManualPeopleMutation(source.people!!.read(id),listOf("小林"),uuid()))
             source.people!!.replace(ManualPeopleMutation(source.people!!.read(id),listOf("小林#2🙂"),uuid()))
-            if(withDate)source.dates.set(RecordEventDateMutation(id,2,OriginalExports.hash(TEXT2),0,DATE,uuid()))
+            if(withDate)source.dates.set(RecordEventDateMutation(id,2,OriginalExports.hash(TEXT2),0,DATE,uuid(),SqlLocalProcessingRepository(source.base.gateway).versions().getValue(id).generation))
             val snapshot=source.originals.capture(listOf(SourceVersion(id,2)),uuid(),50)
             val bytes=source.export(if(history)source.media.previewHistory(snapshot)else source.media.preview(snapshot))
             assertEquals("AIYOUPK6",bytes.copyOfRange(0,8).toString(Charsets.US_ASCII))

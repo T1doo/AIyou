@@ -203,17 +203,19 @@ class RecordFavoriteControllerTest {
     private class Harness : AutoCloseable {
         val f=RecordFavoriteFixture();val id=f.entry();var port:RecordFavoriteRepository=f.favorites
         var state=LocalRecordUiState(ready=true,opening=false,entries=listOf(f.current(id)),supportsFavorites=true,
-            favorites=f.favorites.snapshots(),favoritesAvailable=true,localSearch=f.search,localSearchEpoch=f.epoch())
+            favorites=f.favorites.snapshots(),favoritesAvailable=true,localSearch=f.search,localSearchEpoch=f.epoch(),
+            localProcessingVersions=SqlLocalProcessingRepository(f.base.gateway).versions())
         val queue=ArrayDeque<suspend(EntryRepository)->Unit>();var accept=true
         private val base=SqliteVmEntryRepository(f.db,f.base.gateway,RemoteTextTransactions(f.base.gateway)){}
         private val store=object:EntryRepository by base {
-            override val favorites get()=port;override val localSearch get()=f.search
+            override val favorites get()=port;override val localProcessing=SqlLocalProcessingRepository(f.base.gateway)
+            override val localSearch get()=f.search
             override val recycleBin get()=f.base.bin;override val permanentErasure get()=f.base.erase
         }
         val controller=RecordFavoriteController({state},{state=it(state)},{if(accept){queue.addLast(it);true}else false})
         fun choose(value:Boolean){val entry=state.entries.single();controller.set(id,entry.currentRevision,
             OriginalExports.hash(entry.originalText),state.favorites.getValue(id).version,value)}
-        fun drain()=runBlocking{while(queue.isNotEmpty())queue.removeFirst()(store)}
+        fun drain()=runBlocking{while(queue.isNotEmpty()){queue.removeFirst()(store);state=state.copy(localProcessingVersions=SqlLocalProcessingRepository(f.base.gateway).versions())}}
         override fun close(){controller.dispose();f.close()}
     }
 
@@ -238,6 +240,7 @@ class RecordFavoriteControllerTest {
             override val attachments=f.base.media;override val editDrafts=f.base.edits
             override val recordPackages=f.base.packages;override val recycleBin=f.base.bin
             override val permanentErasure=f.base.erase
+            override val localProcessing=SqlLocalProcessingRepository(gate)
             override val localSearch=f.search
             override suspend fun prepare(){check(primary.read("PRAGMA user_version").single().single()==9L)}
             override fun close()=lifetime.close()

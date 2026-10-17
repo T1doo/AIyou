@@ -36,7 +36,7 @@ class RecordFavoritePresentationTest {
     private val one=StoredEntry("one",1,"合成 needle 第一条🙂",55,"UTC",ProcessingPolicy.LOCAL_ONLY)
     private val two=StoredEntry("two",1,"合成 needle 第二条",65,"UTC",ProcessingPolicy.LOCAL_ONLY)
     private val state=mutableStateOf(LocalRecordUiState(ready=true,opening=false,text="synthetic-private-draft",
-        entries=listOf(one,two),supportsFavorites=true,favoritesAvailable=true,
+        entries=listOf(one,two),localProcessingVersions=listOf(one,two).associate{it.id to LocalProcessingVersion(SourceVersion(it.id,it.currentRevision.toLong()),0)},supportsFavorites=true,favoritesAvailable=true,
         favorites=mapOf("one" to RecordFavoriteSnapshot("one",0,false),"two" to RecordFavoriteSnapshot("two",0,false))))
     private val queue=ArrayDeque<suspend(EntryRepository)->Unit>()
     private val durable=state.value.favorites.toMutableMap()
