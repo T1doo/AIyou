@@ -25,7 +25,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
     listState: LazyListState = rememberLazyListState(), onOpenEntry: (String) -> Unit = {}, selectedEntryId: String? = null) {
     val ui=local.mixedCapture ?: MixedCaptureUiState()
     val enabled=local.ready && !local.opening && local.error==null && ui.draft!=null
-    val editable=enabled && !ui.busy && ui.selection==null && !ui.uncertainSave && ui.draft?.discarding!=true
+    val editable=enabled && !ui.busy && ui.selection==null && !ui.uncertainSave && !ui.discardPending && ui.draft?.discarding!=true
     val day by produceState(controller.today(),controller) {
         while(true) { value=controller.today();delay(60_000) }
     }
@@ -36,10 +36,11 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
     val scope=rememberCoroutineScope()
     LaunchedEffect(recentIds,atTop) { if(atTop) seenIds=recentIds }
     DisposableEffect(controller) { onDispose { controller.cancelSelection() } }
-    if(ui.confirmDiscard) AlertDialog(onDismissRequest=controller::cancelDiscard,title={Text("清空这份图文草稿？")},
-        text={Text("将清理这份草稿的文字和加密暂存图片。已保存的记录保持不变。")},
-        confirmButton={TextButton(onClick=controller::confirmDiscard,enabled=!ui.busy,modifier=Modifier.heightIn(min=48.dp).testTag("mixed-discard-confirm")){Text("确认清空草稿")}},
-        dismissButton={TextButton(onClick=controller::cancelDiscard,enabled=!ui.busy){Text("继续编辑")}})
+    if(ui.confirmDiscard) AlertDialog(onDismissRequest=controller::cancelDiscard,title={Text(if(ui.discardPending) "清空结果待核对" else "清空这份图文草稿？")},
+        text={Text(if(ui.discardPending) "清空可能已经完成。先核对这次清空，再继续记录；已清理的图片不会自动恢复。"
+            else "将清理这份草稿的文字和加密暂存图片。已保存的记录保持不变。")},
+        confirmButton={TextButton(onClick=controller::confirmDiscard,enabled=!ui.busy,modifier=Modifier.heightIn(min=48.dp).testTag("mixed-discard-confirm")){Text(if(ui.discardPending) "核对同一次清空" else "确认清空草稿")}},
+        dismissButton={TextButton(onClick=controller::cancelDiscard,enabled=!ui.busy){Text(if(ui.discardPending) "稍后核对" else "继续编辑")}})
     Column(modifier.fillMaxSize()) {
         if(recentIds.any { it !in seenIds }) TextButton(onClick={scope.launch { listState.animateScrollToItem(0) }},
             modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("mixed-new-records")) { Text("有新内容 · 查看今天最近记录") }
@@ -62,30 +63,34 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                 item("composer") { OutlinedTextField(value=ui.text,onValueChange=controller::edit,enabled=editable,
                     label={Text("写下此刻（也可以只添加图片）")},minLines=4,maxLines=8,
                     modifier=Modifier.fillMaxWidth().testTag("mixed-text")) }
-                item("count") { Text("已选 ${ui.draft!!.images.size} / 20 张 · ${ui.draft.images.sumOf { it.intent.byteSize }} 字节",modifier=Modifier.testTag("mixed-count"))
-                    Text("JPEG / PNG；单张最多 16 MiB，合计最多 64 MiB。原图可能含拍摄资料。无 OCR，仅按文字与手工标签查找。") }
-                items(ui.draft!!.images,key={"draft-image:"+it.intent.id}) { item ->
-                    Column(Modifier.fillMaxWidth()) {
-                        val picture=ui.pictures[item.intent.id] as? PlatformAttachmentPicture
-                        if(picture!=null) Image(picture.image,"草稿图片缩略图",contentScale=ContentScale.Fit,
-                            modifier=Modifier.size(120.dp).testTag("mixed-thumb:"+item.intent.id))
-                        Text("${item.intent.mediaType} · ${item.intent.byteSize} 字节 · "+if(item.state==CaptureImageState.READY) "已加密暂存" else "尚未确认完整保存")
-                        if(item.state!=CaptureImageState.READY) OutlinedButton(onClick={controller.select(item.intent.id)},enabled=editable,
-                            modifier=Modifier.heightIn(min=48.dp)){Text("重新选择同一图片")}
-                        TextButton(onClick={controller.remove(item.intent.id)},enabled=editable && ui.pendingEdits==0,
-                            modifier=Modifier.heightIn(min=48.dp).testTag("mixed-remove:"+item.intent.id)){Text("移除图片")}
+                if(!ui.discardPending) {
+                    item("count") { Text("已选 ${ui.draft!!.images.size} / 20 张 · ${ui.draft.images.sumOf { it.intent.byteSize }} 字节",modifier=Modifier.testTag("mixed-count"))
+                        Text("JPEG / PNG；单张最多 16 MiB，合计最多 64 MiB。原图可能含拍摄资料。无 OCR，仅按文字与手工标签查找。") }
+                    items(ui.draft!!.images,key={"draft-image:"+it.intent.id}) { item ->
+                        Column(Modifier.fillMaxWidth()) {
+                            val picture=ui.pictures[item.intent.id] as? PlatformAttachmentPicture
+                            if(picture!=null) Image(picture.image,"草稿图片缩略图",contentScale=ContentScale.Fit,
+                                modifier=Modifier.size(120.dp).testTag("mixed-thumb:"+item.intent.id))
+                            Text("${item.intent.mediaType} · ${item.intent.byteSize} 字节 · "+if(item.state==CaptureImageState.READY) "已加密暂存" else "尚未确认完整保存")
+                            if(item.state!=CaptureImageState.READY) OutlinedButton(onClick={controller.select(item.intent.id)},enabled=editable,
+                                modifier=Modifier.heightIn(min=48.dp)){Text("重新选择同一图片")}
+                            TextButton(onClick={controller.remove(item.intent.id)},enabled=editable && ui.pendingEdits==0,
+                                modifier=Modifier.heightIn(min=48.dp).testTag("mixed-remove:"+item.intent.id)){Text("移除图片")}
+                        }
                     }
+                    item("metadata") { Row { Checkbox(ui.retainJpegMetadata,onCheckedChange=controller::metadata,enabled=editable)
+                        Text("保留 JPEG 拍摄资料；取消勾选将移除拍摄资料与注释。") } }
+                    item("add") { OutlinedButton(onClick={controller.select()},enabled=editable && ui.pendingEdits==0,
+                        modifier=Modifier.heightIn(min=48.dp).testTag("mixed-add")){Text("添加图片")}}
                 }
-                item("metadata") { Row { Checkbox(ui.retainJpegMetadata,onCheckedChange=controller::metadata,enabled=editable)
-                    Text("保留 JPEG 拍摄资料；取消勾选将移除拍摄资料与注释。") } }
-                item("add") { OutlinedButton(onClick={controller.select()},enabled=editable && ui.pendingEdits==0,
-                    modifier=Modifier.heightIn(min=48.dp).testTag("mixed-add")){Text("添加图片")}}
-                item("save") { Button(onClick=controller::save,enabled=enabled && !ui.busy && ui.selection==null && ui.pendingEdits==0,
+                item("save") { Button(onClick=controller::save,enabled=enabled && !ui.busy && ui.selection==null && ui.pendingEdits==0 && !ui.discardPending,
                     modifier=Modifier.heightIn(min=48.dp).testTag("mixed-save")){Text(if(ui.uncertainSave) "核对同一次保存" else "保存这条记录")}}
-                item("clear") { TextButton(onClick=controller::requestDiscard,enabled=editable && ui.pendingEdits==0,
-                    modifier=Modifier.heightIn(min=48.dp).testTag("mixed-clear")){Text("清空草稿")}}
+                item("clear") { TextButton(onClick={if(ui.discardPending) controller.confirmDiscard() else controller.requestDiscard()},
+                    enabled=(editable || enabled && ui.discardPending && !ui.busy) && ui.pendingEdits==0,
+                    modifier=Modifier.heightIn(min=48.dp).testTag("mixed-clear")){Text(if(ui.discardPending) "核对同一次清空" else "清空草稿")}}
             }
             item("status") {
+                if(ui.discardPending) Text("清空前内容仅供核对。请核对同一次清空后继续记录；也可稍后回来核对。",modifier=Modifier.testTag("mixed-discard-pending"))
                 if(ui.busy || ui.pendingEdits>0 || ui.selection?.phase in setOf(AttachmentImportPhase.PREPARING,AttachmentImportPhase.SAVING)) Text("正在保存或核对本机数据，请稍候。")
                 ui.error?.let { Text(it,modifier=Modifier.testTag("mixed-error")) }
                 ui.notice?.let { Text(it,modifier=Modifier.testTag("mixed-notice")) }
@@ -99,6 +104,6 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
             }
         }
         if(enabled && recent.isNotEmpty()) TextButton(onClick={scope.launch { listState.animateScrollToItem(2+recent.size) }},
-            modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("mixed-jump-composer")) { Text("继续记录") }
+            modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("mixed-jump-composer")) { Text(if(ui.discardPending) "查看清空核对" else "继续记录") }
     }
 }

@@ -95,9 +95,28 @@ class MixedCapturePresentationTest {
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
         compose.onNodeWithTag("mixed-text").assertTextContains("下一份合成草稿")
     }
+    @Test fun lostClearAckHasReachableSameClearRetryAndCannotPromiseContinuedEditingBeforeVerification() {
+        content();compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").performTextInput("合成清空前图文");drain();add()
+        val old=f.ui.draft!!.id;f.failDiscardAck=true
+        click("mixed-clear");compose.onNodeWithTag("mixed-discard-confirm").performClick();drain()
+        compose.onNodeWithText("清空结果待核对").assertIsDisplayed()
+        compose.onNodeWithText("稍后核对").performClick()
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").assertIsNotEnabled().assertTextContains("合成清空前图文")
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-save"))
+        compose.onNodeWithTag("mixed-save").assertIsNotEnabled()
+        click("mixed-clear");drain()
+        compose.runOnIdle { assertNotEquals(old,f.ui.draft!!.id);assertFalse(f.ui.discardPending);assertNull(f.ui.error);assertEquals(0,f.saves) }
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").assertIsEnabled().performTextInput("合成核对后新输入");drain()
+        click("mixed-save");drain()
+        compose.runOnIdle { assertEquals("合成核对后新输入",f.local.value.entries.single().originalText) }
+    }
     private class Fixture {
         private var draft=CaptureDraft(uuid(),1,"",emptyList());private val bytes=mutableMapOf<String,ByteArray>()
-        val queue=ArrayDeque<suspend(EntryRepository)->Unit>();var saves=0;var failSave=false
+        val queue=ArrayDeque<suspend(EntryRepository)->Unit>();var saves=0;var failSave=false;var failDiscardAck=false
+        private val discarded=mutableSetOf<String>()
         val local=mutableStateOf(LocalRecordUiState(ready=true,opening=false,supportsMixedCapture=true,mixedCapture=MixedCaptureUiState()))
         private var entries=emptyList<StoredEntry>()
         val store=object:EntryRepository {
@@ -107,7 +126,11 @@ class MixedCapturePresentationTest {
                 override suspend fun add(expected:CaptureDraft,intent:AttachmentIntent,bytes:ByteArray):CaptureDraft { this@Fixture.bytes[intent.id]=bytes.copyOf();return next(images=draft.images+CaptureDraftImage(intent,CaptureImageState.READY)) }
                 override suspend fun image(expected:CaptureDraft,id:String)=bytes.getValue(id).copyOf()
                 override suspend fun remove(draftId:String,imageId:String)=next(images=draft.images.filterNot{it.intent.id==imageId})
-                override suspend fun discard(draftId:String):CaptureDraft { draft=CaptureDraft(uuid(),1,"",emptyList());return draft }
+                override suspend fun discard(draftId:String):CaptureDraft {
+                    if(draft.id==draftId){discarded+=draftId;draft=CaptureDraft(uuid(),1,"",emptyList())}else check(draftId in discarded)
+                    if(failDiscardAck){failDiscardAck=false;error("Synthetic lost clear ACK after committed discard")}
+                    return draft
+                }
                 override suspend fun save(expected:CaptureDraft,capturedAtMillis:Long,zone:String):CaptureSaveResult {
                     if(failSave)error("Synthetic failed save")
                     saves++;entries=entries+StoredEntry(expected.id,1,expected.text,capturedAtMillis,zone,ProcessingDefaults.policy)

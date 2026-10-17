@@ -182,6 +182,7 @@ for label, folder, minimum in targets:
             "removingLastImageRejectsEmptyRecordAndCancelKeepsDraftAndRetiresPicker",
             "failedSaveRetainsTextAndImagesAndPrivateComposerNeverEntersSavedState",
             "newSaveWhileComposerIsScrolledOnlyOffersExplicitJumpAndReaderReturnKeepsNextDraft",
+            "lostClearAckHasReachableSameClearRetryAndCannotPromiseContinuedEditingBeforeVerification",
         )
         additional["com.t1doo.aiyou.FactRecapPresentationTest"] = (
             "actualNarrowDoubleFontRouteShowsOriginalExcerptThenFullTextAndReturnsToSameCard",
