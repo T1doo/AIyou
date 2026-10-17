@@ -139,6 +139,7 @@ fun OriginalReadingScreen(
     onStopAi: (Long) -> Unit = {},
     onCloseAi: (Long) -> Unit = {},
     onOpenTags: ((String, Int) -> Unit)? = null,
+    onOpenPeople: ((String, Int) -> Unit)? = null,
     onMoveToRecycleBin: ((String, Int) -> Unit)? = null,
     location: OriginalReadingLocation? = null,
     requiredSource: OriginalReadingLocation? = null,
@@ -251,6 +252,13 @@ fun OriginalReadingScreen(
                                 controller.open(entry.id, entry.currentRevision) { canUseEventDate(entry.id, entry.currentRevision) } },
                                 enabled = local.supportsEventDates && !local.saving && !local.savePending,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-event-date-open")) { Text("补记／纠正事件日期") }
+                        }
+                        if (local.supportsManualPeople) {
+                            Text(if (local.manualPeopleAvailable) local.manualPeople[entry.id]?.names?.takeIf { it.isNotEmpty() }
+                                ?.joinToString("、", prefix = "关联人物：") ?: "尚未关联人物" else "人物关联暂不可读取")
+                            onOpenPeople?.let { open -> TextButton(onClick = { open(entry.id, entry.currentRevision) },
+                                enabled = !local.saving && !local.savePending,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-manual-people")) { Text("关联／移除人物") } }
                         }
                         onOpenTags?.let { openTags ->
                             TextButton(onClick = { openTags(entry.id, entry.currentRevision) },

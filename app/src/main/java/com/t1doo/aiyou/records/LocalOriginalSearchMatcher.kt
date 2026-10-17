@@ -20,7 +20,8 @@ data class OriginalSearchInput(val query: String = "", val from: String = "", va
     internal val favoriteSnapshot: Map<String, com.t1doo.aiyou.model.RecordFavoriteSnapshot>? = null,
     val dateBasis: RecordDateBasis = RecordDateBasis.CAPTURED,
     internal val eventDateSnapshot: Map<String, RecordEventDateSnapshot>? = null,
-    val onlyImages: Boolean = false, internal val currentImageEntryIds: Set<String>? = null) {
+    val onlyImages: Boolean = false, internal val currentImageEntryIds: Set<String>? = null,
+    val person: String? = null, internal val peopleSnapshot: Map<String, com.t1doo.aiyou.model.ManualPeopleSnapshot>? = null) {
     override fun toString() = "OriginalSearchInput(redacted)"
 }
 
@@ -55,7 +56,7 @@ internal object LocalOriginalSearchMatcher {
         if (validation.stage != OriginalSearchStage.READY) return validation
         return try {
             val proof = owner.candidates(com.t1doo.aiyou.domain.LocalSearchRequest(input.query,
-                input.mode == OriginalSearchMode.EXACT, input.from, input.through, input.tag, input.onlyFavorites, input.dateBasis,input.onlyImages))
+                input.mode == OriginalSearchMode.EXACT, input.from, input.through, input.tag, input.onlyFavorites, input.dateBasis,input.onlyImages, input.person))
             if (input.onlyImages && proof.currentImageEntryIds != proof.entries.map { it.id }.toSet())
                 return OriginalSearchMatches(OriginalSearchStage.FAILED, message = "图片关联暂不可读取，请重试本机读取。")
             if (proof.entries.any { fresh -> entries.none { it == fresh } })
@@ -75,7 +76,12 @@ internal object LocalOriginalSearchMatcher {
                 val fresh = proof.eventDates?.get(entry.id)
                 input.eventDateSnapshot?.get(entry.id)?.let { fresh != null && it.version == fresh.version && it.date == fresh.date } != true
             }) return OriginalSearchMatches(OriginalSearchStage.WAITING)
-            val result = match(proof.entries, input.copy(tagSnapshot = proof.tags, favoriteSnapshot = proof.favorites,
+            if (input.person != null && (proof.people == null || proof.entries.any { entry ->
+                val fresh = proof.people?.get(entry.id)
+                input.peopleSnapshot?.get(entry.id)?.let { old -> fresh != null && old.version == fresh.version &&
+                    old.names == fresh.names } != true
+            })) return OriginalSearchMatches(OriginalSearchStage.WAITING)
+            val result = match(proof.entries, input.copy(peopleSnapshot = proof.people, tagSnapshot = proof.tags, favoriteSnapshot = proof.favorites,
                 eventDateSnapshot = proof.eventDates,currentImageEntryIds = proof.currentImageEntryIds))
             val whole = if (input.mode == OriginalSearchMode.KEYWORDS) fold(input.query).text else input.query
             val ranked = ArrayList<Pair<OriginalSearchHit, Boolean>>()
@@ -119,6 +125,10 @@ internal object LocalOriginalSearchMatcher {
             message = "关键词包含不完整的字符，请重新输入。")
         val terms = if (input.mode == OriginalSearchMode.EXACT) listOf(input.query).filter { it.isNotEmpty() }
             else input.query.split(Regex("[\\p{javaWhitespace}\\p{Zs}]+" )).filter { it.isNotEmpty() }
+        if (input.person != null && input.peopleSnapshot == null) return OriginalSearchMatches(OriginalSearchStage.FAILED,
+            message = "手工人物关联暂不可读取，请重试本机读取。")
+        if (input.person != null && try { com.t1doo.aiyou.model.ManualTags.canonical(listOf(input.person)) != listOf(input.person) }
+            catch (_: IllegalArgumentException) { true }) return OriginalSearchMatches(OriginalSearchStage.INVALID, message = "人物筛选名称无效。")
         if (input.tag != null && input.tagSnapshot == null) return OriginalSearchMatches(OriginalSearchStage.FAILED,
             message = "手工标签暂不可读取，请重试本机读取。")
         if (input.onlyFavorites && input.favoriteSnapshot == null) return OriginalSearchMatches(OriginalSearchStage.FAILED,
@@ -127,11 +137,12 @@ internal object LocalOriginalSearchMatcher {
             message = "图片关联暂不可读取，原文已保留。请重试本机读取。")
         if (input.dateBasis == RecordDateBasis.EVENT && input.eventDateSnapshot == null)
             return OriginalSearchMatches(OriginalSearchStage.FAILED, message = "事件日期暂不可读取，请重试本机读取。")
-        if (terms.isEmpty() && input.dateBasis == RecordDateBasis.CAPTURED && from == null && through == null && input.tag == null && !input.onlyFavorites && !input.onlyImages) return OriginalSearchMatches(OriginalSearchStage.BROWSE)
+        if (terms.isEmpty() && input.dateBasis == RecordDateBasis.CAPTURED && from == null && through == null && input.tag == null && input.person == null && !input.onlyFavorites && !input.onlyImages) return OriginalSearchMatches(OriginalSearchStage.BROWSE)
         val needles = terms.map { compileNeedle(if (input.mode == OriginalSearchMode.KEYWORDS) fold(it).text else it) }
         val hits = ArrayList<OriginalSearchHit>()
         for (entry in entries) {
             currentCoroutineContext().ensureActive()
+            if (input.person != null && input.person !in input.peopleSnapshot?.get(entry.id)?.names.orEmpty()) continue
             if (input.onlyImages && entry.id !in input.currentImageEntryIds.orEmpty()) continue
             if (input.onlyFavorites && input.favoriteSnapshot?.get(entry.id)?.isFavorite != true) continue
             if (input.tag != null && input.tag !in input.tagSnapshot?.get(entry.id)?.names.orEmpty()) continue

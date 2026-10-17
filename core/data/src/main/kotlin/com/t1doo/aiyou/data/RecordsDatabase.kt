@@ -42,7 +42,7 @@ internal interface RecordsDao {
     AttachmentEntity::class, RemoteSourceAccessEntity::class, RemoteTextJobEntity::class, TextAnnotationEntity::class, ManualTagEntity::class,
     ManualTaskEntity::class, LocalSearchFtsEntity::class, LocalSearchDocumentEntity::class,
     LocalSearchEpochEntity::class, PermanentErasureEntity::class, RecordPackageReceiptEntity::class,
-    OwnedFileCreationEntity::class, LocalCandidateBatchEntity::class, RecordEventDateEntity::class], version = 11, exportSchema = true)
+    OwnedFileCreationEntity::class, LocalCandidateBatchEntity::class, RecordEventDateEntity::class, ManualPeopleEntity::class], version = 12, exportSchema = true)
 internal abstract class RecordsDatabase : RoomDatabase() {
     abstract fun records(): RecordsDao
 }
@@ -139,3 +139,8 @@ internal fun installRecordFavoriteGuards(db: SupportSQLiteDatabase) {
         if (ownsTransaction) db.setTransactionSuccessful()
     } finally { if (ownsTransaction) db.endTransaction() }
 }
+
+internal val recordsMigration11To12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) { ManualPeopleSqlSchema.migration11To12.forEach(db::execSQL) }
+}
+internal fun installManualPeopleGuards(db: SupportSQLiteDatabase) { ManualPeopleSqlSchema.guards.forEach(db::execSQL) }

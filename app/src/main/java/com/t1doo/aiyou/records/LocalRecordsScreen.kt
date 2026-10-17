@@ -94,6 +94,7 @@ fun LocalRecordsScreen(
     onRefreshEventDates: () -> Unit = {},
     searchTag: String? = null,
     onSearchTag: (String?) -> Unit = {},
+    searchPerson: String? = null, onSearchPerson: (String?) -> Unit = {}, onRefreshPeople: () -> Unit = {},
     onSearchMode: () -> Unit = {},
     onClearSearch: () -> Unit = {},
     onOpenSearchResult: (OriginalSearchHit) -> Unit = {},
@@ -149,7 +150,7 @@ fun LocalRecordsScreen(
             } },
         )
     }
-    val requestedSearch = searchState?.input?.let { it.onlyImages || it.onlyFavorites || it.dateBasis == com.t1doo.aiyou.model.RecordDateBasis.EVENT || it.tag != null || it.from.isNotEmpty() || it.through.isNotEmpty() ||
+    val requestedSearch = searchState?.input?.let { it.onlyImages || it.onlyFavorites || it.dateBasis == com.t1doo.aiyou.model.RecordDateBasis.EVENT || it.tag != null || it.person != null || it.from.isNotEmpty() || it.through.isNotEmpty() ||
         (if (it.mode == OriginalSearchMode.EXACT) it.query.isNotEmpty() else it.query.isNotBlank()) } == true
     // Keep the durable index in memory; a restored record immediately reveals its existing edit draft again.
     val visiblePendingEdits = if (local.supportsRecycleBin) local.pendingEdits.filter { draft -> local.entries.any { it.id == draft.entryId } } else local.pendingEdits
@@ -337,6 +338,9 @@ fun LocalRecordsScreen(
                         LocalOriginalSearchSection(searchQuery, searchFrom, searchThrough, searchMode,
                             local.ready && !local.opening && local.error == null, onSearchMode, onClearSearch,
                             searchTag, local.manualTags, local.manualTagsAvailable, local.manualTagsError, onSearchTag,
+                        person = searchPerson, peopleSupported = local.supportsManualPeople,
+                        peopleAvailable = local.manualPeopleAvailable, peopleError = local.manualPeopleError,
+                        onPerson = onSearchPerson, onRefreshPeople = onRefreshPeople,
                         onBeforeSearchInput = onBeforeSearchInput,
                         onHistoryInputCommitted = onHistoryInputCommitted,
                             indexSupported = local.localSearch != null, indexBusy = local.localIndexBusy,

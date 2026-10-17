@@ -14,14 +14,18 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 /** HKDF-Expand from the existing uniformly random 256-bit database key; no new credential/alias. */
-internal class ManualTagCipher(databaseKey: ByteArray) {
+internal enum class ManualLabelPurpose(val keyContext: String, val aadContext: String) {
+    TAGS("com.t1doo.aiyou.manual-tags.v1", "AIyou/manual-tags/1"),
+    PEOPLE("com.t1doo.aiyou.manual-people.v1", "AIyou/manual-people/1"),
+}
+internal class ManualTagCipher(databaseKey: ByteArray, private val purpose: ManualLabelPurpose = ManualLabelPurpose.TAGS) {
     private val key: ByteArray
     private val random = SecureRandom()
     init {
         require(databaseKey.size == 32)
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(databaseKey, "HmacSHA256"))
-        key = mac.doFinal("com.t1doo.aiyou.manual-tags.v1".toByteArray(Charsets.US_ASCII) + byteArrayOf(1))
+        key = mac.doFinal(purpose.keyContext.toByteArray(Charsets.US_ASCII) + byteArrayOf(1))
     }
     fun seal(entryId: String, version: Long, mutationId: String, names: List<String>): ByteArray {
         val plain = encode(names)
@@ -65,7 +69,7 @@ internal class ManualTagCipher(databaseKey: ByteArray) {
     }
     private fun aad(id: String, version: Long, mutation: String): ByteArray = ByteArrayOutputStream().use { bytes ->
         DataOutputStream(bytes).use { out ->
-            out.writeUTF("AIyou/manual-tags/1"); out.writeUTF(id); out.writeLong(version); out.writeUTF(mutation)
+            out.writeUTF(purpose.aadContext); out.writeUTF(id); out.writeLong(version); out.writeUTF(mutation)
         }; bytes.toByteArray()
     }
     fun wipe() { key.fill(0) }

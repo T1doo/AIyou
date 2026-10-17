@@ -43,6 +43,8 @@ class EncryptedEntryRepository internal constructor(
     private val candidateStorage = SqlLocalCandidateRepository(borrowedSql, keyBytes)
     override val localCandidates: com.t1doo.aiyou.domain.LocalCandidateRepository get() = candidateStorage
     private val tagStorage = SqlManualTagRepository(borrowedSql, keyBytes)
+    private val peopleStorage = SqlManualPeopleRepository(borrowedSql, keyBytes)
+    override val manualPeople: com.t1doo.aiyou.domain.ManualPeopleRepository get() = peopleStorage
     override val factRecaps: com.t1doo.aiyou.domain.FactRecapRepository = SqlFactRecapRepository(borrowedSql, tagStorage)
     override val sourceTags: com.t1doo.aiyou.domain.SourceTagRepository = SqlSourceTagRepository(borrowedSql, tagStorage)
     private val sourceMemoryStorage = SqlSourceMemoryRepository(borrowedSql, keyBytes)
@@ -52,7 +54,7 @@ class EncryptedEntryRepository internal constructor(
     override val eventDates: com.t1doo.aiyou.domain.RecordEventDateRepository = SqlRecordEventDateRepository(borrowedSql)
     override val manualTags: com.t1doo.aiyou.domain.ManualTagRepository get() = tagStorage
     override val localSearch: com.t1doo.aiyou.domain.LocalSearchRepository =
-        SqlLocalSearchRepository(borrowedSql, tagStorage)
+        SqlLocalSearchRepository(borrowedSql, tagStorage, people = peopleStorage)
     private val taskStorage = SqlManualTaskRepository(borrowedSql, keyBytes)
     override val manualTasks: com.t1doo.aiyou.domain.ManualTaskRepository get() = taskStorage
     override val reminders: com.t1doo.aiyou.domain.TaskReminderRepository get() = taskStorage
@@ -60,8 +62,8 @@ class EncryptedEntryRepository internal constructor(
     override val taskProposals: com.t1doo.aiyou.domain.TaskProposalRepository get() = proposalStorage
     private val packageActivities=SqlRecordPackageActivities(borrowedSql,taskStorage,proposalStorage)
     override val originalExport: com.t1doo.aiyou.domain.OriginalExportRepository =
-        SqlOriginalExportRepository(borrowedSql, tagStorage,packageActivities)
-    private val packageStorage = SqlRecordPackageRepository(borrowedSql, tagStorage,activities=packageActivities)
+        SqlOriginalExportRepository(borrowedSql, tagStorage,packageActivities,peopleStorage)
+    private val packageStorage = SqlRecordPackageRepository(borrowedSql, tagStorage,activities=packageActivities, people=peopleStorage)
     override val mediaPackages: com.t1doo.aiyou.domain.RecordMediaPackageRepository =
         SqlRecordMediaPackageRepository(borrowedSql, originalExport, attachmentStorage, packageStorage,packageActivities)
     override val recordPackages: com.t1doo.aiyou.domain.RecordPackageRepository get() = packageStorage
@@ -160,7 +162,7 @@ class EncryptedEntryRepository internal constructor(
     }
 
     private val lifetime = DrainingRecordsStorage(borrowedSql,attachmentStorage,originalEditStorage,
-        { database.close() }, { tagStorage.wipeKey(); taskStorage.wipeKey(); proposalStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); keyBytes.fill(0) })
+        { database.close() }, { tagStorage.wipeKey(); peopleStorage.wipeKey(); taskStorage.wipeKey(); proposalStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); keyBytes.fill(0) })
     override fun close() = lifetime.close()
     override fun awaitClosed() = lifetime.awaitClosed()
     /** Known external IO owner convenience, including native cold-reopen fixtures. */
@@ -233,7 +235,7 @@ class EncryptedEntryRepository internal constructor(
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
                 val created = Room.databaseBuilder(context.applicationContext, RecordsDatabase::class.java, file.absolutePath)
                 .openHelperFactory(SupportOpenHelperFactory(key))
-                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7, recordsMigration7To8, recordsMigration8To9, recordsMigration9To10, recordsMigration10To11)
+                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7, recordsMigration7To8, recordsMigration8To9, recordsMigration9To10, recordsMigration10To11, recordsMigration11To12)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
@@ -243,14 +245,14 @@ class EncryptedEntryRepository internal constructor(
                         installLocalSearchGuards(db); installPermanentErasureGuards(db)
                         installRecordFavoriteGuards(db)
                         installLocalCandidateGuards(db)
-                        installRecordEventDateGuards(db)
+                        installRecordEventDateGuards(db); installManualPeopleGuards(db)
                     }
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db)
                         installManualTagGuard(db); installManualTaskGuard(db); installLocalSearchGuards(db); installPermanentErasureGuards(db)
                         installRecordFavoriteGuards(db)
                         installLocalCandidateGuards(db)
-                        installRecordEventDateGuards(db)
+                        installRecordEventDateGuards(db); installManualPeopleGuards(db)
                     }
                 }).build()
                 database = created

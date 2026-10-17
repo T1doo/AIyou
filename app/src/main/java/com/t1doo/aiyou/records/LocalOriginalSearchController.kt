@@ -50,6 +50,7 @@ class LocalOriginalSearchController internal constructor(
         return !closed && active && !pendingInput && value.generation == generation && value.inputEpoch == inputEpoch && usable(local) &&
             local?.entries === value.entries && currentInput() == value.input &&
             local?.localSearch === value.owner && local?.localSearchEpoch == value.indexEpoch &&
+            (value.input.person == null || (if (local?.manualPeopleAvailable == true) local.manualPeople else null) === value.input.peopleSnapshot) &&
             (value.input.tag == null || (if (local?.manualTagsAvailable == true) local.manualTags else null) === value.input.tagSnapshot) &&
             (!value.input.onlyFavorites || (if (local?.favoritesAvailable == true) local.favorites else null) === value.input.favoriteSnapshot) &&
             (value.input.dateBasis != com.t1doo.aiyou.model.RecordDateBasis.EVENT ||
@@ -94,7 +95,7 @@ class LocalOriginalSearchController internal constructor(
             }
             pendingInput = false; pendingInputOwner = null
         }
-        if (active && value.inputEpoch == inputEpoch && value.input == input && value.input.tagSnapshot === input.tagSnapshot &&
+        if (active && value.inputEpoch == inputEpoch && value.input == input && value.input.tagSnapshot === input.tagSnapshot && value.input.peopleSnapshot === input.peopleSnapshot &&
             value.input.favoriteSnapshot === input.favoriteSnapshot && value.input.eventDateSnapshot === input.eventDateSnapshot && value.entries === local?.entries &&
             value.indexEpoch == local?.localSearchEpoch && value.owner === local?.localSearch &&
             ((usable(local) && value.stage != OriginalSearchStage.WAITING &&
@@ -111,7 +112,7 @@ class LocalOriginalSearchController internal constructor(
         }
         val entries = checkNotNull(local).entries
         // Preserve immediate manual browsing when no lookup is requested.
-        if (input.query.isEmpty() && input.from.isEmpty() && input.through.isEmpty() && input.tag == null && !input.onlyFavorites && !input.onlyImages && input.dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED) {
+        if (input.query.isEmpty() && input.from.isEmpty() && input.through.isEmpty() && input.tag == null && input.person == null && !input.onlyFavorites && !input.onlyImages && input.dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED) {
             val browse = OriginalSearchState(input, OriginalSearchStage.BROWSE, entries = entries, generation = generation,
                 owner = local.localSearch, indexEpoch = local.localSearchEpoch, inputEpoch = inputEpoch)
             cache = browse
@@ -119,7 +120,7 @@ class LocalOriginalSearchController internal constructor(
             return@synchronized
         }
         val saved = cache?.takeIf { local.localSearch == null && it.proof == null && it.entries === entries &&
-            it.input == input && it.input.tagSnapshot === input.tagSnapshot && it.input.eventDateSnapshot === input.eventDateSnapshot && it.inputEpoch == inputEpoch }
+            it.input == input && it.input.tagSnapshot === input.tagSnapshot && it.input.peopleSnapshot === input.peopleSnapshot && it.input.eventDateSnapshot === input.eventDateSnapshot && it.inputEpoch == inputEpoch }
         if (saved != null) {
             mutableState.value = OriginalSearchState(input, saved.stage, saved.hits, saved.message, entries, generation,
                 inputEpoch = inputEpoch)

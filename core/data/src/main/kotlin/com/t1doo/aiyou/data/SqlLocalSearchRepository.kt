@@ -11,7 +11,10 @@ import java.util.concurrent.CancellationException
 /** Only the encrypted owner constructs the production instance. No separate DB or files. */
 internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase,
     private val tags: SqlManualTagRepository,
-    private val runtimeProfile: () -> String = { LocalSearchTokenizer.profile }) : LocalSearchRepository {
+    private val runtimeProfile: () -> String = { LocalSearchTokenizer.profile },
+    private val people: SqlManualPeopleRepository? = null) : LocalSearchRepository {
+    constructor(database: RecordsSqlDatabase, tags: SqlManualTagRepository, runtimeProfile: () -> String) :
+        this(database, tags, runtimeProfile, null)
     private data class Stamp(val epoch: Long, val version: Int, val profile: String)
     private val favorites = SqlRecordFavoriteRepository(database)
     private val eventDateStorage = SqlRecordEventDateRepository(database)
@@ -26,7 +29,8 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         tagValues: Map<String, ManualTagSnapshot>, override val pending: Boolean,
         override val favorites: Map<String, RecordFavoriteSnapshot>? = null,
         override val eventDates: Map<String, RecordEventDateSnapshot>? = null,
-        val imageRequest: LocalSearchRequest? = null) : LocalSearchSnapshot {
+        val imageRequest: LocalSearchRequest? = null,
+        override val people: Map<String, ManualPeopleSnapshot>? = null) : LocalSearchSnapshot {
         override val epoch = stamp.epoch
         val owner = this@SqlLocalSearchRepository
         override val entries = Collections.unmodifiableList(bindings.map { it.entry })
@@ -156,6 +160,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         val from = date(request.from); val through = date(request.through)
         if (from != null && through != null && from > through) throw LocalSearchInvalid()
         request.tag?.let { if (ManualTags.canonical(listOf(it)) != listOf(it)) throw LocalSearchInvalid() }
+        request.person?.let { if (ManualTags.canonical(listOf(it)) != listOf(it)) throw LocalSearchInvalid() }
         database.transaction { sql ->
             val stamp = epochWithin(sql)
             // Never interpret missing or malformed favorite metadata as an empty collection.
@@ -175,6 +180,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             val condition = if (expression == null || stamp.version != 1 || stamp.profile != profile) "" else
                 " AND (" + valid(stamp.epoch, profile) + "=0 OR e.id IN (SELECT entryId FROM local_search_fts WHERE local_search_fts MATCH ?))"
             val args = if (condition.isEmpty()) emptyList() else listOf(expression)
+            val personValues = if (request.person != null) HashMap<String, ManualPeopleSnapshot>() else null
             val bindings = ArrayList<Binding>()
             val labels = HashMap<String, ManualTagSnapshot>()
             val budget = Budget()
@@ -194,10 +200,14 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                     val tag = tags.readWithin(sql, id)
                     tag.names.forEach(budget::add)
                     if (request.tag != null && request.tag !in tag.names) continue
+                    val person = if (request.person != null) checkNotNull(people).readWithin(sql, id) else null
+                    person?.names?.forEach(budget::add)
+                    if (request.person != null && request.person !in checkNotNull(person).names) continue
                     val bound = read(sql, id, request.onlyImages) ?: throw LocalSearchStale()
                     budget.add(bound.entry.originalText)
                     bindings += bound
                     labels[id] = tag
+                    if (personValues != null) personValues[id] = checkNotNull(person)
                     if (favoriteValues != null) favoriteValues[id] = favorites.readWithin(sql,id)
                     if (eventValues != null) eventValues[id] = checkNotNull(event)
                     if (bindings.size > 1000) throw LocalSearchTooBroad()
@@ -208,7 +218,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                 " LIMIT 1").isNotEmpty() || stamp.version != 1 || stamp.profile != profile
             Proof(stamp, profile, Collections.unmodifiableList(bindings.toList()), labels, pending,
                 favoriteValues?.let { Collections.unmodifiableMap(it) },eventValues?.let { Collections.unmodifiableMap(it) },
-                request.takeIf { it.onlyImages })
+                request.takeIf { it.onlyImages }, personValues?.let { Collections.unmodifiableMap(it) })
         }
     }
 
@@ -240,6 +250,12 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                     val previous = values[before.entry.id] ?: return@transaction false
                     val currentEvent = eventDateStorage.readWithin(sql,before.entry.id)
                     if (previous.version != currentEvent.version || previous.date != currentEvent.date) return@transaction false
+                }
+                proof.people?.let { values ->
+                    val old = checkNotNull(values[before.entry.id])
+                    val now = checkNotNull(people).readWithin(sql, before.entry.id)
+                    if (old.version != now.version || old.names != now.names || old.sourceRevision != now.sourceRevision ||
+                        old.sourceHash != now.sourceHash || old.generation != now.generation) return@transaction false
                 }
                 if (entryId == before.entry.id) selected = current.entry
             }

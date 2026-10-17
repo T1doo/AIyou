@@ -120,7 +120,7 @@ class MainActivity : ComponentActivity() {
                 onOpenTags = records.tags::open, onTagEdit = records.tags::edit, onTagAdd = records.tags::add,
                 favorites = records.favorites, eventDates = records.eventDates,
                 candidates = records.candidates,
-                sourceTags = records.sourceTags,
+                sourceTags = records.sourceTags, people = records.people,
                 sourceMemories = records.sourceMemories,
                 sourceTasks = records.sourceTasks,
                 taskProposals = records.taskProposals,
@@ -225,6 +225,7 @@ fun AIyouApp(
     eventDates: com.t1doo.aiyou.records.RecordEventDateController? = null,
     candidates: com.t1doo.aiyou.records.LocalCandidateController? = null,
     sourceTags: com.t1doo.aiyou.records.SourceTagController? = null,
+    people: com.t1doo.aiyou.records.ManualPeopleController? = null,
     sourceMemories: com.t1doo.aiyou.records.SourceMemoryController? = null,
     sourceTasks: com.t1doo.aiyou.records.SourceTaskController? = null,
     taskProposals: com.t1doo.aiyou.records.TaskProposalController? = null,
@@ -284,6 +285,7 @@ fun AIyouApp(
     var searchDateBasis by remember { mutableStateOf(com.t1doo.aiyou.model.RecordDateBasis.CAPTURED) }
     var searchMode by remember { mutableStateOf(OriginalSearchMode.KEYWORDS) }
     var searchTag by remember { mutableStateOf<String?>(null) }
+    var searchPerson by remember { mutableStateOf<String?>(null) }
     var onlyFavorites by rememberSaveable { mutableStateOf(false) }
     var onlyImages by remember { mutableStateOf(false) }
     var imageGridMode by remember { mutableStateOf(false) }
@@ -301,7 +303,8 @@ fun AIyouApp(
             onlyFavorites,
             if (onlyFavorites && tagsSource?.favoritesAvailable == true) tagsSource.favorites else null,
             searchDateBasis, if (searchDateBasis == com.t1doo.aiyou.model.RecordDateBasis.EVENT && tagsSource?.eventDatesAvailable == true)
-                tagsSource.eventDates else null,onlyImages = onlyImages)
+                tagsSource.eventDates else null,onlyImages = onlyImages, person = searchPerson,
+            peopleSnapshot = if (searchPerson != null && tagsSource?.manualPeopleAvailable == true) tagsSource.manualPeople else null)
     }
     val search = remember {
         LocalOriginalSearchController(
@@ -340,6 +343,7 @@ fun AIyouApp(
         searchThrough = TextFieldState()
         searchMode = OriginalSearchMode.KEYWORDS
         searchTag = null
+        searchPerson = null
         searchDateBasis = com.t1doo.aiyou.model.RecordDateBasis.CAPTURED
         onlyFavorites = false
         onlyImages = false
@@ -380,7 +384,7 @@ fun AIyouApp(
             !browsingPackage && !showSettings && !demo && local != null && local.originalEdit == null && local.originalHistory == null, searchState)
         evidenceAnswers.sync()
         if (!reading && searchReturnAnchor != null &&
-            (renderedSearchInput.copy(tagSnapshot = null) != searchReturnInput?.copy(tagSnapshot = null) || searchSource()?.entries !== searchReturnSource)) {
+            (renderedSearchInput.copy(tagSnapshot = null, peopleSnapshot = null) != searchReturnInput?.copy(tagSnapshot = null, peopleSnapshot = null) || searchSource()?.entries !== searchReturnSource)) {
             searchReturnAnchor = null; searchReturnInput = null; searchReturnSource = null
         }
     }
@@ -472,6 +476,7 @@ fun AIyouApp(
     val returnToList: () -> Unit = {
         if (ownsNavigation() && reading) {
             currentLocal?.eventDateEditor?.let { eventDates?.close(it.session) }
+            currentLocal?.manualPeopleEditor?.takeIf { it.entryId == detailEntryId }?.let { people?.close(it.session) }
             currentLocal?.manualTagEditor?.takeIf { it.entryId == detailEntryId }?.let { onTagClose(it.session) }
             val edit = currentLocal?.originalEdit?.takeIf { it.entryId == readerId }
             val activeHistory = currentLocal?.originalHistory?.takeIf { it.entryId == readerId }
@@ -661,6 +666,17 @@ fun AIyouApp(
     BackHandler(enabled = showSettings) {
         if (ownsNavigation()) { navigation.advance(); if (showLicenses) showLicenses = false else showSettings = false }
     }
+    local?.manualPeopleEditor?.takeIf { reading && it.entryId == detailEntryId && it.owner === local.manualPeopleOwner }?.let { editor ->
+        people?.let { controller ->
+            com.t1doo.aiyou.records.ManualPeopleDialog(editor,
+                onEdit = { session, version, text -> if (ownsNavigation()) controller.edit(session, version, text) },
+                onAdd = { session, version, text -> if (ownsNavigation()) controller.add(session, version, text) },
+                onRemove = { session, version, name, input -> if (ownsNavigation()) controller.remove(session, version, name, input) },
+                onRetry = { if (ownsNavigation()) controller.retry(it) }, onClose = { if (ownsNavigation()) controller.close(it) },
+                sourceAvailable = local.ready && !local.opening && local.error == null && local.manualPeopleOwner === editor.owner &&
+                    local.entries.any { it.id == editor.entryId && it.currentRevision == editor.revision })
+        }
+    }
     local?.manualTagEditor?.takeIf { reading && it.entryId == detailEntryId }?.let { editor ->
         val tagLocal = checkNotNull(local)
         com.t1doo.aiyou.records.ManualTagDialog(editor,
@@ -782,6 +798,7 @@ fun AIyouApp(
                 onOpenAi = { id, revision -> if (canCopy(id, revision)) onOpenAiSession(id, revision) },
                 onStartAi = onStartAiSession, onStopAi = onStopAiSession, onCloseAi = onCloseAiSession,
                 onOpenTags = { id, revision -> if (canCopy(id, revision)) onOpenTags(id, revision) },
+                onOpenPeople = people?.let { controller -> { id, revision -> if (canCopy(id, revision)) controller.open(id, revision) } },
                 location = searchLocation,
                 requiredSource = if(recapRoute||taskSourceRoute) searchLocation else null,
                 requiredSourceTitle = if(taskSourceRoute) "待办来源版本已变化" else "回顾来源版本已变化",
@@ -891,6 +908,11 @@ fun AIyouApp(
                     currentLocal?.ready == true && currentLocal?.opening == false && currentLocal?.error == null &&
                     currentLocal?.localSearch != null && currentLocal?.localIndexBusy == false)
                     onRebuildLocalSearch() },
+                searchPerson = searchPerson, onSearchPerson = { person -> search.changeInput {
+                    if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) {
+                        searchPerson = person; searchModeGeneration++
+                    }
+                } }, onRefreshPeople = onRefreshLocalSearch,
                 searchTag = searchTag, onSearchTag = { tag -> search.changeInput { if (ownsNavigation()) { searchTag = tag; searchModeGeneration++ } } },
                 onlyFavorites = onlyFavorites, onSearchFavorites = { value -> search.changeInput {
                     if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) {
@@ -943,7 +965,7 @@ fun AIyouApp(
                 onClearSearch = { if (ownsNavigation()) clearSearch() }, onOpenSearchResult = openSearchResult,
                 searchReturnAnchor = searchReturnAnchor,
                 ownsSearchReturn = { ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name &&
-                    !showSettings && !demo && searchReturnInput?.copy(tagSnapshot = null) == searchInput().copy(tagSnapshot = null) && currentLocal?.entries === searchReturnSource &&
+                    !showSettings && !demo && searchReturnInput?.copy(tagSnapshot = null, peopleSnapshot = null) == searchInput().copy(tagSnapshot = null, peopleSnapshot = null) && currentLocal?.entries === searchReturnSource &&
                     search.visible(currentLocal, searchInput()) === searchState },
                 onSearchReturnHandled = { if (ownsNavigation()) {
                     searchReturnAnchor = null; searchReturnInput = null; searchReturnSource = null

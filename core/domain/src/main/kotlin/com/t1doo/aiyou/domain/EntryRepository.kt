@@ -26,6 +26,7 @@ interface EntryRepository {
     val manualTasks: ManualTaskRepository? get() = null
     val reminders: TaskReminderRepository? get() = null
     val manualTags: ManualTagRepository? get() = null
+    val manualPeople: ManualPeopleRepository? get() = null
     /** Borrowed capability over the same records database; it never enables remote processing. */
     val sourceBoundText: SourceBoundTextRepository? get() = null
     val editDrafts: OriginalEditDraftStore? get() = null

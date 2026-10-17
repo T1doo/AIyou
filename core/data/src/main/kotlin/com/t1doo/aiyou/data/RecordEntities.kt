@@ -173,3 +173,9 @@ internal data class RecordPackageReceiptEntity(@PrimaryKey val id: String, val e
 @Entity(tableName = "owned_file_creations", primaryKeys = ["bucket", "name"], indices = [Index(value = ["entryId"])])
 internal data class OwnedFileCreationEntity(val bucket: String, val name: String, val entryId: String,
     val state: String, val identity: String)
+
+@Entity(tableName = "entry_manual_people", foreignKeys = [ForeignKey(
+    entity = EntryEntity::class, parentColumns = ["id"], childColumns = ["entryId"], onDelete = ForeignKey.CASCADE,
+)])
+internal data class ManualPeopleEntity(@PrimaryKey val entryId: String, val version: Long,
+    val lastMutationId: String, val ciphertext: ByteArray)

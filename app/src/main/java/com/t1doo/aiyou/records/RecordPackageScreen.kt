@@ -46,7 +46,7 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
         verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         item("scope") {
             Text("加密原文包", style = MaterialTheme.typography.headlineSmall)
-            Text("默认包含选定的当前原文、手工标签、手填事件日期及 IANA 时区和当前版本已完整保存的 JPEG/PNG 原图；可另选这些记录的完整历史，或勾选本机全部正式待办与待确认草稿。记录编辑草稿、AI 结果及所有密钥不包含在内；这不是整库备份。")
+            Text("默认包含选定的当前原文、手工标签、手工人物称呼、手填事件日期及 IANA 时区和当前版本已完整保存的 JPEG/PNG 原图；可另选这些记录的完整历史，或勾选本机全部正式待办与待确认草稿。记录编辑草稿、AI 结果及所有密钥不包含在内；这不是整库备份。")
             Text("事件日期只迁移当前值，不迁移日期修改历史或操作回执；未知与已清除在新副本中都为未补记。")
             Text("恢复会创建新副本，不覆盖旧记录；初始设置为不参与 AI。同一包重复恢复只核对第一次回执。")
             Text("一次最多 20 条记录、20 张原图；单图最多 16 MiB，图片合计最多 64 MiB。任务和待确认草稿各最多 256 条，超限整体失败，不会少带。旧 v1/v2/v3/v4 包仍可恢复；缺少事件日期时保持未知。")
@@ -101,6 +101,7 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                         val history = ui.mediaPreview?.history?.singleOrNull { it.sourceId == record.entry.id }
                         if (history == null) {
                             PackagePreview(originalMetadata(record.entry), record.entry.originalText, record.tags.names)
+                            Text("手工关联人物：" + record.people.names.joinToString("、").ifEmpty { "无" })
                             Text(packageEventDateText(record.eventDate.date), Modifier.testTag("package-event-date-" + record.entry.id))
                             PackageImages(ui.mediaPreview?.images.orEmpty().filter { it.sourceId == record.entry.id })
                         } else PackageHistoryPreview(history, ui.mediaPreview?.images.orEmpty())
@@ -163,6 +164,7 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                             .atZone(java.time.ZoneId.of(record.captureTimeZone))
                             .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm")) + " · " + record.captureTimeZone +
                             " · 原文版本 " + record.sourceRevision, record.originalText, record.tags)
+                        Text("手工关联人物：" + record.people.joinToString("、").ifEmpty { "无" })
                             Text(packageEventDateText(record.eventDate), Modifier.testTag("package-restore-event-date-" + record.sourceId))
                             PackageImages(ui.verified?.images.orEmpty().filter { it.sourceId == record.sourceId })
                         }
@@ -238,6 +240,7 @@ private fun PackageHistoryPreview(record: com.t1doo.aiyou.model.RecordPackageOri
             .atZone(java.time.ZoneId.of(record.captureTimeZone)) + " · 当前原文版本 ${record.sourceRevision}")
         Text(packageEventDateText(record.eventDate), Modifier.testTag("package-history-event-date-" + record.sourceId))
         Text("当前手工标签：" + record.tags.joinToString(" · ").ifEmpty { "无" })
+        Text("手工关联人物：" + record.people.joinToString("、").ifEmpty { "无" })
         record.history.forEach { version ->
             Column(Modifier.testTag("package-history-record:${record.sourceId}:${version.revision}")) {
                 Text("原文版本 ${version.revision}" + if (version.revision == record.sourceRevision) " · 当前版本" else " · 历史版本")

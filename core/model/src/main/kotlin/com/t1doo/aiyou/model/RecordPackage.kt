@@ -23,7 +23,9 @@ data class RecordPackageRevision(val revision: Int, val originalText: String, va
 class RecordPackageOriginal(val sourceId: String, val sourceRevision: Int,
     val capturedAtMillis: Long, val captureTimeZone: String, val originalText: String,
     val contentHash: String, val sourceTagVersion: Long, tags: List<String>, allowImageOnly: Boolean = false,
-    history: List<RecordPackageRevision> = emptyList(), val eventDate: RecordEventDate? = null) {
+    history: List<RecordPackageRevision> = emptyList(), val eventDate: RecordEventDate? = null,
+    val sourcePeopleVersion: Long = 0, people: List<String> = emptyList()) {
+    val people = Collections.unmodifiableList(ManualTags.canonical(people))
     val tags = Collections.unmodifiableList(tags.toList())
     val history = Collections.unmodifiableList(history.toList())
     val restoredRevision get() = if (history.isEmpty()) 1 else sourceRevision
@@ -34,6 +36,7 @@ class RecordPackageOriginal(val sourceId: String, val sourceRevision: Int,
         require(contentHash == OriginalExports.hash(originalText))
         require(sourceTagVersion >= 0 && (sourceTagVersion != 0L || tags.isEmpty()))
         require(ManualTags.canonical(tags) == tags)
+        require(sourcePeopleVersion >= 0 && (sourcePeopleVersion > 0 || people.isEmpty()) && ManualTags.canonical(people) == people)
         if (history.isNotEmpty()) {
             require(capturedAtMillis >= 0)
             require(history.size <= RecordPackages.MAX_REVISIONS_PER_RECORD && history.size == sourceRevision)

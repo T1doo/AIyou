@@ -76,7 +76,7 @@ class DeviceProtocolTests(unittest.TestCase):
 
     def test_inventory_contains_legacy_source_bound_tags_and_manual_task_methods(self):
         actual = collect_source(Path(__file__).resolve().parents[2])
-        self.assertEqual([13, 4, 3, 8, 4, 7, 3, 3, 3, 3, 2], [len(cases) for cases in actual.values()])
+        self.assertEqual([13, 4, 3, 8, 4, 7, 3, 3, 3, 3, 2, 2], [len(cases) for cases in actual.values()])
         self.assertEqual(NATIVE_METHOD_COUNT, sum(map(len, actual.values())))
 
     def test_unregistered_source_class_cannot_silently_keep_passing_count(self):

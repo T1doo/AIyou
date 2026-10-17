@@ -27,7 +27,7 @@ jobs:
           printf '%s  %s\n' \
             3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 \
             gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
-      - name: Generate actual Room v11 event date export and preserve prior native fixtures from the licensed CI toolchain
+      - name: Generate actual Room v12 people export with real v11 predecessor and all prior native fixtures
         run: |
           python3 scripts/check-sdk.py
           python3 scripts/verify-manual-tag-schema.py --capture
@@ -37,6 +37,7 @@ jobs:
           python3 scripts/verify-record-favorite-schema.py --capture
           python3 scripts/verify-local-candidate-schema.py --capture
           python3 scripts/verify-record-event-date-schema.py --capture
+          python3 scripts/verify-manual-people-schema.py --capture
           scripts/gradle.sh :core:data:kspDebugKotlin
           python3 scripts/verify-manual-tag-schema.py --verify
           python3 scripts/verify-manual-task-schema.py --verify
@@ -45,6 +46,7 @@ jobs:
           python3 scripts/verify-record-favorite-schema.py --verify
           python3 scripts/verify-local-candidate-schema.py --verify
           python3 scripts/verify-record-event-date-schema.py --verify
+          python3 scripts/verify-manual-people-schema.py --verify
       - name: Run actual domain and D04 JVM wire contracts
         run: |
           python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test :remote-text:test
@@ -222,7 +224,9 @@ jobs:
             core/data/build/reports/lint-results-debug.*
             core/data/schemas/
             core/data/src/androidTest/assets/records-schema-v11.json
+            core/data/src/androidTest/assets/records-schema-v12.json
             .local-evidence/f05-event-date/schema-generation.json
+            .local-evidence/f05-manual-people/schema-generation.json
             app/build/reports/d02-apk-audit.json
             app/build/reports/device-apk-manifest.json
             app/build/reports/record-ai-permissions.json

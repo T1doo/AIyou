@@ -65,7 +65,9 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     onDateBasis: (com.t1doo.aiyou.model.RecordDateBasis) -> Unit = {},
     eventDatesAvailable: Boolean = true, eventDatesError: String? = null,
     onRefreshEventDates: () -> Unit = {}, onlyImages: Boolean = false,
-    onImages: (Boolean) -> Unit = {}) {
+    onImages: (Boolean) -> Unit = {}, person: String? = null, peopleSupported: Boolean = false,
+    peopleAvailable: Boolean = false, peopleError: String? = null, onPerson: (String?) -> Unit = {},
+    onRefreshPeople: () -> Unit = {}) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
@@ -130,6 +132,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 modifier = Modifier.fillMaxWidth().then(historyKeys(through)).testTag("original-search-through"),
                 lineLimits = TextFieldLineLimits.SingleLine, inputTransformation = transform(through, 10))
             } }
+            if (peopleSupported) LocalPeopleFilter(person, enabled, peopleAvailable, peopleError, onPerson, onRefreshPeople)
             var choosing by remember { mutableStateOf(false) }
             TextButton(onClick = { choosing = true }, enabled = enabled && tagsAvailable,
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-tag")) {

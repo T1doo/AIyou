@@ -7,6 +7,7 @@ val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordHistoryPackageCodec.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordEventDatePackageCodec.kt")
+    from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordPeoplePackageCodec.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/TaskProposalCipher.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlTaskProposalRepository.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlSourceTaskRepository.kt")
@@ -40,7 +41,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     listOf("LocalCandidateSqlSchema.kt", "LocalCandidateCipher.kt", "SqlLocalCandidateRepository.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
-    listOf("RecordEventDateSqlSchema.kt", "SqlRecordEventDateRepository.kt").forEach {
+    listOf("ManualPeopleSqlSchema.kt", "SqlManualPeopleRepository.kt", "RecordEventDateSqlSchema.kt", "SqlRecordEventDateRepository.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
     into(production)
@@ -54,6 +55,7 @@ val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
     from("../../../app/src/main/java/com/t1doo/aiyou/records/RecordEventDateController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/CurrentImageGridController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalEvidenceController.kt")
+    from("../../../app/src/main/java/com/t1doo/aiyou/records/ManualPeopleController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalEvidenceSelection.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalEvidenceAnswer.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/TaskProposalController.kt")

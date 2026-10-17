@@ -80,10 +80,10 @@ object OpenRecordZipCodec {
                         } finally { bytes.fill(0) }
                     }
                     fresh()
-                    val manifest = OriginalExports.utf8("{\"format\":\"AIyou-open-records\",\"formatVersion\":1,\"schemaVersion\":1," +
+                    val manifest = OriginalExports.utf8("{\"format\":\"AIyou-open-records\",\"formatVersion\":" + (if(preview.snapshot.records.any { it.people.version > 0 }) 2 else 1) + ",\"schemaVersion\":1," +
                         "\"snapshotId\":" + q(preview.snapshot.id) + ",\"createdAtMillis\":" + preview.snapshot.createdAtMillis +
                         ",\"encrypted\":false,\"recordCount\":" + preview.snapshot.records.size + ",\"imageCount\":" + preview.images.size +
-                        ",\"scope\":[\"currentOriginals\",\"manualTags\",\"eventDates\",\"originalImages\"],\"excluded\":[\"history\",\"tasks\",\"keys\",\"aiDerived\"]," +
+                        ",\"scope\":[\"currentOriginals\",\"manualTags\",\"eventDates\",\"originalImages\"" + (if(preview.snapshot.records.any { it.people.version > 0 }) ",\"manualPeople\"" else "") + "],\"excluded\":[\"history\",\"tasks\",\"keys\",\"aiDerived\"]," +
                         "\"hashAlgorithm\":\"SHA-256\",\"manifestSelfHash\":false,\"images\":[" + preview.images.joinToString(",") { imageJson(it) } +
                         "],\"files\":[" + files.joinToString(",") + "]}\n")
                     try { writeFile("manifest.json", manifest) } finally { manifest.fill(0) }

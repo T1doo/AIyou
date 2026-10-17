@@ -9,7 +9,8 @@ import java.util.concurrent.CancellationException
 /** Same drained SQL owner and tag AEAD; FK-free v8 receipts remain authoritative after erasure. */
 internal class SqlRecordPackageRepository(private val database: RecordsSqlDatabase,
     private val tags: SqlManualTagRepository, private val maxGroups: Int = 4096,
-    private val activities:SqlRecordPackageActivities? = null) : RecordPackageRepository {
+    private val activities:SqlRecordPackageActivities? = null,
+    private val people: SqlManualPeopleRepository? = null) : RecordPackageRepository {
     private val eventDates = SqlRecordEventDateRepository(database)
     init { require(maxGroups in 1..4096) }
     override fun restore(verified: VerifiedRecordPackage, newIds: List<String>, importedAtMillis: Long): RecordPackageRestoreResult {
@@ -20,6 +21,7 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
         beforeReceipt: (RecordsSqlConnection) -> Unit): RecordPackageRestoreResult = safely {
         val pack = verified as? AuthenticatedRecordPackage ?: throw RecordPackageInvalid()
         require(pack.activities==null || activities!=null)
+        require(pack.records.none { it.sourcePeopleVersion > 0 } || people != null)
         require(!pack.includesHistory || pack.records.isNotEmpty())
         require(newIds.size <= 20)
         val ids = newIds.toList()
@@ -65,6 +67,7 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
                 }
                 sql.execute("INSERT INTO remote_source_access(entryId,generation,deleted,connection,consent) VALUES(?,1,0,NULL,NULL)", listOf(id))
                 tags.createWithin(sql, id, record.tags, "PACKAGE_TAG:" + id)
+                people?.createWithin(sql, id, record.people, "PACKAGE_PEOPLE:" + id)
                 record.eventDate?.let { eventDates.importWithin(sql, id, it, "PACKAGE_EVENT:" + id) }
                 sql.execute("INSERT INTO local_jobs(id,entryId,sourceRevision,operation,state) VALUES(?,?,?,'LOCAL_INDEX','PENDING')",
                     listOf("PACKAGE_INDEX:" + id, id, restoredRevision))

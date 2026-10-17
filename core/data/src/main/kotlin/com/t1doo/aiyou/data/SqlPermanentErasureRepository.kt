@@ -105,6 +105,7 @@ internal class SqlPermanentErasureRepository(private val database: RecordsSqlDat
                         check(sql.execute("DELETE FROM manual_tasks WHERE id=? AND version=?",listOf(TaskProposals.storageId(p.id),p.version))==1)
                     }
                     if (hasCandidates(sql)) sql.execute("DELETE FROM local_candidate_batches WHERE entryId=?",listOf(intent.source.sourceId))
+                    if (hasPeople(sql)) sql.execute("DELETE FROM entry_manual_people WHERE entryId=?", listOf(intent.source.sourceId))
                     for (table in listOf("text_annotations","remote_text_jobs","entry_manual_tags","remote_source_access","local_jobs","attachments","local_search_fts","local_search_documents"))
                         sql.execute("DELETE FROM $table WHERE entryId=?",listOf(intent.source.sourceId))
                     sql.execute("DELETE FROM record_package_receipts WHERE operation='PACKAGE_ORIGIN' AND entryId=?",listOf(intent.source.sourceId))
@@ -133,10 +134,12 @@ internal class SqlPermanentErasureRepository(private val database: RecordsSqlDat
         val row = sql.query("SELECT e.currentRevision,a.generation,a.deleted FROM entries e JOIN remote_source_access a ON a.entryId=e.id WHERE e.id=?",listOf(intent.source.sourceId)).singleOrNull()
         if (row != listOf(intent.source.revision,intent.generation,1L)) throw PermanentErasureConflict()
     }
+    private fun hasPeople(sql: RecordsSqlConnection) = sql.query("SELECT name FROM sqlite_master WHERE type='table' AND name='entry_manual_people'").isNotEmpty()
     private fun absent(sql: RecordsSqlConnection, id: String) {
         check(proposalRows(sql).none {it.binding.source.sourceId==id})
         check(sql.query("SELECT id FROM entries WHERE id=?",listOf(id)).isEmpty())
         if (hasCandidates(sql)) check(sql.query("SELECT entryId FROM local_candidate_batches WHERE entryId=? LIMIT 1",listOf(id)).isEmpty())
+        if (hasPeople(sql)) check(sql.query("SELECT entryId FROM entry_manual_people WHERE entryId=? LIMIT 1", listOf(id)).isEmpty())
         for (table in listOf("entry_revisions","attachments","entry_manual_tags","remote_source_access","local_jobs","text_annotations","remote_text_jobs","local_search_fts","local_search_documents","owned_file_creations"))
             check(sql.query("SELECT entryId FROM $table WHERE entryId=? LIMIT 1",listOf(id)).isEmpty())
         check(sql.query("SELECT id FROM record_package_receipts WHERE operation='PACKAGE_ORIGIN' AND entryId=?",listOf(id)).isEmpty())

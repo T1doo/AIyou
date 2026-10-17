@@ -30,6 +30,11 @@ def input_fingerprint():
     inputs.extend((root / "schemas").glob("*.json"))
     inputs.append(root / "scripts/verify-local-candidate-schema.py")
     inputs.append(root / "scripts/verify-record-event-date-schema.py")
+    inputs.append(root / "scripts/verify-manual-people-schema.py")
+    inputs.append(root / ".github/workflows/android.yml")
+    inputs.extend(root / path for path in ("app/src/test/kotlin/com/t1doo/aiyou/ManualPeoplePresentationTest.kt",
+        "scripts/verify-test-results.py", "scripts/d02_device_acceptance.py", "scripts/tests/test_manual_people_schema.py",
+        "scripts/tests/test_device_acceptance.py"))
     fingerprint = hashlib.sha256()
     for path in sorted(set(inputs)):
         fingerprint.update(str(path.relative_to(root)).encode() + b"\0")

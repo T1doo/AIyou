@@ -76,6 +76,12 @@ data class LocalRecordUiState(
     val supportsSourceMemories: Boolean = false,
     val sourceMemories: SourceMemoryUiState? = null,
     val candidates: LocalCandidateUiState? = null,
+    val supportsManualPeople: Boolean = false,
+    val manualPeopleOwner: com.t1doo.aiyou.domain.ManualPeopleRepository? = null,
+    val manualPeople: Map<String, com.t1doo.aiyou.model.ManualPeopleSnapshot> = emptyMap(),
+    val manualPeopleAvailable: Boolean = false,
+    val manualPeopleError: String? = null,
+    val manualPeopleEditor: ManualPeopleEditor? = null,
     val manualTags: Map<String, com.t1doo.aiyou.model.ManualTagSnapshot> = emptyMap(),
     val manualTagsAvailable: Boolean = false,
     val manualTagsError: String? = null,
@@ -152,6 +158,8 @@ class LocalRecordsViewModel internal constructor(
         canUsePanel = { it.hasRecordAccess(mutableState.value) })
     val tags = ManualTagController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.ManualTags(action)).isSuccess })
+    val people = ManualPeopleController(current = { mutableState.value }, publish = { change -> update(change) },
+        enqueue = { action -> commands.trySend(Command.ManualPeople(action)).isSuccess })
     val favorites = RecordFavoriteController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> commands.trySend(Command.Favorites(action)).isSuccess })
     val eventDates = RecordEventDateController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -303,6 +311,7 @@ class LocalRecordsViewModel internal constructor(
                                 factRecaps.checkCurrent(store)
                                 try { command.action(store) } finally { factRecaps.checkCurrent(store) }
                             }
+                            is Command.ManualPeople -> command.action(checkNotNull(repository))
                             is Command.Favorites -> command.action(checkNotNull(repository))
                             is Command.EventDates -> command.action(checkNotNull(repository))
                             is Command.ManualTasks -> command.action(checkNotNull(repository))
@@ -335,7 +344,7 @@ class LocalRecordsViewModel internal constructor(
                 ai.markDisposed()
                 attachments.markDisposed()
                 imageGrid.dispose()
-                tags.dispose()
+                tags.dispose(); people.dispose()
                 favorites.dispose()
                 eventDates.dispose()
                 tasks.dispose()
@@ -365,7 +374,9 @@ class LocalRecordsViewModel internal constructor(
     /** Local and AI writers validate the selected source in the same state CAS. */
     private inline fun update(transform: (LocalRecordUiState) -> LocalRecordUiState) {
         mutableState.update { previous ->
-            val proposed = transform(previous)
+            val requested = transform(previous)
+            val proposed = if (requested.manualPeople.keys.any { id -> requested.entries.none { it.id == id } }) requested.copy(
+                manualPeople = java.util.Collections.unmodifiableMap(requested.manualPeople.filterKeys { id -> requested.entries.any { it.id == id } })) else requested
             val panel = proposed.localProcessing
             val scoped = if (panel != null && (editsDisposed || !proposed.ready || proposed.opening || proposed.error != null ||
                 proposed.entries.none { it.id == panel.source.sourceId && it.currentRevision.toLong() == panel.source.revision &&
@@ -385,11 +396,17 @@ class LocalRecordsViewModel internal constructor(
                     com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == eventEditor.sourceHash }))
                 eventSource.copy(eventDateEditor = eventEditor.copy(preview = null, conflict = true,
                     error = "原文已变化或不可用，输入已保留。请关闭后重新打开。")) else eventSource
-            val editor = dated.manualTagEditor
-            val labelled = if (editor != null && (!dated.ready || dated.opening || dated.error != null ||
-                dated.entries.none { it.id == editor.entryId && it.currentRevision == editor.revision }))
-                dated.copy(manualTagEditor = editor.copy(busy = false, conflict = true,
-                    error = "原文已变化或不可用，输入已保留，请关闭后重新打开。")) else dated
+            val personEditor = dated.manualPeopleEditor
+            val personScoped = if (personEditor != null && dated.manualPeopleOwner !== personEditor.owner) dated.copy(manualPeopleEditor = null)
+                else if (personEditor != null && (!dated.ready || dated.opening || dated.error != null ||
+                dated.manualPeopleOwner !== personEditor.owner || dated.entries.none { it.id == personEditor.entryId && it.currentRevision == personEditor.revision }))
+                dated.copy(manualPeopleEditor = personEditor.copy(busy = false, conflict = true,
+                    error = "原文或账号已变化，输入已保留，请关闭后重新打开。")) else dated
+            val editor = personScoped.manualTagEditor
+            val labelled = if (editor != null && (!personScoped.ready || personScoped.opening || personScoped.error != null ||
+                personScoped.entries.none { it.id == editor.entryId && it.currentRevision == editor.revision }))
+                personScoped.copy(manualTagEditor = editor.copy(busy = false, conflict = true,
+                    error = "原文已变化或不可用，输入已保留，请关闭后重新打开。")) else personScoped
             val review = labelled.candidates
             val next = if (review != null && (editsDisposed || !labelled.ready || labelled.opening || labelled.error != null ||
                 labelled.entries.none { it.id == review.source.sourceId && it.currentRevision.toLong() == review.source.revision &&
@@ -1086,6 +1103,8 @@ class LocalRecordsViewModel internal constructor(
             persistedDraft = store.readDraft()
             captureDraftMayBeConsumed = false
             val entries = store.entries()
+            val peopleValues = try { store.manualPeople?.snapshots() } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { null }
             val labels = try { store.manualTags?.snapshots() }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             val favoriteValues = try { store.favorites?.snapshots() }
@@ -1113,6 +1132,9 @@ class LocalRecordsViewModel internal constructor(
                 supportsCandidates = store.localCandidates != null,
                 supportsSourceTags = store.sourceTags != null,
                 supportsSourceMemories = store.sourceMemories != null,
+                supportsManualPeople = store.manualPeople != null, manualPeopleOwner = store.manualPeople, manualPeople = peopleValues.orEmpty(),
+                manualPeopleAvailable = peopleValues != null,
+                manualPeopleError = if (store.manualPeople != null && peopleValues == null) "手工人物关联暂不可读取，请重试。" else null,
                 entries = entries, manualTags = labels.orEmpty(), manualTagsAvailable = labels != null,
                 supportsEventDates = store.eventDates != null, eventDates = eventDateValues?.values.orEmpty(),
                 eventDatesAvailable = eventDateValues?.values != null,
@@ -1234,6 +1256,8 @@ class LocalRecordsViewModel internal constructor(
         val store = repository ?: return
         if (editsDisposed || !mutableState.value.ready) return
         val entries = store.entries()
+        val peopleValues = try { store.manualPeople?.snapshots() } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { null }
         val labels = try { store.manualTags?.snapshots() } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { null }
         val favoriteValues = try { store.favorites?.snapshots() } catch (cancelled: CancellationException) { throw cancelled }
@@ -1242,6 +1266,8 @@ class LocalRecordsViewModel internal constructor(
         val epoch = try { store.localSearch?.epoch() } catch (_: Exception) { null }
         refreshProcessingVersions(entries)
         update { if (!it.ready || editsDisposed) it else it.copy(entries = entries,
+            manualPeople = peopleValues.orEmpty(), manualPeopleAvailable = peopleValues != null,
+            manualPeopleError = if (store.manualPeople != null && peopleValues == null) "手工人物关联暂不可读取，请重试。" else null,
             manualTags = labels.orEmpty(), manualTagsAvailable = labels != null, localSearchEpoch = epoch,
             favorites = favoriteValues.orEmpty(), favoritesAvailable = favoriteValues != null,
             favoritesError = if (store.favorites != null && favoriteValues == null) "收藏状态暂不可读取，请重试。" else null,
@@ -1265,7 +1291,7 @@ class LocalRecordsViewModel internal constructor(
         ai.markDisposed()
         attachments.markDisposed()
         imageGrid.dispose()
-        tags.dispose()
+        tags.dispose(); people.dispose()
         favorites.dispose()
         eventDates.dispose()
         tasks.dispose()
@@ -1297,6 +1323,7 @@ class LocalRecordsViewModel internal constructor(
         data class OriginalExport(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualTasks(val action: suspend (EntryRepository) -> Unit) : Command
         data class LocalCandidates(val action: suspend (EntryRepository) -> Unit) : Command
+        data class ManualPeople(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualTags(val action: suspend (EntryRepository) -> Unit) : Command
         data class Favorites(val action: suspend (EntryRepository) -> Unit) : Command
         data class EventDates(val action: suspend (EntryRepository) -> Unit) : Command
