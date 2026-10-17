@@ -14,6 +14,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlLocalProcessingRepository.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlFactRecapRepository.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RemoteTextTransactions.kt")
+    from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlRecordAuthorizationRepository.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/PersistentSourceBoundTextSubscription.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RemoteTextCodec.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RemoteTextSqlSchema.kt")
