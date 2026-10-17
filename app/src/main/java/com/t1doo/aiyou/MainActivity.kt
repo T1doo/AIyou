@@ -113,6 +113,7 @@ class MainActivity : ComponentActivity() {
                 onEditOriginalHistory = records::editOriginalHistory,
                 onConfirmHistoryReplacement = records::confirmHistoryReplacement,
                 onCancelHistoryReplacement = records::cancelHistoryReplacement, attachments = records.attachments, mixedCapture = records.mixedCapture,
+                imageGrid = records.imageGrid,
                 onOpenAiSession = { id, revision -> records.openAiSession(id, revision) },
                 onStartAiSession = records::startAiSession, onStopAiSession = records::stopAiSession,
                 onCloseAiSession = records::closeAiSession,
@@ -249,6 +250,7 @@ fun AIyouApp(
     onRefreshLocalSearch: () -> Unit = {},
     onRebuildLocalSearch: () -> Unit = {},
     manualTasks: com.t1doo.aiyou.records.ManualTaskController? = null,
+    imageGrid: com.t1doo.aiyou.records.CurrentImageGridController? = null,
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -283,6 +285,7 @@ fun AIyouApp(
     var searchTag by remember { mutableStateOf<String?>(null) }
     var onlyFavorites by rememberSaveable { mutableStateOf(false) }
     var onlyImages by remember { mutableStateOf(false) }
+    var imageGridMode by remember { mutableStateOf(false) }
     var searchModeGeneration by remember { mutableLongStateOf(0L) }
     fun searchSource() = if (currentRecordsProvider != null) currentRecordsProvider?.invoke() else currentLocal
     fun searchInput(): OriginalSearchInput {
@@ -332,6 +335,7 @@ fun AIyouApp(
         searchDateBasis = com.t1doo.aiyou.model.RecordDateBasis.CAPTURED
         onlyFavorites = false
         onlyImages = false
+        imageGridMode = false
         searchModeGeneration++
         searchReturnAnchor = null
         searchReturnInput = null
@@ -867,9 +871,17 @@ fun AIyouApp(
                 } },
                 onlyImages = onlyImages, onSearchImages = { value -> search.changeInput {
                     if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) {
-                        onlyImages = value; searchModeGeneration++
+                        onlyImages = value; imageGridMode = false; searchModeGeneration++
                     }
                 } },
+                imageGrid = imageGrid, imageGridMode = imageGridMode,
+                onImageGridMode = { value -> if (ownsNavigation() && detailEntryId == null &&
+                    selectedName == Destination.MEMORIES.name && !showSettings && !demo && onlyImages) {
+                    imageGridMode = value
+                } },
+                ownsImageGrid = { ownsNavigation() && detailEntryId == null &&
+                    selectedName == Destination.MEMORIES.name && !showSettings && !demo && imageGridMode && onlyImages &&
+                    search.visible(searchSource(), searchInput()) === searchState },
                 onRefreshFavorites = { if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) favorites?.refresh() },
                 searchMode = searchMode,
                 searchDateBasis = searchDateBasis,

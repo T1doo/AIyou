@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +26,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
@@ -104,6 +108,10 @@ fun LocalRecordsScreen(
     onRefreshFavorites: () -> Unit = {},
     onlyImages: Boolean = false,
     onSearchImages: (Boolean) -> Unit = {},
+    imageGrid: CurrentImageGridController? = null,
+    imageGridMode: Boolean = false,
+    onImageGridMode: (Boolean) -> Unit = {},
+    ownsImageGrid: () -> Boolean = { false },
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -134,6 +142,27 @@ fun LocalRecordsScreen(
     val searchHits = remember(searchState) { searchState?.hits?.associateBy { it.entry.id }.orEmpty() }
     val displayedEntries = if (destination == Destination.NOW) local.entries.take(5)
         else if (filtered) searchState?.hits?.map { it.entry }.orEmpty() else local.entries
+    val gridEnabled = destination == Destination.MEMORIES && onlyImages && imageGridMode && imageGrid != null &&
+        searchState?.stage == OriginalSearchStage.READY
+    val columns = if (LocalDensity.current.fontScale >= 1.5f) 1 else 2
+    val gridRows = remember(displayedEntries, columns, gridEnabled) { if (gridEnabled) displayedEntries.chunked(columns) else emptyList() }
+    val gridEmission = imageGrid?.state?.collectAsState()?.value
+    val gridTiles = gridEmission?.let { searchState?.let { imageGrid?.visible(it)?.tiles } }.orEmpty()
+    DisposableEffect(imageGrid, searchState, gridEnabled) {
+        onDispose { searchState?.let { imageGrid?.clear(it) } }
+    }
+    LaunchedEffect(imageGrid, searchState, gridEnabled, listState, gridRows) {
+        val controller = imageGrid ?: return@LaunchedEffect
+        val owner = searchState ?: return@LaunchedEffect
+        if (!gridEnabled) { controller.clear(owner); return@LaunchedEffect }
+        snapshotFlow {
+            val layout = listState.layoutInfo
+            layout.visibleItemsInfo.filter { it.offset + it.size > layout.viewportStartOffset && it.offset < layout.viewportEndOffset }
+                .map { it.key }.toSet()
+        }.collect { keys ->
+            controller.sync(owner, gridRows.filter { it.first().id in keys }.flatten().map { it.id }, ownsImageGrid)
+        }
+    }
     var attachedViewport by remember { mutableStateOf(IntSize.Zero) }
     val currentLocal by rememberUpdatedState(local)
     val currentEntries by rememberUpdatedState(displayedEntries)
@@ -150,7 +179,7 @@ fun LocalRecordsScreen(
         if (filtered) add("search-status")
         if (destination == Destination.NOW) add("recent")
         if (local.ready && local.entries.isEmpty()) add("empty")
-        addAll(displayedEntries.map { it.id })
+        addAll(if (gridEnabled) gridRows.map { it.first().id } else displayedEntries.map { it.id })
     }
     LaunchedEffect(searchReturnAnchor, searchState, attachedViewport, contentKeys, returnViewportReady, expectedReturnHeightPx) {
         val anchor = searchReturnAnchor ?: return@LaunchedEffect
@@ -302,6 +331,11 @@ fun LocalRecordsScreen(
                             eventDatesAvailable = local.eventDatesAvailable, eventDatesError = local.eventDatesError,
                             onRefreshEventDates = onRefreshEventDates)
                     else SearchSection(demo = false)
+                    if (onlyImages && imageGrid != null) TextButton(onClick = { onImageGridMode(!imageGridMode) },
+                        enabled = local.ready && !local.opening && local.error == null,
+                        modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-grid")) {
+                        Text(if (imageGridMode) "图片网格 · 切换列表" else "切换图片网格")
+                    }
                 }
                 if (filtered) item("search-status") {
                     when (searchState?.stage) {
@@ -321,7 +355,17 @@ fun LocalRecordsScreen(
                 if (local.ready && local.entries.isEmpty()) item("empty") {
                     StatusNotice(if (destination == Destination.NOW) "从一句话开始" else "还没有回忆", "文字保存在本机，无需配置模型。", state = ComponentState.EMPTY)
                 }
-                items(displayedEntries, key = { it.id }) { entry ->
+                if (gridEnabled) items(gridRows, key = { it.first().id }) { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                        row.forEach { entry ->
+                            val hit = searchHits.getValue(entry.id)
+                            CurrentImageGridCard(hit, gridTiles[entry.id], Modifier.weight(1f)
+                                .semantics { selected = entry.id == selectedEntryId },
+                                onOpen = { onOpenSearchResult(hit) })
+                        }
+                        if (row.size < columns) Spacer(Modifier.weight(1f))
+                    }
+                } else items(displayedEntries, key = { it.id }) { entry ->
                     val hit = if (filtered) searchHits[entry.id] else null
                     val preview = remember(entry.originalText, hit) { hit?.excerpt ?: originalPreview(entry.originalText) }
                     MemoryCard(preview, originalMetadata(entry), policy = entry.policy,

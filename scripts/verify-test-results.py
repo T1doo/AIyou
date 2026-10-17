@@ -101,7 +101,9 @@ for label, folder, minimum in targets:
     if label == "Compose JVM interaction":
         additional["com.t1doo.aiyou.CurrentImageSearchPresentationTest"] = (
             "imageFilterStartsOffCombinesLiteralAndDatesAndClearResetsEveryCondition",
-            "narrowDoubleFontFilterIsReachableAndReadFailureCannotBecomeEmptySuccess")
+            "narrowDoubleFontFilterIsReachableAndReadFailureCannotBecomeEmptySuccess",
+            "gridRequiresExplicitToggleKeepsFailureCardAndOpensOriginalSource",
+            "narrowDoubleFontGridToggleAndFailureCardRemainReachableAndClearReturnsToList")
         additional["com.t1doo.aiyou.RecordEventDatePresentationTest"] = (
             "narrowDoubleFontManualSetCorrectionAndClearEachRequireVisiblePreview",
             "uncertainSaveRetainsSameIntentAndStaleConfirmCannotWriteAfterNavigation",
@@ -270,11 +272,13 @@ for label, folder, minimum in targets:
             "successfulReadbackAcknowledgementDoesNotReplayOnSettingsReturn",
             "actualMotionGateTracksLifecycleSystemScalePowerSaverAndUserPreference")
         additional["com.t1doo.aiyou.PlatformJpegPipelineTest"] = (
+            "gridJpegUsesSmallerAllocationAndKeepsExifOrientationAndOriginalBytes",
             "nativeDecoderAppliesAllEightExifDirectionsOnceWithCorrectPixelsAndBothEndianHeaders",
             "progressiveAndLargeJpegActuallyDecodeWithinDisplayBound",
             "explicitMetadataRemovalHasNoGpsAndKeepsNativeOrientedPixelsWithoutRecompression",
             "nativeEarlyEoiAcceptanceIsRecordedWhileProductionRejectsInsufficientPayloadBeforeSave")
         additional["com.t1doo.aiyou.PlatformPngPipelineTest"] = (
+            "gridPngIsSampledDirectlyWithinAllocationBudgetAndPreservesOriginal",
             "actualNativeDecoderReadsPixelsAndKeepsOriginalBytesUnchanged",
             "largePngIsActuallySampledAndDimensionsAboveBoundAreRejected",
             "malformedPixelsCrcTruncationAnimationOrientationAndTrailingBytesAreRejected",

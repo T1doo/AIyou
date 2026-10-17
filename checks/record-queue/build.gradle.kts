@@ -24,6 +24,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/ManualTagController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/RecordFavoriteController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/RecordEventDateController.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/CurrentImageGridController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/ManualTaskController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalExportController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalExportIo.kt")

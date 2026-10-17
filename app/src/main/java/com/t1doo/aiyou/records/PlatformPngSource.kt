@@ -26,6 +26,7 @@ class PlatformAttachmentPicture internal constructor(private val bitmap: Bitmap)
     override val width = bitmap.width
     override val height = bitmap.height
     val pixelBytes = bitmap.byteCount
+    override val allocationBytes: Long get() = bitmap.allocationByteCount.toLong()
     override fun releaseUnpublished() { bitmap.recycle() }
     internal fun thumbnail(): PlatformAttachmentPicture {
         val scale=minOf(1f,160f/maxOf(width,height))
@@ -38,16 +39,18 @@ class PlatformAttachmentPicture internal constructor(private val bitmap: Bitmap)
 /** API26/27 retains the PNG path; never use a lenient JPEG decoder as a silent fallback. */
 object PlatformImageDecoder {
     fun thumbnail(bytes: ByteArray): AttachmentPicture = (decode(bytes) as PlatformAttachmentPicture).thumbnail()
-    fun decode(bytes: ByteArray): AttachmentPicture {
+    fun gridThumbnail(bytes: ByteArray): AttachmentPicture = decode(bytes, CurrentImageGridController.MAX_EDGE)
+    fun decode(bytes: ByteArray): AttachmentPicture = decode(bytes, PlatformPngDecoder.MAX_PREVIEW_DIMENSION)
+    private fun decode(bytes: ByteArray, maxEdge: Int): AttachmentPicture {
         if (bytes.size >= 2 && bytes[0] == (-1).toByte() && bytes[1] == 0xd8.toByte()) {
             if (Build.VERSION.SDK_INT < 28) throw IllegalArgumentException("JPEG requires Android 9 or later")
-            return decodeJpeg(bytes)
+            return decodeJpeg(bytes, maxEdge)
         }
-        return PlatformPngDecoder.decode(bytes)
+        return PlatformPngDecoder.decode(bytes, maxEdge)
     }
 
     @RequiresApi(28)
-    private fun decodeJpeg(bytes: ByteArray): AttachmentPicture {
+    private fun decodeJpeg(bytes: ByteArray, maxEdge: Int): AttachmentPicture {
         val original = JpegPayloadValidator.inspect(bytes)
         val swap = original.orientation in 5..8
         val width = if (swap) original.height else original.width
@@ -59,11 +62,11 @@ object PlatformImageDecoder {
                 decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                 decoder.setTargetColorSpace(ColorSpace.get(ColorSpace.Named.SRGB))
                 var sample = 1
-                while ((maxOf(width, height) + sample - 1) / sample > PlatformPngDecoder.MAX_PREVIEW_DIMENSION) sample *= 2
+                while ((maxOf(width, height) + sample - 1) / sample > maxEdge) sample *= 2
                 decoder.setTargetSampleSize(sample)
                 decoder.setOnPartialImageListener { false }
             }
-            require(bitmap.width in 1..1024 && bitmap.height in 1..1024 && bitmap.byteCount <= 4 * 1024 * 1024)
+            require(bitmap.width in 1..maxEdge && bitmap.height in 1..maxEdge && bitmap.allocationByteCount <= maxEdge * maxEdge * 4)
             return PlatformAttachmentPicture(bitmap)
         } catch (failure: OutOfMemoryError) {
             bitmap?.recycle(); throw IllegalArgumentException("Insufficient image decode memory", failure)
@@ -75,7 +78,8 @@ object PlatformImageDecoder {
 object PlatformPngDecoder {
     const val MAX_DIMENSION = 4096
     const val MAX_PREVIEW_DIMENSION = 1024
-    fun decode(bytes: ByteArray): AttachmentPicture {
+    fun decode(bytes: ByteArray, maxEdge: Int = MAX_PREVIEW_DIMENSION): AttachmentPicture {
+        require(maxEdge in 1..MAX_PREVIEW_DIMENSION)
         val dimensions = PngPayloadValidator.validate(bytes)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
@@ -83,11 +87,16 @@ object PlatformPngDecoder {
         val options = BitmapFactory.Options().apply {
             inPreferredConfig = Bitmap.Config.ARGB_8888
             inSampleSize = 1
-            while ((maxOf(bounds.outWidth, bounds.outHeight) + inSampleSize - 1) / inSampleSize > MAX_PREVIEW_DIMENSION) inSampleSize *= 2
+            while ((maxOf(bounds.outWidth, bounds.outHeight) + inSampleSize - 1) / inSampleSize > maxEdge) inSampleSize *= 2
         }
-        val bitmap = requireNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options))
-        require(bitmap.width in 1..MAX_PREVIEW_DIMENSION && bitmap.height in 1..MAX_PREVIEW_DIMENSION)
-        return PlatformAttachmentPicture(bitmap)
+        var bitmap: Bitmap? = null
+        try {
+            bitmap = requireNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options))
+            require(bitmap.width in 1..maxEdge && bitmap.height in 1..maxEdge && bitmap.allocationByteCount <= maxEdge * maxEdge * 4)
+            return PlatformAttachmentPicture(bitmap)
+        } catch (failure: OutOfMemoryError) {
+            bitmap?.recycle(); throw IllegalArgumentException("Insufficient image decode memory", failure)
+        } catch (failure: Exception) { bitmap?.recycle(); throw failure }
     }
 
 }

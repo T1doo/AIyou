@@ -27,6 +27,16 @@ import org.robolectric.shadows.ShadowContentResolver
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PlatformPngPipelineTest {
+    @Test fun gridPngIsSampledDirectlyWithinAllocationBudgetAndPreservesOriginal() {
+        val bytes = png(4096, 64); val before = bytes.copyOf()
+        val picture = com.t1doo.aiyou.records.PlatformImageDecoder.gridThumbnail(bytes)
+        try {
+            assertEquals(256, picture.width); assertTrue(picture.height in 1..256)
+            assertTrue(picture.allocationBytes in 1..com.t1doo.aiyou.records.CurrentImageGridController.MAX_TILE_BYTES)
+            assertArrayEquals(before, bytes)
+        } finally { picture.releaseUnpublished() }
+        rejected { com.t1doo.aiyou.records.PlatformImageDecoder.gridThumbnail(bytes + 1) }
+    }
     @Test fun actualNativeDecoderReadsPixelsAndKeepsOriginalBytesUnchanged() {
         val bytes = png(1, 1); val original = bytes.copyOf()
         val picture = PlatformPngDecoder.decode(bytes)

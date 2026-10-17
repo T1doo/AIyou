@@ -28,6 +28,20 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk=[35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PlatformJpegPipelineTest {
+    @Test fun gridJpegUsesSmallerAllocationAndKeepsExifOrientationAndOriginalBytes() {
+        val bytes = JpegFixture.large(); val before = bytes.copyOf()
+        val large = PlatformImageDecoder.gridThumbnail(bytes)
+        try {
+            assertEquals(256, large.width); assertTrue(large.height in 1..256)
+            assertTrue(large.allocationBytes in 1..com.t1doo.aiyou.records.CurrentImageGridController.MAX_TILE_BYTES)
+            assertArrayEquals(before, bytes)
+        } finally { large.releaseUnpublished() }
+        val oriented = PlatformImageDecoder.gridThumbnail(JpegFixture.withMetadata()) as PlatformAttachmentPicture
+        try {
+            assertEquals(64, oriented.width); assertEquals(96, oriented.height)
+            assertEquals(listOf(2, 0, 3, 1), corners(oriented).map(::color))
+        } finally { oriented.releaseUnpublished() }
+    }
     private fun corners(picture:PlatformAttachmentPicture):List<Int> {
         val pixels=IntArray(picture.width*picture.height); picture.image.readPixels(pixels)
         return listOf(pixels[8*picture.width+8],pixels[8*picture.width+picture.width-9],

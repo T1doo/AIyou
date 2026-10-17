@@ -126,11 +126,15 @@ class LocalRecordsViewModel internal constructor(
     private val bindAi: ((EntryRepository) -> RecordAiCapability)? = null,
     private val extractLocalCandidates: (com.t1doo.aiyou.model.LocalCandidateJob) -> com.t1doo.aiyou.model.ExcerptDocument = com.t1doo.aiyou.domain.LocalExcerptRules::extract,
     private val decodeCapture: (ByteArray) -> AttachmentPicture = PlatformImageDecoder::thumbnail,
+    private val decodeGrid: (ByteArray) -> AttachmentPicture = PlatformImageDecoder::gridThumbnail,
 ) : AndroidViewModel(application) {
     constructor(application: Application) : this(application, { EncryptedEntryRepository.open(application) })
     private val mutableState = MutableStateFlow(LocalRecordUiState())
     val state = mutableState.asStateFlow()
     private val commands = Channel<Command>(Channel.UNLIMITED)
+    val imageGrid = CurrentImageGridController(
+        enqueue = { action -> commands.trySend(Command.Attachment(action)).isSuccess },
+        decode = decodeGrid, current = { mutableState.value })
     val sourceTasks = SourceTaskController({ mutableState.value }, { change -> update(change) },
         { action -> commands.trySend(Command.ManualTasks(action)).isSuccess },clock, { tasks.refresh() },{taskProposals.open(it)})
     val taskProposals = TaskProposalController({ mutableState.value }, { change -> update(change) },
@@ -330,6 +334,7 @@ class LocalRecordsViewModel internal constructor(
                 mixedCapture.dispose()
                 ai.markDisposed()
                 attachments.markDisposed()
+                imageGrid.dispose()
                 tags.dispose()
                 favorites.dispose()
                 eventDates.dispose()
@@ -1259,6 +1264,7 @@ class LocalRecordsViewModel internal constructor(
         mixedCapture.dispose()
         ai.markDisposed()
         attachments.markDisposed()
+        imageGrid.dispose()
         tags.dispose()
         favorites.dispose()
         eventDates.dispose()

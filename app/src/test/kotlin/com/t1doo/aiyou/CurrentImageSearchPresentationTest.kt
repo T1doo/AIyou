@@ -52,6 +52,7 @@ class CurrentImageSearchPresentationTest {
     }
     private val state=mutableStateOf(LocalRecordUiState(ready=true,opening=false,entries=listOf(picture,text),
         localSearch=port,localSearchEpoch=1))
+    private val grid=CurrentImageGridController({ false }, { error("No Android decode in this presentation fixture") }, { state.value })
     private val results=AtomicReference<OriginalSearchState>()
     private val observer=object:OriginalSearchObserver {
         override fun onResults(state:OriginalSearchState,open:(OriginalSearchHit)->Unit){results.set(state)}
@@ -61,7 +62,7 @@ class CurrentImageSearchPresentationTest {
         CompositionLocalProvider(LocalOriginalSearchObserver provides observer,
             LocalDensity provides if(large)Density(density.density,2f)else density){
             AIyouTheme{Box(if(large)Modifier.size(320.dp,640.dp)else Modifier){
-                AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value})
+                AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},imageGrid=grid)
             }}
         }
     }
@@ -95,5 +96,31 @@ class CurrentImageSearchPresentationTest {
         compose.onNodeWithTag("original-search-images").performScrollTo().assertIsEnabled().performClick()
         await{it.stage==OriginalSearchStage.BROWSE}
         assertFalse(results.get().input.onlyImages)
+    }
+    @Test fun gridRequiresExplicitToggleKeepsFailureCardAndOpensOriginalSource(){
+        compose.setContent{Screen()};await{it.stage==OriginalSearchStage.BROWSE}
+        compose.onAllNodesWithTag("original-search-grid").assertCountEquals(0)
+        compose.onNodeWithTag("original-search-images").performScrollTo().performClick()
+        await{it.stage==OriginalSearchStage.READY&&it.input.onlyImages}
+        compose.onAllNodesWithTag("image-grid-entry-picture").assertCountEquals(0)
+        compose.onNodeWithTag("original-search-grid").performScrollTo().performClick()
+        compose.onNodeWithTag("image-grid-entry-picture").performScrollTo().assertIsDisplayed()
+        compose.waitUntil(3_000){grid.state.value.tiles[picture.id]?.failed==true}
+        compose.onNodeWithTag("image-grid-failed-picture",useUnmergedTree=true).assertExists()
+        compose.onNodeWithTag("image-grid-entry-picture").performClick()
+        compose.onNodeWithTag("original-text").assertTextContains(picture.originalText)
+    }
+    @Test fun narrowDoubleFontGridToggleAndFailureCardRemainReachableAndClearReturnsToList(){
+        compose.setContent{Screen(true)}
+        compose.onNodeWithTag("original-search-images").performScrollTo().performClick()
+        await{it.stage==OriginalSearchStage.READY&&it.input.onlyImages}
+        val toggle=compose.onNodeWithTag("original-search-grid").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        assertTrue(toggle.getUnclippedBoundsInRoot().height>=48.dp);toggle.performClick()
+        compose.onNodeWithTag("image-grid-entry-picture").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("original-search-clear").performScrollTo().performClick()
+        await{it.stage==OriginalSearchStage.BROWSE}
+        compose.onAllNodesWithTag("original-search-grid").assertCountEquals(0)
+        compose.onAllNodesWithTag("image-grid-entry-picture").assertCountEquals(0)
+        assertTrue(grid.state.value.tiles.isEmpty())
     }
 }

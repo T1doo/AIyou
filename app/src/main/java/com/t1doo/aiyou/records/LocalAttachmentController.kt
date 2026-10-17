@@ -23,7 +23,12 @@ interface SelectedImageSource {
     fun open(): InputStream
 }
 
-interface AttachmentPicture { val width: Int; val height: Int; fun releaseUnpublished() {} }
+interface AttachmentPicture {
+    val width: Int
+    val height: Int
+    val allocationBytes: Long get() = width.toLong() * height * 4
+    fun releaseUnpublished() {}
+}
 /** Read permission comes from this exact history request, never from an import session. */
 data class AttachmentHistoryOwner(val sessionId: Long, val requestId: Long, val currentRevision: Int)
 enum class AttachmentImportPhase { PICKING, PREPARING, SAVING, FAILED }

@@ -7,6 +7,7 @@ object PlatformPngDecoder {
 }
 
 object PlatformImageDecoder {
+    fun gridThumbnail(bytes: ByteArray): AttachmentPicture = decode(bytes)
     fun thumbnail(bytes: ByteArray): AttachmentPicture = decode(bytes)
     fun decode(bytes: ByteArray): AttachmentPicture = error("Host requires an explicit platform decoder boundary")
 }
