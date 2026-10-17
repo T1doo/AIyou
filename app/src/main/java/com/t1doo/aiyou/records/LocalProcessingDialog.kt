@@ -27,9 +27,12 @@ internal fun LocalProcessingDialog(ui: LocalProcessingUiState, entry: StoredEntr
     val height = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * 0.9f }
     DisposableEffect(controller, ui.session) { onDispose { controller.close(ui.session) } }
     val confirmation = ui.confirmation
+    val withdrawal = ui.withdrawalConfirmation
     val actions = LocalProcessingDialogActions(
-        { if (canUse() && confirmation != null) controller.confirm(ui.session, confirmation) },
-        { if (canUse() && confirmation != null) controller.cancel(ui.session, confirmation) })
+        { if (canUse()) { if (withdrawal != null) controller.confirmWithdrawal(ui.session, withdrawal)
+            else if (confirmation != null) controller.confirm(ui.session, confirmation) } },
+        { if (canUse()) { if (withdrawal != null) controller.cancelWithdrawal(ui.session, withdrawal)
+            else if (confirmation != null) controller.cancel(ui.session, confirmation) } })
     LocalProcessingDialogObservation.current?.let { observer -> SideEffect { observer.onActions(actions) } }
     Dialog(onDismissRequest = { if (canUse()) controller.close(ui.session) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
@@ -46,10 +49,12 @@ internal fun LocalProcessingDialog(ui: LocalProcessingUiState, entry: StoredEntr
                     if (ui.busy) Text("正在核对本机处理范围…")
                     ui.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("local-processing-error")) }
                     ui.notice?.let { Text(it, modifier = Modifier.testTag("local-processing-notice")) }
-                    if (confirmation != null) {
-                        Text(if (confirmation.target == LocalProcessingChoice.AI_NONE) "确认不要据此推断？" else "确认仅在本机处理？",
+                    if (confirmation != null || withdrawal != null) {
+                        Text(if (withdrawal != null) "确认撤回这条记录的远端授权？"
+                            else if (confirmation?.target == LocalProcessingChoice.AI_NONE) "确认不要据此推断？" else "确认仅在本机处理？",
                             style = MaterialTheme.typography.titleMedium)
-                        Text(if (confirmation.target == LocalProcessingChoice.AI_NONE) "保存与人工浏览，不参与任何 AI；相关派生内容将清除。"
+                        Text(if (withdrawal != null) "改为仅本机并清除这条记录的远端授权，使旧整理结果失效。原文和人工内容保留。"
+                            else if (confirmation?.target == LocalProcessingChoice.AI_NONE) "保存与人工浏览，不参与任何 AI；相关派生内容将清除。"
                             else "允许已安装的端侧处理，不能送到远端；需要你重新主动生成。")
                         Button(enabled = !ui.busy, onClick = actions.confirm,
                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("local-processing-confirm")) { Text("确认修改这条记录") }
@@ -59,20 +64,36 @@ internal fun LocalProcessingDialog(ui: LocalProcessingUiState, entry: StoredEntr
                         Text("当前：" + when (snapshot.policy) {
                             ProcessingPolicy.AI_NONE -> "不要据此推断"
                             ProcessingPolicy.LOCAL_ONLY -> "仅本机"
-                            ProcessingPolicy.REMOTE_ALLOWED -> "已有其他授权，请先撤销原授权后再核对"
+                            ProcessingPolicy.REMOTE_ALLOWED -> "远端处理策略（还需匹配的当前授权）"
                         }, modifier = Modifier.testTag("local-processing-current"))
+                        ui.authorization?.let { preview ->
+                            Text(authorizationStatus(preview), modifier = Modifier.testTag("record-authorization-connection"))
+                            Text(if (preview.authorizationCurrent) "本次核对时，此用途授权在有效期内；当前不能发送。"
+                                else "本次核对未发现有效的远端授权。", modifier = Modifier.testTag("record-authorization-current"))
+                            preview.snapshot.consent?.let { grant ->
+                                Text("授权用途：" + if (grant.purpose == com.t1doo.aiyou.model.TextPurpose.ORGANIZATION) "整理" else "对话")
+                                Text("授权区间：${grant.issuedAt} 至 ${grant.expiresAt}")
+                            }
+                            if (preview.snapshot.connection != null || preview.snapshot.consent != null || snapshot.policy == ProcessingPolicy.REMOTE_ALLOWED) {
+                                TextButton(enabled = !ui.busy && ui.pending == null && ui.pendingWithdrawal == null && snapshot.generation < Long.MAX_VALUE,
+                                    onClick = { if (canUse()) controller.prepareWithdrawal(ui.session) },
+                                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("record-authorization-withdraw")) { Text("撤回远端授权，改为仅本机") }
+                            }
+                        } ?: if (snapshot.policy == ProcessingPolicy.REMOTE_ALLOWED) {
+                            Text("远端授权详情暂不可核对。当前页面不提供发送能力。")
+                        } else Unit
                         if (snapshot.policy != ProcessingPolicy.REMOTE_ALLOWED) {
-                            TextButton(enabled = !ui.busy && ui.pending == null && snapshot.policy != ProcessingPolicy.AI_NONE && snapshot.generation < Long.MAX_VALUE,
+                            TextButton(enabled = !ui.busy && ui.pending == null && ui.pendingWithdrawal == null && snapshot.policy != ProcessingPolicy.AI_NONE && snapshot.generation < Long.MAX_VALUE,
                                 onClick = { if (canUse()) controller.prepare(ui.session, LocalProcessingChoice.AI_NONE) },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("local-processing-none")) { Text("不要据此推断") }
-                            TextButton(enabled = !ui.busy && ui.pending == null && snapshot.policy != ProcessingPolicy.LOCAL_ONLY && snapshot.generation < Long.MAX_VALUE,
+                            TextButton(enabled = !ui.busy && ui.pending == null && ui.pendingWithdrawal == null && snapshot.policy != ProcessingPolicy.LOCAL_ONLY && snapshot.generation < Long.MAX_VALUE,
                                 onClick = { if (canUse()) controller.prepare(ui.session, LocalProcessingChoice.LOCAL_ONLY) },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("local-processing-local")) { Text("仅本机") }
                         }
                     }
                     if (ui.error != null) TextButton(enabled = !ui.busy, onClick = { if (canUse()) controller.retry(ui.session, ui.request) },
                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("local-processing-retry")) { Text("重新核对处理范围") }
-                    if (ui.pending != null || ui.busy) Text("关闭不会撤回已经提交的修改；可重新打开核对实际范围。")
+                    if (ui.pending != null || ui.pendingWithdrawal != null || ui.busy) Text("关闭不会撤回已经提交的修改；可重新打开核对实际范围。")
                     TextButton(onClick = { if (canUse()) controller.close(ui.session) },
                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("local-processing-close")) { Text("关闭") }
                 }

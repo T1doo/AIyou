@@ -45,6 +45,7 @@ data class LocalRecordUiState(
     val localProcessingVersions: Map<String, com.t1doo.aiyou.domain.LocalProcessingVersion> = emptyMap(),
     val localProcessingAvailable: Boolean = true,
     val localProcessing: LocalProcessingUiState? = null,
+    val recordAuthorizationOwner: com.t1doo.aiyou.domain.RecordAuthorizationRepository? = null,
     val supportsFactRecaps: Boolean = false,
     val factRecap: FactRecapUiState? = null,
     val supportsMixedCapture: Boolean = false,
@@ -146,7 +147,7 @@ class LocalRecordsViewModel internal constructor(
     val taskProposals = TaskProposalController({ mutableState.value }, { change -> update(change) },
         { action -> commands.trySend(Command.ManualTasks(action)).isSuccess },clock, { tasks.refresh() })
     val localProcessing = LocalProcessingController({ mutableState.value }, { change -> update(change) },
-        { action -> commands.trySend(Command.LocalProcessing(action)).isSuccess }, ::retireDerived)
+        { action -> commands.trySend(Command.LocalProcessing(action)).isSuccess }, ::retireDerived, clock)
     val factRecaps = FactRecapController({ mutableState.value }, { change -> update(change) },
         { action -> commands.trySend(Command.FactRecap(action)).isSuccess },clock.withZone(ZoneId.systemDefault()))
     val mixedCapture = MixedCaptureController({ mutableState.value },{ change -> update(change) },
@@ -382,6 +383,7 @@ class LocalRecordsViewModel internal constructor(
                 manualPeople = java.util.Collections.unmodifiableMap(requested.manualPeople.filterKeys { id -> requested.entries.any { it.id == id } })) else requested
             val panel = proposed.localProcessing
             val scoped = if (panel != null && (editsDisposed || !proposed.ready || proposed.opening || proposed.error != null ||
+                panel.authorizationSource?.let { it.owner !== proposed.recordAuthorizationOwner } == true ||
                 proposed.entries.none { it.id == panel.source.sourceId && it.currentRevision.toLong() == panel.source.revision &&
                     com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == panel.sourceHash })) proposed.copy(localProcessing = null) else proposed
             val safe = if (scoped.supportsLocalProcessing && !scoped.localProcessingAvailable) scoped.copy(
@@ -1129,6 +1131,7 @@ class LocalRecordsViewModel internal constructor(
                 taskProposals = it.taskProposals.copy(supported=store.taskProposals!=null,available=false,loading=store.taskProposals!=null),
                 supportsSourceTasks = store.sourceTasks != null && store.localProcessing != null && store.manualTasks != null,
                 supportsLocalProcessing = store.localProcessing != null,
+                recordAuthorizationOwner = store.recordAuthorizations,
                 localProcessingVersions = processingVersions.orEmpty(), localProcessingAvailable = processingVersions != null,
                 supportsFactRecaps = store.factRecaps != null,
                 supportsMixedCapture = store.captureRecords != null,
@@ -1250,8 +1253,10 @@ class LocalRecordsViewModel internal constructor(
             val stale = panel?.snapshot?.let { snapshot -> versions?.get(snapshot.source.sourceId) !=
                 com.t1doo.aiyou.domain.LocalProcessingVersion(snapshot.source, snapshot.generation) } == true
             local.copy(entries = entries ?: local.entries, localProcessingVersions = versions.orEmpty(), localProcessingAvailable = versions != null,
-                localProcessing = if (stale && !panel.busy && panel.pending == null) panel.copy(
-                    snapshot = null, confirmation = null, notice = null, error = "处理范围已变化，请重新读取后确认。") else panel)
+                recordAuthorizationOwner = store.recordAuthorizations,
+                localProcessing = if (stale && !panel.busy && panel.pending == null && panel.pendingWithdrawal == null) panel.copy(
+                    snapshot = null, authorization = null, confirmation = null, withdrawalConfirmation = null,
+                    notice = null, error = "处理范围已变化，请关闭后从当前原文重新打开。") else panel)
         }
     }
 

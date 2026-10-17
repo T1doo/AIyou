@@ -146,3 +146,40 @@ SQL 回滚、撤回/迟到 ACK、配置/策略及真实来源版本 1→2→1 AB
 父线程原始 GitHub 邮件已确认祖先 75e130d / 8e45ea4 / 016d03e / 8a295f9 的 Android CI 均 FAIL，
 原因仍 UNKNOWN，不推断 SDK、代码或额度；与对应主机通过记录分开保存。详情见 ZIP 内原始邮件核对回执。
 本片新提交 CI 仍 UNKNOWN，未读取被拒绝的 Actions/log/API 或替代路径。
+
+## 2026-10-17 原文详情的授权查看与明确撤回（原对话框）
+
+正常新安装当前没有创建连接/远端授权的用户写入链；本机范围查看和 LOCAL_ONLY / AI_NONE 切换早已存在。
+本片闭合原处理范围对话框“已有其他授权，请先撤销”却无操作的错误引导，不增加配置目录、诊断页或新的授权入口。
+库内无连接时如实显示未配置；已有连接元数据也只能显示未核验、不能发送。授权有效性只表示对应来源/配置/用途/时间的元数据匹配。
+没有新建连接或 secretRef，没有调用 RecordAuthorizationChange.confirm；生产 bindAi=null 与 INTERNET 移除原样保留。
+
+沿用原文详情的“处理范围”按钮、LocalProcessingController 和同一 ViewModel IO 队列。
+按钮渲染时冻结来源版本/原文哈希/source generation 和实际 RecordAuthorizationRepository owner；首次读取不能升级旧代次。
+确认前再次校验相同快照与身份。撤回需要单独确认，将该记录改为 LOCAL_ONLY，清除记录级连接和授权快照，原文与人工内容保留。
+既有本机策略切换不改变合同；实际写入仍调用 aa616583 已准入的同库端口，不修改 schema、codec、SQL 事务或密钥提供者。
+
+未知提交结果保留原不可变请求，代次刷新后仍可精确核对，不换 nonce 重做。
+重放回执以端口返回的当前范围为准；后来已有新授权时不重新撤回，也不显示“当前已撤回”。
+关闭、来源删改、仓库 owner 替换或 ViewModel 销毁后，旧按钮、确认和迟到读取不得回填新页面。
+现有 Room 11/12 导出/fixture 及 SDK 门仍保留；正式无密钥草案目录/12→13/配置页面仍受阻，不能用旁路存储替代。
+
+本片的产品入口已接线，Compose 渲染和 Android/Room/SQLCipher/Preview/设备验收仍 NOT RUN，无新 APK。
+实际 ViewModel/SQL 主机测试使用既有 v8 合同与合成完整配置，不代表生产有可用模型或已经真实配置。
+本片完整主机门未通过，实际计数、失败及证据见后附记录；父独审待进行。
+
+本片首轮定向 24 项有 2 个超时：测试使用健康状态 retry 误当 owner 刷新，及把无保证的 StateFlow 发射当计数通知。
+改用实际元数据刷新并同步 owner、以真实 IO 队列草稿 ACK 等待迟到读取后，第二轮暴露末尾验证查询已关闭 driver；
+改为独立 SQLite 连接重开持久文件。第三轮定向 **24/24 PASS**；三轮日志、失败 XML 和对应源码保全，未放宽超时/断言。
+
+首轮完整执行了 **1039 个唯一方法，其中 1 FAIL**：
+`MetadataSourceGenerationViewModelTest.committedDateWithLostAckCanBeConfirmedAfterCloseTrashRestoreReopenWithoutAnotherWrite`
+第 105 行索引 epoch 期望 10、实际 11；此前日期版本断言通过，新增 9 项全部通过。
+**原因 UNKNOWN**；没有归因 SDK、代码、额度或环境，没有改动该用例、日期/索引逻辑或时限。
+同源单例复核 1/1 PASS，不能解释或抹去首次失败；仅再做一次有限完整复核，原始失败闭包与同源指纹保存。
+
+有限第二次完整回归仍 **1039 项 / 1 FAIL**，同一 epoch 断言仍期望 10、实际 11，新增 9 项再次全部通过。
+主机完整门明确 **FAIL / 待独审，不能准入**；停止更多重试，不修改或跳过既有断言、用例、时限及日期/索引逻辑。
+失败归因继续 UNKNOWN。正常开发分支保全最小实现和失败证据，等待父独审定位，未宣称完整回归或完整 D04 通过。
+[失败证据 ZIP](evidence/d04-record-authorization-view-withdraw-host-failed.zip) 包含两次完整原始 XML/日志、同源单例通过、
+定向 24 项通过、所有输入与 Git 绑定辅助程序；它不是通过主机验证门的绿色闭包，原验证器按预期仍拒绝失败套件。

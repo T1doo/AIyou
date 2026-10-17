@@ -279,8 +279,13 @@ fun OriginalReadingScreen(
                                 modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("original-source-task")) { Text("从原文摘录创建待办") }
                         }
                         localProcessingController?.let { controller ->
-                            TextButton(enabled = local.supportsLocalProcessing && !local.saving && !local.savePending,
-                                onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
+                            val authorizationSource = local.authorizationReadingSource(entry.id, entry.currentRevision)
+                            TextButton(enabled = local.supportsLocalProcessing && !local.saving && !local.savePending &&
+                                (local.recordAuthorizationOwner == null || authorizationSource != null),
+                                onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) {
+                                    if (authorizationSource != null) controller.open(authorizationSource)
+                                    else if (local.recordAuthorizationOwner == null) controller.open(entry.id, entry.currentRevision)
+                                } },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-local-processing")) { Text("处理范围") }
                         }
                         onOpenAi?.let { openAi ->
