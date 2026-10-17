@@ -150,4 +150,32 @@ class CurrentImageSearchPresentationTest {
         compose.onAllNodesWithTag("local-evidence-status").assertCountEquals(0)
         assertEquals("missing",results.get().input.query)
     }
+    @Test fun localEvidenceRequiresExplicitSelectionAndReconfirmationAfterExclusion(){
+        compose.setContent{Screen()}
+        compose.onNodeWithTag("original-search-query").performScrollTo().performTextReplacement("needle")
+        await{it.stage==OriginalSearchStage.READY}
+        compose.onNodeWithTag("local-evidence-mode").performScrollTo().performClick()
+        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-confirm").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("local-evidence-confirm").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("local-evidence-select-picture").performScrollTo().assertIsOff().performClick().assertIsOn()
+        compose.onNodeWithTag("local-evidence-confirm").performScrollTo().assertIsEnabled().performClick()
+        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-confirmed").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("local-evidence-select-picture").performScrollTo().performClick().assertIsOff()
+        compose.onAllNodesWithTag("local-evidence-confirmed").assertCountEquals(0)
+        compose.onNodeWithTag("local-evidence-confirm").performScrollTo().assertIsNotEnabled()
+    }
+    @Test fun narrowDoubleFontLocalEvidenceSelectionAndConfirmationRemainReachable(){
+        compose.setContent{Screen(true)}
+        compose.onNodeWithTag("original-search-query").performScrollTo().performTextReplacement("needle")
+        await{it.stage==OriginalSearchStage.READY}
+        compose.onNodeWithTag("local-evidence-mode").performScrollTo().performClick()
+        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-select-picture").fetchSemanticsNodes().isNotEmpty()}
+        val checkbox=compose.onNodeWithTag("local-evidence-select-picture").performScrollTo().assertIsDisplayed()
+        assertTrue(checkbox.getUnclippedBoundsInRoot().height>=48.dp);checkbox.performClick()
+        val confirm=compose.onNodeWithTag("local-evidence-confirm").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        assertTrue(confirm.getUnclippedBoundsInRoot().height>=48.dp);confirm.performClick()
+        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-confirmed").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("local-evidence-confirmed").performScrollTo().assertIsDisplayed()
+    }
+
 }

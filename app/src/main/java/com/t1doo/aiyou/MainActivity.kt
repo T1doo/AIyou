@@ -893,6 +893,12 @@ fun AIyouApp(
                     evidence.clear(); evidenceMode = value; if (value) imageGridMode = false
                 } },
                 onOpenEvidence = { card -> if (evidence.canOpen(evidenceState, card)) openSearchResultAt(card.hit, card.reference) },
+                onToggleEvidence = { card -> if (ownsNavigation() && detailEntryId == null &&
+                    selectedName == Destination.MEMORIES.name && !showSettings && !demo && evidenceMode)
+                    evidence.toggle(evidenceState, card) },
+                onConfirmEvidence = { if (ownsNavigation() && detailEntryId == null &&
+                    selectedName == Destination.MEMORIES.name && !showSettings && !demo && evidenceMode)
+                    evidence.confirm(evidenceState) },
                 onImageGridMode = { value -> if (ownsNavigation() && detailEntryId == null &&
                     selectedName == Destination.MEMORIES.name && !showSettings && !demo && onlyImages) {
                     imageGridMode = value

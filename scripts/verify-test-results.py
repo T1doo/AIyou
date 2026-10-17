@@ -101,6 +101,8 @@ for label, folder, minimum in targets:
     if label == "Compose JVM interaction":
         additional["com.t1doo.aiyou.CurrentImageSearchPresentationTest"] = (
             "localEvidenceCardsUseCurrentSourceAndReturnWithoutChangingQuestion",
+            "localEvidenceRequiresExplicitSelectionAndReconfirmationAfterExclusion",
+            "narrowDoubleFontLocalEvidenceSelectionAndConfirmationRemainReachable",
             "narrowDoubleFontEvidenceShowsExplicitNoEvidenceAndKeepsManualListReachable",
             "imageFilterStartsOffCombinesLiteralAndDatesAndClearResetsEveryCondition",
             "narrowDoubleFontFilterIsReachableAndReadFailureCannotBecomeEmptySuccess",

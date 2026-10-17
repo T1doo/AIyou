@@ -1,6 +1,9 @@
 package com.t1doo.aiyou.records
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.Checkbox
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
@@ -117,6 +120,8 @@ fun LocalRecordsScreen(
     evidenceState: LocalEvidenceState = LocalEvidenceState(LocalEvidenceStage.WAITING),
     onEvidenceMode: (Boolean) -> Unit = {},
     onOpenEvidence: (LocalEvidenceCard) -> Unit = {},
+    onToggleEvidence: (LocalEvidenceCard) -> Unit = {},
+    onConfirmEvidence: () -> Unit = {},
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -370,13 +375,23 @@ fun LocalRecordsScreen(
                 }
                 if (evidenceMode) {
                     item("local-evidence-status") {
-                        LocalEvidenceNotice(evidenceState)
+                        LocalEvidenceNotice(evidenceState, onConfirmEvidence)
                     }
                     items(evidenceState.cards, key = { it.reference.source.sourceId }) { card ->
-                        SourceCitationCard(originalMetadata(card.hit.entry), card.reference.quote,
-                            "原文版本 ${card.reference.source.revision} · Unicode 码点 [${card.reference.start}, ${card.reference.end})",
-                            modifier = Modifier.testTag("local-evidence-${card.reference.source.sourceId}"),
-                            onOpen = { onOpenEvidence(card) })
+                        Column {
+                            val selected = evidenceState.selection.cards.any { it === card }
+                            Row(Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget)
+                                .testTag("local-evidence-select-${card.reference.source.sourceId}")
+                                .toggleable(selected, role = Role.Checkbox, onValueChange = { onToggleEvidence(card) }),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = selected, onCheckedChange = null)
+                                Text(if (selected) "已选为本次出处" else "未选入本次出处")
+                            }
+                            SourceCitationCard(originalMetadata(card.hit.entry), card.reference.quote,
+                                "原文版本 ${card.reference.source.revision} · Unicode 码点 [${card.reference.start}, ${card.reference.end})",
+                                modifier = Modifier.testTag("local-evidence-${card.reference.source.sourceId}"),
+                                onOpen = { onOpenEvidence(card) })
+                        }
                     }
                 } else if (gridEnabled) items(gridRows, key = { it.first().id }) { row ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {

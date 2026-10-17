@@ -3,7 +3,6 @@ package com.t1doo.aiyou.records
 import com.t1doo.aiyou.model.LocalCandidates
 import com.t1doo.aiyou.model.OriginalTextReference
 import com.t1doo.aiyou.model.ProcessingPolicy
-import com.t1doo.aiyou.model.SourceVersion
 import java.util.Collections
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,8 +19,11 @@ class LocalEvidenceCard internal constructor(val reference: OriginalTextReferenc
 class LocalEvidenceState internal constructor(val stage: LocalEvidenceStage,
     val question: String = "", cards: List<LocalEvidenceCard> = emptyList(), val limited: Boolean = false,
     val message: String? = null, internal val source: OriginalSearchState? = null,
-    internal val generation: Long = 0) {
+    internal val generation: Long = 0,
+    val selection: LocalEvidenceSelection = LocalEvidenceSelection()) {
     val cards: List<LocalEvidenceCard> = Collections.unmodifiableList(ArrayList(cards))
+    internal fun selecting(selection: LocalEvidenceSelection) = LocalEvidenceState(stage, question, cards, limited,
+        message, source, generation, selection)
     override fun toString() = "LocalEvidenceState(stage=$stage, redacted)"
 }
 
@@ -43,20 +45,14 @@ internal fun localEvidenceCandidates(source: OriginalSearchState, generation: Lo
         // Ordinary manual search still shows AI_NONE. It never enters this candidate packet.
         if (hit.entry.policy == ProcessingPolicy.AI_NONE || !seen.add(hit.entry.id) || hit.quote.isEmpty()) continue
         if (cards.size == LocalEvidenceController.MAX_SOURCES) { limited = true; break }
-        val original = hit.entry.originalText
-        require(hit.entry.currentRevision > 0 && LocalCandidates.validUnicode(original))
-        val count = original.codePointCount(0, original.length)
-        require(hit.startCodePoint >= 0 && hit.endCodePoint in (hit.startCodePoint + 1)..count)
-        val size = hit.quote.codePointCount(0, hit.quote.length)
-        require(size <= 240 && size == hit.endCodePoint - hit.startCodePoint && hit.quote == original.substring(
-            original.offsetByCodePoints(0, hit.startCodePoint), original.offsetByCodePoints(0, hit.endCodePoint)))
+        val reference = localEvidenceReference(hit)
+        val size = reference.end - reference.start
         val encoded = hit.quote.toByteArray(Charsets.UTF_8).size
         if (points + size > LocalEvidenceController.MAX_QUOTE_POINTS || bytes + encoded > LocalEvidenceController.MAX_QUOTE_BYTES) {
             limited = true; break
         }
         points += size; bytes += encoded
-        cards += LocalEvidenceCard(OriginalTextReference(SourceVersion(hit.entry.id, hit.entry.currentRevision.toLong()),
-            hit.startCodePoint, hit.endCodePoint, hit.quote), hit.entry.capturedAtMillis, hit.entry.captureTimeZone, hit)
+        cards += LocalEvidenceCard(reference, hit.entry.capturedAtMillis, hit.entry.captureTimeZone, hit)
     }
     return LocalEvidenceState(if (cards.isEmpty()) LocalEvidenceStage.EMPTY else LocalEvidenceStage.READY,
         question, cards, limited, source = source, generation = generation)
@@ -78,11 +74,15 @@ class LocalEvidenceController internal constructor(
     private var closed = false
     private var generation = 0L
     private var job: Job? = null
+    private var reviewJob: Job? = null
+    private var confirmation: LocalEvidenceConfirmation? = null
     private fun owns(value: LocalEvidenceState) = !closed && active && value.generation == generation &&
         value.source != null && currentSearch() === value.source
 
     fun visible(source: OriginalSearchState): LocalEvidenceState = synchronized(lock) {
-        mutable.value.takeIf { it.source === source && owns(it) } ?: when (source.stage) {
+        mutable.value.takeIf { it.source === source && owns(it) } ?: if (mutable.value.selection.cards.isNotEmpty())
+            LocalEvidenceState(LocalEvidenceStage.STALE, message = "来源或条件已变化，旧选择与确认已失效。请重新选择并确认。",
+                selection = LocalEvidenceSelection(LocalEvidenceSelectionStage.EXPIRED)) else when (source.stage) {
             OriginalSearchStage.FAILED, OriginalSearchStage.INVALID -> LocalEvidenceState(LocalEvidenceStage.FAILED,
                 message = "当前原文查找未成功，请先修正条件或重试本机读取。没有生成出处候选。")
             OriginalSearchStage.BROWSE -> LocalEvidenceState(LocalEvidenceStage.INVALID,
@@ -102,6 +102,7 @@ class LocalEvidenceController internal constructor(
         }
         if (active && mutable.value.source === source) return@synchronized
         active = true; generation++
+        confirmation = null; reviewJob?.cancel(); reviewJob = null
         job?.cancel()
         val request = LocalEvidenceState(LocalEvidenceStage.RUNNING, source = source, generation = generation)
         mutable.value = request
@@ -129,9 +130,91 @@ class LocalEvidenceController internal constructor(
             }
         }
     }
+    /** A UI click can only change the current, identity-owned candidate set. Nothing is selected by default. */
+    fun toggle(value: LocalEvidenceState, card: LocalEvidenceCard) = synchronized(lock) {
+        if (!canOpen(value, card)) return@synchronized
+        reviewJob?.cancel(); reviewJob = null; confirmation = null
+        val wasSelected = value.selection.cards.any { it === card }
+        val selected = value.cards.filter { candidate ->
+            if (candidate === card) !wasSelected else value.selection.cards.any { it === candidate }
+        }
+        if (selected.size > MAX_SOURCES) return@synchronized
+        mutable.value = value.selecting(LocalEvidenceSelection(cards = selected))
+    }
+
+    /** Explicit local review, rechecking every source's private revision/access binding under one SQL lease. */
+    fun confirm(value: LocalEvidenceState) = synchronized(lock) {
+        if (mutable.value !== value || !owns(value) || value.stage != LocalEvidenceStage.READY ||
+            value.selection.stage != LocalEvidenceSelectionStage.CHOOSING || value.selection.cards.isEmpty()) return@synchronized
+        confirmation = null; reviewJob?.cancel()
+        val request = value.selecting(LocalEvidenceSelection(LocalEvidenceSelectionStage.CHECKING,
+            value.selection.cards, value.selection.id))
+        mutable.value = request
+        reviewJob = scope.launch {
+            val accepted = try {
+                // This local packet is never returned by the preparation or confirmation API.
+                LocalEvidencePacket.reviewed(request)
+                val source = checkNotNull(request.source)
+                checkNotNull(source.owner).publishCurrent(checkNotNull(source.proof)) {
+                    synchronized(lock) {
+                        if (mutable.value === request && owns(request)) {
+                            val receipt = LocalEvidenceConfirmation(request.selection.id)
+                            confirmation = receipt
+                            mutable.value = request.selecting(LocalEvidenceSelection(LocalEvidenceSelectionStage.CONFIRMED,
+                                request.selection.cards, request.selection.id, receipt))
+                        }
+                    }
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { false }
+            if (!accepted) expire(request)
+        }
+    }
+
+    /**
+     * IO-only, local nonblocking inspection. There is no production model consumer. An old selection ID,
+     * an ordinary source reference or a single-source ConsentGrant cannot authorize this operation.
+     * Recheck the same whole private proof and owned receipt at the actual publication boundary.
+     * The callback runs under the counted SQL lease; it must never perform network or blocking work.
+     */
+    internal fun inspectConfirmed(value: LocalEvidenceState, receipt: LocalEvidenceConfirmation?,
+        publish: (LocalEvidencePacket) -> Unit): Boolean {
+        fun admitted() = mutable.value === value && owns(value) && value.stage == LocalEvidenceStage.READY &&
+            value.selection.stage == LocalEvidenceSelectionStage.CONFIRMED && receipt != null &&
+            confirmation === receipt && value.selection.confirmation === receipt && receipt.selectionId == value.selection.id
+        if (!synchronized(lock) { admitted() }) return false
+        var published = false
+        val accepted = try {
+            val packet = LocalEvidencePacket.reviewed(value)
+            val source = checkNotNull(value.source)
+            checkNotNull(source.owner).publishCurrent(checkNotNull(source.proof)) {
+                synchronized(lock) { if (admitted()) { publish(packet); published = true } }
+            }
+        } catch (_: Exception) { false }
+        if (!accepted) expire(value)
+        return accepted && published
+    }
+
+    private fun expire(value: LocalEvidenceState) {
+        val notify = synchronized(lock) {
+            val current = mutable.value
+            if (current.source !== value.source || current.generation != value.generation ||
+                current.selection.id != value.selection.id || !owns(current)) false else {
+                confirmation = null
+                mutable.value = LocalEvidenceState(LocalEvidenceStage.STALE,
+                    message = "来源或授权已变化，已清除本次选择与确认。请重新查找、选择并确认。",
+                    source = value.source, generation = value.generation,
+                    selection = LocalEvidenceSelection(LocalEvidenceSelectionStage.EXPIRED))
+                true
+            }
+        }
+        if (notify) onInvalidated()
+    }
+
     private fun resetLocked() {
         if (!active && mutable.value === waiting) return
-        active = false; generation++; job?.cancel(); job = null; mutable.value = waiting
+        active = false; generation++; job?.cancel(); job = null
+        reviewJob?.cancel(); reviewJob = null; confirmation = null; mutable.value = waiting
     }
     fun clear() = synchronized(lock) { resetLocked() }
     override fun close() = synchronized(lock) { closed = true; resetLocked(); scope.cancel() }
