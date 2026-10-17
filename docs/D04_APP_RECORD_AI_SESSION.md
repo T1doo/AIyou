@@ -183,3 +183,34 @@ SQL 回滚、撤回/迟到 ACK、配置/策略及真实来源版本 1→2→1 AB
 失败归因继续 UNKNOWN。正常开发分支保全最小实现和失败证据，等待父独审定位，未宣称完整回归或完整 D04 通过。
 [失败证据 ZIP](evidence/d04-record-authorization-view-withdraw-host-failed.zip) 包含两次完整原始 XML/日志、同源单例通过、
 定向 24 项通过、所有输入与 Git 绑定辅助程序；它不是通过主机验证门的绿色闭包，原验证器按预期仍拒绝失败套件。
+
+## 2026-10-17 日期回执 epoch 失败：已完成受控因果验证
+
+f77 两次全量的日期恢复断言 10→11 已用闩锁确定性复现；原失败 ZIP 保持原字节，不以单例绿解释失败。
+在 f77 与已准入 aa 的独立临时 checkout 使用完全相同插桩：均为原严格断言 1 FAIL、因果诊断 1 PASS，
+两端 SQL 轨迹逐字节相同。aa 的索引调度/执行及日期 SQL/控制器/触发器实现与 f77 原字节一致。
+临时 checkout 只复用既有、已核的 JDK17 与离线缓存，未配置/下载/接受 SDK，比较结束后正常清理自有 checkout。
+
+确定的时序是：恢复事务提交并发布来源 generation=3，测试据此退出等待；恢复后的 IndexBatch 尚未完成。
+闩锁在该 generation 的实际索引 batch 事务前暂停，允许读到 epoch=10。放行后日志明确记录 INDEX_SQL 的
+BEGIN IMMEDIATE、唯一 UPDATE local_search_epoch CAS、FTS/文档/作业写入和 COMMIT；实际所有者返回 ACK 后，
+索引文档 visibilityGeneration=3、processed=1、remaining=false、epoch=11。随后日期精确回执事务只有
+BEGIN、SELECT、COMMIT，**没有 DML**；同一个 mutation 对象/ID，日期 version 仍为 1，epoch 仍为 11。
+旧测试把独立且合法的恢复索引递增算进了日期重试窗口，根因是测试边界缺少索引完成回执，未发现重复日期业务变更。
+
+该 fixture 的 epoch 路径从已核 SQL 得出：记录/访问行插入 +2，启动 tokenizer reset/首批索引 +2，
+首次日期 INSERT +1，移入回收站（entries UPDATE、源策略联动及显式 access UPSERT）+3，恢复 +2，
+合计 10；恢复索引首文档 CAS +1 到 11。日期重放 +0。其他通用写者包括 tags/access/entries 触发器、
+收藏 entries UPDATE、event_dates/people 元数据触发器及 rebuild/reset；本实验窗口只有索引批次实际更新 epoch。
+
+最小修复仅在现有主机测试：对恢复 generation=3 的实际 batch COMMIT ACK 取基线，不依赖 !localIndexBusy，
+也不把 generation 发布当索引完成。日期和同类收藏回执的严格 epoch 等式、原 nonce/version 检查均保留；
+日期另加实际事务无 DML 检查，新因果用例精确检查索引独立递增 +1 和日期回执 +0。
+未改生产代码、授权、SQL/schema、预期比较或原 15 秒/5 秒预算，没有 sleep 或过滤用例冒充完整门。
+同样边界修复在 aa 的两项受控用例已 PASS。本工作树相关 **34/34 PASS**；最终不带用例筛选的完整主机门
+**1040/1040 PASS**（178 AI + 71 domain + 791 remote-text），零失败/错误/跳过，5 分 2 秒，固定源码仅一次完整执行。
+原 f77 的 1039 个方法全部保留，新增 1 项因果回归。149 队列 / 151 Python 仅保留历史证据，未重跑。
+[因果与最终闭包 ZIP](evidence/d04-date-epoch-boundary-host.zip) 含 aa/f77 受控反例、同源 SQL 轨迹、固定边界结果、
+原 f77 失败节选与原档 SHA、完整原始 XML/捕获/最终输入，未删除或改写任何旧失败档。
+本片只解释这一日期 epoch 缺口，旧 AI 准备失败及 CI 原因不由此推断；Android/Room/SQLCipher/Compose/
+Preview/设备仍 NOT RUN，无新 APK。父独审待进行。

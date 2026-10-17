@@ -8,6 +8,7 @@ import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import org.junit.Assert.*
@@ -86,10 +87,14 @@ class MetadataSourceGenerationViewModelTest {
         h.await{it.favoriteWrites[h.id]?.let{w->!w.busy&&w.error!=null}==true}
         assertTrue(h.f.base.favorites.read(h.id).isFavorite)
         val pending=h.vm.state.value.favoriteWrites.getValue(h.id).intent
-        h.actualTrashRestore();val epoch=h.f.search.epoch()
-        h.vm.favorites.retry(h.id);h.await{it.favoriteWrites.isEmpty()&&it.favoriteNotice!=null}
-        assertSame(pending,h.favoriteCalls.last());assertEquals(1L,h.f.base.favorites.read(h.id).version)
-        assertEquals(epoch,h.f.search.epoch());assertTrue(h.f.base.favorites.read(h.id).isFavorite)
+        val index=h.holdRestoredIndex()
+        try {
+            h.actualTrashRestore();assertTrue(index.entered.await(5,TimeUnit.SECONDS));h.finishRestoredIndex(index)
+            val epoch=h.f.search.epoch()
+            h.vm.favorites.retry(h.id);h.await{it.favoriteWrites.isEmpty()&&it.favoriteNotice!=null}
+            assertSame(pending,h.favoriteCalls.last());assertEquals(1L,h.f.base.favorites.read(h.id).version)
+            assertEquals(epoch,h.f.search.epoch());assertTrue(h.f.base.favorites.read(h.id).isFavorite)
+        } finally {index.release.countDown();h.dumpTrace("favorite-receipt-boundary")}
     } }
 
     @Test(timeout=15_000) fun committedDateWithLostAckCanBeConfirmedAfterCloseTrashRestoreReopenWithoutAnotherWrite(): Unit = Harness().use { h -> runBlocking {
@@ -98,11 +103,45 @@ class MetadataSourceGenerationViewModelTest {
         h.await{it.eventDateWrites[h.id]?.let{w->!w.busy&&w.error!=null}==true}
         assertEquals(DAY,h.f.base.dates.read(h.id).date)
         val pending=h.vm.state.value.eventDateWrites.getValue(h.id).intent
-        h.vm.eventDates.close(editor.session);h.actualTrashRestore();val epoch=h.f.search.epoch()
-        val fresh=h.openDate();h.vm.eventDates.retry(fresh.session)
-        h.await{it.eventDateWrites.isEmpty()&&it.eventDateEditor?.notice!=null}
-        assertSame(pending,h.dateCalls.last());assertEquals(1L,h.f.base.dates.read(h.id).version)
-        assertEquals(epoch,h.f.search.epoch());assertEquals(DAY,h.f.base.dates.read(h.id).date)
+        h.vm.eventDates.close(editor.session);val index=h.holdRestoredIndex()
+        try {
+            h.actualTrashRestore();assertTrue(index.entered.await(5,TimeUnit.SECONDS))
+            h.trace("BEFORE_RESTORED_INDEX_ACK epoch=${h.f.search.epoch()} generation=3")
+            h.finishRestoredIndex(index)
+            // Generation visibility is not the index completion receipt. The strict
+            // no-write baseline belongs after this generation's actual index COMMIT.
+            val epoch=h.f.search.epoch();h.trace("STABLE_BASELINE epoch=$epoch generation=3")
+            val fresh=h.openDate();h.vm.eventDates.retry(fresh.session)
+            h.await{it.eventDateWrites.isEmpty()&&it.eventDateEditor?.notice!=null}
+            h.assertReadOnlyDateReceipt(pending)
+            assertSame(pending,h.dateCalls.last());assertEquals(1L,h.f.base.dates.read(h.id).version)
+            assertEquals(epoch,h.f.search.epoch());assertEquals(DAY,h.f.base.dates.read(h.id).date)
+        } finally {index.release.countDown();h.dumpTrace("original-receipt-boundary")}
+    } }
+
+    @Test(timeout=15_000) fun restoredIndexBatchOwnsEpochAdvanceWhileDateReceiptTransactionIsReadOnly():Unit=Harness().use { h -> runBlocking {
+        h.ready();val editor=h.openDate();h.prepareDate(editor);h.loseDateAck=true
+        h.vm.eventDates.confirm(editor.session,checkNotNull(h.vm.state.value.eventDateEditor?.preview).id)
+        h.await{it.eventDateWrites[h.id]?.let{w->!w.busy&&w.error!=null}==true}
+        val pending=h.vm.state.value.eventDateWrites.getValue(h.id).intent
+        h.vm.eventDates.close(editor.session);val index=h.holdRestoredIndex()
+        try {
+            h.actualTrashRestore();assertTrue(index.entered.await(5,TimeUnit.SECONDS))
+            val before=h.f.search.epoch();h.trace("SAMPLED_WHILE_INDEX_HELD epoch=$before generation=3")
+            assertEquals(1,h.dateCalls.size);assertEquals(1L,h.f.base.dates.read(h.id).version)
+            val progress=h.finishRestoredIndex(index);val stable=h.f.search.epoch()
+            assertEquals(Math.addExact(before,1),stable);assertEquals(stable,progress.epoch)
+            assertEquals(1,h.dateCalls.size);assertEquals(1L,h.f.base.dates.read(h.id).version)
+            val indexSql=h.indexSql.toList()
+            assertEquals(1,indexSql.count{it.startsWith("UPDATE local_search_epoch SET epoch=?")})
+            assertTrue(indexSql.first()=="BEGIN IMMEDIATE"&&indexSql.last()=="COMMIT")
+            assertFalse(indexSql.any{it.contains("INTO entry_event_dates")||it.startsWith("UPDATE entry_event_dates")||it.startsWith("DELETE FROM entry_event_dates")})
+            val fresh=h.openDate();h.vm.eventDates.retry(fresh.session)
+            h.await{it.eventDateWrites.isEmpty()&&it.eventDateEditor?.notice!=null}
+            h.assertReadOnlyDateReceipt(pending)
+            assertEquals(stable,h.f.search.epoch());assertEquals(1L,h.f.base.dates.read(h.id).version)
+            assertEquals(DAY,h.f.base.dates.read(h.id).date)
+        } finally {index.release.countDown();h.dumpTrace("index-writer-vs-readonly-date-receipt")}
     } }
 
     @Test(timeout=15_000) fun renderedMetadataButtonsNeedAvailableLedgerAndCannotAdoptRestoredGeneration(): Unit = Harness().use { h -> runBlocking {
@@ -168,6 +207,37 @@ class MetadataSourceGenerationViewModelTest {
         @Volatile var holdDate:(()->Unit)?=null
         val favoriteCalls=CopyOnWriteArrayList<RecordFavoriteMutation>()
         val dateCalls=CopyOnWriteArrayList<RecordEventDateMutation>()
+        private val dateTransactionSql=ThreadLocal<MutableList<String>?>()
+        val dateTransactions=CopyOnWriteArrayList<List<String>>()
+        private val inIndex=ThreadLocal.withInitial{false}
+        val indexSql=CopyOnWriteArrayList<String>()
+        private val timeline=CopyOnWriteArrayList<String>()
+        private val indexGates=CopyOnWriteArrayList<RestoredIndex>()
+        @Volatile private var restoredIndex:RestoredIndex?=null
+        class RestoredIndex {
+            val entered=CountDownLatch(1);val release=CountDownLatch(1);val committed=CountDownLatch(1)
+            val progress=AtomicReference<LocalSearchProgress>();val failure=AtomicReference<Throwable>()
+        }
+        fun trace(message:String){check(timeline.size<512);timeline+=message}
+        fun holdRestoredIndex()=RestoredIndex().also{indexGates+=it;restoredIndex=it}
+        fun finishRestoredIndex(gate:RestoredIndex):LocalSearchProgress {
+            gate.release.countDown();assertTrue(gate.committed.await(5,TimeUnit.SECONDS))
+            gate.failure.get()?.let{throw AssertionError("Controlled restored index failed",it)}
+            val result=checkNotNull(gate.progress.get());assertEquals(1,result.processed);assertFalse(result.remaining)
+            assertEquals(3L,f.base.db.read("SELECT visibilityGeneration FROM local_search_documents WHERE entryId=?",id).single().single())
+            trace("RESTORE_INDEX_COMMIT_ACK generation=3 epoch=${result.epoch}")
+            return result
+        }
+        fun assertReadOnlyDateReceipt(pending:RecordEventDateMutation){
+            assertSame(pending,dateCalls.last());assertEquals(2,dateTransactions.size)
+            val statements=dateTransactions.last()
+            assertEquals("BEGIN IMMEDIATE",statements.first());assertEquals("COMMIT",statements.last())
+            assertFalse(statements.any{it.trimStart().substringBefore(' ').uppercase()in setOf("INSERT","UPDATE","DELETE","REPLACE","CREATE","ALTER","DROP")})
+            assertEquals(1L,f.base.dates.read(id).version)
+            assertEquals(pending.mutationId,f.base.db.read("SELECT lastMutationId FROM entry_event_dates WHERE entryId=?",id).single().single())
+            trace("DATE_RECEIPT_COMMIT noDML=true sameMutation=true version=1 epoch=${f.search.epoch()}")
+        }
+        fun dumpTrace(label:String){println("EPOCH_TRACE[$label] "+timeline.joinToString("\n"))}
         private val favorites=object:RecordFavoriteRepository by f.base.favorites {
             override fun set(mutation:RecordFavoriteMutation):RecordFavoriteSnapshot {
                 favoriteCalls+=mutation;holdFavorite?.invoke();if(failFavorite)throw RecordFavoriteStorageFailure()
@@ -179,7 +249,8 @@ class MetadataSourceGenerationViewModelTest {
         private val dates=object:RecordEventDateRepository by f.base.dates {
             override fun set(mutation:RecordEventDateMutation):RecordEventDateSnapshot {
                 dateCalls+=mutation;holdDate?.invoke();if(failDate)throw RecordEventDateStorageFailure()
-                val result=f.base.dates.set(mutation)
+                val sql=ArrayList<String>();dateTransactionSql.set(sql)
+                val result=try{f.base.dates.set(mutation)}finally{dateTransactionSql.remove();dateTransactions+=sql.toList()}
                 if(loseDateAck){loseDateAck=false;throw RecordEventDateStorageFailure()}
                 return result
             }
@@ -189,17 +260,33 @@ class MetadataSourceGenerationViewModelTest {
             override fun versions():Map<String,LocalProcessingVersion>{if(failVersions)throw LocalProcessingStorageFailure();return actualProcessing.versions()}
         }
         private val bin=SqlRecycleBinRepository(f.base.gateway,f.base.tags)
+        private val search=object:LocalSearchRepository by f.search {
+            override fun batch():LocalSearchProgress {
+                val gate=restoredIndex?.takeIf{bin.read(id).let{it.generation==3L&&!it.deleted}}
+                if(gate==null)return f.search.batch()
+                restoredIndex=null;trace("INDEX_ENTER generation=3; before batch transaction");gate.entered.countDown()
+                try {
+                    check(gate.release.await(5,TimeUnit.SECONDS));inIndex.set(true)
+                    return f.search.batch().also{gate.progress.set(it)}
+                }catch(failure:Throwable){gate.failure.set(failure);throw failure}
+                finally{inIndex.remove();gate.committed.countDown()}
+            }
+        }
         private val original=SqliteVmEntryRepository(f.base.db,f.base.gateway,RemoteTextTransactions(f.base.gateway)){}
         private val store=object:EntryRepository by original,AutoCloseable {
             override val favorites=this@Harness.favorites
             override val eventDates=dates
             override val recycleBin=bin
             override val manualTags=f.base.tags
-            override val localSearch=f.search
+            override val localSearch=search
             override val localProcessing=processing
             override suspend fun prepare(){check(f.base.db.read("PRAGMA user_version").single().single()==12L)}
             override fun close()=original.close()
         }
+        init{f.base.db.beforeSql={sql->
+            dateTransactionSql.get()?.let{check(it.size<128);it+=sql;if(indexGates.isNotEmpty())trace("DATE_SQL $sql")}
+            if(inIndex.get()){check(indexSql.size<128);indexSql+=sql;trace("INDEX_SQL $sql")}
+        }}
         val vm=LocalRecordsViewModel(Application(),{store})
         suspend fun await(test:(LocalRecordUiState)->Boolean)=withTimeout(5_000){vm.state.first(test)}
         suspend fun ready()=await{it.ready&&!it.opening}
@@ -235,6 +322,7 @@ class MetadataSourceGenerationViewModelTest {
             assertEquals(3L,bin.read(id).generation);assertEquals(1,vm.state.value.entries.single().currentRevision)
         }
         override fun close(){holdFavorite=null;holdDate=null;failFavorite=false;failDate=false
+            indexGates.forEach{it.release.countDown()}
             vm.clearForHostTest();check(original.closed.await(5,TimeUnit.SECONDS));f.close()}
     }
     companion object {private val DAY=RecordEventDate("2024-02-29","UTC")}
