@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -17,6 +18,7 @@ internal fun RecordEventDateDialog(ui: RecordEventDateEditor, pending: RecordEve
     // No date, zone, preview, mutation or original text enters a Bundle/Saver.
     CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
         AlertDialog(onDismissRequest = { controller.close(ui.session) },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
             title = { Text("事件发生日期 · 手工补记") },
             text = { Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -176,7 +176,7 @@ class RecordEventDatePresentationTest {
         System.err.println("DATE_ISOLATION after-dialog-setContent")
         control("event-date-input").assertIsEnabled()
         control("event-date-zone").assertIsEnabled()
-        control("event-date-close").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("event-date-close").assertIsDisplayed().performClick()
         compose.runOnIdle{assertNull(state.value.eventDateEditor)}
         System.err.println("DATE_ISOLATION after-dialog-only")
     }
