@@ -1,0 +1,55 @@
+name: Isolated Compose source diagnosis (not D01 acceptance)
+
+'on':
+  push:
+    branches: ['diagnostic/ui-source-probe-20261018']
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-methods:
+    if: github.repository == 'T1doo/AIyou' && github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Verify existing SDK and exact schema ownership without installation
+        run: |
+          python3 scripts/check-sdk.py
+          python3 -m unittest scripts.tests.test_ui_lazy_repro -v
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people; do
+            python3 "scripts/verify-$kind-schema.py" --capture
+          done
+      - name: Compile the actual application for the isolated Compose methods
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: |
+          timeout --signal=TERM --kill-after=10s 360s scripts/gradle.sh :app:assembleDebug
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people; do
+            python3 "scripts/verify-$kind-schema.py" --verify
+          done
+          python3 scripts/inspect-record-ai-permissions.py
+      - name: Run original/current evidence method and independent date method
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: python3 scripts/reproduce-ui-lazy-source.py --expected-head "$GITHUB_SHA"
+      - name: Preserve exact isolated method reports even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: isolated-ui-source-reports
+          path: |
+            app/build/reports/ui-lazy-repro/
+            app/build/test-results/testDebugUnitTest/
+            .local-evidence/f05-event-date/schema-generation.json
+            .local-evidence/f05-manual-people/schema-generation.json
+          if-no-files-found: warn
+          retention-days: 14

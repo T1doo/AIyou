@@ -76,6 +76,8 @@ class LocalEvidenceController internal constructor(
     private var job: Job? = null
     private var reviewJob: Job? = null
     private var confirmation: LocalEvidenceConfirmation? = null
+    private var lastSyncEnabled: Boolean? = null
+    private var lastSyncSourceCurrent: Boolean? = null
     private fun owns(value: LocalEvidenceState) = !closed && active && value.generation == generation &&
         value.source != null && currentSearch() === value.source
 
@@ -97,7 +99,10 @@ class LocalEvidenceController internal constructor(
     }
     fun sync(enabled: Boolean, source: OriginalSearchState) = synchronized(lock) {
         if (closed) return@synchronized
-        if (!enabled || source.stage != OriginalSearchStage.READY || currentSearch() !== source) {
+        val current = if (enabled && source.stage == OriginalSearchStage.READY) currentSearch() else null
+        lastSyncEnabled = enabled
+        lastSyncSourceCurrent = current === source
+        if (!enabled || source.stage != OriginalSearchStage.READY || current !== source) {
             resetLocked(); return@synchronized
         }
         if (active && mutable.value.source === source) return@synchronized
@@ -129,6 +134,14 @@ class LocalEvidenceController internal constructor(
                 onInvalidated()
             }
         }
+    }
+    /** Optional test observer only: identity booleans/enums, never query, excerpts or IDs. */
+    internal fun visibilityDiagnostics(source: OriginalSearchState): String = synchronized(lock) {
+        val fresh = currentSearch()
+        "evidenceRaw=${mutable.value.stage}/${mutable.value.generation}, evidenceOwner=$generation, " +
+            "evidenceActive=$active, evidenceClosed=$closed, evidenceRenderSource=${mutable.value.source === source}, " +
+            "evidenceFreshStage=${fresh.stage}, evidenceFreshSource=${fresh === source}, " +
+            "evidenceJobActive=${job?.isActive}, evidenceSyncEnabled=$lastSyncEnabled, evidenceSyncCurrent=$lastSyncSourceCurrent"
     }
     /** A UI click can only change the current, identity-owned candidate set. Nothing is selected by default. */
     fun toggle(value: LocalEvidenceState, card: LocalEvidenceCard) = synchronized(lock) {

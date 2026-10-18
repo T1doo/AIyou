@@ -56,8 +56,10 @@ class CurrentImageSearchPresentationTest {
         localSearch=port,localSearchEpoch=1))
     private val grid=CurrentImageGridController({ false }, { error("No Android decode in this presentation fixture") }, { state.value })
     private val results=AtomicReference<OriginalSearchState>()
+    private val diagnostics=AtomicReference("")
     private val observer=object:OriginalSearchObserver {
         override fun onResults(state:OriginalSearchState,open:(OriginalSearchHit)->Unit){results.set(state)}
+        override fun onDiagnostics(value:String){diagnostics.set(value)}
     }
     @Composable private fun Screen(large:Boolean=false,fixture:SyntheticEvidenceAnswerProvider?=null){
         val density=LocalDensity.current
@@ -88,7 +90,7 @@ class CurrentImageSearchPresentationTest {
                 .fetchSemanticsNodes().map { it.config[SemanticsProperties.TestTag] }
             val messages = compose.onAllNodes(hasAnyAncestor(hasTestTag("local-evidence-status")), useUnmergedTree = true)
                 .fetchSemanticsNodes().flatMap { it.config.getOrNull(SemanticsProperties.Text).orEmpty() }.map { it.text }
-            System.err.println("UI_LAZY_DIAGNOSTIC stage=${results.get()?.stage} hits=${results.get()?.hits?.size} tags=$tags status=$messages")
+            System.err.println("UI_LAZY_DIAGNOSTIC stage=${results.get()?.stage} hits=${results.get()?.hits?.size} tags=$tags status=$messages owners=${diagnostics.get()}")
             missing?.let(timeout::addSuppressed)
             throw timeout
         }

@@ -569,7 +569,8 @@ fun AIyouApp(
     LocalOriginalSearchObserver.current?.let { observer ->
         SideEffect {
             observer.onResults(searchState, openSearchResult)
-            observer.onDiagnostics(search.visibilityDiagnostics(local, renderedSearchInput))
+            observer.onDiagnostics(search.visibilityDiagnostics(local, renderedSearchInput) +
+                if (evidenceMode) "; " + evidence.visibilityDiagnostics(searchState) + ", evidenceMode=true, reading=$reading" else "")
             observer.onInputs(searchQuery, searchFrom, searchThrough)
         }
     }

@@ -91,7 +91,12 @@ class RecordEventDatePresentationTest {
     private fun open(){
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"))
         compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-one"))).performClick()
-        control("original-event-date-open").performClick();drain()
+        val dateOpen = control("original-event-date-open")
+        System.err.println("DATE_PHASE before-open-click")
+        dateOpen.performClick()
+        System.err.println("DATE_PHASE after-open-click")
+        drain()
+        System.err.println("DATE_PHASE after-open-drain")
     }
     // Test-only geometry before each scroll: identify an oversized target separately
     // from SDK-main-thread Trace retention. No field values or originals are logged.
@@ -102,7 +107,9 @@ class RecordEventDatePresentationTest {
             it.config.contains(SemanticsProperties.VerticalScrollAxisRange)
         }
         System.err.println("DATE_SCROLL_DIAGNOSTIC tag=$tag targetDp=${target.getUnclippedBoundsInRoot()} viewportPx=${viewport?.boundsInRoot}")
-        return target.performScrollTo()
+        val scrolled = target.performScrollTo()
+        System.err.println("DATE_PHASE after-scroll tag=$tag")
+        return scrolled
     }
     private fun drain(){compose.runOnIdle{runBlocking{while(queue.isNotEmpty())queue.removeFirst()(store)}};compose.waitForIdle()}
     private fun fill(day:String,zone:String){
