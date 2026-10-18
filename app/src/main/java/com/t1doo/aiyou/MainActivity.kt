@@ -378,11 +378,14 @@ fun AIyouApp(
     DisposableEffect(evidenceAnswers) { onDispose { evidenceAnswers.close() } }
     val evidenceAnswerEmission by evidenceAnswers.state.collectAsState()
     val evidenceAnswerState = evidenceAnswerEmission.let { evidenceAnswers.visible() }
+    // Read the mode while composing: reading delegated State only inside a stable
+    // SideEffect lambda does not schedule that effect when just the mode changes.
+    val searchEnabled = selected == Destination.MEMORIES && !recapRoute && !reading && !browsingRecycle &&
+        !browsingPackage && !showSettings && !demo && local != null && local.originalEdit == null && local.originalHistory == null
+    val evidenceEnabled = evidenceMode && searchEnabled
     SideEffect {
-        search.sync(selected == Destination.MEMORIES && !recapRoute && !reading && !browsingRecycle && !browsingPackage && !showSettings && !demo &&
-            local != null && local.originalEdit == null && local.originalHistory == null)
-        evidence.sync(evidenceMode && selected == Destination.MEMORIES && !recapRoute && !reading && !browsingRecycle &&
-            !browsingPackage && !showSettings && !demo && local != null && local.originalEdit == null && local.originalHistory == null, searchState)
+        search.sync(searchEnabled)
+        evidence.sync(evidenceEnabled, searchState)
         evidenceAnswers.sync()
         if (!reading && searchReturnAnchor != null &&
             (renderedSearchInput.copy(tagSnapshot = null, peopleSnapshot = null) != searchReturnInput?.copy(tagSnapshot = null, peopleSnapshot = null) || searchSource()?.entries !== searchReturnSource)) {
@@ -567,10 +570,13 @@ fun AIyouApp(
     }
     val openSearchResult: (com.t1doo.aiyou.records.OriginalSearchHit) -> Unit = { openSearchResultAt(it) }
     LocalOriginalSearchObserver.current?.let { observer ->
+        val observedEvidenceMode = evidenceMode
+        val observedEvidenceStage = evidenceState.stage
         SideEffect {
             observer.onResults(searchState, openSearchResult)
             observer.onDiagnostics(search.visibilityDiagnostics(local, renderedSearchInput) +
-                if (evidenceMode) "; " + evidence.visibilityDiagnostics(searchState) + ", evidenceMode=true, reading=$reading" else "")
+                if (observedEvidenceMode) "; " + evidence.visibilityDiagnostics(searchState) +
+                    ", evidenceMode=true, renderedEvidence=$observedEvidenceStage, reading=$reading" else "")
             observer.onInputs(searchQuery, searchFrom, searchThrough)
         }
     }

@@ -27,10 +27,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Real App/Compose/controller, explicit synthetic ports; no device/SQLCipher claim. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[35],qualifiers="w360dp-h1000dp")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class RecordEventDatePresentationTest {
     @get:Rule val compose=createComposeRule()
     private val one=StoredEntry("one",1,"合成 coffee needle 原文🙂",0,"UTC",ProcessingPolicy.LOCAL_ONLY)
