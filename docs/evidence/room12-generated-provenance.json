@@ -1,0 +1,19 @@
+{
+  "schema_version": 12,
+  "generation": "Actual Room KSP output; original bytes from successful generation step, strictly decoded from official CI job log without JSON reserialization",
+  "source_commit": "2e4225a814af71d188ee5e2d510ed832fd3b0485",
+  "source_run": 39091652907,
+  "source_job": 117569502147,
+  "source_url": "https://github.com/T1doo/AIyou/actions/runs/39091652907/job/117569502147",
+  "log_state_line": 527,
+  "log_receipt_line": 245,
+  "log_bytes": 594814,
+  "log_sha256": "4da94bfea8c5e3f5c75e50dc6afd81761bd733525295abcab90fbf8b3dc1cdc0",
+  "bytes": 37842,
+  "sha256": "b83429f352a4bee50b08907d362e74fab88315e0e7895d4c444d405515c5e51a",
+  "source_and_fixture_byte_identical": true,
+  "historical_v2_to_v11": "20 source/fixture files exact committed and matching source receipt",
+  "predecessor_v11_sha256": "af9a9ebf205410b770aa5a374351553304682faabd70597617b2dc1101ac9290",
+  "SDK": "CI verified existing platform37.0r2/build-tools36.0.0 acceptance; no new agreement accepted",
+  "acceptance_limit": "KSP12 and all1040 JVM contracts PASS, whole source CI FAIL at queue compile due omitted existing production source files; no Android build/device acceptance. Require another exact-head CI after committing original12 bytes."
+}
