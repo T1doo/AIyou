@@ -145,6 +145,8 @@ for label, folder, minimum in targets:
             "explicitPersonAndKeywordSavedZoneDateOpenOriginalAndRetireStalePersonResult",
             "doubleFontEditorKeepsCloseReachableAndPrivateInputOutOfSavedStateWhenSourceFails")
         additional["com.t1doo.aiyou.CurrentImageSearchPresentationTest"] = (
+            "productionSelectedExcerptTimelineIsExplicitAndOpensExactOriginalWithFreshConfirmationOnReturn",
+            "narrowDoubleFontProductionTimelineKeepsChronologyAndClearsOnSelectionOrInputChange",
             "localEvidenceCardsUseCurrentSourceAndReturnWithoutChangingQuestion",
             "localEvidenceRequiresExplicitSelectionAndReconfirmationAfterExclusion",
             "syntheticSelectedAnswerCitationsOpenOriginalAndReturningRequiresNewConfirmation",

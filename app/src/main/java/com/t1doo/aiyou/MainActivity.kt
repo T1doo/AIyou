@@ -414,7 +414,7 @@ fun AIyouApp(
                 !showSettings && !demo && searchSource()?.ready == true && searchSource()?.opening == false &&
                 searchSource()?.originalEdit == null && searchSource()?.originalHistory == null &&
                 searchSource()?.recycleBin?.browsing != true && searchSource()?.recordPackage == null },
-            fixture = evidenceAnswerFixture)
+            fixture = evidenceAnswerFixture, localSummary = evidenceAnswerFixture == null)
     }
     DisposableEffect(evidenceAnswers) { onDispose { evidenceAnswers.close() } }
     val evidenceAnswerEmission by evidenceAnswers.state.collectAsState()

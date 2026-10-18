@@ -267,4 +267,39 @@ class CurrentImageSearchPresentationTest {
         compose.onAllNodesWithTag("local-answer-paragraph-0").assertCountEquals(0)
     }
 
+    @Test fun productionSelectedExcerptTimelineIsExplicitAndOpensExactOriginalWithFreshConfirmationOnReturn(){
+        compose.setContent{Screen()}
+        compose.onAllNodesWithTag("local-timeline-generate").assertCountEquals(0)
+        selectPictureForAnswer()
+        compose.onAllNodesWithTag("local-timeline-source-0-picture").assertCountEquals(0)
+        reveal(hasText("所选出处时间线")).assertIsDisplayed()
+        reveal("local-timeline-generate").performClick()
+        reveal(hasText(picture.originalText) and hasAnyAncestor(hasTestTag("local-timeline-source-0-picture"))).assertTextEquals(picture.originalText)
+        compose.onAllNodesWithTag("local-answer-paragraph-0").assertCountEquals(0)
+        compose.onNode(hasText("查看原文") and hasAnyAncestor(hasTestTag("local-timeline-source-0-picture")))
+            .performScrollTo().performClick()
+        awaitOriginalPicture()
+        compose.onNodeWithText("返回列表").performClick();await{it.stage==OriginalSearchStage.READY}
+        compose.onAllNodesWithTag("local-timeline-generate").assertCountEquals(0)
+        compose.onAllNodesWithTag("local-timeline-source-0-picture").assertCountEquals(0)
+        assertEquals("needle",results.get().input.query)
+    }
+
+    @Test fun narrowDoubleFontProductionTimelineKeepsChronologyAndClearsOnSelectionOrInputChange(){
+        compose.setContent{Screen(true)};selectPictureForAnswer()
+        reveal("local-evidence-select-text").performClick()
+        compose.onAllNodesWithTag("local-timeline-generate").assertCountEquals(0)
+        reveal("local-evidence-confirm").performClick();reveal("local-evidence-confirmed")
+        val generate=reveal("local-timeline-generate").assertIsEnabled()
+        assertTrue(generate.getUnclippedBoundsInRoot().height>=48.dp);generate.performClick()
+        reveal(hasText(picture.originalText) and hasAnyAncestor(hasTestTag("local-timeline-source-0-picture"))).assertTextEquals(picture.originalText)
+        reveal(hasText(text.originalText) and hasAnyAncestor(hasTestTag("local-timeline-source-1-text"))).assertTextEquals(text.originalText)
+        reveal("local-evidence-select-picture").performClick()
+        compose.onAllNodesWithTag("local-timeline-source-0-picture").assertCountEquals(0)
+        compose.onAllNodesWithTag("local-timeline-source-1-text").assertCountEquals(0)
+        reveal("original-search-query").performTextReplacement("missing")
+        await{it.stage==OriginalSearchStage.READY&&it.hits.isEmpty()}
+        compose.onAllNodesWithTag("local-timeline-generate").assertCountEquals(0)
+    }
+
 }
