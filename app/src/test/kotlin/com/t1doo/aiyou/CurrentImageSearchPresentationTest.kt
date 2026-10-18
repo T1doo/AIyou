@@ -138,7 +138,7 @@ class CurrentImageSearchPresentationTest {
         compose.waitUntil(3_000){grid.state.value.tiles[picture.id]?.failed==true}
         compose.onNodeWithTag("image-grid-failed-picture",useUnmergedTree=true).assertExists()
         compose.onNodeWithTag("image-grid-entry-picture").performClick()
-        compose.onNodeWithTag("original-text").assertTextContains(picture.originalText)
+        compose.onNodeWithTag("original-text",useUnmergedTree=true).assertTextContains(picture.originalText)
     }
     @Test fun narrowDoubleFontGridToggleAndFailureCardRemainReachableAndClearReturnsToList(){
         compose.setContent{Screen(true)}
@@ -162,7 +162,7 @@ class CurrentImageSearchPresentationTest {
         reveal("local-evidence-picture").assertExists()
         compose.onNode(hasText("查看原文") and hasAnyAncestor(hasTestTag("local-evidence-picture")))
             .performScrollTo().performClick()
-        compose.onNodeWithTag("original-text").assertTextContains(picture.originalText)
+        compose.onNodeWithTag("original-text",useUnmergedTree=true).assertTextContains(picture.originalText)
         compose.onNodeWithText("返回列表").performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.query=="needle"}
         reveal("local-evidence-picture")
@@ -230,10 +230,10 @@ class CurrentImageSearchPresentationTest {
             r.packet.citations.map { LocalEvidenceAnswerParagraph("合成引用："+it.reference.quote,listOf(it.reference)) }) }
         compose.setContent{Screen(fixture=fixture)};selectPictureForAnswer()
         reveal("local-answer-ask").performClick()
-        reveal("local-answer-paragraph-0").assertTextContains(picture.originalText)
+        reveal("local-answer-paragraph-0").assertTextEquals("合成引用："+picture.originalText)
         compose.onNode(hasText("查看原文") and hasAnyAncestor(hasTestTag("local-answer-source-0-picture")))
             .performScrollTo().performClick()
-        compose.onNodeWithTag("original-text").assertTextContains(picture.originalText)
+        compose.onNodeWithTag("original-text",useUnmergedTree=true).assertTextContains(picture.originalText)
         compose.onNodeWithText("返回列表").performClick();await{it.stage==OriginalSearchStage.READY}
         compose.onAllNodesWithTag("local-answer-paragraph-0").assertCountEquals(0)
     }

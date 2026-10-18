@@ -12,7 +12,6 @@ import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -79,18 +78,24 @@ class RecordEventDatePresentationTest {
     }
     private val controller=RecordEventDateController({state.value},{state.value=it(state.value)},{queue.addLast(it);true})
     private val results=AtomicReference<OriginalSearchState>()
+    private val searchDiagnostics=AtomicReference("")
+    private val retainedConfirm=AtomicReference<() -> Unit>()
+    private val confirmObserver: (() -> Unit) -> Unit = { retainedConfirm.set(it) }
+    private var refreshReads=0
     private val observer=object:OriginalSearchObserver {
         override fun onResults(state:OriginalSearchState,open:(OriginalSearchHit)->Unit){results.set(state)}
+        override fun onDiagnostics(value:String){searchDiagnostics.set(value)}
     }
     private var registry:SaveableStateRegistry?=null
     @Composable private fun Screen(large:Boolean=false){
         val current=LocalSaveableStateRegistry.current;SideEffect{registry=current}
         val density=LocalDensity.current
         CompositionLocalProvider(LocalOriginalSearchObserver provides observer,
+            LocalRecordEventDateConfirmObserver provides confirmObserver,
             LocalDensity provides if(large)Density(density.density,2f)else density){
             AIyouTheme { Box(if(large)Modifier.size(320.dp,640.dp)else Modifier){
                 AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},eventDates=controller,
-                    onRefreshLocalSearch={state.value=state.value.copy(eventDates=durable.toMap(),eventDatesAvailable=true,eventDatesError=null)})
+                    onRefreshLocalSearch={refreshReads++;state.value=state.value.copy(eventDates=durable.toMap(),eventDatesAvailable=true,eventDatesError=null)})
             } }
         }
     }
@@ -216,7 +221,10 @@ class RecordEventDatePresentationTest {
         control("event-date-retry").performClick();drain()
         assertSame(calls[0],calls[1]);assertEquals(1L,durable.getValue("one").version)
         fill("2024-04-01","UTC");preview()
-        val old=control("event-date-confirm").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        control("event-date-confirm").assertIsEnabled()
+        // Retain the exact app handler used by Button. A detached framework
+        // semantics action reads its dead Modifier node before testing our guard.
+        val old=checkNotNull(retainedConfirm.get())
         compose.onNodeWithTag("event-date-close").performClick()
         compose.onNodeWithText("返回列表").performClick()
         compose.runOnIdle{old();assertTrue(queue.isEmpty());assertEquals(2,calls.size)}
@@ -247,7 +255,12 @@ class RecordEventDatePresentationTest {
         control("original-search-date-basis").performClick()
         compose.waitUntil(2_000){results.get()?.stage==OriginalSearchStage.FAILED}
         control("original-search-event-date-retry").assertIsEnabled().performClick()
-        compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.dateBasis==RecordDateBasis.EVENT}==true}
+        try {
+            compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.dateBasis==RecordDateBasis.EVENT}==true}
+        } catch (failure:ComposeTimeoutException) {
+            System.err.println("DATE_SEARCH_RETRY reads=$refreshReads available=${state.value.eventDatesAvailable} stage=${results.get()?.stage} basis=${results.get()?.input?.dateBasis} diagnostics=${searchDiagnostics.get()}")
+            throw failure
+        }
         assertEquals(listOf("one"),results.get().hits.map{it.entry.id})
     }
 }

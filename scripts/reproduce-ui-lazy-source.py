@@ -86,7 +86,9 @@ def inspect_xml(folder, phase, exit_code, started_ns, expected_class=CASE, expec
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--expected-head', required=True)
-    parser.add_argument('--date-only', action='store_true', help='Diagnose date sublayers without repeating already verified evidence controls')
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument('--date-only', action='store_true', help='Diagnose date sublayers without repeating already verified evidence controls')
+    scope.add_argument('--ui-failures-only', action='store_true', help='Individually run the four actual failed methods from full D01 run39101762817')
     args = parser.parse_args()
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise SystemExit('Single-method Compose reproduction requires the existing licensed CI toolchain')
@@ -103,6 +105,8 @@ def main():
               'baseline_head': '269d62babac3795e61b1efe620a01c1751cd6b64', 'baseline_sha256': BASELINE_SHA, 'phases': []}
     if args.date_only:
         report['scope'] = 'date sublayers only, one actual method per isolated Compose JVM; evidence controls NOT RUN this invocation; no device/Room/SQLCipher acceptance'
+    if args.ui_failures_only:
+        report['scope'] = 'four actual failed UI methods from run39101762817 only, one requested method per isolated Compose JVM; not the full UI gate or device acceptance'
     source = ROOT / SOURCE
     fixed = source.read_bytes()
     baseline = (ROOT / 'checks/ui-lazy-repro/CurrentImageSearchPresentationTest.kt.source').read_bytes()
@@ -121,6 +125,12 @@ def main():
                 ('date-fields-only', fixed, DATE_CASE, 'standaloneDoubleFontDateFieldsHaveFiniteLayout', 'green'),
                 ('date-dialog-only', fixed, DATE_CASE, 'standaloneLoadedDoubleFontDateDialogHasFiniteLayout', 'green'),
                 ('date-independent', fixed, DATE_CASE, DATE_METHOD, 'green')]
+        if args.ui_failures_only:
+            plan = [
+                ('image-original', fixed, CASE, METHOD, 'green'),
+                ('image-citations', fixed, CASE, 'syntheticSelectedAnswerCitationsOpenOriginalAndReturningRequiresNewConfirmation', 'green'),
+                ('date-filter-retry', fixed, DATE_CASE, 'eventDateBasisCombinesKeywordTagFavoriteAndNeverMatchesUnknownCaptureDate', 'green'),
+                ('date-stale-confirm', fixed, DATE_CASE, 'uncertainSaveRetainsSameIntentAndStaleConfirmCannotWriteAfterNavigation', 'green')]
         for label, raw, case, method, expectation in plan:
             if args.date_only and not label.startswith('date-'):
                 continue

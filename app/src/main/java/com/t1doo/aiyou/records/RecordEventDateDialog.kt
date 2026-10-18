@@ -11,6 +11,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.dp
 
+/** Optional memory-only observation of the application handler, without retaining a UI node. */
+internal val LocalRecordEventDateConfirmObserver = staticCompositionLocalOf<((() -> Unit) -> Unit)?> { null }
+
 @Composable
 internal fun RecordEventDateDialog(ui: RecordEventDateEditor, pending: RecordEventDateWrite?,
     controller: RecordEventDateController, current: () -> Boolean) {
@@ -45,7 +48,9 @@ internal fun RecordEventDateDialog(ui: RecordEventDateEditor, pending: RecordEve
                         else "预览：事件发生于 ${next.localDate} · ${next.timeZone}，仅日期，无时刻。",
                         modifier = Modifier.testTag("event-date-preview"))
                     Text("请确认这是事件发生日期。保存后记录日期、原文和原文版本均不变。")
-                    Button({ if (current()) controller.confirm(ui.session, preview.id) }, enabled = !ui.busy && !ui.conflict,
+                    val confirm = { if (current()) controller.confirm(ui.session, preview.id) }
+                    LocalRecordEventDateConfirmObserver.current?.let { observer -> SideEffect { observer(confirm) } }
+                    Button(confirm, enabled = !ui.busy && !ui.conflict,
                         modifier = Modifier.heightIn(min = 48.dp).testTag("event-date-confirm")) { Text(if (next == null) "确认清除事件日期" else "确认保存事件日期") }
                     TextButton({ if (current()) controller.cancelPreview(ui.session, preview.id) }, enabled = !ui.busy,
                         modifier = Modifier.heightIn(min = 48.dp).testTag("event-date-cancel-preview")) { Text("返回修改") }
