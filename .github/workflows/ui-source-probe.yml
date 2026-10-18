@@ -37,11 +37,22 @@ jobs:
             python3 "scripts/verify-$kind-schema.py" --verify
           done
           python3 scripts/inspect-record-ai-permissions.py
-      - name: Run only the actual remaining lazy recycle navigation method
+      - name: Verify all actual lint gates after the configuration-aware test correction
         env:
           AIYOU_CI_ANDROID_DAEMON: 'true'
-        run: python3 scripts/reproduce-ui-lazy-source.py --expected-head "$GITHUB_SHA" --recycle-only
-      - name: Preserve exact isolated method reports even on failure
+        run: |
+          scripts/gradle.sh :app:lintDebug :core:designsystem:lintDebug :core:data:lintDebug
+          git diff --exit-code
+      - name: Print complete actual lint findings even on failure
+        if: always()
+        run: |
+          for module in app core/designsystem core/data; do
+            report=$module/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            if [ -f "$report" ]; then
+              cat "$report"
+            fi
+          done
+      - name: Preserve exact isolated check reports even on failure
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -49,6 +60,12 @@ jobs:
           path: |
             app/build/reports/ui-lazy-repro/
             app/build/test-results/testDebugUnitTest/
+            app/build/reports/lint-results-debug.*
+            app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            core/designsystem/build/reports/lint-results-debug.*
+            core/designsystem/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            core/data/build/reports/lint-results-debug.*
+            core/data/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             .local-evidence/f05-event-date/schema-generation.json
             .local-evidence/f05-manual-people/schema-generation.json
           if-no-files-found: warn

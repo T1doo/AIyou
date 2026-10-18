@@ -149,7 +149,9 @@ jobs:
       - name: Run Android lint
         env:
           AIYOU_CI_ANDROID_DAEMON: 'true'
-        run: scripts/gradle.sh :app:lintDebug :core:designsystem:lintDebug :core:data:lintDebug
+        run: |
+          scripts/gradle.sh :app:lintDebug :core:designsystem:lintDebug :core:data:lintDebug
+          git diff --exit-code
       - name: Generate initial Preview render smoke references
         id: preview_generate
         if: always() && steps.assemble.outcome == 'success'

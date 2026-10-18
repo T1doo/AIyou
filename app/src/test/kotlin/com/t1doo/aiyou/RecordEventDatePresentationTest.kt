@@ -173,7 +173,7 @@ class RecordEventDatePresentationTest {
         compose.setContent{
             val density=LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density,2f)){
-                assertEquals(2f,androidx.compose.ui.platform.LocalContext.current.resources.configuration.fontScale,0f)
+                assertEquals(2f,androidx.compose.ui.platform.LocalConfiguration.current.fontScale,0f)
                 assertEquals(2f,LocalDensity.current.fontScale,0f)
                 AIyouTheme{state.value.eventDateEditor?.let{ui->RecordEventDateDialog(ui,null,controller){true}}}
             }
