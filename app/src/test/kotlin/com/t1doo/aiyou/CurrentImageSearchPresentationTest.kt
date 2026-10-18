@@ -162,7 +162,7 @@ class CurrentImageSearchPresentationTest {
         reveal("local-evidence-picture").assertExists()
         compose.onNode(hasText("查看原文") and hasAnyAncestor(hasTestTag("local-evidence-picture")))
             .performScrollTo().performClick()
-        compose.onNodeWithTag("original-text",useUnmergedTree=true).assertTextContains(picture.originalText)
+        awaitOriginalPicture()
         compose.onNodeWithText("返回列表").performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.query=="needle"}
         reveal("local-evidence-picture")
@@ -225,6 +225,12 @@ class CurrentImageSearchPresentationTest {
         reveal("local-evidence-confirm").performClick()
         reveal("local-evidence-confirmed")
     }
+    private fun awaitOriginalPicture(){
+        // SQL-backed search.open publishes navigation asynchronously. Wait for
+        // its actual unmerged Text, then retain the complete original assertion.
+        compose.waitUntil(3_000){compose.onAllNodesWithTag("original-text",useUnmergedTree=true).fetchSemanticsNodes().size==1}
+        compose.onNodeWithTag("original-text",useUnmergedTree=true).assertTextContains(picture.originalText)
+    }
     @Test fun syntheticSelectedAnswerCitationsOpenOriginalAndReturningRequiresNewConfirmation(){
         val fixture=SyntheticEvidenceAnswerProvider { r -> LocalEvidenceAnswerResponse(r.id,r.packet.selectionId,
             r.packet.citations.map { LocalEvidenceAnswerParagraph("合成引用："+it.reference.quote,listOf(it.reference)) }) }
@@ -233,7 +239,7 @@ class CurrentImageSearchPresentationTest {
         reveal("local-answer-paragraph-0").assertTextEquals("合成引用："+picture.originalText)
         compose.onNode(hasText("查看原文") and hasAnyAncestor(hasTestTag("local-answer-source-0-picture")))
             .performScrollTo().performClick()
-        compose.onNodeWithTag("original-text",useUnmergedTree=true).assertTextContains(picture.originalText)
+        awaitOriginalPicture()
         compose.onNodeWithText("返回列表").performClick();await{it.stage==OriginalSearchStage.READY}
         compose.onAllNodesWithTag("local-answer-paragraph-0").assertCountEquals(0)
     }

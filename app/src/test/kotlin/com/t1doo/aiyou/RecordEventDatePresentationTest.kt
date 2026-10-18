@@ -258,7 +258,9 @@ class RecordEventDatePresentationTest {
         try {
             compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.dateBasis==RecordDateBasis.EVENT}==true}
         } catch (failure:ComposeTimeoutException) {
-            System.err.println("DATE_SEARCH_RETRY reads=$refreshReads available=${state.value.eventDatesAvailable} stage=${results.get()?.stage} basis=${results.get()?.input?.dateBasis} diagnostics=${searchDiagnostics.get()}")
+            val result=results.get()
+            val replay=runBlocking{LocalOriginalSearchMatcher.match(state.value.entries,result.input)}
+            System.err.println("DATE_SEARCH_RETRY reads=$refreshReads available=${state.value.eventDatesAvailable} stage=${result.stage} basis=${result.input.dateBasis} snapshotSize=${result.input.eventDateSnapshot?.size} currentSize=${state.value.eventDates.size} message=${result.message} replay=${replay.stage}/${replay.message} diagnostics=${searchDiagnostics.get()}")
             throw failure
         }
         assertEquals(listOf("one"),results.get().hits.map{it.entry.id})
