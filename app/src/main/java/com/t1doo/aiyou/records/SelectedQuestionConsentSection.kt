@@ -1,6 +1,7 @@
 package com.t1doo.aiyou.records
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -66,9 +67,9 @@ import java.time.ZoneId
     }
     val review = state.review
     if (state.stage == QuestionConsentStage.REVIEW && review != null && fixture != null) AlertDialog(
-        onDismissRequest = onStop, title = { Text("仅本次授权演练 · 无外发") },
+        onDismissRequest = onStop, modifier = Modifier.fillMaxWidth(), title = { Text("仅本次授权演练 · 无外发") },
         text = {
-            Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()).testTag("question-consent-scope-scroll")) {
+            Column(Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()).testTag("question-consent-scope-scroll")) {
                 Text("本机选取确认不是本次发送授权。", style = MaterialTheme.typography.titleSmall)
                 Text(review.request.question, Modifier.testTag("question-consent-question"))
                 Text("问题时刻：${Instant.ofEpochMilli(review.request.askedAtMillis).atZone(ZoneId.of(review.request.questionTimeZone))}")
@@ -81,7 +82,7 @@ import java.time.ZoneId
                     evidence.selection.cards.singleOrNull { it.reference == source.reference }?.let { card ->
                         Text(originalMetadata(card.hit.entry), style = MaterialTheme.typography.bodySmall)
                         Text("版本 ${source.reference.source.revision} · 码点 [${source.reference.start}, ${source.reference.end})")
-                        Text(source.reference.quote, Modifier.testTag("question-consent-quote-$index"))
+                        Text(source.reference.quote, Modifier.fillMaxWidth().testTag("question-consent-quote-$index"))
                     }
                 }
                 Text("仅内存假传输，不发送给外部服务。真实发送接入后，撤回不能追回服务商已收到的数据或费用。不会保存问题或回答为事实、任务或答案缓存。")
@@ -92,8 +93,8 @@ import java.time.ZoneId
         dismissButton = { TextButton(onStop, Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("question-consent-cancel-review")) { Text("取消审阅") } })
     val reply = state.receipt?.reply
     if (showResult && reply != null && state.stage in setOf(QuestionConsentStage.READY, QuestionConsentStage.NO_EVIDENCE)) AlertDialog(
-        onDismissRequest = { showResult = false }, title = { Text("本机演练结果 · 待核对") },
-        text = { Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()).testTag("question-consent-result-scroll")) {
+        onDismissRequest = { showResult = false }, modifier = Modifier.fillMaxWidth(), title = { Text("本机演练结果 · 待核对") },
+        text = { Column(Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()).testTag("question-consent-result-scroll")) {
             if (reply.noEvidence) Text("当前所选出处不足以形成回答，不能据此断言某件事从未发生。", Modifier.testTag("question-consent-no-evidence"))
             reply.paragraphs.forEachIndexed { index, paragraph ->
                 Text(paragraph.text, Modifier.testTag("question-consent-paragraph-$index"))

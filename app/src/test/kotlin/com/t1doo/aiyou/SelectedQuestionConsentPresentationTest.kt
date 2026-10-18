@@ -86,13 +86,22 @@ class SelectedQuestionConsentPresentationTest {
         compose.onNodeWithTag("question-consent-question").performScrollTo().assertTextEquals("needle")
         compose.onNodeWithTag("question-consent-destination").performScrollTo()
             .assertTextContains("https://consent-ui.invalid/custom/v1/chat/completions", substring = true)
-        entries.forEachIndexed { i, e -> compose.onNodeWithTag("question-consent-quote-$i").performScrollTo().assertTextEquals(e.originalText) }
+        // Main search presents the newer capture first; preserve that source order rather
+        // than mistaking the fixture port's insertion order for the user's current results.
+        val searchOrder = listOf(entries[1], entries[0])
+        assertTrue(compose.onNodeWithTag("question-consent-scope-scroll").getUnclippedBoundsInRoot().width >= 160.dp)
+        searchOrder.forEachIndexed { i, e ->
+            val quote = compose.onNodeWithTag("question-consent-quote-$i").performScrollTo().assertTextEquals(e.originalText)
+            assertTrue(quote.getUnclippedBoundsInRoot().width >= 160.dp)
+        }
         assertEquals(0, fixture.authorizations.get()); assertEquals(0, fixture.opened.get())
         val confirm = compose.onNodeWithTag("question-consent-confirm").assertIsDisplayed()
         assertTrue(confirm.getUnclippedBoundsInRoot().height >= 48.dp); confirm.performClick()
         reveal("question-consent-show-result").performClick()
+        assertTrue(compose.onNodeWithTag("question-consent-result-scroll").getUnclippedBoundsInRoot().width >= 160.dp)
         compose.onNodeWithTag("question-consent-paragraph-0").assertTextEquals("合成授权演练结果")
         assertEquals(1, fixture.authorizations.get()); assertEquals(1, fixture.opened.get())
+        assertEquals(searchOrder.map { it.id }, fixture.sentSources.get())
         compose.onNode(hasText("查看原文") and hasAnyAncestor(hasTestTag("question-consent-source-0-picture")))
             .performScrollTo().performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("original-text", useUnmergedTree = true).fetchSemanticsNodes().size == 1 }
@@ -128,6 +137,7 @@ class SelectedQuestionConsentPresentationTest {
     /** Synthetic metadata/ack port only. Does not replace the product's SQL authority test. */
     private class Fixture {
         val opened = AtomicInteger(); val authorizations = AtomicInteger(); val withdrawals = AtomicInteger()
+        val sentSources = AtomicReference<List<String>>()
         val failWithdrawal = AtomicBoolean(); private val state = AtomicReference("NEW")
         private val connection = ProviderConnection("synthetic-ui", 1, "https://consent-ui.invalid/custom/v1/",
             ConnectionProtocol.CHAT_COMPLETIONS, "fixture-model", SecretReference("unresolved-synthetic-reference"))
@@ -136,6 +146,8 @@ class SelectedQuestionConsentPresentationTest {
                 opened.incrementAndGet()
                 val messages = JSONObject(request.bodyJson).getJSONArray("messages")
                 val payload = JSONObject(messages.getJSONObject(messages.length() - 1).getString("content"))
+                val selectedSources = payload.getJSONArray("sources")
+                sentSources.set((0 until selectedSources.length()).map { selectedSources.getJSONObject(it).getString("sourceId") })
                 object : LocalQuestionWireExchange {
                     override fun cancel() { }
                     override fun execute(onChunk: (ByteArray) -> Unit) {
