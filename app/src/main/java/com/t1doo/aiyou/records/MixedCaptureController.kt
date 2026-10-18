@@ -9,7 +9,8 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 
-data class CapturePolicyChange(val requestId: Long, val expected: CaptureDraft, val target: ProcessingPolicy) {
+data class CapturePolicyChange(val requestId: Long, val expected: CaptureDraft, val target: ProcessingPolicy,
+    val priorError: String? = null) {
     override fun toString() = "CapturePolicyChange(redacted)"
 }
 
@@ -54,8 +55,12 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
             val read=store.captureRecords!!.current();val old=ui()?.draft
             if(old!=null && old.id!=read.id) throw CaptureConflict()
             binding=read
-            update { it.copy(draft=read,text=if(it.draft==null) read.text else it.text,error=null,
-                supportsProcessingChoice=store.captureRecords!!.supportsProcessingChoice) }
+            update {
+                val text=if(it.draft==null) read.text else it.text
+                it.copy(draft=read,text=text,error=if(text!=read.text && it.pendingEdits==0)
+                    it.error ?: "文字草稿尚未确认保存，输入已保留，请重试保存。" else null,
+                    supportsProcessingChoice=store.captureRecords!!.supportsProcessingChoice)
+            }
             thumbnails(store)
         }
         catch(e:CancellationException){throw e} catch(_:Exception){update { it.copy(error="图文草稿尚未读取，已保留本机数据，请重试。") }}
@@ -86,8 +91,8 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
             u.uncertainSave || u.discardPending || u.confirmDiscard || u.policyChange!=null || draft.discarding ||
             draft.id!=draftId || draft.version!=version || target==draft.policy ||
             target !in setOf(ProcessingPolicy.LOCAL_ONLY,ProcessingPolicy.AI_NONE)) return
-        val change=CapturePolicyChange(ids.incrementAndGet(),draft,target)
-        update { it.copy(policyChange=change,busy=true,error=null,notice=null) }
+        val change=CapturePolicyChange(ids.incrementAndGet(),draft,target,u.error)
+        update { it.copy(policyChange=change,busy=true,notice=null) }
         submit { store -> commitPolicy(store,change) }
     }
     fun retryPolicy(requestId: Long) {
@@ -108,7 +113,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
                 result.policy==change.target && result.text==change.expected.text && result.images==change.expected.images && !result.discarding)
             if(!ownsPolicy(change)) return
             binding=result
-            update { it.copy(draft=result,policyChange=null,busy=false,error=null,
+            update { it.copy(draft=result,policyChange=null,busy=false,error=change.priorError,
                 notice="这份草稿的范围已保存在本机；已有记录保持不变。") }
         } catch(e:CancellationException){throw e}
         catch(_:Exception){if(ownsPolicy(change)) update { it.copy(error="范围保存尚未确认。请重试确认同一次选择，或重新读取当前范围；核对前不能保存记录。") }}
@@ -125,7 +130,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
                 require(actual.id==change.expected.id && !actual.discarding)
                 if(!ownsPolicy(change)) return@submit
                 binding=actual
-                update { it.copy(draft=actual,policyChange=null,busy=false,error=null,
+                update { it.copy(draft=actual,policyChange=null,busy=false,error=change.priorError,
                     notice="已重新读取这份草稿的当前范围；此前未确认的选择没有重发。请核对后继续。") }
                 thumbnails(store)
             } catch(e:CancellationException){throw e}

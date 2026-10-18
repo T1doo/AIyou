@@ -58,8 +58,10 @@ class MixedCapturePresentationTest {
     }
     @Test fun narrowPreSaveRangeDefaultsLocalAndRetiredActualChoiceCannotAffectReturnedDraft() {
         content()
+        f.failTextWrite=true
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
         compose.onNodeWithTag("mixed-text").performTextInput("合成保存前选择范围");drain()
+        val textError=f.ui.error;assertNotNull(textError)
         policyNode("mixed-policy-LOCAL_ONLY").assertIsSelected().assertHeightIsAtLeast(48.dp)
         policyNode("mixed-policy-AI_NONE").assertIsNotSelected().assertHeightIsAtLeast(48.dp)
         val stale=compose.runOnIdle { policyActions.getValue("policy:AI_NONE") }
@@ -74,7 +76,9 @@ class MixedCapturePresentationTest {
         drain()
         policyNode("mixed-policy-AI_NONE").assertIsSelected()
         compose.runOnIdle { val saved=registry!!.performSave().toString()
+            assertEquals(textError,f.ui.error)
             assertFalse(saved.contains("合成保存前选择范围"));assertFalse(saved.contains(f.ui.draft!!.id)) }
+        f.failTextWrite=false
         click("mixed-save");drain()
         compose.runOnIdle { assertEquals(ProcessingPolicy.AI_NONE,f.local.value.entries.single().policy)
             assertEquals("合成保存前选择范围",f.local.value.entries.single().originalText)
@@ -190,7 +194,7 @@ class MixedCapturePresentationTest {
     private class Fixture {
         private var draft=CaptureDraft(uuid(),1,"",emptyList());private val bytes=mutableMapOf<String,ByteArray>()
         val queue=ArrayDeque<suspend(EntryRepository)->Unit>();var saves=0;var failSave=false;var failDiscardAck=false
-        var failPolicyAck=false;var failPolicyBefore=false;var failPolicyRead=false;var policyCalls=0
+        var failPolicyAck=false;var failPolicyBefore=false;var failPolicyRead=false;var policyCalls=0;var failTextWrite=false
         private val discarded=mutableSetOf<String>()
         val local=mutableStateOf(LocalRecordUiState(ready=true,opening=false,supportsMixedCapture=true,mixedCapture=MixedCaptureUiState()))
         private var entries=emptyList<StoredEntry>()
@@ -213,7 +217,10 @@ class MixedCapturePresentationTest {
                     if(failPolicyAck){failPolicyAck=false;error("Synthetic lost range ACK after commit")}
                     return draft
                 }
-                override suspend fun edit(expected:CaptureDraft,text:String)=next(text=text)
+                override suspend fun edit(expected:CaptureDraft,text:String):CaptureDraft {
+                    if(failTextWrite)error("Synthetic text write failure")
+                    return next(text=text)
+                }
                 override suspend fun add(expected:CaptureDraft,intent:AttachmentIntent,bytes:ByteArray):CaptureDraft { this@Fixture.bytes[intent.id]=bytes.copyOf();return next(images=draft.images+CaptureDraftImage(intent,CaptureImageState.READY)) }
                 override suspend fun image(expected:CaptureDraft,id:String)=bytes.getValue(id).copyOf()
                 override suspend fun remove(draftId:String,imageId:String)=next(images=draft.images.filterNot{it.intent.id==imageId})

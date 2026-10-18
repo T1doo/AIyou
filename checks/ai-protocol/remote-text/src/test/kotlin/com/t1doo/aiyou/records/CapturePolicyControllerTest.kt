@@ -10,6 +10,8 @@ class CapturePolicyControllerTest {
     @Test fun explicitChoiceWaitsForAckPreservesTextImagesAndOnlyChangesThisNewRecord(): Unit = runBlocking {
         MixedCaptureControllerTest.Harness().use { h ->
             h.start(); h.c.edit("合成只作手账的图文"); h.drain(); h.add()
+            h.failEdit=true; h.c.edit("合成范围选择前尚未确认的文字"); h.drain()
+            val pendingText=h.ui.text; val textError=h.ui.error; assertNotNull(textError)
             val before = h.ui.draft!!
             assertTrue(h.ui.supportsProcessingChoice)
             assertEquals(ProcessingPolicy.LOCAL_ONLY, before.policy)
@@ -17,14 +19,17 @@ class CapturePolicyControllerTest {
             assertTrue(h.ui.busy); assertNotNull(h.ui.policyChange)
             assertEquals(ProcessingPolicy.LOCAL_ONLY, h.ui.draft!!.policy)
             h.c.save(); h.c.edit("不得代入的旧回调"); h.c.remove(before.images.single().intent.id); h.c.requestDiscard()
-            assertEquals(1, h.queue.size); assertEquals(before.text, h.ui.text)
+            assertEquals(1, h.queue.size); assertEquals(pendingText, h.ui.text)
             h.drain()
             assertEquals(ProcessingPolicy.AI_NONE, h.ui.draft!!.policy)
             assertEquals(before.images, h.ui.draft!!.images)
-            assertEquals(before.text, h.ui.text); assertNull(h.ui.policyChange); assertFalse(h.ui.busy)
+            assertEquals(pendingText, h.ui.text); assertNull(h.ui.policyChange); assertFalse(h.ui.busy)
+            assertEquals(textError,h.ui.error) // Confirming the range does not confirm a previously failed text write.
+            h.c.initialize(h.store); assertEquals(textError,h.ui.error); assertEquals(pendingText,h.ui.text)
+            h.failEdit=false
             h.c.save(); h.drain()
             assertEquals(ProcessingPolicy.AI_NONE, h.local.entries.single().policy)
-            assertEquals(before.text, h.local.entries.single().originalText)
+            assertEquals(pendingText, h.local.entries.single().originalText)
             assertEquals(1, h.f.media.list(before.id, 1).size)
             assertEquals(ProcessingPolicy.LOCAL_ONLY, h.ui.draft!!.policy)
             h.c.edit("合成下一份默认记录"); h.drain(); h.c.save(); h.drain()
