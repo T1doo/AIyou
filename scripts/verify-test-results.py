@@ -47,6 +47,11 @@ for label, folder, minimum in targets:
     print(f"PASS: {label} tests={total} actual={cases} failures=0 errors=0 skipped=0")
     additional = {}
     if label == "host queue":
+        additional["com.t1doo.aiyou.ui.AppAccessPreferenceOwnerTest"] = (
+            "retiredBlockedEnableCannotLeaveNewOwnerOpenWithDisabledSnapshot",)
+        additional["com.t1doo.aiyou.ui.AppAccessPreferenceOperationTest"] = (
+            "retiredOwnerQueuedBehindAnotherOperationCannotWriteAfterItsOwnershipWasRevoked",
+            "failedAcknowledgementAndReadRemainRecoverableByFreshOwnerWithoutRepeatingTheWrite")
         additional["com.t1doo.aiyou.ui.AppAccessControllerTest"] = (
             "disabledFirstStartOpensOnlyAfterConfirmedReadAndCloseBarrier",
             "enabledStartupCancelMissingCredentialAndForeignResultsNeverOpenRecords",
@@ -297,6 +302,7 @@ for label, folder, minimum in targets:
             "narrowLargeFontEditorKeepsActionsReachableAndHidesPersistedLabelsWhenSourceFails",
             "rawSavedStateAndRestorationExcludeTagConditionsInputsAndClearedFieldUndoHistory")
         additional["com.t1doo.aiyou.AppAccessPreferenceTest"] = (
+            "replacementOwnerReadsCommittedRealFileAfterRetiredBlockingEnableCompletes",
             "confirmedSettingSurvivesNewInstancesAndStaleWriterCannotDisableIt",
             "malformedOversizedAndIncompleteSettingFailClosedAndPreserveTheirBytes",
             "atomicRecoveryKeepsConfirmedEnabledBackupAndVersionOverflowCannotOverwriteIt")

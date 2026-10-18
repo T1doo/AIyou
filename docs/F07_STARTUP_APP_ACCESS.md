@@ -20,7 +20,7 @@ The next session waits for the previous actor and actual storage-close boundary.
 A process-level barrier holds only close acknowledgements so a replacement
 Activity cannot forget an old owner's pending or failed close. A failed close
 acknowledgement cannot admit a new session. Old source callbacks,
-settings actions and credential results cannot reopen or write through retired
+settings actions and credential results cannot initiate new work through retired
 owners.
 
 Preference writes use compare-and-set versions, AtomicFile and exact readback.
@@ -56,6 +56,28 @@ barrier. File/Compose tests use real AtomicFile and production UI, with a synthe
 credential intent/ActivityResultRegistry boundary. A production Activity startup
 regression checks that an enabled lock keeps the records directory absent across
 recreation. These are JVM checks, not device, Room, SQLCipher or Keystore execution.
-CI retains the seven targeted app test methods' actual XML and verifies their
+CI retains the eight targeted app test methods' actual XML and verifies their
 unique names before running the full suite. The existing Android SDK license and
 device acceptance boundaries remain unchanged.
+
+## Preference operation ownership (P2)
+
+A controlled dual-owner host regression on `bc36f8a` reproduced an admitted
+blocking enable finishing after its owner retired, while a replacement owner had
+already read disabled. This is a synthetic interleaving, not a reported user
+incident. The identical regression now requires the replacement to remain closed,
+read the committed enabled value and require its own system verification.
+
+Every production controller shares a process-owned preference operation mutex.
+Initial/retry reads and the entire write/readback execute inside that boundary on
+IO. Ownership is checked after acquiring it. A queued retired write is rejected;
+an already executing blocking write may finish, and replacement readers wait for
+its physical completion before reading the actual file. Cancellation alone is
+not treated as acknowledgement that a blocking store operation stopped.
+
+The order is operation mutex, brief ownership check, then file-store monitor.
+Disposal takes only the ownership monitor and does not wait for disk. No caller
+waits for the operation mutex while holding the ownership monitor. A failed write
+releases the mutex so an explicit fresh read can resolve a lost acknowledgement;
+it does not permanently poison admission. Tests cover queued cancellation,
+committed-write/lost-ACK recovery and the same scheduling against real AtomicFile.

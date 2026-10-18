@@ -190,6 +190,7 @@ jobs:
           import hashlib, json, shutil, xml.etree.ElementTree as ET
           expected = {
               'com.t1doo.aiyou.AppAccessPreferenceTest': {
+                  'replacementOwnerReadsCommittedRealFileAfterRetiredBlockingEnableCompletes',
                   'confirmedSettingSurvivesNewInstancesAndStaleWriterCannotDisableIt',
                   'malformedOversizedAndIncompleteSettingFailClosedAndPreserveTheirBytes',
                   'atomicRecoveryKeepsConfirmedEnabledBackupAndVersionOverflowCannotOverwriteIt'},
@@ -213,8 +214,8 @@ jobs:
               shutil.copy2(source, target / source.name)
               receipts.append({'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
           wanted = {(name, method) for name, methods in expected.items() for method in methods}
-          assert len(observed) == len(set(observed)) == len(wanted) == 7 and set(observed) == wanted
-          receipt = {'tests': 7, 'failures': 0, 'errors': 0, 'skipped': 0, 'xml': receipts}
+          assert len(observed) == len(set(observed)) == len(wanted) == 8 and set(observed) == wanted
+          receipt = {'tests': 8, 'failures': 0, 'errors': 0, 'skipped': 0, 'xml': receipts}
           (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
           print('APP_ACCESS_TARGETED_XML_JSON ' + json.dumps(receipt))
           PY

@@ -42,6 +42,7 @@ internal class AppAccessController(
     private val beforeOpen: suspend () -> Unit,
     private val io: CoroutineDispatcher = Dispatchers.IO,
     private val newKey: () -> String = { "aiyou-app-access-" + UUID.randomUUID() },
+    private val preferenceOperations: AppAccessPreferenceOperations = processAppAccessPreferenceOperations,
 ) {
     private val guard = Any()
     private val mutable = MutableStateFlow(AppAccessState())
@@ -62,7 +63,10 @@ internal class AppAccessController(
         }
         scope.launch {
             try {
-                val preference = withContext(io) { storage.read() }
+                val preference = withContext(io) { preferenceOperations.perform {
+                    if (!owned(token)) throw CancellationException("Retired app access read")
+                    storage.read()
+                } }
                 synchronized(guard) {
                     if (disposed || generation != token) return@launch
                     mutable.value = AppAccessState(if (preference.enabled) AppAccessPhase.LOCKED else AppAccessPhase.OPENING,
@@ -140,14 +144,14 @@ internal class AppAccessController(
             val (token, purpose, previous) = work
             try {
                 if (!owned(token)) return@launch
-                val confirmed = if (purpose == AppAccessPurpose.UNLOCK) previous else withContext(io) {
+                val confirmed = if (purpose == AppAccessPurpose.UNLOCK) previous else withContext(io) { preferenceOperations.perform {
                     if (!owned(token)) throw CancellationException("Retired app access operation")
                     val requested = purpose == AppAccessPurpose.ENABLE
                     val receipt = storage.write(previous, requested)
                     check(receipt.enabled == requested && receipt.version == previous.version + 1)
                     check(storage.read() == receipt)
                     receipt
-                }
+                } }
                 synchronized(guard) {
                     if (disposed || generation != token) return@launch
                     mutable.value = AppAccessState(AppAccessPhase.OPENING, preference = confirmed)
