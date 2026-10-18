@@ -3,7 +3,6 @@ package com.t1doo.aiyou
 import android.app.Application
 import android.os.Process
 import android.util.AtomicFile
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -112,8 +111,12 @@ class ProductionColdStartPersistenceTest {
                 val acknowledgement = JSONObject(marker.openRead().use { it.readBytes().toString(Charsets.UTF_8) })
                 assertNotEquals("Must be a different actual Android PID", acknowledgement.getInt("pid"), Process.myPid())
                 ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-                    lateinit var model: LocalRecordsViewModel
-                    scenario.onActivity { activity -> model = ViewModelProvider(activity)[LocalRecordsViewModel::class.java] }
+                    val admitted = java.util.concurrent.atomic.AtomicReference<LocalRecordsViewModel?>(null)
+                    await {
+                        scenario.onActivity { activity -> admitted.set(activity.admittedRecords()) }
+                        admitted.get() != null
+                    }
+                    val model = checkNotNull(admitted.get())
                     await { model.state.value.ready && !model.state.value.opening }
                     assertEquals(capture, model.state.value.text)
                     val id = acknowledgement.getString("entryId")

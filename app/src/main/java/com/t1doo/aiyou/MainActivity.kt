@@ -85,23 +85,58 @@ import com.t1doo.aiyou.ui.NotebookNavigation
 class MainActivity : ComponentActivity() {
     private var packagePicker: com.t1doo.aiyou.records.ActivityRecordPackagePicker? = null
     private var packageRecords: LocalRecordsViewModel? = null
+    private var accessOwner: com.t1doo.aiyou.ui.AppAccessViewModel? = null
+    internal fun admittedRecords(): LocalRecordsViewModel? = accessOwner?.admittedRecords()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
         )
-        val records = ViewModelProvider(this)[LocalRecordsViewModel::class.java]
-        packageRecords = records
-        packagePicker = com.t1doo.aiyou.records.ActivityRecordPackagePicker(this, savedInstanceState).also {
-            records.recordPackages.attachPickerOwner(it)
-        }
+        val access = ViewModelProvider(this)[com.t1doo.aiyou.ui.AppAccessViewModel::class.java]
+        accessOwner = access
         val preferences = ViewModelProvider(this)[UiPreferencesViewModel::class.java]
-        val storageUsage = ViewModelProvider(this)[com.t1doo.aiyou.ui.StorageUsageViewModel::class.java]
         setContent {
-            val local by records.state.collectAsState()
-            val display by preferences.state.collectAsState()
-            AIyouTheme { AIyouApp(local = local, display = display, onDisplayChange = preferences::change, onRetryDisplay = preferences::retry, onDraftChange = records::changeText, onSave = records::save, onRetry = records::retry,
+            val accessState by access.controller.state.collectAsState()
+            SideEffect {
+                // This Activity's access gate owns FLAG_SECURE, including after configuration recreation.
+                if (accessState.preference?.enabled != false || !accessState.canReadRecords)
+                    window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+            }
+            AIyouTheme {
+                com.t1doo.aiyou.ui.AppAccessHost(access.controller) { id ->
+                    UnlockedApplication(access, id, preferences, savedInstanceState)
+                }
+            }
+        }
+    }
+
+    private var initialPickerStateConsumed = false
+
+    @Composable
+    private fun UnlockedApplication(access: com.t1doo.aiyou.ui.AppAccessViewModel, id: Long,
+        preferences: UiPreferencesViewModel, savedInstanceState: Bundle?) {
+        val session = remember(access, id) { access.session(id) }
+        val records = session.records
+        val storageUsage = session.storageUsage
+        var picker by remember(records) { mutableStateOf<com.t1doo.aiyou.records.ActivityRecordPackagePicker?>(null) }
+        DisposableEffect(records) {
+            val restore = if (!initialPickerStateConsumed) savedInstanceState else null
+            initialPickerStateConsumed = true
+            val active = com.t1doo.aiyou.records.ActivityRecordPackagePicker(this@MainActivity, restore)
+            records.recordPackages.attachPickerOwner(active)
+            packageRecords = records; packagePicker = active; picker = active
+            onDispose {
+                records.recordPackages.detachPickerOwner(active)
+                active.destroy(); picker = null
+                if (packagePicker === active) { packagePicker = null; packageRecords = null }
+            }
+        }
+        val local by records.state.collectAsState()
+        val display by preferences.state.collectAsState()
+        val accessIdle by records.appAccessIdle.collectAsState()
+        AIyouApp(local = local, display = display, onDisplayChange = preferences::change, onRetryDisplay = preferences::retry, onDraftChange = records::changeText, onSave = records::save, onRetry = records::retry,
                 onRefreshLocalSearch = records::refreshLocalSearch, onRebuildLocalSearch = records::rebuildLocalSearch,
                 onBeginOriginalEdit = records::beginOriginalEdit, onOriginalEditChange = records::changeOriginalEdit,
                 onOriginalEditSave = records::saveOriginalEdit, onOriginalEditCancel = records::cancelOriginalEdit,
@@ -136,8 +171,9 @@ class MainActivity : ComponentActivity() {
                 onTaskCreationDate = records.tasks::editCreationDate, onTaskBeginDate = records.tasks::beginDate,
                 onTaskEditDate = records.tasks::editDate, onTaskSaveDate = records.tasks::saveDate, onTaskCloseDate = records.tasks::closeDate,
                 exports = records.exports, recycleBin = records.recycleBin, recordPackages = records.recordPackages, factRecaps = records.factRecaps,
-                recordPackagePicker = packagePicker, currentRecords = { records.state.value }) }
-        }
+                recordPackagePicker = picker, currentRecords = { records.state.value },
+                appAccessSettings = { com.t1doo.aiyou.ui.AppAccessSettings(access.controller, id,
+                    accessIdle && access.retirementReady(id)) })
     }
     override fun onResume() { super.onResume(); packagePicker?.resumed() }
     override fun onPause() { packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); super.onPause() }
@@ -145,6 +181,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         packagePicker?.let { packageRecords?.recordPackages?.detachPickerOwner(it); it.destroy() }
         packagePicker = null; packageRecords = null
+        accessOwner = null
         super.onDestroy()
     }
     @Suppress("DEPRECATION")
@@ -256,6 +293,7 @@ fun AIyouApp(
     manualTasks: com.t1doo.aiyou.records.ManualTaskController? = null,
     imageGrid: com.t1doo.aiyou.records.CurrentImageGridController? = null,
     evidenceAnswerFixture: com.t1doo.aiyou.records.SyntheticEvidenceAnswerProvider? = null,
+    appAccessSettings: (@Composable () -> Unit)? = null,
 ) {
     val navigation = remember { NavigationOwner() }
     DisposableEffect(navigation) { onDispose { navigation.active = false } }
@@ -778,7 +816,8 @@ fun AIyouApp(
                 onLicenses = { if (ownsNavigation()) { navigation.advance(); showLicenses = true } },
                 onDemo = { if (ownsNavigation()) { navigation.advance(); clearSearch(); demo = !demo } },
                 onDemoState = { if (ownsNavigation()) { navigation.advance(); stateName = it.name } },
-                modifier = modifier, hasRecordPackages=local?.supportsRecordPackages==true, storageUsage = storageUsage)
+                modifier = modifier, hasRecordPackages=local?.supportsRecordPackages==true, storageUsage = storageUsage,
+                appAccessSection = appAccessSettings)
         } else if (browsingPackage && local != null && recordPackages != null && packageUi != null) {
             com.t1doo.aiyou.records.RecordPackageScreen(local, packageUi, recordPackages, recordPackagePicker, ::ownsPackageRoute, modifier)
         } else if (browsingRecycle && local != null && recycleBin != null && recycleUi != null) {

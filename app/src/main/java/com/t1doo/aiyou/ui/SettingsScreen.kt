@@ -46,6 +46,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     hasRecordPackages: Boolean = false,
     storageUsage: StorageUsageController? = null,
+    appAccessSection: (@Composable () -> Unit)? = null,
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
@@ -82,6 +83,7 @@ fun SettingsScreen(
                     Text("之后可连接你选择的模型。发送任何记录前，会先说明范围并征求授权。",
                         style = MaterialTheme.typography.bodyMedium, color = AIyouColors.textSecondary)
                 }
+                appAccessSection?.let { section -> SettingsGroup("应用锁") { section() } }
                 if (storageUsage != null) SettingsGroup("存储") {
                     StorageUsageSection(storageUsage)
                 }

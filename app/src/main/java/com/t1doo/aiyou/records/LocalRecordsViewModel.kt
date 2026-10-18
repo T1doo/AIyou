@@ -139,50 +139,99 @@ class LocalRecordsViewModel internal constructor(
     private val mutableState = MutableStateFlow(LocalRecordUiState())
     val state = mutableState.asStateFlow()
     private val commands = Channel<Command>(Channel.UNLIMITED)
+    private val appAccessGuard = Any()
+    private val appAccessCommands = java.util.concurrent.atomic.AtomicInteger()
+    private val mutableAppAccessIdle = MutableStateFlow(false)
+    internal val appAccessIdle = mutableAppAccessIdle.asStateFlow()
+    private val appAccessClosed = kotlinx.coroutines.CompletableDeferred<Unit>()
+
+    private fun submit(command: Command): kotlinx.coroutines.channels.ChannelResult<Unit> = synchronized(appAccessGuard) {
+        appAccessCommands.incrementAndGet()
+        mutableAppAccessIdle.value = false
+        val result = commands.trySend(command)
+        if (result.isFailure) mutableAppAccessIdle.value = appAccessCommands.decrementAndGet() == 0
+        result
+    }
+
+    internal fun canRetireForAppAccess(): Boolean = synchronized(appAccessGuard) { appAccessMayRetire() }
+
+    /** Freeze admission at the same boundary used by every records IO command. */
+    internal fun retireForAppAccess(): Boolean = synchronized(appAccessGuard) {
+        if (!appAccessMayRetire()) return@synchronized false
+        editsDisposed = true
+        commands.close()
+        true
+    }
+
+    private fun appAccessMayRetire(): Boolean {
+        val local = mutableState.value
+        if (editsDisposed || appAccessCommands.get() != 0 || !local.ready || local.opening || local.error != null ||
+            local.saving || local.savePending || local.captureDiscard != null || local.localIndexBusy ||
+            local.originalEdit != null || local.originalHistory != null || attachments.state.value != null ||
+            local.ai != null || local.sourceTask != null || local.sourceTags != null || local.sourceMemories != null ||
+            local.localProcessing != null || local.factRecap != null || local.candidates != null ||
+            local.originalExport != null || local.recordPackage != null || local.recycleBin != null ||
+            local.manualTagEditor != null || local.manualPeopleEditor != null || local.eventDateEditor != null ||
+            local.favoriteWrites.isNotEmpty() || local.eventDateWrites.isNotEmpty() ||
+            local.tasks.busy || local.tasks.pending != null || local.tasks.editor != null ||
+            local.tasks.dateEditor != null || local.tasks.titleEditor != null || local.taskProposals.editor != null ||
+            local.reminders.busy || local.reminders.pending != null || local.reminders.editor != null) return false
+        val mixed = local.mixedCapture
+        if (mixed != null) {
+            val draft = mixed.draft ?: return false
+            return !mixed.busy && mixed.pendingEdits == 0 && mixed.selection == null &&
+                !mixed.uncertainSave && !mixed.discardPending && !mixed.confirmDiscard && mixed.policyChange == null &&
+                mixed.error == null && !draft.discarding && draft.text == mixed.text
+        }
+        return persistedDraft?.text == local.text || (local.text.isEmpty() && editGeneration.get() == 0L)
+    }
+
+    internal suspend fun awaitAppAccessClosed() = appAccessClosed.await()
+    internal val appAccessClosure: kotlinx.coroutines.Deferred<Unit> get() = appAccessClosed
     val imageGrid = CurrentImageGridController(
-        enqueue = { action -> commands.trySend(Command.Attachment(action)).isSuccess },
+        enqueue = { action -> submit(Command.Attachment(action)).isSuccess },
         decode = decodeGrid, current = { mutableState.value })
     val sourceTasks = SourceTaskController({ mutableState.value }, { change -> update(change) },
-        { action -> commands.trySend(Command.ManualTasks(action)).isSuccess },clock, { tasks.refresh() },{taskProposals.open(it)})
+        { action -> submit(Command.ManualTasks(action)).isSuccess },clock, { tasks.refresh() },{taskProposals.open(it)})
     val taskProposals = TaskProposalController({ mutableState.value }, { change -> update(change) },
-        { action -> commands.trySend(Command.ManualTasks(action)).isSuccess },clock, { tasks.refresh() })
+        { action -> submit(Command.ManualTasks(action)).isSuccess },clock, { tasks.refresh() })
     val localProcessing = LocalProcessingController({ mutableState.value }, { change -> update(change) },
-        { action -> commands.trySend(Command.LocalProcessing(action)).isSuccess }, ::retireDerived, clock)
+        { action -> submit(Command.LocalProcessing(action)).isSuccess }, ::retireDerived, clock)
     val factRecaps = FactRecapController({ mutableState.value }, { change -> update(change) },
-        { action -> commands.trySend(Command.FactRecap(action)).isSuccess },clock.withZone(ZoneId.systemDefault()))
+        { action -> submit(Command.FactRecap(action)).isSuccess },clock.withZone(ZoneId.systemDefault()))
     val mixedCapture = MixedCaptureController({ mutableState.value },{ change -> update(change) },
-        { action -> commands.trySend(Command.MixedCapture(action)).isSuccess },decodeCapture,clock)
+        { action -> submit(Command.MixedCapture(action)).isSuccess },decodeCapture,clock)
     val attachments = LocalAttachmentController(
-        enqueue = { action -> commands.trySend(Command.Attachment(action)).isSuccess }, decodePng = decodePng,
+        enqueue = { action -> submit(Command.Attachment(action)).isSuccess }, decodePng = decodePng,
         canUseRecord = { mutableState.value.let { it.ready && !it.opening && it.error == null &&
             !it.saving && !it.savePending && it.captureDiscard == null && it.recycleBin == null } },
         canUsePanel = { it.hasRecordAccess(mutableState.value) })
     val tags = ManualTagController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> commands.trySend(Command.ManualTags(action)).isSuccess })
+        enqueue = { action -> submit(Command.ManualTags(action)).isSuccess })
     val people = ManualPeopleController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> commands.trySend(Command.ManualPeople(action)).isSuccess })
+        enqueue = { action -> submit(Command.ManualPeople(action)).isSuccess })
     val favorites = RecordFavoriteController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> commands.trySend(Command.Favorites(action)).isSuccess })
+        enqueue = { action -> submit(Command.Favorites(action)).isSuccess })
     val eventDates = RecordEventDateController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> commands.trySend(Command.EventDates(action)).isSuccess })
+        enqueue = { action -> submit(Command.EventDates(action)).isSuccess })
     val tasks = ManualTaskController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> commands.trySend(Command.ManualTasks(action)).isSuccess }, clock = clock)
+        enqueue = { action -> submit(Command.ManualTasks(action)).isSuccess }, clock = clock)
     val reminders = TaskReminderController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> commands.trySend(Command.ManualTasks(action)).isSuccess }, clock = clock)
+        enqueue = { action -> submit(Command.ManualTasks(action)).isSuccess }, clock = clock)
     val candidates = LocalCandidateController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> commands.trySend(Command.LocalCandidates(action)).isSuccess },
+        enqueue = { action -> submit(Command.LocalCandidates(action)).isSuccess },
         scope = viewModelScope, clock = clock, extract = extractLocalCandidates)
     val sourceTags = SourceTagController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> commands.trySend(Command.LocalCandidates(action)).isSuccess }, clock = clock)
+        enqueue = { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock = clock)
     val sourceMemories = SourceMemoryController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> commands.trySend(Command.LocalCandidates(action)).isSuccess }, clock = clock)
+        enqueue = { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock = clock)
     val exports = OriginalExportController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> commands.trySend(Command.OriginalExport(action)).isSuccess }, clock = clock, decodeImage = decodeCapture)
+        enqueue = { action -> submit(Command.OriginalExport(action)).isSuccess }, clock = clock, decodeImage = decodeCapture)
     val recordPackages = RecordPackageController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> commands.trySend(Command.RecordPackage(action)).isSuccess },
+        enqueue = { action -> submit(Command.RecordPackage(action)).isSuccess },
         cipher = com.t1doo.aiyou.data.JcaRecordPackageCipher(), clock = clock)
     val recycleBin = RecycleBinController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> commands.trySend(Command.RecycleBin(action)).isSuccess },
+        enqueue = { action -> submit(Command.RecycleBin(action)).isSuccess },
         canMove = { attachments.state.value == null },
         onCommittedMove = { id ->
             ai.reconcileRecords()
@@ -238,6 +287,7 @@ class LocalRecordsViewModel internal constructor(
                 open()
                 ai.reconcileRecords()
                 scheduleLocalIndex()
+                mutableAppAccessIdle.value = appAccessCommands.get() == 0
                 for (command in commands) {
                     val previousEntries = mutableState.value.entries
                     try {
@@ -287,7 +337,7 @@ class LocalRecordsViewModel internal constructor(
                                     originalHistory = it.originalHistory?.let { history -> history.copy(
                                         requestId = history.requestId + 1, loading = true, revisions = emptyList(), error = null, unavailable = false,
                                         replacement = null) }) }
-                                mutableState.value.originalHistory?.let { commands.trySend(Command.ReadHistory(it.sessionId, it.requestId)) }
+                                mutableState.value.originalHistory?.let { submit(Command.ReadHistory(it.sessionId, it.requestId)) }
                             }
                             is Command.Revise -> reviseOriginal(command)
                             is Command.OpenEdit -> openOriginalDraft(command)
@@ -336,6 +386,7 @@ class LocalRecordsViewModel internal constructor(
                         if (command is Command.Save || command is Command.Revise || command is Command.ManualTags ||
                             command is Command.RecordPackage || command is Command.RecycleBin ||
                             command is Command.Retry || command is Command.RefreshSearch || command is Command.LocalProcessing) scheduleLocalIndex()
+                        mutableAppAccessIdle.value = appAccessCommands.decrementAndGet() == 0
                     }
                 }
             } finally {
@@ -359,7 +410,7 @@ class LocalRecordsViewModel internal constructor(
                 exports.dispose()
                 recordPackages.dispose()
                 recycleBin.dispose()
-                withContext(NonCancellable + Dispatchers.IO) {
+                try { withContext(NonCancellable + Dispatchers.IO) {
                     try { ai.closeAndJoin() }
                     finally {
                         mixedCapture.disposeOnIo()
@@ -370,8 +421,13 @@ class LocalRecordsViewModel internal constructor(
                             repository = null
                         }
                     }
+                } } catch (_: Exception) {
+                    appAccessClosed.completeExceptionally(IllegalStateException("Records session closure unconfirmed"))
                 }
             }
+        }.invokeOnCompletion { failure ->
+            if (failure == null || failure is CancellationException) appAccessClosed.complete(Unit)
+            else appAccessClosed.completeExceptionally(IllegalStateException("Records session closure unconfirmed"))
         }
     }
 
@@ -465,7 +521,7 @@ class LocalRecordsViewModel internal constructor(
         val generation = editGeneration.incrementAndGet()
         discardIntent = null
         update { it.copy(text = text, draftNotice = "正在保存草稿", saveNotice = null, inputNotice = null, captureDiscard = null) }
-        commands.trySend(Command.Edit(text, generation))
+        submit(Command.Edit(text, generation))
     }
 
     fun save() {
@@ -473,24 +529,24 @@ class LocalRecordsViewModel internal constructor(
         if (editsDisposed || !current.ready || current.captureDiscard != null || current.saving || current.text.isBlank() || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         val intent = pendingIntent.get() ?: SaveIntent(current.text, editGeneration.get()).also { pendingIntent.set(it) }
         update { it.copy(saving = true, savePending = true, saveNotice = null, error = null, inputNotice = null) }
-        commands.trySend(Command.Save(intent))
+        submit(Command.Save(intent))
     }
 
     fun retry() {
         val current = mutableState.value
         if (current.captureDiscard != null) return
         if (current.editDraftError != null && current.ready) {
-            commands.trySend(Command.RefreshEditDrafts)
+            submit(Command.RefreshEditDrafts)
             if (current.error == null) return
         }
         if (current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) {
             if (!current.ready || current.opening || current.error == null || current.originalEdit?.saving == true) return
             // Recover the prior capture write without replacing this editor or routing through changeText.
             update { it.copy(opening = true) }
-            commands.trySend(Command.RecoverDraft(current.text, editGeneration.get()))
+            submit(Command.RecoverDraft(current.text, editGeneration.get()))
         } else if (!current.ready && !current.opening) {
             update { it.copy(opening = true, error = null) }
-            commands.trySend(Command.Retry)
+            submit(Command.Retry)
         } else if (mutableState.value.savePending) save()
         else if (mutableState.value.ready) changeText(mutableState.value.text)
     }
@@ -525,7 +581,7 @@ class LocalRecordsViewModel internal constructor(
             intent.generation != editGeneration.get() || intent.text != current.text) return
         if (active.recoveryFailed) { queueCaptureRecovery(requestId); return }
         update { it.copy(captureDiscard = active.copy(busy = true, error = null)) }
-        commands.trySend(Command.DiscardCapture(intent))
+        submit(Command.DiscardCapture(intent))
     }
 
     private fun queueCaptureRecovery(requestId: Long) {
@@ -535,7 +591,7 @@ class LocalRecordsViewModel internal constructor(
         if (editsDisposed || active.requestId != requestId || active.busy || intent.id != requestId ||
             intent.generation != editGeneration.get() || intent.text != current.text || !active.recoveryRequired) return
         update { it.copy(captureDiscard = active.copy(busy = true, recovering = true, error = null)) }
-        commands.trySend(Command.RestoreCapture(intent))
+        submit(Command.RestoreCapture(intent))
     }
 
     private suspend fun restoreCapture(intent: DiscardIntent) {
@@ -606,7 +662,7 @@ class LocalRecordsViewModel internal constructor(
         val edit = OriginalEditUiState(originalEditIds.incrementAndGet(), entry.id, entry.currentRevision, entry.originalText,
             loadingDraft = current.supportsEditDrafts)
         update { it.copy(originalEdit = edit, originalEditNotice = null) }
-        if (current.supportsEditDrafts) commands.trySend(Command.OpenEdit(edit, false))
+        if (current.supportsEditDrafts) submit(Command.OpenEdit(edit, false))
     }
 
     fun resumeOriginalEdit(entryId: String, draftId: String) {
@@ -621,7 +677,7 @@ class LocalRecordsViewModel internal constructor(
         val edit = OriginalEditUiState(originalEditIds.incrementAndGet(), entryId, entry?.currentRevision ?: ref.baseRevision,
             entry?.originalText.orEmpty(), loadingDraft = true)
         update { it.copy(originalEdit = edit, originalEditNotice = null) }
-        commands.trySend(Command.OpenEdit(edit, false, draftId))
+        submit(Command.OpenEdit(edit, false, draftId))
     }
 
     fun changeOriginalEdit(sessionId: Long, text: String) {
@@ -639,7 +695,7 @@ class LocalRecordsViewModel internal constructor(
                     error = if (edit.conflict) edit.error else null))
             }
         }
-        if (accepted && mutableState.value.supportsEditDrafts) commands.trySend(Command.PersistEdit(sessionId, text))
+        if (accepted && mutableState.value.supportsEditDrafts) submit(Command.PersistEdit(sessionId, text))
     }
 
     fun keepOriginalEdit(sessionId: Long) {
@@ -652,7 +708,7 @@ class LocalRecordsViewModel internal constructor(
         update { if (it.originalEdit != edit) it else it.copy(
             originalEdit = edit.copy(keeping = true, error = null, draftNotice = "正在确认本机编辑草稿")) }
         if (mutableState.value.originalEdit?.let { it.sessionId == sessionId && it.keeping } == true)
-            commands.trySend(Command.KeepEdit(sessionId, edit.text))
+            submit(Command.KeepEdit(sessionId, edit.text))
     }
 
     fun cancelOriginalEdit(sessionId: Long) {
@@ -662,7 +718,7 @@ class LocalRecordsViewModel internal constructor(
         if (mutableState.value.supportsEditDrafts && !active.draftConflict) {
             update { if (it.originalEdit?.sessionId != sessionId) it else it.copy(
                 originalEdit = it.originalEdit.copy(discarding = true, error = null)) }
-            commands.trySend(Command.DiscardEdit(sessionId))
+            submit(Command.DiscardEdit(sessionId))
             return
         }
         update { current ->
@@ -670,7 +726,7 @@ class LocalRecordsViewModel internal constructor(
             if (edit?.sessionId != sessionId || !edit.canCancel || current.originalHistory != null) current
             else current.copy(originalEdit = null, originalEditNotice = null)
         }
-        if (mutableState.value.supportsEditDrafts) commands.trySend(Command.ReleaseEdit(sessionId))
+        if (mutableState.value.supportsEditDrafts) submit(Command.ReleaseEdit(sessionId))
     }
 
     fun saveOriginalEdit(sessionId: Long) {
@@ -680,7 +736,7 @@ class LocalRecordsViewModel internal constructor(
         if (edit.sessionId != sessionId || edit.saving || edit.keeping || edit.conflict || edit.loadingDraft || edit.discarding || !current.ready || current.opening || current.error != null || current.originalHistory != null) return
         if (!edit.awaitingReadback && (edit.text.isBlank() || !edit.dirty || edit.text.length > EncryptedEntryRepository.MAX_TEXT_LENGTH)) return
         update { it.copy(originalEdit = edit.copy(saving = true, error = null, inputNotice = null)) }
-        commands.trySend(Command.Revise(sessionId, edit.entryId, edit.baseRevision, edit.text))
+        submit(Command.Revise(sessionId, edit.entryId, edit.baseRevision, edit.text))
     }
 
     fun beginOriginalHistory(entryId: String, expectedRevision: Int) {
@@ -692,7 +748,7 @@ class LocalRecordsViewModel internal constructor(
         current.ai?.let { ai.leave(it.sessionId) }
         val history = OriginalHistoryUiState(originalHistoryIds.incrementAndGet(), entryId)
         update { it.copy(originalHistory = history) }
-        commands.trySend(Command.ReadHistory(history.sessionId, history.requestId))
+        submit(Command.ReadHistory(history.sessionId, history.requestId))
     }
 
     fun selectOriginalRevision(sessionId: Long, revision: Int?) {
@@ -749,7 +805,7 @@ class LocalRecordsViewModel internal constructor(
 
     private fun queueHistoricalDraft(beforeEditId: Long?) {
         mutableState.value.originalEdit?.takeIf { it.loadingDraft && it.sessionId != beforeEditId }?.let {
-            commands.trySend(Command.OpenEdit(it, true))
+            submit(Command.OpenEdit(it, true))
         }
     }
 
@@ -787,7 +843,7 @@ class LocalRecordsViewModel internal constructor(
         val next = history.copy(requestId = history.requestId + 1, loading = true, revisions = emptyList(), error = null, unavailable = false,
             replacement = null)
         update { if (it.originalHistory?.sessionId == history.sessionId) it.copy(originalHistory = next) else it }
-        commands.trySend(Command.ReadHistory(next.sessionId, next.requestId))
+        submit(Command.ReadHistory(next.sessionId, next.requestId))
     }
 
     private suspend fun readHistory(command: Command.ReadHistory) {
@@ -1172,14 +1228,14 @@ class LocalRecordsViewModel internal constructor(
 
     fun refreshLocalSearch() {
         if (!editsDisposed && mutableState.value.ready && searchRefreshQueued.compareAndSet(false, true) &&
-            !commands.trySend(Command.RefreshSearch).isSuccess) searchRefreshQueued.set(false)
+            !submit(Command.RefreshSearch).isSuccess) searchRefreshQueued.set(false)
     }
     fun rebuildLocalSearch() {
         if (!editsDisposed && mutableState.value.ready && !mutableState.value.opening &&
             mutableState.value.error == null && mutableState.value.localSearch != null &&
             !mutableState.value.localIndexBusy && indexRebuildQueued.compareAndSet(false, true)) {
             update { it.copy(localIndexBusy = true) }
-            if (!commands.trySend(Command.RebuildIndex).isSuccess) {
+            if (!submit(Command.RebuildIndex).isSuccess) {
                 indexRebuildQueued.set(false)
                 update { if (editsDisposed) it else it.copy(localIndexBusy = false) }
             }
@@ -1188,7 +1244,7 @@ class LocalRecordsViewModel internal constructor(
     private fun scheduleLocalIndex() {
         if (!editsDisposed && !indexQueued && !indexFailed && repository?.localSearch != null &&
             mutableState.value.ready && mutableState.value.error == null) {
-            indexQueued = commands.trySend(Command.IndexBatch).isSuccess
+            indexQueued = submit(Command.IndexBatch).isSuccess
         }
     }
     private fun runLocalIndex() {

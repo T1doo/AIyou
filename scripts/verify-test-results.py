@@ -47,6 +47,22 @@ for label, folder, minimum in targets:
     print(f"PASS: {label} tests={total} actual={cases} failures=0 errors=0 skipped=0")
     additional = {}
     if label == "host queue":
+        additional["com.t1doo.aiyou.ui.AppAccessControllerTest"] = (
+            "disabledFirstStartOpensOnlyAfterConfirmedReadAndCloseBarrier",
+            "enabledStartupCancelMissingCredentialAndForeignResultsNeverOpenRecords",
+            "enableAndDisableRequireFreshAuthenticationAndExactReadbackBeforeOpeningNewSession",
+            "manualLockWaitsForRetiredStorageAndOldSessionCannotLockReopenedRecords",
+            "busyDurableBoundaryRejectsManualLockAndPreferenceChangeWithoutLaunchingAuthentication",
+            "cancelledSettingsAuthenticationCanExplicitlyReturnToPriorAccessWithoutChangingPreference",
+            "lostEnableAcknowledgementFailsClosedAndRetryReadsCommittedPolicyWithoutRepeatingWrite",
+            "readFailureAndDisposedOwnerCannotReopenOrAcceptLateAuthentication")
+        additional["AppAccessRecordsBoundaryTest"] = (
+            "idleRetirementSealsAllAdmissionAndWaitsForActualStorageClosure",
+            "queuedAndFailedDraftCannotRetireUntilTheSameInputIsConfirmedDurable",
+            "failedStorageClosureCannotBecomeAnAcknowledgedRetiredSession")
+        additional["com.t1doo.aiyou.ui.AppAccessRetirementBarrierTest"] = (
+            "newAccessOwnerWaitsForPreviousOwnersStorageCloseAcknowledgement",
+            "failedCloseSurvivesOwnerDisposalAndCannotBeForgottenByANewController")
         additional["com.t1doo.aiyou.records.OriginalSearchPreviewTest"] = (
             "foldedMatchHighlightsOnlyOriginalCodePointsAndNeverNormalizesOrStoresText",
             "longExactMatchClipsAtCodePointBudgetWithoutHighlightingOmissionMarks",
@@ -280,6 +296,16 @@ for label, folder, minimum in targets:
             "changedTagVersionRevokesOldResultBeforeCompositionAndReadFailureIsDistinctFromEmpty",
             "narrowLargeFontEditorKeepsActionsReachableAndHidesPersistedLabelsWhenSourceFails",
             "rawSavedStateAndRestorationExcludeTagConditionsInputsAndClearedFieldUndoHistory")
+        additional["com.t1doo.aiyou.AppAccessPreferenceTest"] = (
+            "confirmedSettingSurvivesNewInstancesAndStaleWriterCannotDisableIt",
+            "malformedOversizedAndIncompleteSettingFailClosedAndPreserveTheirBytes",
+            "atomicRecoveryKeepsConfirmedEnabledBackupAndVersionOverflowCannotOverwriteIt")
+        additional["com.t1doo.aiyou.AppAccessPresentationTest"] = (
+            "lockedDoubleFontGateKeepsOriginalAbsentUntilCurrentSystemResultAndRejectsEarlierResult",
+            "actualSettingsRequireVerificationRespectBusyBoundaryAndRetireCallbacksAcrossPageAndLock",
+            "uncertainPreferenceWriteKeepsActualProtectedTreeAbsentUntilExplicitReadAndNewVerification")
+        additional["com.t1doo.aiyou.AppAccessStartupPresentationTest"] = (
+            "productionLockedStartupAndRecreationNeverOpenRecordsOrExposeTheirSurface",)
         additional["com.t1doo.aiyou.LocalOriginalSearchPresentationTest"] = (
             "searchCardsHighlightVerifiedOriginalUnicodeKeepOrderAndClearWithoutTouchingSource",
             "searchCardFirstHitIsVisibleAtDoubleFontAndRevisionDeletionRetireItsHighlightAndAction",
