@@ -124,6 +124,7 @@ class OriginalReadingPresentationTest {
         val preview = originalPreview(text)
         assertEquals(241, preview.codePointCount(0, preview.length))
         assertTrue(preview.endsWith("…"))
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-record"))
         compose.onNodeWithText(preview).assertIsDisplayed()
         compose.onAllNodesWithText(text).assertCountEquals(0)
         open()

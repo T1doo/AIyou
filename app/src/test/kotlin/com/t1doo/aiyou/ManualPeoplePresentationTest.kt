@@ -7,6 +7,8 @@ import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
@@ -76,7 +78,7 @@ class ManualPeoplePresentationTest {
         content();openEditor();field("manual-people-input","我的称呼🙂");failWrite=true
         compose.onNodeWithTag("manual-people-add").performScrollTo().performClick()
         assertTrue(state.value.manualPeopleEditor!!.busy);assertEquals(listOf("小林"),persisted.getValue("one").names)
-        pump();compose.onNodeWithTag("manual-people-input").assertTextEquals("我的称呼🙂")
+        pump();assertInputEquals("我的称呼🙂")
         failWrite=false;compose.onNodeWithTag("manual-people-retry").performScrollTo().performClick();pump()
         assertEquals(listOf("小林","我的称呼🙂"),persisted.getValue("one").names)
         compose.onNodeWithTag("manual-people-remove-1").performScrollTo().performClick();pump()
@@ -103,7 +105,7 @@ class ManualPeoplePresentationTest {
         compose.runOnIdle{assertFalse(registry!!.performSave().toString().contains("未提交私密称呼"));state.value=state.value.copy(error="合成读取失败")}
         compose.onAllNodes(hasText("小林")).assertCountEquals(0)
         compose.onNodeWithTag("manual-people-add").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithTag("manual-people-input").assertTextEquals("未提交私密称呼")
+        assertInputEquals("未提交私密称呼")
         compose.onNodeWithTag("manual-people-close").performScrollTo().assertIsDisplayed().performClick()
         assertNull(state.value.manualPeopleEditor)
     }
@@ -122,6 +124,8 @@ class ManualPeoplePresentationTest {
         compose.onNodeWithTag("original-manual-people").performScrollTo().performClick();pump()}
     private fun pump(){compose.runOnIdle{runBlocking{queue.removeFirst()(store)}};compose.waitForIdle()}
     private fun field(tag:String,text:String)=compose.onNodeWithTag(tag).performScrollTo().performTextReplacement(text)
+    private fun assertInputEquals(value:String)=compose.onNodeWithTag("manual-people-input").assert(
+        SemanticsMatcher.expectValue(SemanticsProperties.EditableText,AnnotatedString(value)))
     private fun await(predicate:(OriginalSearchState)->Boolean){compose.waitForIdle();compose.waitUntil(2_000){result?.let(predicate)==true};compose.waitForIdle()}
     companion object {
         private fun entry(id:String,text:String,zone:String)=StoredEntry(id,1,text,Instant.parse("2026-10-13T23:30:00Z").toEpochMilli(),zone,ProcessingPolicy.LOCAL_ONLY)

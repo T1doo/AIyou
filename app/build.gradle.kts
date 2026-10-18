@@ -43,6 +43,9 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
+            // Bound Robolectric sandbox/Trace ThreadLocal retention across UI classes.
+            // Recycle workers without increasing their heap or parallelism.
+            it.forkEvery = 4L
             it.testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
             it.dependsOn(prepareRobolectricSdk)
             // Gradle resolves the fixed, locked Maven SDK; the test runner gets

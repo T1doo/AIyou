@@ -66,45 +66,66 @@ class CurrentImageSearchPresentationTest {
             }}
         }
     }
+    // Searching existing semantics cannot discover an uncomposed lazy item. Scroll the
+    // actual list while retaining the existing bounded asynchronous publication wait.
+    private fun reveal(tag: String) = reveal(hasTestTag(tag))
+    private fun reveal(matcher: SemanticsMatcher): SemanticsNodeInteraction {
+        var missing: AssertionError? = null
+        try {
+            compose.waitUntil(3_000) {
+                try {
+                    compose.onNode(hasScrollToIndexAction()).performScrollToNode(matcher)
+                    true
+                } catch (failure: AssertionError) {
+                    missing = failure
+                    false
+                }
+            }
+        } catch (timeout: ComposeTimeoutException) {
+            missing?.let(timeout::addSuppressed)
+            throw timeout
+        }
+        return compose.onNode(matcher).assertIsDisplayed()
+    }
     private fun await(predicate:(OriginalSearchState)->Boolean){
         compose.waitForIdle();compose.waitUntil(3_000){results.get()?.let(predicate)==true}
     }
     @Test fun imageFilterStartsOffCombinesLiteralAndDatesAndClearResetsEveryCondition(){
         compose.setContent{Screen()};await{it.stage==OriginalSearchStage.BROWSE}
         assertFalse(results.get().input.onlyImages)
-        compose.onNodeWithTag("original-search-images").performScrollTo().performClick()
+        reveal("original-search-images").performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.onlyImages}
         assertEquals(listOf(picture.id),results.get().hits.map{it.entry.id})
-        compose.onNodeWithTag("original-search-query").performScrollTo().performTextReplacement("needle")
-        compose.onNodeWithTag("original-search-from").performScrollTo().performTextReplacement("1970-01-01")
-        compose.onNodeWithTag("original-search-through").performScrollTo().performTextReplacement("1970-01-01")
+        reveal("original-search-query").performTextReplacement("needle")
+        reveal("original-search-from").performTextReplacement("1970-01-01")
+        reveal("original-search-through").performTextReplacement("1970-01-01")
         await{it.stage==OriginalSearchStage.READY&&it.input.through=="1970-01-01"}
         assertTrue(results.get().input.onlyImages);assertEquals(listOf(picture.id),results.get().hits.map{it.entry.id})
-        compose.onNodeWithTag("original-search-clear").performScrollTo().performClick()
+        reveal("original-search-clear").performClick()
         await{it.stage==OriginalSearchStage.BROWSE}
         assertFalse(results.get().input.onlyImages);assertEquals("",results.get().input.query)
         assertEquals("",results.get().input.from);assertEquals("",results.get().input.through)
     }
     @Test fun narrowDoubleFontFilterIsReachableAndReadFailureCannotBecomeEmptySuccess(){
         compose.setContent{Screen(true)}
-        val control=compose.onNodeWithTag("original-search-images").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        val control=reveal("original-search-images").assertIsDisplayed().assertIsEnabled()
         assertTrue(control.getUnclippedBoundsInRoot().height>=48.dp)
         compose.runOnIdle{failRead=true};control.performClick()
         await{it.stage==OriginalSearchStage.FAILED&&it.input.onlyImages}
         assertTrue(results.get().hits.isEmpty());assertTrue(results.get().message!!.contains("原文已保留"))
         compose.onAllNodesWithText("没有匹配的原文").assertCountEquals(0)
-        compose.onNodeWithTag("original-search-images").performScrollTo().assertIsEnabled().performClick()
+        reveal("original-search-images").assertIsEnabled().performClick()
         await{it.stage==OriginalSearchStage.BROWSE}
         assertFalse(results.get().input.onlyImages)
     }
     @Test fun gridRequiresExplicitToggleKeepsFailureCardAndOpensOriginalSource(){
         compose.setContent{Screen()};await{it.stage==OriginalSearchStage.BROWSE}
         compose.onAllNodesWithTag("original-search-grid").assertCountEquals(0)
-        compose.onNodeWithTag("original-search-images").performScrollTo().performClick()
+        reveal("original-search-images").performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.onlyImages}
         compose.onAllNodesWithTag("image-grid-entry-picture").assertCountEquals(0)
-        compose.onNodeWithTag("original-search-grid").performScrollTo().performClick()
-        compose.onNodeWithTag("image-grid-entry-picture").performScrollTo().assertIsDisplayed()
+        reveal("original-search-grid").performClick()
+        reveal("image-grid-entry-picture").assertIsDisplayed()
         compose.waitUntil(3_000){grid.state.value.tiles[picture.id]?.failed==true}
         compose.onNodeWithTag("image-grid-failed-picture",useUnmergedTree=true).assertExists()
         compose.onNodeWithTag("image-grid-entry-picture").performClick()
@@ -112,12 +133,12 @@ class CurrentImageSearchPresentationTest {
     }
     @Test fun narrowDoubleFontGridToggleAndFailureCardRemainReachableAndClearReturnsToList(){
         compose.setContent{Screen(true)}
-        compose.onNodeWithTag("original-search-images").performScrollTo().performClick()
+        reveal("original-search-images").performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.onlyImages}
-        val toggle=compose.onNodeWithTag("original-search-grid").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        val toggle=reveal("original-search-grid").assertIsDisplayed().assertIsEnabled()
         assertTrue(toggle.getUnclippedBoundsInRoot().height>=48.dp);toggle.performClick()
-        compose.onNodeWithTag("image-grid-entry-picture").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("original-search-clear").performScrollTo().performClick()
+        reveal("image-grid-entry-picture").assertIsDisplayed()
+        reveal("original-search-clear").performClick()
         await{it.stage==OriginalSearchStage.BROWSE}
         compose.onAllNodesWithTag("original-search-grid").assertCountEquals(0)
         compose.onAllNodesWithTag("image-grid-entry-picture").assertCountEquals(0)
@@ -125,75 +146,69 @@ class CurrentImageSearchPresentationTest {
     }
     @Test fun localEvidenceCardsUseCurrentSourceAndReturnWithoutChangingQuestion(){
         compose.setContent{Screen()}
-        compose.onNodeWithTag("original-search-query").performScrollTo().performTextReplacement("needle")
+        reveal("original-search-query").performTextReplacement("needle")
         await{it.stage==OriginalSearchStage.READY}
-        compose.onNodeWithTag("local-evidence-mode").performScrollTo().performClick()
-        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-picture").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithTag("local-evidence-picture").performScrollTo().assertExists()
+        reveal("local-evidence-mode").performClick()
+        reveal("local-evidence-picture").assertExists()
         compose.onNode(hasText("查看原文") and hasAnyAncestor(hasTestTag("local-evidence-picture")))
             .performScrollTo().performClick()
         compose.onNodeWithTag("original-text").assertTextContains(picture.originalText)
         compose.onNodeWithText("返回列表").performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.query=="needle"}
-        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-picture").fetchSemanticsNodes().isNotEmpty()}
+        reveal("local-evidence-picture")
         compose.onNodeWithTag("local-evidence-picture").assertExists()
     }
     @Test fun narrowDoubleFontEvidenceShowsExplicitNoEvidenceAndKeepsManualListReachable(){
         compose.setContent{Screen(true)}
-        compose.onNodeWithTag("original-search-query").performScrollTo().performTextReplacement("missing")
+        reveal("original-search-query").performTextReplacement("missing")
         await{it.stage==OriginalSearchStage.READY&&it.hits.isEmpty()}
-        val toggle=compose.onNodeWithTag("local-evidence-mode").performScrollTo().assertIsEnabled()
+        val toggle=reveal("local-evidence-mode").assertIsEnabled()
         assertTrue(toggle.getUnclippedBoundsInRoot().height>=48.dp);toggle.performClick()
-        compose.waitUntil(3_000){compose.onAllNodesWithText("没有可引用的证据").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithText("没有可引用的证据").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("local-evidence-mode").performScrollTo().performClick()
+        reveal(hasText("没有可引用的证据")).assertIsDisplayed()
+        reveal("local-evidence-mode").performClick()
         compose.onAllNodesWithTag("local-evidence-status").assertCountEquals(0)
         assertEquals("missing",results.get().input.query)
     }
     @Test fun localEvidenceRequiresExplicitSelectionAndReconfirmationAfterExclusion(){
         compose.setContent{Screen()}
-        compose.onNodeWithTag("original-search-query").performScrollTo().performTextReplacement("needle")
+        reveal("original-search-query").performTextReplacement("needle")
         await{it.stage==OriginalSearchStage.READY}
-        compose.onNodeWithTag("local-evidence-mode").performScrollTo().performClick()
-        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-confirm").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithTag("local-evidence-confirm").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithTag("local-evidence-select-picture").performScrollTo().assertIsOff().performClick().assertIsOn()
-        compose.onNodeWithTag("local-evidence-confirm").performScrollTo().assertIsEnabled().performClick()
-        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-confirmed").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithTag("local-evidence-select-picture").performScrollTo().performClick().assertIsOff()
+        reveal("local-evidence-mode").performClick()
+        reveal("local-evidence-confirm").assertIsNotEnabled()
+        reveal("local-evidence-select-picture").assertIsOff().performClick().assertIsOn()
+        reveal("local-evidence-confirm").assertIsEnabled().performClick()
+        reveal("local-evidence-confirmed")
+        reveal("local-evidence-select-picture").performClick().assertIsOff()
+        reveal("local-evidence-status")
         compose.onAllNodesWithTag("local-evidence-confirmed").assertCountEquals(0)
-        compose.onNodeWithTag("local-evidence-confirm").performScrollTo().assertIsNotEnabled()
+        reveal("local-evidence-confirm").assertIsNotEnabled()
     }
     @Test fun narrowDoubleFontLocalEvidenceSelectionAndConfirmationRemainReachable(){
         compose.setContent{Screen(true)}
-        compose.onNodeWithTag("original-search-query").performScrollTo().performTextReplacement("needle")
+        reveal("original-search-query").performTextReplacement("needle")
         await{it.stage==OriginalSearchStage.READY}
-        compose.onNodeWithTag("local-evidence-mode").performScrollTo().performClick()
-        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-select-picture").fetchSemanticsNodes().isNotEmpty()}
-        val checkbox=compose.onNodeWithTag("local-evidence-select-picture").performScrollTo().assertIsDisplayed()
+        reveal("local-evidence-mode").performClick()
+        val checkbox=reveal("local-evidence-select-picture").assertIsDisplayed()
         assertTrue(checkbox.getUnclippedBoundsInRoot().height>=48.dp);checkbox.performClick()
-        val confirm=compose.onNodeWithTag("local-evidence-confirm").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        val confirm=reveal("local-evidence-confirm").assertIsDisplayed().assertIsEnabled()
         assertTrue(confirm.getUnclippedBoundsInRoot().height>=48.dp);confirm.performClick()
-        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-confirmed").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithTag("local-evidence-confirmed").performScrollTo().assertIsDisplayed()
+        reveal("local-evidence-confirmed").assertIsDisplayed()
     }
 
     private fun selectPictureForAnswer(){
-        compose.onNodeWithTag("original-search-query").performScrollTo().performTextReplacement("needle")
+        reveal("original-search-query").performTextReplacement("needle")
         await{it.stage==OriginalSearchStage.READY}
-        compose.onNodeWithTag("local-evidence-mode").performScrollTo().performClick()
-        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-select-picture").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithTag("local-evidence-select-picture").performScrollTo().performClick()
-        compose.onNodeWithTag("local-evidence-confirm").performScrollTo().performClick()
-        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-evidence-confirmed").fetchSemanticsNodes().isNotEmpty()}
+        reveal("local-evidence-mode").performClick()
+        reveal("local-evidence-select-picture").performClick()
+        reveal("local-evidence-confirm").performClick()
+        reveal("local-evidence-confirmed")
     }
     @Test fun syntheticSelectedAnswerCitationsOpenOriginalAndReturningRequiresNewConfirmation(){
         val fixture=SyntheticEvidenceAnswerProvider { r -> LocalEvidenceAnswerResponse(r.id,r.packet.selectionId,
             r.packet.citations.map { LocalEvidenceAnswerParagraph("合成引用："+it.reference.quote,listOf(it.reference)) }) }
         compose.setContent{Screen(fixture=fixture)};selectPictureForAnswer()
-        compose.onNodeWithTag("local-answer-ask").performScrollTo().performClick()
-        compose.waitUntil(3_000){compose.onAllNodesWithTag("local-answer-paragraph-0").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithTag("local-answer-paragraph-0").performScrollTo().assertTextContains(picture.originalText)
+        reveal("local-answer-ask").performClick()
+        reveal("local-answer-paragraph-0").assertTextContains(picture.originalText)
         compose.onNode(hasText("查看原文") and hasAnyAncestor(hasTestTag("local-answer-source-0-picture")))
             .performScrollTo().performClick()
         compose.onNodeWithTag("original-text").assertTextContains(picture.originalText)
@@ -203,25 +218,24 @@ class CurrentImageSearchPresentationTest {
     @Test fun narrowDoubleFontSyntheticNoEvidenceKeepsOriginalCardsAndNeverInventsAnswer(){
         val fixture=SyntheticEvidenceAnswerProvider { r -> LocalEvidenceAnswerResponse(r.id,r.packet.selectionId,noEvidence=true) }
         compose.setContent{Screen(true,fixture)};selectPictureForAnswer()
-        val ask=compose.onNodeWithTag("local-answer-ask").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        val ask=reveal("local-answer-ask").assertIsDisplayed().assertIsEnabled()
         assertTrue(ask.getUnclippedBoundsInRoot().height>=48.dp);ask.performClick()
-        compose.waitUntil(3_000){compose.onAllNodesWithText("选定出处不足以回答").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithText("选定出处不足以回答").performScrollTo().assertIsDisplayed()
+        reveal(hasText("选定出处不足以回答")).assertIsDisplayed()
         compose.onAllNodesWithTag("local-answer-paragraph-0").assertCountEquals(0)
-        compose.onNodeWithTag("local-evidence-picture").performScrollTo().assertIsDisplayed()
+        reveal("local-evidence-picture").assertIsDisplayed()
     }
     @Test fun syntheticAnswerStopCancelsRequestAndSuppressesLateText(){
         val request=AtomicReference<LocalEvidenceAnswerRequest>()
         val reply=kotlinx.coroutines.CompletableDeferred<LocalEvidenceAnswerResponse>()
         val fixture=SyntheticEvidenceAnswerProvider { r -> request.set(r);reply.await() }
         compose.setContent{Screen(fixture=fixture)};selectPictureForAnswer()
-        compose.onNodeWithTag("local-answer-ask").performScrollTo().performClick()
+        reveal("local-answer-ask").performClick()
         compose.waitUntil(3_000){request.get()!=null}
-        compose.onNodeWithTag("local-answer-stop").performScrollTo().performClick()
+        reveal("local-answer-stop").performClick()
         compose.waitUntil(3_000){request.get().cancelled}
         val r=request.get();reply.complete(LocalEvidenceAnswerResponse(r.id,r.packet.selectionId,
             listOf(LocalEvidenceAnswerParagraph("合成迟到响应",listOf(r.packet.citations[0].reference)))))
-        compose.onNodeWithText("回答已停止").performScrollTo().assertIsDisplayed()
+        reveal(hasText("回答已停止")).assertIsDisplayed()
         compose.onAllNodesWithTag("local-answer-paragraph-0").assertCountEquals(0)
     }
 

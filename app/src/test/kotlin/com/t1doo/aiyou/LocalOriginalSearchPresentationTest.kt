@@ -141,6 +141,7 @@ class LocalOriginalSearchPresentationTest {
         val found = ready(exact)
         assertEquals(OriginalSearchMode.EXACT, found.state.input.mode); assertEquals(listOf("one"), found.state.hits.map { it.entry.id })
         assertEquals(full, found.state.hits.single().quote)
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"))
         compose.onNodeWithText(found.state.hits.single().excerpt).performScrollTo().assertIsDisplayed()
         openCard("one"); assertEquals(full, fullText())
         compose.onNodeWithText("返回列表").performClick(); ready(exact)

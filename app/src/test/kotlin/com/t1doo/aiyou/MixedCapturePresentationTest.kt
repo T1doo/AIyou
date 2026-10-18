@@ -43,6 +43,11 @@ class MixedCapturePresentationTest {
         }
     }
     private fun click(tag:String) { compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag(tag));compose.onNodeWithTag(tag).assertIsDisplayed().assertIsEnabled().performClick() }
+    private fun openRecent(id:String) {
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("entry-$id"))
+        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-$id")))
+            .performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
+    }
     private fun drain(){compose.runOnIdle { runBlocking { while(f.queue.isNotEmpty())f.queue.removeFirst()(f.store) } }}
     private fun add() { click("mixed-add");compose.runOnIdle { val s=f.ui.selection!!;if(!s.launched)f.c.claimPicker(s.requestId);f.c.selected(s.requestId,Source()) };drain() }
     @Test fun actualNowPurePictureHasThumbnailCountRemovalAndSeparateDurableSaveAtLargeFont() {
@@ -54,7 +59,7 @@ class MixedCapturePresentationTest {
         click("mixed-save");compose.runOnIdle { assertEquals(0,f.saves) };drain()
         compose.runOnIdle { assertEquals(1,f.saves);assertEquals("",f.local.value.entries.single().originalText);assertTrue(f.ui.draft!!.images.isEmpty()) }
         val saved=f.local.value.entries.single().id
-        click("entry-$saved")
+        openRecent(saved)
         compose.onNodeWithText("记录原文").assertExists()
         compose.onNodeWithText("图片记录 · 无文字正文；请打开附件查看原图。").assertExists()
         compose.onNodeWithText("返回列表").performClick()
@@ -89,7 +94,7 @@ class MixedCapturePresentationTest {
         assertEquals(0f,compose.onNodeWithTag("mixed-list").fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value(),0f)
         compose.onNodeWithTag("mixed-jump-composer").assertHeightIsAtLeast(48.dp).performClick()
         compose.onNodeWithTag("mixed-text").performTextInput("下一份合成草稿");drain()
-        val id=f.local.value.entries.single().id;click("entry-$id")
+        val id=f.local.value.entries.single().id;openRecent(id)
         compose.onNodeWithTag("original-text").assertTextContains("合成今天可直接阅读的原文")
         compose.onNodeWithText("返回列表").performClick()
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
