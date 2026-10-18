@@ -138,7 +138,7 @@ class CurrentImageSearchPresentationTest {
         compose.waitUntil(3_000){grid.state.value.tiles[picture.id]?.failed==true}
         compose.onNodeWithTag("image-grid-failed-picture",useUnmergedTree=true).assertExists()
         compose.onNodeWithTag("image-grid-entry-picture").performClick()
-        compose.onNodeWithTag("original-text",useUnmergedTree=true).assertTextContains(picture.originalText)
+        awaitOriginalPicture()
     }
     @Test fun narrowDoubleFontGridToggleAndFailureCardRemainReachableAndClearReturnsToList(){
         compose.setContent{Screen(true)}
@@ -226,7 +226,7 @@ class CurrentImageSearchPresentationTest {
         reveal("local-evidence-confirmed")
     }
     private fun awaitOriginalPicture(){
-        // SQL-backed search.open publishes navigation asynchronously. Wait for
+        // search.open publishes owned navigation asynchronously. Wait for
         // its actual unmerged Text, then retain the complete original assertion.
         compose.waitUntil(3_000){compose.onAllNodesWithTag("original-text",useUnmergedTree=true).fetchSemanticsNodes().size==1}
         compose.onNodeWithTag("original-text",useUnmergedTree=true).assertTextContains(picture.originalText)

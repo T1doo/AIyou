@@ -92,6 +92,7 @@ def main():
     scope.add_argument('--ui-failures-only', action='store_true', help='Individually run the four actual failed methods from full D01 run39101762817')
     scope.add_argument('--date-retry-only', action='store_true', help='Run only the remaining actual event-date retry failure')
     scope.add_argument('--recycle-only', action='store_true', help='Run only the actual remaining lazy recycle navigation failure from run39105360059')
+    scope.add_argument('--grid-only', action='store_true', help='Run only the actual remaining asynchronous grid navigation failure from run39109514461')
     args = parser.parse_args()
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise SystemExit('Single-method Compose reproduction requires the existing licensed CI toolchain')
@@ -114,6 +115,8 @@ def main():
         report['scope'] = 'one remaining event-date retry method only; previously passing image/stale/date-layout controls NOT RUN; not full UI/device acceptance'
     if args.recycle_only:
         report['scope'] = 'one actual remaining recycle navigation method from run39105360059 only; other controlled methods NOT RUN; not full UI/device acceptance'
+    if args.grid_only:
+        report['scope'] = 'one actual grid navigation method from run39109514461 only; other controls NOT RUN; not full UI/device acceptance'
     source = ROOT / SOURCE
     fixed = source.read_bytes()
     baseline = (ROOT / 'checks/ui-lazy-repro/CurrentImageSearchPresentationTest.kt.source').read_bytes()
@@ -142,6 +145,8 @@ def main():
             plan = [('date-filter-retry', fixed, DATE_CASE, 'eventDateBasisCombinesKeywordTagFavoriteAndNeverMatchesUnknownCaptureDate', 'green')]
         if args.recycle_only:
             plan = [('recycle-lazy-navigation', fixed, RECYCLE_CASE, 'actualMoveAndExplicitRestoreKeepFullOriginalTagsAndRequireEachConfirmation', 'green')]
+        if args.grid_only:
+            plan = [('grid-source-navigation', fixed, CASE, 'gridRequiresExplicitToggleKeepsFailureCardAndOpensOriginalSource', 'green')]
         for label, raw, case, method, expectation in plan:
             if args.date_only and not label.startswith('date-'):
                 continue
