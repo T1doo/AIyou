@@ -61,9 +61,9 @@ class CurrentImageSearchPresentationTest {
         override fun onResults(state:OriginalSearchState,open:(OriginalSearchHit)->Unit){results.set(state)}
         override fun onDiagnostics(value:String){diagnostics.set(value)}
     }
-    @Composable private fun Screen(large:Boolean=false,fixture:SyntheticEvidenceAnswerProvider?=null){
+    @Composable private fun Screen(large:Boolean=false,fixture:SyntheticEvidenceAnswerProvider?=null,observe:Boolean=true){
         val density=LocalDensity.current
-        CompositionLocalProvider(LocalOriginalSearchObserver provides observer,
+        CompositionLocalProvider(LocalOriginalSearchObserver provides if(observe)observer else null,
             LocalDensity provides if(large)Density(density.density,2f)else density){
             AIyouTheme{Box(if(large)Modifier.size(320.dp,640.dp)else Modifier){
                 AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},imageGrid=grid,evidenceAnswerFixture=fixture)
@@ -167,6 +167,18 @@ class CurrentImageSearchPresentationTest {
         await{it.stage==OriginalSearchStage.READY&&it.input.query=="needle"}
         reveal("local-evidence-picture")
         compose.onNodeWithTag("local-evidence-picture").assertExists()
+    }
+    @Test fun evidenceModeStartsAfterReadySearchWithoutAnyTestObserver(){
+        compose.setContent{Screen(observe=false)}
+        reveal("original-search-query").performTextReplacement("needle")
+        reveal(hasText("找到 2 条原文")).assertIsDisplayed()
+        reveal("local-evidence-mode").performClick()
+        reveal("local-evidence-picture").assertIsDisplayed()
+        reveal("local-evidence-mode").performClick()
+        reveal("local-evidence-mode").assertTextContains("为当前问题选取本机出处候选")
+        reveal("original-search-query").assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.EditableText, androidx.compose.ui.text.AnnotatedString("needle")))
+        compose.onAllNodesWithTag("local-evidence-status").assertCountEquals(0)
     }
     @Test fun narrowDoubleFontEvidenceShowsExplicitNoEvidenceAndKeepsManualListReachable(){
         compose.setContent{Screen(true)}

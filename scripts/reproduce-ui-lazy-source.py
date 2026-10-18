@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = Path('app/src/test/kotlin/com/t1doo/aiyou/CurrentImageSearchPresentationTest.kt')
 CASE = 'com.t1doo.aiyou.CurrentImageSearchPresentationTest'
 METHOD = 'localEvidenceCardsUseCurrentSourceAndReturnWithoutChangingQuestion'
+UNOBSERVED_METHOD = 'evidenceModeStartsAfterReadySearchWithoutAnyTestObserver'
 BASELINE_SHA = '63db4d52c998ae65cf82c1b44bed6798cb11b1038e044a321b4285e569a8e2f7'
 DATE_CASE = 'com.t1doo.aiyou.RecordEventDatePresentationTest'
 DATE_METHOD = 'narrowDoubleFontManualSetCorrectionAndClearEachRequireVisiblePreview'
@@ -97,7 +98,7 @@ def main():
     subprocess.run([sys.executable, 'scripts/check-sdk.py'], cwd=ROOT, check=True)
     output = ROOT / 'app/build/reports/ui-lazy-repro'
     output.mkdir(parents=True, exist_ok=False)
-    report = {'status': 'FAIL', 'head': head, 'scope': 'one method per isolated Compose JVM invocation; original/current evidence control and independent date diagnosis; no device/Room/SQLCipher acceptance',
+    report = {'status': 'FAIL', 'head': head, 'scope': 'one method per isolated Compose JVM invocation; original/current evidence controls, observer-free mode and independent date diagnosis; no device/Room/SQLCipher acceptance',
               'baseline_head': '269d62babac3795e61b1efe620a01c1751cd6b64', 'baseline_sha256': BASELINE_SHA, 'phases': []}
     source = ROOT / SOURCE
     fixed = source.read_bytes()
@@ -113,6 +114,7 @@ def main():
         for label, raw, case, method, expectation in [
                 ('red', baseline, CASE, METHOD, 'red'),
                 ('green', fixed, CASE, METHOD, 'green'),
+                ('mode-no-observer', fixed, CASE, UNOBSERVED_METHOD, 'green'),
                 ('date-independent', fixed, DATE_CASE, DATE_METHOD, 'green')]:
             source.write_bytes(raw)
             started = time.time_ns()

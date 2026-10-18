@@ -570,7 +570,7 @@ fun AIyouApp(
     }
     val openSearchResult: (com.t1doo.aiyou.records.OriginalSearchHit) -> Unit = { openSearchResultAt(it) }
     LocalOriginalSearchObserver.current?.let { observer ->
-        val observedEvidenceMode = evidenceMode
+        val observedEvidenceMode = evidenceEnabled
         val observedEvidenceStage = evidenceState.stage
         SideEffect {
             observer.onResults(searchState, openSearchResult)
