@@ -57,7 +57,12 @@ class RecycleBinPresentationTest {
         openOriginal()
         compose.onNodeWithTag("original-recycle-move").assertIsDisplayed().assertIsEnabled().performClick(); pump()
     }
-    private fun browse() { compose.onNodeWithTag("recycle-open").performScrollTo().performClick(); pump() }
+    private fun browse() {
+        // After deleting the visible row, the remembered timeline can keep its
+        // header offscreen. Compose that lazy item before looking up its node.
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("recycle-open"))
+        compose.onNodeWithTag("recycle-open").assertIsDisplayed().performClick(); pump()
+    }
     @Test fun actualMoveAndExplicitRestoreKeepFullOriginalTagsAndRequireEachConfirmation() {
         content(); moveDialog(); compose.onNodeWithText("移入回收站？").assertExists()
         compose.onNodeWithText("已经导出、另存或发给服务商的数据无法通过本次操作撤回。").performScrollTo().assertExists()
@@ -77,7 +82,8 @@ class RecycleBinPresentationTest {
         compose.onNodeWithTag("recycle-notice").assertTextEquals("已恢复到本机列表；不参与 AI，旧远端授权未恢复。")
         compose.runOnIdle { assertFalse(f.deleted); assertEquals(ProcessingPolicy.AI_NONE, f.state.value.entries.single().policy)
             assertEquals(2, f.applied.size); navigation.get().selectDestination(Destination.MEMORIES) }
-        compose.onNodeWithTag("entry-one").performScrollTo().assertExists()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"))
+        compose.onNodeWithTag("entry-one").assertIsDisplayed()
         assertEquals(listOf("合成私密标签"), f.state.value.manualTags.getValue("one").names)
     }
     @Test fun loadingEmptyAndFailedReadsAreDistinctAndNeverExposeStaleTrashBody() {

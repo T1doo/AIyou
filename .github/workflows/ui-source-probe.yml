@@ -37,10 +37,10 @@ jobs:
             python3 "scripts/verify-$kind-schema.py" --verify
           done
           python3 scripts/inspect-record-ai-permissions.py
-      - name: Run only the remaining actual event-date retry method
+      - name: Run only the actual remaining lazy recycle navigation method
         env:
           AIYOU_CI_ANDROID_DAEMON: 'true'
-        run: python3 scripts/reproduce-ui-lazy-source.py --expected-head "$GITHUB_SHA" --date-retry-only
+        run: python3 scripts/reproduce-ui-lazy-source.py --expected-head "$GITHUB_SHA" --recycle-only
       - name: Preserve exact isolated method reports even on failure
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

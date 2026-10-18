@@ -22,6 +22,7 @@ METHOD = 'localEvidenceCardsUseCurrentSourceAndReturnWithoutChangingQuestion'
 UNOBSERVED_METHOD = 'evidenceModeStartsAfterReadySearchWithoutAnyTestObserver'
 BASELINE_SHA = '63db4d52c998ae65cf82c1b44bed6798cb11b1038e044a321b4285e569a8e2f7'
 DATE_CASE = 'com.t1doo.aiyou.RecordEventDatePresentationTest'
+RECYCLE_CASE = 'com.t1doo.aiyou.RecycleBinPresentationTest'
 DATE_METHOD = 'narrowDoubleFontManualSetCorrectionAndClearEachRequireVisiblePreview'
 
 
@@ -90,6 +91,7 @@ def main():
     scope.add_argument('--date-only', action='store_true', help='Diagnose date sublayers without repeating already verified evidence controls')
     scope.add_argument('--ui-failures-only', action='store_true', help='Individually run the four actual failed methods from full D01 run39101762817')
     scope.add_argument('--date-retry-only', action='store_true', help='Run only the remaining actual event-date retry failure')
+    scope.add_argument('--recycle-only', action='store_true', help='Run only the actual remaining lazy recycle navigation failure from run39105360059')
     args = parser.parse_args()
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise SystemExit('Single-method Compose reproduction requires the existing licensed CI toolchain')
@@ -110,6 +112,8 @@ def main():
         report['scope'] = 'four actual failed UI methods from run39101762817 only, one requested method per isolated Compose JVM; not the full UI gate or device acceptance'
     if args.date_retry_only:
         report['scope'] = 'one remaining event-date retry method only; previously passing image/stale/date-layout controls NOT RUN; not full UI/device acceptance'
+    if args.recycle_only:
+        report['scope'] = 'one actual remaining recycle navigation method from run39105360059 only; other controlled methods NOT RUN; not full UI/device acceptance'
     source = ROOT / SOURCE
     fixed = source.read_bytes()
     baseline = (ROOT / 'checks/ui-lazy-repro/CurrentImageSearchPresentationTest.kt.source').read_bytes()
@@ -136,6 +140,8 @@ def main():
                 ('date-stale-confirm', fixed, DATE_CASE, 'uncertainSaveRetainsSameIntentAndStaleConfirmCannotWriteAfterNavigation', 'green')]
         if args.date_retry_only:
             plan = [('date-filter-retry', fixed, DATE_CASE, 'eventDateBasisCombinesKeywordTagFavoriteAndNeverMatchesUnknownCaptureDate', 'green')]
+        if args.recycle_only:
+            plan = [('recycle-lazy-navigation', fixed, RECYCLE_CASE, 'actualMoveAndExplicitRestoreKeepFullOriginalTagsAndRequireEachConfirmation', 'green')]
         for label, raw, case, method, expectation in plan:
             if args.date_only and not label.startswith('date-'):
                 continue
@@ -146,7 +152,9 @@ def main():
             with (output / (label + '.stdout.log')).open('xb') as stdout, \
                     (output / (label + '.stderr.log')).open('xb') as stderr:
                 process = subprocess.run(command, cwd=ROOT, stdout=stdout, stderr=stderr)
-            test_source = SOURCE if case == CASE else Path('app/src/test/kotlin/com/t1doo/aiyou/RecordEventDatePresentationTest.kt')
+            test_source = {CASE: SOURCE,
+                           DATE_CASE: Path('app/src/test/kotlin/com/t1doo/aiyou/RecordEventDatePresentationTest.kt'),
+                           RECYCLE_CASE: Path('app/src/test/kotlin/com/t1doo/aiyou/RecycleBinPresentationTest.kt')}[case]
             state = {'label': label, 'command': command, 'exit': process.returncode,
                      'overlay_source_sha256': digest(raw), 'test_source': str(test_source),
                      'test_source_sha256': digest((ROOT / test_source).read_bytes())}
