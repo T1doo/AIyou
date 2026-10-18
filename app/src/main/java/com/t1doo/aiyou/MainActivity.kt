@@ -318,6 +318,7 @@ fun AIyouApp(
     var taskSourceRoute by remember { mutableStateOf(false) }
     DisposableEffect(factRecaps) { onDispose { factRecaps?.close() } }
     val currentLocal by rememberUpdatedState(local)
+    val currentDisplay by rememberUpdatedState(display)
     val currentRecordsProvider by rememberUpdatedState(currentRecords)
     // Construct directly: rememberTextFieldState has a Saver and would put the query in Bundle.
     var searchQuery by remember { mutableStateOf(TextFieldState()) }
@@ -935,7 +936,7 @@ fun AIyouApp(
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
                 onOpenFactRecap = factRecaps?.let { controller -> { if(ownsNavigation() && selected==Destination.MEMORIES && !reading && !showSettings && !demo) {
-                    navigation.advance();clearSearch();controller.open();recapRoute=true
+                    navigation.advance();clearSearch();controller.open(currentDisplay.preferences.defaultRecapPeriod);recapRoute=true
                 } } },
                 onBeginRecordPackage = recordPackages?.let { controller -> { if (ownsNavigation() &&
                     selectedName == Destination.MEMORIES.name && detailEntryId == null && !showSettings && !demo) {

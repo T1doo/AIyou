@@ -14,9 +14,16 @@ import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.records.*
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.ui.Destination
+import com.t1doo.aiyou.ui.UiPreferences
+import com.t1doo.aiyou.ui.UiPreferencesState
+import com.t1doo.aiyou.ui.UiPreferencesViewModel
+import com.t1doo.aiyou.ui.FileUiPreferences
 import java.time.*
 import java.util.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
+import java.io.File
+import org.junit.rules.TemporaryFolder
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -31,11 +38,15 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class FactRecapPresentationTest {
     @get:Rule val compose=createComposeRule()
+    @get:Rule val temporary=TemporaryFolder()
     private val f=Fixture();private var registry:SaveableStateRegistry?=null
-    private fun content() {compose.setContent {
+    private val display=mutableStateOf(UiPreferencesState(UiPreferences(showCompanion=false,reduceMotion=true),ready=true))
+    private fun content(preferences: UiPreferencesViewModel?=null) {compose.setContent {
         registry=LocalSaveableStateRegistry.current;val d=LocalDensity.current
+        val confirmed=preferences?.state?.collectAsState()?.value ?: display.value
         CompositionLocalProvider(LocalDensity provides Density(d.density,2f)) {
             AIyouTheme {AIyouApp(previewDestination=Destination.MEMORIES,local=f.local.value,factRecaps=f.c,attachments=f.attachments,
+                display=confirmed,onDisplayChange={preferences?.change(it)},onRetryDisplay={preferences?.retry()},
                 onOpenTags=f.tags::open,onTagClose=f.tags::close)}
         }
     }}
@@ -43,6 +54,48 @@ class FactRecapPresentationTest {
     private fun open(){compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("recap-open"));compose.onNodeWithTag("recap-open").performClick()}
     private fun drain(){compose.runOnIdle {runBlocking {while(f.queue.isNotEmpty())f.queue.removeFirst()(f.store)}}}
     private fun generate(){click("recap-generate");drain()}
+    @Test fun actualSettingsPersistWeekAndOpenedRangeKeepsItsOwnChoiceBeforeExplicitGeneration() {
+        val file=File(temporary.newFolder(),"preferences")
+        FileUiPreferences(file).write(UiPreferences(false,true))
+        val preferences=UiPreferencesViewModel(org.robolectric.RuntimeEnvironment.getApplication(),FileUiPreferences(file),Dispatchers.Unconfined)
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        content(preferences);compose.onNodeWithText("设置").performClick()
+        val week=compose.onNodeWithTag("recap-default-week").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        val retiredWeek=week.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!!
+        week.assertHeightIsAtLeast(48.dp).performClick();week.assertIsSelected()
+        compose.runOnIdle {assertEquals(UiPreferences(false,true,FactRecapPeriod.WEEK),FileUiPreferences(file).read())}
+        compose.onNodeWithText("返回").performClick();open()
+        compose.runOnIdle {assertEquals(FactRecapPeriod.WEEK,f.local.value.factRecap!!.period);assertNull(f.local.value.factRecap!!.snapshot);assertTrue(f.queue.isEmpty())}
+        compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag("recap-range-preview"))
+        compose.onNodeWithTag("recap-range-preview").assertTextContains("2026-10-12",substring=true).assertTextContains("2026-10-19",substring=true)
+        // A later confirmed preference is for the next open; it never rewrites this range or result.
+        compose.runOnIdle {preferences.change(preferences.state.value.preferences.copy(defaultRecapPeriod=FactRecapPeriod.DAY))}
+        compose.runOnIdle {retiredWeek();assertEquals(FactRecapPeriod.DAY,FileUiPreferences(file).read().defaultRecapPeriod)}
+        compose.runOnIdle {assertEquals(FactRecapPeriod.WEEK,f.local.value.factRecap!!.period);assertTrue(f.queue.isEmpty())}
+        generate();compose.runOnIdle {assertEquals(FactRecapPeriod.WEEK,f.local.value.factRecap!!.snapshot!!.range.period)}
+        compose.runOnIdle {preferences.change(preferences.state.value.preferences.copy(defaultRecapPeriod=FactRecapPeriod.WEEK))}
+        click("recap-day");compose.runOnIdle {
+            assertEquals(FactRecapPeriod.DAY,f.local.value.factRecap!!.period);assertNull(f.local.value.factRecap!!.snapshot)
+            assertEquals(FactRecapPeriod.WEEK,FileUiPreferences(file).read().defaultRecapPeriod)
+        }
+        compose.onNodeWithText("返回回忆").performClick();open()
+        compose.runOnIdle {assertEquals(FactRecapPeriod.WEEK,f.local.value.factRecap!!.period);assertTrue(f.queue.isEmpty())}
+    }
+    @Test fun latePreferenceReadDoesNotRewriteOpenDayAndRetainedOpenUsesLatestConfirmedDefault() {
+        display.value=UiPreferencesState()
+        content();compose.onNodeWithText("设置").performClick()
+        compose.onNodeWithTag("recap-default-week").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("recap-default-day").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("返回").performClick();open()
+        compose.runOnIdle {display.value=UiPreferencesState(UiPreferences(false,true,FactRecapPeriod.WEEK),ready=true)}
+        compose.runOnIdle {assertEquals(FactRecapPeriod.DAY,f.local.value.factRecap!!.period);assertNull(f.local.value.factRecap!!.snapshot);assertTrue(f.queue.isEmpty())}
+        compose.onNodeWithText("返回回忆").performClick()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("recap-open"))
+        val retained=compose.onNodeWithTag("recap-open").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!!
+        compose.runOnIdle {display.value=display.value.copy(preferences=display.value.preferences.copy(defaultRecapPeriod=FactRecapPeriod.DAY))}
+        compose.runOnIdle {retained()}
+        compose.runOnIdle {assertEquals(FactRecapPeriod.DAY,f.local.value.factRecap!!.period);assertTrue(f.queue.isEmpty())}
+    }
     @Test fun actualNarrowDoubleFontRouteShowsOriginalExcerptThenFullTextAndReturnsToSameCard() {
         content();open();generate();val id=f.records[5].id
         compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag("recap-source:$id"))

@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.AtomicFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.t1doo.aiyou.model.FactRecapPeriod
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -15,8 +16,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Ordinary display choices only; never records, consent, provider credentials or keys. */
-data class UiPreferences(val showCompanion: Boolean = true, val reduceMotion: Boolean = false)
+/** Ordinary display and initial-view choices; never records, consent, credentials or keys. */
+data class UiPreferences(val showCompanion: Boolean = true, val reduceMotion: Boolean = false,
+    val defaultRecapPeriod: FactRecapPeriod = FactRecapPeriod.DAY)
 
 data class UiPreferencesState(
     val preferences: UiPreferences = UiPreferences(showCompanion = false, reduceMotion = true),
@@ -39,13 +41,16 @@ internal class FileUiPreferences(private val file: File) : UiPreferencesStorage 
             throw failure
         }
         val value = bytes.toString(Charsets.US_ASCII)
-        return when (value) {
-            encode(UiPreferences(true, true)) -> UiPreferences(true, true)
-            encode(UiPreferences(true, false)) -> UiPreferences(true, false)
-            encode(UiPreferences(false, true)) -> UiPreferences(false, true)
-            encode(UiPreferences(false, false)) -> UiPreferences(false, false)
-            else -> throw IOException("Invalid display preferences")
+        for (companion in listOf(false, true)) for (motion in listOf(false, true)) {
+            val legacy = UiPreferences(companion, motion)
+            // Reading a v1 file neither migrates it nor changes either existing display choice.
+            if (value == "AIyou display v1\n$companion\n$motion\n") return legacy
+            for (period in FactRecapPeriod.entries) {
+                val candidate = legacy.copy(defaultRecapPeriod = period)
+                if (value == encode(candidate)) return candidate
+            }
         }
+        throw IOException("Invalid UI preferences")
     }
 
     override fun write(value: UiPreferences) {
@@ -61,10 +66,10 @@ internal class FileUiPreferences(private val file: File) : UiPreferencesStorage 
             throw failure
         }
         // AtomicFile can log a failed rename; never report success without readback.
-        if (read() != value) throw IOException("Display preferences not confirmed")
+        if (read() != value) throw IOException("UI preferences not confirmed")
     }
 
-    private fun encode(value: UiPreferences) = "AIyou display v1\n${value.showCompanion}\n${value.reduceMotion}\n"
+    private fun encode(value: UiPreferences) = "AIyou display v2\n${value.showCompanion}\n${value.reduceMotion}\n${value.defaultRecapPeriod.name}\n"
 }
 
 class UiPreferencesViewModel internal constructor(
@@ -89,7 +94,7 @@ class UiPreferencesViewModel internal constructor(
                 mutableState.value = UiPreferencesState(value, ready = true)
             } catch (failure: CancellationException) { throw failure }
             catch (_: Exception) {
-                mutableState.value = mutableState.value.copy(busy = false, error = "显示设置暂不可读取，轻触重试。")
+                mutableState.value = mutableState.value.copy(busy = false, error = "偏好设置暂不可读取，轻触重试。")
             }
         }
     }

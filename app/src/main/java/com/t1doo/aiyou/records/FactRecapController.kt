@@ -11,6 +11,12 @@ data class FactRecapUiState(val date: String="",val zone: String="UTC",val perio
     override fun toString()="FactRecapUiState(loading=$loading, redacted)"
 }
 
+/** One interpretation shared by the pre-generation preview and the actual request. */
+internal fun FactRecapUiState.requestedRange(): FactRecapRange {
+    require(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(date))
+    return FactRecapRange(LocalDate.parse(date), period, zone)
+}
+
 /** Explicit user requests on the existing records IO actor; nothing scheduled or persisted. */
 class FactRecapController internal constructor(private val current: ()->LocalRecordUiState,
     private val publish: ((LocalRecordUiState)->LocalRecordUiState)->Unit,
@@ -21,7 +27,12 @@ class FactRecapController internal constructor(private val current: ()->LocalRec
     private fun ui()=current().factRecap
     private fun available()=!disposed && current().let { it.ready && !it.opening && it.error==null && it.supportsFactRecaps && (!it.supportsLocalProcessing || it.localProcessingAvailable) }
     private fun change(action:(FactRecapUiState)->FactRecapUiState)=publish { if(disposed) it else it.copy(factRecap=action(it.factRecap ?: FactRecapUiState())) }
-    fun open():Unit=synchronized(ownershipGate) { if(!available()) return;generation.incrementAndGet();change { FactRecapUiState(LocalDate.now(clock).toString(),clock.zone.id) } }
+    fun open(defaultPeriod: FactRecapPeriod = FactRecapPeriod.DAY):Unit=synchronized(ownershipGate) {
+        if(!available()) return
+        generation.incrementAndGet()
+        // Copy the confirmed preference once. Later preference reads/writes never mutate this request.
+        change { FactRecapUiState(LocalDate.now(clock).toString(),clock.zone.id,defaultPeriod) }
+    }
     fun input(date: String,zone: String,period: FactRecapPeriod):Unit=synchronized(ownershipGate) {
         if(ui()==null || date.length>10 || zone.length>64) return
         generation.incrementAndGet();change { it.copy(date=date,zone=zone,period=period,loading=false,snapshot=null,error=null) }
@@ -44,7 +55,7 @@ class FactRecapController internal constructor(private val current: ()->LocalRec
     fun generate() {
         val (token,range)=synchronized(ownershipGate) {
             val u=ui() ?: return;if(!available() || u.loading) return
-            val range=try { require(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(u.date));FactRecapRange(LocalDate.parse(u.date),u.period,u.zone) }
+            val range=try { u.requestedRange() }
                 catch(_:Exception){change { it.copy(snapshot=null,error="请填写 1900–2100 年的有效日期和时区，例如 Asia/Shanghai 或 UTC。") };return}
             val token=generation.incrementAndGet();change { it.copy(loading=true,snapshot=null,error=null) };token to range
         }

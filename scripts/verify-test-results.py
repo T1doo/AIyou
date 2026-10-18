@@ -229,6 +229,8 @@ for label, folder, minimum in targets:
             "lostClearAckHasReachableSameClearRetryAndCannotPromiseContinuedEditingBeforeVerification",
         )
         additional["com.t1doo.aiyou.FactRecapPresentationTest"] = (
+            "actualSettingsPersistWeekAndOpenedRangeKeepsItsOwnChoiceBeforeExplicitGeneration",
+            "latePreferenceReadDoesNotRewriteOpenDayAndRetainedOpenUsesLatestConfirmedDefault",
             "actualNarrowDoubleFontRouteShowsOriginalExcerptThenFullTextAndReturnsToSameCard",
             "pureImageCardOpensExactVersionAttachmentAndReturnsWithoutInventingText",
             "failedReadRetryCancelAndChangedSourceHidePrivateResultsAndRejectRetainedClick",
@@ -329,6 +331,10 @@ for label, folder, minimum in targets:
             "shortNarrowDoubleFontTasksScrollAndSettingsReturnWithoutChangingDraft",
             "shortLandscapeKeepsTaskStatusNavigationAndSettingsReachable")
         additional["com.t1doo.aiyou.UiPreferencesTest"] = (
+            "confirmedRecapWeekSurvivesNewStorageAndViewModelAndKeepsDisplayChoices",
+            "legacyDisplayBytesDefaultToDayAndAreUntouchedUntilExplicitPreferenceSave",
+            "failedRecapSaveKeepsConfirmedPeriodAndRetryConfirmsOnlyRequestedChoice",
+            "unknownOrIncompleteRecapPreferenceIsPreservedAndCannotBeOverwritten",
             "bothDisplayChoicesSurviveNewStorageAndViewModelInstances",
             "failedWriteKeepsConfirmedValuesAndRetryPersistsTheRequestedChoice",
             "corruptPreferencesArePreservedAndNeverFlashTheCompanion")

@@ -221,6 +221,41 @@ jobs:
           PY
           scripts/gradle.sh :app:testDebugUnitTest
           python3 scripts/verify-test-results.py --ui
+          # Preserve the affected classes from this actual full-suite execution; do not rerun them.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, shutil, xml.etree.ElementTree as ET
+          required = {
+              'com.t1doo.aiyou.UiPreferencesTest': {
+                  'confirmedRecapWeekSurvivesNewStorageAndViewModelAndKeepsDisplayChoices',
+                  'legacyDisplayBytesDefaultToDayAndAreUntouchedUntilExplicitPreferenceSave',
+                  'failedRecapSaveKeepsConfirmedPeriodAndRetryConfirmsOnlyRequestedChoice',
+                  'unknownOrIncompleteRecapPreferenceIsPreservedAndCannotBeOverwritten'},
+              'com.t1doo.aiyou.FactRecapPresentationTest': {
+                  'actualSettingsPersistWeekAndOpenedRangeKeepsItsOwnChoiceBeforeExplicitGeneration',
+                  'latePreferenceReadDoesNotRewriteOpenDayAndRetainedOpenUsesLatestConfirmedDefault'}}
+          target = Path('app/build/reports/recap-preferences-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          observed, receipts = [], []
+          for name, methods in required.items():
+              source = Path('app/build/test-results/testDebugUnitTest') / ('TEST-' + name + '.xml')
+              raw = source.read_bytes()
+              suite = ET.fromstring(raw)
+              cases = list(suite.iter('testcase'))
+              assert int(suite.get('tests', '-1')) == len(cases)
+              assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
+              assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
+              assert all(case.get('classname') == name for case in cases)
+              assert methods <= {case.get('name') for case in cases}
+              observed.extend((case.get('classname'), case.get('name')) for case in cases)
+              shutil.copy2(source, target / source.name)
+              receipts.append({'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+          assert len(observed) == len(set(observed)) == 13
+          receipt = {'tests': 13, 'new_cases': 6, 'failures': 0, 'errors': 0, 'skipped': 0,
+                     'source': 'subset of actual full app suite, no second execution', 'xml': receipts}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('RECAP_PREFERENCES_TARGETED_XML_JSON ' + json.dumps(receipt))
+          PY
       - name: Compile actual D02 native-storage instrumentation APK without claiming execution
         env:
           AIYOU_CI_ANDROID_DAEMON: 'true'
@@ -314,6 +349,7 @@ jobs:
             app/build/reports/capture-policy-targeted/
             app/build/reports/search-highlight-targeted/
             app/build/reports/app-access-targeted/
+            app/build/reports/recap-preferences-targeted/
             app/build/reports/lint-results-debug.*
             app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             core/designsystem/build/reports/lint-results-debug.*

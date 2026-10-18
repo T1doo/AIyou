@@ -12,6 +12,51 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class FactRecapControllerTest {
+    @Test fun defaultWeekIsCopiedOnOpenAndManualDayDoesNotChangeTheNextDefault():Unit=runBlocking {
+        FactRecapHarness().use { h->
+            val preferred=FactRecapPeriod.WEEK
+            h.c.open(preferred)
+            assertEquals(FactRecapPeriod.WEEK,h.ui.period);assertNull(h.ui.snapshot);assertTrue(h.queue.isEmpty())
+            assertEquals(LocalDate.parse("2026-10-12"),h.ui.requestedRange().firstDay)
+            assertEquals(LocalDate.parse("2026-10-19"),h.ui.requestedRange().endDay)
+            h.c.generate();h.drain();assertEquals(FactRecapPeriod.WEEK,h.ui.snapshot!!.range.period)
+            h.c.input(h.ui.date,h.ui.zone,FactRecapPeriod.DAY)
+            assertNull(h.ui.snapshot);h.c.generate();h.drain()
+            assertEquals(FactRecapPeriod.DAY,h.ui.snapshot!!.range.period)
+            h.c.close();h.c.open(preferred)
+            assertEquals(FactRecapPeriod.WEEK,h.ui.period);assertNull(h.ui.snapshot);assertTrue(h.queue.isEmpty())
+        }
+    }
+    @Test fun newDefaultOpenAndCancelRejectOldRangeResultAndRetainedSource():Unit=runBlocking {
+        FactRecapHarness().use { h->
+            h.c.open(FactRecapPeriod.WEEK)
+            h.afterCapture={h.c.close();h.c.open(FactRecapPeriod.DAY)}
+            h.c.generate();h.drain()
+            assertEquals(FactRecapPeriod.DAY,h.ui.period);assertNull(h.ui.snapshot);assertFalse(h.ui.loading)
+            h.afterCapture={};h.c.generate();h.drain()
+            val old=h.ui.snapshot!!.cards.single();var opens=0
+            h.c.source(old){opens++};h.c.close();h.c.open(FactRecapPeriod.WEEK);h.drain()
+            assertEquals(0,opens);assertNull(h.ui.snapshot)
+            h.c.generate();h.c.cancel();h.drain()
+            assertEquals(FactRecapPeriod.WEEK,h.ui.period);assertNull(h.ui.snapshot);assertFalse(h.ui.loading)
+        }
+    }
+    @Test fun previewAndGenerationShareActualDstBoundariesAndRejectInvalidRange():Unit=runBlocking {
+        FactRecapHarness().use { h->
+            h.c.open(FactRecapPeriod.WEEK)
+            for(period in FactRecapPeriod.entries) {
+                h.c.input("2026-03-08","America/New_York",period)
+                val preview=h.ui.requestedRange()
+                assertEquals(if(period==FactRecapPeriod.DAY)23L else 167L,(preview.endMillis-preview.startMillis)/3600000)
+                h.c.generate();h.drain();assertEquals(preview,h.ui.snapshot!!.range)
+            }
+            for((date,zone) in listOf("2026-02-30" to "UTC","2026-03-08" to "Made/Up","2101-01-01" to "UTC")) {
+                h.c.input(date,zone,FactRecapPeriod.DAY)
+                assertThrows(Exception::class.java){h.ui.requestedRange()}
+                h.c.generate();assertNotNull(h.ui.error);assertNull(h.ui.snapshot);assertTrue(h.queue.isEmpty())
+            }
+        }
+    }
     @Test fun changedGenerationBetweenOwnershipCheckAndStateTransformCannotWriteOldSnapshot():Unit=runBlocking {
         for(cancel in listOf(false,true)) FactRecapHarness().use {h->
             h.c.open();h.c.generate()

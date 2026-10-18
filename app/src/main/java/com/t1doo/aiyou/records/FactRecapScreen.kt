@@ -17,6 +17,7 @@ fun FactRecapScreen(local: LocalRecordUiState,controller: FactRecapController,li
     onSource: (FactRecapCard,Boolean)->Unit,modifier: Modifier=Modifier,onRetryRecords: ()->Unit={}) {
     val u=local.factRecap ?: return
     val ready=local.ready && !local.opening && local.error==null
+    val range=runCatching { u.requestedRange() }.getOrNull()
     LazyColumn(modifier.fillMaxSize().testTag("recap-list"),state=list,contentPadding=PaddingValues(16.dp),
         verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item("intro") { Text("本机日／周回顾",style=MaterialTheme.typography.headlineSmall)
@@ -32,7 +33,12 @@ fun FactRecapScreen(local: LocalRecordUiState,controller: FactRecapController,li
             OutlinedButton({controller.input(u.date,u.zone,FactRecapPeriod.WEEK)},enabled=ready,
                 modifier=Modifier.heightIn(min=48.dp).testTag("recap-week")){Text("所在周"+if(u.period==FactRecapPeriod.WEEK) " · 已选" else "")}
         } }
-        item("generate") { Button(controller::generate,enabled=ready && !u.loading,
+        item("range-preview") {
+            Text(if(range==null) "本次范围无效，请检查日期与时区。" else
+                "本次范围：${Instant.ofEpochMilli(range.startMillis).atZone(ZoneId.of(range.zone))} 至 ${Instant.ofEpochMilli(range.endMillis).atZone(ZoneId.of(range.zone))} 前",
+                modifier=Modifier.testTag("recap-range-preview"))
+        }
+        item("generate") { Button(controller::generate,enabled=ready && !u.loading && range!=null,
             modifier=Modifier.heightIn(min=48.dp).testTag("recap-generate")){Text(if(u.error!=null) "重试生成回顾" else "生成这次回顾")}
             TextButton(controller::cancel,modifier=Modifier.heightIn(min=48.dp).testTag("recap-cancel")){Text(if(u.loading) "取消生成" else "清除这次回顾")}
             if(u.loading) Text("正在读取本机证据…")
