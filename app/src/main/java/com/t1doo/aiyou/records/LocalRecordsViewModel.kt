@@ -122,6 +122,7 @@ data class LocalRecordUiState(
     val localIndexBusy: Boolean = false,
     val localIndexError: String? = null,
     val reminders: TaskRemindersUiState = TaskRemindersUiState(),
+    val selectedQuestionAuthorizationOwner: com.t1doo.aiyou.domain.SelectedQuestionAuthorizationRepository? = null,
 )
 
 /** All draft writes and saves share one queue, preserving edits around a save boundary. */
@@ -1188,6 +1189,7 @@ class LocalRecordsViewModel internal constructor(
                 supportsSourceTasks = store.sourceTasks != null && store.localProcessing != null && store.manualTasks != null,
                 supportsLocalProcessing = store.localProcessing != null,
                 recordAuthorizationOwner = store.recordAuthorizations,
+                selectedQuestionAuthorizationOwner = store.selectedQuestionAuthorizations,
                 localProcessingVersions = processingVersions.orEmpty(), localProcessingAvailable = processingVersions != null,
                 supportsFactRecaps = store.factRecaps != null,
                 supportsMixedCapture = store.captureRecords != null,
@@ -1310,6 +1312,7 @@ class LocalRecordsViewModel internal constructor(
                 com.t1doo.aiyou.domain.LocalProcessingVersion(snapshot.source, snapshot.generation) } == true
             local.copy(entries = entries ?: local.entries, localProcessingVersions = versions.orEmpty(), localProcessingAvailable = versions != null,
                 recordAuthorizationOwner = store.recordAuthorizations,
+                selectedQuestionAuthorizationOwner = store.selectedQuestionAuthorizations,
                 localProcessing = if (stale && !panel.busy && panel.pending == null && panel.pendingWithdrawal == null) panel.copy(
                     snapshot = null, authorization = null, confirmation = null, withdrawalConfirmation = null,
                     notice = null, error = "处理范围已变化，请关闭后从当前原文重新打开。") else panel)

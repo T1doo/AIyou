@@ -33,6 +33,7 @@ def input_fingerprint():
     inputs.append(root / "scripts/verify-manual-people-schema.py")
     inputs.append(root / ".github/workflows/android.yml")
     inputs.extend(root / path for path in ("app/src/test/kotlin/com/t1doo/aiyou/ManualPeoplePresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/SelectedQuestionConsentPresentationTest.kt",
         "scripts/verify-test-results.py", "scripts/d02_device_acceptance.py", "scripts/tests/test_manual_people_schema.py",
         "scripts/tests/test_device_acceptance.py"))
     fingerprint = hashlib.sha256()

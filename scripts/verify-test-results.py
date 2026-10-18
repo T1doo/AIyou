@@ -137,6 +137,10 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.SelectedQuestionConsentPresentationTest"] = (
+            "narrowDoubleFontSeparateMultiSourceReviewAndExactOriginalJump",
+            "withdrawUnknownAckHidesResultAndExplicitRetryNeverExecutesAgain",
+            "serviceReplacementRetiresOpenReviewAndDefaultCapabilityNeverOffersSend")
         additional["com.t1doo.aiyou.StorageUsagePresentationTest"] = (
             "explicitQueryAndRefreshShowCategoriesAndRetiredActualButtonCannotQueryNextVisit",
             "narrowDoubleFontFailureNeverShowsZeroAndExplicitRetryCanConfirmEmptyFiles")

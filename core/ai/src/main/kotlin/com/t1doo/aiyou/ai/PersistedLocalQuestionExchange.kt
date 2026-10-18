@@ -8,7 +8,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /** Exercises persisted multi-source authority using ONLY the final memory-fixture service.
- * Not a SelectedQuestionService, not installed in Activity, and cannot enable remote requests.
+ * Not a SelectedQuestionService; UI can inject it only through the explicit memory rehearsal
+ * capability. Production has no such capability and this cannot enable remote requests.
  * Real transport will need its own immediately-before-wire admission and protected secret wiring.
  */
 class PersistedLocalQuestionExchange(private val repository: SelectedQuestionAuthorizationRepository,

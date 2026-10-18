@@ -324,6 +324,29 @@ jobs:
                      'xml': [{'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}]}
           (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
           print('SELECTED_EVIDENCE_QUESTION_TARGETED_XML_JSON ' + json.dumps(receipt))
+          source = Path('app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.SelectedQuestionConsentPresentationTest.xml')
+          raw = source.read_bytes()
+          suite = ET.fromstring(raw)
+          cases = list(suite.iter('testcase'))
+          expected = {
+              'narrowDoubleFontSeparateMultiSourceReviewAndExactOriginalJump',
+              'withdrawUnknownAckHidesResultAndExplicitRetryNeverExecutesAgain',
+              'serviceReplacementRetiresOpenReviewAndDefaultCapabilityNeverOffersSend'}
+          assert {case.get('name') for case in cases} == expected
+          assert int(suite.get('tests', '-1')) == len(cases) == 3
+          assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
+          assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
+          assert all(case.get('classname') == 'com.t1doo.aiyou.SelectedQuestionConsentPresentationTest' for case in cases)
+          target = Path('app/build/reports/selected-question-consent-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(source, target / source.name)
+          receipt = {'head_sha': os.environ['GITHUB_SHA'], 'tests': len(cases),
+                     'failures': 0, 'errors': 0, 'skipped': 0, 'mode': 'LOCAL_PROTOCOL_FIXTURE',
+                     'authority': 'synthetic UI port; persistent authority covered by host SQLite controller tests',
+                     'external_model_calls': 0, 'source': 'subset of same full app suite, no second execution',
+                     'xml': [{'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}]}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('CONSENT_UI_TARGETED_XML_JSON ' + json.dumps(receipt))
           PY
       - name: Compile actual D02 native-storage instrumentation APK without claiming execution
         env:
@@ -422,6 +445,7 @@ jobs:
             app/build/reports/original-edit-migration-targeted/
             app/build/reports/local-evidence-timeline-targeted/
             app/build/reports/selected-evidence-question-targeted/
+            app/build/reports/selected-question-consent-targeted/
             app/build/reports/lint-results-debug.*
             app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             core/designsystem/build/reports/lint-results-debug.*
