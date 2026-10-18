@@ -74,6 +74,10 @@ class LocalOriginalSearchController internal constructor(
             "renderInput=${input == value.input}, freshInput=${freshInput == value.input}, " +
             "renderQuery=${input.query == value.input.query}, freshQuery=${freshInput.query == value.input.query}, " +
             "renderOwnership=${input.ownership == value.input.ownership}, freshOwnership=${freshInput.ownership == value.input.ownership}"
+            .plus(", renderEventAvailable=${local?.eventDatesAvailable}, freshEventAvailable=${fresh?.eventDatesAvailable}, " +
+                "renderEventSize=${local?.eventDates?.size}, freshEventSize=${fresh?.eventDates?.size}, " +
+                "inputEventSize=${input.eventDateSnapshot?.size}, freshInputEventSize=${freshInput.eventDateSnapshot?.size}, " +
+                "freshDateBasis=${freshInput.dateBasis}")
     }
 
     /** Called after a committed render; compare snapshot identity rather than List.equals. */

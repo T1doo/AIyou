@@ -89,6 +89,7 @@ def main():
     scope = parser.add_mutually_exclusive_group()
     scope.add_argument('--date-only', action='store_true', help='Diagnose date sublayers without repeating already verified evidence controls')
     scope.add_argument('--ui-failures-only', action='store_true', help='Individually run the four actual failed methods from full D01 run39101762817')
+    scope.add_argument('--date-retry-only', action='store_true', help='Run only the remaining actual event-date retry failure')
     args = parser.parse_args()
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise SystemExit('Single-method Compose reproduction requires the existing licensed CI toolchain')
@@ -107,6 +108,8 @@ def main():
         report['scope'] = 'date sublayers only, one actual method per isolated Compose JVM; evidence controls NOT RUN this invocation; no device/Room/SQLCipher acceptance'
     if args.ui_failures_only:
         report['scope'] = 'four actual failed UI methods from run39101762817 only, one requested method per isolated Compose JVM; not the full UI gate or device acceptance'
+    if args.date_retry_only:
+        report['scope'] = 'one remaining event-date retry method only; previously passing image/stale/date-layout controls NOT RUN; not full UI/device acceptance'
     source = ROOT / SOURCE
     fixed = source.read_bytes()
     baseline = (ROOT / 'checks/ui-lazy-repro/CurrentImageSearchPresentationTest.kt.source').read_bytes()
@@ -131,6 +134,8 @@ def main():
                 ('image-citations', fixed, CASE, 'syntheticSelectedAnswerCitationsOpenOriginalAndReturningRequiresNewConfirmation', 'green'),
                 ('date-filter-retry', fixed, DATE_CASE, 'eventDateBasisCombinesKeywordTagFavoriteAndNeverMatchesUnknownCaptureDate', 'green'),
                 ('date-stale-confirm', fixed, DATE_CASE, 'uncertainSaveRetainsSameIntentAndStaleConfirmCannotWriteAfterNavigation', 'green')]
+        if args.date_retry_only:
+            plan = [('date-filter-retry', fixed, DATE_CASE, 'eventDateBasisCombinesKeywordTagFavoriteAndNeverMatchesUnknownCaptureDate', 'green')]
         for label, raw, case, method, expectation in plan:
             if args.date_only and not label.startswith('date-'):
                 continue
