@@ -162,7 +162,9 @@ for label, folder, minimum in targets:
             "eventDateBasisCombinesKeywordTagFavoriteAndNeverMatchesUnknownCaptureDate")
         additional["com.t1doo.aiyou.RecordHistoryPackagePresentationTest"] = (
             "explicitHistoryAtDoubleFontPreviewsEveryVersionAndDeletedTextWarningBeforeScopeConfirmation",
-            "authenticatedHistoryShowsAllVersionsBeforeSeparateRestoreConfirmationCreatesNewCopy")
+            "authenticatedHistoryShowsAllVersionsBeforeSeparateRestoreConfirmationCreatesNewCopy",
+            "originalEditScopeDefaultsOffRequiresFullHistoryAndShowsFullDraftBeforeConsentAtDoubleFont",
+            "authenticatedOriginalEditsRequireSeparateConfirmationAndPublishRecoveryEntryWithoutSavingOriginal")
         additional["com.t1doo.aiyou.ManualTaskTitlePresentationTest"] = (
             "explicitTitleCorrectionRequiresReviewAndConfirmationWithoutSavingPrivateInput",
             "unconfirmedTitleCanBeCancelledAndUnknownCommitHasNoSuccessUntilExactRetry",

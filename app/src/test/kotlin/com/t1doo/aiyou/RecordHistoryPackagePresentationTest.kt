@@ -51,16 +51,21 @@ class RecordHistoryPackagePresentationTest {
     private var authenticated = 0
     private var restored = false
     private var newId: String? = null
+    private var editMode = false
+    private val editDraft = OriginalEditDraft("00000000-0000-0000-0000-000000000077",sourceId,2,1,1,currentText,"合成独立编辑未提交全文")
+    private val restoredEdits = mutableListOf<OriginalEditDraft>()
     private val verified = object : VerifiedRecordPackage {
         override val manifest = RecordPackageManifest(UUID.randomUUID().toString(), 50, 1)
         override val records = listOf(record)
         override val digest = "b".repeat(64)
         override val includesHistory = true
+        override val editDrafts get() = if (editMode) listOf(editDraft) else null
     }
     private val packages = object : RecordPackageRepository {
         override fun restore(verified: VerifiedRecordPackage, newIds: List<String>, importedAtMillis: Long): RecordPackageRestoreResult {
             restores++; val replayed = restored
-            if (!restored) { newId = newIds.single(); restored = true }
+            if (!restored) { newId = newIds.single(); restored = true
+                if(editMode) restoredEdits += editDraft.copy(id=UUID.randomUUID().toString(),entryId=newIds.single()) }
             return RecordPackageRestoreResult(listOf(checkNotNull(newId)), 100, replayed)
         }
         override fun origins() = emptyMap<String, RecordPackageOrigin>()
@@ -80,6 +85,9 @@ class RecordHistoryPackagePresentationTest {
             override suspend fun previewHistory(snapshot: OriginalExportSnapshot, includeActivities: Boolean): RecordMediaPreview {
                 check(!includeActivities); historyPreviews++; return RecordMediaPreview(snapshot, emptyList(), history = listOf(record))
             }
+            override suspend fun previewEditDrafts(snapshot: OriginalExportSnapshot, includeActivities: Boolean): RecordMediaPreview {
+                check(!includeActivities);return RecordMediaPreview(snapshot,emptyList(),history=listOf(record),editDrafts=listOf(editDraft))
+            }
             override suspend fun isCurrent(preview: RecordMediaPreview) = true
             override suspend fun seal(preview: RecordMediaPreview, password: CharArray): PreparedRecordMediaPackage {
                 password.fill('\u0000'); seals++; error("Presentation test must not write a file")
@@ -91,6 +99,11 @@ class RecordHistoryPackagePresentationTest {
             override suspend fun recover() = Unit
         }
         override val recordPackages = packages
+        override val editDrafts = object : OriginalEditDraftStore {
+            override suspend fun read(entryId:String)=restoredEdits.singleOrNull {it.entryId==entryId}
+            override suspend fun pending()=OriginalEditDraftIndex(restoredEdits.map {OriginalEditDraftRef(it.id,it.entryId,it.baseRevision)})
+            override suspend fun write(expected:OriginalEditDraft?,next:OriginalEditDraft):OriginalEditDraft=error("Presentation port must not edit")
+        }
         override val manualTags = object : ManualTagRepository {
             override fun read(entryId: String) = ManualTagSnapshot(entryId, 0, emptyList())
             override fun snapshots() = (listOf(sourceId) + listOfNotNull(newId)).associateWith { ManualTagSnapshot(it, 0, emptyList()) }
@@ -167,5 +180,32 @@ class RecordHistoryPackagePresentationTest {
         val restoredEntry = state.value.entries.single { it.id != sourceId }
         assertEquals(2, restoredEntry.currentRevision); assertEquals(ProcessingPolicy.AI_NONE, restoredEntry.policy)
         assertEquals("合成未提交输入", state.value.text); assertEquals(0, seals)
+    }
+
+    @Test fun originalEditScopeDefaultsOffRequiresFullHistoryAndShowsFullDraftBeforeConsentAtDoubleFont() {
+        content();open();click("package-export");node("package-include-edit-drafts").assertIsOff()
+        click("package-select:$sourceId");click("package-include-edit-drafts")
+        node("package-include-history").assertIsOn();click("package-preview");pump()
+        node("package-edit-draft-summary").assertTextContains("1 份",substring=true)
+        node("package-edit-draft:$sourceId").assertExists();compose.onNodeWithText(editDraft.text).assertExists()
+        node("package-encrypt").assertIsNotEnabled();assertEquals(0,seals);assertEquals(0,restores)
+        compose.runOnIdle {val saved=checkNotNull(registry).performSave().toString();assertFalse(saved.contains(editDraft.text));assertFalse(saved.contains("合成未提交输入"))}
+        click("package-cancel");assertEquals("合成未提交输入",state.value.text);assertTrue(restoredEdits.isEmpty())
+    }
+
+    @Test fun authenticatedOriginalEditsRequireSeparateConfirmationAndPublishRecoveryEntryWithoutSavingOriginal() {
+        editMode=true;content();open();click("package-restore")
+        compose.runOnIdle {checkNotNull(picked)(object:SelectedRecordPackageDocument {
+            override fun openForRead()=byteArrayOf(1).inputStream()
+            override fun openForWrite():OutputStream=error("Read only selected package")
+        })}
+        node("package-password").performTextInput("synthetic edit migration 42");click("package-authenticate");pump()
+        node("package-edit-draft-summary").assertExists();node("package-edit-draft:$sourceId").assertExists()
+        compose.onNodeWithText(editDraft.text).assertExists();assertEquals(0,restores);assertTrue(state.value.pendingEdits.isEmpty())
+        node("package-confirm").assertHeightIsAtLeast(48.dp);click("package-confirm");pump()
+        assertEquals(1,restores);assertEquals(RecordPackagePhase.DONE,state.value.recordPackage!!.phase)
+        assertEquals(newId,state.value.pendingEdits.single().entryId);assertNotEquals(editDraft.id,state.value.pendingEdits.single().id)
+        assertTrue(state.value.entries.all {it.originalText==currentText});assertEquals("合成未提交输入",state.value.text)
+        node("package-notice").assertTextContains("1 份独立记录编辑草稿",substring=true)
     }
 }

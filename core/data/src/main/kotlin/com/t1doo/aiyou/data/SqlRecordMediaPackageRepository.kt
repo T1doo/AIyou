@@ -11,7 +11,8 @@ import java.util.concurrent.CancellationException
 internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlDatabase,
     private val originals: OriginalExportRepository, private val media: EncryptedAttachmentStore,
     private val packages: SqlRecordPackageRepository,
-    private val activities:SqlRecordPackageActivities? = null) : RecordMediaPackageRepository {
+    private val activities:SqlRecordPackageActivities? = null,
+    private val edits: EncryptedOriginalEditStore? = null) : RecordMediaPackageRepository {
     private val cipher = RecordMediaPackageCipher()
     override suspend fun preview(snapshot: OriginalExportSnapshot): RecordMediaPreview = checkedPreview(snapshot) { true }
     override suspend fun previewActivities(snapshot:OriginalExportSnapshot):RecordMediaPreview = safely {
@@ -37,6 +38,16 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         preview
     }
     override suspend fun previewOpenZip(snapshot: OriginalExportSnapshot, active: () -> Boolean): RecordMediaPreview = checkedPreview(snapshot, active)
+    override suspend fun previewEditDrafts(snapshot: OriginalExportSnapshot, includeActivities: Boolean): RecordMediaPreview = safely {
+        val base = previewHistory(snapshot, includeActivities)
+        RecordMediaPreview(snapshot, base.images, base.activities, base.history, captureEdits(snapshot)).also {
+            check(isCurrent(it))
+        }
+    }
+    private suspend fun captureEdits(snapshot: OriginalExportSnapshot): List<OriginalEditDraft> =
+        checkNotNull(edits).packageFiles { lease -> snapshot.records.mapNotNull { record ->
+            lease.read(record.entry.id)?.takeIf { it.state == OriginalEditDraftState.ACTIVE }
+        } }
     private suspend fun checkedPreview(snapshot: OriginalExportSnapshot, active: () -> Boolean): RecordMediaPreview = safely {
         if (!active()) throw OpenRecordZipCancelled()
         check(originals.isCurrent(snapshot))
@@ -54,6 +65,7 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         originals.isCurrent(preview.snapshot) &&
             (preview.history?.let { sameHistory(it, history(preview.snapshot)) } ?: true) &&
             preview.images == inventory(preview.snapshot, preview.history) &&
+            (preview.editDrafts?.let { it == captureEdits(preview.snapshot) } ?: true) &&
             (preview.activities?.let {checkNotNull(activities).current(preview.snapshot,it)} ?: true)
     } catch (e: CancellationException) { throw e } catch (_: Exception) { false }
     override suspend fun seal(preview: RecordMediaPreview, password: CharArray): PreparedRecordMediaPackage {
@@ -63,7 +75,7 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         } finally { password.fill('\u0000') }
     }
     override suspend fun exportOpenZip(preview: RecordMediaPreview): PreparedRecordMediaPackage {
-        if (preview.history != null || !isCurrent(preview)) throw OriginalExportConflict()
+        if (preview.history != null || preview.editDrafts != null || !isCurrent(preview)) throw OriginalExportConflict()
         return OpenRecordZipCodec.prepare(preview, { image ->
             val bytes = media.read(image.attachmentId)
             try { RecordMediaPackageCipher.checkImage(image, bytes); bytes }
@@ -156,8 +168,12 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
                     AttachmentIntent(UUID.randomUUID().toString(),newIds[index],if (pack.includesHistory) image.sourceRevision else 1,
                         image.mediaType,image.sha256,image.byteSize)
                 }
+                val editIntents = pack.editDrafts.orEmpty().map { draft ->
+                    val mapped = draft.copy(id = UUID.randomUUID().toString(), entryId = newIds[pack.records.indexOfFirst { it.sourceId == draft.entryId }], version = 1)
+                    OriginalEditImportIntent(mapped.id, mapped.entryId, RecordEditDraftPackageCodec.digest(mapped))
+                }
                 val value = Plan(pack.manifest.backupId,pack.digest,newIds.toList(),importedAtMillis,intents,"PENDING",
-                    if (pack.includesHistory) 4 else if (newIds.isEmpty()) 3 else 2)
+                    if (pack.editDrafts != null) 5 else if (pack.includesHistory) 4 else if (newIds.isEmpty()) 3 else 2, editIntents)
                 sql.execute("INSERT INTO record_package_receipts(id,entryId,sourceRevision,operation,state) VALUES(?,?,1,?,?)",
                     listOf(PREFIX+value.backupId,value.ids.firstOrNull() ?: SqlRecordPackageActivities.anchor(value.backupId),OP,encode(value)))
                 value
@@ -170,9 +186,10 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
             complete
         }
         if(committed) return@safely replay(pack, plan)
-        val commit = {
+        val commit: (List<List<Any?>>?) -> RecordPackageRestoreResult = { expectedSources ->
             packages.restoreWithFiles(pack,plan.ids,plan.imported) { sql ->
                 require(journal(sql,plan.backupId) == encode(plan))
+                if (expectedSources != null) require(sourceRows(sql, pack) == expectedSources)
                 plan.intents.forEach { i ->
                     sql.execute("INSERT INTO attachments(id,entryId,revision,mediaType,sha256,byteSize,state) VALUES(?,?,?,?,?,?,'READY')",
                         listOf(i.id,i.entryId,i.revision,i.mediaType,i.sha256,i.byteSize))
@@ -181,12 +198,49 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
                     listOf(encode(plan.copy(phase="DONE")),PREFIX+plan.backupId,encode(plan))) == 1)
             }
         }
-        if(plan.intents.isEmpty()) {
+        if (pack.editDrafts != null) {
+            // Always take both leases, even for a text-only batch, matching permanent erasure/recovery.
+            media.importPackage(plan.intents, { consume -> pack.cipher.consume(pack, consume) }) {
+                checkNotNull(edits).packageFiles { lease ->
+                    // A competing importer may have committed while we acquired the file locks.
+                    val complete = database.transaction { sql ->
+                        require(journal(sql, plan.backupId) in listOf(encode(plan), encode(plan.copy(phase = "DONE"))))
+                        sql.query("SELECT id FROM record_package_receipts WHERE id=?", listOf("PACKAGE_RESTORE:" + plan.backupId)).isNotEmpty()
+                    }
+                    if (complete) packages.restoreWithFiles(pack, plan.ids, plan.imported) {} else {
+                        val sources = database.transaction { sourceRows(it, pack) }
+                        pack.editDrafts.orEmpty().forEach { source ->
+                            val local = lease.read(source.entryId)
+                            val sourceIndex = pack.records.indexOfFirst { it.sourceId == source.entryId }
+                            require(if (sources[sourceIndex].isNotEmpty()) local == source else local == null)
+                        }
+                        plan.ids.forEach { id -> database.transaction { sql ->
+                            require(sql.query("SELECT id FROM entries WHERE id=?", listOf(id)).isEmpty() && !SqlErasureFileHooks.fenced(sql,id))
+                        } }
+                        pack.editDrafts.orEmpty().forEachIndexed { i, source ->
+                            val intent = plan.editIntents[i]
+                            lease.install(source.copy(id = intent.id, entryId = intent.entryId, version = 1))
+                        }
+                        commit(sources)
+                    }
+                }
+            }
+        } else if(plan.intents.isEmpty()) {
             // No files exist in this batch. Still authenticate every frame and exact EOF before SQL.
             pack.cipher.consume(pack) {_,_->throw RecordPackageInvalid()}
-            commit()
-        } else media.importPackage(plan.intents,{ consume -> pack.cipher.consume(pack,consume) },commit)
+            commit(null)
+        } else media.importPackage(plan.intents,{ consume -> pack.cipher.consume(pack,consume) }) { commit(null) }
     }
+
+    /** Only first import checks local source eligibility. Replays never restore draft bytes. */
+    private fun sourceRows(sql: RecordsSqlConnection, pack: AuthenticatedMediaPackage): List<List<Any?>> =
+        pack.records.map { record ->
+            require(!SqlErasureFileHooks.fenced(sql, record.sourceId))
+            val row = sql.query("SELECT e.currentRevision,COALESCE(a.generation,0),COALESCE(a.deleted,0) FROM entries e LEFT JOIN remote_source_access a ON a.entryId=e.id WHERE e.id=?",
+                listOf(record.sourceId)).singleOrNull().orEmpty()
+            if (row.isNotEmpty()) require(row[0] == record.sourceRevision.toLong() && row[2] == 0L)
+            row
+        }
 
     /** History replay verifies the originally imported media without replacing missing files.
      * Erasure receipts remain authoritative; deleted members must never be recreated for this check. */
@@ -222,6 +276,22 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         }
         require(plans.size <= 64) // Bounded startup recovery; larger interrupted workloads fail visibly.
         for (plan in plans) {
+            if (plan.version >= 5) {
+                media.packageFiles { mediaLease -> checkNotNull(edits).packageFiles { editLease ->
+                    database.transaction { sql ->
+                        require(journal(sql,plan.backupId) == encode(plan))
+                        require(sql.query("SELECT id FROM record_package_receipts WHERE id=?",listOf("PACKAGE_RESTORE:"+plan.backupId)).isEmpty())
+                        plan.ids.forEach { require(sql.query("SELECT id FROM entries WHERE id=?",listOf(it)).isEmpty()) }
+                    }
+                    media.cleanupPackageUnderLease(plan.intents, mediaLease)
+                    plan.editIntents.forEach(editLease::cleanup)
+                    database.transaction { sql ->
+                        require(sql.execute("UPDATE record_package_receipts SET state=? WHERE id=? AND state=?",
+                            listOf(encode(plan.copy(phase="ABORTED")),PREFIX+plan.backupId,encode(plan))) == 1)
+                    }
+                } }
+                continue
+            }
             database.transaction { sql ->
                 require(journal(sql,plan.backupId) == encode(plan))
                 require(sql.query("SELECT id FROM record_package_receipts WHERE id=?",listOf("PACKAGE_RESTORE:"+plan.backupId)).isEmpty())
@@ -241,15 +311,26 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
             require(record >= 0 && i.entryId == plan.ids[record] && i.revision == (if (pack.includesHistory) image.sourceRevision else 1) &&
                 i.mediaType == image.mediaType && i.sha256 == image.sha256 && i.byteSize == image.byteSize)
         }
+        require((plan.version >= 5) == (pack.editDrafts != null) && plan.editIntents.size == pack.editDrafts.orEmpty().size)
+        pack.editDrafts.orEmpty().forEachIndexed { index, draft ->
+            val intent = plan.editIntents[index]
+            require(intent.entryId == plan.ids[pack.records.indexOfFirst { it.sourceId == draft.entryId }] &&
+                intent.digest == RecordEditDraftPackageCodec.digest(draft.copy(id = intent.id, entryId = intent.entryId, version = 1)))
+        }
     }
     private data class Plan(val backupId: String, val digest: String, val ids: List<String>, val imported: Long,
-        val intents: List<AttachmentIntent>, val phase: String, val version: Int = 4)
+        val intents: List<AttachmentIntent>, val phase: String, val version: Int = 4,
+        val editIntents: List<OriginalEditImportIntent> = emptyList())
     private fun encode(p: Plan): String = PackageWriter(32768).use { out ->
         out.i32(p.version); out.string(p.backupId,36); out.raw(packageUnhex(p.digest)); out.i64(p.imported)
         out.string(p.phase,16); out.strings(p.ids,20,36); out.i32(p.intents.size)
         p.intents.forEach { i -> out.string(i.id,36); out.string(i.entryId,36)
             if (p.version >= 4) out.i32(i.revision)
             out.string(i.mediaType,32); out.i64(i.byteSize); out.raw(packageUnhex(i.sha256)) }
+        if (p.version >= 5) {
+            out.i32(p.editIntents.size)
+            p.editIntents.forEach { out.string(it.id,36); out.string(it.entryId,36); out.raw(packageUnhex(it.digest)) }
+        }
         val raw = out.bytes(); try { Base64.getEncoder().encodeToString(raw) } finally { raw.fill(0) }
     }
     private fun decode(value: String): Plan {
@@ -257,7 +338,7 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         val bytes = Base64.getDecoder().decode(value)
         try {
             require(bytes.size <= 32768 && Base64.getEncoder().encodeToString(bytes) == value)
-            val r = PackageReader(bytes); val version=r.i32(); require(version in listOf(2,3,4))
+            val r = PackageReader(bytes); val version=r.i32(); require(version in listOf(2,3,4,5))
             val id = r.string(36).also(RecordPackages::uuid); val digest = packageHex(r.raw(32)); val imported = r.i64(); require(imported >= 0)
             val phase = r.string(16); require(phase in setOf("PENDING","ABORTED","DONE"))
             val ids = r.strings(20,36); require((ids.isNotEmpty() || version>=3) && ids.distinct().size == ids.size); ids.forEach(RecordPackages::uuid)
@@ -269,7 +350,10 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
                 AttachmentIntent(attachment,entry,revision,mime,hash,size).also { EncryptedAttachmentStore.validate(it); require(entry in ids && mime.startsWith("image/")) }
             }
             require(intents.map { it.id }.distinct().size == intents.size && intents.sumOf { it.byteSize } <= RecordMediaPackages.MAX_IMAGE_TOTAL)
-            r.end(); return Plan(id,digest,ids,imported,intents,phase,version)
+            val editIntents = if (version >= 5) List(r.count(20)) { OriginalEditImportIntent(r.string(36),r.string(36),packageHex(r.raw(32))) } else emptyList()
+            require(editIntents.map { it.id }.distinct().size == editIntents.size &&
+                editIntents.map { it.entryId }.distinct().size == editIntents.size && editIntents.all { it.entryId in ids })
+            r.end(); return Plan(id,digest,ids,imported,intents,phase,version,editIntents)
         } finally { bytes.fill(0) }
     }
     private fun journal(sql: RecordsSqlConnection, id: String): String? = sql.query(

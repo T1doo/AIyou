@@ -8,6 +8,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordHistoryPackageCodec.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordEventDatePackageCodec.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordPeoplePackageCodec.kt")
+    from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordEditDraftPackageCodec.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/TaskProposalCipher.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlTaskProposalRepository.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlSourceTaskRepository.kt")

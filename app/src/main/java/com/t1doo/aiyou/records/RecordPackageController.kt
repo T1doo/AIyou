@@ -17,7 +17,7 @@ class RecordPackageUiState(val session: Long, val phase: RecordPackagePhase = Re
     val verified: VerifiedRecordPackage? = null, val scopeAccepted: Boolean = false,
     val requestKey: String? = null, val pickerLaunched: Boolean = false,
     val notice: String? = null, val error: String? = null, internal val epoch: Long = 0, val mediaPreview: RecordMediaPreview? = null,
-    val includeActivities:Boolean = false, val includeHistory: Boolean = false) {
+    val includeActivities:Boolean = false, val includeHistory: Boolean = false, val includeEditDrafts: Boolean = false) {
     val selection = Collections.unmodifiableList(selection.toList())
     val busy get() = phase in setOf(RecordPackagePhase.PREPARING, RecordPackagePhase.ENCRYPTING,
         RecordPackagePhase.WRITING, RecordPackagePhase.READING, RecordPackagePhase.IMPORTING)
@@ -26,8 +26,9 @@ class RecordPackageUiState(val session: Long, val phase: RecordPackagePhase = Re
         scopeAccepted: Boolean = this.scopeAccepted, requestKey: String? = this.requestKey,
         pickerLaunched: Boolean = this.pickerLaunched, notice: String? = this.notice, error: String? = this.error,
         epoch: Long = this.epoch, mediaPreview: RecordMediaPreview? = this.mediaPreview,
-        includeActivities:Boolean = this.includeActivities, includeHistory: Boolean = this.includeHistory) = RecordPackageUiState(session, phase, selection, snapshot, verified, scopeAccepted,
-            requestKey, pickerLaunched, notice, error, epoch, mediaPreview,includeActivities,includeHistory)
+        includeActivities:Boolean = this.includeActivities, includeHistory: Boolean = this.includeHistory,
+        includeEditDrafts: Boolean = this.includeEditDrafts) = RecordPackageUiState(session, phase, selection, snapshot, verified, scopeAccepted,
+            requestKey, pickerLaunched, notice, error, epoch, mediaPreview,includeActivities,includeHistory,includeEditDrafts)
     override fun toString() = "RecordPackageUiState(phase=" + phase + ", redacted)"
 }
 
@@ -96,7 +97,13 @@ class RecordPackageController internal constructor(private val current: () -> Lo
     }
     fun includeHistory(session: Long, include: Boolean) {
         val ui = panel(session) ?: return
-        if (available() && ui.phase == RecordPackagePhase.SELECTING) update(session) { it.copy(includeHistory = include, error = null) }
+        if (available() && ui.phase == RecordPackagePhase.SELECTING) update(session) { it.copy(includeHistory = include,
+            includeEditDrafts = include && it.includeEditDrafts, error = null) }
+    }
+    fun includeEditDrafts(session: Long, include: Boolean) {
+        val ui = panel(session) ?: return
+        if (available() && ui.phase == RecordPackagePhase.SELECTING) update(session) { it.copy(includeEditDrafts = include,
+            includeHistory = include || it.includeHistory, error = null) }
     }
     fun toggle(session: Long, id: String, revision: Int) {
         val ui = panel(session) ?: return
@@ -120,11 +127,13 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                 val snapshot = if(ui.selection.isEmpty()) OriginalExportSnapshot(UUID.randomUUID().toString(),clock.millis(),emptyList(),true)
                     else checkNotNull(store.originalExport).capture(ui.selection, UUID.randomUUID().toString(), clock.millis())
                 val preview = when {
+                    ui.includeEditDrafts -> checkNotNull(store.mediaPackages).previewEditDrafts(snapshot, ui.includeActivities)
                     ui.includeHistory -> checkNotNull(store.mediaPackages).previewHistory(snapshot, ui.includeActivities)
                     ui.includeActivities -> checkNotNull(store.mediaPackages).previewActivities(snapshot)
                     else -> store.mediaPackages?.preview(snapshot)
                 }
                 check((preview?.history != null) == ui.includeHistory)
+                check((preview?.editDrafts != null) == ui.includeEditDrafts)
                 updateOwned(active, RecordPackagePhase.PREPARING) { it.copy(phase = RecordPackagePhase.EXPORT_PREVIEW, snapshot = snapshot, mediaPreview = preview) }
             } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { fail(active, "原文、历史、原图、任务或草稿核对失败，也可能没有选择任何已保存内容或超限。缺失、损坏、未保存完成或超限的内容不会被跳过，请检查后重新选择。") }
             finally { if (work.compareAndSet(active, null)) active.retire() }
@@ -140,7 +149,8 @@ class RecordPackageController internal constructor(private val current: () -> Lo
         try {
             val ui = panel(session) ?: return; val snapshot = ui.snapshot ?: return
             if (!available() || ui.phase != RecordPackagePhase.EXPORT_PREVIEW || !ui.scopeAccepted || snapshot.id != snapshotId ||
-                ui.includeHistory != (ui.mediaPreview?.history != null)) return
+                ui.includeHistory != (ui.mediaPreview?.history != null) ||
+                ui.includeEditDrafts != (ui.mediaPreview?.editDrafts != null)) return
             try { RecordPackages.password(password); require(password.contentEquals(again)) }
             catch (_: Exception) { update(session) { it.copy(error = "请输入两次一致的独立恢复口令：12–128 个可打印 ASCII 字符，空格原样保留。") }; return }
             val active = Work(session, ui.epoch + 1, snapshot = snapshot, mediaPreview = ui.mediaPreview); active.setPassword(password); retire(); work.set(active)
@@ -254,6 +264,8 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                 val tasks=if(verified.activities!=null) checkNotNull(store.manualTasks).snapshots() else null
                 val proposals=if(verified.activities!=null) checkNotNull(store.taskProposals).list() else null
                 val versions=if(verified.activities!=null) store.localProcessing?.versions() else null
+                val editIndex = if (verified.editDrafts != null) try { checkNotNull(store.editDrafts).pending() }
+                    catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null } else null
                 publish { local ->
                     val panel = local.recordPackage
                     if (disposed || !available(local)) local else
@@ -266,11 +278,17 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                             taskProposals=if(proposals!=null && local.taskProposals.editor==null) local.taskProposals.copy(items=proposals,available=true,loading=false,error=null) else local.taskProposals,
                             localProcessingVersions=versions ?: local.localProcessingVersions,
                             localProcessingAvailable=if(versions!=null) true else local.localProcessingAvailable,
+                            pendingEdits = if (verified.editDrafts != null && editIndex != null) editIndex.drafts else local.pendingEdits,
+                            editDraftIndexAvailable = if (verified.editDrafts != null) editIndex != null else local.editDraftIndexAvailable,
+                            editDraftIssueCount = editIndex?.unreadableCount ?: local.editDraftIssueCount,
+                            editDraftError = if (verified.editDrafts == null) local.editDraftError else if (editIndex == null)
+                                "编辑草稿目录暂不可读取，恢复列表尚未确认。加密数据已保留，请重试本机读取。"
+                                else if (editIndex.unreadableCount > 0) "${editIndex.unreadableCount} 份编辑草稿暂无法安全恢复；加密数据已保留，请重试读取。" else null,
                             recordPackage = if (!owned(active, RecordPackagePhase.IMPORTING, local)) panel else checkNotNull(panel).copy(phase = RecordPackagePhase.DONE, verified = null, notice =
                                 if (result.replayed) "已核对第一次恢复回执，没有新增、覆盖或复活记录、任务或草稿。已永久删除 " + result.deletedCount +
                                     " 条，删除未完成 " + result.erasingCount + " 条；其余副本以当前本机状态为准。"
                                 else "已核对恢复回执：首次导入 " + result.ids.size + " 条记录新副本、"+result.taskIds.size+" 条正式待办和 "+result.proposalIds.size+
-                                    " 条待确认草稿；当前内容与状态以本机清单为准。记录初始不参与 AI。本次恢复没有自动确认草稿、安排提醒或恢复联网授权。"))
+                                    " 条待办建议草稿、" + verified.editDrafts.orEmpty().size + " 份独立记录编辑草稿；正式原文未提交编辑内容，可从恢复编辑草稿入口继续。当前内容与状态以本机清单为准。记录初始不参与 AI。本次恢复没有自动确认草稿、安排提醒或恢复联网授权。"))
                             .withFavoriteSource(favorites).withEventDateSource(eventDates)
                 }
                 if (work.compareAndSet(active, null)) active.retire()

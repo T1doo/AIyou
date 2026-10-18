@@ -46,10 +46,10 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
         verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         item("scope") {
             Text("加密原文包", style = MaterialTheme.typography.headlineSmall)
-            Text("默认包含选定的当前原文、手工标签、手工人物称呼、手填事件日期及 IANA 时区和当前版本已完整保存的 JPEG/PNG 原图；可另选这些记录的完整历史，或勾选本机全部正式待办与待确认草稿。记录编辑草稿、AI 结果及所有密钥不包含在内；这不是整库备份。")
+            Text("默认包含选定的当前原文、手工标签、手工人物称呼、手填事件日期及 IANA 时区和当前版本已完整保存的 JPEG/PNG 原图；可另选这些记录的完整历史、已保留的记录编辑草稿，或本机全部正式待办与待办建议草稿。正在输入但未保留的内容、AI 结果及所有密钥不包含在内；这不是整库备份。")
             Text("事件日期只迁移当前值，不迁移日期修改历史或操作回执；未知与已清除在新副本中都为未补记。")
             Text("恢复会创建新副本，不覆盖旧记录；初始设置为不参与 AI。同一包重复恢复只核对第一次回执。")
-            Text("一次最多 20 条记录、20 张原图；单图最多 16 MiB，图片合计最多 64 MiB。任务和待确认草稿各最多 256 条，超限整体失败，不会少带。旧 v1/v2/v3/v4 包仍可恢复；缺少事件日期时保持未知。")
+            Text("一次最多 20 条记录、20 张原图；单图最多 16 MiB，图片合计最多 64 MiB。任务和待办建议草稿各最多 256 条；记录编辑草稿每条至多一份、共最多20份。超限整体失败，不会少带。旧 v1–v6 包仍可恢复；缺少事件日期时保持未知。")
             Text("文字总量也有上限；内容过多时本次整体失败，不会静默截断。")
             Text("恢复的草稿仍须另行确认；不安排提醒、不恢复联网授权。未随包完整匹配的来源保持不可用。")
             Text("独立恢复口令丢失无法解密。取消或失败可能留下空文件或部分密文，应用不会自动删除。")
@@ -75,6 +75,13 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                         }
                         if (ui.includeHistory) HistoryWarning()
                         Text("完整历史最多每条128版、合计256版，历史文字UTF-8合计最多约2 MiB；媒体仍受同一总量限制，超限整包拒绝。")
+                    }
+                    item("edit-draft-choice") {
+                        Row {
+                            Checkbox(ui.includeEditDrafts, onCheckedChange = { if (ownsRoute()) controller.includeEditDrafts(ui.session, it) },
+                                modifier = Modifier.testTag("package-include-edit-drafts"))
+                            Text("包含所选记录已保留的编辑草稿；默认关闭，开启时同时包含完整历史。未保留的当前输入不会被带出。")
+                        }
                     }
                     item("activity-choice") { Row {
                         Checkbox(ui.includeActivities,onCheckedChange={if(ownsRoute()) controller.includeActivities(ui.session,it)},modifier=Modifier.testTag("package-include-activities"))
@@ -112,6 +119,7 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                     }
                     packageActivities(ui.mediaPreview?.activities, ui.mediaPreview?.history != null,
                         ui.snapshot?.records.orEmpty().any { it.eventDate.date != null })
+                    packageEditDrafts(ui.mediaPreview?.editDrafts)
                     item("scope-confirm") {
                         Row {
                             Checkbox(ui.scopeAccepted, onCheckedChange = { accepted ->
@@ -175,6 +183,7 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                     }
                     packageActivities(ui.verified?.activities, ui.verified?.includesHistory == true,
                         ui.verified?.records.orEmpty().any { it.eventDate != null })
+                    packageEditDrafts(ui.verified?.editDrafts)
                     item("confirm-restore") {
                         Button(onClick = { if (ownsRoute()) ui.verified?.let { controller.confirmRestore(ui.session, it.manifest.backupId, it.digest, ui.epoch) } },
                             enabled = ui.verified != null, modifier = Modifier.heightIn(min = androidx.compose.ui.unit.Dp(48f)).testTag("package-confirm")) {
@@ -195,6 +204,21 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
             if (ui.phase !in setOf(RecordPackagePhase.HOME, RecordPackagePhase.DONE, RecordPackagePhase.FAILED, RecordPackagePhase.CANCELLED))
                 TextButton(onClick = { if (ownsRoute()) { clearPasswords(); controller.cancel(ui.session) } },
                     modifier = Modifier.testTag("package-cancel")) { Text("取消并保留已有文件或提交") }
+        }
+    }
+}
+
+private fun LazyListScope.packageEditDrafts(drafts: List<com.t1doo.aiyou.model.OriginalEditDraft>?) {
+    if (drafts == null) return
+    item("original-edit-summary") {
+        Text("独立记录编辑草稿 ${drafts.size} 份", Modifier.testTag("package-edit-draft-summary"))
+        Text("每份草稿随完整历史恢复到新副本，正式原文保持包内当前版本；之后仍需手动恢复编辑并保存新版本。不会替换当前输入。")
+        Text("本机已修改、弃稿或删除的源草稿不能首次恢复旧包。另一设备离线包无法获知本机之后的修改或删除，请逐份核对。")
+    }
+    itemsIndexed(drafts, key = { index, _ -> "original-edit:$index" }) { _, draft ->
+        Column(Modifier.testTag("package-edit-draft:" + draft.entryId)) {
+            Text("记录 ${draft.entryId} · 基于版本 ${draft.baseRevision} · 编辑来源版本 ${draft.sourceRevision}")
+            SelectionContainer { Text(draft.text.ifEmpty { "编辑草稿正文为空。" }) }
         }
     }
 }

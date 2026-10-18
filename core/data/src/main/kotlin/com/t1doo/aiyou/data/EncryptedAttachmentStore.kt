@@ -142,7 +142,7 @@ internal class EncryptedAttachmentStore(
      * No file IO is performed inside that transaction; the existing file -> DB lock order is kept.
      */
     internal suspend fun <T> importPackage(intents: List<AttachmentIntent>,
-        consume: suspend (suspend (Int, ByteArray) -> Unit) -> Unit, commit: () -> T): T = locked {
+        consume: suspend (suspend (Int, ByteArray) -> Unit) -> Unit, commit: suspend () -> T): T = locked {
         require(intents.size <= com.t1doo.aiyou.model.RecordMediaPackages.MAX_IMAGES)
         intents.forEach { validate(it); check(ledger.find(it.id) == null && !erasureHooks.fenced(it.entryId)) }
         var received = 0
@@ -167,6 +167,13 @@ internal class EncryptedAttachmentStore(
 
     /** Reentrant cleanup only for a registered, uncommitted package mapping. Never enumerate/delete unknown files. */
     internal suspend fun cleanupPackage(intents: List<AttachmentIntent>): Unit = locked {
+        cleanupPackageUnderLease(intents, ErasureDirectoryLease(BUCKET, directory))
+    }
+    internal suspend fun <T> packageFiles(action: suspend (ErasureDirectoryLease) -> T): T = locked {
+        action(ErasureDirectoryLease(BUCKET, directory))
+    }
+    internal suspend fun cleanupPackageUnderLease(intents: List<AttachmentIntent>, lease: ErasureDirectoryLease) {
+        lease.verify()
         intents.forEach { intent ->
             validate(intent); check(ledger.find(intent.id) == null)
             val target = file(intent,false)
@@ -181,6 +188,7 @@ internal class EncryptedAttachmentStore(
             deleteOwnedPartial(intent)
             checkpoint("package-cleaned")
         }
+        lease.verify()
     }
 
     private suspend fun recoverLocked() {

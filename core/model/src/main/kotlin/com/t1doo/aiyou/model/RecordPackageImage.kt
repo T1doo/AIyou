@@ -12,11 +12,15 @@ data class RecordPackageImage(val sourceId: String, val sourceRevision: Int, val
     }
 }
 class RecordMediaPreview(val snapshot: OriginalExportSnapshot, images: List<RecordPackageImage>,
-    val activities: RecordPackageActivities? = null, history: List<RecordPackageOriginal>? = null) {
+    val activities: RecordPackageActivities? = null, history: List<RecordPackageOriginal>? = null,
+    editDrafts: List<OriginalEditDraft>? = null) {
+    /** Null means excluded; empty means the explicitly selected scope contains no active edits. */
+    val editDrafts = editDrafts?.let { Collections.unmodifiableList(it.toList()) }
     val images = Collections.unmodifiableList(images.toList())
     val history = history?.let { Collections.unmodifiableList(it.toList()) }
     val imageBytes = images.sumOf { it.byteSize }
     init {
+        if (editDrafts != null) RecordEditDraftPackages.validate(editDrafts, checkNotNull(history))
         require(images.size <= RecordMediaPackages.MAX_IMAGES && imageBytes <= RecordMediaPackages.MAX_IMAGE_TOTAL)
         require(images.map { it.attachmentId }.distinct().size == images.size)
         if (history == null) {

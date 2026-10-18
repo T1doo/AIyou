@@ -66,7 +66,7 @@ class EncryptedEntryRepository internal constructor(
         SqlOriginalExportRepository(borrowedSql, tagStorage,packageActivities,peopleStorage)
     private val packageStorage = SqlRecordPackageRepository(borrowedSql, tagStorage,activities=packageActivities, people=peopleStorage)
     override val mediaPackages: com.t1doo.aiyou.domain.RecordMediaPackageRepository =
-        SqlRecordMediaPackageRepository(borrowedSql, originalExport, attachmentStorage, packageStorage,packageActivities)
+        SqlRecordMediaPackageRepository(borrowedSql, originalExport, attachmentStorage, packageStorage,packageActivities, originalEditStorage)
     override val recordPackages: com.t1doo.aiyou.domain.RecordPackageRepository get() = packageStorage
     override val permanentErasure: com.t1doo.aiyou.domain.PermanentErasureRepository =
         SqlPermanentErasureRepository(borrowedSql, attachmentStorage, originalEditStorage, packageStorage, proposalStorage::readAllWithin)
@@ -138,16 +138,21 @@ class EncryptedEntryRepository internal constructor(
         checkNotNull(dao.entry(entryId)).toModel()
     }
 
-    override suspend fun reviseFromDraft(draft: OriginalEditDraft, createdAtMillis: Long): StoredEntry = database.withTransaction {
+    override suspend fun reviseFromDraft(draft: OriginalEditDraft, createdAtMillis: Long): StoredEntry {
         require(draft.state == OriginalEditDraftState.ACTIVE)
-        committedEdit(draft)?.let { return@withTransaction it }
-        // Require the full independently acknowledged encrypted snapshot, not only its text.
-        if (editDrafts.read(draft.entryId) != draft) throw com.t1doo.aiyou.domain.OriginalEditDraftConflict()
-        val saved = revise(draft.entryId, draft.baseRevision, draft.text, createdAtMillis)
-        // Completed receipt, never runnable work: same encrypted transaction as revision + LOCAL_INDEX.
-        dao.insertJob(LocalJobEntity(editReceiptId(draft), draft.entryId, saved.currentRevision,
-            "ORIGINAL_EDIT_COMMIT", "CONFIRMED"))
-        saved
+        committedEdit(draft)?.let { return it }
+        return originalEditStorage.packageFiles { lease ->
+            committedEdit(draft)?.let { return@packageFiles it }
+            if (lease.read(draft.entryId) != draft) throw com.t1doo.aiyou.domain.OriginalEditDraftConflict()
+            database.withTransaction {
+                committedEdit(draft)?.let { return@withTransaction it }
+                val saved = revise(draft.entryId, draft.baseRevision, draft.text, createdAtMillis)
+                // Completed receipt, never runnable work: same encrypted transaction as revision + LOCAL_INDEX.
+                dao.insertJob(LocalJobEntity(editReceiptId(draft), draft.entryId, saved.currentRevision,
+                    "ORIGINAL_EDIT_COMMIT", "CONFIRMED"))
+                saved
+            }
+        }
     }
 
     override suspend fun committedEdit(draft: OriginalEditDraft): StoredEntry? = database.withTransaction {

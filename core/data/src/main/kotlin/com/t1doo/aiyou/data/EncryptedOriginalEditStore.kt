@@ -33,6 +33,11 @@ import javax.crypto.BadPaddingException
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
+internal data class OriginalEditImportIntent(val id: String, val entryId: String, val digest: String) {
+    init { com.t1doo.aiyou.model.RecordPackages.uuid(id); com.t1doo.aiyou.model.RecordPackages.uuid(entryId)
+        com.t1doo.aiyou.model.RecordPackages.digest(digest) }
+}
+
 /** Production AES-256-GCM adapter. Only ciphertext is written, including temporary files. */
 class EncryptedOriginalEditStore(
     private val directory: File,
@@ -158,7 +163,7 @@ class EncryptedOriginalEditStore(
         } finally { plain.fill(0) }
     }
 
-    private fun publish(value: OriginalEditDraft) {
+    private fun publish(value: OriginalEditDraft, partialId: String = UUID.randomUUID().toString()) {
         val target = file(value.entryId)
         val plain = ByteArrayOutputStream().also { bytes ->
             DataOutputStream(bytes).use { out ->
@@ -175,7 +180,7 @@ class EncryptedOriginalEditStore(
             byteArrayOf(1) + nonce + cipher.doFinal(plain)
         } finally { plain.fill(0) }
         // Unique owned partials survive failure for diagnosis; they are never restoration sources.
-        val temporary = File(directory, target.name + ".partial." + UUID.randomUUID())
+        val temporary = File(directory, target.name + ".partial." + partialId)
         erasureHooks.reserve(value.entryId, BUCKET, temporary.name)
         Files.createFile(temporary.toPath())
         FileOutputStream(temporary).use {
@@ -192,6 +197,63 @@ class EncryptedOriginalEditStore(
         syncDirectory(directory)
         checkpoint("durable")
         erasureHooks.forgotten(value.entryId, BUCKET, temporary.name)
+    }
+
+    /** The package coordinator holds MEDIA before this lease and commits SQL only after publish.
+     * The lease cannot escape its live file lock; no nested public store reads are needed. */
+    internal suspend fun <T> packageFiles(action: suspend (PackageLease) -> T): T = locked {
+        val lease = PackageLease(ErasureDirectoryLease(BUCKET, directory))
+        try { action(lease) } finally { lease.active = false }
+    }
+    internal inner class PackageLease(private val directoryLease: ErasureDirectoryLease) {
+        internal var active = true
+        private fun verify() { check(active); directoryLease.verify() }
+        fun read(entryId: String): OriginalEditDraft? {
+            verify(); check(!erasureHooks.fenced(entryId)); return readLocked(entryId)
+        }
+        fun install(value: OriginalEditDraft) {
+            verify(); validate(value)
+            require(value.state == OriginalEditDraftState.ACTIVE && value.version == 1L)
+            check(!erasureHooks.fenced(value.entryId))
+            val existing = readLocked(value.entryId)
+            if (existing != null) { check(existing == value); syncDirectory(directory); return }
+            val intent = OriginalEditImportIntent(value.id, value.entryId, RecordEditDraftPackageCodec.digest(value))
+            // A lost pre-publication ACK can leave this plan's deterministic partial.
+            cleanup(intent)
+            publish(value, value.id)
+            check(readLocked(value.entryId) == value)
+            checkpoint("package-edit-published")
+        }
+        fun cleanup(intent: OriginalEditImportIntent) {
+            verify()
+            val canonical = file(intent.entryId)
+            val partial = canonical.name + ".partial." + intent.id
+            val candidates = Files.newDirectoryStream(directory.toPath()).use { stream ->
+                var scanned = 0
+                stream.filter { path ->
+                    check(++scanned <= 4096)
+                    val name = path.fileName.toString()
+                    name == canonical.name || name.startsWith(canonical.name + ".partial.")
+                }.map { it.toFile() }
+            }
+            // An unexpected competing partial is preserved; it cannot authorize cleanup.
+            check(candidates.all { it.name == canonical.name || it.name == partial })
+            val observations = candidates.map { candidate ->
+                val observed = checkNotNull(directoryLease.observe(candidate))
+                val proof = if (candidate.name == partial) erasureHooks.creation(intent.entryId, BUCKET, partial) else null
+                if (proof == null || proof != createdFileProof(candidate, 13)) {
+                    val value = authenticated(candidate, canonical.name)
+                    check(value.id == intent.id && value.entryId == intent.entryId &&
+                        RecordEditDraftPackageCodec.digest(value) == intent.digest)
+                }
+                check(directoryLease.observe(candidate) == observed)
+                observed
+            }
+            observations.forEach(directoryLease::erase)
+            directoryLease.sync()
+            erasureHooks.forgotten(intent.entryId, BUCKET, partial)
+            checkpoint("package-edit-cleaned")
+        }
     }
 
     private suspend fun <T> locked(action: suspend () -> T): T = trackedFileOperation(lifecycle) {
