@@ -27,6 +27,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -34,6 +35,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
@@ -113,7 +118,20 @@ fun MemoryCard(
     attachmentLabel: String? = null,
     state: ComponentState = ComponentState.NORMAL,
     onOpen: (() -> Unit)? = null,
+    highlight: TextRange? = null,
 ) {
+    val preview = remember(originalText, highlight) {
+        buildAnnotatedString {
+            append(originalText)
+            fun boundary(index: Int) = index == 0 || index == originalText.length ||
+                !(originalText[index - 1].isHighSurrogate() && originalText[index].isLowSurrogate())
+            if (highlight != null && highlight.start >= 0 && highlight.end > highlight.start &&
+                highlight.end <= originalText.length && boundary(highlight.start) && boundary(highlight.end)) {
+                addStyle(SpanStyle(color = AIyouColors.textPrimary, background = AIyouColors.primaryContainer,
+                    fontWeight = FontWeight.Bold, textDecoration = TextDecoration.Underline), highlight.start, highlight.end)
+            }
+        }
+    }
     ComponentCard(modifier, padding = AIyouDimensions.spaceMd) {
         if (state == ComponentState.EMPTY) {
             Text("还没有记录", style = MaterialTheme.typography.titleMedium)
@@ -126,7 +144,7 @@ fun MemoryCard(
             Text(if (policy == ProcessingPolicy.LOCAL_ONLY) "原文 · 仅本机" else "原文", style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
         }
         if (onOpen != null) Text("原文预览", style = MaterialTheme.typography.labelMedium, color = AIyouColors.textSecondary)
-        Text(originalText, style = MaterialTheme.typography.bodyLarge,
+        Text(preview, style = MaterialTheme.typography.bodyLarge,
             maxLines = if (onOpen != null) 4 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
         onOpen?.let { open ->
             TextButton(onClick = open, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("阅读全文") }

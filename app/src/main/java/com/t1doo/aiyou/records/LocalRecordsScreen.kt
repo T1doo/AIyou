@@ -418,12 +418,15 @@ fun LocalRecordsScreen(
                     }
                 } else items(displayedEntries, key = { it.id }) { entry ->
                     val hit = if (filtered) searchHits[entry.id] else null
-                    val preview = remember(entry.originalText, hit) { hit?.excerpt ?: originalPreview(entry.originalText) }
-                    MemoryCard(preview, originalMetadata(entry), policy = entry.policy,
+                    val preview = remember(entry, hit) { hit?.let { originalSearchPreview(entry, it) } }
+                    MemoryCard(preview?.text ?: originalPreview(entry.originalText), originalMetadata(entry), policy = entry.policy,
                         modifier = Modifier.testTag("entry-${entry.id}").semantics { selected = entry.id == selectedEntryId }
                             .then(if (entry.id == selectedEntryId) Modifier.border(AIyouDimensions.iconStroke,
                                 AIyouColors.primary, MaterialTheme.shapes.medium) else Modifier),
-                        onOpen = { if (hit != null) onOpenSearchResult(hit) else onOpenEntry(entry.id) })
+                        onOpen = { if (hit != null) onOpenSearchResult(hit) else onOpenEntry(entry.id) },
+                        highlight = preview?.takeIf { it.highlightEnd > it.highlightStart }?.let {
+                            androidx.compose.ui.text.TextRange(it.highlightStart, it.highlightEnd)
+                        })
                 }
             }
         }

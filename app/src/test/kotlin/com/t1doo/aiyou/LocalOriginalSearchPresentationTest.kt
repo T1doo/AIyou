@@ -50,6 +50,8 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
@@ -142,7 +144,7 @@ class LocalOriginalSearchPresentationTest {
         assertEquals(OriginalSearchMode.EXACT, found.state.input.mode); assertEquals(listOf("one"), found.state.hits.map { it.entry.id })
         assertEquals(full, found.state.hits.single().quote)
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"))
-        compose.onNodeWithText(found.state.hits.single().excerpt).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("…MiXeD \t咖啡🙂\n合成后文，保留空白。").performScrollTo().assertIsDisplayed()
         openCard("one"); assertEquals(full, fullText())
         compose.onNodeWithText("返回列表").performClick(); ready(exact)
         assertEquals(exact, editable("original-search-query")); assertEquals("2026-10-14", editable("original-search-from"))
@@ -152,6 +154,84 @@ class LocalOriginalSearchPresentationTest {
             assertEquals(full, state.value.entries.single { it.id == "one" }.originalText)
             assertEquals(0, draftChanges); assertEquals(0, saves)
         }
+    }
+
+    @Test fun searchCardsHighlightVerifiedOriginalUnicodeKeepOrderAndClearWithoutTouchingSource() {
+        val matched = "İ𐐀🙂MiXeD"
+        val full = "前🙂".repeat(150) + matched + " 咖啡e\u0301\t后文\n" + "叶".repeat(100)
+        val state = local(entry("one", full), entry("two", "MiXeD 咖啡"), entry("none", "未命中"))
+        content(state); field("original-search-query", "mixed 咖啡")
+        assertEquals(listOf("one", "two"), ready("mixed 咖啡").state.hits.map { it.entry.id })
+        val card = searchCardText("one")
+        var actual = card.fetchSemanticsNode().config[SemanticsProperties.Text].single()
+        assertTrue(actual.text.startsWith("…MiXeD 咖啡e\u0301\t后文\n"))
+        assertSearchMark(actual, "MiXeD")
+        field("original-search-query", "i𐐨🙂mixed")
+        assertEquals(listOf("one"), ready("i𐐨🙂mixed").state.hits.map { it.entry.id })
+        actual = searchCardText("one").fetchSemanticsNode().config[SemanticsProperties.Text].single()
+        assertTrue(actual.text.startsWith("…" + matched + " 咖啡e\u0301\t后文\n")); assertSearchMark(actual, matched)
+        openCard("one"); assertEquals(full, fullText())
+        compose.onNodeWithText("返回列表").performClick(); ready("i𐐨🙂mixed")
+        compose.onNodeWithTag("original-search-clear").performScrollTo().performClick()
+        observation { it.state.stage == OriginalSearchStage.BROWSE }
+        assertTrue(searchCardText("one").fetchSemanticsNode().config[SemanticsProperties.Text].single().spanStyles.isEmpty())
+        assertEquals(full, state.value.entries.first().originalText)
+        assertEquals(ProcessingPolicy.LOCAL_ONLY, state.value.entries.first().policy)
+        assertEquals(0, draftChanges); assertEquals(0, saves)
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w320dp-h640dp")
+    fun searchCardFirstHitIsVisibleAtDoubleFontAndRevisionDeletionRetireItsHighlightAndAction() {
+        val needle = "目标🙂"
+        val full = "前文\n".repeat(150) + needle + "后文".repeat(100)
+        val state = local(entry("one", full))
+        content(state, largeFont = true); field("original-search-query", needle)
+        val retained = ready(needle)
+        val card = searchCardText("one")
+        val actual = card.fetchSemanticsNode().config[SemanticsProperties.Text].single()
+        assertTrue(actual.text.startsWith("…" + needle)); assertSearchMark(actual, needle)
+        val layouts = mutableListOf<TextLayoutResult>()
+        card.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { assertTrue(it(layouts)) }
+        val layout = layouts.single()
+        val mark = actual.spanStyles.single()
+        assertEquals(0, layout.getLineForOffset(mark.start))
+        assertTrue(layout.getLineEnd(0, visibleEnd = true) > mark.start)
+        val glyph = layout.getBoundingBox(mark.start)
+        assertTrue(glyph.width > 0f && glyph.height > 0f)
+        assertTrue(glyph.left >= 0f && glyph.right <= layout.size.width)
+        val cardNode = card.fetchSemanticsNode()
+        val viewport = compose.onNode(hasScrollToIndexAction()).fetchSemanticsNode().boundsInRoot
+        assertTrue(cardNode.positionInRoot.y + glyph.top >= viewport.top &&
+            cardNode.positionInRoot.y + glyph.bottom <= viewport.bottom)
+        compose.runOnIdle { state.value = state.value.copy(entries = listOf(entry("one", "新版保留" + needle, revision = 2))) }
+        observation { it.state.stage == OriginalSearchStage.READY && it.state.hits.singleOrNull()?.entry?.currentRevision == 2 }
+        val updated = searchCardText("one").fetchSemanticsNode().config[SemanticsProperties.Text].single()
+        assertEquals("…" + needle, updated.text); assertSearchMark(updated, needle)
+        compose.runOnIdle { retained.open(retained.state.hits.single()) }; assertNoReader()
+        compose.runOnIdle { state.value = state.value.copy(entries = emptyList()) }
+        assertTrue(ready(needle).state.hits.isEmpty())
+        compose.onAllNodes(hasTestTag("entry-one")).assertCountEquals(0)
+        compose.runOnIdle { retained.open(retained.state.hits.single()) }; assertNoReader()
+        assertEquals(0, saves); assertEquals(0, draftChanges)
+    }
+
+    private fun searchCardText(id: String): androidx.compose.ui.test.SemanticsNodeInteraction {
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))
+        return compose.onNode(hasAnyAncestor(hasTestTag("entry-$id")) and SemanticsMatcher("original preview text") {
+            it.config.getOrNull(SemanticsProperties.Text)?.singleOrNull()?.text?.let { value ->
+                value != "原文预览" && value != "阅读全文" && !value.startsWith("记录日期：") &&
+                    value != "原文 · 仅本机"
+            } == true
+        }).performScrollTo().assertIsDisplayed()
+    }
+
+    private fun assertSearchMark(actual: AnnotatedString, matched: String) {
+        val mark = actual.spanStyles.single()
+        assertEquals(matched, actual.text.substring(mark.start, mark.end))
+        assertEquals(FontWeight.Bold, mark.item.fontWeight); assertEquals(TextDecoration.Underline, mark.item.textDecoration)
+        assertEquals(com.t1doo.aiyou.designsystem.AIyouColors.textPrimary, mark.item.color)
+        assertEquals(com.t1doo.aiyou.designsystem.AIyouColors.primaryContainer, mark.item.background)
+        assertEquals(1, mark.start)
     }
 
     @Test fun readerReturnKeepsActualMemoriesListIndexAndOffsetWhenPaddingShowsPreviousItem() {
