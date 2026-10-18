@@ -86,6 +86,7 @@ def inspect_xml(folder, phase, exit_code, started_ns, expected_class=CASE, expec
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--expected-head', required=True)
+    parser.add_argument('--date-only', action='store_true', help='Diagnose date sublayers without repeating already verified evidence controls')
     args = parser.parse_args()
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise SystemExit('Single-method Compose reproduction requires the existing licensed CI toolchain')
@@ -100,6 +101,8 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     report = {'status': 'FAIL', 'head': head, 'scope': 'one method per isolated Compose JVM invocation; original/current evidence controls, observer-free mode and independent date diagnosis; no device/Room/SQLCipher acceptance',
               'baseline_head': '269d62babac3795e61b1efe620a01c1751cd6b64', 'baseline_sha256': BASELINE_SHA, 'phases': []}
+    if args.date_only:
+        report['scope'] = 'date sublayers only, one actual method per isolated Compose JVM; evidence controls NOT RUN this invocation; no device/Room/SQLCipher acceptance'
     source = ROOT / SOURCE
     fixed = source.read_bytes()
     baseline = (ROOT / 'checks/ui-lazy-repro/CurrentImageSearchPresentationTest.kt.source').read_bytes()
@@ -111,13 +114,16 @@ def main():
     try:
         errors = []
         report['unexpected_outcomes'] = errors
-        for label, raw, case, method, expectation in [
+        plan = [
                 ('red', baseline, CASE, METHOD, 'red'),
                 ('green', fixed, CASE, METHOD, 'green'),
                 ('mode-no-observer', fixed, CASE, UNOBSERVED_METHOD, 'green'),
                 ('date-fields-only', fixed, DATE_CASE, 'standaloneDoubleFontDateFieldsHaveFiniteLayout', 'green'),
                 ('date-dialog-only', fixed, DATE_CASE, 'standaloneLoadedDoubleFontDateDialogHasFiniteLayout', 'green'),
-                ('date-independent', fixed, DATE_CASE, DATE_METHOD, 'green')]:
+                ('date-independent', fixed, DATE_CASE, DATE_METHOD, 'green')]
+        for label, raw, case, method, expectation in plan:
+            if args.date_only and not label.startswith('date-'):
+                continue
             source.write_bytes(raw)
             started = time.time_ns()
             command = ['timeout', '--signal=TERM', '--kill-after=10s', '180s',

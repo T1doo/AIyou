@@ -31,6 +31,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /** Real App/Compose/controller, explicit synthetic ports; no device/SQLCipher claim. */
@@ -154,6 +155,11 @@ class RecordEventDatePresentationTest {
     }
 
     @Test fun standaloneLoadedDoubleFontDateDialogHasFiniteLayout(){
+        // Dialog creates another Android window: configure platform resources as
+        // well as the composition's density, using the existing Robolectric API.
+        System.err.println("DATE_CONFIG before-dialog platformFont=${RuntimeEnvironment.getFontScale()}")
+        RuntimeEnvironment.setFontScale(2f)
+        assertEquals(2f,RuntimeEnvironment.getFontScale(),0f)
         controller.open("one",1)
         runBlocking{while(queue.isNotEmpty())queue.removeFirst()(store)}
         assertFalse(state.value.eventDateEditor!!.busy)
@@ -162,9 +168,12 @@ class RecordEventDatePresentationTest {
         compose.setContent{
             val density=LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density,2f)){
+                assertEquals(2f,androidx.compose.ui.platform.LocalContext.current.resources.configuration.fontScale,0f)
+                assertEquals(2f,LocalDensity.current.fontScale,0f)
                 AIyouTheme{state.value.eventDateEditor?.let{ui->RecordEventDateDialog(ui,null,controller){true}}}
             }
         }
+        System.err.println("DATE_ISOLATION after-dialog-setContent")
         control("event-date-input").assertIsEnabled()
         control("event-date-zone").assertIsEnabled()
         control("event-date-close").assertIsDisplayed().performClick()
@@ -173,6 +182,8 @@ class RecordEventDatePresentationTest {
     }
 
     @Test fun narrowDoubleFontManualSetCorrectionAndClearEachRequireVisiblePreview(){
+        RuntimeEnvironment.setFontScale(2f)
+        assertEquals(2f,RuntimeEnvironment.getFontScale(),0f)
         compose.setContent{Screen(true)};open()
         control("event-date-input").assertIsEnabled()
         compose.runOnIdle{assertEquals("",state.value.eventDateEditor!!.dateInput);assertEquals("",state.value.eventDateEditor!!.zoneInput)}
