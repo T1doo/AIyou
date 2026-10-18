@@ -8,9 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.unit.dp
-import com.t1doo.aiyou.designsystem.AIyouDimensions
 
 @Composable
 internal fun RecordEventDateDialog(ui: RecordEventDateEditor, pending: RecordEventDateWrite?,
@@ -18,14 +16,10 @@ internal fun RecordEventDateDialog(ui: RecordEventDateEditor, pending: RecordEve
     DisposableEffect(ui.session) { onDispose { controller.close(ui.session) } }
     // No date, zone, preview, mutation or original text enters a Bundle/Saver.
     CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
-        Dialog(onDismissRequest = { controller.close(ui.session) }) {
-            Surface(shape = MaterialTheme.shapes.large) {
-            // Share one finite scroll viewport for the title, fields and close
-            // action, following the other metadata editors at large font scales.
-            Column(Modifier.fillMaxWidth().heightIn(max = AIyouDimensions.contentMaxWidth)
-                .verticalScroll(rememberScrollState()).padding(AIyouDimensions.spaceMd),
+        AlertDialog(onDismissRequest = { controller.close(ui.session) },
+            title = { Text("事件发生日期 · 手工补记") },
+            text = { Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("事件发生日期 · 手工补记", style = MaterialTheme.typography.titleLarge)
                 Text("只保存单日日历日期和 IANA 时区，不补时刻。未知请留空；不会从原文、今天或记录时间推测。")
                 val saved = ui.snapshot?.date
                 Text(if (ui.snapshot == null) "已保存事件日期：尚未读取" else if (saved == null) "已保存事件日期：未补记（未知）"
@@ -67,10 +61,8 @@ internal fun RecordEventDateDialog(ui: RecordEventDateEditor, pending: RecordEve
                         Text(if (pending != null && !pending.conflict) "重试确认同一次选择" else "重新读取事件日期")
                     }
                 }
-                TextButton({ controller.close(ui.session) },
-                    modifier = Modifier.heightIn(min = 48.dp).testTag("event-date-close")) { Text("关闭") }
-            }
-            }
-        }
+            } },
+            confirmButton = { TextButton({ controller.close(ui.session) },
+                modifier = Modifier.heightIn(min = 48.dp).testTag("event-date-close")) { Text("关闭") } })
     }
 }

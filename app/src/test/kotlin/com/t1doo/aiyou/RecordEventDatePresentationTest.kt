@@ -111,7 +111,14 @@ class RecordEventDatePresentationTest {
         System.err.println("DATE_PHASE after-scroll tag=$tag")
         return scrolled
     }
-    private fun drain(){compose.runOnIdle{runBlocking{while(queue.isNotEmpty())queue.removeFirst()(store)}};compose.waitForIdle()}
+    private fun drain(){
+        // A controlled repository reply must not depend on the busy UI becoming
+        // idle first. Release only this fixture's queue on the UI thread, then
+        // require the normal Compose idle boundary and all existing assertions.
+        compose.runOnUiThread{runBlocking{while(queue.isNotEmpty())queue.removeFirst()(store)}}
+        System.err.println("DATE_PHASE after-repository-drain")
+        compose.waitForIdle()
+    }
     private fun fill(day:String,zone:String){
         control("event-date-input").performTextReplacement(day)
         control("event-date-zone").performTextReplacement(zone)
