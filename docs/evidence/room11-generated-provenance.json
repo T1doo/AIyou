@@ -1,0 +1,17 @@
+{
+  "schema_version": 11,
+  "generation": "Actual Room KSP output; original bytes recovered from already obtained official CI log, without regeneration or reserialization",
+  "source_commit": "cbaf2618f7d8c2cb6f85d6dd621c001944958ffc",
+  "source_run": 38991956980,
+  "source_job": 117276070948,
+  "source_url": "https://github.com/T1doo/AIyou/actions/runs/38991956980/job/117276070948",
+  "log_state_line": 2039,
+  "log_receipt_line": 242,
+  "log_sha256": "90c605355f9694c28c3858f2eea0e9dd944fecde6a439deb0bd2798ce3d8c4b0",
+  "bytes": 36377,
+  "sha256": "af9a9ebf205410b770aa5a374351553304682faabd70597617b2dc1101ac9290",
+  "source_and_fixture_byte_identical": true,
+  "historical_v2_to_v10": "18 files unchanged and matched historical receipt hashes",
+  "SDK": "Source CI verified existing platform37.0r2/build-tools36.0.0 acceptance, no new terms accepted",
+  "acceptance_limit": "Historical generation step PASS; historical whole CI later FAIL. This restore is not current-head KSP, Android Room migration, SQLCipher or device acceptance. Current-head CI must verify checked-in v11 and generate real v12."
+}
