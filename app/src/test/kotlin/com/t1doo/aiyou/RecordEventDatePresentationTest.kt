@@ -8,6 +8,7 @@ import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
@@ -90,30 +91,41 @@ class RecordEventDatePresentationTest {
     private fun open(){
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"))
         compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-one"))).performClick()
-        compose.onNodeWithTag("original-event-date-open").performScrollTo().performClick();drain()
+        control("original-event-date-open").performClick();drain()
+    }
+    // Test-only geometry before each scroll: identify an oversized target separately
+    // from SDK-main-thread Trace retention. No field values or originals are logged.
+    private fun control(tag:String):SemanticsNodeInteraction {
+        val target=compose.onNodeWithTag(tag)
+        val node=target.fetchSemanticsNode()
+        val viewport=generateSequence(node.parent){it.parent}.firstOrNull {
+            it.config.contains(SemanticsProperties.VerticalScrollAxisRange)
+        }
+        System.err.println("DATE_SCROLL_DIAGNOSTIC tag=$tag targetDp=${target.getUnclippedBoundsInRoot()} viewportPx=${viewport?.boundsInRoot}")
+        return target.performScrollTo()
     }
     private fun drain(){compose.runOnIdle{runBlocking{while(queue.isNotEmpty())queue.removeFirst()(store)}};compose.waitForIdle()}
     private fun fill(day:String,zone:String){
-        compose.onNodeWithTag("event-date-input").performScrollTo().performTextReplacement(day)
-        compose.onNodeWithTag("event-date-zone").performScrollTo().performTextReplacement(zone)
+        control("event-date-input").performTextReplacement(day)
+        control("event-date-zone").performTextReplacement(zone)
     }
-    private fun preview(){compose.onNodeWithTag("event-date-preview-set").performScrollTo().performClick()}
-    private fun confirm(){compose.onNodeWithTag("event-date-confirm").performScrollTo().performClick();drain()}
+    private fun preview(){control("event-date-preview-set").performClick()}
+    private fun confirm(){control("event-date-confirm").performClick();drain()}
 
     @Test fun narrowDoubleFontManualSetCorrectionAndClearEachRequireVisiblePreview(){
         compose.setContent{Screen(true)};open()
-        compose.onNodeWithTag("event-date-input").performScrollTo().assertIsEnabled()
+        control("event-date-input").assertIsEnabled()
         compose.runOnIdle{assertEquals("",state.value.eventDateEditor!!.dateInput);assertEquals("",state.value.eventDateEditor!!.zoneInput)}
         fill("2024-02-29","Asia/Shanghai");preview()
-        compose.onNodeWithTag("event-date-preview").performScrollTo().assertTextContains("2024-02-29",substring=true)
+        control("event-date-preview").assertTextContains("2024-02-29",substring=true)
         assertTrue(calls.isEmpty())
-        val button=compose.onNodeWithTag("event-date-confirm").performScrollTo().assertIsEnabled()
+        val button=control("event-date-confirm").assertIsEnabled()
         assertTrue(button.getUnclippedBoundsInRoot().height>=48.dp);confirm()
-        compose.onNodeWithTag("event-date-notice").performScrollTo().assertExists()
+        control("event-date-notice").assertExists()
         fill("2024-03-10","America/New_York");preview();confirm()
-        compose.onNodeWithTag("event-date-preview-clear").performScrollTo().performClick()
+        control("event-date-preview-clear").performClick()
         assertNotNull(durable.getValue("one").date)
-        compose.onNodeWithTag("event-date-preview").performScrollTo().assertTextContains("清除事件日期",substring=true)
+        control("event-date-preview").assertTextContains("清除事件日期",substring=true)
         confirm();assertNull(durable.getValue("one").date);assertEquals(3L,durable.getValue("one").version)
         compose.onNodeWithTag("event-date-close").performClick()
         compose.onNodeWithTag("original-event-date").assertTextEquals("事件日期：未补记（未知）")
@@ -123,17 +135,17 @@ class RecordEventDatePresentationTest {
 
     @Test fun uncertainSaveRetainsSameIntentAndStaleConfirmCannotWriteAfterNavigation(){
         compose.setContent{Screen()};open();fill("2024-03-10","America/New_York");preview();lose=true;confirm()
-        compose.onNodeWithTag("event-date-input").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithTag("event-date-preview-set").performScrollTo().assertIsNotEnabled()
+        control("event-date-input").assertIsNotEnabled()
+        control("event-date-preview-set").assertIsNotEnabled()
         compose.runOnIdle{
             val pending=state.value.eventDateWrites.getValue("one").intent
             val raw=checkNotNull(registry).performSave().toString()
             for(secret in listOf(pending.mutationId,pending.sourceHash,one.originalText,"2024-03-10","America/New_York"))assertFalse(raw.contains(secret))
         }
-        compose.onNodeWithTag("event-date-retry").performScrollTo().performClick();drain()
+        control("event-date-retry").performClick();drain()
         assertSame(calls[0],calls[1]);assertEquals(1L,durable.getValue("one").version)
         fill("2024-04-01","UTC");preview()
-        val old=compose.onNodeWithTag("event-date-confirm").performScrollTo().fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        val old=control("event-date-confirm").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
         compose.onNodeWithTag("event-date-close").performClick()
         compose.onNodeWithText("返回列表").performClick()
         compose.runOnIdle{old();assertTrue(queue.isEmpty());assertEquals(2,calls.size)}
@@ -143,27 +155,27 @@ class RecordEventDatePresentationTest {
         durable["one"]=RecordEventDateSnapshot("one",1,RecordEventDate("2024-03-10","America/New_York"))
         state.value=state.value.copy(eventDates=durable.toMap())
         compose.setContent{Screen()}
-        compose.onNodeWithTag("original-search-date-basis").performScrollTo().performClick()
+        control("original-search-date-basis").performClick()
         compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.dateBasis==RecordDateBasis.EVENT}==true}
         assertEquals(listOf("one"),results.get().hits.map{it.entry.id})
-        compose.onNodeWithTag("original-search-query").performScrollTo().performTextReplacement("coffee")
-        compose.onNodeWithTag("original-search-from").performScrollTo().performTextReplacement("2024-03-10")
-        compose.onNodeWithTag("original-search-through").performScrollTo().performTextReplacement("2024-03-10")
-        compose.onNodeWithTag("original-search-tag").performScrollTo().performClick()
+        control("original-search-query").performTextReplacement("coffee")
+        control("original-search-from").performTextReplacement("2024-03-10")
+        control("original-search-through").performTextReplacement("2024-03-10")
+        control("original-search-tag").performClick()
         compose.onNodeWithTag("original-search-tag-option-0").performClick()
-        compose.onNodeWithTag("original-search-favorites").performScrollTo().performClick()
+        control("original-search-favorites").performClick()
         compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.onlyFavorites&&it.input.tag=="手工"&&it.input.through=="2024-03-10"}==true}
         assertEquals(listOf("one"),results.get().hits.map{it.entry.id})
-        compose.onNodeWithTag("original-search-date-basis").performScrollTo().performClick()
+        control("original-search-date-basis").performClick()
         compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.dateBasis==RecordDateBasis.CAPTURED}==true}
         assertTrue(results.get().hits.isEmpty())
-        compose.onNodeWithTag("original-search-clear").performScrollTo().performClick()
+        control("original-search-clear").performClick()
         compose.waitUntil(2_000){results.get()?.stage==OriginalSearchStage.BROWSE}
         assertEquals(RecordDateBasis.CAPTURED,results.get().input.dateBasis)
         compose.runOnIdle{state.value=state.value.copy(eventDatesAvailable=false,eventDatesError="合成读取失败")}
-        compose.onNodeWithTag("original-search-date-basis").performScrollTo().performClick()
+        control("original-search-date-basis").performClick()
         compose.waitUntil(2_000){results.get()?.stage==OriginalSearchStage.FAILED}
-        compose.onNodeWithTag("original-search-event-date-retry").performScrollTo().assertIsEnabled().performClick()
+        control("original-search-event-date-retry").assertIsEnabled().performClick()
         compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.dateBasis==RecordDateBasis.EVENT}==true}
         assertEquals(listOf("one"),results.get().hits.map{it.entry.id})
     }

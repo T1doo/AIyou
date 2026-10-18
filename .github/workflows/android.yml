@@ -127,6 +127,11 @@ jobs:
           sha256sum app/build/outputs/apk/debug/app-debug.apk
       - name: Inspect actual merged APK for absent INTERNET permission (device NOT RUN)
         run: python3 scripts/inspect-record-ai-permissions.py
+      - name: Independently reproduce the original lazy-node failure and verify the corrected method
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[ui-lazy-repro]')
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: python3 scripts/reproduce-ui-lazy-source.py --expected-head "$GITHUB_SHA"
       - name: Run actual Compose disabled-control and storage-wiring regressions (JVM simulation)
         env:
           AIYOU_CI_ANDROID_DAEMON: 'true'
@@ -236,6 +241,7 @@ jobs:
             app/build/reports/screenshotTest/
             app/build/test-results/validateDebugScreenshotTest/
             app/build/reports/d01-preview-manifest.json
+            app/build/reports/ui-lazy-repro/
           if-no-files-found: warn
           retention-days: 14
       - name: Preserve debug APK

@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
@@ -82,6 +84,11 @@ class CurrentImageSearchPresentationTest {
                 }
             }
         } catch (timeout: ComposeTimeoutException) {
+            val tags = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.TestTag), useUnmergedTree = true)
+                .fetchSemanticsNodes().map { it.config[SemanticsProperties.TestTag] }
+            val messages = compose.onAllNodes(hasAnyAncestor(hasTestTag("local-evidence-status")), useUnmergedTree = true)
+                .fetchSemanticsNodes().flatMap { it.config.getOrNull(SemanticsProperties.Text).orEmpty() }.map { it.text }
+            System.err.println("UI_LAZY_DIAGNOSTIC stage=${results.get()?.stage} hits=${results.get()?.hits?.size} tags=$tags status=$messages")
             missing?.let(timeout::addSuppressed)
             throw timeout
         }
@@ -149,6 +156,7 @@ class CurrentImageSearchPresentationTest {
         reveal("original-search-query").performTextReplacement("needle")
         await{it.stage==OriginalSearchStage.READY}
         reveal("local-evidence-mode").performClick()
+        reveal("local-evidence-mode").assertTextContains("本机出处候选 · 返回原文列表")
         reveal("local-evidence-picture").assertExists()
         compose.onNode(hasText("查看原文") and hasAnyAncestor(hasTestTag("local-evidence-picture")))
             .performScrollTo().performClick()

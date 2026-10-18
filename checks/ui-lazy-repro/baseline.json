@@ -1,0 +1,12 @@
+{
+  "source_head": "269d62babac3795e61b1efe620a01c1751cd6b64",
+  "source_path": "app/src/test/kotlin/com/t1doo/aiyou/CurrentImageSearchPresentationTest.kt",
+  "fixture_path": "checks/ui-lazy-repro/CurrentImageSearchPresentationTest.kt.source",
+  "bytes": 16295,
+  "sha256": "63db4d52c998ae65cf82c1b44bed6798cb11b1038e044a321b4285e569a8e2f7",
+  "method": "localEvidenceCardsUseCurrentSourceAndReturnWithoutChangingQuestion",
+  "expected_old_failure_line": 131,
+  "scope": "verbatim historical test source for independent one-method red/green control; never compiled as a second product implementation",
+  "trigger": "explicit push commit marker [ui-lazy-repro]; unchanged full UI gate always applies",
+  "independent_date_method": "com.t1doo.aiyou.RecordEventDatePresentationTest.narrowDoubleFontManualSetCorrectionAndClearEachRequireVisiblePreview"
+}
