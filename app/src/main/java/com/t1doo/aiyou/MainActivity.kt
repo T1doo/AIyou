@@ -97,6 +97,7 @@ class MainActivity : ComponentActivity() {
             records.recordPackages.attachPickerOwner(it)
         }
         val preferences = ViewModelProvider(this)[UiPreferencesViewModel::class.java]
+        val storageUsage = ViewModelProvider(this)[com.t1doo.aiyou.ui.StorageUsageViewModel::class.java]
         setContent {
             val local by records.state.collectAsState()
             val display by preferences.state.collectAsState()
@@ -114,7 +115,7 @@ class MainActivity : ComponentActivity() {
                 onEditOriginalHistory = records::editOriginalHistory,
                 onConfirmHistoryReplacement = records::confirmHistoryReplacement,
                 onCancelHistoryReplacement = records::cancelHistoryReplacement, attachments = records.attachments, mixedCapture = records.mixedCapture,
-                imageGrid = records.imageGrid,
+                imageGrid = records.imageGrid, storageUsage = storageUsage.controller,
                 onOpenAiSession = { id, revision -> records.openAiSession(id, revision) },
                 onStartAiSession = records::startAiSession, onStopAiSession = records::stopAiSession,
                 onCloseAiSession = records::closeAiSession,
@@ -211,6 +212,7 @@ fun AIyouApp(
     onDisplayChange: (UiPreferences) -> Unit = {},
     onRetryDisplay: () -> Unit = {},
     previewSettings: Boolean = false,
+    storageUsage: com.t1doo.aiyou.ui.StorageUsageController? = null,
     onOpenAiSession: (String, Int) -> Unit = { _, _ -> },
     onStartAiSession: (Long) -> Unit = {},
     onStopAiSession: (Long) -> Unit = {},
@@ -776,7 +778,7 @@ fun AIyouApp(
                 onLicenses = { if (ownsNavigation()) { navigation.advance(); showLicenses = true } },
                 onDemo = { if (ownsNavigation()) { navigation.advance(); clearSearch(); demo = !demo } },
                 onDemoState = { if (ownsNavigation()) { navigation.advance(); stateName = it.name } },
-                modifier = modifier, hasRecordPackages=local?.supportsRecordPackages==true)
+                modifier = modifier, hasRecordPackages=local?.supportsRecordPackages==true, storageUsage = storageUsage)
         } else if (browsingPackage && local != null && recordPackages != null && packageUi != null) {
             com.t1doo.aiyou.records.RecordPackageScreen(local, packageUi, recordPackages, recordPackagePicker, ::ownsPackageRoute, modifier)
         } else if (browsingRecycle && local != null && recycleBin != null && recycleUi != null) {

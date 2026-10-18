@@ -225,6 +225,8 @@ jobs:
             checks/native-trace/build/reports/tests/test/
             core/designsystem/build/test-results/testDebugUnitTest/
             core/designsystem/build/reports/tests/testDebugUnitTest/
+            core/data/build/test-results/testDebugUnitTest/
+            core/data/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/
             app/build/reports/tests/testDebugUnitTest/
             app/build/reports/lint-results-debug.*

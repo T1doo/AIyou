@@ -45,6 +45,7 @@ fun SettingsScreen(
     onDemoState: (ComponentState) -> Unit,
     modifier: Modifier = Modifier,
     hasRecordPackages: Boolean = false,
+    storageUsage: StorageUsageController? = null,
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
@@ -80,6 +81,9 @@ fun SettingsScreen(
                     Text("尚未开放", style = MaterialTheme.typography.titleMedium)
                     Text("之后可连接你选择的模型。发送任何记录前，会先说明范围并征求授权。",
                         style = MaterialTheme.typography.bodyMedium, color = AIyouColors.textSecondary)
+                }
+                if (storageUsage != null) SettingsGroup("存储") {
+                    StorageUsageSection(storageUsage)
                 }
                 SettingsGroup("关于") {
                     Text("爱忆 AIyou · 本机记录伙伴", style = MaterialTheme.typography.bodyMedium)

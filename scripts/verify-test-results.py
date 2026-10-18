@@ -47,6 +47,17 @@ for label, folder, minimum in targets:
     print(f"PASS: {label} tests={total} actual={cases} failures=0 errors=0 skipped=0")
     additional = {}
     if label == "host queue":
+        additional["com.t1doo.aiyou.storage.StorageUsageTest"] = (
+            "countsActualDatabaseSidecarsCiphertextDraftsAndRecoveryFilesWithoutChangingBytes",
+            "freshInstallationReturnsZeroWithoutCreatingRecordsDirectoryOrReadingSiblingKeys",
+            "invalidRootAndNestedSymbolicLinkFailInsteadOfReportingZeroOrFollowingOutside",
+            "danglingLinkCannotBecomePartialSuccess",
+            "entryAndDepthBudgetsRejectPartialTotals",
+            "interruptedMeasurementCannotReturnPartialSuccessAndOverflowIsRejected",
+            "explicitQueryRunsOnlyOnIoRejectsBusyDuplicateAndRefreshesChangedMeasurement",
+            "readFailureHidesPreviousTotalAndExplicitRetryCanConfirmRealZero",
+            "navigationDuringAnAlreadyExecutingReadRejectsItsResultAndRetiredCallback",
+            "disposalCancelsQueuedIoAndCannotReopenOrPublish")
         additional["OriginalEditRecoveryTest"] = (
             "aiNoneSourceAllowsManualAutosaveAndNewVersionWithoutChangingItsPolicy",)
         additional["com.t1doo.aiyou.records.LocalOriginalSearchTest"] = (
@@ -99,6 +110,9 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.StorageUsagePresentationTest"] = (
+            "explicitQueryAndRefreshShowCategoriesAndRetiredActualButtonCannotQueryNextVisit",
+            "narrowDoubleFontFailureNeverShowsZeroAndExplicitRetryCanConfirmEmptyFiles")
         additional["com.t1doo.aiyou.ManualPeoplePresentationTest"] = (
             "manualEditorWaitsForAckKeepsFailedInputAndOnlyConfirmedRemoveChangesNames",
             "explicitPersonAndKeywordSavedZoneDateOpenOriginalAndRetireStalePersonResult",

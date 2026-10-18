@@ -6,6 +6,8 @@ dependencyLocking { lockAllConfigurations() }
 // Compile the actual product sources, never an independently copied ViewModel.
 val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
+    from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordsStorageUsageReader.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/ui/StorageUsageController.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordHistoryPackageCodec.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordEventDatePackageCodec.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordPeoplePackageCodec.kt")
