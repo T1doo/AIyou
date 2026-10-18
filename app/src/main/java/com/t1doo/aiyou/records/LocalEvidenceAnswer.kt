@@ -2,6 +2,13 @@ package com.t1doo.aiyou.records
 
 import com.t1doo.aiyou.model.LocalCandidates
 import com.t1doo.aiyou.model.OriginalTextReference
+import com.t1doo.aiyou.model.SelectedQuestionRequest
+import com.t1doo.aiyou.model.SelectedQuestionSource
+import com.t1doo.aiyou.model.SelectedQuestionMode
+import com.t1doo.aiyou.domain.SelectedQuestionService
+import com.t1doo.aiyou.domain.SelectedQuestionExchange
+import java.time.Clock
+import java.time.ZoneId
 import java.util.Collections
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -38,16 +45,17 @@ class LocalEvidenceAnswerResponse(val requestId: String, val selectionId: String
     override fun toString() = "LocalEvidenceAnswerResponse(redacted)"
 }
 
-enum class LocalEvidenceAnswerStage { WAITING, RUNNING, READY, NO_EVIDENCE, FAILED, CANCELLED, STALE, UNAVAILABLE }
+enum class LocalEvidenceAnswerStage { WAITING, REVIEW, RUNNING, READY, NO_EVIDENCE, FAILED, CANCELLED, STALE, UNAVAILABLE }
 
 class LocalEvidenceAnswerState internal constructor(val stage: LocalEvidenceAnswerStage,
     val requestId: String? = null, paragraphs: List<LocalEvidenceAnswerParagraph> = emptyList(),
-    internal val evidence: LocalEvidenceState? = null, val excerptTimeline: Boolean = false) {
+    internal val evidence: LocalEvidenceState? = null, val excerptTimeline: Boolean = false,
+    val questionReview: SelectedQuestionRequest? = null) {
     val paragraphs: List<LocalEvidenceAnswerParagraph> = Collections.unmodifiableList(ArrayList(paragraphs))
     override fun toString() = "LocalEvidenceAnswerState(stage=$stage, redacted)"
 }
 
-/** Reuses the existing selection/receipt and SQL proof. No second retrieval or confirmation layer. */
+/** Shares the existing selection/proof. Question review adds request identity, never remote consent. */
 class LocalEvidenceAnswerController internal constructor(
     private val evidence: LocalEvidenceController,
     private val currentEvidence: () -> LocalEvidenceState,
@@ -55,28 +63,48 @@ class LocalEvidenceAnswerController internal constructor(
     private val fixture: SyntheticEvidenceAnswerProvider? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val localSummary: Boolean = false,
+    private val questionService: SelectedQuestionService? = null,
+    private val clock: Clock = Clock.systemUTC(),
+    private val questionTimeZone: String = ZoneId.systemDefault().id,
 ) : AutoCloseable {
-    init { require(fixture == null || !localSummary) }
+    init {
+        require(listOf(fixture != null, localSummary, questionService != null).count { it } <= 1)
+        require(questionService == null || questionService.mode == SelectedQuestionMode.LOCAL_PROTOCOL_FIXTURE)
+    }
     private val lock = Any()
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private fun stateOf(stage: LocalEvidenceAnswerStage, requestId: String? = null,
-        paragraphs: List<LocalEvidenceAnswerParagraph> = emptyList(), evidence: LocalEvidenceState? = null) =
-        LocalEvidenceAnswerState(stage, requestId, paragraphs, evidence, excerptTimeline = localSummary)
-    private val waiting = stateOf(if (fixture == null && !localSummary) LocalEvidenceAnswerStage.UNAVAILABLE else LocalEvidenceAnswerStage.WAITING)
+        paragraphs: List<LocalEvidenceAnswerParagraph> = emptyList(), evidence: LocalEvidenceState? = null,
+        review: SelectedQuestionRequest? = null) =
+        LocalEvidenceAnswerState(stage, requestId, paragraphs, evidence, excerptTimeline = localSummary, questionReview = review)
+    private val waiting = stateOf(if (fixture == null && !localSummary && questionService == null) LocalEvidenceAnswerStage.UNAVAILABLE else LocalEvidenceAnswerStage.WAITING)
     private val mutable = MutableStateFlow(waiting)
     val state = mutable.asStateFlow()
-    val available get() = fixture != null || localSummary
+    val available get() = fixture != null || localSummary || questionService != null
     private class Run(val view: LocalEvidenceState) {
         val id = UUID.randomUUID().toString()
         var request: LocalEvidenceAnswerRequest? = null
         val stop = AtomicBoolean()
         var job: Job? = null
-        fun cancel() { stop.set(true); request?.cancel(); job?.cancel() }
+        var question: SelectedQuestionRequest? = null
+        var exchange: SelectedQuestionExchange? = null
+    }
+    private val cancellations = ArrayList<SelectedQuestionExchange>()
+    private fun cancelLocked(value: Run?) {
+        value ?: return
+        value.stop.set(true); value.request?.cancel(); value.job?.cancel()
+        value.exchange?.let { cancellations += it }; value.exchange = null
+    }
+    private fun cancelExchange(value: SelectedQuestionExchange?) { try { value?.cancel() } catch (_: Exception) { } }
+    private fun drainCancellation() {
+        val pending = synchronized(lock) { cancellations.toList().also { cancellations.clear() } }
+        pending.forEach(::cancelExchange)
     }
     private var closed = false
     private var run: Run? = null
     private fun owns(value: Run) = !closed && run === value && !value.stop.get() && ownsSession() &&
-        currentEvidence() === value.view && value.view.selection.stage == LocalEvidenceSelectionStage.CONFIRMED
+        currentEvidence() === value.view && value.view.selection.stage == LocalEvidenceSelectionStage.CONFIRMED &&
+        (questionService == null || value.question?.target == questionService.target)
 
     fun visible(): LocalEvidenceAnswerState = synchronized(lock) {
         val value = mutable.value
@@ -86,16 +114,35 @@ class LocalEvidenceAnswerController internal constructor(
     }
     fun sync() = synchronized(lock) {
         if (run?.let { !owns(it) } == true) {
-            run?.cancel(); run = null; mutable.value = stateOf(LocalEvidenceAnswerStage.STALE)
+            cancelLocked(run); run = null; mutable.value = stateOf(LocalEvidenceAnswerStage.STALE)
         }
-    }
-    fun ask(value: LocalEvidenceState) = synchronized(lock) {
+    }.also { drainCancellation() }
+    /** Separate one-shot review of question + target + selected scope; never a remote ConsentGrant. */
+    fun review(value: LocalEvidenceState) = synchronized(lock) {
+        val service = questionService ?: return@synchronized
+        if (closed || !ownsSession() || currentEvidence() !== value || value.stage != LocalEvidenceStage.READY ||
+            value.selection.stage != LocalEvidenceSelectionStage.CONFIRMED) return@synchronized
+        val packet = try { LocalEvidencePacket.reviewed(value) } catch (_: Exception) { return@synchronized }
+        cancelLocked(run)
+        val next = Run(value)
+        next.question = SelectedQuestionRequest(next.id, packet.selectionId, packet.question, service.target,
+            clock.millis(), questionTimeZone, packet.citations.map {
+                SelectedQuestionSource(it.reference, it.capturedAtMillis, it.captureTimeZone, it.policy)
+            })
+        run = next
+        mutable.value = stateOf(LocalEvidenceAnswerStage.REVIEW, next.id, evidence = value, review = next.question)
+    }.also { drainCancellation() }
+    fun ask(value: LocalEvidenceState, expectedReview: SelectedQuestionRequest? = null) = synchronized(lock) {
         if (closed || !available || !ownsSession() || currentEvidence() !== value ||
             value.stage != LocalEvidenceStage.READY || value.selection.stage != LocalEvidenceSelectionStage.CONFIRMED ||
             value.selection.confirmation == null || value.selection.cards.isEmpty()) return@synchronized
         if (run?.let { owns(it) } == true && mutable.value.stage == LocalEvidenceAnswerStage.RUNNING) return@synchronized
-        run?.cancel()
-        val next = Run(value); run = next
+        val next = if (questionService != null) {
+            run?.takeIf { owns(it) && mutable.value.stage == LocalEvidenceAnswerStage.REVIEW &&
+                mutable.value.questionReview === expectedReview && it.question === expectedReview } ?: return@synchronized
+        } else {
+            cancelLocked(run); Run(value).also { run = it }
+        }
         mutable.value = stateOf(LocalEvidenceAnswerStage.RUNNING, next.id, evidence = value)
         next.job = scope.launch {
             try {
@@ -106,9 +153,30 @@ class LocalEvidenceAnswerController internal constructor(
                 val request = synchronized(lock) {
                     if (!owns(next)) null else LocalEvidenceAnswerRequest(next.id, checkNotNull(packet)).also { next.request = it }
                 } ?: return@launch
-                // Pure in-memory processing outside SQL/owner locks. Production only copies exact
-                // selected quotes; it does not answer the question, infer facts or invoke a provider.
-                val response = if (localSummary) LocalEvidenceTimeline.generate(request) else checkNotNull(fixture).answer(request)
+                // Outside SQL/owner locks. Default fallback copies quotes; optional question service
+                // remains a local protocol fixture. Neither path grants remote sending authority.
+                val response = when {
+                    localSummary -> LocalEvidenceTimeline.generate(request)
+                    questionService != null -> {
+                        val approved = checkNotNull(next.question)
+                        require(approved.question == request.packet.question && approved.selectionId == request.packet.selectionId &&
+                            approved.sources == request.packet.citations.map {
+                                SelectedQuestionSource(it.reference, it.capturedAtMillis, it.captureTimeZone, it.policy)
+                            })
+                        val exchange = questionService.newExchange(approved)
+                        val registered = synchronized(lock) { if (!owns(next)) false else { next.exchange = exchange; true } }
+                        if (!registered) { cancelExchange(exchange); return@launch }
+                        try {
+                            val reply = exchange.execute()
+                            LocalEvidenceAnswerResponse(reply.requestId, reply.selectionId,
+                                reply.paragraphs.map { LocalEvidenceAnswerParagraph(it.text, it.references) }, reply.noEvidence)
+                        } finally {
+                            val retained = synchronized(lock) { next.exchange.also { next.exchange = null } }
+                            cancelExchange(retained)
+                        }
+                    }
+                    else -> checkNotNull(fixture).answer(request)
+                }
                 currentCoroutineContext().ensureActive()
                 val paragraphs = validate(request, response)
                 // A completed provider output is still provisional. Inspect again and wait for COMMIT;
@@ -119,23 +187,24 @@ class LocalEvidenceAnswerController internal constructor(
                 finish(next, if (response.noEvidence) LocalEvidenceAnswerStage.NO_EVIDENCE else LocalEvidenceAnswerStage.READY, paragraphs)
             } catch (cancelled: CancellationException) {
                 synchronized(lock) { if (!closed && run === next && !next.stop.get()) {
-                    next.cancel(); run = null; mutable.value = stateOf(LocalEvidenceAnswerStage.CANCELLED, next.id)
+                    cancelLocked(next); run = null; mutable.value = stateOf(LocalEvidenceAnswerStage.CANCELLED, next.id)
                 } }
+                drainCancellation()
                 throw cancelled
             } catch (_: Exception) { finish(next, LocalEvidenceAnswerStage.FAILED) }
         }
-    }
+    }.also { drainCancellation() }
     private fun finish(value: Run, stage: LocalEvidenceAnswerStage, paragraphs: List<LocalEvidenceAnswerParagraph> = emptyList()) = synchronized(lock) {
         if (owns(value)) mutable.value = stateOf(stage, value.id, paragraphs, value.view)
         else if (!closed && run === value && !value.stop.get()) {
-            value.cancel(); run = null; mutable.value = stateOf(LocalEvidenceAnswerStage.STALE)
+            cancelLocked(value); run = null; mutable.value = stateOf(LocalEvidenceAnswerStage.STALE)
         }
-    }
+    }.also { drainCancellation() }
     fun cancel() = synchronized(lock) {
         val old = run ?: return@synchronized
-        old.cancel(); run = null
+        cancelLocked(old); run = null
         mutable.value = stateOf(LocalEvidenceAnswerStage.CANCELLED, old.id)
-    }
+    }.also { drainCancellation() }
     /** The source card is still owned by the original evidence view; its existing search.open resolves SQL again. */
     fun sourceFor(value: LocalEvidenceAnswerState, reference: OriginalTextReference): LocalEvidenceCard? = synchronized(lock) {
         val current = run ?: return@synchronized null
@@ -143,7 +212,8 @@ class LocalEvidenceAnswerController internal constructor(
             value.paragraphs.none { reference in it.references }) return@synchronized null
         current.view.selection.cards.singleOrNull { it.reference == reference && evidence.canOpen(current.view, it) }
     }
-    override fun close() = synchronized(lock) { closed = true; run?.cancel(); run = null; mutable.value = waiting; scope.cancel() }
+    override fun close() = synchronized(lock) { closed = true; cancelLocked(run); run = null; mutable.value = waiting; scope.cancel() }
+        .also { drainCancellation() }
 
     companion object {
         const val MAX_PARAGRAPHS = 5

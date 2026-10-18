@@ -3,6 +3,7 @@ package com.t1doo.aiyou.data
 import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
 import com.t1doo.aiyou.records.*
+import kotlinx.serialization.json.*
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -318,7 +319,143 @@ class LocalEvidenceAnswerTest {
         h.answers.sync(); assertTrue(h.answers.visible().excerptTimeline)
     }
 
-    private class Harness(timeline: Boolean = false) : AutoCloseable {
+    @Test fun localProtocolQuestionRequiresExactOneShotScopeReviewAndBothProtocolsReachOriginal(): Unit {
+        for (protocol in ConnectionProtocol.entries) {
+            val fixture = QuestionProtocolFixture(protocol)
+            Harness(question = fixture).use { h ->
+                val view = h.confirm(0, 2); val before = h.f.originalState()
+                h.answers.ask(view); assertEquals(0, fixture.opened.get())
+                h.answers.review(view); val first = checkNotNull(h.answers.state.value.questionReview)
+                h.answers.review(view); val second = checkNotNull(h.answers.state.value.questionReview)
+                assertNotSame(first, second); assertEquals("needle", second.question); assertEquals(fixture.target, second.target)
+                h.answers.ask(view, first); assertEquals(0, fixture.opened.get())
+                h.answers.ask(view, second); h.answers.ask(view, second)
+                val answer = h.await(LocalEvidenceAnswerStage.READY); h.joinAnswer()
+                assertEquals("本机假服务根据所选片段回应🙂", answer.paragraphs.single().text)
+                assertEquals(1, fixture.opened.get()); assertEquals(1, fixture.executions.get()); assertEquals(0, h.calls.get())
+                val refs = view.selection.cards.map { it.reference }
+                assertEquals(refs, answer.paragraphs.single().references)
+                assertEquals(refs.map { it.quote }, checkNotNull(fixture.payload).getValue("sources").jsonArray.map {
+                    it.jsonObject.getValue("quote").jsonPrimitive.content
+                })
+                assertTrue(refs.all { it.end - it.start <= 240 })
+                assertFalse(checkNotNull(fixture.prepared).bodyJson.contains("中".repeat(300)))
+                refs.forEach { ref ->
+                    val card = checkNotNull(h.answers.sourceFor(answer, ref)); var opened: StoredEntry? = null
+                    assertTrue(h.owner.resolve(checkNotNull(view.source?.proof), ref.source.sourceId) { opened = it })
+                    assertEquals(card.hit.entry, opened)
+                }
+                h.answers.ask(view, second); assertEquals(1, fixture.opened.get())
+                assertEquals(before, h.f.originalState())
+            }
+        }
+    }
+
+    @Test fun questionReviewTargetRouteAbaAndChangedAccountInputOrSelectionRejectOldConfirmation(): Unit {
+        for (kind in listOf("target", "route", "account", "input", "selection")) {
+            val fixture = QuestionProtocolFixture(); val target = AtomicReference(fixture.target)
+            val service = object : SelectedQuestionService by fixture.service { override val target get() = target.get() }
+            Harness(question = fixture, questionService = service).use { h ->
+                val view = h.confirm(0); h.answers.review(view); val old = checkNotNull(h.answers.state.value.questionReview)
+                when (kind) {
+                    "target" -> target.set(fixture.target.copy(modelId = "other-model"))
+                    "route" -> h.session.set(false)
+                    "selection" -> h.evidence.toggle(view, view.cards[0])
+                    else -> {
+                        val search = h.source.get()
+                        h.source.set(OriginalSearchState(if (kind == "input") search.input.copy(query = "changed") else search.input,
+                            search.stage, search.hits, entries = search.entries, proof = search.proof,
+                            owner = if (kind == "account") object : LocalSearchRepository by h.owner {} else h.owner))
+                    }
+                }
+                h.answers.sync(); assertEquals(LocalEvidenceAnswerStage.STALE, h.answers.visible().stage)
+                if (kind == "target" || kind == "route") {
+                    target.set(fixture.target); h.session.set(true); h.answers.review(view)
+                    assertNotSame(old, h.answers.state.value.questionReview)
+                }
+                h.answers.ask(view, old); assertEquals(0, fixture.opened.get())
+            }
+        }
+    }
+
+    @Test fun questionBothInspectionCommitsAndDeletedRevisedOrWithdrawnSourcesBlockPublication(): Unit {
+        for (failedPhase in 1..2) {
+            val fixture = QuestionProtocolFixture()
+            Harness(question = fixture).use { h ->
+                val view = h.confirm(0, 1); h.answers.review(view); val review = h.answers.state.value.questionReview
+                val commits = AtomicInteger()
+                h.f.db.beforeCommit = { if (commits.incrementAndGet() == failedPhase) error("Synthetic question COMMIT failure") }
+                h.answers.ask(view, review); assertTrue(h.await(LocalEvidenceAnswerStage.STALE).paragraphs.isEmpty())
+                assertEquals(failedPhase - 1, fixture.executions.get()); assertNull(h.evidence.state.value.selection.confirmation)
+            }
+        }
+        for (kind in listOf("delete", "revision", "withdraw", "withdraw-restore")) {
+            val fixture = QuestionProtocolFixture()
+            Harness(question = fixture).use { h ->
+                val view = h.confirm(0, 1); h.answers.review(view); val review = h.answers.state.value.questionReview
+                val checks = AtomicInteger(); h.beforeProof = { if (checks.incrementAndGet() == 2) h.mutate(kind, 0) }
+                h.answers.ask(view, review); assertTrue(h.await(LocalEvidenceAnswerStage.STALE).paragraphs.isEmpty())
+                assertEquals(1, fixture.executions.get()); assertNull(h.answers.sourceFor(h.answers.state.value, view.cards[0].reference))
+            }
+        }
+    }
+
+    @Test fun questionCancelledWhileExchangeIsBeingCreatedCancelsReturnedOwnerOutsideControllerLocks(): Unit {
+        val fixture = QuestionProtocolFixture(); val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        Harness(question = fixture).use { h ->
+            fixture.onOpen = { entered.countDown(); check(release.await(5, TimeUnit.SECONDS)) }
+            fixture.onCancel = {
+                for (controller in listOf(h.answers, h.evidence)) {
+                    val lock = controller.javaClass.getDeclaredField("lock").apply { isAccessible = true }.get(controller)
+                    assertFalse("No external cancellation under owner lock", Thread.holdsLock(lock))
+                }
+            }
+            val view = h.confirm(0); h.answers.review(view); h.answers.ask(view, h.answers.state.value.questionReview)
+            assertTrue(entered.await(5, TimeUnit.SECONDS)); val job = h.worker()
+            try { h.answers.cancel() } finally { release.countDown() }
+            runBlocking { withTimeout(5_000) { job.join() } }
+            assertEquals(LocalEvidenceAnswerStage.CANCELLED, h.answers.visible().stage)
+            assertEquals(0, fixture.executions.get()); assertEquals(1, fixture.cancels.get())
+        }
+    }
+
+    @Test fun questionStopRejectsNonCooperativeLateReplyAndFreshReviewCanComplete(): Unit {
+        val fixture = QuestionProtocolFixture(); val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        Harness(question = fixture).use { h ->
+            fixture.beforeExecute = { entered.countDown(); check(release.await(5, TimeUnit.SECONDS)) }
+            val view = h.confirm(0); h.answers.review(view); h.answers.ask(view, h.answers.state.value.questionReview)
+            assertTrue(entered.await(5, TimeUnit.SECONDS)); val old = h.worker()
+            try {
+                h.answers.cancel(); assertEquals(1, fixture.cancels.get())
+                fixture.beforeExecute = {}; h.answers.review(view); h.answers.ask(view, h.answers.state.value.questionReview)
+                val next = h.await(LocalEvidenceAnswerStage.READY); h.joinAnswer()
+                release.countDown(); runBlocking { withTimeout(5_000) { old.join() } }
+                assertSame(next, h.answers.state.value); assertEquals(2, fixture.executions.get())
+            } finally { release.countDown() }
+        }
+    }
+
+    @Test fun questionForgedCitationNoEvidenceAndProviderFailureNeverWriteFactsOrAutoRetry(): Unit {
+        val fixture = QuestionProtocolFixture()
+        Harness(question = fixture).use { h ->
+            val view = h.confirm(0); val before = h.f.originalState()
+            for (kind in listOf("forged", "failure", "no-evidence")) {
+                fixture.wire = { payload ->
+                    if (kind == "failure") error("Synthetic private diagnostic")
+                    val reply = QuestionProtocolFixture.reply(payload, noEvidence = kind == "no-evidence")
+                    QuestionProtocolFixture.wire(fixture.target.protocol,
+                        if (kind == "forged") reply.replace(view.cards[0].reference.source.sourceId, "unselected") else reply)
+                }
+                h.answers.review(view); h.answers.ask(view, h.answers.state.value.questionReview)
+                val result = h.await(if (kind == "no-evidence") LocalEvidenceAnswerStage.NO_EVIDENCE else LocalEvidenceAnswerStage.FAILED)
+                h.joinAnswer(); assertTrue(result.paragraphs.isEmpty())
+            }
+            assertEquals(3, fixture.executions.get()); assertEquals(before, h.f.originalState())
+        }
+    }
+
+    private class Harness(timeline: Boolean = false, question: QuestionProtocolFixture? = null,
+        questionService: SelectedQuestionService? = question?.service) : AutoCloseable {
         val f = RecordEventDateFixture()
         val ids = (1..3).map { "60000000-0000-4000-8000-${it.toString().padStart(12, '0')}" }
         val source = AtomicReference<OriginalSearchState>()
@@ -341,7 +478,8 @@ class LocalEvidenceAnswerTest {
             assertFalse(Thread.holdsLock(ownerLock))
             calls.incrementAndGet(); requests += request; handler(request)
         }
-        val answers = LocalEvidenceAnswerController(evidence, ::current, session::get, if (timeline) null else fixture, localSummary = timeline)
+        val answers = LocalEvidenceAnswerController(evidence, ::current, session::get,
+            if (timeline || questionService != null) null else fixture, localSummary = timeline, questionService = questionService)
         init { ids.forEach { f.entry(it, "🙂".repeat(90) + "needle 合成记录\n" + "中".repeat(300)) }; refresh() }
         fun current() = evidence.visible(source.get())
         fun refresh() {

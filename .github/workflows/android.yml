@@ -284,7 +284,7 @@ jobs:
           (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
           print('ORIGINAL_EDIT_MIGRATION_TARGETED_XML_JSON ' + json.dumps(receipt))
           PY
-      - name: Preserve production selected-excerpt fallback UI evidence from same full suite
+      - name: Preserve selected-excerpt and local protocol question UI evidence from same full suite
         run: |
           python3 - <<'PY'
           import hashlib, json, os, shutil
@@ -297,7 +297,7 @@ jobs:
           new_cases = {
               'productionSelectedExcerptTimelineIsExplicitAndOpensExactOriginalWithFreshConfirmationOnReturn',
               'narrowDoubleFontProductionTimelineKeepsChronologyAndClearsOnSelectionOrInputChange'}
-          assert int(suite.get('tests', '-1')) == len(cases) == 14
+          assert int(suite.get('tests', '-1')) == len(cases) == 16
           assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
           assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
           assert new_cases <= {case.get('name') for case in cases}
@@ -311,6 +311,19 @@ jobs:
                      'xml': [{'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}]}
           (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
           print('LOCAL_EVIDENCE_TIMELINE_TARGETED_XML_JSON ' + json.dumps(receipt))
+          question_cases = {
+              'narrowDoubleFontProtocolQuestionRequiresSeparateScopeConfirmationAndJumpsToCurrentOriginal',
+              'protocolQuestionStopAndServiceReplacementRejectNonCooperativeLateAnswer'}
+          assert question_cases <= {case.get('name') for case in cases}
+          target = Path('app/build/reports/selected-evidence-question-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(source, target / source.name)
+          receipt = {'head_sha': os.environ['GITHUB_SHA'], 'tests': len(cases), 'new_cases': len(question_cases),
+                     'failures': 0, 'errors': 0, 'skipped': 0, 'mode': 'LOCAL_PROTOCOL_FIXTURE',
+                     'external_model_calls': 0, 'source': 'subset of same full app suite, no second execution',
+                     'xml': [{'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}]}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('SELECTED_EVIDENCE_QUESTION_TARGETED_XML_JSON ' + json.dumps(receipt))
           PY
       - name: Compile actual D02 native-storage instrumentation APK without claiming execution
         env:
@@ -408,6 +421,7 @@ jobs:
             app/build/reports/recap-preferences-targeted/
             app/build/reports/original-edit-migration-targeted/
             app/build/reports/local-evidence-timeline-targeted/
+            app/build/reports/selected-evidence-question-targeted/
             app/build/reports/lint-results-debug.*
             app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             core/designsystem/build/reports/lint-results-debug.*

@@ -17,6 +17,13 @@ import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
 import com.t1doo.aiyou.records.*
 import com.t1doo.aiyou.ui.Destination
+import com.t1doo.aiyou.ai.*
+import org.json.JSONObject
+import org.json.JSONArray
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -61,12 +68,14 @@ class CurrentImageSearchPresentationTest {
         override fun onResults(state:OriginalSearchState,open:(OriginalSearchHit)->Unit){results.set(state)}
         override fun onDiagnostics(value:String){diagnostics.set(value)}
     }
-    @Composable private fun Screen(large:Boolean=false,fixture:SyntheticEvidenceAnswerProvider?=null,observe:Boolean=true){
+    @Composable private fun Screen(large:Boolean=false,fixture:SyntheticEvidenceAnswerProvider?=null,observe:Boolean=true,
+        question:SelectedQuestionService?=null){
         val density=LocalDensity.current
         CompositionLocalProvider(LocalOriginalSearchObserver provides if(observe)observer else null,
             LocalDensity provides if(large)Density(density.density,2f)else density){
             AIyouTheme{Box(if(large)Modifier.size(320.dp,640.dp)else Modifier){
-                AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},imageGrid=grid,evidenceAnswerFixture=fixture)
+                AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},imageGrid=grid,
+                    evidenceAnswerFixture=fixture,selectedQuestionService=question)
             }}
         }
     }
@@ -271,6 +280,7 @@ class CurrentImageSearchPresentationTest {
         compose.setContent{Screen()}
         compose.onAllNodesWithTag("local-timeline-generate").assertCountEquals(0)
         selectPictureForAnswer()
+        reveal("selected-question-unavailable").assertTextContains("模型问答尚未接入",substring=true)
         compose.onAllNodesWithTag("local-timeline-source-0-picture").assertCountEquals(0)
         reveal(hasText("所选出处时间线")).assertIsDisplayed()
         reveal("local-timeline-generate").performClick()
@@ -300,6 +310,83 @@ class CurrentImageSearchPresentationTest {
         reveal("original-search-query").performTextReplacement("missing")
         await{it.stage==OriginalSearchStage.READY&&it.hits.isEmpty()}
         compose.onAllNodesWithTag("local-timeline-generate").assertCountEquals(0)
+    }
+
+    @Test fun narrowDoubleFontProtocolQuestionRequiresSeparateScopeConfirmationAndJumpsToCurrentOriginal(){
+        val fixture=QuestionUiFixture("本机协议假服务的回答")
+        compose.setContent{Screen(true,question=fixture.service)};selectPictureForAnswer()
+        assertEquals(0,fixture.opened.get())
+        reveal("selected-question-fixture").assertTextContains("不连接外部模型",substring=true)
+        reveal("selected-question-review").performClick()
+        reveal("selected-question-reviewed-question").assertTextEquals("needle")
+        reveal("selected-question-scope-0").assertTextEquals(picture.originalText)
+        assertEquals(0,fixture.opened.get())
+        val confirm=reveal("selected-question-confirm").assertIsEnabled()
+        assertTrue(confirm.getUnclippedBoundsInRoot().height>=48.dp);confirm.performClick()
+        reveal("selected-question-paragraph-0").assertTextEquals("本机协议假服务的回答")
+        reveal("selected-question-unverified").assertTextContains("待核对",substring=true)
+        assertEquals(1,fixture.opened.get())
+        val payload=checkNotNull(fixture.payload.get());assertEquals("needle",payload.getString("question"))
+        assertEquals("picture",payload.getJSONArray("sources").getJSONObject(0).getString("sourceId"))
+        compose.onNode(hasText("查看原文") and hasAnyAncestor(hasTestTag("selected-question-source-0-picture")))
+            .performScrollTo().performClick()
+        awaitOriginalPicture()
+        compose.onNodeWithText("返回列表").performClick();await{it.stage==OriginalSearchStage.READY}
+        compose.onAllNodesWithTag("selected-question-paragraph-0").assertCountEquals(0)
+        compose.onAllNodesWithTag("selected-question-confirm").assertCountEquals(0)
+        assertEquals("needle",results.get().input.query)
+    }
+
+    @Test fun protocolQuestionStopAndServiceReplacementRejectNonCooperativeLateAnswer(){
+        val old=QuestionUiFixture("不应显示的迟到回答");val next=QuestionUiFixture("新假服务回答")
+        val entered=CountDownLatch(1);val release=CountDownLatch(1)
+        old.beforeReply={entered.countDown();check(release.await(10,TimeUnit.SECONDS))}
+        val selected=mutableStateOf<SelectedQuestionService>(old.service)
+        compose.setContent{Screen(question=selected.value)};selectPictureForAnswer()
+        reveal("selected-question-review").performClick();reveal("selected-question-confirm").performClick()
+        compose.waitUntil(3_000){entered.count==0L}
+        try{
+            reveal("selected-question-stop").performClick();assertTrue(old.cancelled.get())
+            compose.runOnIdle{selected.value=next.service}
+            reveal("selected-question-review").performClick();reveal("selected-question-confirm").performClick()
+            reveal("selected-question-paragraph-0").assertTextEquals("新假服务回答")
+            release.countDown();compose.waitUntil(3_000){old.returned.get()}
+            reveal("selected-question-paragraph-0").assertTextEquals("新假服务回答")
+            compose.onAllNodesWithText("不应显示的迟到回答").assertCountEquals(0)
+            assertEquals(1,old.opened.get());assertEquals(1,next.opened.get())
+        }finally{release.countDown()}
+    }
+
+    /** Actual main codec/provider/stream behind an explicitly local, memory-only wire fixture. */
+    private class QuestionUiFixture(private val answer:String){
+        val opened=AtomicInteger();val cancelled=AtomicBoolean();val returned=AtomicBoolean()
+        val payload=AtomicReference<JSONObject>()
+        @Volatile var beforeReply:()->Unit={}
+        val service=LocalProtocolQuestionService(SelectedQuestionTarget(ConnectionProtocol.CHAT_COMPLETIONS,
+            "https://ui-question-fixture.invalid/custom/v1/","fixture-model"),LocalQuestionProtocolFixture{prepared->
+            val messages=JSONObject(prepared.bodyJson).getJSONArray("messages")
+            val p=JSONObject(messages.getJSONObject(messages.length()-1).getString("content"))
+            payload.set(p);opened.incrementAndGet()
+            object:LocalQuestionWireExchange{
+                override fun cancel(){cancelled.set(true)}
+                override fun execute(onChunk:(ByteArray)->Unit){
+                    try{
+                        beforeReply()
+                        val refs=JSONArray();val sources=p.getJSONArray("sources")
+                        for(i in 0 until sources.length()){
+                            val source=sources.getJSONObject(i);val ref=JSONObject()
+                            for(key in listOf("sourceId","sourceRevision","start","end","quote"))ref.put(key,source.get(key))
+                            refs.put(ref)
+                        }
+                        val reply=JSONObject().put("requestId",p.get("requestId")).put("selectionId",p.get("selectionId"))
+                            .put("noEvidence",false).put("paragraphs",JSONArray().put(JSONObject().put("text",answer).put("references",refs)))
+                        val chunk=JSONObject().put("choices",JSONArray().put(JSONObject().put("index",0)
+                            .put("delta",JSONObject().put("role","assistant").put("content",reply.toString())).put("finish_reason","stop")))
+                        onChunk(("data: $chunk\n\ndata: [DONE]\n\n").toByteArray(Charsets.UTF_8))
+                    }finally{returned.set(true)}
+                }
+            }
+        })
     }
 
 }

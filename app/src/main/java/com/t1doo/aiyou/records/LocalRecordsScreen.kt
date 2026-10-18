@@ -128,6 +128,7 @@ fun LocalRecordsScreen(
     onEvidenceAnswer: () -> Unit = {},
     onCancelEvidenceAnswer: () -> Unit = {},
     onOpenAnswerSource: (com.t1doo.aiyou.model.OriginalTextReference) -> Unit = {},
+    evidenceQuestion: (@Composable () -> Unit)? = null,
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -388,6 +389,7 @@ fun LocalRecordsScreen(
                             LocalEvidenceNotice(evidenceState, onConfirmEvidence)
                             LocalEvidenceAnswerSection(evidenceState, evidenceAnswerState, evidenceAnswerAvailable,
                                 onEvidenceAnswer, onCancelEvidenceAnswer, onOpenAnswerSource)
+                            evidenceQuestion?.invoke()
                         }
                     }
                     items(evidenceState.cards, key = { it.reference.source.sourceId }) { card ->

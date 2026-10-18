@@ -293,6 +293,7 @@ fun AIyouApp(
     manualTasks: com.t1doo.aiyou.records.ManualTaskController? = null,
     imageGrid: com.t1doo.aiyou.records.CurrentImageGridController? = null,
     evidenceAnswerFixture: com.t1doo.aiyou.records.SyntheticEvidenceAnswerProvider? = null,
+    selectedQuestionService: com.t1doo.aiyou.domain.SelectedQuestionService? = null,
     appAccessSettings: (@Composable () -> Unit)? = null,
 ) {
     val navigation = remember { NavigationOwner() }
@@ -419,6 +420,20 @@ fun AIyouApp(
     DisposableEffect(evidenceAnswers) { onDispose { evidenceAnswers.close() } }
     val evidenceAnswerEmission by evidenceAnswers.state.collectAsState()
     val evidenceAnswerState = evidenceAnswerEmission.let { evidenceAnswers.visible() }
+    val currentQuestionService by rememberUpdatedState(selectedQuestionService)
+    val evidenceQuestions = remember(evidence, selectedQuestionService) {
+        com.t1doo.aiyou.records.LocalEvidenceAnswerController(evidence,
+            currentEvidence = { evidence.visible(search.visible(searchSource(), searchInput())) },
+            ownsSession = { currentQuestionService === selectedQuestionService && evidenceMode &&
+                selectedName == Destination.MEMORIES.name && detailEntryId == null && !recapRoute &&
+                !showSettings && !demo && searchSource()?.ready == true && searchSource()?.opening == false &&
+                searchSource()?.originalEdit == null && searchSource()?.originalHistory == null &&
+                searchSource()?.recycleBin?.browsing != true && searchSource()?.recordPackage == null },
+            questionService = selectedQuestionService)
+    }
+    DisposableEffect(evidenceQuestions) { onDispose { evidenceQuestions.close() } }
+    val evidenceQuestionEmission by evidenceQuestions.state.collectAsState()
+    val evidenceQuestionState = evidenceQuestionEmission.let { evidenceQuestions.visible() }
     // Read the mode while composing: reading delegated State only inside a stable
     // SideEffect lambda does not schedule that effect when just the mode changes.
     val searchEnabled = selected == Destination.MEMORIES && !recapRoute && !reading && !browsingRecycle &&
@@ -428,6 +443,7 @@ fun AIyouApp(
         search.sync(searchEnabled)
         evidence.sync(evidenceEnabled, searchState)
         evidenceAnswers.sync()
+        evidenceQuestions.sync()
         if (!reading && searchReturnAnchor != null &&
             (renderedSearchInput.copy(tagSnapshot = null, peopleSnapshot = null) != searchReturnInput?.copy(tagSnapshot = null, peopleSnapshot = null) || searchSource()?.entries !== searchReturnSource)) {
             searchReturnAnchor = null; searchReturnInput = null; searchReturnSource = null
@@ -983,6 +999,16 @@ fun AIyouApp(
                     evidenceAnswers.sourceFor(evidenceAnswerState, reference)?.let { card ->
                         if (evidence.canOpen(evidenceState, card)) openSearchResultAt(card.hit, card.reference)
                     }
+                },
+                evidenceQuestion = {
+                    com.t1doo.aiyou.records.LocalEvidenceQuestionSection(evidenceState, evidenceQuestionState,
+                        evidenceQuestions.available, onReview = { evidenceQuestions.review(evidenceState) },
+                        onConfirm = { evidenceQuestions.ask(evidenceState, evidenceQuestionState.questionReview) },
+                        onCancel = evidenceQuestions::cancel, onOpen = { reference ->
+                            evidenceQuestions.sourceFor(evidenceQuestionState, reference)?.let { card ->
+                                if (evidence.canOpen(evidenceState, card)) openSearchResultAt(card.hit, card.reference)
+                            }
+                        })
                 },
                 onEvidenceMode = { value -> if (ownsNavigation() && detailEntryId == null &&
                     selectedName == Destination.MEMORIES.name && !showSettings && !demo) {
