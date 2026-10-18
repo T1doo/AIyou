@@ -18,6 +18,7 @@ import com.t1doo.aiyou.ui.UiPreferences
 import com.t1doo.aiyou.ui.UiPreferencesState
 import com.t1doo.aiyou.ui.UiPreferencesViewModel
 import com.t1doo.aiyou.ui.FileUiPreferences
+import com.t1doo.aiyou.ui.LocalRecapPreferenceActionObserver
 import java.time.*
 import java.util.*
 import kotlinx.coroutines.runBlocking
@@ -41,10 +42,11 @@ class FactRecapPresentationTest {
     @get:Rule val temporary=TemporaryFolder()
     private val f=Fixture();private var registry:SaveableStateRegistry?=null
     private val display=mutableStateOf(UiPreferencesState(UiPreferences(showCompanion=false,reduceMotion=true),ready=true))
-    private fun content(preferences: UiPreferencesViewModel?=null) {compose.setContent {
+    private fun content(preferences: UiPreferencesViewModel?=null,
+        observeDefault: ((FactRecapPeriod, () -> Unit) -> Unit)?=null) {compose.setContent {
         registry=LocalSaveableStateRegistry.current;val d=LocalDensity.current
         val confirmed=preferences?.state?.collectAsState()?.value ?: display.value
-        CompositionLocalProvider(LocalDensity provides Density(d.density,2f)) {
+        CompositionLocalProvider(LocalDensity provides Density(d.density,2f),LocalRecapPreferenceActionObserver provides observeDefault) {
             AIyouTheme {AIyouApp(previewDestination=Destination.MEMORIES,local=f.local.value,factRecaps=f.c,attachments=f.attachments,
                 display=confirmed,onDisplayChange={preferences?.change(it)},onRetryDisplay={preferences?.retry()},
                 onOpenTags=f.tags::open,onTagClose=f.tags::close)}
@@ -59,9 +61,11 @@ class FactRecapPresentationTest {
         FileUiPreferences(file).write(UiPreferences(false,true))
         val preferences=UiPreferencesViewModel(org.robolectric.RuntimeEnvironment.getApplication(),FileUiPreferences(file),Dispatchers.Unconfined)
         org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
-        content(preferences);compose.onNodeWithText("设置").performClick()
+        var observedWeek: (() -> Unit)?=null
+        content(preferences) { period, action -> if(period==FactRecapPeriod.WEEK) observedWeek=action }
+        compose.onNodeWithText("设置").performClick()
         val week=compose.onNodeWithTag("recap-default-week").performScrollTo().assertIsDisplayed().assertIsEnabled()
-        val retiredWeek=week.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!!
+        val retiredWeek=checkNotNull(observedWeek)
         week.assertHeightIsAtLeast(48.dp).performClick();week.assertIsSelected()
         compose.runOnIdle {assertEquals(UiPreferences(false,true,FactRecapPeriod.WEEK),FileUiPreferences(file).read())}
         compose.onNodeWithText("返回").performClick();open()

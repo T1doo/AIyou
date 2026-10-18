@@ -27,6 +27,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -39,6 +40,9 @@ import com.t1doo.aiyou.designsystem.ComponentState
 import com.t1doo.aiyou.designsystem.StatusNotice
 import com.t1doo.aiyou.model.FactRecapPeriod
 import java.util.concurrent.atomic.AtomicBoolean
+
+/** Observe the owned callback itself in tests, before Compose's detachable click/sound wrapper. */
+internal val LocalRecapPreferenceActionObserver = staticCompositionLocalOf<((FactRecapPeriod, () -> Unit) -> Unit)?> { null }
 
 @Composable
 fun SettingsScreen(
@@ -92,10 +96,12 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodyMedium, color = AIyouColors.textSecondary)
                     for (period in FactRecapPeriod.entries) {
                         val selected = display.preferences.defaultRecapPeriod == period
+                        val select = { change { it.copy(defaultRecapPeriod = period) } }
+                        LocalRecapPreferenceActionObserver.current?.invoke(period, select)
                         Row(Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget)
                             .testTag("recap-default-" + period.name.lowercase())
                             .selectable(selected, enabled = display.ready && !display.busy, role = Role.RadioButton,
-                                onClick = { change { it.copy(defaultRecapPeriod = period) } }),
+                                onClick = select),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                             RadioButton(selected, onClick = null, enabled = display.ready && !display.busy)
