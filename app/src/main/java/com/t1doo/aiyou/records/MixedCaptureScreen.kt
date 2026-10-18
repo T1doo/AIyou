@@ -25,7 +25,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
     listState: LazyListState = rememberLazyListState(), onOpenEntry: (String) -> Unit = {}, selectedEntryId: String? = null) {
     val ui=local.mixedCapture ?: MixedCaptureUiState()
     val enabled=local.ready && !local.opening && local.error==null && ui.draft!=null
-    val editable=enabled && !ui.busy && ui.selection==null && !ui.uncertainSave && !ui.discardPending && ui.draft?.discarding!=true
+    val editable=enabled && !ui.busy && ui.selection==null && !ui.uncertainSave && !ui.discardPending && ui.policyChange==null && ui.draft?.discarding!=true
     val day by produceState(controller.today(),controller) {
         while(true) { value=controller.today();delay(60_000) }
     }
@@ -47,7 +47,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
         LazyColumn(Modifier.weight(1f).padding(horizontal=AIyouDimensions.pageNarrow).testTag("mixed-list"),state=listState,
             contentPadding=PaddingValues(vertical=16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             item("heading") { Text("今天 · ${day.date}",style=MaterialTheme.typography.headlineMedium)
-                Text("文字、图文，或只用图片记下来。仅保存在本机，不参与 AI。") }
+                Text("文字、图文，或只用图片记下来。默认仅在本机处理，不会发送到远端。") }
             item("recent") { Text("今天最近记录",style=MaterialTheme.typography.titleLarge)
                 Text("按记录时间显示最近 5 条；更多记录可到回忆查看。") }
             if(local.ready && !local.opening && local.error==null && recent.isEmpty()) item("recent-empty") {
@@ -63,6 +63,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                 item("composer") { OutlinedTextField(value=ui.text,onValueChange=controller::edit,enabled=editable,
                     label={Text("写下此刻（也可以只添加图片）")},minLines=4,maxLines=8,
                     modifier=Modifier.fillMaxWidth().testTag("mixed-text")) }
+                if(ui.supportsProcessingChoice) item("processing-policy") { CaptureProcessingChoice(ui,controller) }
                 if(!ui.discardPending) {
                     item("count") { Text("已选 ${ui.draft!!.images.size} / 20 张 · ${ui.draft.images.sumOf { it.intent.byteSize }} 字节",modifier=Modifier.testTag("mixed-count"))
                         Text("JPEG / PNG；单张最多 16 MiB，合计最多 64 MiB。原图可能含拍摄资料。无 OCR，仅按文字与手工标签查找。") }
@@ -83,7 +84,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                     item("add") { OutlinedButton(onClick={controller.select()},enabled=editable && ui.pendingEdits==0,
                         modifier=Modifier.heightIn(min=48.dp).testTag("mixed-add")){Text("添加图片")}}
                 }
-                item("save") { Button(onClick=controller::save,enabled=enabled && !ui.busy && ui.selection==null && ui.pendingEdits==0 && !ui.discardPending,
+                item("save") { Button(onClick=controller::save,enabled=enabled && !ui.busy && ui.selection==null && ui.pendingEdits==0 && !ui.discardPending && ui.policyChange==null,
                     modifier=Modifier.heightIn(min=48.dp).testTag("mixed-save")){Text(if(ui.uncertainSave) "核对同一次保存" else "保存这条记录")}}
                 item("clear") { TextButton(onClick={if(ui.discardPending) controller.confirmDiscard() else controller.requestDiscard()},
                     enabled=(editable || enabled && ui.discardPending && !ui.busy) && ui.pendingEdits==0,

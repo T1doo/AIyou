@@ -4,6 +4,11 @@ import com.t1doo.aiyou.model.*
 
 /** Encrypted draft metadata + authenticated encrypted image staging; no URI or plaintext files. */
 interface CaptureRepository {
+    val supportsProcessingChoice: Boolean get() = false
+    /** This exact draft only; never grants remote consent or changes a saved entry. */
+    suspend fun changePolicy(expected: CaptureDraft, policy: ProcessingPolicy): CaptureDraft {
+        throw UnsupportedOperationException("Capture processing choice unavailable")
+    }
     suspend fun current(): CaptureDraft
     suspend fun edit(expected: CaptureDraft,text: String): CaptureDraft
     suspend fun add(expected: CaptureDraft,intent: AttachmentIntent,bytes: ByteArray): CaptureDraft

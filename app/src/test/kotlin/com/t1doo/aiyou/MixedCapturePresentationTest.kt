@@ -32,12 +32,14 @@ import org.robolectric.annotation.GraphicsMode
 class MixedCapturePresentationTest {
     @get:Rule val compose=createComposeRule()
     private val f=Fixture();private var registry:SaveableStateRegistry?=null
+    private val policyActions=mutableMapOf<String,()->Unit>()
     private fun content() {
         runBlocking { f.c.initialize(f.store) }
         compose.setContent {
             registry=LocalSaveableStateRegistry.current
             val d=LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(d.density,2f)) {
+            CompositionLocalProvider(LocalDensity provides Density(d.density,2f),
+                LocalCapturePolicyActionObserver provides { name,action -> policyActions[name]=action }) {
                 AIyouTheme { AIyouApp(local=f.local.value,mixedCapture=f.c) }
             }
         }
@@ -50,6 +52,73 @@ class MixedCapturePresentationTest {
     }
     private fun drain(){compose.runOnIdle { runBlocking { while(f.queue.isNotEmpty())f.queue.removeFirst()(f.store) } }}
     private fun add() { click("mixed-add");compose.runOnIdle { val s=f.ui.selection!!;if(!s.launched)f.c.claimPicker(s.requestId);f.c.selected(s.requestId,Source()) };drain() }
+    private fun policyNode(tag:String):SemanticsNodeInteraction {
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag(tag))
+        return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
+    }
+    @Test fun narrowPreSaveRangeDefaultsLocalAndRetiredActualChoiceCannotAffectReturnedDraft() {
+        content()
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").performTextInput("合成保存前选择范围");drain()
+        policyNode("mixed-policy-LOCAL_ONLY").assertIsSelected().assertHeightIsAtLeast(48.dp)
+        policyNode("mixed-policy-AI_NONE").assertIsNotSelected().assertHeightIsAtLeast(48.dp)
+        val stale=compose.runOnIdle { policyActions.getValue("policy:AI_NONE") }
+        compose.onNodeWithText("设置").performClick();compose.onNodeWithText("返回").performClick()
+        compose.runOnIdle { stale();assertTrue(f.queue.isEmpty());assertNull(f.ui.policyChange)
+            assertEquals(ProcessingPolicy.LOCAL_ONLY,f.ui.draft!!.policy) }
+        policyNode("mixed-policy-AI_NONE").performClick()
+        compose.runOnIdle { assertTrue(f.ui.busy);assertEquals(0,f.saves);assertEquals(ProcessingPolicy.LOCAL_ONLY,f.ui.draft!!.policy) }
+        policyNode("mixed-policy-AI_NONE").assertIsNotSelected().assertIsNotEnabled()
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-save"))
+        compose.onNodeWithTag("mixed-save").assertIsNotEnabled()
+        drain()
+        policyNode("mixed-policy-AI_NONE").assertIsSelected()
+        compose.runOnIdle { val saved=registry!!.performSave().toString()
+            assertFalse(saved.contains("合成保存前选择范围"));assertFalse(saved.contains(f.ui.draft!!.id)) }
+        click("mixed-save");drain()
+        compose.runOnIdle { assertEquals(ProcessingPolicy.AI_NONE,f.local.value.entries.single().policy)
+            assertEquals("合成保存前选择范围",f.local.value.entries.single().originalText)
+            assertEquals(ProcessingPolicy.LOCAL_ONLY,f.ui.draft!!.policy) }
+    }
+    @Test fun narrowLostRangeAckKeepsPendingChoiceDisablesSaveAndRetriesExactTransition() {
+        content()
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").performTextInput("合成范围确认失败仍保留");drain()
+        val before=f.ui.draft!!;f.failPolicyAck=true
+        policyNode("mixed-policy-AI_NONE").performClick();drain()
+        policyNode("mixed-policy-pending").assertTextContains("不参与 AI")
+        policyNode("mixed-policy-LOCAL_ONLY").assertIsSelected().assertIsNotEnabled()
+        compose.runOnIdle { assertEquals(before.version,f.ui.draft!!.version);assertEquals(1,f.policyCalls)
+            assertNotNull(f.ui.error);assertEquals(0,f.saves) }
+        f.failPolicyRead=true
+        policyNode("mixed-policy-read").assertIsEnabled().performClick();drain()
+        compose.runOnIdle { assertNotNull(f.ui.policyChange);assertEquals(1,f.policyCalls) }
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-save"))
+        compose.onNodeWithTag("mixed-save").assertIsNotEnabled()
+        f.failPolicyRead=false
+        policyNode("mixed-policy-retry").assertHeightIsAtLeast(48.dp).performClick();drain()
+        compose.runOnIdle { assertNull(f.ui.policyChange);assertNull(f.ui.error);assertEquals(2,f.policyCalls)
+            assertEquals(before.version+1,f.ui.draft!!.version);assertEquals("合成范围确认失败仍保留",f.ui.text) }
+        policyNode("mixed-policy-AI_NONE").assertIsSelected()
+        click("mixed-save");drain()
+        compose.runOnIdle { assertEquals(1,f.saves);assertEquals(ProcessingPolicy.AI_NONE,f.local.value.entries.single().policy) }
+    }
+    @Test fun explicitReadAfterFailedRangeWriteDoesNotResendAndRetiresOldRetryHandler() {
+        content();f.failPolicyBefore=true
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").performTextInput("合成只读取当前范围");drain()
+        policyNode("mixed-policy-AI_NONE").performClick();drain()
+        policyNode("mixed-policy-retry").assertIsEnabled()
+        val staleRetry=compose.runOnIdle { policyActions.getValue("retry") }
+        policyNode("mixed-policy-read").performClick();drain()
+        compose.runOnIdle { assertNull(f.ui.policyChange);assertEquals(1,f.policyCalls)
+            assertEquals(ProcessingPolicy.LOCAL_ONLY,f.ui.draft!!.policy);assertEquals("合成只读取当前范围",f.ui.text)
+            staleRetry();assertTrue(f.queue.isEmpty()) }
+        policyNode("mixed-policy-LOCAL_ONLY").assertIsSelected()
+        click("mixed-save");drain()
+        compose.runOnIdle { staleRetry();assertTrue(f.queue.isEmpty());assertEquals(1,f.policyCalls)
+            assertEquals(ProcessingPolicy.LOCAL_ONLY,f.local.value.entries.single().policy) }
+    }
     @Test fun actualNowPurePictureHasThumbnailCountRemovalAndSeparateDurableSaveAtLargeFont() {
         content();add();val id=f.ui.draft!!.images.single().intent.id
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-thumb:"+id));compose.onNodeWithTag("mixed-thumb:"+id).assertIsDisplayed()
@@ -121,12 +190,29 @@ class MixedCapturePresentationTest {
     private class Fixture {
         private var draft=CaptureDraft(uuid(),1,"",emptyList());private val bytes=mutableMapOf<String,ByteArray>()
         val queue=ArrayDeque<suspend(EntryRepository)->Unit>();var saves=0;var failSave=false;var failDiscardAck=false
+        var failPolicyAck=false;var failPolicyBefore=false;var failPolicyRead=false;var policyCalls=0
         private val discarded=mutableSetOf<String>()
         val local=mutableStateOf(LocalRecordUiState(ready=true,opening=false,supportsMixedCapture=true,mixedCapture=MixedCaptureUiState()))
         private var entries=emptyList<StoredEntry>()
         val store=object:EntryRepository {
             override val captureRecords=object:CaptureRepository {
-                override suspend fun current()=draft
+                override val supportsProcessingChoice=true
+                override suspend fun current():CaptureDraft {
+                    if(failPolicyRead)error("Synthetic range read failure")
+                    return draft
+                }
+                override suspend fun changePolicy(expected:CaptureDraft,policy:ProcessingPolicy):CaptureDraft {
+                    policyCalls++
+                    if(failPolicyBefore)error("Synthetic range write failure")
+                    require(policy==ProcessingPolicy.LOCAL_ONLY || policy==ProcessingPolicy.AI_NONE)
+                    val changed=CaptureDraft(expected.id,expected.version+1,expected.text,expected.images,policy=policy)
+                    if(!(draft.id==changed.id && draft.version==changed.version && draft.policy==changed.policy && draft.text==changed.text && draft.images==changed.images)) {
+                        check(draft.id==expected.id && draft.version==expected.version && draft.policy==expected.policy)
+                        draft=changed
+                    }
+                    if(failPolicyAck){failPolicyAck=false;error("Synthetic lost range ACK after commit")}
+                    return draft
+                }
                 override suspend fun edit(expected:CaptureDraft,text:String)=next(text=text)
                 override suspend fun add(expected:CaptureDraft,intent:AttachmentIntent,bytes:ByteArray):CaptureDraft { this@Fixture.bytes[intent.id]=bytes.copyOf();return next(images=draft.images+CaptureDraftImage(intent,CaptureImageState.READY)) }
                 override suspend fun image(expected:CaptureDraft,id:String)=bytes.getValue(id).copyOf()
@@ -138,7 +224,8 @@ class MixedCapturePresentationTest {
                 }
                 override suspend fun save(expected:CaptureDraft,capturedAtMillis:Long,zone:String):CaptureSaveResult {
                     if(failSave)error("Synthetic failed save")
-                    saves++;entries=entries+StoredEntry(expected.id,1,expected.text,capturedAtMillis,zone,ProcessingDefaults.policy)
+                    check(draft.id==expected.id && draft.version==expected.version && draft.policy==expected.policy)
+                    saves++;entries=entries+StoredEntry(expected.id,1,expected.text,capturedAtMillis,zone,expected.policy)
                     draft=CaptureDraft(uuid(),1,"",emptyList());return CaptureSaveResult(expected.id,false,false)
                 }
                 override suspend fun recover()=Unit
@@ -150,7 +237,7 @@ class MixedCapturePresentationTest {
             override suspend fun revisions(entryId:String)=emptyList<OriginalRevision>()
             override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry=error("Unrelated")
         }
-        private fun next(text:String=draft.text,images:List<CaptureDraftImage> = draft.images)=CaptureDraft(draft.id,draft.version+1,text,images).also{draft=it}
+        private fun next(text:String=draft.text,images:List<CaptureDraftImage> = draft.images)=CaptureDraft(draft.id,draft.version+1,text,images,policy=draft.policy).also{draft=it}
         val c=MixedCaptureController({local.value},{local.value=it(local.value)},{queue.add(it);true},PlatformImageDecoder::thumbnail,Clock.systemUTC())
         val ui get()=checkNotNull(local.value.mixedCapture)
     }

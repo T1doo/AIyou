@@ -10,6 +10,20 @@ import java.util.concurrent.CancellationException
 /** One encrypted draft slot; durable file intents precede any IO. No entry exists until all media authenticate. */
 internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,private val media: EncryptedAttachmentStore,
     private val tags: SqlManualTagRepository) : CaptureRepository {
+    override val supportsProcessingChoice = true
+    override suspend fun changePolicy(expected: CaptureDraft, policy: ProcessingPolicy): CaptureDraft = safely {
+        require(policy == ProcessingPolicy.LOCAL_ONLY || policy == ProcessingPolicy.AI_NONE)
+        database.transaction { sql ->
+            val actual = required(sql, expected.id); require(!actual.discarding)
+            // A lost acknowledgement retries the exact version/content/range transition, never a rebase.
+            if (expected.policy == policy) { same(expected, actual); actual }
+            else {
+                val changed = next(expected, policy = policy)
+                if (encode(actual) == encode(changed)) actual
+                else { same(expected, actual); replace(sql, actual, changed) }
+            }
+        }
+    }
     override suspend fun current(): CaptureDraft = safely { database.transaction { sql ->
         read(sql) ?: run {
             val legacy=sql.query("SELECT id,version,text FROM capture_draft WHERE slot=1").singleOrNull()
@@ -21,7 +35,7 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
     } }
     override suspend fun edit(expected: CaptureDraft,text: String): CaptureDraft = safely { database.transaction { sql ->
         val actual=required(sql,expected.id);require(!actual.discarding)
-        if (actual.text==text && actual.version==expected.version+1 && actual.images==expected.images) actual
+        if (actual.text==text && actual.version==expected.version+1 && actual.images==expected.images && actual.policy==expected.policy) actual
         else { same(expected,actual);replace(sql,actual,next(actual,text=text)) }
     } }
     override suspend fun add(expected: CaptureDraft,intent: AttachmentIntent,bytes: ByteArray): CaptureDraft = safely {
@@ -93,7 +107,7 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
             val a=required(sql,expected.id);same(expected,a)
             require(!SqlErasureFileHooks.fenced(sql,a.id))
             require((sql.query("SELECT count(*) FROM record_package_receipts WHERE operation='CAPTURE_SAVED'").single().single() as Long)<4096)
-            sql.execute("INSERT INTO entries(id,currentRevision,capturedAtMillis,captureTimeZone,privacyPolicy) VALUES(?,1,?,?,?)",listOf(a.id,capturedAtMillis,zone,ProcessingDefaults.policy.name))
+            sql.execute("INSERT INTO entries(id,currentRevision,capturedAtMillis,captureTimeZone,privacyPolicy) VALUES(?,1,?,?,?)",listOf(a.id,capturedAtMillis,zone,a.policy.name))
             sql.execute("INSERT INTO entry_revisions VALUES(?,1,?,?,?)",listOf(a.id,a.text,OriginalExports.hash(a.text),capturedAtMillis))
             sql.execute("INSERT INTO remote_source_access VALUES(?,1,0,NULL,NULL)",listOf(a.id))
             a.images.forEach { val i=it.intent
@@ -131,7 +145,8 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
         val deleted=erased || sql.query("SELECT entryId FROM remote_source_access WHERE entryId=? AND deleted=1",listOf(expected.id)).isNotEmpty()
         return CaptureSaveResult(expected.id,true,deleted)
     }
-    private fun next(a: CaptureDraft,text: String=a.text,images: List<CaptureDraftImage> = a.images,discarding: Boolean=a.discarding)=CaptureDraft(a.id,Math.addExact(a.version,1),text,images,discarding)
+    private fun next(a: CaptureDraft,text: String=a.text,images: List<CaptureDraftImage> = a.images,discarding: Boolean=a.discarding,
+        policy: ProcessingPolicy=a.policy)=CaptureDraft(a.id,Math.addExact(a.version,1),text,images,discarding,policy)
     private fun same(a: CaptureDraft,b: CaptureDraft) { if(encode(a)!=encode(b)) throw CaptureConflict() }
     private fun read(sql: RecordsSqlConnection): CaptureDraft? = sql.query("SELECT entryId,state FROM record_package_receipts WHERE id=? AND operation='CAPTURE_CURRENT'",listOf(SLOT)).singleOrNull()?.let { decode(it[1] as String).also { a ->require(a.id==it[0]) } }
     private fun required(sql: RecordsSqlConnection,id: String)=checkNotNull(read(sql)).also { if(it.id!=id) throw CaptureConflict() }
@@ -141,7 +156,11 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
         return b
     }
     private fun encode(a: CaptureDraft): String=PackageWriter(420000).use { out ->
-        out.i32(1);out.string(a.id,36);out.i64(a.version);out.i32(if(a.discarding) 1 else 0);out.i32(a.text.length)
+        // LOCAL_ONLY retains the exact v1 bytes, including existing CAS states and save receipts.
+        // v2 adds an explicitly restricted AI_NONE draft; older readers reject it rather than weaken it.
+        out.i32(if(a.policy==ProcessingPolicy.LOCAL_ONLY) 1 else 2)
+        if(a.policy==ProcessingPolicy.AI_NONE) out.string(a.policy.name,16)
+        out.string(a.id,36);out.i64(a.version);out.i32(if(a.discarding) 1 else 0);out.i32(a.text.length)
         a.text.forEach { out.i32(it.code) };out.i32(a.images.size)
         a.images.forEach { val i=it.intent;out.string(i.id,36);out.string(i.mediaType,32);out.i64(i.byteSize);out.raw(packageUnhex(i.sha256));out.i32(it.state.ordinal) }
         val bytes=out.bytes();try { Base64.getEncoder().encodeToString(bytes) } finally { bytes.fill(0) }
@@ -150,11 +169,13 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
         require(encoded.length<=560000);val bytes=Base64.getDecoder().decode(encoded)
         try {
             require(bytes.size<=420000 && Base64.getEncoder().encodeToString(bytes)==encoded)
-            val r=PackageReader(bytes);require(r.i32()==1);val id=r.string(36);val version=r.i64();val discarding=r.i32();require(discarding in 0..1)
+            val r=PackageReader(bytes);val format=r.i32();require(format in 1..2)
+            val policy=if(format==1) ProcessingPolicy.LOCAL_ONLY else ProcessingPolicy.valueOf(r.string(16)).also { require(it==ProcessingPolicy.AI_NONE) }
+            val id=r.string(36);val version=r.i64();val discarding=r.i32();require(discarding in 0..1)
             val count=r.count(100000);val text=CharArray(count) { r.i32().also { require(it in 0..65535) }.toChar() }.let { chars ->try { String(chars) } finally { chars.fill('\u0000') } }
             val images=List(r.count(20)) { val image=r.string(36);val mime=r.string(32);val size=r.i64();val hash=packageHex(r.raw(32));val state=r.i32();require(state in CaptureImageState.entries.indices)
                 CaptureDraftImage(AttachmentIntent(image,id,1,mime,hash,size),CaptureImageState.entries[state]) }
-            r.end();return CaptureDraft(id,version,text,images,discarding==1)
+            r.end();return CaptureDraft(id,version,text,images,discarding==1,policy)
         } finally { bytes.fill(0) }
     }
     private fun digest(a: CaptureDraft)=packageHex(packageHash(encode(a).toByteArray(Charsets.US_ASCII)))

@@ -192,6 +192,9 @@ for label, folder, minimum in targets:
             "narrowDoubleFontControlIsReachableAndRetainedReaderActionCannotWriteAfterNavigation",
             "restorationKeepsPublicFilterAndDropsPrivateQueryWhileReadFailureCannotShowEmptyFavorites")
         additional["com.t1doo.aiyou.MixedCapturePresentationTest"] = (
+            "narrowPreSaveRangeDefaultsLocalAndRetiredActualChoiceCannotAffectReturnedDraft",
+            "narrowLostRangeAckKeepsPendingChoiceDisablesSaveAndRetriesExactTransition",
+            "explicitReadAfterFailedRangeWriteDoesNotResendAndRetiresOldRetryHandler",
             "actualNowPurePictureHasThumbnailCountRemovalAndSeparateDurableSaveAtLargeFont",
             "removingLastImageRejectsEmptyRecordAndCancelKeepsDraftAndRetiresPicker",
             "failedSaveRetainsTextAndImagesAndPrivateComposerNeverEntersSavedState",

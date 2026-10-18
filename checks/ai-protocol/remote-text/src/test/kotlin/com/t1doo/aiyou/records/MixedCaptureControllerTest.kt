@@ -105,8 +105,23 @@ class MixedCaptureControllerTest {
         val f=MixedCaptureSqlTest.fixture();private val repo=MixedCaptureSqlTest.repo(f)
         var local=LocalRecordUiState(ready=true,opening=false,supportsMixedCapture=true,mixedCapture=MixedCaptureUiState())
         val queue=ArrayDeque<suspend(EntryRepository)->Unit>();var failEntries=false;var failEdit=false;var acceptQueue=true
+        var failPolicyBefore=false;var failPolicyAck=false;var failPolicyRead=false
+        var afterPolicyWrite: (suspend () -> Unit)?=null
+        val policyCalls=mutableListOf<Pair<CaptureDraft,ProcessingPolicy>>()
         val store=object:EntryRepository {
             override val captureRecords=object:CaptureRepository by repo {
+                override suspend fun current():CaptureDraft {
+                    if(failPolicyRead) error("Synthetic range read failure")
+                    return repo.current()
+                }
+                override suspend fun changePolicy(expected:CaptureDraft,policy:ProcessingPolicy):CaptureDraft {
+                    policyCalls+=expected to policy
+                    if(failPolicyBefore) error("Synthetic range write failure")
+                    val result=repo.changePolicy(expected,policy)
+                    afterPolicyWrite?.invoke()
+                    if(failPolicyAck){failPolicyAck=false;error("Synthetic lost range ACK after commit")}
+                    return result
+                }
                 override suspend fun edit(expected:CaptureDraft,text:String):CaptureDraft {
                     if(failEdit)error("Synthetic edit failure")
                     return repo.edit(expected,text)

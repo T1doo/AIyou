@@ -142,6 +142,26 @@ jobs:
           scripts/gradle.sh :app:testDebugUnitTest --tests com.t1doo.aiyou.StorageUsagePresentationTest
           mkdir -p app/build/reports/storage-usage-targeted
           cp app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.StorageUsagePresentationTest.xml app/build/reports/storage-usage-targeted/
+          scripts/gradle.sh :app:testDebugUnitTest --tests com.t1doo.aiyou.MixedCapturePresentationTest
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, shutil, xml.etree.ElementTree as ET
+          source = Path('app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.MixedCapturePresentationTest.xml')
+          raw = source.read_bytes()
+          suite = ET.fromstring(raw)
+          cases = list(suite.iter('testcase'))
+          assert int(suite.get('tests', '-1')) == len(cases) == 8
+          assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
+          assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
+          assert len({(case.get('classname'), case.get('name')) for case in cases}) == 8
+          target = Path('app/build/reports/capture-policy-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(source, target / source.name)
+          receipt = {'tests': 8, 'failures': 0, 'errors': 0, 'skipped': 0,
+                     'sha256': hashlib.sha256(raw).hexdigest(), 'path': str(target / source.name)}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('CAPTURE_POLICY_TARGETED_XML_JSON ' + json.dumps(receipt))
+          PY
           scripts/gradle.sh :app:testDebugUnitTest
           python3 scripts/verify-test-results.py --ui
       - name: Compile actual D02 native-storage instrumentation APK without claiming execution
@@ -234,6 +254,7 @@ jobs:
             app/build/test-results/testDebugUnitTest/
             app/build/reports/tests/testDebugUnitTest/
             app/build/reports/storage-usage-targeted/
+            app/build/reports/capture-policy-targeted/
             app/build/reports/lint-results-debug.*
             app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             core/designsystem/build/reports/lint-results-debug.*

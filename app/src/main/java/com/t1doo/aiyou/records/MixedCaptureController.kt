@@ -9,10 +9,15 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 
+data class CapturePolicyChange(val requestId: Long, val expected: CaptureDraft, val target: ProcessingPolicy) {
+    override fun toString() = "CapturePolicyChange(redacted)"
+}
+
 data class MixedCaptureUiState(val draft: CaptureDraft?=null,val text: String="",val busy: Boolean=false,
     val pendingEdits: Int=0,val selection: AttachmentSelection?=null,val pictures: Map<String,AttachmentPicture> = emptyMap(),
     val error: String?=null,val notice: String?=null,val confirmDiscard: Boolean=false,val uncertainSave: Boolean=false,
-    val retainJpegMetadata: Boolean=true,val discardPending: Boolean=false) {
+    val retainJpegMetadata: Boolean=true,val discardPending: Boolean=false,
+    val supportsProcessingChoice: Boolean=false,val policyChange: CapturePolicyChange?=null) {
     override fun toString()="MixedCaptureUiState(busy=$busy, redacted)"
 }
 
@@ -43,18 +48,21 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         if(disposed) local else local.copy(mixedCapture=change(local.mixedCapture ?: MixedCaptureUiState()))
     }
     suspend fun initialize(store: EntryRepository) {
-        if(store.captureRecords==null || disposed) return
+        // Routine record reloads must not turn a lost range ACK into an optimistic UI acknowledgement.
+        if(store.captureRecords==null || disposed || ui()?.policyChange!=null) return
         try {
             val read=store.captureRecords!!.current();val old=ui()?.draft
             if(old!=null && old.id!=read.id) throw CaptureConflict()
             binding=read
-            update { it.copy(draft=read,text=if(it.draft==null) read.text else it.text,error=null) }
+            update { it.copy(draft=read,text=if(it.draft==null) read.text else it.text,error=null,
+                supportsProcessingChoice=store.captureRecords!!.supportsProcessingChoice) }
             thumbnails(store)
         }
         catch(e:CancellationException){throw e} catch(_:Exception){update { it.copy(error="图文草稿尚未读取，已保留本机数据，请重试。") }}
     }
     fun refresh() {
         if(!available() || ui()?.busy==true) return
+        ui()?.policyChange?.let { readCurrentPolicy(it.requestId);return }
         if(ui()?.discardPending==true) { confirmDiscard();return }
         if(pendingSave!=null) { save();return }
         update { it.copy(busy=true,selection=null) }
@@ -62,7 +70,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
     }
     fun edit(text: String) {
         val u=ui() ?: return
-        if(!available() || u.busy || u.selection!=null || u.uncertainSave || u.discardPending || text.length>100000 || u.draft==null) return
+        if(!available() || u.busy || u.selection!=null || u.uncertainSave || u.discardPending || u.policyChange!=null || text.length>100000 || u.draft==null) return
         update { it.copy(text=text,pendingEdits=it.pendingEdits+1,error=null,notice=null) }
         if(!enqueue { store ->
             try {
@@ -72,10 +80,63 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
             finally { update { it.copy(pendingEdits=(it.pendingEdits-1).coerceAtLeast(0)) } }
         }) update { it.copy(pendingEdits=(it.pendingEdits-1).coerceAtLeast(0),error="本机队列暂不可用，输入已保留。") }
     }
-    fun metadata(retain: Boolean) { if(available() && ui()?.busy==false && ui()?.selection==null && ui()?.discardPending==false) update { it.copy(retainJpegMetadata=retain) } }
+    fun changePolicy(draftId: String, version: Long, target: ProcessingPolicy) {
+        val u=ui() ?: return;val draft=u.draft ?: return
+        if(!available() || !u.supportsProcessingChoice || u.busy || u.pendingEdits>0 || u.selection!=null ||
+            u.uncertainSave || u.discardPending || u.confirmDiscard || u.policyChange!=null || draft.discarding ||
+            draft.id!=draftId || draft.version!=version || target==draft.policy ||
+            target !in setOf(ProcessingPolicy.LOCAL_ONLY,ProcessingPolicy.AI_NONE)) return
+        val change=CapturePolicyChange(ids.incrementAndGet(),draft,target)
+        update { it.copy(policyChange=change,busy=true,error=null,notice=null) }
+        submit { store -> commitPolicy(store,change) }
+    }
+    fun retryPolicy(requestId: Long) {
+        val u=ui() ?: return;val change=u.policyChange ?: return
+        if(!available() || u.busy || change.requestId!=requestId || u.draft?.id!=change.expected.id) return
+        update { it.copy(busy=true,error=null) }
+        submit { store -> commitPolicy(store,change) }
+    }
+    private fun ownsPolicy(change: CapturePolicyChange) = available() && ui()?.let {
+        it.policyChange?.requestId==change.requestId && it.draft?.id==change.expected.id &&
+            it.draft.version==change.expected.version && !it.uncertainSave && !it.discardPending
+    }==true
+    private suspend fun commitPolicy(store: EntryRepository,change: CapturePolicyChange) {
+        try {
+            if(!ownsPolicy(change)) return
+            val result=checkNotNull(store.captureRecords).changePolicy(change.expected,change.target)
+            require(result.id==change.expected.id && result.version==Math.addExact(change.expected.version,1) &&
+                result.policy==change.target && result.text==change.expected.text && result.images==change.expected.images && !result.discarding)
+            if(!ownsPolicy(change)) return
+            binding=result
+            update { it.copy(draft=result,policyChange=null,busy=false,error=null,
+                notice="这份草稿的范围已保存在本机；已有记录保持不变。") }
+        } catch(e:CancellationException){throw e}
+        catch(_:Exception){if(ownsPolicy(change)) update { it.copy(error="范围保存尚未确认。请重试确认同一次选择，或重新读取当前范围；核对前不能保存记录。") }}
+        finally { update { if(it.policyChange?.requestId==change.requestId) it.copy(busy=false) else it } }
+    }
+    fun readCurrentPolicy(requestId: Long) {
+        val u=ui() ?: return;val change=u.policyChange ?: return
+        if(!available() || u.busy || change.requestId!=requestId) return
+        update { it.copy(busy=true,error=null) }
+        submit { store ->
+            try {
+                if(!ownsPolicy(change)) return@submit
+                val actual=checkNotNull(store.captureRecords).current()
+                require(actual.id==change.expected.id && !actual.discarding)
+                if(!ownsPolicy(change)) return@submit
+                binding=actual
+                update { it.copy(draft=actual,policyChange=null,busy=false,error=null,
+                    notice="已重新读取这份草稿的当前范围；此前未确认的选择没有重发。请核对后继续。") }
+                thumbnails(store)
+            } catch(e:CancellationException){throw e}
+            catch(_:Exception){if(ownsPolicy(change)) update { it.copy(error="当前范围仍无法完整读取；输入与这次选择已保留，请稍后重试。") }}
+            finally { update { if(it.policyChange?.requestId==requestId) it.copy(busy=false) else it } }
+        }
+    }
+    fun metadata(retain: Boolean) { if(available() && ui()?.busy==false && ui()?.selection==null && ui()?.discardPending==false && ui()?.policyChange==null) update { it.copy(retainJpegMetadata=retain) } }
     fun select(retryId: String?=null) {
         val u=ui() ?: return;val d=u.draft ?: return
-        if(!available() || u.busy || u.selection!=null || u.uncertainSave || u.discardPending || u.pendingEdits>0 || d.discarding) return
+        if(!available() || u.busy || u.selection!=null || u.uncertainSave || u.discardPending || u.policyChange!=null || u.pendingEdits>0 || d.discarding) return
         val item=retryId?.let { id -> d.images.singleOrNull { it.intent.id==id && it.state!=CaptureImageState.READY } ?: return }
         if(item==null && d.images.size>=20) { update { it.copy(error="一次最多 20 张原图。") };return }
         clearPrepared()
@@ -126,12 +187,12 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         clearPrepared();thumbnails(store)
     }
     fun remove(id: String) { mutate { store,a ->store.captureRecords!!.remove(a.id,id) } }
-    fun requestDiscard() { if(available() && ui()?.busy==false && ui()?.selection==null && ui()?.uncertainSave==false && ui()?.discardPending==false) update { it.copy(confirmDiscard=true) } }
+    fun requestDiscard() { if(available() && ui()?.busy==false && ui()?.selection==null && ui()?.uncertainSave==false && ui()?.discardPending==false && ui()?.policyChange==null) update { it.copy(confirmDiscard=true) } }
     fun cancelDiscard() { update { it.copy(confirmDiscard=false) } }
     fun confirmDiscard() { if(ui()?.confirmDiscard==true || ui()?.discardPending==true) mutate(resetText=true) { store,a ->store.captureRecords!!.discard(a.id) } }
     private fun mutate(resetText:Boolean=false,operation: suspend (EntryRepository,CaptureDraft)->CaptureDraft) {
         val u=ui() ?: return
-        if(!available() || u.busy || u.selection!=null || u.uncertainSave || u.pendingEdits>0 || (u.discardPending && !resetText)) return
+        if(!available() || u.busy || u.selection!=null || u.uncertainSave || u.policyChange!=null || u.pendingEdits>0 || (u.discardPending && !resetText)) return
         update { it.copy(busy=true,discardPending=it.discardPending || resetText) }
         val accepted=submit(if(resetText && u.discardPending)
             "本机队列暂不可用，清空结果仍待核对。请稍后核对同一次清空，再继续记录。" else null) { store ->
@@ -151,7 +212,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
     }
     fun save() {
         val u=ui() ?: return
-        if(!available() || u.busy || u.selection!=null || u.pendingEdits>0 || u.draft==null || u.discardPending) return
+        if(!available() || u.busy || u.selection!=null || u.pendingEdits>0 || u.draft==null || u.discardPending || u.policyChange!=null) return
         if(pendingSave==null && (u.draft.discarding || u.draft.images.any { it.state!=CaptureImageState.READY })) {
             update { it.copy(error="图片尚未完整保存，请重试读取、重新选择同一图片或明确移除后再保存。") };return
         }
@@ -175,7 +236,8 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
                 val epoch=store.localSearch?.epoch()
                 val fresh=repo.current();binding=fresh;pendingSave=null;clearPrepared()
                 publish { local ->if(disposed) local else local.copy(entries=entries,manualTags=labels,manualTagsAvailable=store.manualTags!=null,localSearchEpoch=epoch,
-                    mixedCapture=MixedCaptureUiState(draft=fresh,text=fresh.text,notice=if(result.deleted) "已核对先前保存；记录已删除，没有恢复。" else "已保存在本机 · 文字和全部图片已持久认证。")).withFavoriteSource(favorites).withEventDateSource(eventDates) }
+                    mixedCapture=MixedCaptureUiState(draft=fresh,text=fresh.text,supportsProcessingChoice=repo.supportsProcessingChoice,
+                        notice=if(result.deleted) "已核对先前保存；记录已删除，没有恢复。" else "已保存在本机 · 文字和全部图片已持久认证。")).withFavoriteSource(favorites).withEventDateSource(eventDates) }
                 thumbnails(store)
             } catch(e:CancellationException){throw e} catch(_:Exception){update { it.copy(error="保存结果尚未确认，文字及全部图片保留。请核对同一次保存，不会另建记录。",uncertainSave=pendingSave!=null) }}
             finally { update { it.copy(busy=false) } }
