@@ -138,6 +138,10 @@ jobs:
         env:
           AIYOU_CI_ANDROID_DAEMON: 'true'
         run: |
+          # Keep the new settings callback regression's exact targeted XML before the full suite.
+          scripts/gradle.sh :app:testDebugUnitTest --tests com.t1doo.aiyou.StorageUsagePresentationTest
+          mkdir -p app/build/reports/storage-usage-targeted
+          cp app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.StorageUsagePresentationTest.xml app/build/reports/storage-usage-targeted/
           scripts/gradle.sh :app:testDebugUnitTest
           python3 scripts/verify-test-results.py --ui
       - name: Compile actual D02 native-storage instrumentation APK without claiming execution
@@ -229,6 +233,7 @@ jobs:
             core/data/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/
             app/build/reports/tests/testDebugUnitTest/
+            app/build/reports/storage-usage-targeted/
             app/build/reports/lint-results-debug.*
             app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
             core/designsystem/build/reports/lint-results-debug.*

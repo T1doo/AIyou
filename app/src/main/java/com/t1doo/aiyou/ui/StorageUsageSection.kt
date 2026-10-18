@@ -8,6 +8,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -17,6 +19,9 @@ import androidx.compose.ui.semantics.semantics
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import java.util.Locale
 
+/** Optional memory-only observation of the actual button handler, without retaining its UI node. */
+internal val LocalStorageUsageQueryObserver = staticCompositionLocalOf<((() -> Unit) -> Unit)?> { null }
+
 @Composable
 internal fun StorageUsageSection(controller: StorageUsageController) {
     DisposableEffect(controller) {
@@ -25,6 +30,8 @@ internal fun StorageUsageSection(controller: StorageUsageController) {
     }
     val state by controller.state.collectAsState()
     val owner = state.session
+    val query = { controller.query(owner) }
+    LocalStorageUsageQueryObserver.current?.let { observer -> SideEffect { observer(query) } }
     Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         Text("本机记录占用", style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.semantics { heading() })
@@ -41,7 +48,7 @@ internal fun StorageUsageSection(controller: StorageUsageController) {
         if (state.error) Text("暂时无法完整读取占用，请稍后重试。", modifier = Modifier.testTag("storage-usage-error"))
         Text("不含应用安装包、密钥和你另存的导出文件；不代表设备剩余空间。",
             style = MaterialTheme.typography.bodySmall)
-        OutlinedButton(onClick = { controller.query(owner) }, enabled = state.active && !state.busy,
+        OutlinedButton(onClick = query, enabled = state.active && !state.busy,
             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("storage-usage-query")) {
             Text(when { state.error -> "重试查询占用"; state.usage != null -> "刷新占用"; else -> "查询占用" })
         }

@@ -4,7 +4,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
@@ -16,6 +15,7 @@ import com.t1doo.aiyou.domain.StorageUsageReader
 import com.t1doo.aiyou.model.LocalStorageUsage
 import com.t1doo.aiyou.records.LocalRecordUiState
 import com.t1doo.aiyou.ui.StorageUsageController
+import com.t1doo.aiyou.ui.LocalStorageUsageQueryObserver
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.*
@@ -34,11 +34,14 @@ class StorageUsagePresentationTest {
     @Test fun explicitQueryAndRefreshShowCategoriesAndRetiredActualButtonCannotQueryNextVisit() {
         var reads = 0
         var measured = LocalStorageUsage(13, 17, 19, 23)
+        var actualQuery: (() -> Unit)? = null
         compose.setContent {
             val scope = rememberCoroutineScope()
             val controller = remember { StorageUsageController(scope, StorageUsageReader { reads++; measured }, Dispatchers.Unconfined) }
-            AIyouTheme { AIyouApp(local = LocalRecordUiState(ready = true, opening = false, text = "合成保留草稿"),
-                storageUsage = controller) }
+            CompositionLocalProvider(LocalStorageUsageQueryObserver provides { actualQuery = it }) {
+                AIyouTheme { AIyouApp(local = LocalRecordUiState(ready = true, opening = false, text = "合成保留草稿"),
+                    storageUsage = controller) }
+            }
         }
         compose.onNodeWithText("设置").performClick()
         val query = compose.onNodeWithTag("storage-usage-query").performScrollTo().assertIsDisplayed()
@@ -53,13 +56,13 @@ class StorageUsagePresentationTest {
         compose.runOnIdle { assertEquals(1, reads); measured = LocalStorageUsage(31) }
         compose.onNodeWithText("刷新占用").performScrollTo().performClick()
         compose.onNodeWithText("文件大小合计：31 B").performScrollTo().assertIsDisplayed()
-        val retired = compose.onNodeWithTag("storage-usage-query").performScrollTo()
-            .fetchSemanticsNode().config[SemanticsActions.OnClick].action
+        // Capture the very handler supplied to the real Button, not an unattached Modifier node.
+        val retired = compose.runOnIdle { checkNotNull(actualQuery) }
         compose.onNodeWithText("返回").performClick()
         compose.onNodeWithContentDescription("此刻，想记下什么").assertTextEquals("合成保留草稿")
         compose.onNodeWithText("设置").performClick()
         compose.onNodeWithTag("storage-usage-query").performScrollTo().assertIsDisplayed()
-        compose.runOnIdle { assertEquals(2, reads); retired?.invoke() }
+        compose.runOnIdle { assertEquals(2, reads); retired() }
         compose.onNodeWithTag("storage-usage-total").assertDoesNotExist()
         compose.runOnIdle { assertEquals(2, reads) }
         compose.onNodeWithText("查询占用").performClick()
