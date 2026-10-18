@@ -1,12 +1,17 @@
 package com.t1doo.aiyou
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
@@ -125,6 +130,47 @@ class RecordEventDatePresentationTest {
     }
     private fun preview(){control("event-date-preview-set").performClick()}
     private fun confirm(){control("event-date-confirm").performClick();drain()}
+
+    @Test fun standaloneDoubleFontDateFieldsHaveFiniteLayout(){
+        System.err.println("DATE_ISOLATION before-fields-only")
+        compose.setContent{
+            val density=LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density,2f),LocalSaveableStateRegistry provides null){
+                AIyouTheme{Box(Modifier.size(320.dp,640.dp)){
+                    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())){
+                        androidx.compose.material3.OutlinedTextField("",{},singleLine=true,
+                            label={androidx.compose.material3.Text("事件日期 YYYY-MM-DD（未知留空）")},
+                            modifier=Modifier.fillMaxWidth().testTag("date-probe-field"))
+                        androidx.compose.material3.OutlinedTextField("",{},singleLine=true,
+                            label={androidx.compose.material3.Text("IANA 时区，例如 Asia/Shanghai")},
+                            modifier=Modifier.fillMaxWidth().testTag("date-probe-zone"))
+                    }
+                }}
+            }
+        }
+        compose.onNodeWithTag("date-probe-field").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithTag("date-probe-zone").assertIsDisplayed().assertIsEnabled()
+        System.err.println("DATE_ISOLATION after-fields-only")
+    }
+
+    @Test fun standaloneLoadedDoubleFontDateDialogHasFiniteLayout(){
+        controller.open("one",1)
+        runBlocking{while(queue.isNotEmpty())queue.removeFirst()(store)}
+        assertFalse(state.value.eventDateEditor!!.busy)
+        assertNotNull(state.value.eventDateEditor!!.snapshot)
+        System.err.println("DATE_ISOLATION before-dialog-only")
+        compose.setContent{
+            val density=LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density,2f)){
+                AIyouTheme{state.value.eventDateEditor?.let{ui->RecordEventDateDialog(ui,null,controller){true}}}
+            }
+        }
+        control("event-date-input").assertIsEnabled()
+        control("event-date-zone").assertIsEnabled()
+        control("event-date-close").assertIsDisplayed().performClick()
+        compose.runOnIdle{assertNull(state.value.eventDateEditor)}
+        System.err.println("DATE_ISOLATION after-dialog-only")
+    }
 
     @Test fun narrowDoubleFontManualSetCorrectionAndClearEachRequireVisiblePreview(){
         compose.setContent{Screen(true)};open()

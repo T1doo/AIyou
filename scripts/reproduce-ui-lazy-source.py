@@ -115,6 +115,8 @@ def main():
                 ('red', baseline, CASE, METHOD, 'red'),
                 ('green', fixed, CASE, METHOD, 'green'),
                 ('mode-no-observer', fixed, CASE, UNOBSERVED_METHOD, 'green'),
+                ('date-fields-only', fixed, DATE_CASE, 'standaloneDoubleFontDateFieldsHaveFiniteLayout', 'green'),
+                ('date-dialog-only', fixed, DATE_CASE, 'standaloneLoadedDoubleFontDateDialogHasFiniteLayout', 'green'),
                 ('date-independent', fixed, DATE_CASE, DATE_METHOD, 'green')]:
             source.write_bytes(raw)
             started = time.time_ns()
