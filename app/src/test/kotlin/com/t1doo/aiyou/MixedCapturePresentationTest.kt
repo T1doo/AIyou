@@ -90,7 +90,7 @@ class MixedCapturePresentationTest {
         compose.onNodeWithTag("mixed-text").performTextInput("合成范围确认失败仍保留");drain()
         val before=f.ui.draft!!;f.failPolicyAck=true
         policyNode("mixed-policy-AI_NONE").performClick();drain()
-        policyNode("mixed-policy-pending").assertTextContains("不参与 AI")
+        policyNode("mixed-policy-pending").assertTextEquals("范围保存尚未确认：不参与 AI。核对前不能保存记录。")
         policyNode("mixed-policy-LOCAL_ONLY").assertIsSelected().assertIsNotEnabled()
         compose.runOnIdle { assertEquals(before.version,f.ui.draft!!.version);assertEquals(1,f.policyCalls)
             assertNotNull(f.ui.error);assertEquals(0,f.saves) }
