@@ -255,6 +255,10 @@ class RecordEventDatePresentationTest {
         control("original-search-date-basis").performClick()
         compose.waitUntil(2_000){results.get()?.stage==OriginalSearchStage.FAILED}
         control("original-search-event-date-retry").assertIsEnabled().performClick()
+        // The synthetic repository publishes Compose State directly. Apply its
+        // queued UI update before polling the separate search controller result;
+        // mainClock/waitUntil alone does not flush Android's pending UI work.
+        compose.waitForIdle()
         try {
             compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.dateBasis==RecordDateBasis.EVENT}==true}
         } catch (failure:ComposeTimeoutException) {
