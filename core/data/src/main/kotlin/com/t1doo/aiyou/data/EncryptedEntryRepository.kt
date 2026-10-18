@@ -41,6 +41,9 @@ class EncryptedEntryRepository internal constructor(
     /** Blocking IO; shares the existing encrypted database and never enables remote processing. */
     override val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(borrowedSql)
     override val recordAuthorizations: com.t1doo.aiyou.domain.RecordAuthorizationRepository = SqlRecordAuthorizationRepository(borrowedSql)
+    private val questionAuthorizationStorage = SqlSelectedQuestionAuthorizationRepository(borrowedSql)
+    override val selectedQuestionAuthorizations: com.t1doo.aiyou.domain.SelectedQuestionAuthorizationRepository
+        get() = questionAuthorizationStorage
     private val candidateStorage = SqlLocalCandidateRepository(borrowedSql, keyBytes)
     override val localCandidates: com.t1doo.aiyou.domain.LocalCandidateRepository get() = candidateStorage
     private val tagStorage = SqlManualTagRepository(borrowedSql, keyBytes)
@@ -169,8 +172,8 @@ class EncryptedEntryRepository internal constructor(
 
     private val lifetime = DrainingRecordsStorage(borrowedSql,attachmentStorage,originalEditStorage,
         { database.close() }, { tagStorage.wipeKey(); peopleStorage.wipeKey(); taskStorage.wipeKey(); proposalStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); keyBytes.fill(0) })
-    override fun close() = lifetime.close()
-    override fun awaitClosed() = lifetime.awaitClosed()
+    override fun close() { questionAuthorizationStorage.close(); lifetime.close() }
+    override fun awaitClosed() { close(); lifetime.awaitClosed() }
     /** Known external IO owner convenience, including native cold-reopen fixtures. */
     fun closeAndAwait() { close(); awaitClosed() }
 

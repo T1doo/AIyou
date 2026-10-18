@@ -9,6 +9,8 @@ import com.t1doo.aiyou.model.OriginalEditDraft
 interface EntryRepository {
     /** Explicit metadata-only authorization management; no connection catalog or send capability. */
     val recordAuthorizations: RecordAuthorizationRepository? get() = null
+    /** Separate request-specific send review; never enabled by local source selection. */
+    val selectedQuestionAuthorizations: SelectedQuestionAuthorizationRepository? get() = null
     val taskProposals: TaskProposalRepository? get() = null
     val sourceTasks: SourceTaskRepository? get() = null
     val localProcessing: LocalProcessingRepository? get() = null

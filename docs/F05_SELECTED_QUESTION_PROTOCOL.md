@@ -28,6 +28,8 @@
 
 ## 最小剩余接入工作
 
+后续持久化授权代码片见 [F05_SELECTED_QUESTION_AUTHORITY.md](F05_SELECTED_QUESTION_AUTHORITY.md)：复用既有 grant/source jobs 实现整组单次授权、准入、持续失效观察和结果摘要回执，并以明确内存传输验证。该片不把本机范围确认升级为外发权限；以下真实 provider/配置/秘密与生产界面接线仍未完成。
+
 真实远程 provider 需要在同一权威持久事务中冻结并核准全部来源的当前版本、处理策略、access generation、连接／模型／配置和逐源同用途 ConsentGrant，原子消费一次发送准入；执行期间持续观察撤回并取消自有请求，完成后再次核验全部来源及回执。还需正式连接配置与受保护秘密解析、用户可见目标与最小范围确认，以及受上述权威约束的真实传输适配器。
 
 当前接口只有 LOCAL_PROTOCOL_FIXTURE 模式。启用真实 provider 不能仅替换 fixture、打开 INTERNET 或把多个单源授权拼在一起；它需要单独实现和审阅上述权威链路。本轮不新增 Room schema、权限、依赖、凭据、付费、真实模型请求或网络配置。
