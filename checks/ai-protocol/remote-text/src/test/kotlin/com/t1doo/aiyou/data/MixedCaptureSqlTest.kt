@@ -2,6 +2,7 @@ package com.t1doo.aiyou.data
 
 import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
+import com.t1doo.aiyou.records.*
 import java.util.Base64
 import java.util.UUID
 import java.io.ByteArrayOutputStream
@@ -141,7 +142,21 @@ class MixedCaptureSqlTest {
             assertEquals(listOf(d.id),tagged.entries.map { it.id })
             assertEquals(listOf("合成照片"),tagged.tags.getValue(d.id).names)
             assertTrue(search.publishCurrent(tagged) {})
-            assertTrue(search.candidates(LocalSearchRequest("合成照片")).entries.isEmpty())
+            val keyword=search.candidates(LocalSearchRequest("合成照片"))
+            assertEquals(listOf(d.id),keyword.entries.map { it.id })
+            val input=OriginalSearchInput("合成照片",tagSnapshot=f.tags.snapshots())
+            val result=LocalOriginalSearchMatcher.indexed(keyword.entries,input,search)
+            assertEquals(OriginalSearchStage.READY,result.stage)
+            val hit=result.hits.single()
+            assertEquals("",hit.entry.originalText);assertEquals("",hit.quote)
+            assertFalse(hit.originalMatchesQuery);assertEquals(listOf("合成照片"),hit.tagMatches)
+            assertEquals(0,hit.matchStartCodePoint);assertEquals(0,hit.matchEndCodePoint)
+            val state=OriginalSearchState(input,result.stage,result.hits,entries=result.proof!!.entries,
+                proof=result.proof,owner=search)
+            assertEquals(LocalEvidenceStage.EMPTY,localEvidenceCandidates(state,1).stage)
+            assertThrows(IllegalArgumentException::class.java) { localEvidenceReference(hit) }
+            assertTrue(LocalOriginalSearchMatcher.indexed(keyword.entries,
+                input.copy(mode=OriginalSearchMode.EXACT),search).hits.isEmpty())
             assertTrue(search.candidates(LocalSearchRequest("不存在的画面内容")).entries.isEmpty())
             val original=f.bin.read(d.id);val trash=f.bin.apply(RecycleMutation(SourceVersion(d.id,1),original.generation,false,uuid()))
             assertTrue(trash.deleted);val restored=f.bin.apply(RecycleMutation(SourceVersion(d.id,1),trash.generation,true,uuid()))
