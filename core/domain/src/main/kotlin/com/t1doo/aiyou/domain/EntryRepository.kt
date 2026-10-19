@@ -9,6 +9,8 @@ import com.t1doo.aiyou.model.OriginalEditDraft
 interface EntryRepository {
     /** Non-secret local configuration only; it confers no send authority. */
     val modelConnections: ModelConnectionCatalog? get() = null
+    /** Local capability observations only; neither a probe client nor record send authority. */
+    val modelCapabilities: ModelCapabilityRepository? get() = null
     /** Same-owner vault and credential-current transactional text port; no automatic AI activation. */
     val localModelConnections: LocalModelConnectionServices? get() = null
     /** Explicit metadata-only authorization management; no connection catalog or send capability. */

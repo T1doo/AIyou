@@ -353,6 +353,10 @@ for label, folder, minimum in targets:
             "narrowDoubleFontExplicitSaveReplaceAndRevokeKeepCapabilitiesUnknownAndRetireOldActions",
             "passwordNeverEntersSavedStateAndRestorationOrOwnerReplacementRetiresInputCallbacks",
             "uncertainWriteRetainsOnlySameOpaqueOperationAcrossRecreationAndConflictRequiresReload")
+        additional["com.t1doo.aiyou.ModelCapabilitiesPresentationTest"] = (
+            "explicitFixedSampleReviewShowsExactVersionAndLimitedUsesWithoutAutomaticCalls",
+            "unknownFailureAndConfigurationChangesNeverDisplayStaleSupportOrInvokeRetiredReview",
+            "uncertainArchiveWriteRetriesOnlySameObservationAndProductionGateStaysDisabled")
         additional["com.t1doo.aiyou.UiPreferencesTest"] = (
             "legacyDefaultsStayLocalAndExplicitNoneSurvivesNewFileAndViewModelOwners",
             "unreadableDefaultRestrictsOnlyNewDraftsAndPreservesEveryUnknownPreferenceByte",

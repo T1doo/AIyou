@@ -8,6 +8,12 @@ import com.t1doo.aiyou.domain.SendDenial
 import com.t1doo.aiyou.domain.SendPermit
 import com.t1doo.aiyou.domain.SourceBoundTextRepository
 import com.t1doo.aiyou.domain.SourceBoundTextSubscription
+import com.t1doo.aiyou.domain.ModelCapabilityProbeTicket
+import com.t1doo.aiyou.domain.ModelCapabilityRepository
+import com.t1doo.aiyou.domain.ModelCapabilityProbeExchange
+import com.t1doo.aiyou.model.TextCapabilityObservation
+import com.t1doo.aiyou.model.CapabilityProbeReason
+import com.t1doo.aiyou.model.CapabilityState
 import com.t1doo.aiyou.model.ChatBudgetField
 import com.t1doo.aiyou.model.ConnectionProtocol
 import com.t1doo.aiyou.model.RemoteSendIntent
@@ -94,6 +100,84 @@ class OkHttpStreamingTransport private constructor(
         return synchronized(ownerLock) {
             check(!closed) { "HTTP transport is closed" }
             Exchange(protocol, streamLimits, wireRequest).also { exchanges.add(it) }
+        }
+    }
+
+    /** Separate fixed-sample admission: it cannot send source records or mint source consent. */
+    internal fun newCapabilityProbeExchange(ticket: ModelCapabilityProbeTicket,
+        profiles: ModelCapabilityRepository, secrets: SecretResolver,
+        clock: java.time.Clock): ModelCapabilityProbeExchange = synchronized(ownerLock) {
+        check(!closed)
+        CapabilityExchange(ticket,profiles,secrets,clock).also { exchanges.add(it) }
+    }
+
+    private class CapabilityGate(val current: () -> Boolean, val claim: () -> Boolean) {
+        fun admit(call: Call) {
+            if(!current() || !claim() || !current()) { call.cancel();throw GuardCancelled() }
+        }
+    }
+
+    private inner class CapabilityExchange(private val ticket: ModelCapabilityProbeTicket,
+        private val profiles: ModelCapabilityRepository, private val secrets: SecretResolver,
+        private val clock: java.time.Clock) : ModelCapabilityProbeExchange, OwnedExchange {
+        private val lock=Any()
+        private var executed=false
+        private var cancelled=false
+        private var wire: Exchange?=null
+        override fun cancel() {
+            val owned=synchronized(lock) { cancelled=true;wire }
+            owned?.cancel()
+            synchronized(ownerLock) { exchanges.remove(this) }
+        }
+        override fun execute(): TextCapabilityObservation {
+            synchronized(lock) { check(!executed);executed=true }
+            val snapshot=ticket.profile.connection
+            var resolved: ResolvedSecret?=null
+            var watch: AutoCloseable?=null
+            var profileWatch: AutoCloseable?=null
+            fun failure(reason: CapabilityProbeReason)=TextCapabilityObservation(
+                CapabilityState.UNKNOWN,reason,maxOf(ticket.profile.startedAtMillis,clock.millis()))
+            fun current(): Boolean = !synchronized(lock){cancelled} && profiles.current(ticket) &&
+                snapshot.secretRef?.let(secrets::isCurrent)==true
+            try {
+                if(!current()) return failure(CapabilityProbeReason.CONFIGURATION_CHANGED)
+                profileWatch=profiles.watch(ticket,::cancel)
+                val ref=checkNotNull(snapshot.secretRef)
+                watch=secrets.watch(ref,::cancel)
+                if(!current()) return failure(CapabilityProbeReason.CONFIGURATION_CHANGED)
+                resolved=secrets.resolve(ref)
+                val value=resolved?.headerValue()?:return failure(CapabilityProbeReason.SECRET_UNAVAILABLE)
+                if(!current()) return failure(CapabilityProbeReason.CONFIGURATION_CHANGED)
+                val prepared=FixedTextCapabilitySample.prepare(snapshot)
+                val protocol=Protocol.valueOf(snapshot.details.protocol.name)
+                val request=validateRequest(protocol,prepared).newBuilder().tag(CapabilityGate::class.java,CapabilityGate(::current,{ profiles.admit(ticket) })).apply {
+                    if(prepared.authentication==AuthenticationKind.BEARER) header("Authorization","Bearer $value") else header("x-api-key",value)
+                }.build()
+                resolved.close();resolved=null
+                val delegate=Exchange(protocol,StreamLimits(maxChunkBytes=8192,maxLineChars=2048,maxEventChars=4096,
+                    maxFrames=32,maxTotalBytes=8192,maxTextChars=128),request,10_000)
+                val stopped=synchronized(lock) { wire=delegate;cancelled }
+                if(stopped) delegate.cancel()
+                val reply=StringBuilder()
+                val outcome=delegate.execute { event ->
+                    if(!current()) delegate.cancel()
+                    else if(event is StreamEvent.TextDelta) reply.append(event.text)
+                }
+                if(!current()) return failure(CapabilityProbeReason.CONFIGURATION_CHANGED)
+                return FixedTextCapabilitySample.normalize(outcome,reply.toString().trim()==FixedTextCapabilitySample.ANSWER,
+                    maxOf(ticket.profile.startedAtMillis,clock.millis()))
+            } catch(cancelled: CancellationException) { throw cancelled }
+            catch(_: Exception) { return failure(CapabilityProbeReason.STORAGE_UNAVAILABLE) }
+            finally {
+                resolved?.close()
+                var fatal: Throwable?=null
+                for(owned in listOf(watch,profileWatch)) try { owned?.close() } catch(failure: Throwable) {
+                    if(failure is VirtualMachineError || failure is ThreadDeath || failure is LinkageError) fatal=failure
+                }
+                synchronized(lock) { wire.also { wire=null } }?.cancel()
+                synchronized(ownerLock) { exchanges.remove(this) }
+                fatal?.let { throw it }
+            }
         }
     }
 
@@ -245,6 +329,7 @@ class OkHttpStreamingTransport private constructor(
     private inner class RejectHttpFollowUps : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             chain.request().tag(GuardContext::class.java)?.admit(chain.call())
+            chain.request().tag(CapabilityGate::class.java)?.admit(chain.call())
             val response = chain.proceed(chain.request())
             if (response.code in 200..299) return response
             val values = response.headers("Retry-After")
@@ -742,6 +827,7 @@ class OkHttpStreamingTransport private constructor(
         protocol: Protocol,
         limits: StreamLimits,
         request: Request,
+        private val totalMillis: Long? = null,
     ) : StreamingHttpExchange, OwnedExchange {
         private val stateLock = Any()
         private val stream = ProtocolStream(protocol, limits)
@@ -794,6 +880,7 @@ class OkHttpStreamingTransport private constructor(
                 val pending = synchronized(stateLock) { queuedRequest }
                 if (pending == null) return finishOutcome(onEvent)
                 val ownedCall = client.newCall(pending)
+                totalMillis?.let { ownedCall.timeout().timeout(minOf(it,bounds.totalMillis),TimeUnit.MILLISECONDS) }
                 val shouldExecute = synchronized(stateLock) {
                     call = ownedCall
                     queuedRequest = null

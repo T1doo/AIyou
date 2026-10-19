@@ -33,16 +33,24 @@ data class ModelConnectionSecretEditor(val expected: ModelConnectionConfiguratio
     val confirmRevoke: Boolean = false, internal val pending: ModelConnectionSecretMutation? = null) {
     override fun toString() = "ModelConnectionSecretEditor(version=${expected.version}, redacted)"
 }
+data class ModelCapabilityProbeEditor(val expected: ModelConnectionConfiguration, val busy: Boolean = false,
+    val error: String? = null, val conflict: Boolean = false,
+    internal val pending: Pair<ModelCapabilityProbeTicket,TextCapabilityObservation>? = null,
+    internal val reviewId: String = UUID.randomUUID().toString())
 data class ModelConnectionsUiState(val session: Long = 0, val busy: Boolean = false,
     val configurations: List<ModelConnectionConfiguration> = emptyList(), val editor: ModelConnectionEditor? = null,
     val secretEditor: ModelConnectionSecretEditor? = null, val secretsAvailable: Boolean = false,
+    val capabilityProfiles: List<ModelCapabilityProfile> = emptyList(),
+    val capabilityError: String? = null,
+    val probeEditor: ModelCapabilityProbeEditor? = null, val probeAvailable: Boolean = false,
     val error: String? = null, val notice: String? = null) {
     override fun toString() = "ModelConnectionsUiState(busy=$busy, redacted)"
 }
 
 /** Settings session only; all durable operations borrow the existing records IO command owner. */
 class ModelConnectionsController internal constructor(private val current: () -> LocalRecordUiState,
-    private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean) {
+    private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
+    private val capabilityProbe: ModelCapabilityProbe? = null, private val clock: java.time.Clock = java.time.Clock.systemUTC()) {
     private val epochs = AtomicLong()
     private val mutable = MutableStateFlow(ModelConnectionsUiState())
     val state = mutable.asStateFlow()
@@ -50,18 +58,21 @@ class ModelConnectionsController internal constructor(private val current: () ->
     @Volatile private var disposed = false
     @Volatile private var owner: ModelConnectionCatalog? = null
     @Volatile private var secretOwner: ConnectionSecretVault? = null
+    @Volatile private var capabilityOwner: ModelCapabilityRepository? = null
+    private val probeLock=Any()
+    private var runningProbe: ModelCapabilityProbeExchange? = null
     private var retainedOwner: ModelConnectionCatalog? = null
     private var retainedEditor: ModelConnectionEditor? = null
     private var retainedSecretOwner: ConnectionSecretVault? = null
     private var retainedSecretEditor: ModelConnectionSecretEditor? = null
     private val inputLock = Any()
     private var queuedSecretInput: CharArray? = null
-    val editingOrBusy: Boolean get() = active && (mutable.value.busy || mutable.value.editor != null || mutable.value.secretEditor != null)
+    val editingOrBusy: Boolean get() = active && (mutable.value.busy || mutable.value.editor != null || mutable.value.secretEditor != null || mutable.value.probeEditor != null)
     private fun live(session: Long): Boolean {
         val source=current()
-        val owns = !disposed && active && owner!=null && source.modelConnectionOwner===owner && source.modelSecretOwner===secretOwner &&
+        val owns = !disposed && active && owner!=null && source.modelConnectionOwner===owner && source.modelSecretOwner===secretOwner && source.modelCapabilityOwner===capabilityOwner &&
             source.ready && !source.opening && source.error==null
-        if(!owns) clearQueuedSecretInput()
+        if(!owns) { clearQueuedSecretInput();stopProbe() }
         return owns && epochs.get()==session
     }
     fun visible(): ModelConnectionsUiState = mutable.value.let {
@@ -77,8 +88,10 @@ class ModelConnectionsController internal constructor(private val current: () ->
         if(catalog!=null) { retainedOwner=null;retainedEditor=null;retainedSecretOwner=null;retainedSecretEditor=null }
         val session=epochs.incrementAndGet();active=true;owner=catalog
         secretOwner=vault
+        stopProbe()
+        capabilityOwner=source.modelCapabilityOwner.takeIf { source.modelConnectionOwner===catalog }
         mutable.value=ModelConnectionsUiState(session,busy=catalog!=null,editor=restored?.copy(),
-            secretEditor=restoredSecret?.copy(),secretsAvailable=vault!=null)
+            secretEditor=restoredSecret?.copy(),secretsAvailable=vault!=null,probeAvailable=capabilityProbe!=null&&capabilityOwner!=null&&vault!=null)
         if(live(session)) load(session) else mutable.value=ModelConnectionsUiState(session,error="本机连接配置暂不可读取。")
         return session
     }
@@ -92,29 +105,35 @@ class ModelConnectionsController internal constructor(private val current: () ->
         retainedSecretOwner=secretOwner.takeIf { retainEditor && !disposed && secret!=null }
         retainedSecretEditor=secret?.takeIf { retainEditor && !disposed }?.copy(busy=false,
             error="写入结果尚未确认，输入已清空；重试只核对同一次密钥操作。")
-        active=false;owner=null;secretOwner=null;epochs.incrementAndGet();clearQueuedSecretInput();mutable.value=ModelConnectionsUiState()
+        active=false;owner=null;secretOwner=null;capabilityOwner=null;epochs.incrementAndGet();stopProbe();clearQueuedSecretInput();mutable.value=ModelConnectionsUiState()
     }
     /** Explicit navigation retirement differs from configuration recreation. */
     fun leave() { retainedOwner=null;retainedEditor=null;retainedSecretOwner=null;retainedSecretEditor=null
         if(active)close(epochs.get());clearQueuedSecretInput() }
     fun dispose() { disposed=true;leave();owner=null;epochs.incrementAndGet();mutable.value=ModelConnectionsUiState() }
     private fun publish(session: Long, change: (ModelConnectionsUiState)->ModelConnectionsUiState) {
-        mutable.update { if(live(session) && it.session==session) change(it) else it }
+        mutable.update { if(live(session) && it.session==session) change(it).let { next ->
+            next.copy(capabilityProfiles=next.capabilityProfiles.filter { p -> p.connection in next.configurations })
+        } else it }
     }
-    fun reload(session: Long) { if(live(session) && !mutable.value.busy && mutable.value.editor?.busy!=true && mutable.value.secretEditor?.busy!=true) load(session) }
+    fun reload(session: Long) { if(live(session) && !mutable.value.busy && mutable.value.editor?.busy!=true && mutable.value.secretEditor?.busy!=true && mutable.value.probeEditor?.busy!=true) load(session) }
     private fun load(session: Long) {
         publish(session){it.copy(busy=true,error=null,notice=null)}
         queue(session) { store ->
             try { val catalog=checkNotNull(store.modelConnections);check(catalog===owner)
                 val values=catalog.configurations()
-                publish(session){it.copy(busy=false,configurations=values,error=null)}
+                var capabilityError: String?=null
+                val profiles=try { capabilityOwner?.let { check(store.modelCapabilities===it);it.profiles() }.orEmpty() }
+                    catch(cancelled: CancellationException) { throw cancelled }
+                    catch(_: Exception) { capabilityError="能力档案读取失败，已隐藏旧结果；连接和密钥仍可管理。请重新读取。";emptyList() }
+                publish(session){it.copy(busy=false,configurations=values,capabilityProfiles=profiles,capabilityError=capabilityError,error=null)}
             } catch(e: CancellationException) { throw e }
             catch(_: Exception) { publish(session){it.copy(busy=false,error="连接配置读取失败，原数据保留，请重试读取。",configurations=emptyList())} }
         }
     }
     fun begin(session: Long, rendered: ModelConnectionConfiguration? = null) {
         val ui=mutable.value
-        if(!live(session)||ui.busy||ui.error!=null||ui.editor!=null||ui.secretEditor!=null) return
+        if(!live(session)||ui.busy||ui.error!=null||ui.editor!=null||ui.secretEditor!=null||ui.probeEditor!=null) return
         if(rendered!=null && ui.configurations.none { it==rendered }) return
         if(rendered==null && ui.configurations.size>=32) { publish(session){it.copy(notice="最多保存32个使用中的连接配置。")} ;return }
         val d=rendered?.details
@@ -177,7 +196,7 @@ class ModelConnectionsController internal constructor(private val current: () ->
     }
     fun beginSecret(session: Long, rendered: ModelConnectionConfiguration) {
         val ui=mutable.value
-        if(!live(session)||secretOwner==null||ui.busy||ui.error!=null||ui.editor!=null||ui.secretEditor!=null) return
+        if(!live(session)||secretOwner==null||ui.busy||ui.error!=null||ui.editor!=null||ui.secretEditor!=null||ui.probeEditor!=null) return
         if(ui.configurations.none { it==rendered }) return
         publish(session){it.copy(secretEditor=ModelConnectionSecretEditor(rendered),notice=null)}
     }
@@ -295,8 +314,75 @@ class ModelConnectionsController internal constructor(private val current: () ->
     private fun clearQueuedSecretInput() = synchronized(inputLock) {
         queuedSecretInput?.fill('\u0000');queuedSecretInput=null
     }
+    fun beginProbe(session: Long, rendered: ModelConnectionConfiguration) {
+        val ui=mutable.value
+        if(!live(session)||!ui.probeAvailable||ui.busy||ui.error!=null||ui.capabilityError!=null||editingOrBusy||rendered.secretRef==null||rendered !in ui.configurations) return
+        publish(session){it.copy(probeEditor=ModelCapabilityProbeEditor(rendered),notice=null)}
+    }
+    fun cancelProbe(session: Long, editor: ModelCapabilityProbeEditor) {
+        if(!live(session)||mutable.value.probeEditor?.reviewId!=editor.reviewId) return
+        publish(session){it.copy(probeEditor=null)}
+        stopProbe()
+        load(session)
+    }
+    /** Exactly one user-confirmed sample. Retry below can persist only this result, never send again. */
+    fun runProbe(session: Long, editor: ModelCapabilityProbeEditor) {
+        val ui=mutable.value
+        if(!live(session)||!ui.probeAvailable||ui.busy||ui.error!=null||ui.capabilityError!=null||ui.probeEditor!==editor||editor.busy||editor.conflict||editor.pending!=null) return
+        val pending=editor.copy(busy=true,error=null)
+        publish(session){it.copy(probeEditor=pending)}
+        queue(session) { store ->
+            if(mutable.value.probeEditor!==pending) return@queue
+            var exchange: ModelCapabilityProbeExchange?=null
+            try {
+                val profiles=probeRepository(store)
+                val ticket=profiles.begin(editor.expected,UUID.randomUUID().toString(),clock.millis())
+                if(!live(session)||mutable.value.probeEditor!==pending) return@queue
+                exchange=checkNotNull(capabilityProbe).newExchange(ticket)
+                val mayRun=synchronized(probeLock) {
+                    if(!live(session)||mutable.value.probeEditor!==pending) false else { runningProbe=exchange;true }
+                }
+                if(!mayRun) { exchange.cancel();return@queue }
+                val result=exchange.execute()
+                if(!live(session)||mutable.value.probeEditor!==pending) return@queue
+                val saving=pending.copy(pending=ticket to result)
+                publish(session){if(it.probeEditor===pending)it.copy(probeEditor=saving) else it}
+                if(live(session)&&mutable.value.probeEditor===saving) persistProbe(session,saving,store)
+            } catch(e: CancellationException) { throw e }
+            catch(_: ModelConnectionConflict) { probeError(session,pending,true,"连接版本或探测代次已变化，请关闭并重新读取。") }
+            catch(_: Exception) { probeError(session,pending,false,"探测未完成，未自动重试。请关闭并重新读取后再次明确发起。") }
+            finally {
+                synchronized(probeLock){if(runningProbe===exchange)runningProbe=null}
+                exchange?.cancel()
+            }
+        }
+    }
+    fun retryProbePersistence(session: Long, editor: ModelCapabilityProbeEditor) {
+        if(!live(session)||mutable.value.busy||mutable.value.error!=null||mutable.value.probeEditor!==editor||editor.busy||editor.conflict||editor.pending==null) return
+        val pending=editor.copy(busy=true,error=null)
+        publish(session){it.copy(probeEditor=pending)}
+        queue(session){store ->if(mutable.value.probeEditor===pending)persistProbe(session,pending,store)}
+    }
+    private fun persistProbe(session: Long, editor: ModelCapabilityProbeEditor, store: EntryRepository) {
+        try {
+            val profiles=probeRepository(store);val pending=checkNotNull(editor.pending)
+            profiles.finish(pending.first,pending.second)
+            val configs=checkNotNull(store.modelConnections).configurations();val values=profiles.profiles()
+            publish(session){if(it.probeEditor!==editor)it else it.copy(probeEditor=null,configurations=configs,
+                capabilityProfiles=values,notice="已保存本次文本能力检查；未授予任何记录外发权限。")}
+        } catch(e: CancellationException) { throw e }
+        catch(_: ModelConnectionConflict) { probeError(session,editor,true,"连接版本或探测代次已变化，旧结果不会覆盖当前档案。请关闭并重新读取。") }
+        catch(_: Exception) { probeError(session,editor,false,"探测结果写入尚未确认；重试仅核对本次结果，不会再次请求服务。") }
+    }
+    private fun probeRepository(store: EntryRepository): ModelCapabilityRepository = checkNotNull(capabilityOwner).also {
+        check(store.modelConnections===owner&&store.localModelConnections?.secrets===secretOwner&&store.modelCapabilities===it)
+    }
+    private fun probeError(session: Long, editor: ModelCapabilityProbeEditor, conflict: Boolean, message: String) {
+        publish(session){if(it.probeEditor!==editor)it else it.copy(probeEditor=editor.copy(busy=false,conflict=conflict,error=message))}
+    }
+    private fun stopProbe() { synchronized(probeLock){runningProbe.also { runningProbe=null }}?.cancel() }
     private fun queue(session: Long, action: suspend (EntryRepository)->Unit) {
         if(!enqueue { store -> if(live(session)) action(store) }) publish(session){it.copy(busy=false,
-            error="本机资料已关闭，请重新打开设置。",editor=it.editor?.copy(busy=false))}
+            error="本机资料已关闭，请重新打开设置。",editor=it.editor?.copy(busy=false),probeEditor=it.probeEditor?.copy(busy=false))}
     }
 }

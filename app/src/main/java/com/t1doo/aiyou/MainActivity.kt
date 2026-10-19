@@ -856,7 +856,7 @@ fun AIyouApp(
                 appAccessSection = appAccessSettings,
                 modelConnectionSection = if(modelConnections==null || demo) null else ({
                     com.t1doo.aiyou.ui.ModelConnectionSettings(modelConnections,local?.modelConnectionOwner,
-                        local?.ready==true && !local.opening && local.error==null, local?.modelSecretOwner)
+                        local?.ready==true && !local.opening && local.error==null, local?.modelSecretOwner, local?.modelCapabilityOwner)
                 }))
         } else if (browsingPackage && local != null && recordPackages != null && packageUi != null) {
             com.t1doo.aiyou.records.RecordPackageScreen(local, packageUi, recordPackages, recordPackagePicker, ::ownsPackageRoute, modifier)
