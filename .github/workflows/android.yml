@@ -250,8 +250,8 @@ jobs:
               observed.extend((case.get('classname'), case.get('name')) for case in cases)
               shutil.copy2(source, target / source.name)
               receipts.append({'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
-          assert len(observed) == len(set(observed)) == 13
-          receipt = {'tests': 13, 'new_cases': 6, 'failures': 0, 'errors': 0, 'skipped': 0,
+          assert len(observed) == len(set(observed)) == 16
+          receipt = {'tests': 16, 'new_cases': 6, 'failures': 0, 'errors': 0, 'skipped': 0,
                      'source': 'subset of actual full app suite, no second execution', 'xml': receipts}
           (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
           print('RECAP_PREFERENCES_TARGETED_XML_JSON ' + json.dumps(receipt))
