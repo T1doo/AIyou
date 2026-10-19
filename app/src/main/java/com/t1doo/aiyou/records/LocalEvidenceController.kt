@@ -43,7 +43,7 @@ internal fun localEvidenceCandidates(source: OriginalSearchState, generation: Lo
     var limited = false
     for (hit in source.hits) {
         // Ordinary manual search still shows AI_NONE. It never enters this candidate packet.
-        if (hit.entry.policy == ProcessingPolicy.AI_NONE || !seen.add(hit.entry.id) || hit.quote.isEmpty()) continue
+        if (!hit.originalMatchesQuery || hit.entry.policy == ProcessingPolicy.AI_NONE || !seen.add(hit.entry.id) || hit.quote.isEmpty()) continue
         if (cards.size == LocalEvidenceController.MAX_SOURCES) { limited = true; break }
         val reference = localEvidenceReference(hit)
         val size = reference.end - reference.start
@@ -94,7 +94,7 @@ class LocalEvidenceController internal constructor(
     }
     fun canOpen(value: LocalEvidenceState, card: LocalEvidenceCard): Boolean = synchronized(lock) {
         mutable.value === value && owns(value) && value.stage == LocalEvidenceStage.READY &&
-            value.cards.any { it === card } && card.hit.entry.policy != ProcessingPolicy.AI_NONE &&
+            value.cards.any { it === card } && card.hit.originalMatchesQuery && card.hit.entry.policy != ProcessingPolicy.AI_NONE &&
             value.source?.hits?.any { it === card.hit } == true
     }
     fun sync(enabled: Boolean, source: OriginalSearchState) = synchronized(lock) {

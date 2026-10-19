@@ -85,6 +85,9 @@ internal object LocalSearchTokenizer {
             for (i in 1 until run.size) tokens += encoded('b', listOf(run[i - 1], run[i]))
             if (tokens.size > 64) return null
         }
-        return tokens.takeIf { it.isNotEmpty() && it.size <= 64 }?.joinToString(" ") { "bodyTokens:" + it }
+        // Both indexed text columns may recall a candidate. The app verifies each
+        // complete literal against the authenticated original or current manual tags.
+        // entryId is not indexed; user text never becomes MATCH syntax.
+        return tokens.takeIf { it.isNotEmpty() && it.size <= 64 }?.joinToString(" ")
     }
 }

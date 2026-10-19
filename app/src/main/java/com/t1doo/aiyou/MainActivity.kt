@@ -344,7 +344,8 @@ fun AIyouApp(
         val tagsSource = searchSource()
         return OriginalSearchInput(query.toString(), from.toString(), through.toString(), searchMode,
             OriginalSearchInputOwnership(query, from, through, searchModeGeneration), searchTag,
-            if (searchTag != null && tagsSource?.manualTagsAvailable == true) tagsSource.manualTags else null,
+            if ((searchTag != null || searchMode == OriginalSearchMode.KEYWORDS && query.isNotBlank()) &&
+                tagsSource?.manualTagsAvailable == true) tagsSource.manualTags else null,
             onlyFavorites,
             if (onlyFavorites && tagsSource?.favoritesAvailable == true) tagsSource.favorites else null,
             searchDateBasis, if (searchDateBasis == com.t1doo.aiyou.model.RecordDateBasis.EVENT && tagsSource?.eventDatesAvailable == true)
@@ -634,9 +635,9 @@ fun AIyouApp(
                     searchReturnSource = searchState.entries
                     openEntry(hit.entry.id)
                     if (detailEntryId == hit.entry.id) {
-                        locationToken = com.t1doo.aiyou.records.OriginalReadingLocation(
+                        locationToken = if (reference != null || hit.originalMatchesQuery) com.t1doo.aiyou.records.OriginalReadingLocation(
                             hit.entry.id, hit.entry.currentRevision, com.t1doo.aiyou.model.OriginalExports.hash(hit.entry.originalText),
-                            reference?.start ?: hit.matchStartCodePoint, reference?.end ?: hit.matchEndCodePoint)
+                            reference?.start ?: hit.matchStartCodePoint, reference?.end ?: hit.matchEndCodePoint) else null
                         searchLocation = locationToken
                         locationGeneration = navigation.generation
                     }

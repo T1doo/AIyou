@@ -78,6 +78,7 @@ class LocalEvidencePacket private constructor(val selectionId: String, val quest
 
 /** One shared half-open Unicode-code-point contract for candidate display and confirmed inspection. */
 internal fun localEvidenceReference(hit: OriginalSearchHit): OriginalTextReference {
+    require(hit.originalMatchesQuery) { "Manual tag recall is not an original quotation match" }
     val entry = hit.entry
     val original = entry.originalText
     require(entry.currentRevision > 0 && LocalCandidates.validUnicode(original))

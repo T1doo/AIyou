@@ -7,6 +7,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class OriginalSearchPreviewTest {
+    @Test fun tagAssistedKeywordRecallNeverInventsBodyHighlightAndBodyOnlyMatchKeepsItsOriginalRange() = runBlocking {
+        val record = entry("咖啡原文")
+        val tags = mapOf(record.id to com.t1doo.aiyou.model.ManualTagSnapshot(record.id, 1, listOf("旅行")))
+        for (query in listOf("旅行", "咖啡 旅行")) {
+            val hit = LocalOriginalSearchMatcher.match(listOf(record), OriginalSearchInput(query, tagSnapshot = tags)).hits.single()
+            assertFalse(hit.originalMatchesQuery)
+            val preview = requireNotNull(originalSearchPreview(record, hit))
+            assertEquals(record.originalText, preview.text)
+            assertEquals(0, preview.highlightStart); assertEquals(0, preview.highlightEnd)
+        }
+        val body = LocalOriginalSearchMatcher.match(listOf(record), OriginalSearchInput("咖啡", tagSnapshot = tags)).hits.single()
+        assertTrue(body.originalMatchesQuery); assertTrue(body.tagMatches.isEmpty())
+        val preview = requireNotNull(originalSearchPreview(record, body))
+        assertEquals("咖啡", preview.text.substring(preview.highlightStart, preview.highlightEnd))
+        assertTrue(LocalOriginalSearchMatcher.match(listOf(record), OriginalSearchInput("旅行", mode = OriginalSearchMode.EXACT, tagSnapshot = tags)).hits.isEmpty())
+    }
     private fun entry(text: String) = StoredEntry("synthetic", 1, text, 0L, "UTC", ProcessingPolicy.LOCAL_ONLY)
     private fun hit(entry: StoredEntry, query: String, exact: Boolean = false) = runBlocking {
         LocalOriginalSearchMatcher.match(listOf(entry), OriginalSearchInput(query,

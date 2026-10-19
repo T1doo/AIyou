@@ -411,6 +411,9 @@ for label, folder, minimum in targets:
             "narrowDoubleFontDirectoryChoiceShowsDestinationVersionReferenceBoundaryAndSeparateConfirmation",
             "cancelledRetainedReviewAndChangedConfigurationCannotGrantAnOldConnection",
             "uncertainDecisionRetryOnlyReadsReceiptAndNeverRefreshesIntervalOrSends")
+        additional["com.t1doo.aiyou.ManualTagRecallPresentationTest"] = (
+            "keywordTagRecallShowsLabelWithoutBodyHighlightKeepsNavigationAndExactOriginalMode",
+            "changedOrRemovedTagAndRevisionRetireRetainedMixedResultBeforeItCanOpenOrHighlight")
     for owner, names in additional.items():
         for name in names:
             matches = [case for case in observed_cases if case.get("classname") == owner

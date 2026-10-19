@@ -161,7 +161,7 @@ class LocalSearchSqlTest {
             val before = f.index.candidates(LocalSearchRequest("合成"))
             // Simulate old Unicode tables having emitted no new-runtime bigram.
             // Keep source/hash/tag/generation/job/document binding exactly intact.
-            f.base.db.write("UPDATE local_search_fts SET bodyTokens='' WHERE entryId=?", ID)
+            f.base.db.write("UPDATE local_search_fts SET bodyTokens='',tagTokens='' WHERE entryId=?", ID)
             assertTrue(f.index.candidates(LocalSearchRequest("合成")).entries.isEmpty())
             val bindings = f.base.db.read("SELECT * FROM local_search_documents")
             f.reopen("v1:" + "b".repeat(64))
@@ -181,12 +181,12 @@ class LocalSearchSqlTest {
     @Test fun unknownDocumentOrRootProfileCannotExcludeCurrentOriginalFromFallback(): Unit = Fixture().use { f ->
         assertTrue(Regex("v1:[0-9a-f]{64}").matches(LocalSearchTokenizer.profile))
         f.drain()
-        f.base.db.write("UPDATE local_search_fts SET bodyTokens='' WHERE entryId=?", ID)
+        f.base.db.write("UPDATE local_search_fts SET bodyTokens='',tagTokens='' WHERE entryId=?", ID)
         f.base.db.write("UPDATE local_search_documents SET tokenizerProfile='UNKNOWN' WHERE entryId=?", ID)
         assertEquals(listOf(ID), f.index.candidates(LocalSearchRequest("合成")).entries.map { it.id })
         f.drain()
         val before = f.index.candidates(LocalSearchRequest("合成"))
-        f.base.db.write("UPDATE local_search_fts SET bodyTokens='' WHERE entryId=?", ID)
+        f.base.db.write("UPDATE local_search_fts SET bodyTokens='',tagTokens='' WHERE entryId=?", ID)
         f.base.db.write("UPDATE local_search_epoch SET epoch=epoch+1,tokenizerProfile='UNKNOWN'")
         val fallback = f.index.candidates(LocalSearchRequest("合成"))
         assertTrue(fallback.pending)

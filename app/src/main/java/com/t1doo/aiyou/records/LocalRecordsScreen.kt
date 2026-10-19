@@ -421,6 +421,8 @@ fun LocalRecordsScreen(
                 } else items(displayedEntries, key = { it.id }) { entry ->
                     val hit = if (filtered) searchHits[entry.id] else null
                     val preview = remember(entry, hit) { hit?.let { originalSearchPreview(entry, it) } }
+                    Column {
+                    hit?.let { OriginalSearchTagMatch(it) }
                     MemoryCard(preview?.text ?: originalPreview(entry.originalText), originalMetadata(entry), policy = entry.policy,
                         modifier = Modifier.testTag("entry-${entry.id}").semantics { selected = entry.id == selectedEntryId }
                             .then(if (entry.id == selectedEntryId) Modifier.border(AIyouDimensions.iconStroke,
@@ -429,6 +431,7 @@ fun LocalRecordsScreen(
                         highlight = preview?.takeIf { it.highlightEnd > it.highlightStart }?.let {
                             androidx.compose.ui.text.TextRange(it.highlightStart, it.highlightEnd)
                         })
+                    }
                 }
             }
         }

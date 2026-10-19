@@ -18,6 +18,7 @@ internal fun originalSearchPreview(entry: StoredEntry, hit: OriginalSearchHit): 
     val from = source.offsetByCodePoints(0, hit.startCodePoint)
     val through = source.offsetByCodePoints(from, hit.endCodePoint - hit.startCodePoint)
     if (through - from != hit.quote.length || !source.regionMatches(from, hit.quote, 0, hit.quote.length)) return null
+    if (!hit.originalMatchesQuery) return OriginalSearchPreview(hit.excerpt)
     if (hit.matchStartCodePoint == 0 && hit.matchEndCodePoint == 0) return OriginalSearchPreview(hit.excerpt)
     if (hit.matchStartCodePoint !in hit.startCodePoint until hit.endCodePoint ||
         hit.matchEndCodePoint !in (hit.matchStartCodePoint + 1)..total) return null

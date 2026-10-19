@@ -51,7 +51,8 @@ class LocalOriginalSearchController internal constructor(
             local?.entries === value.entries && currentInput() == value.input &&
             local?.localSearch === value.owner && local?.localSearchEpoch == value.indexEpoch &&
             (value.input.person == null || (if (local?.manualPeopleAvailable == true) local.manualPeople else null) === value.input.peopleSnapshot) &&
-            (value.input.tag == null || (if (local?.manualTagsAvailable == true) local.manualTags else null) === value.input.tagSnapshot) &&
+            (value.input.tag == null && !value.input.usesTagRecall ||
+                (if (local?.manualTagsAvailable == true) local.manualTags else null) === value.input.tagSnapshot) &&
             (!value.input.onlyFavorites || (if (local?.favoritesAvailable == true) local.favorites else null) === value.input.favoriteSnapshot) &&
             (value.input.dateBasis != com.t1doo.aiyou.model.RecordDateBasis.EVENT ||
                 (if (local?.eventDatesAvailable == true) local.eventDates else null) === value.input.eventDateSnapshot)

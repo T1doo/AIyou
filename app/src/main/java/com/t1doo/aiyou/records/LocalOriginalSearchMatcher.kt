@@ -22,6 +22,7 @@ data class OriginalSearchInput(val query: String = "", val from: String = "", va
     internal val eventDateSnapshot: Map<String, RecordEventDateSnapshot>? = null,
     val onlyImages: Boolean = false, internal val currentImageEntryIds: Set<String>? = null,
     val person: String? = null, internal val peopleSnapshot: Map<String, com.t1doo.aiyou.model.ManualPeopleSnapshot>? = null) {
+    internal val usesTagRecall: Boolean get() = mode == OriginalSearchMode.KEYWORDS && query.isNotBlank()
     override fun toString() = "OriginalSearchInput(redacted)"
 }
 
@@ -39,7 +40,9 @@ enum class OriginalSearchStage { BROWSE, WAITING, RUNNING, READY, INVALID, FAILE
 
 class OriginalSearchHit internal constructor(val entry: StoredEntry, val quote: String,
     val startCodePoint: Int, val endCodePoint: Int, val leading: Boolean, val trailing: Boolean,
-    val matchStartCodePoint: Int = startCodePoint, val matchEndCodePoint: Int = endCodePoint) {
+    val matchStartCodePoint: Int = startCodePoint, val matchEndCodePoint: Int = endCodePoint,
+    val originalMatchesQuery: Boolean = true, tagMatches: List<String> = emptyList()) {
+    val tagMatches: List<String> = java.util.Collections.unmodifiableList(tagMatches.toList())
     val excerpt: String get() = (if (leading) "…" else "") + quote + (if (trailing) "…" else "")
     override fun toString() = "OriginalSearchHit(redacted)"
 }
@@ -48,7 +51,7 @@ internal class OriginalSearchMatches(val stage: OriginalSearchStage, val hits: L
     val message: String? = null, val proof: com.t1doo.aiyou.domain.LocalSearchSnapshot? = null,
     val owner: com.t1doo.aiyou.domain.LocalSearchRepository? = null)
 
-/** Literal lookup of the current originals, without an index, normalization or AI. */
+/** Literal verification of current originals and confirmed manual tags; never AI inference. */
 internal object LocalOriginalSearchMatcher {
     suspend fun indexed(entries: List<StoredEntry>, input: OriginalSearchInput,
         owner: com.t1doo.aiyou.domain.LocalSearchRepository): OriginalSearchMatches {
@@ -61,8 +64,10 @@ internal object LocalOriginalSearchMatcher {
                 return OriginalSearchMatches(OriginalSearchStage.FAILED, message = "图片关联暂不可读取，请重试本机读取。")
             if (proof.entries.any { fresh -> entries.none { it == fresh } })
                 return OriginalSearchMatches(OriginalSearchStage.WAITING)
-            if (input.tag != null && proof.tags.any { (id, fresh) ->
-                input.tagSnapshot?.get(id)?.let { it.version == fresh.version && it.names == fresh.names } != true })
+            if ((input.tag != null || input.usesTagRecall && input.tagSnapshot != null) && proof.tags.any { (id, fresh) ->
+                val before = input.tagSnapshot?.get(id)
+                if (before == null) fresh.version != 0L || fresh.names.isNotEmpty()
+                else before.entryId != fresh.entryId || before.version != fresh.version || before.names != fresh.names })
                 return OriginalSearchMatches(OriginalSearchStage.WAITING)
             if (input.onlyFavorites && proof.favorites == null)
                 return OriginalSearchMatches(OriginalSearchStage.FAILED, message = "收藏查找暂不可读取，请重试本机读取。")
@@ -161,13 +166,25 @@ internal object LocalOriginalSearchMatcher {
             }
             val text = entry.originalText
             val haystack = if (input.mode == OriginalSearchMode.KEYWORDS && needles.isNotEmpty()) fold(text) else null
+            val labels = if (input.usesTagRecall) input.tagSnapshot?.get(entry.id)?.names.orEmpty() else emptyList()
+            val foldedLabels = labels.map { fold(it).text }
+            val tagMatches = LinkedHashSet<String>()
             var firstStart = Int.MAX_VALUE
             var firstEnd = 0
             var found = true
+            var originalMatchesQuery = true
             for (needle in needles) {
                 currentCoroutineContext().ensureActive()
                 val index = find((haystack?.text ?: text), needle)
-                if (index < 0) { found = false; break }
+                if (index < 0) {
+                    originalMatchesQuery = false
+                    var tagFound = false
+                    for (at in foldedLabels.indices) if (find(foldedLabels[at], needle) >= 0) {
+                        tagMatches += labels[at]; tagFound = true
+                    }
+                    if (!tagFound) { found = false; break }
+                    continue
+                }
                 val start = haystack?.originalOffsets?.get(index) ?: index
                 if (start < firstStart) {
                     firstStart = start
@@ -176,12 +193,13 @@ internal object LocalOriginalSearchMatcher {
             }
             if (found) {
                 val total = text.codePointCount(0, text.length)
-                val matchStart = if (firstStart == Int.MAX_VALUE) 0 else text.codePointCount(0, firstStart)
+                val matchStart = if (!originalMatchesQuery || firstStart == Int.MAX_VALUE) 0 else text.codePointCount(0, firstStart)
                 val start = (matchStart - 80).coerceAtLeast(0)
                 val end = (start + 240).coerceAtMost(total)
                 val quote = text.substring(text.offsetByCodePoints(0, start), text.offsetByCodePoints(0, end))
-                val matchEnd = if (firstStart == Int.MAX_VALUE) 0 else text.codePointCount(0, firstEnd)
-                hits += OriginalSearchHit(entry, quote, start, end, start > 0, end < total, matchStart, matchEnd)
+                val matchEnd = if (!originalMatchesQuery || firstStart == Int.MAX_VALUE) 0 else text.codePointCount(0, firstEnd)
+                hits += OriginalSearchHit(entry, quote, start, end, start > 0, end < total, matchStart, matchEnd,
+                    originalMatchesQuery, tagMatches.toList())
             }
         }
         return OriginalSearchMatches(OriginalSearchStage.READY, hits)

@@ -108,6 +108,8 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-mode")) {
                 Text(if (mode == OriginalSearchMode.EXACT) "精确片段 · 区分大小写和空白" else "关键词 · 全部包含，忽略大小写")
             }
+            Text("关键词可在当前原文或手工标签中满足；精确片段只查原文。标签命中只供查找，不构成原文出处。",
+                style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = { onDateBasis(if (dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED)
                 com.t1doo.aiyou.model.RecordDateBasis.EVENT else com.t1doo.aiyou.model.RecordDateBasis.CAPTURED) }, enabled = enabled,
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-date-basis")) {
@@ -164,7 +166,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
             Text("图片筛选只看当前版本的 PNG/JPEG 附件关联；不识别图片文字，历史版本有图不计入。",
                 style = MaterialTheme.typography.bodySmall)
             Text(if (dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED)
-                "记录日期按捕获时区，包含起止两天。关键词、日期、手工标签、收藏与图片条件同时满足；仅查当前本机原文，不使用 AI。"
+                "记录日期按捕获时区，包含起止两天。关键词、日期、手工标签、收藏与图片条件同时满足；只在本机查找，不使用 AI。"
                 else "事件日期按手填的日历日期与 IANA 时区，包含起止两天。未补记不匹配，不回落记录日期；与关键词、手工标签、收藏和图片条件同时满足。",
                 style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onClear, enabled = enabled,
@@ -179,4 +181,11 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
             }
         }
     }
+}
+
+@Composable
+internal fun OriginalSearchTagMatch(hit: OriginalSearchHit) {
+    if (hit.tagMatches.isNotEmpty()) Text("手工标签命中：" + hit.tagMatches.joinToString("、") + "；不作为原文出处。",
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.testTag("original-search-tag-match-${hit.entry.id}"))
 }

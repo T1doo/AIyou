@@ -33,6 +33,7 @@ internal fun CurrentImageGridCard(hit: OriginalSearchHit, tile: ImageGridTile?, 
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.testTag(if (tile?.failed == true) "image-grid-failed-${hit.entry.id}" else "image-grid-loading-${hit.entry.id}"))
             }
+            OriginalSearchTagMatch(hit)
             if (hit.excerpt.isNotEmpty()) Text(hit.excerpt, maxLines = 3, overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodyMedium)
             Text(originalMetadata(hit.entry), style = MaterialTheme.typography.bodySmall)
