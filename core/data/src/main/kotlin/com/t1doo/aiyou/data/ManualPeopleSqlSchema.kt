@@ -13,7 +13,8 @@ internal object ManualPeopleSqlSchema {
             "typeof(NEW.ciphertext)!='blob' OR length(NEW.ciphertext) NOT BETWEEN 29 AND 8192 " +
             "BEGIN SELECT RAISE(ABORT,'invalid manual people'); END"
     } + listOf("INSERT", "UPDATE", "DELETE").map { event ->
-        // People are a separate exact filter, never inserted into original-text FTS or AI annotations.
+        // Names keep their exact filter; confirmed record-local aliases use a separate bounded
+        // authenticated candidate channel, never original-text FTS or AI annotations.
         "CREATE TRIGGER IF NOT EXISTS manual_people_search_" + event.lowercase() + " AFTER " + event +
             " ON entry_manual_people BEGIN UPDATE local_search_epoch SET epoch=epoch+1 WHERE slot=1; END"
     }

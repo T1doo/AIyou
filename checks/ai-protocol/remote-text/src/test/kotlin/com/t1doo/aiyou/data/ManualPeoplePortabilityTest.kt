@@ -147,7 +147,7 @@ class ManualPeoplePortabilityTest {
             }}
     }
 
-    private class PeopleMediaFixture(withPeople:Boolean=true):AutoCloseable {
+    internal class PeopleMediaFixture(withPeople:Boolean=true):AutoCloseable {
         val base=PermanentErasureFixture(ManualPeopleFixture.KEY)
         var people:SqlManualPeopleRepository?=null;private set
         lateinit var originals:SqlOriginalExportRepository;private set

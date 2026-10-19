@@ -350,7 +350,7 @@ fun AIyouApp(
             if (onlyFavorites && tagsSource?.favoritesAvailable == true) tagsSource.favorites else null,
             searchDateBasis, if (searchDateBasis == com.t1doo.aiyou.model.RecordDateBasis.EVENT && tagsSource?.eventDatesAvailable == true)
                 tagsSource.eventDates else null,onlyImages = onlyImages, person = searchPerson,
-            peopleSnapshot = if (searchPerson != null && tagsSource?.manualPeopleAvailable == true) tagsSource.manualPeople else null)
+            peopleSnapshot = if ((searchPerson != null || searchMode == OriginalSearchMode.KEYWORDS && query.isNotBlank()) && tagsSource?.manualPeopleAvailable == true) tagsSource.manualPeople else null)
     }
     val search = remember {
         LocalOriginalSearchController(
@@ -759,7 +759,10 @@ fun AIyouApp(
                 onRemove = { session, version, name, input -> if (ownsNavigation()) controller.remove(session, version, name, input) },
                 onRetry = { if (ownsNavigation()) controller.retry(it) }, onClose = { if (ownsNavigation()) controller.close(it) },
                 sourceAvailable = local.ready && !local.opening && local.error == null && local.manualPeopleOwner === editor.owner &&
-                    local.hasManualPeopleReadingSource(editor))
+                    local.hasManualPeopleReadingSource(editor),
+                onAliasEdit = { session, version, alias, name -> if (ownsNavigation()) controller.editAlias(session, version, alias, name) },
+                onAliasSave = { session, version, alias, name -> if (ownsNavigation()) controller.saveAlias(session, version, alias, name) },
+                onAliasRemove = { session, version, alias -> if (ownsNavigation()) controller.removeAlias(session, version, alias) })
         }
     }
     local?.manualTagEditor?.takeIf { reading && it.entryId == detailEntryId }?.let { editor ->

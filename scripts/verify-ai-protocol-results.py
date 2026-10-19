@@ -29,6 +29,7 @@ def input_fingerprint():
         "app/src/main/AndroidManifest.xml", "app/build.gradle.kts", "scripts/inspect-record-ai-permissions.py"))
     inputs.extend(root / path for path in ("app/src/main/java/com/t1doo/aiyou/ui/ModelConnectionSettings.kt",
         "app/src/test/kotlin/com/t1doo/aiyou/ManualTagRecallPresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/ManualAliasRecallPresentationTest.kt",
         "app/src/test/kotlin/com/t1doo/aiyou/RecordConnectionReviewPresentationTest.kt"))
     inputs.extend((root / "schemas").glob("*.json"))
     inputs.append(root / "scripts/verify-local-candidate-schema.py")

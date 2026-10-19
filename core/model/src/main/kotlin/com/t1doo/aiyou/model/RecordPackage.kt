@@ -24,8 +24,10 @@ class RecordPackageOriginal(val sourceId: String, val sourceRevision: Int,
     val capturedAtMillis: Long, val captureTimeZone: String, val originalText: String,
     val contentHash: String, val sourceTagVersion: Long, tags: List<String>, allowImageOnly: Boolean = false,
     history: List<RecordPackageRevision> = emptyList(), val eventDate: RecordEventDate? = null,
-    val sourcePeopleVersion: Long = 0, people: List<String> = emptyList()) {
+    val sourcePeopleVersion: Long = 0, people: List<String> = emptyList(),
+    peopleAliases: List<ManualPersonAlias> = emptyList()) {
     val people = Collections.unmodifiableList(ManualTags.canonical(people))
+    val peopleAliases = Collections.unmodifiableList(ManualPeopleAliases.canonical(this.people, peopleAliases))
     val tags = Collections.unmodifiableList(tags.toList())
     val history = Collections.unmodifiableList(history.toList())
     val restoredRevision get() = if (history.isEmpty()) 1 else sourceRevision

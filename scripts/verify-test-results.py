@@ -414,6 +414,10 @@ for label, folder, minimum in targets:
         additional["com.t1doo.aiyou.ManualTagRecallPresentationTest"] = (
             "keywordTagRecallShowsLabelWithoutBodyHighlightKeepsNavigationAndExactOriginalMode",
             "changedOrRemovedTagAndRevisionRetireRetainedMixedResultBeforeItCanOpenOrHighlight")
+        additional["com.t1doo.aiyou.ManualAliasRecallPresentationTest"] = (
+            "keywordAliasRecallShowsLabelWithoutBodyHighlightKeepsNavigationAndExactOriginalMode",
+            "changedOrRevokedAliasAndRevisionRetireRetainedMixedResultBeforeItCanOpenOrHighlight",
+            "doubleFontExplicitAliasEditorCreatesChangesAndRevokesWithoutSavingPrivateInputOrChangingNames")
     for owner, names in additional.items():
         for name in names:
             matches = [case for case in observed_cases if case.get("classname") == owner

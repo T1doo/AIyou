@@ -14,10 +14,11 @@ object OriginalActivityExportCodec {
         val drafts = activities.drafts.map { item -> draft(item) }
         val body = (records + tasks + drafts).joinToString("", transform = { "$it\n" })
         val withPeople = snapshot.records.any { it.people.version > 0 }
-        val manifest = "{\"type\":\"manifest\",\"format\":\"AIyou-originals-and-activities\",\"formatVersion\":${if(withPeople) 2 else FORMAT_VERSION},\"schemaVersion\":1," +
+        val withAliases = snapshot.records.any { it.people.aliases.isNotEmpty() }
+        val manifest = "{\"type\":\"manifest\",\"format\":\"AIyou-originals-and-activities\",\"formatVersion\":${if(withAliases) 3 else if(withPeople) 2 else FORMAT_VERSION},\"schemaVersion\":1," +
             "\"snapshotId\":${q(snapshot.id)},\"createdAtMillis\":${snapshot.createdAtMillis},\"encrypted\":false," +
             "\"recordCount\":${records.size},\"taskCount\":${tasks.size},\"proposalCount\":${drafts.size}," +
-            "\"scope\":[\"currentOriginals\",\"manualTags\",\"eventDates\",\"allSavedFormalTasks\",\"savedDraftProposals\"" + (if(withPeople) ",\"manualPeople\"" else "") + "]," +
+            "\"scope\":[\"currentOriginals\",\"manualTags\",\"eventDates\",\"allSavedFormalTasks\",\"savedDraftProposals\"" + (if(withPeople) ",\"manualPeople\"" else "") + (if(withAliases) ",\"manualAliases\"" else "") + "]," +
             "\"excluded\":[\"attachments\",\"history\",\"proposalHistory\",\"unsavedForms\",\"aiDerived\",\"reminders\",\"keys\",\"consents\"]," +
             "\"sourceAssociation\":\"exactSelectedCurrentOriginal\",\"hashAlgorithm\":\"SHA-256\"}"
         val end = "{\"type\":\"end\",\"snapshotId\":${q(snapshot.id)},\"recordCount\":${records.size}," +

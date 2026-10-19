@@ -15,7 +15,7 @@ class OriginalExportPayload internal constructor(val format: OriginalExportForma
 }
 
 object OriginalExportCodec {
-    const val FORMAT_VERSION = 3
+    const val FORMAT_VERSION = 4
     fun render(snapshot: OriginalExportSnapshot, format: OriginalExportFormat): OriginalExportPayload {
         val text = when (format) {
             OriginalExportFormat.JSONL -> jsonl(snapshot)
@@ -30,10 +30,11 @@ object OriginalExportCodec {
     }
     private fun manifest(snapshot: OriginalExportSnapshot): String {
         val people = snapshot.records.any { it.people.version > 0 }
-        return "{\"type\":\"manifest\",\"format\":\"AIyou-current-originals\",\"formatVersion\":" + (if (people) 3 else 2) + ",\"snapshotId\":" +
+        val aliases = snapshot.records.any { it.people.aliases.isNotEmpty() }
+        return "{\"type\":\"manifest\",\"format\":\"AIyou-current-originals\",\"formatVersion\":" + (if (aliases) 4 else if (people) 3 else 2) + ",\"snapshotId\":" +
             quoted(snapshot.id) + ",\"createdAtMillis\":" + snapshot.createdAtMillis + ",\"recordCount\":" + snapshot.records.size +
             ",\"encrypted\":false,\"scope\":[\"currentOriginals\",\"manualTags\",\"eventDates\"" +
-            (if (people) ",\"manualPeople\"" else "") + "],\"excluded\":[\"attachments\",\"history\",\"tasks\",\"keys\"]}"
+            (if (people) ",\"manualPeople\"" else "") + (if (aliases) ",\"manualAliases\"" else "") + "],\"excluded\":[\"attachments\",\"history\",\"tasks\",\"keys\"]}"
     }
     internal fun record(value: OriginalExportRecord): String {
         val e = value.entry
@@ -43,7 +44,10 @@ object OriginalExportCodec {
             ",\"manualTagVersion\":" + value.tags.version + ",\"manualTags\":[" + value.tags.names.joinToString(",") { quoted(it) } + "],\"eventDateVersion\":" + value.eventDate.version +
             ",\"eventDate\":" + (value.eventDate.date?.let { "{\"localDate\":" + quoted(it.localDate) + ",\"timeZone\":" + quoted(it.timeZone) + "}" } ?: "null") +
             (if (value.people.version > 0) ",\"manualPeopleVersion\":" + value.people.version + ",\"manualPeople\":[" +
-                value.people.names.joinToString(",") { quoted(it) } + "]" else "") + "}"
+                value.people.names.joinToString(",") { quoted(it) } + "]" else "") +
+            (if (value.people.aliases.isNotEmpty()) ",\"manualAliases\":[" + value.people.aliases.joinToString(",") {
+                "{\"alias\":" + quoted(it.alias) + ",\"name\":" + quoted(it.name) + ",\"scope\":\"record\"}"
+            } + "]" else "") + "}"
     }
     private fun jsonl(snapshot: OriginalExportSnapshot): String {
         val body = snapshot.records.joinToString("") { record(it) + "\n" }
@@ -52,7 +56,7 @@ object OriginalExportCodec {
             ",\"recordsSha256\":" + quoted(OriginalExports.hash(body)) + "}\n"
     }
     private fun markdown(snapshot: OriginalExportSnapshot): String = buildString {
-        append("# 爱忆当前原文导出\n\n普通明文导出，非完整备份。仅含选定当前原文、手工标签、已手工关联的人物称呼与手填事件日期及 IANA 时区；事件日期为空表示未知或已清除，不推测时刻。不含附件、历史版本、待办或密钥。\n\n")
+        append("# 爱忆当前原文导出\n\n普通明文导出，非完整备份。仅含选定当前原文、手工标签、已手工关联的人物称呼、仅本条记录的用户确认别名与手填事件日期及 IANA 时区；事件日期为空表示未知或已清除，不推测时刻。不含附件、历史版本、待办或密钥。\n\n")
         append(fenced("json", manifest(snapshot))); append("\n")
         snapshot.records.forEachIndexed { index, value ->
             append("## 原文 "); append(index + 1); append("\n\n")

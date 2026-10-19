@@ -7,19 +7,22 @@ import java.util.Collections
 internal object RecordPeoplePackageCodec {
     fun encode(preview: RecordMediaPreview, baseVersion: Int, base: ByteArray): ByteArray {
         require(baseVersion in 2..5 && preview.snapshot.records.any { it.people.version > 0 })
+        val extended = preview.snapshot.records.any { it.people.aliases.isNotEmpty() }
         return PackageWriter(RecordMediaPackages.MAX_METADATA).use { out ->
-            out.string("AIyou-manual-people-v6", 32); out.i32(6); out.i32(1); out.i32(baseVersion)
+            out.string("AIyou-manual-people-v6", 32); out.i32(6); out.i32(if (extended) 2 else 1); out.i32(baseVersion)
             out.i32(base.size); out.raw(base); out.i32(preview.snapshot.records.size)
             preview.snapshot.records.forEachIndexed { index, record ->
                 out.i32(index); out.string(record.entry.id, 512); out.i64(record.people.version)
                 out.strings(record.people.names, 12, 160)
+                if (extended) writeAliases(out, record.people.aliases)
             }; out.bytes()
         }
     }
     fun parse(bytes: ByteArray, parseBase: (ByteArray, Int) -> AuthenticatedRecordPackage): AuthenticatedRecordPackage {
         require(bytes.size <= RecordMediaPackages.MAX_METADATA)
         val input = PackageReader(bytes)
-        require(input.string(32) == "AIyou-manual-people-v6" && input.i32() == 6 && input.i32() == 1)
+        require(input.string(32) == "AIyou-manual-people-v6" && input.i32() == 6)
+        val format = input.i32(); require(format in 1..2)
         val baseVersion = input.i32(); require(baseVersion in 2..5)
         val raw = input.raw(input.i32(), RecordMediaPackages.MAX_METADATA)
         val base = try { parseBase(raw, baseVersion) } finally { raw.fill(0) }
@@ -28,16 +31,24 @@ internal object RecordPeoplePackageCodec {
             val old = base.records[index]
             require(input.i32() == index && input.string(512) == old.sourceId)
             val version = input.i64(); val names = input.strings(12, 160)
+            val aliases = if (format == 2) List(input.count(ManualPeopleAliases.MAX_COUNT)) {
+                ManualPersonAlias(input.string(160), input.string(160))
+            } else emptyList()
             RecordPackageOriginal(old.sourceId, old.sourceRevision, old.capturedAtMillis, old.captureTimeZone,
-                old.originalText, old.contentHash, old.sourceTagVersion, old.tags, true, old.history, old.eventDate, version, names)
+                old.originalText, old.contentHash, old.sourceTagVersion, old.tags, true, old.history, old.eventDate, version, names, aliases)
         }
         input.end(); require(records.any { it.sourcePeopleVersion > 0 })
-        val digests = records.mapIndexed { index, record -> PackageWriter(4096).use { out ->
+        require(format == 1 || records.any { it.peopleAliases.isNotEmpty() })
+        val digests = records.mapIndexed { index, record -> PackageWriter(8192).use { out ->
             out.string("AIyou-people-record-v6", 32); out.raw(packageUnhex(base.recordDigests[index]))
             out.i64(record.sourcePeopleVersion); out.strings(record.people, 12, 160)
+            if (format == 2) writeAliases(out, record.peopleAliases)
             val block = out.bytes(); try { packageHex(packageHash(block)) } finally { block.fill(0) }
         } }
         return PeoplePackage(base, records, digests, packageHex(packageHash(bytes)))
+    }
+    private fun writeAliases(out: PackageWriter, aliases: List<ManualPersonAlias>) {
+        out.i32(aliases.size); aliases.forEach { out.string(it.alias, 160); out.string(it.name, 160) }
     }
     fun legacyPreview(preview: RecordMediaPreview): RecordMediaPreview {
         val snapshot = OriginalExportSnapshot(preview.snapshot.id, preview.snapshot.createdAtMillis,

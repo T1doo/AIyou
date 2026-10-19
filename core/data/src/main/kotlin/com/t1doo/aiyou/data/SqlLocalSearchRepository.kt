@@ -154,6 +154,49 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         }
     }
 
+    /** Authenticated record-local lookup, never a global replacement in the FTS expression. */
+    private fun aliasCandidates(sql: RecordsSqlConnection, request: LocalSearchRequest,
+        from: LocalDate?, through: LocalDate?, budget: Budget, favoriteCondition: String, imageCondition: String): Set<String> {
+        val owner = people ?: return emptySet()
+        if (request.exact || request.query.isBlank()) return emptySet()
+        val whole = ManualPeopleAliases.fold(request.query.trim())
+        val terms = request.query.split(Regex("[\\p{javaWhitespace}\\p{Zs}]+")).filter { it.isNotEmpty() }
+            .map(ManualPeopleAliases::fold).toSet() + whole
+        val ids = LinkedHashSet<String>()
+        var scanned = 0
+        var authenticated = 0
+        while (true) {
+            val rows = sql.query("SELECT e.id,e.capturedAtMillis,e.captureTimeZone FROM entry_manual_people p " +
+                "JOIN entries e ON e.id=p.entryId LEFT JOIN remote_source_access a ON a.entryId=e.id WHERE " +
+                live + favoriteCondition + imageCondition + " ORDER BY e.id LIMIT 100 OFFSET " + scanned)
+            if (rows.isEmpty()) break
+            for (row in rows) {
+                if (++scanned > 10_000) throw LocalSearchTooBroad()
+                val id = row[0] as String
+                val selectedDate = if (request.dateBasis == RecordDateBasis.EVENT)
+                    eventDateStorage.readWithin(sql, id).date?.let { LocalDate.parse(it.localDate) } ?: continue
+                    else Instant.ofEpochMilli(row[1] as Long).atZone(ZoneId.of(row[2] as String)).toLocalDate()
+                if ((from != null && selectedDate < from) || (through != null && selectedDate > through)) continue
+                if (request.tag != null) {
+                    val tag = tags.readWithin(sql, id); tag.names.forEach(budget::add)
+                    if (request.tag !in tag.names) continue
+                }
+                if (++authenticated > 4096) throw LocalSearchTooBroad()
+                val snapshot = owner.readWithin(sql, id)
+                snapshot.names.forEach(budget::add)
+                snapshot.aliases.forEach { budget.add(it.alias); budget.add(it.name) }
+                if (request.person != null && request.person !in snapshot.names) continue
+                if (snapshot.aliases.any { ManualPeopleAliases.fold(it.alias) in terms || ManualPeopleAliases.fold(it.name) in terms }) {
+                    ids += id
+                    // One FTS bind plus at most 512 IDs; reject the whole scope rather than truncate it.
+                    if (ids.size > 512) throw LocalSearchTooBroad()
+                }
+            }
+            if (rows.size < 100) break
+        }
+        return ids
+    }
+
     override fun candidates(request: LocalSearchRequest): LocalSearchSnapshot = safely {
         val profile = activeProfile()
         if (request.query.length > 100_000) throw LocalSearchInvalid()
@@ -176,14 +219,16 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             val favoriteCondition = if (request.onlyFavorites) " AND e.isFavorite=1" else ""
             val imageCondition = if (request.onlyImages) " AND EXISTS(SELECT 1 FROM attachments p " +
                 "WHERE p.entryId=e.id AND p.revision=e.currentRevision AND p.mediaType IN ('image/png','image/jpeg'))" else ""
+            val budget = Budget()
+            val aliasIds = aliasCandidates(sql, request, from, through, budget, favoriteCondition, imageCondition)
             val expression = LocalSearchTokenizer.query(request.query, request.exact)
             val condition = if (expression == null || stamp.version != 1 || stamp.profile != profile) "" else
-                " AND (" + valid(stamp.epoch, profile) + "=0 OR e.id IN (SELECT entryId FROM local_search_fts WHERE local_search_fts MATCH ?))"
-            val args = if (condition.isEmpty()) emptyList() else listOf(expression)
-            val personValues = if (request.person != null) HashMap<String, ManualPeopleSnapshot>() else null
+                " AND (" + valid(stamp.epoch, profile) + "=0 OR e.id IN (SELECT entryId FROM local_search_fts WHERE local_search_fts MATCH ?)" +
+                    (if (aliasIds.isEmpty()) "" else " OR e.id IN (" + aliasIds.joinToString(",") { "?" } + ")") + ")"
+            val args = if (condition.isEmpty()) emptyList() else listOf(expression) + aliasIds.toList()
+            val personValues = if (request.person != null || people != null && !request.exact && request.query.isNotBlank()) HashMap<String, ManualPeopleSnapshot>() else null
             val bindings = ArrayList<Binding>()
             val labels = HashMap<String, ManualTagSnapshot>()
-            val budget = Budget()
             var scanned = 0
             while (true) {
                 val page = sql.query("SELECT e.id,e.capturedAtMillis,e.captureTimeZone" + sourceFrom +
@@ -200,8 +245,9 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                     val tag = tags.readWithin(sql, id)
                     tag.names.forEach(budget::add)
                     if (request.tag != null && request.tag !in tag.names) continue
-                    val person = if (request.person != null) checkNotNull(people).readWithin(sql, id) else null
+                    val person = if (personValues != null) checkNotNull(people).readWithin(sql, id) else null
                     person?.names?.forEach(budget::add)
+                    person?.aliases?.forEach { budget.add(it.alias); budget.add(it.name) }
                     if (request.person != null && request.person !in checkNotNull(person).names) continue
                     val bound = read(sql, id, request.onlyImages) ?: throw LocalSearchStale()
                     budget.add(bound.entry.originalText)
@@ -254,7 +300,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                 proof.people?.let { values ->
                     val old = checkNotNull(values[before.entry.id])
                     val now = checkNotNull(people).readWithin(sql, before.entry.id)
-                    if (old.version != now.version || old.names != now.names || old.sourceRevision != now.sourceRevision ||
+                    if (old.version != now.version || old.names != now.names || old.aliases != now.aliases || old.sourceRevision != now.sourceRevision ||
                         old.sourceHash != now.sourceHash || old.generation != now.generation) return@transaction false
                 }
                 if (entryId == before.entry.id) selected = current.entry

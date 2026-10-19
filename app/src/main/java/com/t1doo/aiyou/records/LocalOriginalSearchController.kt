@@ -50,7 +50,7 @@ class LocalOriginalSearchController internal constructor(
         return !closed && active && !pendingInput && value.generation == generation && value.inputEpoch == inputEpoch && usable(local) &&
             local?.entries === value.entries && currentInput() == value.input &&
             local?.localSearch === value.owner && local?.localSearchEpoch == value.indexEpoch &&
-            (value.input.person == null || (if (local?.manualPeopleAvailable == true) local.manualPeople else null) === value.input.peopleSnapshot) &&
+            (value.input.person == null && !value.input.usesAliasRecall || (if (local?.manualPeopleAvailable == true) local.manualPeople else null) === value.input.peopleSnapshot) &&
             (value.input.tag == null && !value.input.usesTagRecall ||
                 (if (local?.manualTagsAvailable == true) local.manualTags else null) === value.input.tagSnapshot) &&
             (!value.input.onlyFavorites || (if (local?.favoritesAvailable == true) local.favorites else null) === value.input.favoriteSnapshot) &&

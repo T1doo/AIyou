@@ -67,7 +67,7 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
                 }
                 sql.execute("INSERT INTO remote_source_access(entryId,generation,deleted,connection,consent) VALUES(?,1,0,NULL,NULL)", listOf(id))
                 tags.createWithin(sql, id, record.tags, "PACKAGE_TAG:" + id)
-                people?.createWithin(sql, id, record.people, "PACKAGE_PEOPLE:" + id)
+                people?.createWithin(sql, id, record.people, "PACKAGE_PEOPLE:" + id, record.peopleAliases)
                 record.eventDate?.let { eventDates.importWithin(sql, id, it, "PACKAGE_EVENT:" + id) }
                 sql.execute("INSERT INTO local_jobs(id,entryId,sourceRevision,operation,state) VALUES(?,?,?,'LOCAL_INDEX','PENDING')",
                     listOf("PACKAGE_INDEX:" + id, id, restoredRevision))

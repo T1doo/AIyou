@@ -56,7 +56,16 @@ class ManualPeopleRecordsIntegrationTest {
         assertThrows(ManualPeopleConflict::class.java){second.manualPeople.replace(ManualPeopleMutation(intent.before,emptyList(),"synthetic-stale"))}
         val hit=second.localSearch.candidates(LocalSearchRequest("needle",person="明确称呼"))
         assertEquals(listOf(original.id),hit.entries.map{it.id});assertTrue(second.localSearch.publishCurrent(hit){})
+        first.manualPeople.replace(ManualPeopleMutation(first.manualPeople.read(original.id),listOf("明确称呼"),"synthetic-alias",
+            listOf(ManualPersonAlias("合成别名", "明确称呼"))))
+        var aliasBatches=0;while (second.localSearch.batch().remaining) check(++aliasBatches<10)
+        val aliasHit=second.localSearch.candidates(LocalSearchRequest("合成别名"))
+        assertEquals(listOf(original.id),aliasHit.entries.map{it.id})
+        assertEquals(listOf(ManualPersonAlias("合成别名", "明确称呼")),aliasHit.people!!.getValue(original.id).aliases)
+        assertFalse(aliasHit.entries.single().originalText.contains("合成别名"))
         first.manualPeople.replace(ManualPeopleMutation(first.manualPeople.read(original.id),emptyList(),"synthetic-clear"))
+        assertFalse(second.localSearch.publishCurrent(aliasHit){})
+        assertTrue(second.localSearch.candidates(LocalSearchRequest("合成别名")).entries.isEmpty())
         assertFalse(second.localSearch.publishCurrent(hit){});assertTrue(second.localSearch.candidates(LocalSearchRequest("needle",person="明确称呼")).entries.isEmpty())
         assertEquals(ProcessingPolicy.LOCAL_ONLY,second.entries().single().policy)
     }

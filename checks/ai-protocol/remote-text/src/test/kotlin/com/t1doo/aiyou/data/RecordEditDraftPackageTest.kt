@@ -54,16 +54,19 @@ class RecordEditDraftPackageTest {
         PermanentErasureFixture().use { f ->
             val id=f.entry();val plain=snapshot(f,id);val old=plain.records.single();val date=RecordEventDate("2026-10-17","Asia/Shanghai")
             val enriched=OriginalExportRecord(old.entry,old.contentHash,old.tags,old.sourceGeneration,1,
-                RecordEventDateSnapshot(id,1,date),ManualPeopleSnapshot(id,1,listOf("合成称呼"),1,old.contentHash,old.sourceGeneration))
+                RecordEventDateSnapshot(id,1,date),ManualPeopleSnapshot(id,1,listOf("合成称呼"),1,old.contentHash,old.sourceGeneration,
+                    listOf(ManualPersonAlias("合成别名", "合成称呼"))))
             val snapshot=OriginalExportSnapshot(plain.id,plain.createdAtMillis,listOf(enriched))
             val history=RecordPackageOriginal(id,1,old.entry.capturedAtMillis,old.entry.captureTimeZone,old.entry.originalText,old.contentHash,0,emptyList(),
-                history=listOf(RecordPackageRevision(1,old.entry.originalText,old.contentHash,5)),eventDate=date,sourcePeopleVersion=1,people=listOf("合成称呼"))
+                history=listOf(RecordPackageRevision(1,old.entry.originalText,old.contentHash,5)),eventDate=date,sourcePeopleVersion=1,people=listOf("合成称呼"),
+                peopleAliases=listOf(ManualPersonAlias("合成别名", "合成称呼")))
             val png=RecordHistoryMediaTest.image(1);val image=RecordPackageImage(id,1,uuid(),"image/png",png.size.toLong(),PermanentErasureFixture.hash(png))
             val edits=listOf(f.draft(id));val activities=RecordPackageActivities(emptyList(),emptyList(),listOf(old.sourceGeneration))
             val cipher=RecordMediaPackageCipher();val prepared=cipher.seal(RecordMediaPreview(snapshot,listOf(image),activities,listOf(history),edits),password(),{png.copyOf()},{true})
             val bytes=ByteArrayOutputStream().also {prepared.writeTo(it) {true}}.toByteArray();val pack=cipher.open({bytes.inputStream()},password())
             try {
                 assertEquals(edits,pack.editDrafts);assertEquals(listOf("合成称呼"),pack.records.single().people);assertEquals(date,pack.records.single().eventDate)
+                assertEquals(listOf(ManualPersonAlias("合成别名", "合成称呼")),pack.records.single().peopleAliases)
                 assertTrue(pack.includesHistory);assertEquals(listOf(image),pack.images);assertNotNull(pack.activities)
                 var frames=0;cipher.consume(pack as AuthenticatedMediaPackage) {index,payload->assertEquals(0,index);assertArrayEquals(png,payload);frames++};assertEquals(1,frames)
             } finally {pack.release()}

@@ -31,11 +31,14 @@ class ManualPeopleEditor(val session: Long, val entryId: String, val revision: I
     val snapshot: ManualPeopleSnapshot? = null, val input: String = "", val busy: Boolean = false,
     val error: String? = null, val notice: String? = null, val conflict: Boolean = false,
     internal val pending: ManualPeopleMutation? = null, internal val adding: Boolean = false,
-    internal val owner: ManualPeopleRepository? = null, internal val sourceHash: String? = null, internal val sourceGeneration: Long? = null) {
+    internal val owner: ManualPeopleRepository? = null, internal val sourceHash: String? = null, internal val sourceGeneration: Long? = null,
+    val aliasInput: String = "", val aliasTarget: String = "", internal val pendingAlias: Boolean = false) {
     fun copy(snapshot: ManualPeopleSnapshot? = this.snapshot, input: String = this.input, busy: Boolean = this.busy,
         error: String? = this.error, notice: String? = this.notice, conflict: Boolean = this.conflict,
-        pending: ManualPeopleMutation? = this.pending, adding: Boolean = this.adding) =
-        ManualPeopleEditor(session, entryId, revision, snapshot, input, busy, error, notice, conflict, pending, adding, owner, sourceHash, sourceGeneration)
+        pending: ManualPeopleMutation? = this.pending, adding: Boolean = this.adding,
+        aliasInput: String = this.aliasInput, aliasTarget: String = this.aliasTarget, pendingAlias: Boolean = this.pendingAlias) =
+        ManualPeopleEditor(session, entryId, revision, snapshot, input, busy, error, notice, conflict, pending, adding, owner, sourceHash, sourceGeneration,
+            aliasInput, aliasTarget, pendingAlias)
     override fun toString() = "ManualPeopleEditor(busy=$busy, redacted)"
 }
 
@@ -93,11 +96,33 @@ class ManualPeopleController internal constructor(
     }
     fun retry(session: Long) {
         val editor = current().manualPeopleEditor?.takeIf { it.session == session && !it.busy && live(it) } ?: return
-        if (editor.pending != null && !editor.conflict) submit(editor, editor.pending, editor.adding)
+        if (editor.pending != null && !editor.conflict) submit(editor, editor.pending, editor.adding, editor.pendingAlias)
         else { update(editor) { it.copy(busy = true, notice = null) }; enqueue { store -> load(editor, store) } }
+    }
+    fun editAlias(session: Long, version: Long, alias: String, name: String) {
+        val editor = current().manualPeopleEditor?.takeIf { it.session == session && it.snapshot?.version == version && !it.busy && live(it) } ?: return
+        if (alias == editor.aliasInput && name == editor.aliasTarget) return
+        update(editor) { it.copy(aliasInput = alias, aliasTarget = name, notice = null, pending = null) }
+    }
+    fun saveAlias(session: Long, version: Long, alias: String, name: String) {
+        editAlias(session, version, alias, name)
+        val editor = current().manualPeopleEditor?.takeIf { it.session == session && it.snapshot?.version == version && !it.busy && live(it) && it.pending == null && !it.conflict } ?: return
+        val snapshot = editor.snapshot ?: return
+        try {
+            val relation = ManualPersonAlias(alias.trim(), name.trim())
+            val aliases = snapshot.aliases.filter { ManualPeopleAliases.fold(it.alias) != ManualPeopleAliases.fold(relation.alias) } + relation
+            submit(editor, ManualPeopleMutation(snapshot, snapshot.names, UUID.randomUUID().toString(), aliases), true, true)
+        } catch (_: IllegalArgumentException) { update(editor) { it.copy(error = "请填写已关联的原称呼和不同的别名，各 1–40 个字符、最多 12 组。别名不可与本条其他称呼重复或形成别名链。") } }
+    }
+    fun removeAlias(session: Long, version: Long, alias: String) {
+        val editor = current().manualPeopleEditor?.takeIf { it.session == session && it.snapshot?.version == version && !it.busy && live(it) && it.pending == null && !it.conflict } ?: return
+        val snapshot = editor.snapshot ?: return
+        if (snapshot.aliases.none { it.alias == alias }) return
+        submit(editor, ManualPeopleMutation(snapshot, snapshot.names, UUID.randomUUID().toString(), snapshot.aliases.filter { it.alias != alias }), false, true)
     }
     private suspend fun load(editor: ManualPeopleEditor, store: EntryRepository) {
         if (!live(editor)) return
+        val metadata = current().manualPeople
         try {
             val tags = checkNotNull(store.manualPeople)
             if (tags !== editor.owner) throw ManualPeopleUnavailable()
@@ -121,18 +146,23 @@ class ManualPeopleController internal constructor(
             if (!sourceMatches(editor, sources.read(SourceVersion(editor.entryId, editor.revision.toLong())))) {
                 failed(editor, conflict = true, sourceChanged = true); return
             }
-            publish { local -> if (!live(editor, local)) local else local.copy(manualPeople = all,
+            publish { local -> if (!live(editor, local)) local
+                else if (local.manualPeople !== metadata) local.copy(manualPeopleEditor = local.manualPeopleEditor?.copy(
+                    busy = false, conflict = true, error = "人物或别名已变化，输入已保留，请重新读取。"))
+                else local.copy(manualPeople = all,
                 manualPeopleAvailable = true, manualPeopleError = null, localSearchEpoch = epoch ?: local.localSearchEpoch, manualPeopleEditor = local.manualPeopleEditor?.copy(
                     snapshot = snapshot, busy = false, pending = null, conflict = false, error = null, notice = null)) }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { val changed = failure is LocalProcessingConflict || failure is ManualPeopleUnavailable
-            failed(editor, conflict = changed, reading = true, sourceChanged = changed) }
+            if (current().manualPeople === metadata) failed(editor, conflict = changed, reading = true, sourceChanged = changed)
+            else update(editor) { it.copy(busy = false, conflict = true, error = "人物或别名已变化，输入已保留，请重新读取。") } }
     }
     private fun sourceMatches(editor: ManualPeopleEditor, actual: LocalProcessingSnapshot) =
         actual.source == SourceVersion(editor.entryId, editor.revision.toLong()) &&
             actual.sourceHash == editor.sourceHash && actual.generation == editor.sourceGeneration
-    private fun submit(editor: ManualPeopleEditor, mutation: ManualPeopleMutation, adding: Boolean) {
-        update(editor) { it.copy(busy = true, pending = mutation, adding = adding, error = null, notice = null) }
+    private fun submit(editor: ManualPeopleEditor, mutation: ManualPeopleMutation, adding: Boolean, aliasChange: Boolean = false) {
+        val metadata = current().manualPeople
+        update(editor) { it.copy(busy = true, pending = mutation, adding = adding, pendingAlias = aliasChange, error = null, notice = null) }
         enqueue { store ->
             if (!live(editor)) {
                 publish { local -> if (disposed || local.manualPeopleOwner !== editor.owner || local.manualPeopleEditor?.session != editor.session) local else local.copy(
@@ -145,17 +175,28 @@ class ManualPeopleController internal constructor(
                 val saved = tags.replace(mutation)
                 val all = tags.snapshots()
                 val epoch = store.localSearch?.epoch()
-                check(all[editor.entryId]?.let { it.version == saved.version && it.names == saved.names } == true)
+                check(all[editor.entryId]?.let { it.version == saved.version && it.names == saved.names && it.aliases == saved.aliases } == true)
                 publish { local ->
-                    if (disposed || local.manualPeopleOwner !== editor.owner) local else {
+                    if (disposed || local.manualPeopleOwner !== editor.owner) local
+                    else if (local.manualPeople !== metadata) {
+                        if (local.manualPeopleEditor?.session != editor.session) local else local.copy(manualPeopleEditor =
+                            local.manualPeopleEditor.copy(busy = false, conflict = true, error = "人物或别名已变化，输入已保留，请重新读取。"))
+                    } else {
                         val confirmed = local.copy(manualPeople = all, manualPeopleAvailable = true, manualPeopleError = null, localSearchEpoch = epoch ?: local.localSearchEpoch)
                         if (!live(editor, local)) confirmed else confirmed.copy(manualPeopleEditor = local.manualPeopleEditor?.copy(
-                            snapshot = saved, input = if (adding) "" else local.manualPeopleEditor.input,
-                            busy = false, pending = null, conflict = false, error = null, notice = "手工人物关联已保存在本机"))
+                            snapshot = saved, input = if (adding && !aliasChange) "" else local.manualPeopleEditor.input,
+                            aliasInput = if (adding && aliasChange) "" else local.manualPeopleEditor.aliasInput,
+                            aliasTarget = if (adding && aliasChange) "" else local.manualPeopleEditor.aliasTarget,
+                            busy = false, pending = null, conflict = false, error = null,
+                            notice = if (aliasChange) "别名关系已保存在本机，仅用于本条记录的查找，不认定人物身份。"
+                                else if (mutation.before.aliases != saved.aliases) "手工人物关联已保存在本机；被移除称呼的别名关系已同时撤销。"
+                                else "手工人物关联已保存在本机"))
                     }
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { failed(editor, failure is ManualPeopleConflict || failure is ManualPeopleUnavailable) }
+            catch (failure: Exception) { if (current().manualPeople === metadata)
+                failed(editor, failure is ManualPeopleConflict || failure is ManualPeopleUnavailable)
+                else update(editor) { it.copy(busy = false, conflict = true, error = "人物或别名已变化，输入已保留，请重新读取。") } }
         }
     }
     private fun failed(editor: ManualPeopleEditor, conflict: Boolean, reading: Boolean = false, sourceChanged: Boolean = false) = publish { local ->

@@ -29,7 +29,7 @@ class OriginalExportRecord(val entry: StoredEntry, val contentHash: String, val 
     fun same(other: OriginalExportRecord) = entry == other.entry && contentHash == other.contentHash &&
         tags.version == other.tags.version && tags.names == other.tags.names && sourceGeneration == other.sourceGeneration && imageCount == other.imageCount &&
         eventDate.version == other.eventDate.version && eventDate.date == other.eventDate.date &&
-        people.version == other.people.version && people.names == other.people.names
+        people.version == other.people.version && people.names == other.people.names && people.aliases == other.people.aliases
     override fun toString() = "OriginalExportRecord(redacted)"
 }
 

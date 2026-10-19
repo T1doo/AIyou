@@ -108,7 +108,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-mode")) {
                 Text(if (mode == OriginalSearchMode.EXACT) "精确片段 · 区分大小写和空白" else "关键词 · 全部包含，忽略大小写")
             }
-            Text("关键词可在当前原文或手工标签中满足；精确片段只查原文。标签命中只供查找，不构成原文出处。",
+            Text("关键词可在当前原文、手工标签或你为本条记录确认的别名关系中满足；精确片段只查原文。标签和别名命中只供查找，不构成原文出处。",
                 style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = { onDateBasis(if (dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED)
                 com.t1doo.aiyou.model.RecordDateBasis.EVENT else com.t1doo.aiyou.model.RecordDateBasis.CAPTURED) }, enabled = enabled,
@@ -188,4 +188,8 @@ internal fun OriginalSearchTagMatch(hit: OriginalSearchHit) {
     if (hit.tagMatches.isNotEmpty()) Text("手工标签命中：" + hit.tagMatches.joinToString("、") + "；不作为原文出处。",
         style = MaterialTheme.typography.bodySmall,
         modifier = Modifier.testTag("original-search-tag-match-${hit.entry.id}"))
+    if (hit.aliasMatches.isNotEmpty()) Text("别名命中：" + hit.aliasMatches.joinToString("、") { it.alias + " → " + it.name } +
+        "（你为本条记录确认的称呼关系）；不表示原文出现该称呼，不作为原文出处。",
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.testTag("original-search-alias-match-${hit.entry.id}"))
 }

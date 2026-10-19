@@ -23,6 +23,7 @@ data class OriginalSearchInput(val query: String = "", val from: String = "", va
     val onlyImages: Boolean = false, internal val currentImageEntryIds: Set<String>? = null,
     val person: String? = null, internal val peopleSnapshot: Map<String, com.t1doo.aiyou.model.ManualPeopleSnapshot>? = null) {
     internal val usesTagRecall: Boolean get() = mode == OriginalSearchMode.KEYWORDS && query.isNotBlank()
+    internal val usesAliasRecall: Boolean get() = mode == OriginalSearchMode.KEYWORDS && query.isNotBlank()
     override fun toString() = "OriginalSearchInput(redacted)"
 }
 
@@ -41,8 +42,10 @@ enum class OriginalSearchStage { BROWSE, WAITING, RUNNING, READY, INVALID, FAILE
 class OriginalSearchHit internal constructor(val entry: StoredEntry, val quote: String,
     val startCodePoint: Int, val endCodePoint: Int, val leading: Boolean, val trailing: Boolean,
     val matchStartCodePoint: Int = startCodePoint, val matchEndCodePoint: Int = endCodePoint,
-    val originalMatchesQuery: Boolean = true, tagMatches: List<String> = emptyList()) {
+    val originalMatchesQuery: Boolean = true, tagMatches: List<String> = emptyList(),
+    aliasMatches: List<com.t1doo.aiyou.model.ManualPersonAlias> = emptyList()) {
     val tagMatches: List<String> = java.util.Collections.unmodifiableList(tagMatches.toList())
+    val aliasMatches = java.util.Collections.unmodifiableList(aliasMatches.toList())
     val excerpt: String get() = (if (leading) "…" else "") + quote + (if (trailing) "…" else "")
     override fun toString() = "OriginalSearchHit(redacted)"
 }
@@ -81,11 +84,14 @@ internal object LocalOriginalSearchMatcher {
                 val fresh = proof.eventDates?.get(entry.id)
                 input.eventDateSnapshot?.get(entry.id)?.let { fresh != null && it.version == fresh.version && it.date == fresh.date } != true
             }) return OriginalSearchMatches(OriginalSearchStage.WAITING)
-            if (input.person != null && (proof.people == null || proof.entries.any { entry ->
+            if (input.person != null && proof.people == null) return OriginalSearchMatches(OriginalSearchStage.WAITING)
+            if ((input.person != null || input.usesAliasRecall && input.peopleSnapshot != null) && proof.entries.any { entry ->
                 val fresh = proof.people?.get(entry.id)
-                input.peopleSnapshot?.get(entry.id)?.let { old -> fresh != null && old.version == fresh.version &&
-                    old.names == fresh.names } != true
-            })) return OriginalSearchMatches(OriginalSearchStage.WAITING)
+                val old = input.peopleSnapshot?.get(entry.id)
+                if (old == null) fresh != null && (fresh.version != 0L || fresh.names.isNotEmpty() || fresh.aliases.isNotEmpty())
+                else fresh == null || old.entryId != entry.id || fresh.entryId != entry.id ||
+                    old.version != fresh.version || old.names != fresh.names || old.aliases != fresh.aliases
+            }) return OriginalSearchMatches(OriginalSearchStage.WAITING)
             val result = match(proof.entries, input.copy(peopleSnapshot = proof.people, tagSnapshot = proof.tags, favoriteSnapshot = proof.favorites,
                 eventDateSnapshot = proof.eventDates,currentImageEntryIds = proof.currentImageEntryIds))
             val whole = if (input.mode == OriginalSearchMode.KEYWORDS) fold(input.query).text else input.query
@@ -147,6 +153,8 @@ internal object LocalOriginalSearchMatcher {
         val hits = ArrayList<OriginalSearchHit>()
         for (entry in entries) {
             currentCoroutineContext().ensureActive()
+            if ((input.person != null || input.usesAliasRecall) && input.peopleSnapshot?.get(entry.id)?.entryId?.let { it != entry.id } == true)
+                return OriginalSearchMatches(OriginalSearchStage.FAILED, message = "人物或别名的记录范围不一致，请重试本机读取。")
             if (input.person != null && input.person !in input.peopleSnapshot?.get(entry.id)?.names.orEmpty()) continue
             if (input.onlyImages && entry.id !in input.currentImageEntryIds.orEmpty()) continue
             if (input.onlyFavorites && input.favoriteSnapshot?.get(entry.id)?.isFavorite != true) continue
@@ -169,6 +177,14 @@ internal object LocalOriginalSearchMatcher {
             val labels = if (input.usesTagRecall) input.tagSnapshot?.get(entry.id)?.names.orEmpty() else emptyList()
             val foldedLabels = labels.map { fold(it).text }
             val tagMatches = LinkedHashSet<String>()
+            val aliases = if (input.usesAliasRecall) input.peopleSnapshot?.get(entry.id)?.aliases.orEmpty() else emptyList()
+            val aliasMatches = LinkedHashSet<com.t1doo.aiyou.model.ManualPersonAlias>()
+            val aliasKeys = HashMap<String, MutableList<com.t1doo.aiyou.model.ManualPersonAlias>>()
+            aliases.forEach { relation ->
+                for (name in listOf(relation.alias, relation.name)) aliasKeys.getOrPut(
+                    com.t1doo.aiyou.model.ManualPeopleAliases.fold(name)) { ArrayList() }.add(relation)
+            }
+            val wholeAliases = aliasKeys[com.t1doo.aiyou.model.ManualPeopleAliases.fold(input.query.trim())].orEmpty()
             var firstStart = Int.MAX_VALUE
             var firstEnd = 0
             var found = true
@@ -182,7 +198,14 @@ internal object LocalOriginalSearchMatcher {
                     for (at in foldedLabels.indices) if (find(foldedLabels[at], needle) >= 0) {
                         tagMatches += labels[at]; tagFound = true
                     }
-                    if (!tagFound) { found = false; break }
+                    if (!tagFound) {
+                        val selected = aliasKeys[needle.text].orEmpty()
+                        if (selected.isNotEmpty()) aliasMatches += selected
+                        else if (wholeAliases.isNotEmpty()) {
+                            // A confirmed name containing spaces remains queryable as one whole query.
+                            aliasMatches.clear(); aliasMatches += wholeAliases; tagMatches.clear(); break
+                        } else { found = false; break }
+                    }
                     continue
                 }
                 val start = haystack?.originalOffsets?.get(index) ?: index
@@ -199,7 +222,7 @@ internal object LocalOriginalSearchMatcher {
                 val quote = text.substring(text.offsetByCodePoints(0, start), text.offsetByCodePoints(0, end))
                 val matchEnd = if (!originalMatchesQuery || firstStart == Int.MAX_VALUE) 0 else text.codePointCount(0, firstEnd)
                 hits += OriginalSearchHit(entry, quote, start, end, start > 0, end < total, matchStart, matchEnd,
-                    originalMatchesQuery, tagMatches.toList())
+                    originalMatchesQuery, tagMatches.toList(), aliasMatches.toList())
             }
         }
         return OriginalSearchMatches(OriginalSearchStage.READY, hits)
