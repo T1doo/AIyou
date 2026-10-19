@@ -33,7 +33,8 @@ class ModelConnectionDetails(val name: String, val apiRoot: String, val protocol
     }
 }
 
-data class ModelConnectionConfiguration(val id: String, val version: Long, val details: ModelConnectionDetails) {
+data class ModelConnectionConfiguration(val id: String, val version: Long, val details: ModelConnectionDetails,
+    val secretRef: SecretReference? = null) {
     init { require(id.length in 1..128 && id.none { it.isISOControl() } && version > 0) }
     override fun toString() = "ModelConnectionConfiguration(version=$version, redacted)"
 }

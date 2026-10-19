@@ -17,10 +17,15 @@ interface RecordsSqlConnection {
 class RemoteTextStorageFailure : RuntimeException("Remote text storage unavailable")
 
 /** All authoritative reads, checks and writes use one records database transaction. */
-class RemoteTextTransactions(
+class RemoteTextTransactions private constructor(
     private val database: RecordsSqlDatabase,
-    private val newId: () -> String = { UUID.randomUUID().toString() },
+    private val newId: () -> String,
+    private val connectionCurrent: ((RecordsSqlConnection,ProviderConnection,TextPurpose)->Boolean)?,
 ) : SourceBoundTextRepository {
+    constructor(database: RecordsSqlDatabase, newId: ()->String = { UUID.randomUUID().toString() }) : this(database,newId,null)
+    internal constructor(database: RecordsSqlDatabase,
+        connectionCurrent: (RecordsSqlConnection,ProviderConnection,TextPurpose)->Boolean) :
+        this(database,{UUID.randomUUID().toString()},connectionCurrent)
     /** Read current metadata for a later generation-CAS action; originals are never returned. */
     fun readAccess(sourceId: String): SourceAccessSnapshot? {
         try {
@@ -40,7 +45,7 @@ class RemoteTextTransactions(
                     return@transaction SourceQueueOutcome.Denied(SourceCommitDenial.JOB_INVALID)
                 val source=readSource(db,intent.source.sourceId)
                     ?: return@transaction SourceQueueOutcome.Denied(SourceCommitDenial.SOURCE_CHANGED)
-                authorize(source,intent,clock())?.let { return@transaction SourceQueueOutcome.Denied(it) }
+                authorize(db,source,intent,clock())?.let { return@transaction SourceQueueOutcome.Denied(it) }
                 val config=checkNotNull(source.state.connection); val grant=checkNotNull(source.state.consent)
                 val binding=RemoteTextCodec.binding(intent.source,intent.purpose,promptVersion,source.generation,config,grant)
                 val existing=db.query("SELECT $JOB_COLUMNS FROM remote_text_jobs WHERE bindingKey=?",listOf(binding)).singleOrNull()
@@ -51,14 +56,14 @@ class RemoteTextTransactions(
                     if(stored.status!="COMMITTED") return@transaction SourceQueueOutcome.Denied(SourceCommitDenial.JOB_INVALID)
                     val job=job(stored,source)
                     if(!matches(job,stored,source)) return@transaction SourceQueueOutcome.Denied(SourceCommitDenial.JOB_INVALID)
-                    authorize(source,intent,clock())?.let { return@transaction SourceQueueOutcome.Denied(it) }
+                    authorize(db,source,intent,clock())?.let { return@transaction SourceQueueOutcome.Denied(it) }
                     val annotation=readAnnotation(db,job,source)
                         ?: return@transaction SourceQueueOutcome.Denied(SourceCommitDenial.JOB_INVALID)
-                    authorize(source,intent,clock())?.let { return@transaction SourceQueueOutcome.Denied(it) }
+                    authorize(db,source,intent,clock())?.let { return@transaction SourceQueueOutcome.Denied(it) }
                     return@transaction SourceQueueOutcome.AlreadyCommitted(job,annotation)
                 }
                 val id=newId(); require(id.isNotBlank() && id.length<=256 && id.none { it.isISOControl() })
-                authorize(source,intent,clock())?.let { return@transaction SourceQueueOutcome.Denied(it) }
+                authorize(db,source,intent,clock())?.let { return@transaction SourceQueueOutcome.Denied(it) }
                 db.execute("INSERT INTO remote_text_jobs(id,bindingKey,entryId,sourceRevision,generation,purpose,promptVersion,connection,consent,state,sourceHash) VALUES(?,?,?,?,?,?,?,?,?,'QUEUED',?)",
                     listOf(id,binding,intent.source.sourceId,intent.source.revision,source.generation,intent.purpose.name,promptVersion,
                         RemoteTextCodec.encodeConnection(config),RemoteTextCodec.encodeConsent(grant),source.hash))
@@ -81,7 +86,7 @@ class RemoteTextTransactions(
             val stored=storedJob(db,job.id) ?: return@transaction SendDenial.QUEUE_INVALIDATED
             if(stored.status!="QUEUED") return@transaction SendDenial.ALREADY_SENT
             val source=checkNotNull(readSource(db,job.intent.source.sourceId))
-            authorize(source,job.intent,clock())?.let { return@transaction it.toSendDenial() }
+            authorize(db,source,job.intent,clock())?.let { return@transaction it.toSendDenial() }
             check(db.execute("UPDATE remote_text_jobs SET state='ADMITTED' WHERE id=? AND state='QUEUED'",listOf(job.id))==1)
             null
         }
@@ -103,12 +108,12 @@ class RemoteTextTransactions(
                 // This fresh time is read after validation, while holding the same transaction
                 // that inserts the annotation and completes the job.
                 val now=clock()
-                authorize(source,job.intent,now)?.let { return@transaction SourceCommitOutcome.Denied(it) }
+                authorize(db,source,job.intent,now)?.let { return@transaction SourceCommitOutcome.Denied(it) }
                 if(stored.status=="COMMITTED") {
                     val old=readAnnotation(db,job,source)
                         ?: return@transaction SourceCommitOutcome.Denied(SourceCommitDenial.JOB_INVALID)
                     val oldHash=RemoteTextCodec.sha256(RemoteTextCodec.encodeCandidate(old.candidate))
-                    authorize(source,job.intent,clock())?.let { return@transaction SourceCommitOutcome.Denied(it) }
+                    authorize(db,source,job.intent,clock())?.let { return@transaction SourceCommitOutcome.Denied(it) }
                     return@transaction if(oldHash==hash) SourceCommitOutcome.Committed(old,true)
                         else SourceCommitOutcome.Denied(SourceCommitDenial.RESULT_CONFLICT)
                 }
@@ -171,11 +176,11 @@ class RemoteTextTransactions(
                 listOf(source.sourceId,source.revision,current.generation))
             val result=rows.mapNotNull { values ->
                 val stored=readJob(values); val ticket=job(stored,current)
-                if(!matches(ticket,stored,current) || authorize(current,ticket.intent,clock())!=null) null
+                if(!matches(ticket,stored,current) || authorize(db,current,ticket.intent,clock())!=null) null
                 else readAnnotation(db,ticket,current)
             }
             val purpose=current.state.consent?.purpose ?: return@transaction emptyList()
-            if(authorize(current,RemoteSendIntent(source,purpose),clock())!=null) emptyList() else result
+            if(authorize(db,current,RemoteSendIntent(source,purpose),clock())!=null) emptyList() else result
         } } catch(failure:Throwable) { propagateCritical(failure); throw RemoteTextStorageFailure() }
     }
 
@@ -188,7 +193,7 @@ class RemoteTextTransactions(
         val stored=storedJob(db,job.id) ?: return SourceCommitDenial.JOB_INVALID
         if(!matches(job,stored,source)) return metadataDenial(job,source)
         if(stored.status=="CANCELLED")return SourceCommitDenial.JOB_INVALID
-        return authorize(source,job.intent,clock())
+        return authorize(db,source,job.intent,clock())
     }
     private fun metadataDenial(job:SourceBoundTextJob,source:SourceSnapshot)=when {
         source.state.deleted -> SourceCommitDenial.SOURCE_DELETED
@@ -197,11 +202,12 @@ class RemoteTextTransactions(
         source.generation!=job.generation || source.state.connection!=job.state.connection || source.state.consent!=job.state.consent -> SourceCommitDenial.AUTHORIZATION_CHANGED
         else -> SourceCommitDenial.JOB_INVALID
     }
-    private fun authorize(source:SourceSnapshot,intent:RemoteSendIntent,now:Instant):SourceCommitDenial? {
+    private fun authorize(db:RecordsSqlConnection,source:SourceSnapshot,intent:RemoteSendIntent,now:Instant):SourceCommitDenial? {
         if(source.state.deleted)return SourceCommitDenial.SOURCE_DELETED
         if(source.source!=intent.source)return SourceCommitDenial.SOURCE_CHANGED
         if(source.state.policy!=ProcessingPolicy.REMOTE_ALLOWED)return SourceCommitDenial.POLICY_BLOCKED
         val config=source.state.connection ?: return SourceCommitDenial.AUTHORIZATION_CHANGED
+        if(connectionCurrent?.invoke(db,config,intent.purpose)==false) return SourceCommitDenial.AUTHORIZATION_CHANGED
         val grant=source.state.consent ?: return SourceCommitDenial.AUTHORIZATION_CHANGED
         if(grant.revoked || now<grant.issuedAt || now>=grant.expiresAt)return SourceCommitDenial.CONSENT_NOT_CURRENT
         if(grant.source!=intent.source || grant.connection!=config || grant.purpose!=intent.purpose)return SourceCommitDenial.AUTHORIZATION_CHANGED

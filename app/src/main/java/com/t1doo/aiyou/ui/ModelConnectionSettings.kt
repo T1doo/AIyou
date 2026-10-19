@@ -33,7 +33,7 @@ fun ModelConnectionSettings(controller: ModelConnectionsController, owner: Model
     val ui=emission.let { controller.visible() }
     val session=ui.session
     Text("本机连接配置",style=MaterialTheme.typography.titleMedium)
-    Text("先保存服务、模型和计划用途。未设置密钥，尚不可调用；所有能力未验证。保存不会联网或改变记录的处理范围。",
+    Text("先保存服务、模型和计划用途。密钥管理尚未开放，所有能力未验证。保存不会联网或改变记录的处理范围。",
         style=MaterialTheme.typography.bodyMedium)
     Text("连接配置仅留在本机，不进入资料库备份；恢复资料库不会覆盖它。",style=MaterialTheme.typography.bodySmall)
     if(ui.busy) Text("正在读取本机配置…")
@@ -53,7 +53,8 @@ fun ModelConnectionSettings(controller: ModelConnectionsController, owner: Model
                 Text("版本 ${config.version} · ${protocolLabel(config.details.protocol)}")
                 Text(config.details.apiRoot);Text("模型：${config.details.modelId}")
                 Text("计划用途："+config.details.purposes.sortedBy { it.ordinal }.joinToString("、"){purposeLabel(it)})
-                Text("密钥未配置 · 能力未验证 · 尚不可调用",style=MaterialTheme.typography.bodySmall)
+                Text(if(config.secretRef==null) "密钥未配置 · 能力未验证 · 尚不可调用" else
+                    "本机密钥引用已保存 · 能力未验证 · 尚不可调用",style=MaterialTheme.typography.bodySmall)
                 TextButton(onClick={controller.begin(session,config)},enabled=ui.editor==null&&!ui.busy&&ui.error==null,
                     modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("model-config-edit-${config.id}")) { Text("编辑此配置") }
             }
@@ -62,6 +63,8 @@ fun ModelConnectionSettings(controller: ModelConnectionsController, owner: Model
     ui.editor?.let { editor ->
         val enabled=!ui.busy&&ui.error==null&&!editor.busy&&editor.pending==null&&!editor.conflict
         Text(if(editor.version==0L) "新连接配置" else "编辑配置 · 版本 ${editor.version}",style=MaterialTheme.typography.titleMedium)
+        if(ui.configurations.any { it.id==editor.id && it.secretRef!=null })
+            Text("保存配置修改会撤销已有密钥引用；不会沿用旧授权。")
         OutlinedTextField(editor.form.name,{controller.edit(session,editor,editor.form.copy(name=it))},label={Text("连接名称")},
             enabled=enabled,modifier=Modifier.fillMaxWidth().testTag("model-config-name"))
         OutlinedTextField(editor.form.apiRoot,{controller.edit(session,editor,editor.form.copy(apiRoot=it))},label={Text("HTTPS API 根路径")},

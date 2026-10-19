@@ -517,6 +517,7 @@ class OkHttpStreamingTransport private constructor(
         val stamp: QueuedSendStamp,
         val clock: () -> Instant,
         val persistentGate: PersistentSendGate?,
+        val credentialCurrent: () -> Boolean,
     ) {
         @Volatile var permit: SendPermit? = null
             private set
@@ -533,6 +534,7 @@ class OkHttpStreamingTransport private constructor(
 
         fun admit(ownedCall: Call) {
             try {
+                if(!credentialCurrent()) reject(SendDenial.SECRET_UNAVAILABLE,ownedCall)
                 persistentGate?.admit()?.let { reject(it, ownedCall) }
                 when (val admission = authority.claim(stamp, clock) {
                     try { onInvalidated?.invoke() } finally { ownedCall.cancel() }
@@ -543,6 +545,7 @@ class OkHttpStreamingTransport private constructor(
                         if (admission.permit.invalidated) reject(SendDenial.QUEUE_INVALIDATED, ownedCall)
                     }
                 }
+                if(!credentialCurrent()) reject(SendDenial.SECRET_UNAVAILABLE,ownedCall)
             } catch (failure: GateRejected) {
                 throw failure
             } catch (failure: Throwable) {
@@ -597,6 +600,8 @@ class OkHttpStreamingTransport private constructor(
             }
             var resolved: ResolvedSecret? = null
             var context: GuardContext? = null
+            var credentialWatch: AutoCloseable? = null
+            val credentialRetired=java.util.concurrent.atomic.AtomicBoolean()
             var wireOutcome: HttpOutcome? = null
             var exceptionDenial = SendDenial.STATE_UNAVAILABLE
             try {
@@ -621,9 +626,17 @@ class OkHttpStreamingTransport private constructor(
                 }
                 if (isCancelled()) return preOutcome(StreamEvent.Cancelled, null, onEvent)
                 exceptionDenial = SendDenial.SECRET_UNAVAILABLE
+                if(!secrets.isCurrent(connection.secretRef)) return preDenied(SendDenial.SECRET_UNAVAILABLE,onEvent)
+                credentialWatch=secrets.watch(connection.secretRef) {
+                    credentialRetired.set(true)
+                    synchronized(guardLock) { wire }?.cancel()
+                }
+                if(credentialRetired.get()||!secrets.isCurrent(connection.secretRef)) return preDenied(SendDenial.SECRET_UNAVAILABLE,onEvent)
                 resolved = secrets.resolve(connection.secretRef)
                 if (isCancelled()) return preOutcome(StreamEvent.Cancelled, null, onEvent)
                 if (resolved == null) return preDenied(SendDenial.SECRET_UNAVAILABLE, onEvent)
+                val credentialCurrent={ !credentialRetired.get() && secrets.isCurrent(connection.secretRef) }
+                if(!credentialCurrent()) return preDenied(SendDenial.SECRET_UNAVAILABLE,onEvent)
                 exceptionDenial = SendDenial.STATE_UNAVAILABLE
                 authority.check(ticket, clock())?.let { return preDenied(it, onEvent) }
                 persistentGate?.check()?.let { return preDenied(it, onEvent) }
@@ -636,7 +649,7 @@ class OkHttpStreamingTransport private constructor(
                 val base = validateRequest(protocol, prepared)
                 exceptionDenial = SendDenial.SECRET_UNAVAILABLE
                 val value = resolved.headerValue() ?: return preDenied(SendDenial.SECRET_UNAVAILABLE, onEvent)
-                context = GuardContext(authority, ticket, clock, persistentGate)
+                context = GuardContext(authority, ticket, clock, persistentGate,credentialCurrent)
                 val authenticated = base.newBuilder().tag(GuardContext::class.java, context).apply {
                     when (prepared.authentication) {
                         AuthenticationKind.BEARER -> header("Authorization", "Bearer $value")
@@ -655,7 +668,12 @@ class OkHttpStreamingTransport private constructor(
                     cancelled
                 }
                 if (cancelledBeforeExecute) delegate.cancel()
-                wireOutcome = delegate.execute(onEvent)
+                wireOutcome = delegate.execute preview@{ event ->
+                    if(!credentialCurrent()) { credentialRetired.set(true);delegate.cancel();return@preview }
+                    onEvent(event)
+                }
+                if(!credentialCurrent()) return done(GuardedSendOutcome(StreamEvent.Failed(FailureKind.SEND_DENIED),
+                    wireOutcome,resultDenial=SendDenial.SECRET_UNAVAILABLE))
                 val admitted = context.permit
                 if (admitted == null) {
                     val rejection = context.denial
@@ -691,6 +709,7 @@ class OkHttpStreamingTransport private constructor(
                 return preDenied(exceptionDenial, onEvent)
             } finally {
                 resolved?.close()
+                try { credentialWatch?.close() } catch(failure: Throwable) { rethrowFatal(failure) }
                 context?.permit?.let { authority.release(it) }
                 synchronized(guardLock) { wire = null; finished = true }
                 synchronized(ownerLock) { exchanges.remove(this) }

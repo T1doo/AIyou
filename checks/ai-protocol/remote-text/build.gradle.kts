@@ -27,6 +27,8 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/DrainingRecordsSqlDatabase.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/ModelConnectionSqlSchema.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlModelConnectionCatalog.kt")
+    from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/ModelConnectionPayload.kt")
+    from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/ConnectionSecretCipher.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedAttachmentStore.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedOriginalEditStore.kt")
     listOf("ErasureFileProtocol.kt", "PermanentErasureSqlSchema.kt", "SqlPermanentErasureRepository.kt", "DrainingRecordsStorage.kt", "PermanentErasureRecovery.kt").forEach {
@@ -67,6 +69,7 @@ val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
     from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalEvidenceController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/ManualPeopleController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/ModelConnectionsController.kt")
+    from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalConnectionSecretResolver.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalEvidenceSelection.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalEvidenceAnswer.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/SelectedQuestionConsentController.kt")

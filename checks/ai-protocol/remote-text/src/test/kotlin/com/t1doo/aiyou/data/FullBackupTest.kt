@@ -14,9 +14,12 @@ class FullBackupTest {
     @Test fun localConnectionCatalogIsExcludedAndEmptyRecordRestorePreservesItsExactBytes():Unit=runBlocking {
         FullFixture().use { source ->FullFixture(99).use { target ->
             for(f in listOf(source,target)) f.db.transaction { sql->ModelConnectionSqlSchema.migration12To13.forEach { sql.execute(it) };sql.execute("PRAGMA user_version=13") }
-            source.entry();source.gateway.let { SqlModelConnectionCatalog(it) }.change(ModelConnectionCatalogTest.change("source-only",0,"source-config"))
-            val catalog=SqlModelConnectionCatalog(target.gateway)
-            val local=catalog.change(ModelConnectionCatalogTest.change("target-local",0,"target-config",ModelConnectionCatalogTest.details(name="合成本机设置")))!!
+            source.entry();val sourceCatalog=SqlModelConnectionCatalog(source.gateway,source.key)
+            val sourceLocal=sourceCatalog.change(ModelConnectionCatalogTest.change("source-only",0,"source-config"))!!
+            sourceCatalog.apply(sourceCatalog.prepare(sourceLocal,"source-secret",ConnectionSecretVaultTest.material()))
+            val catalog=SqlModelConnectionCatalog(target.gateway,target.key)
+            val initial=catalog.change(ModelConnectionCatalogTest.change("target-local",0,"target-config",ModelConnectionCatalogTest.details(name="合成本机设置")))!!
+            val local=catalog.apply(catalog.prepare(initial,"target-secret",ConnectionSecretVaultTest.material()))
             val before=target.db.read("SELECT payload FROM model_configurations").single().single() as ByteArray
             val bytes=export(source);val pack=target.backup.open({bytes.inputStream()},password())
             try { target.backup.restore(pack) { true } } finally { pack.release() }
@@ -25,6 +28,7 @@ class FullBackupTest {
             assertEquals(listOf("target-local"),target.db.read("SELECT id FROM model_configurations").map { it[0] })
             assertEquals(1,target.db.read("SELECT id FROM entries").size)
             assertEquals("LOCAL_ONLY",target.db.read("SELECT privacyPolicy FROM entries").single().single())
+            assertTrue(catalog.current(local.secretRef!!));catalog.close();sourceCatalog.close()
         } }
     }
     @Test fun aiNoneDeviceDefaultEmptySlotAllowsRestoreButManualRangeChangesStillRefuse(): Unit = runBlocking {

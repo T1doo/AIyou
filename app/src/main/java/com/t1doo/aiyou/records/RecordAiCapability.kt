@@ -22,6 +22,14 @@ internal class SourceBoundRecordAiCapability(
     private val clock: Clock,
     private val maxOutputTokens: Int,
 ) : RecordAiCapability {
+    companion object {
+        /** Future explicit bindAi uses only coherent local services, never the legacy text port. */
+        fun fromLocalConnections(transport: OkHttpStreamingTransport, records: EntryRepository,
+            clock: Clock, maxOutputTokens: Int): SourceBoundRecordAiCapability {
+            val local=checkNotNull(records.localModelConnections) { "Local connection services unavailable" }
+            return SourceBoundRecordAiCapability(transport,local.text,LocalConnectionSecretResolver(local.secrets),clock,maxOutputTokens)
+        }
+    }
     override fun newExchange(intent: RemoteSendIntent) = transport.newSourceBoundExchange(
         repository, intent, maxOutputTokens, secrets, clock::instant)
     override fun close() = transport.close()

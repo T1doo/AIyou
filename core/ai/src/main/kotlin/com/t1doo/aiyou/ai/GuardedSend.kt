@@ -8,6 +8,9 @@ import java.io.Closeable
 /** Resolution is external to the authority lock. A returned value transfers ownership. */
 fun interface SecretResolver {
     fun resolve(reference: SecretReference): ResolvedSecret?
+    /** Stateless test resolvers remain supported; the local vault adapter implements both live checks. */
+    fun isCurrent(reference: SecretReference): Boolean = true
+    fun watch(reference: SecretReference, onRetired: () -> Unit): AutoCloseable? = null
 }
 
 /** A short-lived owned value, never a configuration field or a printable diagnostic. */
