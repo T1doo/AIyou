@@ -67,7 +67,7 @@ class FullBackupPresentationTest {
     @Test fun actualRootFullScopeRequiresExplicitAcceptanceAndMatchingIndependentPasswords() {
         compose.setContent { Content() };open();click("full-backup-preview");pump()
         compose.onNodeWithTag("full-backup").performScrollToNode(hasTestTag("full-backup-summary"))
-        compose.onNodeWithTag("full-backup-summary").assertTextContains("记录 26 条（回收站 1 条）")
+        compose.onNodeWithTag("full-backup-summary").assertTextEquals("记录 26 条（回收站 1 条）；修订 27 个；原图 2 张／24 字节。")
         compose.onNodeWithTag("full-backup").performScrollToNode(hasTestTag("full-backup-save"))
         compose.onNodeWithTag("full-backup-save").assertIsNotEnabled()
         click("full-backup-scope");input("full-backup-password",PASSWORD);input("full-backup-password-again","mismatched synthetic passphrase")
@@ -81,7 +81,7 @@ class FullBackupPresentationTest {
         compose.runOnIdle { assertEquals(0,f.imports);assertEquals(RecordPackagePhase.RESTORE_PREVIEW,f.ui.phase) }
         click("full-backup-restore");compose.runOnIdle { assertEquals(0,f.imports) };pump()
         compose.onNodeWithTag("full-backup").performScrollToNode(hasTestTag("full-backup-notice"))
-        compose.onNodeWithTag("full-backup-notice").assertTextContains("回收站")
+        compose.onNodeWithTag("full-backup-notice").assertTextEquals("已核对完整资料库恢复回执。原身份、回收站、版本与草稿保持原义；联网授权已清空，提醒须重新确认。")
         compose.runOnIdle { assertEquals(1,f.imports);assertEquals(RecordPackagePhase.DONE,f.ui.phase) }
     }
     @Test fun narrowDoubleFontRecreationDropsPasswordsAndNavigationRetiresPickerBeforeRecomposition() {

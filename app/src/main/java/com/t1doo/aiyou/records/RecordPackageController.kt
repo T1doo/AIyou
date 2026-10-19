@@ -393,18 +393,31 @@ class RecordPackageController internal constructor(private val current: () -> Lo
         val ui=panel(session) ?: return;val active=work.get() ?: return
         if(!owned(active) || !ui.fullMode || ui.phase !in setOf(RecordPackagePhase.RESTORE_PREVIEW,RecordPackagePhase.UNCERTAIN) ||
             ui.epoch!=epoch || ui.fullSummary?.backupId!=id || ui.fullDigest!=digest) return
-        if(current().text.isNotEmpty() || current().mixedCapture?.let { it.text.isNotEmpty() || it.pendingEdits>0 || it.busy || it.selection!=null || it.uncertainSave || it.confirmDiscard || it.discardPending || it.policyChange!=null }==true) {
-            update(session) { it.copy(error="当前输入尚非空，恢复已暂停；请先保全现有草稿。") };return
-        }
-        updateOwned(active,ui.phase) { it.copy(phase=RecordPackagePhase.IMPORTING,error=null,notice="只导入空资料库；已开始的事务可能在退出后完成。") }
+        updateOwned(active,ui.phase) { it.copy(phase=RecordPackagePhase.IMPORTING,error=null,notice="先核对同一备份的完成回执；无回执时仅导入空资料库。已开始的事务可能在退出后完成。") }
         if(!enqueue { store ->
             if(!owned(active,RecordPackagePhase.IMPORTING) || !active.beginFull()) return@enqueue
             try {
-                var completed=false
                 val verified=checkNotNull(active.fullVerified)
                 val backups=checkNotNull(store.fullBackups)
+                require(verified.summary.backupId==id && verified.digest==digest)
+                // Exact authenticated id+digest only. A committed retry reads its receipt even when
+                // the restored draft is nonempty; it never re-enters SQL/file restoration.
+                val alreadyDone=backups.completed(verified)
+                if(!alreadyDone) {
+                    val local=current()
+                    if(!owned(active,RecordPackagePhase.IMPORTING,local)) return@enqueue
+                    if(hasFullBackupInput(local)) {
+                        updateOwned(active,RecordPackagePhase.IMPORTING) { it.copy(phase=ui.phase,
+                            error="当前输入尚非空，恢复已暂停；请先保全现有草稿。",notice=null) }
+                        return@enqueue
+                    }
+                }
+                var completed=alreadyDone
                 val result=try {
-                    backups.restore(verified) { owned(active,RecordPackagePhase.IMPORTING) }.also { completed=true }
+                    if(alreadyDone) FullBackupRestored(verified.summary,true)
+                    else backups.restore(verified) {
+                        val local=current();owned(active,RecordPackagePhase.IMPORTING,local) && !hasFullBackupInput(local)
+                    }.also { completed=true }
                 } finally {
                     if(!completed) completed=backups.completed(verified)
                     refreshFullSources(store,completed)
@@ -419,6 +432,10 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             } finally { active.endFull() }
         }) updateOwned(active,RecordPackagePhase.IMPORTING) { it.copy(phase=RecordPackagePhase.UNCERTAIN,error="恢复尚未确认，请保留同一备份并重试核对。") }
     }
+    private fun hasFullBackupInput(local:LocalRecordUiState)=local.text.isNotEmpty() || local.mixedCapture?.let {
+        it.text.isNotEmpty() || it.pendingEdits>0 || it.busy || it.selection!=null || it.uncertainSave ||
+            it.confirmDiscard || it.discardPending || it.policyChange!=null
+    }==true
     /** Data belongs to the still-open records owner even when its importing page has retired.
      * A lost commit ACK still requires reading actual committed rows; only panel completion is session-scoped. */
     private suspend fun refreshFullSources(store:EntryRepository,completed:Boolean) {

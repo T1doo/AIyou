@@ -10,6 +10,8 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -50,8 +52,10 @@ class FullBackupControllerTest {
                 h.local=h.local.copy(mixedCapture=MixedCaptureUiState(draft=draft,selection=if(kind=="selection") selection else null,
                     uncertainSave=kind=="uncertain",discardPending=kind=="discard",confirmDiscard=kind=="confirmation",
                     policyChange=if(kind=="policy") CapturePolicyChange(1,draft,ProcessingPolicy.AI_NONE) else null))
-                val before=h.local.mixedCapture;h.confirm();assertTrue(kind,h.queue.isEmpty());assertSame(before,h.local.mixedCapture)
+                val before=h.local.mixedCapture;h.confirm();h.drain();assertSame(before,h.local.mixedCapture)
+                assertEquals(RecordPackagePhase.RESTORE_PREVIEW,h.ui.phase);assertTrue(h.ui.error!!.contains("当前输入"))
                 assertTrue(target.db.read("SELECT * FROM entries").isEmpty())
+                assertTrue(target.db.read("SELECT * FROM record_package_receipts WHERE operation='FULL_BACKUP_IMPORT_V8'").isEmpty())
             }
         }
     }
@@ -107,8 +111,75 @@ class FullBackupControllerTest {
             } finally { vm.clearForHostTest();assertTrue(closed.await(3,TimeUnit.SECONDS)) }
         } }
     }
-    private suspend fun document(source:FullFixture):Document {
-        val snapshot=source.backup.capture(FullBackupTest.uuid(),100);val payload=source.backup.seal(snapshot,password());val out=ByteArrayOutputStream()
+    @Test(timeout=40000) fun lostAckWithRestoredNonemptyDraftConfirmsOnlyExactDoneAndPreservesLaterChanges():Unit=runBlocking {
+        for(lateInput in listOf(false,true)) FullFixture().use { source -> FullFixture(99).use { target ->
+            val keep=source.entry();val erase=source.entry();val image=source.image(erase)
+            source.capture.edit(source.capture.current(),"合成恢复草稿")
+            val h=Harness(target);val closed=CountDownLatch(1);val restores=AtomicInteger();val inject=AtomicBoolean()
+            lateinit var vm:LocalRecordsViewModel
+            val backups=object:FullBackupRepository by target.backup {
+                override fun completed(backup:VerifiedFullBackup):Boolean {
+                    val done=target.backup.completed(backup)
+                    if(done && inject.compareAndSet(true,false)) {
+                        vm.mixedCapture.edit("回执核对期间的新输入")
+                        vm.recordPackages.close(checkNotNull(vm.state.value.recordPackage).session)
+                    }
+                    return done
+                }
+                override suspend fun restore(backup:VerifiedFullBackup,active:()->Boolean):FullBackupRestored {
+                    restores.incrementAndGet();return target.backup.restore(backup,active)
+                }
+            }
+            val owner=object:EntryRepository by h.store,AutoCloseable {
+                override val fullBackups=backups
+                override fun close() { closed.countDown() }
+            }
+            vm=LocalRecordsViewModel(android.app.Application(),{owner},decodeCapture={object:AttachmentPicture {override val width=1;override val height=1}})
+            try {
+                withTimeout(5000) { vm.state.first { it.ready && it.mixedCapture?.draft!=null } }
+                val c=vm.recordPackages
+                suspend fun authenticate(doc:Document):RecordPackageUiState {
+                    vm.state.value.recordPackage?.let { c.close(it.session) }
+                    c.open();c.fullHome(checkNotNull(vm.state.value.recordPackage).session)
+                    c.chooseRestore(checkNotNull(vm.state.value.recordPackage).session)
+                    val picker=checkNotNull(vm.state.value.recordPackage);assertTrue(c.claimPicker(picker.session,picker.requestKey!!))
+                    c.picked(picker.session,picker.requestKey,doc);c.authenticate(picker.session,password())
+                    return withTimeout(5000) { vm.state.first { it.recordPackage?.phase==RecordPackagePhase.RESTORE_PREVIEW } }.recordPackage!!
+                }
+                val preview=authenticate(document(source));target.checkpoint={ if(it=="full-committed") error("synthetic committed ACK loss with nonempty draft") }
+                c.restoreFull(preview.session,preview.fullSummary!!.backupId,preview.fullDigest!!,preview.epoch)
+                withTimeout(5000) { vm.state.first { it.recordPackage?.phase==RecordPackagePhase.UNCERTAIN && it.mixedCapture?.text=="合成恢复草稿" } }
+                assertEquals(1,restores.get());target.checkpoint={}
+                vm.mixedCapture.edit("恢复后的继续编辑")
+                withTimeout(5000) { vm.state.first { it.mixedCapture?.let { d -> d.text=="恢复后的继续编辑" && d.pendingEdits==0 }==true } }
+                target.revise(keep,"恢复后的已修改原文")
+                val bin=SqlRecycleBinRepository(target.gateway,target.tags,SqlErasureFileHooks::fenced)
+                val before=bin.read(erase);val deleted=bin.apply(RecycleMutation(SourceVersion(erase,1),before.generation,false,FullBackupTest.uuid()))
+                SqlPermanentErasureRepository(target.gateway,target.media,target.edits,target.packages).erase(
+                    PermanentErasureIntent(SourceVersion(erase,1),deleted.generation,FullBackupTest.uuid()))
+                inject.set(lateInput)
+                c.restoreFull(preview.session,preview.fullSummary!!.backupId,preview.fullDigest!!,preview.epoch)
+                withTimeout(5000) { vm.state.first { state -> if(lateInput) state.recordPackage==null &&
+                    state.mixedCapture?.let { it.text=="回执核对期间的新输入" && it.pendingEdits==0 }==true
+                    else state.recordPackage?.phase==RecordPackagePhase.DONE && state.mixedCapture?.text=="恢复后的继续编辑" } }
+                assertEquals(1,restores.get()) // The retry only probes the exact receipt, never enters restore/file publication.
+                assertEquals(listOf(keep),target.db.read("SELECT id FROM entries").map { it[0] })
+                assertEquals("恢复后的已修改原文",target.db.read("SELECT originalText FROM entry_revisions WHERE entryId=? AND revision=2",keep).single().single())
+                assertFalse(target.mediaRoot.resolve(image.id+".aead").exists())
+                assertEquals(1L,target.db.read("SELECT count(*) FROM permanent_erasure_receipts WHERE entryId=? AND phase='DONE'",erase).single().single())
+                assertEquals(if(lateInput) "回执核对期间的新输入" else "恢复后的继续编辑",target.capture.current().text)
+                if(!lateInput) for(doc in listOf(document(source),document(source,preview.fullSummary.backupId,101))) {
+                    val different=authenticate(doc);assertNotEquals(preview.fullDigest,different.fullDigest)
+                    c.restoreFull(different.session,different.fullSummary!!.backupId,different.fullDigest!!,different.epoch)
+                    withTimeout(5000) { vm.state.first { it.recordPackage?.let { p -> p.phase==RecordPackagePhase.RESTORE_PREVIEW && p.error?.contains("当前输入")==true }==true } }
+                    assertEquals(1,restores.get());assertEquals("恢复后的继续编辑",vm.state.value.mixedCapture!!.text)
+                    assertEquals(1L,target.db.read("SELECT count(*) FROM record_package_receipts WHERE operation='FULL_BACKUP_IMPORT_V8'").single().single())
+                }
+            } finally { vm.clearForHostTest();assertTrue(closed.await(3,TimeUnit.SECONDS)) }
+        } }
+    }
+    private suspend fun document(source:FullFixture,backupId:String=FullBackupTest.uuid(),created:Long=100):Document {
+        val snapshot=source.backup.capture(backupId,created);val payload=source.backup.seal(snapshot,password());val out=ByteArrayOutputStream()
         try { payload.writeTo(out) { true };return Document(out.toByteArray()) } finally { payload.release();snapshot.release() }
     }
     private class Harness(val f:FullFixture) {
