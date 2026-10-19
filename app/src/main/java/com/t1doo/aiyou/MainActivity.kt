@@ -157,7 +157,7 @@ class MainActivity : ComponentActivity() {
                 onOpenTags = records.tags::open, onTagEdit = records.tags::edit, onTagAdd = records.tags::add,
                 favorites = records.favorites, eventDates = records.eventDates,
                 candidates = records.candidates,
-                sourceTags = records.sourceTags, people = records.people,
+                sourceTags = records.sourceTags, people = records.people, modelConnections = records.modelConnections,
                 sourceMemories = records.sourceMemories,
                 sourceTasks = records.sourceTasks,
                 taskProposals = records.taskProposals,
@@ -266,6 +266,7 @@ fun AIyouApp(
     candidates: com.t1doo.aiyou.records.LocalCandidateController? = null,
     sourceTags: com.t1doo.aiyou.records.SourceTagController? = null,
     people: com.t1doo.aiyou.records.ManualPeopleController? = null,
+    modelConnections: com.t1doo.aiyou.records.ModelConnectionsController? = null,
     sourceMemories: com.t1doo.aiyou.records.SourceMemoryController? = null,
     sourceTasks: com.t1doo.aiyou.records.SourceTaskController? = null,
     taskProposals: com.t1doo.aiyou.records.TaskProposalController? = null,
@@ -456,6 +457,7 @@ fun AIyouApp(
         !browsingPackage && !showSettings && !demo && local != null && local.originalEdit == null && local.originalHistory == null
     val evidenceEnabled = evidenceMode && searchEnabled
     SideEffect {
+        if(!showSettings || showLicenses || demo) modelConnections?.leave()
         search.sync(searchEnabled)
         evidence.sync(evidenceEnabled, searchState)
         evidenceAnswers.sync()
@@ -851,7 +853,11 @@ fun AIyouApp(
                 onDemo = { if (ownsNavigation()) { navigation.advance(); clearSearch(); demo = !demo } },
                 onDemoState = { if (ownsNavigation()) { navigation.advance(); stateName = it.name } },
                 modifier = modifier, hasRecordPackages=local?.supportsRecordPackages==true, hasFullBackup=local?.supportsFullBackup==true, storageUsage = storageUsage,
-                appAccessSection = appAccessSettings)
+                appAccessSection = appAccessSettings,
+                modelConnectionSection = if(modelConnections==null || demo) null else ({
+                    com.t1doo.aiyou.ui.ModelConnectionSettings(modelConnections,local?.modelConnectionOwner,
+                        local?.ready==true && !local.opening && local.error==null)
+                }))
         } else if (browsingPackage && local != null && recordPackages != null && packageUi != null) {
             com.t1doo.aiyou.records.RecordPackageScreen(local, packageUi, recordPackages, recordPackagePicker, ::ownsPackageRoute, modifier)
         } else if (browsingRecycle && local != null && recycleBin != null && recycleUi != null) {

@@ -37,6 +37,7 @@ data class CaptureDiscardUiState(val requestId: Long, val busy: Boolean = false,
     val recovering: Boolean = false, val recoveryFailed: Boolean = false)
 
 data class LocalRecordUiState(
+    val modelConnectionOwner: com.t1doo.aiyou.domain.ModelConnectionCatalog? = null,
     val taskProposals: TaskProposalsUiState = TaskProposalsUiState(),
     val supportsSourceTasks: Boolean = false,
     val sourceTask: SourceTaskUiState? = null,
@@ -167,6 +168,7 @@ class LocalRecordsViewModel internal constructor(
 
     private fun appAccessMayRetire(): Boolean {
         val local = mutableState.value
+        if (modelConnections.editingOrBusy) return false
         if (editsDisposed || appAccessCommands.get() != 0 || !local.ready || local.opening || local.error != null ||
             local.saving || local.savePending || local.captureDiscard != null || local.localIndexBusy ||
             local.originalEdit != null || local.originalHistory != null || attachments.state.value != null ||
@@ -212,6 +214,8 @@ class LocalRecordsViewModel internal constructor(
         enqueue = { action -> submit(Command.ManualTags(action)).isSuccess })
     val people = ManualPeopleController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.ManualPeople(action)).isSuccess })
+    val modelConnections = ModelConnectionsController(current = { mutableState.value },
+        enqueue = { action -> submit(Command.ModelConnections(action)).isSuccess })
     val favorites = RecordFavoriteController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.Favorites(action)).isSuccess })
     val eventDates = RecordEventDateController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -369,6 +373,7 @@ class LocalRecordsViewModel internal constructor(
                                 try { command.action(store) } finally { factRecaps.checkCurrent(store) }
                             }
                             is Command.ManualPeople -> command.action(checkNotNull(repository))
+                            is Command.ModelConnections -> command.action(checkNotNull(repository))
                             is Command.Favorites -> command.action(checkNotNull(repository))
                             is Command.EventDates -> command.action(checkNotNull(repository))
                             is Command.ManualTasks -> command.action(checkNotNull(repository))
@@ -402,7 +407,7 @@ class LocalRecordsViewModel internal constructor(
                 ai.markDisposed()
                 attachments.markDisposed()
                 imageGrid.dispose()
-                tags.dispose(); people.dispose()
+                tags.dispose(); people.dispose(); modelConnections.dispose()
                 favorites.dispose()
                 eventDates.dispose()
                 tasks.dispose()
@@ -1199,6 +1204,7 @@ class LocalRecordsViewModel internal constructor(
                 supportsSourceTags = store.sourceTags != null,
                 supportsSourceMemories = store.sourceMemories != null,
                 supportsManualPeople = store.manualPeople != null, manualPeopleOwner = store.manualPeople, manualPeople = peopleValues.orEmpty(),
+                modelConnectionOwner = store.modelConnections,
                 manualPeopleAvailable = peopleValues != null,
                 manualPeopleError = if (store.manualPeople != null && peopleValues == null) "手工人物关联暂不可读取，请重试。" else null,
                 entries = entries, manualTags = labels.orEmpty(), manualTagsAvailable = labels != null,
@@ -1361,7 +1367,7 @@ class LocalRecordsViewModel internal constructor(
         ai.markDisposed()
         attachments.markDisposed()
         imageGrid.dispose()
-        tags.dispose(); people.dispose()
+        tags.dispose(); people.dispose(); modelConnections.dispose()
         favorites.dispose()
         eventDates.dispose()
         tasks.dispose()
@@ -1394,6 +1400,7 @@ class LocalRecordsViewModel internal constructor(
         data class ManualTasks(val action: suspend (EntryRepository) -> Unit) : Command
         data class LocalCandidates(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualPeople(val action: suspend (EntryRepository) -> Unit) : Command
+        data class ModelConnections(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualTags(val action: suspend (EntryRepository) -> Unit) : Command
         data class Favorites(val action: suspend (EntryRepository) -> Unit) : Command
         data class EventDates(val action: suspend (EntryRepository) -> Unit) : Command

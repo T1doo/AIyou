@@ -36,6 +36,7 @@ class EncryptedEntryRepository internal constructor(
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) : EntryRepository, AwaitableRecordStorage {
     private val dao get() = database.records()
+    override val modelConnections: com.t1doo.aiyou.domain.ModelConnectionCatalog = SqlModelConnectionCatalog(borrowedSql)
     override val localProcessing: com.t1doo.aiyou.domain.LocalProcessingRepository = SqlLocalProcessingRepository(borrowedSql)
     override val sourceTasks: com.t1doo.aiyou.domain.SourceTaskRepository by lazy { SqlSourceTaskRepository(borrowedSql, taskStorage) }
     override val attachments: AttachmentStore get() = attachmentStorage
@@ -250,7 +251,7 @@ class EncryptedEntryRepository internal constructor(
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
                 val created = Room.databaseBuilder(context.applicationContext, RecordsDatabase::class.java, file.absolutePath)
                 .openHelperFactory(SupportOpenHelperFactory(key))
-                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7, recordsMigration7To8, recordsMigration8To9, recordsMigration9To10, recordsMigration10To11, recordsMigration11To12)
+                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7, recordsMigration7To8, recordsMigration8To9, recordsMigration9To10, recordsMigration10To11, recordsMigration11To12, recordsMigration12To13)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
@@ -260,14 +261,14 @@ class EncryptedEntryRepository internal constructor(
                         installLocalSearchGuards(db); installPermanentErasureGuards(db)
                         installRecordFavoriteGuards(db)
                         installLocalCandidateGuards(db)
-                        installRecordEventDateGuards(db); installManualPeopleGuards(db)
+                        installRecordEventDateGuards(db); installManualPeopleGuards(db); installModelConnectionGuards(db)
                     }
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db)
                         installManualTagGuard(db); installManualTaskGuard(db); installLocalSearchGuards(db); installPermanentErasureGuards(db)
                         installRecordFavoriteGuards(db)
                         installLocalCandidateGuards(db)
-                        installRecordEventDateGuards(db); installManualPeopleGuards(db)
+                        installRecordEventDateGuards(db); installManualPeopleGuards(db); installModelConnectionGuards(db)
                     }
                 }).build()
                 database = created

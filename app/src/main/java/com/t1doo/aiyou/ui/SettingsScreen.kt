@@ -63,6 +63,7 @@ fun SettingsScreen(
     storageUsage: StorageUsageController? = null,
     appAccessSection: (@Composable () -> Unit)? = null,
     hasFullBackup: Boolean = false,
+    modelConnectionSection: (@Composable () -> Unit)? = null,
 ) {
     val owner = remember { AtomicBoolean(true) }
     DisposableEffect(owner) { onDispose { owner.set(false) } }
@@ -149,9 +150,11 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                 }
                 SettingsGroup("模型连接") {
+                    if(modelConnectionSection!=null) modelConnectionSection() else {
                     Text("尚未开放", style = MaterialTheme.typography.titleMedium)
                     Text("之后可连接你选择的模型。发送任何记录前，会先说明范围并征求授权。",
                         style = MaterialTheme.typography.bodyMedium, color = AIyouColors.textSecondary)
+                    }
                 }
                 appAccessSection?.let { section -> SettingsGroup("应用锁") { section() } }
                 if (storageUsage != null) SettingsGroup("存储") {

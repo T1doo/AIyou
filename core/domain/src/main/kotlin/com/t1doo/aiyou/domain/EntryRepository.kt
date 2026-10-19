@@ -7,6 +7,8 @@ import com.t1doo.aiyou.model.OriginalEditDraft
 
 /** Successful completion means a durable transaction, never an optimistic UI insert. */
 interface EntryRepository {
+    /** Non-secret local configuration only; it confers no send authority. */
+    val modelConnections: ModelConnectionCatalog? get() = null
     /** Explicit metadata-only authorization management; no connection catalog or send capability. */
     val recordAuthorizations: RecordAuthorizationRepository? get() = null
     /** Separate request-specific send review; never enabled by local source selection. */

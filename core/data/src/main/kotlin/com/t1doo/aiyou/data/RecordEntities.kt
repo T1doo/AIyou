@@ -6,6 +6,10 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+@Entity(tableName = "model_configurations")
+internal data class ModelConfigurationEntity(@PrimaryKey val id: String, val version: Long,
+    val lastMutationId: String, val deleted: Boolean, val payload: ByteArray?)
+
 @Entity(tableName = "entry_event_dates", foreignKeys = [ForeignKey(
     entity = EntryEntity::class, parentColumns = ["id"], childColumns = ["entryId"],
     onDelete = ForeignKey.CASCADE,

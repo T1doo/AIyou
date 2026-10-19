@@ -40,6 +40,7 @@ jobs:
           python3 scripts/verify-local-candidate-schema.py --capture
           python3 scripts/verify-record-event-date-schema.py --capture
           python3 scripts/verify-manual-people-schema.py --capture
+          python3 scripts/verify-model-configuration-schema.py --capture
           scripts/gradle.sh :core:data:kspDebugKotlin
           python3 scripts/verify-manual-tag-schema.py --verify
           python3 scripts/verify-manual-task-schema.py --verify
@@ -49,6 +50,7 @@ jobs:
           python3 scripts/verify-local-candidate-schema.py --verify
           python3 scripts/verify-record-event-date-schema.py --verify
           python3 scripts/verify-manual-people-schema.py --verify
+          python3 scripts/verify-model-configuration-schema.py --verify
       - name: Run actual domain and D04 JVM wire contracts
         run: |
           python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test :remote-text:test
@@ -356,7 +358,7 @@ jobs:
           import xml.etree.ElementTree as ET
           inventories = [
               ('app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.FullBackupPresentationTest.xml', 3),
-              ('checks/ai-protocol/remote-text/build/test-results/test/TEST-com.t1doo.aiyou.data.FullBackupTest.xml', 17),
+              ('checks/ai-protocol/remote-text/build/test-results/test/TEST-com.t1doo.aiyou.data.FullBackupTest.xml', 18),
               ('checks/ai-protocol/remote-text/build/test-results/test/TEST-com.t1doo.aiyou.records.FullBackupControllerTest.xml', 7),
           ]
           target = Path('app/build/reports/full-offline-backup-targeted')
@@ -483,8 +485,10 @@ jobs:
             core/data/schemas/
             core/data/src/androidTest/assets/records-schema-v11.json
             core/data/src/androidTest/assets/records-schema-v12.json
+            core/data/src/androidTest/assets/records-schema-v13.json
             .local-evidence/f05-event-date/schema-generation.json
             .local-evidence/f05-manual-people/schema-generation.json
+            .local-evidence/d04-model-configuration/schema-generation.json
             app/build/reports/d02-apk-audit.json
             app/build/reports/device-apk-manifest.json
             app/build/reports/record-ai-permissions.json

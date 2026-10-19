@@ -345,6 +345,10 @@ for label, folder, minimum in targets:
             "localRecordsNeverBecomeTasksAndUnopenedCompletionIsExplicit",
             "shortNarrowDoubleFontTasksScrollAndSettingsReturnWithoutChangingDraft",
             "shortLandscapeKeepsTaskStatusNavigationAndSettingsReachable")
+        additional["com.t1doo.aiyou.ModelConnectionSettingsPresentationTest"] = (
+            "sameOwnerCompositionReplacementRetainsFormAndUnconfirmedRequestButRetiresOldActions",
+            "narrowDoubleFontConfiguresBothProtocolsAndRetiredPageActionsCannotSaveOrDelete",
+            "invalidRootAndUncertainSaveKeepInputAndRetryOnlyTheSameConfiguration")
         additional["com.t1doo.aiyou.UiPreferencesTest"] = (
             "legacyDefaultsStayLocalAndExplicitNoneSurvivesNewFileAndViewModelOwners",
             "unreadableDefaultRestrictsOnlyNewDraftsAndPreservesEveryUnknownPreferenceByte",
