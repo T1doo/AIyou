@@ -95,7 +95,7 @@ fun ModelConnectionSettings(controller: ModelConnectionsController, owner: Model
         if(editor.busy) Text("正在检查此连接…")
         editor.error?.let { Text(it,color=AIyouColors.error,modifier=Modifier.testTag("model-capability-error")) }
         if(editor.pending!=null&&!editor.conflict) OutlinedButton(onClick={controller.retryProbePersistence(session,editor)},enabled=!editor.busy,
-            modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("model-capability-retry")) { Text("仅核对本次结果写入") }
+            modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("model-capability-retry")) { Text("仅重读确认本次结果") }
         TextButton(onClick={controller.cancelProbe(session,editor)},modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget)
             .testTag("model-capability-close")) { Text(if(editor.busy) "停止检查" else "关闭检查并重新读取") }
     }
@@ -224,7 +224,7 @@ private fun capabilityStateLabel(value: CapabilityState) = when(value) {
     CapabilityState.UNSUPPORTED -> "UNSUPPORTED · 此配置的文本接口不可用"
 }
 private fun capabilityReasonLabel(value: CapabilityProbeReason) = when(value) {
-    CapabilityProbeReason.IN_PROGRESS -> "上次检查尚未完成，请明确发起新检查。"
+    CapabilityProbeReason.IN_PROGRESS -> "检查尚未完成。若已中断，请明确发起新检查。"
     CapabilityProbeReason.TEXT_STREAM_VERIFIED -> "固定样本文本流通过，未验证其他能力。"
     CapabilityProbeReason.TEXT_ENDPOINT_UNAVAILABLE -> "所配文本接口或模型不可用（404/405/501），请核对协议、根路径与模型。"
     CapabilityProbeReason.AUTH_REQUIRED -> "认证未通过，请核对本机密钥与服务权限；能力仍未知。"

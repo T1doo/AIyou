@@ -18,6 +18,8 @@ interface ModelCapabilityRepository {
     fun watch(ticket: ModelCapabilityProbeTicket, onRetired: () -> Unit): AutoCloseable
     /** A newer probe, edit, key replacement or revocation rejects the old result transactionally. */
     fun finish(ticket: ModelCapabilityProbeTicket, observation: TextCapabilityObservation): ModelCapabilityProfile
+    /** Read-only uncertain-commit confirmation. Null means this exact result is not durably present. */
+    fun confirm(ticket: ModelCapabilityProbeTicket, observation: TextCapabilityObservation): ModelCapabilityProfile?
 }
 
 /** Explicitly invoked fixed-sample operation; never accepts records, prompts or caller output budgets. */

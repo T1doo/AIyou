@@ -20,11 +20,23 @@ class ModelCapabilityControllerTest {
         assertEquals(1,h.calls);assertEquals(1,h.profiles.begins)
         h.controller.runProbe(s,uncertain);h.drain();assertEquals(1,h.calls)
         h.controller.retryProbePersistence(s,uncertain);h.drain()
-        assertEquals(1,h.calls);assertEquals(1,h.exchanges);assertEquals(2,h.profiles.finishes)
-        assertSame(h.profiles.observations[0],h.profiles.observations[1]);assertNull(h.controller.visible().probeEditor)
+        assertEquals(1,h.calls);assertEquals(1,h.exchanges);assertEquals(1,h.profiles.finishes);assertEquals(1,h.profiles.confirms)
+        assertSame(h.profiles.observations[0],h.profiles.confirmations[0]);assertNull(h.controller.visible().probeEditor)
         h.controller.runProbe(s,running);h.drain();assertEquals(1,h.calls)
         assertEquals(CapabilityState.SUPPORTED,h.controller.visible().capabilityProfiles.single().observation.state)
         assertEquals("合成当前草稿",h.local.text);assertEquals(ProcessingPolicy.LOCAL_ONLY,ProcessingDefaults.policy)
+        val absent=Harness();val next=absent.open();absent.controller.beginProbe(next,absent.config)
+        absent.controller.runProbe(next,absent.editor());absent.drain()
+        assertEquals(CapabilityState.SUPPORTED,absent.controller.visible().capabilityProfiles.single().observation.state)
+        absent.controller.beginProbe(next,absent.config);absent.profiles.failBeforeFinish=true
+        absent.controller.runProbe(next,absent.editor())
+        assertTrue(absent.controller.visible().capabilityProfiles.isEmpty())
+        absent.drain()
+        assertEquals(CapabilityState.UNKNOWN,absent.controller.visible().capabilityProfiles.single().observation.state)
+        absent.controller.retryProbePersistence(next,absent.editor());absent.drain()
+        assertEquals(2,absent.calls);assertEquals(2,absent.profiles.finishes);assertEquals(1,absent.profiles.confirms)
+        assertEquals(CapabilityState.UNKNOWN,absent.controller.visible().capabilityProfiles.single().observation.state)
+        assertNotNull(absent.editor().pending);assertTrue(absent.editor().error!!.contains("本次重读未写入"))
     }
     @Test fun oldRunningStopStillRetiresSameReviewDuringSlowPersistenceButCannotCloseNewReview():Unit=runBlocking {
         val h=Harness();val s=h.open();h.controller.beginProbe(s,h.config);h.controller.runProbe(s,h.editor())
@@ -36,7 +48,7 @@ class ModelCapabilityControllerTest {
             assertNull(h.controller.visible().probeEditor);assertTrue(h.controller.visible().busy)
         }
         h.one();assertNull(h.controller.visible().probeEditor)
-        assertTrue(h.controller.visible().capabilityProfiles.isEmpty()) // The late callback did not fill it.
+        assertEquals(CapabilityState.UNKNOWN,h.controller.visible().capabilityProfiles.single().observation.state) // No late success filled it.
         h.profiles.beforeFinish=null;h.drain() // A distinct fresh SQL/port read may confirm admitted persistence.
         h.controller.beginProbe(s,h.config);val replacement=h.editor();assertNotEquals(oldRunning.reviewId,replacement.reviewId)
         h.controller.cancelProbe(s,oldRunning);assertSame(replacement,h.editor());assertTrue(h.cancellations>0)
@@ -79,8 +91,9 @@ class ModelCapabilityControllerTest {
         h.controller.retryProbePersistence(session,h.editor());h.drain();assertEquals(0,h.calls)
     }
     private class Profiles(val config:()->ModelConnectionConfiguration):ModelCapabilityRepository {
-        var value:ModelCapabilityProfile?=null;var begins=0;var finishes=0;var readFailure=false;var loseAck=false
+        var value:ModelCapabilityProfile?=null;var begins=0;var finishes=0;var confirms=0;var readFailure=false;var loseAck=false;var failBeforeFinish=false
         var beforeFinish:(()->Unit)?=null;val observations=mutableListOf<TextCapabilityObservation>()
+        val confirmations=mutableListOf<TextCapabilityObservation>()
         override fun profiles():List<ModelCapabilityProfile> {
             if(readFailure)throw IOException("Synthetic archive read failure")
             return listOfNotNull(value?.takeIf {it.connection==config()})
@@ -97,9 +110,14 @@ class ModelCapabilityControllerTest {
         override fun finish(ticket:ModelCapabilityProbeTicket,observation:TextCapabilityObservation):ModelCapabilityProfile {
             beforeFinish?.invoke();finishes++;observations+=observation
             if(!current(ticket))throw ModelConnectionConflict()
+            if(failBeforeFinish)throw IOException("Synthetic uncommitted result")
             return ticket.profile.copy(observation=observation).also {
                 value=it;if(loseAck){loseAck=false;throw IOException("Synthetic committed archive ACK loss")}
             }
+        }
+        override fun confirm(ticket:ModelCapabilityProbeTicket,observation:TextCapabilityObservation):ModelCapabilityProfile? {
+            confirms++;confirmations+=observation;if(!current(ticket))throw ModelConnectionConflict()
+            return value?.takeIf {it.observation==observation}
         }
     }
     private class Harness(enabled:Boolean=true) {

@@ -10,6 +10,12 @@ import androidx.room.PrimaryKey
 internal data class ModelConfigurationEntity(@PrimaryKey val id: String, val version: Long,
     val lastMutationId: String, val deleted: Boolean, val payload: ByteArray?)
 
+@Entity(tableName = "model_capability_profiles", foreignKeys = [ForeignKey(
+    entity = ModelConfigurationEntity::class, parentColumns = ["id"], childColumns = ["configId"],
+)])
+internal data class ModelCapabilityEntity(@PrimaryKey val configId: String, val generation: Long,
+    val probeId: String, val phase: String, val payload: ByteArray)
+
 @Entity(tableName = "entry_event_dates", foreignKeys = [ForeignKey(
     entity = EntryEntity::class, parentColumns = ["id"], childColumns = ["entryId"],
     onDelete = ForeignKey.CASCADE,

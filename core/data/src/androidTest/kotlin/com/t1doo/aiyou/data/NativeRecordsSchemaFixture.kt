@@ -11,7 +11,7 @@ import org.json.JSONObject
 /** Schema-only fixture from the exact checked-in Room export; never copies authorization logic. */
 internal object NativeRecordsSchemaFixture {
     fun create(file: File, syntheticKey: ByteArray, version: Int, seed: (SQLiteDatabase) -> Unit) {
-        require(version in 2..12)
+        require(version in 2..13)
         check(!file.exists()) { "Native fixture must own a new database file" }
         val schema = exported(version)
         check(schema.getInt("version") == version)
@@ -40,10 +40,10 @@ internal object NativeRecordsSchemaFixture {
         }
     }
 
-    /** Reads the actual generated v13 export; never substitutes Room validation or fabricates an identity. */
+    /** Reads the actual generated v14 export; never substitutes Room validation or fabricates an identity. */
     fun assertCurrentSchema(db: SupportSQLiteDatabase) {
-        val schema = exported(13)
-        assertEquals(13, db.version)
+        val schema = exported(14)
+        assertEquals(14, db.version)
         db.query("PRAGMA foreign_keys").use { check(it.moveToFirst()); assertEquals(1, it.getInt(0)) }
         db.query("SELECT identity_hash FROM room_master_table WHERE id=42").use {
             check(it.moveToFirst()); assertEquals(schema.getString("identityHash"), it.getString(0))
@@ -54,7 +54,7 @@ internal object NativeRecordsSchemaFixture {
             "AND name NOT IN ('android_metadata','room_master_table')").use { cursor ->
             buildSet { while (cursor.moveToNext()) add(cursor.getString(0)) }
         }
-        assertEquals(20, expectedTables.size)
+        assertEquals(21, expectedTables.size)
         val ftsShadows = setOf("content", "segments", "segdir", "docsize", "stat").map { "local_search_fts_" + it }.toSet()
         assertEquals(expectedTables + ftsShadows, actualTables)
         for (position in 0 until entities.length()) {

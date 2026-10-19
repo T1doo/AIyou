@@ -330,7 +330,7 @@ class ModelConnectionsController internal constructor(private val current: () ->
         val ui=mutable.value
         if(!live(session)||!ui.probeAvailable||ui.busy||ui.error!=null||ui.capabilityError!=null||ui.probeEditor!==editor||editor.busy||editor.conflict||editor.pending!=null) return
         val pending=editor.copy(busy=true,error=null)
-        publish(session){it.copy(probeEditor=pending)}
+        publish(session){it.copy(probeEditor=pending,capabilityProfiles=it.capabilityProfiles.filter {p -> p.connection.id!=editor.expected.id})}
         queue(session) { store ->
             if(mutable.value.probeEditor!==pending) return@queue
             var exchange: ModelCapabilityProbeExchange?=null
@@ -338,6 +338,8 @@ class ModelConnectionsController internal constructor(private val current: () ->
                 val profiles=probeRepository(store)
                 val ticket=profiles.begin(editor.expected,UUID.randomUUID().toString(),clock.millis())
                 if(!live(session)||mutable.value.probeEditor!==pending) return@queue
+                publish(session){if(it.probeEditor!==pending)it else it.copy(
+                    capabilityProfiles=it.capabilityProfiles.filter {p -> p.connection.id!=editor.expected.id}+ticket.profile)}
                 exchange=checkNotNull(capabilityProbe).newExchange(ticket)
                 val mayRun=synchronized(probeLock) {
                     if(!live(session)||mutable.value.probeEditor!==pending) false else { runningProbe=exchange;true }
@@ -361,12 +363,17 @@ class ModelConnectionsController internal constructor(private val current: () ->
         if(!live(session)||mutable.value.busy||mutable.value.error!=null||mutable.value.probeEditor!==editor||editor.busy||editor.conflict||editor.pending==null) return
         val pending=editor.copy(busy=true,error=null)
         publish(session){it.copy(probeEditor=pending)}
-        queue(session){store ->if(mutable.value.probeEditor===pending)persistProbe(session,pending,store)}
+        queue(session){store ->if(mutable.value.probeEditor===pending)persistProbe(session,pending,store,confirmOnly=true)}
     }
-    private fun persistProbe(session: Long, editor: ModelCapabilityProbeEditor, store: EntryRepository) {
+    private fun persistProbe(session: Long, editor: ModelCapabilityProbeEditor, store: EntryRepository, confirmOnly: Boolean = false) {
         try {
             val profiles=probeRepository(store);val pending=checkNotNull(editor.pending)
-            profiles.finish(pending.first,pending.second)
+            if(confirmOnly) {
+                if(profiles.confirm(pending.first,pending.second)==null) {
+                    probeError(session,editor,false,"数据库尚未确认本次结果；本次重读未写入，也不会再次请求服务。可关闭后重新读取。")
+                    return
+                }
+            } else profiles.finish(pending.first,pending.second)
             val configs=checkNotNull(store.modelConnections).configurations();val values=profiles.profiles()
             publish(session){if(it.probeEditor!==editor)it else it.copy(probeEditor=null,configurations=configs,
                 capabilityProfiles=values,notice="已保存本次文本能力检查；未授予任何记录外发权限。")}

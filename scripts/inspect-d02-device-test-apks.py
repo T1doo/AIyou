@@ -85,7 +85,7 @@ def verify_inventory(actual, expected):
 def verify_schema_assets(apk, root):
     schemas = {}
     with zipfile.ZipFile(apk) as archive:
-        for version in range(2, 14):
+        for version in range(2, 15):
             path = f"assets/records-schema-v{version}.json"
             if archive.namelist().count(path) != 1:
                 raise ValueError("Missing/duplicate actual native schema asset: " + path)

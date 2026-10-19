@@ -29,6 +29,9 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlModelConnectionCatalog.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/ModelConnectionPayload.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/ConnectionSecretCipher.kt")
+    listOf("ModelCapabilitySqlSchema.kt","ModelCapabilityPayload.kt","SqlModelCapabilityRepository.kt").forEach {
+        from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
+    }
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedAttachmentStore.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedOriginalEditStore.kt")
     listOf("ErasureFileProtocol.kt", "PermanentErasureSqlSchema.kt", "SqlPermanentErasureRepository.kt", "DrainingRecordsStorage.kt", "PermanentErasureRecovery.kt").forEach {

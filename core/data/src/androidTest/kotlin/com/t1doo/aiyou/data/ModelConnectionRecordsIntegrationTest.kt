@@ -16,6 +16,39 @@ import org.junit.runner.RunWith
 /** Compile/inventory evidence only until an actual native runner executes this method. */
 @RunWith(AndroidJUnit4::class)
 class ModelConnectionRecordsIntegrationTest {
+    @Test fun actualThirteenMigrationAndColdCapabilityArchiveKeepConnectionVersionAndRevokeOldResults():Unit=runBlocking {
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val directory=File(context.noBackupFilesDir,"synthetic-capabilities-"+UUID.randomUUID()).also {check(it.mkdirs())}
+        val file=File(directory,"records.db");val key=ByteArray(32){(it+39).toByte()};val stores=mutableListOf<EncryptedEntryRepository>()
+        System.loadLibrary("sqlcipher")
+        try {
+            NativeRecordsSchemaFixture.create(file,key,13){sql ->
+                sql.execSQL("INSERT INTO entries(id,currentRevision,capturedAtMillis,captureTimeZone,privacyPolicy) VALUES('legacy',1,55,'UTC','LOCAL_ONLY')")
+                sql.execSQL("INSERT INTO entry_revisions VALUES('legacy',1,'合成原文',?,55)",arrayOf(OriginalExports.hash("合成原文")))
+                sql.execSQL("INSERT INTO capture_draft VALUES(1,'draft',7,'合成独立草稿')")
+                sql.execSQL("INSERT INTO local_search_epoch VALUES(1,0,1,'UNKNOWN')")
+            }
+            fun open()=EncryptedEntryRepository.openWithKey(context,file,key.copyOf()).also(stores::add)
+            val first=open();NativeRecordsSchemaFixture.assertCurrentSchema(first.database.openHelper.writableDatabase)
+            assertTrue(first.modelCapabilities.profiles().isEmpty())
+            val c=first.modelConnections.change(ModelConnectionChange("native-profile",0,"create",ModelConnectionDetails("合成服务",
+                "https://example.test/custom/v1/",ConnectionProtocol.CHAT_COMPLETIONS,"synthetic-model",setOf(ModelConfigurationPurpose.CONVERSATION))))!!
+            val bound=first.localModelConnections.secrets.let {it.apply(it.prepare(c,"key","SYNTHETIC_ONLY_NATIVE_PROBE".toCharArray()))}
+            fun bytes(owner:EncryptedEntryRepository)=owner.database.openHelper.writableDatabase.query("SELECT payload FROM model_configurations WHERE id='native-profile'")
+                .use {check(it.moveToFirst());it.getBlob(0)}
+            val before=bytes(first);val ticket=first.modelCapabilities.begin(bound,"native-probe",100)
+            assertTrue(first.modelCapabilities.admit(ticket));assertFalse(first.modelCapabilities.admit(ticket))
+            val profile=first.modelCapabilities.finish(ticket,TextCapabilityObservation(CapabilityState.SUPPORTED,CapabilityProbeReason.TEXT_STREAM_VERIFIED,101))
+            assertArrayEquals(before,bytes(first));assertEquals(bound,first.modelConnections.configurations().single());first.closeAndAwait()
+            val cold=open();assertEquals(listOf(profile),cold.modelCapabilities.profiles());assertArrayEquals(before,bytes(cold))
+            val resumed=cold.modelCapabilities.begin(bound,"native-probe",100);assertFalse(cold.modelCapabilities.admit(resumed))
+            assertEquals(profile,cold.modelCapabilities.finish(resumed,profile.observation))
+            cold.localModelConnections.secrets.revoke(bound,"revoke");assertTrue(cold.modelCapabilities.profiles().isEmpty())
+            assertThrows(ModelConnectionConflict::class.java){cold.modelCapabilities.finish(resumed,profile.observation)}
+            assertEquals("合成原文",cold.entries().single().originalText);assertEquals(ProcessingPolicy.LOCAL_ONLY,cold.entries().single().policy)
+            assertEquals("合成独立草稿",cold.readDraft()!!.text)
+        } finally {stores.forEach {it.closeAndAwait()};key.fill(0);directory.deleteRecursively()}
+    }
     @Test fun nativeColdVaultReferenceAndSameOwnerStrictCommitRejectRevocationWithoutChangingOriginals():Unit=runBlocking {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val directory=File(context.noBackupFilesDir,"synthetic-vault-"+UUID.randomUUID()).also { check(it.mkdirs()) }

@@ -71,7 +71,7 @@ class ModelCapabilitiesPresentationTest {
         compose.onNodeWithTag("model-capability-error").performScrollTo().assertTextEquals("探测结果写入尚未确认；重试仅核对本次结果，不会再次请求服务。")
         compose.onNodeWithTag("model-capability-run").assertIsNotEnabled()
         click("model-capability-retry")
-        compose.runOnIdle {assertEquals(1,h.calls);assertEquals(2,h.profiles.finishes)}
+        compose.runOnIdle {assertEquals(1,h.calls);assertEquals(1,h.profiles.finishes);assertEquals(1,h.profiles.confirms)}
         compose.onNodeWithText("返回").performClick()
         compose.runOnIdle {h.enabled=false;h.controller.dispose();h.controller=h.newController()}
         compose.onNodeWithText("设置").performClick()
@@ -136,7 +136,7 @@ class ModelCapabilitiesPresentationTest {
         var controller by mutableStateOf(newController())
     }
     private class Profiles(val config:()->ModelConnectionConfiguration):ModelCapabilityRepository {
-        var values=emptyList<ModelCapabilityProfile>();var finishes=0;var loseAck=false
+        var values=emptyList<ModelCapabilityProfile>();var finishes=0;var confirms=0;var loseAck=false
         private var generation=0L
         override fun profiles()=values.filter {it.connection==config()}
         override fun begin(expected:ModelConnectionConfiguration,probeId:String,startedAtMillis:Long):ModelCapabilityProbeTicket {
@@ -152,6 +152,10 @@ class ModelCapabilitiesPresentationTest {
             finishes++;if(!current(ticket))throw ModelConnectionConflict()
             return ticket.profile.copy(observation=observation).also {values=listOf(it)
                 if(loseAck){loseAck=false;throw IOException("Synthetic archive ACK loss")}}
+        }
+        override fun confirm(ticket:ModelCapabilityProbeTicket,observation:TextCapabilityObservation):ModelCapabilityProfile? {
+            confirms++;if(!current(ticket))throw ModelConnectionConflict()
+            return values.singleOrNull()?.takeIf {it.observation==observation}
         }
     }
     companion object {private val NOW=Instant.parse("2026-10-19T10:00:00Z")}

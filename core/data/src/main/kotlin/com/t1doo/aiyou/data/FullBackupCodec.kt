@@ -27,7 +27,7 @@ internal object FullBackupTables {
     )
     // s=text, l=integer, b=portable bytes, ?=nullable text, n=required NULL (never remote authority).
     val kinds=listOf("sllssll?l","slssl","sllnn","sslssls","slsb","slsb","slsl??","slsb","sslslllsslb","lsls","sslss","sllssss","sslss")
-    val excluded=setOf("remote_text_jobs","text_annotations","local_search_fts","local_search_documents","local_search_epoch","owned_file_creations","model_configurations")
+    val excluded=setOf("remote_text_jobs","text_annotations","local_search_fts","local_search_documents","local_search_epoch","owned_file_creations","model_configurations","model_capability_profiles")
     val receipts=setOf("PACKAGE_ORIGIN","PACKAGE_RESTORE","PACKAGE_TASK_RESTORE","PACKAGE_MEDIA_INTENT",
         "CAPTURE_CURRENT","CAPTURE_SAVED","CAPTURE_DISCARDED","CAPTURE_REMOVED","FULL_BACKUP_IMPORT_V8")
     val retainedJobs=setOf("ORIGINAL_EDIT_COMMIT","PACKAGE_ORIGIN","PACKAGE_RESTORE")

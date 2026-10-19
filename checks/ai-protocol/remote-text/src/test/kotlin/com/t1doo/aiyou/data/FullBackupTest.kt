@@ -13,18 +13,27 @@ import org.junit.Test
 class FullBackupTest {
     @Test fun localConnectionCatalogIsExcludedAndEmptyRecordRestorePreservesItsExactBytes():Unit=runBlocking {
         FullFixture().use { source ->FullFixture(99).use { target ->
-            for(f in listOf(source,target)) f.db.transaction { sql->ModelConnectionSqlSchema.migration12To13.forEach { sql.execute(it) };sql.execute("PRAGMA user_version=13") }
+            for(f in listOf(source,target)) f.db.transaction { sql->
+                (ModelConnectionSqlSchema.migration12To13+ModelCapabilitySqlSchema.migration13To14).forEach { sql.execute(it) };sql.execute("PRAGMA user_version=14") }
             source.entry();val sourceCatalog=SqlModelConnectionCatalog(source.gateway,source.key)
             val sourceLocal=sourceCatalog.change(ModelConnectionCatalogTest.change("source-only",0,"source-config"))!!
-            sourceCatalog.apply(sourceCatalog.prepare(sourceLocal,"source-secret",ConnectionSecretVaultTest.material()))
+            val sourceBound=sourceCatalog.apply(sourceCatalog.prepare(sourceLocal,"source-secret",ConnectionSecretVaultTest.material()))
+            val sourceProfiles=SqlModelCapabilityRepository(source.gateway,sourceCatalog)
+            val sourceProbe=sourceProfiles.begin(sourceBound,"source-probe",90);assertTrue(sourceProfiles.admit(sourceProbe))
+            sourceProfiles.finish(sourceProbe,TextCapabilityObservation(CapabilityState.SUPPORTED,CapabilityProbeReason.TEXT_STREAM_VERIFIED,91))
             val catalog=SqlModelConnectionCatalog(target.gateway,target.key)
             val initial=catalog.change(ModelConnectionCatalogTest.change("target-local",0,"target-config",ModelConnectionCatalogTest.details(name="合成本机设置")))!!
             val local=catalog.apply(catalog.prepare(initial,"target-secret",ConnectionSecretVaultTest.material()))
             val before=target.db.read("SELECT payload FROM model_configurations").single().single() as ByteArray
+            val profiles=SqlModelCapabilityRepository(target.gateway,catalog);val probe=profiles.begin(local,"target-probe",90)
+            assertTrue(profiles.admit(probe));val profile=profiles.finish(probe,TextCapabilityObservation(CapabilityState.UNKNOWN,CapabilityProbeReason.AUTH_REQUIRED,91))
+            val beforeProfile=target.db.read("SELECT payload FROM model_capability_profiles").single().single() as ByteArray
             val bytes=export(source);val pack=target.backup.open({bytes.inputStream()},password())
             try { target.backup.restore(pack) { true } } finally { pack.release() }
             assertEquals(listOf(local),catalog.configurations())
             assertArrayEquals(before,target.db.read("SELECT payload FROM model_configurations").single().single() as ByteArray)
+            assertArrayEquals(beforeProfile,target.db.read("SELECT payload FROM model_capability_profiles").single().single() as ByteArray)
+            assertEquals(listOf(profile),profiles.profiles())
             assertEquals(listOf("target-local"),target.db.read("SELECT id FROM model_configurations").map { it[0] })
             assertEquals(1,target.db.read("SELECT id FROM entries").size)
             assertEquals("LOCAL_ONLY",target.db.read("SELECT privacyPolicy FROM entries").single().single())

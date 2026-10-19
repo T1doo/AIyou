@@ -153,6 +153,12 @@ internal class SqlModelConnectionCatalog(private val database: RecordsSqlDatabas
         if(config.secretRef==null || !runCatching { config.textConnection(purpose)==connection }.getOrDefault(false)) return false
         authenticate(value);return !closed
     }
+    internal fun capabilityCurrent(sql: RecordsSqlConnection, expected: ModelConnectionConfiguration): Boolean {
+        if(closed||cipher==null||expected.secretRef==null) return false
+        preflight(sql);val value=row(sql,expected.id)?:return false
+        if(value.configuration!=expected) return false
+        authenticate(value);return !closed
+    }
     private fun authenticate(row: Row) {
         val c=checkNotNull(row.configuration);val ref=checkNotNull(c.secretRef)
         val plain=checkNotNull(cipher).crypt(c.id,c.version,row.mutation,ref,c.details,checkNotNull(row.cell),false)

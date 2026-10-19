@@ -31,6 +31,7 @@ def input_fingerprint():
     inputs.append(root / "scripts/verify-local-candidate-schema.py")
     inputs.append(root / "scripts/verify-record-event-date-schema.py")
     inputs.append(root / "scripts/verify-manual-people-schema.py")
+    inputs.append(root / "scripts/verify-model-capability-schema.py")
     inputs.append(root / ".github/workflows/android.yml")
     inputs.extend(root / path for path in ("app/src/test/kotlin/com/t1doo/aiyou/ManualPeoplePresentationTest.kt",
         "app/src/test/kotlin/com/t1doo/aiyou/FullBackupPresentationTest.kt",

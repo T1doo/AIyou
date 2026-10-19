@@ -100,6 +100,7 @@ class FixedTextCapabilityProbeTest {
             override fun watch(ticket:ModelCapabilityProbeTicket,onRetired:()->Unit)=AutoCloseable { }
             override fun begin(expected:ModelConnectionConfiguration,probeId:String,startedAtMillis:Long):ModelCapabilityProbeTicket=error("No implicit probe")
             override fun finish(ticket:ModelCapabilityProbeTicket,observation:TextCapabilityObservation):ModelCapabilityProfile=error("Wire completion cannot write an archive")
+            override fun confirm(ticket:ModelCapabilityProbeTicket,observation:TextCapabilityObservation):ModelCapabilityProfile?=error("Wire exchange cannot confirm archive results")
         }
         val probe=FixedTextCapabilityProbe(f.transport,profiles,f.resolver(),Clock.fixed(f.records.now,ZoneOffset.UTC))
     }

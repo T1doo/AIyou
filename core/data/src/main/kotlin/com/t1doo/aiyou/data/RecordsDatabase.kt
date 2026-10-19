@@ -43,7 +43,7 @@ internal interface RecordsDao {
     ManualTaskEntity::class, LocalSearchFtsEntity::class, LocalSearchDocumentEntity::class,
     LocalSearchEpochEntity::class, PermanentErasureEntity::class, RecordPackageReceiptEntity::class,
     OwnedFileCreationEntity::class, LocalCandidateBatchEntity::class, RecordEventDateEntity::class, ManualPeopleEntity::class,
-    ModelConfigurationEntity::class], version = 13, exportSchema = true)
+    ModelConfigurationEntity::class, ModelCapabilityEntity::class], version = 14, exportSchema = true)
 internal abstract class RecordsDatabase : RoomDatabase() {
     abstract fun records(): RecordsDao
 }
@@ -150,3 +150,8 @@ internal val recordsMigration12To13 = object : Migration(12, 13) {
     override fun migrate(db: SupportSQLiteDatabase) { ModelConnectionSqlSchema.migration12To13.forEach(db::execSQL) }
 }
 internal fun installModelConnectionGuards(db: SupportSQLiteDatabase) { ModelConnectionSqlSchema.guards.forEach(db::execSQL) }
+
+internal val recordsMigration13To14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) { ModelCapabilitySqlSchema.migration13To14.forEach(db::execSQL) }
+}
+internal fun installModelCapabilityGuards(db: SupportSQLiteDatabase) { ModelCapabilitySqlSchema.guards.forEach(db::execSQL) }
