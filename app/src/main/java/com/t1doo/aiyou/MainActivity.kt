@@ -962,7 +962,8 @@ fun AIyouApp(
         } else if (!demo && local != null && selected==Destination.NOW && local.supportsMixedCapture && mixedCapture!=null) {
             com.t1doo.aiyou.records.MixedCapturePicker(mixedCapture,local.mixedCapture?.selection)
             com.t1doo.aiyou.records.MixedCaptureScreen(local,mixedCapture,modifier,
-                listState=nowList,onOpenEntry=openEntry,selectedEntryId=selectedNowId)
+                listState=nowList,onOpenEntry=openEntry,selectedEntryId=selectedNowId,
+                defaultPolicyUnavailable=!display.ready && display.error!=null)
         } else if (!demo && local != null && selected != Destination.TASKS) {
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }

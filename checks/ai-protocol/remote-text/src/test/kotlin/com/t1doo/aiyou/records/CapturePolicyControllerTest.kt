@@ -7,6 +7,37 @@ import org.junit.Test
 
 /** Production controller over actual capture SQL/cipher files, with deterministic ACK/queue boundaries. */
 class CapturePolicyControllerTest {
+    @Test fun changedDeviceDefaultKeepsCurrentInputAndOnlyNewDraftsAdoptIt(): Unit = runBlocking {
+        var chosen=ProcessingPolicy.LOCAL_ONLY
+        MixedCaptureControllerTest.Harness { chosen }.use { h ->
+            h.start();h.c.edit("合成默认变更前的图文");h.drain();h.add()
+            val original=h.ui.draft!!
+            chosen=ProcessingPolicy.AI_NONE
+            h.c.initialize(h.store)
+            com.t1doo.aiyou.data.assertCaptureDraftEquals(original,h.ui.draft!!)
+            assertEquals(original.text,h.ui.text)
+            h.c.save();h.drain()
+            assertFalse(h.ui.uncertainSave)
+            assertEquals(ProcessingPolicy.LOCAL_ONLY,h.local.entries.single().policy)
+            assertEquals(ProcessingPolicy.AI_NONE,h.ui.draft!!.policy)
+            assertNotEquals(original.id,h.ui.draft!!.id)
+            assertArrayEquals(com.t1doo.aiyou.data.MixedCaptureSqlTest.png,h.f.media.read(original.images.single().intent.id))
+
+            chosen=ProcessingPolicy.LOCAL_ONLY
+            h.c.edit("合成仍选择不参与 AI 的第二份");h.drain()
+            val localChoice=h.ui.draft!!
+            h.c.changePolicy(localChoice.id,localChoice.version,ProcessingPolicy.LOCAL_ONLY);h.drain()
+            val manual=h.ui.draft!!
+            h.c.changePolicy(manual.id,manual.version,ProcessingPolicy.AI_NONE);h.drain()
+            assertEquals(ProcessingPolicy.LOCAL_ONLY,chosen)
+            h.c.save();h.drain()
+            assertEquals(ProcessingPolicy.AI_NONE,h.local.entries.single { it.id==manual.id }.policy)
+            assertEquals(ProcessingPolicy.LOCAL_ONLY,h.local.entries.single { it.id==original.id }.policy)
+            assertEquals(ProcessingPolicy.LOCAL_ONLY,h.ui.draft!!.policy)
+            assertTrue(h.f.db.read("SELECT id FROM remote_text_jobs").isEmpty())
+        }
+    }
+
     @Test fun explicitChoiceWaitsForAckPreservesTextImagesAndOnlyChangesThisNewRecord(): Unit = runBlocking {
         MixedCaptureControllerTest.Harness().use { h ->
             h.start(); h.c.edit("合成只作手账的图文"); h.drain(); h.add()

@@ -101,8 +101,8 @@ class MixedCaptureControllerTest {
             assertEquals("",h.ui.text);h.c.dispose();val late=Source();h.c.selected(1,late);h.drain();assertEquals(0,late.opens)
         }
     }
-    internal class Harness:AutoCloseable {
-        val f=MixedCaptureSqlTest.fixture();private val repo=MixedCaptureSqlTest.repo(f)
+    internal class Harness(newDraftPolicy: () -> ProcessingPolicy = { ProcessingDefaults.policy }):AutoCloseable {
+        val f=MixedCaptureSqlTest.fixture();private val repo=SqlCaptureRepository(f.gateway,f.media,f.tags,newDraftPolicy)
         var local=LocalRecordUiState(ready=true,opening=false,supportsMixedCapture=true,mixedCapture=MixedCaptureUiState())
         val queue=ArrayDeque<suspend(EntryRepository)->Unit>();var failEntries=false;var failEdit=false;var acceptQueue=true
         var failPolicyBefore=false;var failPolicyAck=false;var failPolicyRead=false

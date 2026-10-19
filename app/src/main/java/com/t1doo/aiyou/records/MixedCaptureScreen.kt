@@ -22,7 +22,8 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureController,modifier: Modifier=Modifier,
-    listState: LazyListState = rememberLazyListState(), onOpenEntry: (String) -> Unit = {}, selectedEntryId: String? = null) {
+    listState: LazyListState = rememberLazyListState(), onOpenEntry: (String) -> Unit = {}, selectedEntryId: String? = null,
+    defaultPolicyUnavailable: Boolean = false) {
     val ui=local.mixedCapture ?: MixedCaptureUiState()
     val enabled=local.ready && !local.opening && local.error==null && ui.draft!=null
     val editable=enabled && !ui.busy && ui.selection==null && !ui.uncertainSave && !ui.discardPending && ui.policyChange==null && ui.draft?.discarding!=true
@@ -47,7 +48,9 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
         LazyColumn(Modifier.weight(1f).padding(horizontal=AIyouDimensions.pageNarrow).testTag("mixed-list"),state=listState,
             contentPadding=PaddingValues(vertical=16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             item("heading") { Text("今天 · ${day.date}",style=MaterialTheme.typography.headlineMedium)
-                Text("文字、图文，或只用图片记下来。默认仅在本机处理，不会发送到远端。") }
+                Text("文字、图文，或只用图片记下来。不会发送到远端；本次范围以草稿中的选择为准。")
+                if(defaultPolicyUnavailable) Text("设置暂不可读取；以后新建的草稿暂用不参与 AI。当前草稿范围保持不变，仍可逐稿选择。",
+                    modifier=Modifier.testTag("mixed-default-policy-unavailable")) }
             item("recent") { Text("今天最近记录",style=MaterialTheme.typography.titleLarge)
                 Text("按记录时间显示最近 5 条；更多记录可到回忆查看。") }
             if(local.ready && !local.opening && local.error==null && recent.isEmpty()) item("recent-empty") {

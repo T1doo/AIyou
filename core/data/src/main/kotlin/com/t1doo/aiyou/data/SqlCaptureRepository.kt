@@ -9,7 +9,8 @@ import java.util.concurrent.CancellationException
 
 /** One encrypted draft slot; durable file intents precede any IO. No entry exists until all media authenticate. */
 internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,private val media: EncryptedAttachmentStore,
-    private val tags: SqlManualTagRepository) : CaptureRepository {
+    private val tags: SqlManualTagRepository,
+    private val newDraftPolicy: () -> ProcessingPolicy = { ProcessingDefaults.policy }) : CaptureRepository {
     override val supportsProcessingChoice = true
     override suspend fun changePolicy(expected: CaptureDraft, policy: ProcessingPolicy): CaptureDraft = safely {
         require(policy == ProcessingPolicy.LOCAL_ONLY || policy == ProcessingPolicy.AI_NONE)
@@ -27,7 +28,10 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
     override suspend fun current(): CaptureDraft = safely { database.transaction { sql ->
         read(sql) ?: run {
             val legacy=sql.query("SELECT id,version,text FROM capture_draft WHERE slot=1").singleOrNull()
-            val draft=CaptureDraft(legacy?.get(0) as String? ?: uuid(),1,legacy?.get(2) as String? ?: "",emptyList())
+            // A device default applies only at creation, never to an existing or legacy draft.
+            val policy=if(legacy==null) newDraftPolicy() else ProcessingDefaults.policy
+            require(policy==ProcessingPolicy.LOCAL_ONLY || policy==ProcessingPolicy.AI_NONE)
+            val draft=CaptureDraft(legacy?.get(0) as String? ?: uuid(),1,legacy?.get(2) as String? ?: "",emptyList(),policy=policy)
             sql.execute("INSERT INTO record_package_receipts VALUES(?,?,1,'CAPTURE_CURRENT',?)",listOf(SLOT,draft.id,encode(draft)))
             if (legacy!=null) require(sql.execute("DELETE FROM capture_draft WHERE slot=1 AND id=? AND version=?",listOf(legacy[0],legacy[1]))==1)
             draft

@@ -346,6 +346,9 @@ for label, folder, minimum in targets:
             "shortNarrowDoubleFontTasksScrollAndSettingsReturnWithoutChangingDraft",
             "shortLandscapeKeepsTaskStatusNavigationAndSettingsReachable")
         additional["com.t1doo.aiyou.UiPreferencesTest"] = (
+            "legacyDefaultsStayLocalAndExplicitNoneSurvivesNewFileAndViewModelOwners",
+            "unreadableDefaultRestrictsOnlyNewDraftsAndPreservesEveryUnknownPreferenceByte",
+            "lostDefaultWriteAcknowledgementShowsUnconfirmedAndRetriesOnlyTheSamePreference",
             "confirmedRecapWeekSurvivesNewStorageAndViewModelAndKeepsDisplayChoices",
             "legacyDisplayBytesDefaultToDayAndAreUntouchedUntilExplicitPreferenceSave",
             "failedRecapSaveKeepsConfirmedPeriodAndRetryConfirmsOnlyRequestedChoice",
@@ -354,6 +357,7 @@ for label, folder, minimum in targets:
             "failedWriteKeepsConfirmedValuesAndRetryPersistsTheRequestedChoice",
             "corruptPreferencesArePreservedAndNeverFlashTheCompanion")
         additional["com.t1doo.aiyou.CompanionSettingsPresentationTest"] = (
+            "captureDefaultHasExplicitLocalChoicesAndRetiredOrUnconfirmedActionsCannotChangeIt",
             "companionIsLocalOptionalAndSettingsReturnPreservesCapture",
             "narrowDoubleFontSettingsHaveOneSwitchTargetAndReachableLicenseAndRetry",
             "eachProductionDestinationReturnsFromSettingsWithoutChangingSelection",

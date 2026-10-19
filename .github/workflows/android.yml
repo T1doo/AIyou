@@ -356,7 +356,7 @@ jobs:
           import xml.etree.ElementTree as ET
           inventories = [
               ('app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.FullBackupPresentationTest.xml', 3),
-              ('checks/ai-protocol/remote-text/build/test-results/test/TEST-com.t1doo.aiyou.data.FullBackupTest.xml', 16),
+              ('checks/ai-protocol/remote-text/build/test-results/test/TEST-com.t1doo.aiyou.data.FullBackupTest.xml', 17),
               ('checks/ai-protocol/remote-text/build/test-results/test/TEST-com.t1doo.aiyou.records.FullBackupControllerTest.xml', 7),
           ]
           target = Path('app/build/reports/full-offline-backup-targeted')

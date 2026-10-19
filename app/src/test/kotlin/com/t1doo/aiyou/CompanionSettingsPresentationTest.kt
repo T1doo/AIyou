@@ -17,6 +17,7 @@ import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.designsystem.MascotState
 import com.t1doo.aiyou.ui.*
 import com.t1doo.aiyou.records.LocalRecordUiState
+import com.t1doo.aiyou.model.ProcessingPolicy
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -31,6 +32,43 @@ class CompanionSettingsPresentationTest {
     @get:Rule val compose = createComposeRule(effectContext = object : androidx.compose.ui.MotionDurationScale {
         override val scaleFactor = 1f
     })
+
+    @Test @Config(sdk = [35], qualifiers = "w320dp-h640dp")
+    fun captureDefaultHasExplicitLocalChoicesAndRetiredOrUnconfirmedActionsCannotChangeIt() {
+        val display = mutableStateOf(UiPreferencesState(UiPreferences(false, true), ready = true))
+        val local = LocalRecordUiState(ready = true, opening = false, text = "合成已有草稿")
+        val actions = mutableMapOf<ProcessingPolicy, () -> Unit>()
+        var changes = 0
+        var retries = 0
+        compose.setContent {
+            val density = LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                LocalDensity provides Density(density.density, 2f),
+                LocalCaptureDefaultActionObserver provides { policy, action -> actions[policy] = action }) {
+                AIyouTheme { AIyouApp(local = local, display = display.value,
+                    onDisplayChange = { changes++; display.value = display.value.copy(preferences = it) },
+                    onRetryDisplay = { retries++ }) }
+            }
+        }
+        compose.onNodeWithText("设置").performClick()
+        compose.onNodeWithTag("capture-default-LOCAL_ONLY").performScrollTo().assertIsSelected()
+        compose.onNodeWithTag("capture-default-AI_NONE").performScrollTo().assertIsDisplayed()
+            .assertHeightIsAtLeast(48.dp).performClick().assertIsSelected()
+        val retired = checkNotNull(actions[ProcessingPolicy.LOCAL_ONLY])
+        compose.runOnIdle { assertEquals(1, changes); assertEquals("合成已有草稿", local.text) }
+        compose.onNodeWithText("返回").performClick()
+        compose.runOnIdle { retired(); assertEquals(1, changes) }
+        compose.onNodeWithText("设置").performClick()
+        compose.runOnIdle { display.value = display.value.copy(saveUnconfirmed = true, error = "设置保存尚未确认") }
+        compose.onNodeWithTag("capture-default-LOCAL_ONLY").performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle { actions.getValue(ProcessingPolicy.LOCAL_ONLY)(); assertEquals(1, changes) }
+        compose.onNodeWithText("重试核对默认范围").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(1, retries) }
+        compose.runOnIdle { display.value = UiPreferencesState(error = "设置暂不可读取") }
+        compose.onNodeWithTag("capture-default-read-failed").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("capture-default-AI_NONE").performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle { assertEquals("合成已有草稿", local.text); assertEquals(1, changes) }
+    }
 
     @Test fun companionIsLocalOptionalAndSettingsReturnPreservesCapture() {
         val display = mutableStateOf(UiPreferencesState(UiPreferences(), ready = true))

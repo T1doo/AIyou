@@ -12,6 +12,7 @@ import com.t1doo.aiyou.domain.RecordConflict
 import com.t1doo.aiyou.domain.RecordIntegrityFailure
 import com.t1doo.aiyou.model.OriginalRevision
 import com.t1doo.aiyou.model.ProcessingPolicy
+import com.t1doo.aiyou.model.ProcessingDefaults
 import com.t1doo.aiyou.model.StoredEntry
 import com.t1doo.aiyou.model.TextDraft
 import com.t1doo.aiyou.model.OriginalEditDraft
@@ -31,6 +32,7 @@ class EncryptedEntryRepository internal constructor(
     private val attachmentStorage: EncryptedAttachmentStore,
     private val originalEditStorage: EncryptedOriginalEditStore,
     private val borrowedSql: DrainingRecordsSqlDatabase = DrainingRecordsSqlDatabase(RoomRecordsSqlDatabase(database)),
+    private val newCapturePolicy: () -> ProcessingPolicy = { ProcessingDefaults.policy },
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) : EntryRepository, AwaitableRecordStorage {
     private val dao get() = database.records()
@@ -52,7 +54,7 @@ class EncryptedEntryRepository internal constructor(
     override val factRecaps: com.t1doo.aiyou.domain.FactRecapRepository = SqlFactRecapRepository(borrowedSql, tagStorage)
     override val sourceTags: com.t1doo.aiyou.domain.SourceTagRepository = SqlSourceTagRepository(borrowedSql, tagStorage)
     private val sourceMemoryStorage = SqlSourceMemoryRepository(borrowedSql, keyBytes)
-    override val captureRecords: com.t1doo.aiyou.domain.CaptureRepository = SqlCaptureRepository(borrowedSql,attachmentStorage,tagStorage)
+    override val captureRecords: com.t1doo.aiyou.domain.CaptureRepository = SqlCaptureRepository(borrowedSql,attachmentStorage,tagStorage,newCapturePolicy)
     override val sourceMemories: com.t1doo.aiyou.domain.SourceMemoryRepository get() = sourceMemoryStorage
     override val favorites: com.t1doo.aiyou.domain.RecordFavoriteRepository = SqlRecordFavoriteRepository(borrowedSql)
     override val eventDates: com.t1doo.aiyou.domain.RecordEventDateRepository = SqlRecordEventDateRepository(borrowedSql)
@@ -184,14 +186,14 @@ class EncryptedEntryRepository internal constructor(
         const val MAX_TEXT_LENGTH = 100_000
 
         /** Call on an IO dispatcher after device unlock; an unavailable key is recoverable UI failure. */
-        fun open(context: Context): EncryptedEntryRepository = openProtected(
+        fun open(context: Context, newCapturePolicy: () -> ProcessingPolicy = { ProcessingDefaults.policy }): EncryptedEntryRepository = openProtected(
             context.noBackupFilesDir,
             loadKey = { purpose, existing ->
                 AndroidDatabaseKeyProvider(File(context.noBackupFilesDir, "keys/${purpose.fileName}"),
                     DATABASE_KEY_ALIAS, purpose.associatedData).load(existing)
             },
         ) { file, key, editKey, attachmentKey ->
-            openWithKey(context, file, key, editKey = { editKey() }) { database ->
+            openWithKey(context, file, key, editKey = { editKey() }, newCapturePolicy = newCapturePolicy) { database ->
                 val existingRows = database.openHelper.writableDatabase.query("SELECT count(*) FROM attachments").use {
                     check(it.moveToFirst())
                     it.getLong(0) > 0
@@ -234,6 +236,7 @@ class EncryptedEntryRepository internal constructor(
             editKey: (RecordsDatabase) -> ByteArray = {
                 MessageDigest.getInstance("SHA-256").digest("AIyou synthetic edit test key v1".toByteArray(Charsets.US_ASCII) + key)
             },
+            newCapturePolicy: () -> ProcessingPolicy = { ProcessingDefaults.policy },
             attachmentKey: (RecordsDatabase) -> ByteArray = { key.copyOf() },
         ): EncryptedEntryRepository {
             var database: RecordsDatabase? = null
@@ -279,7 +282,8 @@ class EncryptedEntryRepository internal constructor(
                 val draftKey = editKey(created)
                 try { edits = EncryptedOriginalEditStore(File(file.parentFile, file.name + ".original-edits"), draftKey).also { it.installErasureHooks(fileHooks) } }
                 catch (failure: Exception) { draftKey.fill(0); throw failure }
-                return EncryptedEntryRepository(created, key, checkNotNull(storage), checkNotNull(edits), ownerSql).also { opened = true }
+                return EncryptedEntryRepository(created, key, checkNotNull(storage), checkNotNull(edits), ownerSql,
+                    newCapturePolicy = newCapturePolicy).also { opened = true }
             } finally {
                 if (!opened) {
                     gateway?.seal(); storage?.close(); edits?.close()

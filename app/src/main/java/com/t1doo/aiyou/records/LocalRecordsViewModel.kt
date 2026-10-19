@@ -137,7 +137,7 @@ class LocalRecordsViewModel internal constructor(
     private val decodeCapture: (ByteArray) -> AttachmentPicture = PlatformImageDecoder::thumbnail,
     private val decodeGrid: (ByteArray) -> AttachmentPicture = PlatformImageDecoder::gridThumbnail,
 ) : AndroidViewModel(application) {
-    constructor(application: Application) : this(application, { EncryptedEntryRepository.open(application) })
+    constructor(application: Application) : this(application, { openProductionRecordStore(application) })
     private val mutableState = MutableStateFlow(LocalRecordUiState())
     val state = mutableState.asStateFlow()
     private val commands = Channel<Command>(Channel.UNLIMITED)

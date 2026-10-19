@@ -11,6 +11,34 @@ import org.junit.Test
 
 /** Product SQL/ciphers/files and independently keyed owners; never Android/SAF/SQLCipher acceptance. */
 class FullBackupTest {
+    @Test fun aiNoneDeviceDefaultEmptySlotAllowsRestoreButManualRangeChangesStillRefuse(): Unit = runBlocking {
+        FullFixture().use { source ->
+            val id=source.entry();val original=source.capture.edit(source.capture.current(),"合成包内草稿")
+            val bytes=export(source)
+            for (edited in listOf(false,true)) FullFixture(99).use { target ->
+                var reads=0
+                val capture=SqlCaptureRepository(target.gateway,target.media,target.tags) { reads++;ProcessingPolicy.AI_NONE }
+                var empty=capture.current()
+                assertEquals(ProcessingPolicy.AI_NONE,empty.policy);assertEquals(1L,empty.version)
+                if(edited) {
+                    empty=capture.changePolicy(empty,ProcessingPolicy.LOCAL_ONLY)
+                    empty=capture.changePolicy(empty,ProcessingPolicy.AI_NONE)
+                }
+                val pack=target.backup.open({bytes.inputStream()},password())
+                try {
+                    if(edited) {
+                        fails { target.backup.restore(pack) { true } }
+                        assertCaptureDraftEquals(empty,capture.current());assertTrue(target.db.read("SELECT id FROM entries").isEmpty())
+                    } else {
+                        target.backup.restore(pack) { true }
+                        assertCaptureDraftEquals(original,capture.current())
+                        assertEquals(listOf(id),target.db.read("SELECT id FROM entries").map { it[0] })
+                    }
+                    assertEquals(1,reads) // Imported/existing draft never consults the device default.
+                } finally { pack.release() }
+            }
+        }
+    }
     @Test fun allRecordsBeyondSelectedPackageLimitIncludeTrashHistoryFavoritesAndCrossKeyImages():Unit=runBlocking {
         FullFixture().use { source -> FullFixture(99).use { target ->
             val ids=(1..26).map { source.entry(text="合成原文 $it") }

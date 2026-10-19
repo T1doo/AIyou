@@ -5,6 +5,7 @@ import com.t1doo.aiyou.ui.UiPreferences
 import com.t1doo.aiyou.ui.UiPreferencesStorage
 import com.t1doo.aiyou.ui.UiPreferencesViewModel
 import com.t1doo.aiyou.model.FactRecapPeriod
+import com.t1doo.aiyou.model.ProcessingPolicy
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +24,70 @@ import android.os.Looper
 @Config(sdk = [35])
 class UiPreferencesTest {
     @get:Rule val temporary = TemporaryFolder()
+
+    @Test fun legacyDefaultsStayLocalAndExplicitNoneSurvivesNewFileAndViewModelOwners() {
+        for (period in FactRecapPeriod.entries) {
+            val file = File(temporary.newFolder(), "preferences")
+            val old = "AIyou display v2\nfalse\ntrue\n${period.name}\n".toByteArray(Charsets.US_ASCII)
+            file.writeBytes(old)
+            val storage = FileUiPreferences(file)
+            assertEquals(UiPreferences(false, true, period), storage.read())
+            assertEquals(ProcessingPolicy.LOCAL_ONLY, storage.newCapturePolicy()); assertArrayEquals(old, file.readBytes())
+            val chosen = storage.read().copy(defaultCapturePolicy = ProcessingPolicy.AI_NONE)
+            storage.write(chosen)
+            val reopened = FileUiPreferences(file)
+            assertEquals(chosen, reopened.read()); assertEquals(ProcessingPolicy.AI_NONE, reopened.newCapturePolicy())
+            val vm = UiPreferencesViewModel(RuntimeEnvironment.getApplication(), reopened, Dispatchers.Unconfined)
+            shadowOf(Looper.getMainLooper()).idle()
+            vm.change(vm.state.value.preferences.copy(showCompanion = true)); shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(chosen.copy(showCompanion = true), FileUiPreferences(file).read())
+        }
+    }
+
+    @Test fun unreadableDefaultRestrictsOnlyNewDraftsAndPreservesEveryUnknownPreferenceByte() {
+        val missing = File(temporary.newFolder(), "preferences")
+        assertEquals(ProcessingPolicy.LOCAL_ONLY, FileUiPreferences(missing).newCapturePolicy()); assertFalse(missing.exists())
+        for (bad in listOf("AIyou display v3\nfalse\ntrue\nWEEK\nREMOTE_ALLOWED\n",
+            "AIyou display v3\nfalse\ntrue\nWEEK\nAI_NONE", "unknown private preference bytes")) {
+            val file = File(temporary.newFolder(), "preferences").apply { writeText(bad) }
+            val storage = FileUiPreferences(file)
+            assertEquals(ProcessingPolicy.AI_NONE, storage.newCapturePolicy())
+            val vm = UiPreferencesViewModel(RuntimeEnvironment.getApplication(), storage, Dispatchers.Unconfined)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertFalse(vm.state.value.ready); assertNotNull(vm.state.value.error)
+            vm.change(UiPreferences()); shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(bad, file.readText())
+        }
+        assertThrows(IllegalArgumentException::class.java) { UiPreferences(defaultCapturePolicy = ProcessingPolicy.REMOTE_ALLOWED) }
+    }
+
+    @Test fun lostDefaultWriteAcknowledgementShowsUnconfirmedAndRetriesOnlyTheSamePreference() {
+        val file = File(temporary.newFolder(), "preferences")
+        val disk = FileUiPreferences(file)
+        val original = UiPreferences(false, true, FactRecapPeriod.WEEK, ProcessingPolicy.AI_NONE)
+        disk.write(original)
+        var loseAck = true
+        val writes = mutableListOf<UiPreferences>()
+        val vm = UiPreferencesViewModel(RuntimeEnvironment.getApplication(), object : UiPreferencesStorage {
+            override fun read() = disk.read()
+            override fun write(value: UiPreferences) {
+                writes += value; disk.write(value)
+                if (loseAck) throw IOException("synthetic post-write ACK loss")
+            }
+        }, Dispatchers.Unconfined)
+        shadowOf(Looper.getMainLooper()).idle()
+        val requested = original.copy(defaultCapturePolicy = ProcessingPolicy.LOCAL_ONLY)
+        vm.change(requested); shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(ProcessingPolicy.LOCAL_ONLY, FileUiPreferences(file).newCapturePolicy())
+        assertEquals(original, vm.state.value.preferences); assertTrue(vm.state.value.saveUnconfirmed)
+        assertTrue(vm.state.value.error!!.contains("文件可能已保存"))
+        vm.change(original.copy(showCompanion = true)); shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(1, writes.size); assertSame(requested, writes.single())
+        loseAck = false; vm.retry(); shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(2, writes.size); assertSame(writes[0], writes[1])
+        assertEquals(requested, vm.state.value.preferences); assertFalse(vm.state.value.saveUnconfirmed)
+        assertNull(vm.state.value.error); assertEquals(requested, disk.read())
+    }
 
     @Test fun confirmedRecapWeekSurvivesNewStorageAndViewModelAndKeepsDisplayChoices() {
         val file = File(temporary.newFolder(), "display/preferences")

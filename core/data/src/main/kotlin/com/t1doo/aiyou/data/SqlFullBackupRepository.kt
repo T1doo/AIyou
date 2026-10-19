@@ -218,7 +218,8 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
                     if(row[0]==PREFIX+pack.data.id) resuming && row==listOf(PREFIX+pack.data.id,pack.data.id,8L,OP,"PENDING:"+pack.digest)
                     else if(row[0]=="CAPTURE_CURRENT" && row[3]=="CAPTURE_CURRENT" && row[2]==1L) {
                         val draft=SqlCaptureRepository.decodeForBackup(row[4] as String)
-                        row[1]==draft.id && draft.version==1L && draft.text.isEmpty() && draft.images.isEmpty() && !draft.discarding && draft.policy==ProcessingPolicy.LOCAL_ONLY
+                        row[1]==draft.id && draft.version==1L && draft.text.isEmpty() && draft.images.isEmpty() && !draft.discarding &&
+                            draft.policy in setOf(ProcessingPolicy.LOCAL_ONLY,ProcessingPolicy.AI_NONE)
                     } else false
                 })
                 require(all.size<=if(resuming) 2 else 1)

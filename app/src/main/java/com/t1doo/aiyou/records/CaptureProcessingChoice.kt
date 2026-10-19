@@ -54,7 +54,7 @@ internal fun CaptureProcessingChoice(ui: MixedCaptureUiState, controller: MixedC
                 RadioButton(draft.policy == policy, onClick = null, enabled = enabled)
                 Column(Modifier.weight(1f)) {
                     Text(if (policy == ProcessingPolicy.LOCAL_ONLY) "仅本机处理" else "不参与 AI")
-                    Text(if (policy == ProcessingPolicy.LOCAL_ONLY) "可在单独确认后使用本机整理；这是新草稿的默认范围。"
+                    Text(if (policy == ProcessingPolicy.LOCAL_ONLY) "可在单独确认后使用本机整理；以后新草稿的默认范围可在设置中选择。"
                         else "只作手账保存与人工浏览，不参与本机或远端 AI。", style = MaterialTheme.typography.bodySmall)
                 }
             }
