@@ -81,6 +81,17 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
             }
         } finally { plain.fill(0) }
     }
+    internal fun portable(id: String, version: Long, mutation: String, bytes: ByteArray, restoring: Boolean): ByteArray {
+        require(bytes.isNotEmpty() && bytes[0].toInt() in 1..4)
+        if (!restoring) open(id,version,mutation,bytes)
+        if (!restoring) return PortableCipherCell.open(key,aad(id,version,mutation,bytes[0].toInt()),bytes,MAX_V4_BYTES)
+        val encrypted=PortableCipherCell.seal(key,aad(id,version,mutation,bytes[0].toInt()),bytes,MAX_V4_BYTES)
+        return try {
+            val p=open(id,version,mutation,encrypted)
+            val task=p.task.copy(reminder=p.task.reminder?.copy(phase=TaskReminderPhase.REVOKED,commands=emptyList()))
+            seal(task,mutation,p.requestedAtMillis,"RESTORE")
+        } finally { encrypted.fill(0) }
+    }
     /** Exact reminder replay binds every field of the caller's old snapshot, not just its version. */
     fun reminderRequestProof(request: TaskReminderMutation): String {
         val bytes = ByteArrayOutputStream().use { buffer ->
@@ -176,6 +187,7 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
         proof?.let { require(it.matches(Regex("[a-f0-9]{64}"))) }
         if (format < 4) require(reminder == null && proof == null && operation !in REMINDER_OPERATIONS)
         when (operation) {
+            "RESTORE" -> require(reminder == null || reminder.phase == TaskReminderPhase.REVOKED && reminder.commands.isEmpty())
             "IMPORT" -> require(task.version == 1L && reminder == null)
             "CREATE" -> require(task.version == 1L && task.status == ManualTaskStatus.OPEN && reminder == null)
             "STATUS" -> require(task.version > 1 && task.status != ManualTaskStatus.OPEN &&

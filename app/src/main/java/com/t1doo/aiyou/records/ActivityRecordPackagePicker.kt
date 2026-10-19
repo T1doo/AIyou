@@ -24,7 +24,7 @@ class ActivityRecordPackagePicker(private val activity: Activity, saved: Bundle?
         pending[code] = Pending(requestKey, callback)
         val intent = Intent(if (export) Intent.ACTION_CREATE_DOCUMENT else Intent.ACTION_OPEN_DOCUMENT)
             .addCategory(Intent.CATEGORY_OPENABLE).setType("application/octet-stream")
-        if (export) intent.putExtra(Intent.EXTRA_TITLE, "AIyou-current-originals.aiyoupk")
+        if (export) intent.putExtra(Intent.EXTRA_TITLE, "AIyou-encrypted-records.aiyoupk")
         return try {
             @Suppress("DEPRECATION")
             activity.startActivityForResult(intent, code)

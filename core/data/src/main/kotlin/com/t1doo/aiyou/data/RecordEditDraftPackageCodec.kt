@@ -30,13 +30,13 @@ internal object RecordEditDraftPackageCodec {
         write(out, draft)
         val bytes = out.bytes(); try { packageHex(packageHash(bytes)) } finally { bytes.fill(0) }
     }
-    private fun write(out: PackageWriter, draft: OriginalEditDraft) {
+    internal fun write(out: PackageWriter, draft: OriginalEditDraft) {
         out.string(draft.id, 36); out.string(draft.entryId, 512); out.i32(draft.baseRevision)
         out.i32(draft.sourceRevision); out.i64(draft.version)
         text(out, draft.originalText); text(out, draft.text)
         out.string(draft.state.name, 16)
     }
-    private fun read(input: PackageReader): OriginalEditDraft = OriginalEditDraft(input.string(36), input.string(512),
+    internal fun read(input: PackageReader): OriginalEditDraft = OriginalEditDraft(input.string(36), input.string(512),
         input.i32(), input.i32(), input.i64(), text(input), text(input), OriginalEditDraftState.valueOf(input.string(16)))
     private fun text(out: PackageWriter, value: String) {
         require(value.length <= RecordEditDraftPackages.MAX_TEXT_LENGTH)

@@ -53,5 +53,13 @@ internal class LocalCandidateCipher(databaseKey: ByteArray) {
     }
     private fun versionedAad(aad: ByteArray, version: Int) = if (version == 1) aad else
         aad + "\u0000AIyou/local-candidates/envelope/2".toByteArray(Charsets.US_ASCII)
+    internal fun portable(aad:ByteArray,bytes:ByteArray,restoring:Boolean):ByteArray {
+        require(bytes.isNotEmpty() && bytes[0].toInt() in 1..2)
+        if(!restoring) open(aad,bytes)
+        val result=if(restoring) PortableCipherCell.seal(key,versionedAad(aad,bytes[0].toInt()),bytes,32768)
+            else PortableCipherCell.open(key,versionedAad(aad,bytes[0].toInt()),bytes,32768)
+        if(restoring) open(aad,result)
+        return result
+    }
     fun wipe() { key.fill(0) }
 }

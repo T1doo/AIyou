@@ -113,6 +113,7 @@ data class LocalRecordUiState(
     val recycleBin: RecycleBinUiState? = null,
     val recycleNotice: String? = null,
     val supportsRecordPackages: Boolean = false,
+    val supportsFullBackup:Boolean=false,
     val recordPackage: RecordPackageUiState? = null,
     val packageOrigins: Map<String, com.t1doo.aiyou.model.RecordPackageOrigin> = emptyMap(),
     val packageOriginsAvailable: Boolean = true,
@@ -230,7 +231,8 @@ class LocalRecordsViewModel internal constructor(
         enqueue = { action -> submit(Command.OriginalExport(action)).isSuccess }, clock = clock, decodeImage = decodeCapture)
     val recordPackages = RecordPackageController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.RecordPackage(action)).isSuccess },
-        cipher = com.t1doo.aiyou.data.JcaRecordPackageCipher(), clock = clock)
+        cipher = com.t1doo.aiyou.data.JcaRecordPackageCipher(), clock = clock,
+        onFullRestored = { store -> mixedCapture.adoptFullRestore(store);tasks.initialize(store);reminders.initialize(store);taskProposals.initialize(store) })
     val recycleBin = RecycleBinController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.RecycleBin(action)).isSuccess },
         canMove = { attachments.state.value == null },
@@ -1207,6 +1209,7 @@ class LocalRecordsViewModel internal constructor(
                 favoritesAvailable = favoriteValues != null, favoritesLoading = false,
                 favoritesError = if (store.favorites != null && favoriteValues == null) "收藏状态暂不可读取，请重试。" else null,
                 supportsOriginalExport = store.originalExport != null,
+                supportsFullBackup = store.fullBackups != null,
                 supportsRecordPackages = store.recordPackages != null && store.originalExport != null && store.manualTags != null,
                 packageOrigins = origins.orEmpty(), packageOriginsAvailable = origins != null,
                 packageOriginsError = if (origins == null) "恢复来源暂不可读取，不能确认来源。" else null,

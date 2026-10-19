@@ -23,6 +23,7 @@ interface EntryRepository {
     val eventDates: RecordEventDateRepository? get() = null
     val permanentErasure: PermanentErasureRepository? get() = null
     val localSearch: LocalSearchRepository? get() = null
+    val fullBackups: FullBackupRepository? get() = null
     val mediaPackages: RecordMediaPackageRepository? get() = null
     val recordPackages: RecordPackageRepository? get() = null
     val recycleBin: RecycleBinRepository? get() = null

@@ -144,6 +144,28 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
         catch(c:InvalidSourceMemory) { throw c }
         catch(c:SourceMemoryLimit) { throw c }
         catch(_:Exception) { throw SourceMemoryStorageFailure() }
+    internal fun validateFullPortableRow(cells:List<Any?>,proof:FullBackupSourceProof?) {
+        val row=decode(cells)
+        if(row.state=="INVALIDATED") require(row.bytes.isEmpty())
+        else {
+            val p=checkNotNull(proof);require(!p.deleted && p.policy!=ProcessingPolicy.AI_NONE)
+            payload(row,SourceMemoryPreview(p.source,p.hash,p.generation,p.original,p.captured,p.zone,p.policy,0))
+        }
+    }
+    internal fun validateFullWithin(sql:RecordsSqlConnection) {
+        val rows=sql.query("SELECT "+COLUMNS+" FROM local_candidate_batches WHERE ruleVersion=2 ORDER BY id LIMIT 4097")
+        require(rows.size<=4096)
+        rows.map(::decode).forEach { row ->
+            if(row.state=="INVALIDATED") require(row.bytes.isEmpty())
+            else payload(row,readSource(sql,row.source))
+        }
+    }
+    internal fun portable(cells:List<Any?>,restoring:Boolean):ByteArray {
+        val row=decode(cells)
+        if(row.state=="INVALIDATED") { require(row.bytes.isEmpty());return byteArrayOf() }
+        require(row.bytes.isNotEmpty() && row.state=="READY")
+        return cipher.portable(aad(row),row.source,row.bytes,restoring)
+    }
     fun wipeKey()=cipher.wipe()
     companion object {
         const val PROFILE_VERSION=2

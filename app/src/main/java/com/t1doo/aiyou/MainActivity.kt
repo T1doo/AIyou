@@ -850,7 +850,7 @@ fun AIyouApp(
                 onLicenses = { if (ownsNavigation()) { navigation.advance(); showLicenses = true } },
                 onDemo = { if (ownsNavigation()) { navigation.advance(); clearSearch(); demo = !demo } },
                 onDemoState = { if (ownsNavigation()) { navigation.advance(); stateName = it.name } },
-                modifier = modifier, hasRecordPackages=local?.supportsRecordPackages==true, storageUsage = storageUsage,
+                modifier = modifier, hasRecordPackages=local?.supportsRecordPackages==true, hasFullBackup=local?.supportsFullBackup==true, storageUsage = storageUsage,
                 appAccessSection = appAccessSettings)
         } else if (browsingPackage && local != null && recordPackages != null && packageUi != null) {
             com.t1doo.aiyou.records.RecordPackageScreen(local, packageUi, recordPackages, recordPackagePicker, ::ownsPackageRoute, modifier)

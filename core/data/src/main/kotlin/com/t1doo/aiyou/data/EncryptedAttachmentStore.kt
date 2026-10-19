@@ -142,8 +142,10 @@ internal class EncryptedAttachmentStore(
      * No file IO is performed inside that transaction; the existing file -> DB lock order is kept.
      */
     internal suspend fun <T> importPackage(intents: List<AttachmentIntent>,
-        consume: suspend (suspend (Int, ByteArray) -> Unit) -> Unit, commit: suspend () -> T): T = locked {
-        require(intents.size <= com.t1doo.aiyou.model.RecordMediaPackages.MAX_IMAGES)
+        consume: suspend (suspend (Int, ByteArray) -> Unit) -> Unit, maximumImages: Int = com.t1doo.aiyou.model.RecordMediaPackages.MAX_IMAGES,
+        before: suspend () -> Unit = {}, commit: suspend () -> T): T = locked {
+        require(maximumImages in 1..256 && intents.size <= maximumImages)
+        before()
         intents.forEach { validate(it); check(ledger.find(it.id) == null && !erasureHooks.fenced(it.entryId)) }
         var received = 0
         consume { index, bytes ->
@@ -154,6 +156,7 @@ internal class EncryptedAttachmentStore(
             else {
                 deleteOwnedPartial(intent)
                 writeEncrypted(intent) { bytes.inputStream() }
+                checkpoint("package-image-encrypted")
                 authenticated(file(intent,true),intent).fill(0)
                 publish(intent)
             }
@@ -163,6 +166,40 @@ internal class EncryptedAttachmentStore(
         intents.forEach { check(!erasureHooks.fenced(it.entryId)); authenticated(file(it,false),it).fill(0) }
         checkpoint("package-before-commit")
         commit().also { checkpoint("package-committed") }
+    }
+
+    internal fun fullImportInventory(intents:List<AttachmentIntent>) { FullLease().inventory(intents,true) }
+    internal fun registerFullCapture(intents:List<AttachmentIntent>) {
+        intents.forEach { intent ->
+            val target=file(intent,false);authenticated(target,intent).fill(0)
+            val proof=createdFileProof(target,17)
+            val old=erasureHooks.creation(intent.entryId,BUCKET,target.name)
+            if(old==null) {
+                erasureHooks.reserve(intent.entryId,BUCKET,target.name)
+                erasureHooks.created(intent.entryId,BUCKET,target.name,proof)
+            } else check(old==proof)
+        }
+    }
+    /** Same MEDIA lock as capture/import/erasure; no nested public store calls. */
+    internal suspend fun <T> fullFiles(action: suspend (FullLease) -> T): T = locked {
+        val lease=FullLease()
+        try { action(lease) } finally { lease.active=false }
+    }
+    internal inner class FullLease {
+        internal var active=true
+        fun inventory(intents:List<AttachmentIntent>, allowPartial:Boolean=false) {
+            check(active)
+            val names=intents.flatMap { if(allowPartial) listOf(it.id+".aead",it.id+".tmp") else listOf(it.id+".aead") }.toSet()+".store.lock"
+            val actual=Files.newDirectoryStream(directory.toPath()).use { stream ->
+                var count=0
+                stream.map { path -> check(++count<=1025 && path.fileName.toString() in names && !Files.isSymbolicLink(path));path.fileName.toString() }.toSet()
+            }
+            if(!allowPartial) check(actual==names)
+        }
+        fun read(intent:AttachmentIntent):ByteArray {
+            check(active);validate(intent);check(!erasureHooks.fenced(intent.entryId))
+            return authenticated(file(intent,false),intent)
+        }
     }
 
     /** Reentrant cleanup only for a registered, uncommitted package mapping. Never enumerate/delete unknown files. */

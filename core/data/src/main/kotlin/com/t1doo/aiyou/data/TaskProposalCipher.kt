@@ -44,5 +44,13 @@ internal class TaskProposalCipher(databaseKey:ByteArray) {
                 r.i64(),r.string(128),r.i64(),TaskProposalState.valueOf(r.string(16))).also {r.end()}
         } finally {plain.fill(0)}
     }
+    internal fun portable(id:String,version:Long,hash:String,bytes:ByteArray,restoring:Boolean):ByteArray {
+        require(bytes.isNotEmpty() && bytes[0]==1.toByte())
+        if(!restoring) open(id,version,hash,bytes)
+        val result=if(restoring) PortableCipherCell.seal(key,aad(id,version,hash),bytes,8221)
+            else PortableCipherCell.open(key,aad(id,version,hash),bytes,8221)
+        if(restoring) open(id,version,hash,result)
+        return result
+    }
     fun wipe()=key.fill(0)
 }

@@ -57,6 +57,16 @@ internal class SourceMemoryCipher(databaseKey: ByteArray) {
                 previous.takeIf(String::isNotEmpty)?.let(SourceMemoryReview::valueOf),at)
         } finally { plain.fill(0) }
     }
+    internal fun portable(aad:ByteArray,source:SourceVersion,bytes:ByteArray,restoring:Boolean):ByteArray {
+        require(bytes.isNotEmpty() && bytes[0]==1.toByte())
+        if(!restoring) open(aad,bytes,source)
+        if(!restoring) return PortableCipherCell.open(key,aad,bytes,32797)
+        val encrypted=PortableCipherCell.seal(key,aad,bytes,32797)
+        return try {
+            val p=open(aad,encrypted,source)
+            seal(aad,p.copy(policy=if(p.policy==ProcessingPolicy.AI_NONE) p.policy else ProcessingPolicy.LOCAL_ONLY))
+        } finally { encrypted.fill(0) }
+    }
     fun wipe() { key.fill(0) }
 }
 

@@ -26,7 +26,7 @@ object RecordPackageIo {
     }
     /** Compare streaming ciphertext digest + exact byte count, with a fixed 8 KiB readback buffer. */
     suspend fun writeMediaAndVerify(document: SelectedRecordPackageDocument,
-        payload: com.t1doo.aiyou.domain.PreparedRecordMediaPackage, active: () -> Boolean) {
+        payload: com.t1doo.aiyou.domain.PreparedRecordMediaPackage, maximumBytes:Long=RecordMediaPackages.MAX_FILE_BYTES, active: () -> Boolean) {
         val written = MessageDigest.getInstance("SHA-256"); var size = 0L
         if (!active()) throw RecordPackageCancelled()
         document.openForWrite().use { destination ->
@@ -34,7 +34,7 @@ object RecordPackageIo {
                 override fun write(value: Int) { write(byteArrayOf(value.toByte()),0,1) }
                 override fun write(bytes: ByteArray, offset: Int, length: Int) {
                     if (!active()) throw RecordPackageCancelled()
-                    require(size + length <= RecordMediaPackages.MAX_FILE_BYTES)
+                    require(size + length <= maximumBytes)
                     destination.write(bytes,offset,length); written.update(bytes,offset,length); size += length
                 }
                 override fun flush() = destination.flush()
@@ -48,7 +48,7 @@ object RecordPackageIo {
                 while (true) {
                     if (!active()) throw RecordPackageCancelled()
                     val n = input.read(buffer); if (n < 0) break; require(n > 0)
-                    read += n; require(read <= size && read <= RecordMediaPackages.MAX_FILE_BYTES); actual.update(buffer,0,n)
+                    read += n; require(read <= size && read <= maximumBytes); actual.update(buffer,0,n)
                 }
             }
             check(active() && read == size && MessageDigest.isEqual(expected,actual.digest()))

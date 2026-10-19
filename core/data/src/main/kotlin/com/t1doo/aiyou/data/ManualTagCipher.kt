@@ -72,5 +72,12 @@ internal class ManualTagCipher(databaseKey: ByteArray, private val purpose: Manu
             out.writeUTF(purpose.aadContext); out.writeUTF(id); out.writeLong(version); out.writeUTF(mutation)
         }; bytes.toByteArray()
     }
+    internal fun portable(id: String, version: Long, mutation: String, bytes: ByteArray, restoring: Boolean): ByteArray {
+        if (!restoring) open(id,version,mutation,bytes)
+        val result = if (restoring) PortableCipherCell.seal(key,aad(id,version,mutation),bytes,8192)
+            else PortableCipherCell.open(key,aad(id,version,mutation),bytes,8192)
+        if (restoring) open(id,version,mutation,result)
+        return result
+    }
     fun wipe() { key.fill(0) }
 }

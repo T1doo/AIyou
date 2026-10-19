@@ -17,7 +17,7 @@ class RecordPackageUiState(val session: Long, val phase: RecordPackagePhase = Re
     val verified: VerifiedRecordPackage? = null, val scopeAccepted: Boolean = false,
     val requestKey: String? = null, val pickerLaunched: Boolean = false,
     val notice: String? = null, val error: String? = null, internal val epoch: Long = 0, val mediaPreview: RecordMediaPreview? = null,
-    val includeActivities:Boolean = false, val includeHistory: Boolean = false, val includeEditDrafts: Boolean = false) {
+    val includeActivities:Boolean = false, val includeHistory: Boolean = false, val includeEditDrafts: Boolean = false, val fullMode:Boolean=false, val fullSummary:FullBackupSummary?=null, val fullDigest:String?=null) {
     val selection = Collections.unmodifiableList(selection.toList())
     val busy get() = phase in setOf(RecordPackagePhase.PREPARING, RecordPackagePhase.ENCRYPTING,
         RecordPackagePhase.WRITING, RecordPackagePhase.READING, RecordPackagePhase.IMPORTING)
@@ -27,8 +27,9 @@ class RecordPackageUiState(val session: Long, val phase: RecordPackagePhase = Re
         pickerLaunched: Boolean = this.pickerLaunched, notice: String? = this.notice, error: String? = this.error,
         epoch: Long = this.epoch, mediaPreview: RecordMediaPreview? = this.mediaPreview,
         includeActivities:Boolean = this.includeActivities, includeHistory: Boolean = this.includeHistory,
-        includeEditDrafts: Boolean = this.includeEditDrafts) = RecordPackageUiState(session, phase, selection, snapshot, verified, scopeAccepted,
-            requestKey, pickerLaunched, notice, error, epoch, mediaPreview,includeActivities,includeHistory,includeEditDrafts)
+        includeEditDrafts: Boolean = this.includeEditDrafts, fullMode:Boolean=this.fullMode,
+        fullSummary:FullBackupSummary?=this.fullSummary, fullDigest:String?=this.fullDigest) = RecordPackageUiState(session, phase, selection, snapshot, verified, scopeAccepted,
+            requestKey, pickerLaunched, notice, error, epoch, mediaPreview,includeActivities,includeHistory,includeEditDrafts,fullMode,fullSummary,fullDigest)
     override fun toString() = "RecordPackageUiState(phase=" + phase + ", redacted)"
 }
 
@@ -36,7 +37,8 @@ class RecordPackageUiState(val session: Long, val phase: RecordPackagePhase = Re
 class RecordPackageController internal constructor(private val current: () -> LocalRecordUiState,
     private val publish: ((LocalRecordUiState) -> LocalRecordUiState) -> Unit,
     private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
-    private val cipher: RecordPackageCipher, private val clock: Clock) {
+    private val cipher: RecordPackageCipher, private val clock: Clock,
+    private val onFullRestored:suspend (EntryRepository)->Unit = {}) {
     private class Work(val session: Long, val epoch: Long, val key: String = UUID.randomUUID().toString(),
         val snapshot: OriginalExportSnapshot? = null, val mediaPreview: RecordMediaPreview? = null) {
         val cancelled = AtomicBoolean()
@@ -44,6 +46,22 @@ class RecordPackageController internal constructor(private val current: () -> Lo
         @Volatile var mediaPayload: PreparedRecordMediaPackage? = null
         @Volatile var document: SelectedRecordPackageDocument? = null
         @Volatile var verified: VerifiedRecordPackage? = null
+        var fullSnapshot:FullBackupSnapshot?=null
+        var fullVerified:VerifiedFullBackup?=null
+        private var fullOperations=0
+        @Synchronized fun beginFull():Boolean { if(cancelled.get()) return false;fullOperations++;return true }
+        @Synchronized fun endFull() { check(fullOperations>0);fullOperations--;releaseFull() }
+        @Synchronized fun holdFull(value:FullBackupSnapshot):Boolean {
+            if(cancelled.get()) { value.release();return false }
+            fullSnapshot=value;return true
+        }
+        @Synchronized fun holdFullVerified(value:VerifiedFullBackup):Boolean {
+            if(cancelled.get()) { value.release();return false }
+            fullVerified=value;document=null;return true
+        }
+        private fun releaseFull() { if(cancelled.get() && fullOperations==0) {
+            fullSnapshot?.release();fullSnapshot=null;fullVerified?.release();fullVerified=null
+        } }
         var ids: List<String> = emptyList()
         private var password: CharArray? = null
         @Synchronized fun setPassword(value: CharArray) { check(!cancelled.get()); password?.fill('\u0000'); password = value.copyOf() }
@@ -55,7 +73,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             if (cancelled.get()) { value.release(); return false }
             document = null; verified = value; ids = value.records.map { UUID.randomUUID().toString() }; return true
         }
-        @Synchronized fun retire() { cancelled.set(true); password?.fill('\u0000'); password = null; payload?.release(); payload = null; mediaPayload?.release(); mediaPayload = null; document = null; verified?.release(); verified = null }
+        @Synchronized fun retire() { cancelled.set(true); password?.fill('\u0000'); password = null; payload?.release(); payload = null; mediaPayload?.release(); mediaPayload = null; document = null; verified?.release(); verified = null;releaseFull() }
     }
     private val sessions = AtomicLong(); private val work = AtomicReference<Work?>()
     @Volatile private var disposed = false
@@ -183,7 +201,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
         if (!available() || ui.busy) return
         val active = Work(session, ui.epoch + 1); retire(); work.set(active)
         update(session) { RecordPackageUiState(session, RecordPackagePhase.PICKING_RESTORE,
-            requestKey = active.key, epoch = active.epoch) }
+            requestKey = active.key, epoch = active.epoch, fullMode=ui.fullMode) }
     }
     fun claimPicker(session: Long, key: String): Boolean {
         val ui = panel(session) ?: return false; val active = work.get() ?: return false
@@ -201,6 +219,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
         if (ui.phase == RecordPackagePhase.PICKING_RESTORE) {
             updateOwned(active, RecordPackagePhase.PICKING_RESTORE) { it.copy(phase = RecordPackagePhase.RESTORE_PASSWORD, requestKey = null) }; return
         }
+        if(ui.fullMode) { writeFull(active,document);return }
         updateOwned(active, RecordPackagePhase.PICKING_EXPORT) { it.copy(phase = RecordPackagePhase.WRITING) }
         if (!enqueue { store ->
             try {
@@ -224,6 +243,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
         try {
             val active = work.get() ?: return; val ui = panel(session) ?: return
             if (!owned(active, RecordPackagePhase.RESTORE_PASSWORD)) return
+            if(ui.fullMode) { authenticateFull(active,password);return }
             try { RecordPackages.password(password) } catch (_: Exception) { update(session) { it.copy(error = "恢复口令须为 12–128 个可打印 ASCII 字符，空格原样保留。") }; return }
             active.setPassword(password); updateOwned(active, RecordPackagePhase.RESTORE_PASSWORD) { it.copy(phase = RecordPackagePhase.READING, error = null) }
             if (!enqueue { store ->
@@ -299,6 +319,126 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             }
         }) { updateOwned(active, RecordPackagePhase.IMPORTING) { it.copy(phase = RecordPackagePhase.UNCERTAIN, error = "恢复结果尚未确认，请保留同一包并重试核对。") } }
     }
+    fun fullHome(session:Long) {
+        val ui=panel(session) ?: return
+        if(!available() || !current().supportsFullBackup || ui.busy) return
+        retire();update(session) { RecordPackageUiState(session,epoch=it.epoch+1,fullMode=true) }
+    }
+    fun prepareFull(session:Long) {
+        val ui=panel(session) ?: return
+        if(!available() || !ui.fullMode || ui.busy) return
+        val active=Work(session,ui.epoch+1);retire();work.set(active)
+        update(session) { it.copy(phase=RecordPackagePhase.PREPARING,epoch=active.epoch,fullSummary=null,scopeAccepted=false,error=null,notice=null) }
+        if(!enqueue { store ->
+            if(!owned(active,RecordPackagePhase.PREPARING) || !active.beginFull()) return@enqueue
+            try {
+                val snapshot=checkNotNull(store.fullBackups).capture(UUID.randomUUID().toString(),clock.millis())
+                if(!active.holdFull(snapshot)) return@enqueue
+                updateOwned(active,RecordPackagePhase.PREPARING) { it.copy(phase=RecordPackagePhase.EXPORT_PREVIEW,fullSummary=snapshot.summary) }
+            } catch(c:CancellationException) { throw c } catch(_:Exception) { fail(active,"完整范围核对失败：可能存在超限、未完成操作、缺失或损坏文件。没有截断或跳过内容，源资料已保留。") }
+            finally { active.endFull() }
+        }) fail(active,"本机操作暂不可用。")
+    }
+    fun acceptFullScope(session:Long,id:String,accepted:Boolean) {
+        val ui=panel(session) ?: return
+        if(available() && ui.fullMode && ui.phase==RecordPackagePhase.EXPORT_PREVIEW && ui.fullSummary?.backupId==id)
+            update(session) { it.copy(scopeAccepted=accepted) }
+    }
+    fun encryptFull(session:Long,id:String,password:CharArray,again:CharArray) {
+        try {
+            val ui=panel(session) ?: return;val active=work.get() ?: return
+            if(!owned(active,RecordPackagePhase.EXPORT_PREVIEW) || !ui.fullMode || !ui.scopeAccepted || ui.fullSummary?.backupId!=id) return
+            try { RecordPackages.password(password);require(password.contentEquals(again)) }
+            catch(_:Exception) { update(session) { it.copy(error="请输入两次一致的独立恢复口令：12–128 个可打印 ASCII 字符，空格原样保留。") };return }
+            active.setPassword(password);updateOwned(active,RecordPackagePhase.EXPORT_PREVIEW) { it.copy(phase=RecordPackagePhase.ENCRYPTING,error=null) }
+            if(!enqueue { store ->
+                if(!owned(active,RecordPackagePhase.ENCRYPTING) || !active.beginFull()) return@enqueue
+                try {
+                    val prepared=checkNotNull(store.fullBackups).seal(checkNotNull(active.fullSnapshot),active.takePassword())
+                    synchronized(active) { if(active.cancelled.get()) prepared.release() else active.mediaPayload=prepared }
+                    updateOwned(active,RecordPackagePhase.ENCRYPTING) { it.copy(phase=RecordPackagePhase.PICKING_EXPORT,requestKey=active.key,pickerLaunched=false) }
+                } catch(c:CancellationException) { throw c } catch(_:Exception) { fail(active,"完整备份加密或库存核对失败，请重新预览。") }
+                finally { active.endFull() }
+            }) fail(active,"本机操作暂不可用。")
+        } finally { password.fill('\u0000');again.fill('\u0000') }
+    }
+    private fun writeFull(active:Work,document:SelectedRecordPackageDocument) {
+        updateOwned(active,RecordPackagePhase.PICKING_EXPORT) { it.copy(phase=RecordPackagePhase.WRITING) }
+        if(!enqueue {
+            if(!owned(active,RecordPackagePhase.WRITING) || !active.beginFull()) return@enqueue
+            try {
+                RecordPackageIo.writeMediaAndVerify(document,checkNotNull(active.mediaPayload),maximumBytes=FULL_BACKUP_FILE_LIMIT) { owned(active,RecordPackagePhase.WRITING) }
+                updateOwned(active,RecordPackagePhase.WRITING) { it.copy(phase=RecordPackagePhase.DONE,scopeAccepted=false,
+                    notice="完整资料库快照已加密写入，并完整读回核对。文件服务的后续同步不在此保证内。") }
+                if(work.compareAndSet(active,null)) active.retire()
+            } catch(c:CancellationException) { throw c } catch(_:Exception) { fail(active,"写入或读回核对失败；可能留下空文件或部分密文，已保留。源资料未改变。") }
+            finally { active.endFull() }
+        }) fail(active,"本机操作暂不可用；所选文件已保留。")
+    }
+    private fun authenticateFull(active:Work,password:CharArray) {
+        try { RecordPackages.password(password) } catch(_:Exception) { update(active.session) { it.copy(error="恢复口令须为 12–128 个可打印 ASCII 字符。") };return }
+        active.setPassword(password);updateOwned(active,RecordPackagePhase.RESTORE_PASSWORD) { it.copy(phase=RecordPackagePhase.READING,error=null) }
+        if(!enqueue { store ->
+            if(!owned(active,RecordPackagePhase.READING) || !active.beginFull()) return@enqueue
+            try {
+                val document=checkNotNull(active.document)
+                val verified=checkNotNull(store.fullBackups).open({RecordPackageIo.openRead(document) { owned(active) }},active.takePassword())
+                if(!active.holdFullVerified(verified)) return@enqueue
+                updateOwned(active,RecordPackagePhase.READING) { it.copy(phase=RecordPackagePhase.RESTORE_PREVIEW,fullSummary=verified.summary,fullDigest=verified.digest,requestKey=null) }
+            } catch(c:CancellationException) { throw c } catch(_:Exception) { fail(active,"口令、完整性或完整备份格式核对失败。没有导入资料，文件已保留。") }
+            finally { active.endFull() }
+        }) fail(active,"本机操作暂不可用。")
+    }
+    fun restoreFull(session:Long,id:String,digest:String,epoch:Long) {
+        val ui=panel(session) ?: return;val active=work.get() ?: return
+        if(!owned(active) || !ui.fullMode || ui.phase !in setOf(RecordPackagePhase.RESTORE_PREVIEW,RecordPackagePhase.UNCERTAIN) ||
+            ui.epoch!=epoch || ui.fullSummary?.backupId!=id || ui.fullDigest!=digest) return
+        if(current().text.isNotEmpty() || current().mixedCapture?.let { it.text.isNotEmpty() || it.pendingEdits>0 || it.busy || it.selection!=null || it.uncertainSave || it.confirmDiscard || it.discardPending || it.policyChange!=null }==true) {
+            update(session) { it.copy(error="当前输入尚非空，恢复已暂停；请先保全现有草稿。") };return
+        }
+        updateOwned(active,ui.phase) { it.copy(phase=RecordPackagePhase.IMPORTING,error=null,notice="只导入空资料库；已开始的事务可能在退出后完成。") }
+        if(!enqueue { store ->
+            if(!owned(active,RecordPackagePhase.IMPORTING) || !active.beginFull()) return@enqueue
+            try {
+                var completed=false
+                val verified=checkNotNull(active.fullVerified)
+                val backups=checkNotNull(store.fullBackups)
+                val result=try {
+                    backups.restore(verified) { owned(active,RecordPackagePhase.IMPORTING) }.also { completed=true }
+                } finally {
+                    if(!completed) completed=backups.completed(verified)
+                    refreshFullSources(store,completed)
+                }
+                updateOwned(active,RecordPackagePhase.IMPORTING) { it.copy(phase=RecordPackagePhase.DONE,fullDigest=null,notice=
+                    if(result.replayed) "已核对同一备份的完成回执。后来的编辑和删除保持当前状态，没有重新安装资料。"
+                    else "已核对完整资料库恢复回执。原身份、回收站、版本与草稿保持原义；联网授权已清空，提醒须重新确认。") }
+                if(work.compareAndSet(active,null)) active.retire()
+            } catch(c:CancellationException) { throw c } catch(_:Exception) {
+                updateOwned(active,RecordPackagePhase.IMPORTING) { it.copy(phase=RecordPackagePhase.UNCERTAIN,
+                    error="恢复尚未确认：目标可能非空、发生变化或文件发布未完成。资料和失败密文已保留；仅可核对同一备份回执，不会覆盖或删除现有库。",notice=null) }
+            } finally { active.endFull() }
+        }) updateOwned(active,RecordPackagePhase.IMPORTING) { it.copy(phase=RecordPackagePhase.UNCERTAIN,error="恢复尚未确认，请保留同一备份并重试核对。") }
+    }
+    /** Data belongs to the still-open records owner even when its importing page has retired.
+     * A lost commit ACK still requires reading actual committed rows; only panel completion is session-scoped. */
+    private suspend fun refreshFullSources(store:EntryRepository,completed:Boolean) {
+        if(!available()) return
+        val entries=store.entries()
+        publish { local -> if(!available(local)) local else local.copy(entries=entries,manualTagsAvailable=false,
+            manualPeopleAvailable=false,packageOriginsAvailable=false,editDraftIndexAvailable=false,localProcessingAvailable=false,
+            manualTagsError="恢复后的手工资料尚在核对；读取失败时请重试本机读取。") }
+        if(completed && available()) onFullRestored(store)
+        val tags=store.manualTags?.snapshots().orEmpty()
+        val people=store.manualPeople?.snapshots().orEmpty();val favorites=readFavoriteSource(store);val dates=readEventDateSource(store)
+        val origins=store.recordPackages?.origins().orEmpty();val pending=store.editDrafts?.pending()
+        val versions=store.localProcessing?.versions().orEmpty()
+        publish { local -> if(!available(local)) local else local.copy(entries=entries,manualTags=tags,manualPeople=people,
+            packageOrigins=origins,pendingEdits=pending?.drafts.orEmpty(),localProcessingVersions=versions,localSearchEpoch=null,
+            manualTagsAvailable=true,manualTagsError=null,manualPeopleAvailable=true,manualPeopleError=null,
+            packageOriginsAvailable=true,packageOriginsError=null,editDraftIndexAvailable=true,editDraftError=null,localProcessingAvailable=true)
+                .withFavoriteSource(favorites).withEventDateSource(dates) }
+    }
+    companion object { const val FULL_BACKUP_FILE_LIMIT=80L*1024*1024+16384 }
     private fun fail(active: Work, message: String) {
         val sourcePhase = panel(active.session)?.phase
         publish { local ->

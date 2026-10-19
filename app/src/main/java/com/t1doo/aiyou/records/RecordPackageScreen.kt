@@ -41,6 +41,10 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
         }
     }
     DisposableEffect(picker, key) { onDispose { if (key != null) picker?.cancel(key) } }
+    if(ui.fullMode) {
+        FullBackupContent(ui,controller,available,picker!=null,ownsRoute,password,again,::clearPasswords,modifier)
+        return
+    }
     LazyColumn(modifier.fillMaxSize().padding(horizontal = AIyouDimensions.pageNarrow).testTag("package-list"),
         contentPadding = PaddingValues(vertical = AIyouDimensions.spaceMd),
         verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
@@ -60,6 +64,8 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
             when (ui.phase) {
                 RecordPackagePhase.HOME, RecordPackagePhase.FAILED, RecordPackagePhase.CANCELLED, RecordPackagePhase.DONE -> item("home-actions") {
                     Column {
+                        if(local.supportsFullBackup) OutlinedButton(onClick={if(ownsRoute()) controller.fullHome(ui.session)},
+                            modifier=Modifier.testTag("package-full-backup")) { Text("完整资料库备份与恢复") }
                         Button(onClick = { if (ownsRoute()) controller.selectExport(ui.session) },
                             modifier = Modifier.testTag("package-export")) { Text("选择内容制作加密包") }
                         OutlinedButton(onClick = { if (ownsRoute()) controller.chooseRestore(ui.session) },

@@ -99,13 +99,7 @@ class EncryptedOriginalEditStore(
         next
     }
 
-    private fun validate(draft: OriginalEditDraft) {
-        require(UUID.fromString(draft.id).toString() == draft.id)
-        require(draft.entryId.isNotEmpty() && draft.entryId.length <= 256)
-        require(draft.baseRevision > 0 && draft.sourceRevision in 1..draft.baseRevision && draft.version > 0)
-        require(draft.originalText.length <= MAX_TEXT_LENGTH && draft.text.length <= MAX_TEXT_LENGTH)
-        if (draft.state != OriginalEditDraftState.ACTIVE) require(draft.originalText.isEmpty() && draft.text.isEmpty())
-    }
+    private fun validate(draft:OriginalEditDraft) = validateFullDraft(draft)
 
     private fun file(entryId: String) = File(directory, hash(entryId) + ".edit")
     private fun readLocked(entryId: String): OriginalEditDraft? {
@@ -208,6 +202,28 @@ class EncryptedOriginalEditStore(
     internal inner class PackageLease(private val directoryLease: ErasureDirectoryLease) {
         internal var active = true
         private fun verify() { check(active); directoryLease.verify() }
+        fun fullDrafts(allowedPartials:List<OriginalEditDraft> = emptyList()):List<OriginalEditDraft> {
+            verify()
+            return Files.newDirectoryStream(directory.toPath()).use { stream ->
+                var count=0
+                stream.filter { path ->
+                    check(++count<=258 && !Files.isSymbolicLink(path))
+                    val name=path.fileName.toString()
+                    val knownPartial=allowedPartials.any { name==file(it.entryId).name+".partial."+it.id }
+                    check(name==".store.lock" || knownPartial || name.matches(Regex("[0-9a-f]{64}\\.edit")))
+                    name!=".store.lock" && !knownPartial
+                }.map { authenticated(it.toFile()) }.sortedBy { it.entryId }
+            }
+        }
+        fun installFull(value:OriginalEditDraft) {
+            verify();validate(value);check(!erasureHooks.fenced(value.entryId))
+            val existing=readLocked(value.entryId)
+            if(existing!=null) { check(existing==value);syncDirectory(directory);return }
+            // Only a prior publication of this exact authenticated backup can be resumed.
+            val partial=File(directory,file(value.entryId).name+".partial."+value.id)
+            if(partial.exists()) cleanup(OriginalEditImportIntent(value.id,value.entryId,RecordEditDraftPackageCodec.digest(value)))
+            publish(value,value.id);check(readLocked(value.entryId)==value)
+        }
         fun read(entryId: String): OriginalEditDraft? {
             verify(); check(!erasureHooks.fenced(entryId)); return readLocked(entryId)
         }
@@ -323,6 +339,14 @@ class EncryptedOriginalEditStore(
     internal fun checkExternalWait() { checkExternalFileWait(lifecycle) }
 
     companion object {
+        internal fun validateFullDraft(draft: OriginalEditDraft) {
+            require(UUID.fromString(draft.id).toString() == draft.id)
+            require(draft.entryId.isNotEmpty() && draft.entryId.length <= 256)
+            require(draft.baseRevision > 0 && draft.sourceRevision in 1..draft.baseRevision && draft.version > 0)
+            require(draft.originalText.length <= MAX_TEXT_LENGTH && draft.text.length <= MAX_TEXT_LENGTH)
+            if (draft.state != OriginalEditDraftState.ACTIVE) require(draft.originalText.isEmpty() && draft.text.isEmpty())
+        }
+
         internal const val BUCKET = "EDITS"
         const val MAX_TEXT_LENGTH = 100_000
         private const val MAX_ENVELOPE_BYTES = 402_048

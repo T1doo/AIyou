@@ -148,7 +148,7 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
     private fun next(a: CaptureDraft,text: String=a.text,images: List<CaptureDraftImage> = a.images,discarding: Boolean=a.discarding,
         policy: ProcessingPolicy=a.policy)=CaptureDraft(a.id,Math.addExact(a.version,1),text,images,discarding,policy)
     private fun same(a: CaptureDraft,b: CaptureDraft) { if(encode(a)!=encode(b)) throw CaptureConflict() }
-    private fun read(sql: RecordsSqlConnection): CaptureDraft? = sql.query("SELECT entryId,state FROM record_package_receipts WHERE id=? AND operation='CAPTURE_CURRENT'",listOf(SLOT)).singleOrNull()?.let { decode(it[1] as String).also { a ->require(a.id==it[0]) } }
+    internal fun read(sql: RecordsSqlConnection): CaptureDraft? = sql.query("SELECT entryId,state FROM record_package_receipts WHERE id=? AND operation='CAPTURE_CURRENT'",listOf(SLOT)).singleOrNull()?.let { decode(it[1] as String).also { a ->require(a.id==it[0]) } }
     private fun required(sql: RecordsSqlConnection,id: String)=checkNotNull(read(sql)).also { if(it.id!=id) throw CaptureConflict() }
     private fun replace(sql: RecordsSqlConnection,a: CaptureDraft,b: CaptureDraft): CaptureDraft {
         require(a.id==b.id && b.version==a.version+1)
@@ -165,7 +165,11 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
         a.images.forEach { val i=it.intent;out.string(i.id,36);out.string(i.mediaType,32);out.i64(i.byteSize);out.raw(packageUnhex(i.sha256));out.i32(it.state.ordinal) }
         val bytes=out.bytes();try { Base64.getEncoder().encodeToString(bytes) } finally { bytes.fill(0) }
     }
-    private fun decode(encoded: String): CaptureDraft {
+    internal fun decode(encoded:String):CaptureDraft = decodeForBackup(encoded)
+    private fun digest(a: CaptureDraft)=packageHex(packageHash(encode(a).toByteArray(Charsets.US_ASCII)))
+    private suspend inline fun <T> safely(block: () -> T): T=try { block() } catch(e:CancellationException){throw e} catch(e:CaptureConflict){throw e} catch(_:Exception){throw CaptureStorageFailure()}
+    companion object {
+    internal fun decodeForBackup(encoded: String): CaptureDraft {
         require(encoded.length<=560000);val bytes=Base64.getDecoder().decode(encoded)
         try {
             require(bytes.size<=420000 && Base64.getEncoder().encodeToString(bytes)==encoded)
@@ -178,7 +182,5 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
             r.end();return CaptureDraft(id,version,text,images,discarding==1,policy)
         } finally { bytes.fill(0) }
     }
-    private fun digest(a: CaptureDraft)=packageHex(packageHash(encode(a).toByteArray(Charsets.US_ASCII)))
-    private suspend inline fun <T> safely(block: () -> T): T=try { block() } catch(e:CancellationException){throw e} catch(e:CaptureConflict){throw e} catch(_:Exception){throw CaptureStorageFailure()}
-    companion object { private const val SLOT="CAPTURE_CURRENT";private const val SAVED="CAPTURE_SAVED:";private const val DISCARDED="CAPTURE_DISCARDED:";private const val REMOVED="CAPTURE_REMOVED:";private fun uuid()=UUID.randomUUID().toString() }
+ private const val SLOT="CAPTURE_CURRENT";private const val SAVED="CAPTURE_SAVED:";private const val DISCARDED="CAPTURE_DISCARDED:";private const val REMOVED="CAPTURE_REMOVED:";private fun uuid()=UUID.randomUUID().toString() }
 }

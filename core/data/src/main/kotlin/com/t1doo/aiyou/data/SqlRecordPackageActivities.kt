@@ -72,5 +72,18 @@ internal class SqlRecordPackageActivities(private val database:RecordsSqlDatabas
     companion object {
         private const val PREFIX="PACKAGE_TASKS:"
         fun anchor(backupId:String)="PACKAGE_ACTIVITY:"+backupId
+        internal fun validateFullReceipt(row:List<Any?>,id:String,digest:String,ids:List<String>) {
+            require(row.take(4)==listOf(PREFIX+id,ids.firstOrNull() ?: anchor(id),1L,"PACKAGE_TASK_RESTORE"))
+            val encoded=row[4] as String;require(encoded.length<=131072)
+            val raw=Base64.getDecoder().decode(encoded)
+            try {
+                require(raw.size<=98304 && Base64.getEncoder().encodeToString(raw)==encoded)
+                val r=PackageReader(raw);require(r.i32()==3 && r.string(36)==id && packageHex(r.raw(32))==digest && r.strings(20,36)==ids)
+                r.raw(32)
+                val tasks=r.strings(256,96);val drafts=r.strings(256,96);r.end()
+                require(tasks.distinct().size==tasks.size && drafts.distinct().size==drafts.size)
+                require(tasks.all { it.matches(Regex("PACKAGE_TASK:[0-9a-f]{64}")) } && drafts.all { it.matches(Regex("PACKAGE_PROPOSAL:[0-9a-f]{64}")) })
+            } finally { raw.fill(0) }
+        }
     }
 }

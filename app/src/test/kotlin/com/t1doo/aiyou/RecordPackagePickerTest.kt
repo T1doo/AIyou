@@ -29,7 +29,7 @@ class RecordPackagePickerTest {
             val launched = Shadows.shadowOf(activity).nextStartedActivityForResult
             assertEquals(1, launched.requestCode); assertEquals(Intent.ACTION_CREATE_DOCUMENT, launched.intent.action)
             assertEquals("application/octet-stream", launched.intent.type)
-            assertEquals("AIyou-current-originals.aiyoupk", launched.intent.getStringExtra(Intent.EXTRA_TITLE))
+            assertEquals("AIyou-encrypted-records.aiyoupk", launched.intent.getStringExtra(Intent.EXTRA_TITLE))
             assertEquals(0, launched.intent.flags); assertTrue(launched.intent.categories!!.contains(Intent.CATEGORY_OPENABLE))
             lifecycle.pause()
             activity.deliver(1, Intent().setData(Uri.parse("content://aiyou.synthetic/private-uri")))

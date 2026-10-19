@@ -333,6 +333,13 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         }
         val raw = out.bytes(); try { Base64.getEncoder().encodeToString(raw) } finally { raw.fill(0) }
     }
+    internal fun validateLogicalForFullBackup() { packages.origins() }
+    internal fun validatePortableLedger(data:FullBackupData) { packages.validateFullBackupLedger(data) }
+    internal fun validateCompletedForFullBackup(value:String) { require(decode(value).phase=="DONE") }
+    internal fun validateCompletedForFullBackup(row:List<Any?>) {
+        val p=decode(row[4] as String)
+        require(p.phase=="DONE" && row.take(4)==listOf(PREFIX+p.backupId,p.ids.firstOrNull() ?: SqlRecordPackageActivities.anchor(p.backupId),1L,OP))
+    }
     private fun decode(value: String): Plan {
         require(value.length <= 43692)
         val bytes = Base64.getDecoder().decode(value)

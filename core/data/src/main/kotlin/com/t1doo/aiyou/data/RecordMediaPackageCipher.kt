@@ -16,6 +16,63 @@ import javax.crypto.Cipher
  */
 internal class RecordMediaPackageCipher(private val random: SecureRandom = SecureRandom(), private val beforeKdf: () -> Unit = {}) {
     private val legacy = JcaRecordPackageCipher()
+    /** v8 borrows the existing KDF, nonce/AAD framing, terminal and streaming image verification.
+     * It has a separate logical manifest and bounds; v1–v7 parsers never accept it. */
+    internal fun sealFull(data: FullBackupData, password: CharArray,
+        read: suspend (RecordPackageImage) -> ByteArray, current: suspend () -> Boolean): PreparedRecordMediaPackage {
+        var key:ByteArray?=null;var metadata:ByteArray?=null
+        try {
+            RecordPackages.password(password)
+            metadata=FullBackupCodec.encode(data)
+            val salt=ByteArray(16).also(random::nextBytes);val prefix=ByteArray(8).also(random::nextBytes)
+            val header=ByteBuffer.allocate(40).put(MAGIC8).putInt(8).putInt(RecordPackages.ITERATIONS).put(salt).put(prefix).array()
+            key=RecordPackageCrypto.derive(password,salt,beforeKdf)
+            return Prepared(header,metadata,checkNotNull(key),data.images,read,current).also { key=null;metadata=null }
+        } finally { key?.fill(0);metadata?.fill(0);password.fill('\u0000') }
+    }
+    internal suspend fun openFull(source:()->InputStream,password:CharArray): AuthenticatedFullBackup {
+        var key:ByteArray?=null;var data:FullBackupData?=null
+        try {
+            RecordPackages.password(password)
+            return source().use { input ->
+                val header=exact(input,40);require(header.copyOfRange(0,8).contentEquals(MAGIC8))
+                val fields=ByteBuffer.wrap(header,8,32)
+                require(fields.int==8 && fields.int==RecordPackages.ITERATIONS)
+                val salt=ByteArray(16).also(fields::get)
+                val first=exact(input,4);require(ByteBuffer.wrap(first).int in 16..FullBackupCodec.MAX_METADATA+16)
+                key=RecordPackageCrypto.derive(password,salt,beforeKdf)
+                val parsed=scanFull(SequenceInputStream(first.inputStream(),input),header,checkNotNull(key),null,null)
+                data=parsed.first
+                AuthenticatedFullBackup(parsed.first,parsed.second,header,checkNotNull(key),source,this).also { key=null;data=null }
+            }
+        } catch(c: java.util.concurrent.CancellationException) { throw c }
+        catch(_:Exception) { throw RecordPackageInvalid() }
+        finally { key?.fill(0);data?.release();password.fill('\u0000') }
+    }
+    internal suspend fun consumeFull(pack:AuthenticatedFullBackup, each:suspend (Int,ByteArray)->Unit) {
+        pack.withKey { key -> pack.source().use { input ->
+            require(MessageDigest.isEqual(exact(input,40),pack.header))
+            val parsed=scanFull(input,pack.header,key,pack.digest,each)
+            try { require(parsed.first.images==pack.data.images) } finally { parsed.first.release() }
+        } }
+    }
+    private suspend fun scanFull(input:InputStream,header:ByteArray,key:ByteArray,expected:String?,
+        each:(suspend (Int,ByteArray)->Unit)?):Pair<FullBackupData,String> {
+        val metadata=frameRead(input,header,key,0,ZERO,FullBackupCodec.MAX_METADATA)
+        var data:FullBackupData?=null
+        try {
+            val binding=packageHash(metadata);val digest=packageHex(binding)
+            require(expected==null || expected==digest)
+            val parsed=FullBackupCodec.decode(metadata).also { data=it }
+            parsed.images.forEachIndexed { index,image ->
+                val bytes=frameRead(input,header,key,index+1,binding,image.byteSize.toInt())
+                try { checkImage(image,bytes);each?.invoke(index,bytes) } finally { bytes.fill(0) }
+            }
+            val terminal=frameRead(input,header,key,parsed.images.size+1,binding,32)
+            try { require(MessageDigest.isEqual(terminal,binding) && input.read()==-1) } finally { terminal.fill(0) }
+            return (parsed to digest).also { data=null }
+        } finally { data?.release();metadata.fill(0) }
+    }
     suspend fun seal(preview: RecordMediaPreview, password: CharArray,
         read: suspend (RecordPackageImage) -> ByteArray, current: suspend () -> Boolean): PreparedRecordMediaPackage {
         var key: ByteArray? = null
@@ -190,6 +247,7 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
         private val MAGIC5 = "AIYOUPK5".toByteArray(Charsets.US_ASCII)
         private val MAGIC6 = "AIYOUPK6".toByteArray(Charsets.US_ASCII)
         private val MAGIC7 = "AIYOUPK7".toByteArray(Charsets.US_ASCII)
+        private val MAGIC8 = "AIYOUPK8".toByteArray(Charsets.US_ASCII)
         private val ZERO = ByteArray(32)
         private val SCOPE = listOf("currentOriginals","manualTags","readyOriginalImages")
         private val EXCLUDED = listOf("originalHistory","tasks","drafts","aiDerived","serviceKeys","deviceKeys")

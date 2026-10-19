@@ -5,6 +5,9 @@ kotlin { jvmToolchain(17) }
 // Compile the product transaction/codec/schema, with only the platform SQL adapter replaced.
 val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
+    listOf("PortableCipherCell.kt","FullBackupCodec.kt","SqlFullBackupRepository.kt").forEach {
+        from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
+    }
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordHistoryPackageCodec.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordEventDatePackageCodec.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordPeoplePackageCodec.kt")

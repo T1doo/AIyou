@@ -148,14 +148,60 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
         return RecordPackageRestoreResult(group.ids, group.imported, replayed, deleted, erasing,activityIds.first,activityIds.second)
     }
 
+    /** The portable ledger uses the same parsers and immutable-prefix proof as the live SQL ledger. */
+    internal fun validateFullBackupLedger(data:FullBackupData) {
+        val rows=data.tables[12]
+        val byId=rows.associateBy { it[0] as String }
+        val groups=rows.filter { it[3]=="PACKAGE_RESTORE" }.map(::group)
+        require(groups.size<=maxGroups && groups.flatMap { it.ids }.distinct().size==groups.sumOf { it.ids.size })
+        val origins=rows.filter { it[3]=="PACKAGE_ORIGIN" }.map(::origin)
+        val originById=origins.associateBy { it.newId }
+        require(origins.all { o -> groups.any { it.id==o.backupId && o.newId in it.ids } })
+        data.tables[10].filter { it[3] in setOf("PACKAGE_RESTORE","PACKAGE_ORIGIN") }.forEach { mirror ->
+            require(byId[mirror[0]]==mirror)
+            if(mirror[3]=="PACKAGE_RESTORE") group(mirror) else origin(mirror)
+        }
+        groups.forEach { g ->
+            g.ids.forEachIndexed { index,id ->
+                val erased=data.tables[11].singleOrNull { it[0]==id }
+                if(erased!=null) {
+                    require(erased[4]=="DONE" && erased[5]=="" && erased[6]==erasureProof(g,index,id))
+                    require(id !in originById && data.tables[10].none { it[0]==ORIGIN+id } && data.tables[0].none { it[0]==id } && data.tables[1].none { it[0]==id })
+                } else {
+                    val o=originById.getValue(id)
+                    require(o.backupId==g.id && o.packageDigest==g.digest && o.packageCreatedAtMillis==g.created &&
+                        o.importedAtMillis==g.imported && o.recordDigest==g.hashes[index] && historyMatches(g,index,o))
+                    val e=data.tables[0].single { it[0]==id }
+                    val history=data.tables[1].filter { it[0]==id && (it[1] as Long)<=o.restoredRevisionCount }.sortedBy { it[1] as Long }.map { it.drop(1) }
+                    immutableRows(o,null,listOf(e[1],e[2],e[3]),history)
+                }
+            }
+            val activity=rows.singleOrNull { it[0]=="PACKAGE_TASKS:"+g.id }
+            if(g.activities) SqlRecordPackageActivities.validateFullReceipt(checkNotNull(activity),g.id,g.digest,g.ids)
+            else require(activity==null)
+        }
+        rows.filter { it[3]=="PACKAGE_TASK_RESTORE" }.forEach { row ->
+            val g=groups.single { row[0]=="PACKAGE_TASKS:"+it.id && it.activities }
+            SqlRecordPackageActivities.validateFullReceipt(row,g.id,g.digest,g.ids)
+        }
+        data.tables[11].filter { (it[6] as String).isNotEmpty() }.forEach { row ->
+            val backup=proofBackupId(row[6] as String,row[0] as String)
+            require(groups.any { it.id==backup && row[0] in it.ids })
+        }
+    }
+
     /** Raw SQL includes trashed rows and authenticates the complete immutable imported prefix. */
     private fun immutable(sql: RecordsSqlConnection, origin: RecordPackageOrigin, original: RecordPackageOriginal?) {
+        val entry=sql.query("SELECT currentRevision,capturedAtMillis,captureTimeZone FROM entries WHERE id=?",listOf(origin.newId)).single()
+        val rows=sql.query("SELECT revision,originalText,contentHash,createdAtMillis FROM entry_revisions WHERE entryId=? AND revision<=? ORDER BY revision",
+            listOf(origin.newId,origin.restoredRevisionCount))
+        immutableRows(origin,original,entry,rows)
+        require(sql.query("SELECT revision FROM entry_revisions WHERE entryId=? AND revision=?",listOf(origin.newId,entry[0])).size==1)
+    }
+    private fun immutableRows(origin:RecordPackageOrigin,original:RecordPackageOriginal?,entry:List<Any?>,rows:List<List<Any?>>) {
         if (origin.historyDigest != null) {
-            val entry = sql.query("SELECT currentRevision,capturedAtMillis,captureTimeZone FROM entries WHERE id=?",listOf(origin.newId)).single()
             if ((entry[0] as Long) < origin.restoredRevisionCount || entry[1] != origin.capturedAtMillis || entry[2] != origin.captureTimeZone)
                 throw RecordPackageConflict()
-            val rows = sql.query("SELECT revision,originalText,contentHash,createdAtMillis FROM entry_revisions WHERE entryId=? AND revision<=? ORDER BY revision",
-                listOf(origin.newId,origin.restoredRevisionCount))
             if (rows.size != origin.restoredRevisionCount) throw RecordPackageConflict()
             val history = rows.mapIndexed { index,row ->
                 if (row[0] != (index+1).toLong()) throw RecordPackageConflict()
@@ -165,14 +211,12 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
                 (original != null && (original.restoredRevision != origin.restoredRevisionCount ||
                     recordHistoryDigest(original.history) != origin.historyDigest))) throw RecordPackageConflict()
             // A later valid append is deliberately untouched; the restore receipt owns only its prefix.
-            require(sql.query("SELECT revision FROM entry_revisions WHERE entryId=? AND revision=?",listOf(origin.newId,entry[0])).size==1)
             return
         }
-        val row = sql.query("SELECT e.currentRevision,e.capturedAtMillis,e.captureTimeZone,r.originalText,r.contentHash,r.createdAtMillis FROM entries e JOIN entry_revisions r ON r.entryId=e.id AND r.revision=1 WHERE e.id=?",
-            listOf(origin.newId)).single()
-        require((row[0] as Long) >= 1 && row[1] == origin.capturedAtMillis && row[2] == origin.captureTimeZone &&
-            row[4] == OriginalExports.hash(row[3] as String) && row[5] == origin.importedAtMillis)
-        if (original != null) require(row[3] == original.originalText && row[4] == original.contentHash)
+        val row=rows.single();require(row[0]==1L)
+        require((entry[0] as Long) >= 1 && entry[1] == origin.capturedAtMillis && entry[2] == origin.captureTimeZone &&
+            row[2] == OriginalExports.hash(row[1] as String) && row[3] == origin.importedAtMillis)
+        if (original != null) require(row[1] == original.originalText && row[2] == original.contentHash)
         // Never inspect/reset the current revision, policy, consent, deletion or mutable tags on replay.
     }
 

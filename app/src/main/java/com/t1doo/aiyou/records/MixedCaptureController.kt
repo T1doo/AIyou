@@ -65,6 +65,22 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         }
         catch(e:CancellationException){throw e} catch(_:Exception){update { it.copy(error="图文草稿尚未读取，已保留本机数据，请重试。") }}
     }
+    /** Only replace an unchanged, empty initialized composer after the verified empty-target import. */
+    internal suspend fun adoptFullRestore(store:EntryRepository) {
+        val before=ui() ?: return
+        val draft=before.draft
+        val clean=before.text.isEmpty() && before.pendingEdits==0 && !before.busy && before.selection==null &&
+            !before.uncertainSave && !before.confirmDiscard && !before.discardPending && before.policyChange==null &&
+            draft?.text.orEmpty().isEmpty() && draft?.images.orEmpty().isEmpty()
+        if(!clean) return
+        val restored=store.captureRecords?.current() ?: return
+        publish { local -> if(disposed || local.mixedCapture!==before) local else {
+            local.copy(mixedCapture=before.copy(draft=restored,text=restored.text,error=null))
+        } }
+        if(ui()?.draft===restored) {
+            binding=restored;pendingSave=null;pendingDiscard=null;thumbnails(store)
+        }
+    }
     fun refresh() {
         if(!available() || ui()?.busy==true) return
         ui()?.policyChange?.let { readCurrentPolicy(it.requestId);return }

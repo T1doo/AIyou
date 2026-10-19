@@ -348,6 +348,36 @@ jobs:
           (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
           print('CONSENT_UI_TARGETED_XML_JSON ' + json.dumps(receipt))
           PY
+      - name: Preserve full offline backup XML from the same completed suites
+        run: |
+          python3 - <<'PYCODE'
+          import hashlib, json, os, shutil
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          inventories = [
+              ('app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.FullBackupPresentationTest.xml', 3),
+              ('checks/ai-protocol/remote-text/build/test-results/test/TEST-com.t1doo.aiyou.data.FullBackupTest.xml', 16),
+              ('checks/ai-protocol/remote-text/build/test-results/test/TEST-com.t1doo.aiyou.records.FullBackupControllerTest.xml', 6),
+          ]
+          target = Path('app/build/reports/full-offline-backup-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          receipts = []
+          for path, expected in inventories:
+              source = Path(path)
+              raw = source.read_bytes()
+              suite = ET.fromstring(raw)
+              cases = list(suite.iter('testcase'))
+              assert int(suite.get('tests', '-1')) == len(cases) == expected
+              assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
+              assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
+              shutil.copy2(source, target / source.name)
+              receipts.append({'path': str(source), 'tests': expected, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+          receipt = {'head_sha': os.environ['GITHUB_SHA'], 'xml': receipts,
+                     'source': 'subsets of the same full suites; no duplicate execution or counting',
+                     'device_saf_room_sqlcipher': 'NOT RUN', 'external_model_calls': 0}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('FULL_OFFLINE_BACKUP_TARGETED_XML_JSON ' + json.dumps(receipt))
+          PYCODE
       - name: Compile actual D02 native-storage instrumentation APK without claiming execution
         env:
           AIYOU_CI_ANDROID_DAEMON: 'true'

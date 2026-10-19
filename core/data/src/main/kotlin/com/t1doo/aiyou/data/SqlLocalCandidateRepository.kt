@@ -211,6 +211,45 @@ internal class SqlLocalCandidateRepository(private val database: RecordsSqlDatab
         catch (conflict: LocalCandidateConflict) { throw conflict }
         catch (invalid: InvalidExcerptResponse) { throw invalid }
         catch (_: Exception) { throw LocalCandidateStorageFailure() }
+    internal fun validateFullPortableRow(cells:List<Any?>,proof:FullBackupSourceProof?) {
+        val row=decode(cells)
+        when(row.state) {
+            LocalCandidateState.INVALIDATED -> require(row.bytes.isEmpty())
+            LocalCandidateState.RUNNING -> error("Unfinished local candidate")
+            LocalCandidateState.READY -> {
+                val p=checkNotNull(proof);require(!p.deleted && p.policy!=ProcessingPolicy.AI_NONE)
+                payload(row,Source(p.source,p.hash,p.generation,p.original,p.captured,p.zone))
+            }
+            LocalCandidateState.CANCELLED -> {
+                val p=checkNotNull(proof)
+                require(p.source==row.source && p.hash==row.hash && OriginalExports.hash(p.original)==row.hash && row.version>=1)
+                val payload=cipher.open(aad(row),row.bytes)
+                require(payload.operation=="CANCEL" && payload.items.isEmpty() && payload.itemId.isEmpty() && payload.expectedVersion==row.version-1)
+            }
+        }
+    }
+    internal fun validateFullWithin(sql:RecordsSqlConnection) {
+        val rows=sql.query("SELECT "+COLUMNS+" FROM local_candidate_batches WHERE ruleVersion=1 ORDER BY id LIMIT 4097")
+        require(rows.size<=4096)
+        rows.map(::decode).forEach { row -> when(row.state) {
+            LocalCandidateState.INVALIDATED -> require(row.bytes.isEmpty())
+            LocalCandidateState.RUNNING -> error("Unfinished local candidate")
+            LocalCandidateState.READY -> payload(row,readSource(sql,row.source))
+            LocalCandidateState.CANCELLED -> {
+                // Cancellation can outlive a revision/policy change; validate against its immutable historical original.
+                val original=sql.query("SELECT originalText,contentHash FROM entry_revisions WHERE entryId=? AND revision=?",listOf(row.source.sourceId,row.source.revision)).single()
+                require(original[1]==row.hash && OriginalExports.hash(original[0] as String)==row.hash && row.version>=1)
+                val p=cipher.open(aad(row),row.bytes)
+                require(p.operation=="CANCEL" && p.items.isEmpty() && p.itemId.isEmpty() && p.expectedVersion==row.version-1)
+            }
+        } }
+    }
+    internal fun portable(cells:List<Any?>,restoring:Boolean):ByteArray {
+        val row=decode(cells)
+        if(row.state==LocalCandidateState.INVALIDATED) { require(row.bytes.isEmpty());return byteArrayOf() }
+        require(row.bytes.isNotEmpty() && row.state!=LocalCandidateState.RUNNING)
+        return cipher.portable(aad(row),row.bytes,restoring)
+    }
     fun wipeKey() = cipher.wipe()
     companion object { private const val COLUMNS = "id,entryId,sourceRevision,sourceHash,generation,ruleVersion,version,state,lastMutationId,createdAtMillis,payload" }
 }

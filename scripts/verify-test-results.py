@@ -246,6 +246,11 @@ for label, folder, minimum in targets:
             "failedReadRetryCancelAndChangedSourceHidePrivateResultsAndRejectRetainedClick",
             "explicitWeekZoneEmptyResultPrivateSavedStateAndAccurateBackupSettings",
         )
+        additional["com.t1doo.aiyou.FullBackupPresentationTest"] = (
+            "actualRootFullScopeRequiresExplicitAcceptanceAndMatchingIndependentPasswords",
+            "fullRestoreAuthenticatesManifestThenRequiresSeparateEmptyTargetConfirmation",
+            "narrowDoubleFontRecreationDropsPasswordsAndNavigationRetiresPickerBeforeRecomposition",
+        )
         additional["com.t1doo.aiyou.RecordPackagePresentationTest"] = (
             "actualFullPreviewRequiresScopeAndTwoMatchingSecretInputsBeforeExportPicker",
             "restoreAuthenticatesAndPreviewsBeforeDistinctConfirmationAndNoImplicitWrite",
