@@ -38,6 +38,7 @@ data class CaptureDiscardUiState(val requestId: Long, val busy: Boolean = false,
 
 data class LocalRecordUiState(
     val modelConnectionOwner: com.t1doo.aiyou.domain.ModelConnectionCatalog? = null,
+    val modelSecretOwner: com.t1doo.aiyou.domain.ConnectionSecretVault? = null,
     val taskProposals: TaskProposalsUiState = TaskProposalsUiState(),
     val supportsSourceTasks: Boolean = false,
     val sourceTask: SourceTaskUiState? = null,
@@ -1205,6 +1206,7 @@ class LocalRecordsViewModel internal constructor(
                 supportsSourceMemories = store.sourceMemories != null,
                 supportsManualPeople = store.manualPeople != null, manualPeopleOwner = store.manualPeople, manualPeople = peopleValues.orEmpty(),
                 modelConnectionOwner = store.modelConnections,
+                modelSecretOwner = store.localModelConnections?.secrets,
                 manualPeopleAvailable = peopleValues != null,
                 manualPeopleError = if (store.manualPeople != null && peopleValues == null) "手工人物关联暂不可读取，请重试。" else null,
                 entries = entries, manualTags = labels.orEmpty(), manualTagsAvailable = labels != null,

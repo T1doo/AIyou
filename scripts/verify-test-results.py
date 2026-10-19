@@ -349,6 +349,10 @@ for label, folder, minimum in targets:
             "sameOwnerCompositionReplacementRetainsFormAndUnconfirmedRequestButRetiresOldActions",
             "narrowDoubleFontConfiguresBothProtocolsAndRetiredPageActionsCannotSaveOrDelete",
             "invalidRootAndUncertainSaveKeepInputAndRetryOnlyTheSameConfiguration")
+        additional["com.t1doo.aiyou.ModelConnectionSecretsPresentationTest"] = (
+            "narrowDoubleFontExplicitSaveReplaceAndRevokeKeepCapabilitiesUnknownAndRetireOldActions",
+            "passwordNeverEntersSavedStateAndRestorationOrOwnerReplacementRetiresInputCallbacks",
+            "uncertainWriteRetainsOnlySameOpaqueOperationAcrossRecreationAndConflictRequiresReload")
         additional["com.t1doo.aiyou.UiPreferencesTest"] = (
             "legacyDefaultsStayLocalAndExplicitNoneSurvivesNewFileAndViewModelOwners",
             "unreadableDefaultRestrictsOnlyNewDraftsAndPreservesEveryUnknownPreferenceByte",
