@@ -12,9 +12,9 @@ permissions:
 jobs:
   d01:
     runs-on: ubuntu-24.04
-    # Full passing checks plus evidence preservation measured25.63minutes.
+    # Actual v13 bootstrap plus evidence preservation measured29m54s.
     # Budget the whole job; individual test deadlines and all gates stay fixed.
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -29,7 +29,7 @@ jobs:
           printf '%s  %s\n' \
             3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 \
             gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
-      - name: Generate actual Room v12 people export with real v11 predecessor and all prior native fixtures
+      - name: Generate actual Room v13 configuration export with unchanged predecessors and native fixtures
         run: |
           python3 scripts/check-sdk.py
           python3 scripts/verify-manual-tag-schema.py --capture
