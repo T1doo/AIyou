@@ -115,7 +115,7 @@ internal object FullBackupCodec {
         require(current.size<=1)
         return current.singleOrNull()?.let { row ->
             require(row[0]=="CAPTURE_CURRENT" && row[2]==1L)
-            SqlCaptureRepository.decodeForBackup(row[4] as String).also { require(it.id==row[1]) }
+            CaptureDraftCodec.decode(row[4] as String).also { require(it.id==row[1]) }
         }
     }
     fun validate(d:FullBackupData) {
