@@ -37,6 +37,7 @@ internal class SourceBoundLoopbackFixture(
     heldTail: Boolean = false,
     readBufferBytes: Int = 8192,
     heldResponsePrefix: ByteArray? = null,
+    httpBounds: HttpBounds? = null,
 ) : Closeable {
     val records = RemoteTextFixture(protocol, selectedB, initiallyApproved)
     val serverA = MockWebServer()
@@ -72,7 +73,7 @@ internal class SourceBoundLoopbackFixture(
         transport = OkHttpStreamingTransport::class.java
             .getDeclaredConstructor(HttpBounds::class.java, OkHttpClient::class.java)
             .apply { isAccessible = true }
-            .newInstance(HttpBounds(connectMillis = 500, totalMillis = 3_000, idleMillis = 1_000,
+            .newInstance(httpBounds ?: HttpBounds(connectMillis = 500, totalMillis = 3_000, idleMillis = 1_000,
                 writeMillis = 1_000, readBufferBytes = readBufferBytes), client)
         listOf(serverA, serverB).forEach { server ->
             val body = if (responseCode == 200) responseBytes else "synthetic-private-provider-error".toByteArray()

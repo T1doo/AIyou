@@ -4,7 +4,8 @@ import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.*
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -50,7 +51,8 @@ data class ModelConnectionsUiState(val session: Long = 0, val busy: Boolean = fa
 /** Settings session only; all durable operations borrow the existing records IO command owner. */
 class ModelConnectionsController internal constructor(private val current: () -> LocalRecordUiState,
     private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
-    private val capabilityProbe: ModelCapabilityProbe? = null, private val clock: java.time.Clock = java.time.Clock.systemUTC()) {
+    private val capabilityProbe: ModelCapabilityProbe? = null, private val clock: java.time.Clock = java.time.Clock.systemUTC(),
+    probeDispatcher: CoroutineDispatcher = Dispatchers.IO) {
     private val epochs = AtomicLong()
     private val mutable = MutableStateFlow(ModelConnectionsUiState())
     val state = mutable.asStateFlow()
@@ -60,14 +62,26 @@ class ModelConnectionsController internal constructor(private val current: () ->
     @Volatile private var secretOwner: ConnectionSecretVault? = null
     @Volatile private var capabilityOwner: ModelCapabilityRepository? = null
     private val probeLock=Any()
-    private var runningProbe: ModelCapabilityProbeExchange? = null
+    private class ProbeRun(val session: Long) {
+        val retired = AtomicBoolean()
+        var worker: Job? = null
+        var exchange: ModelCapabilityProbeExchange? = null
+        var cancellation: Job? = null
+    }
+    private val probeLifetime = SupervisorJob()
+    private val probeScope = CoroutineScope(probeLifetime + probeDispatcher)
+    private val probeWork = mutableSetOf<Job>()
+    private var runningProbe: ProbeRun? = null
+    private var closingProbes: Deferred<Unit>? = null
+    private var firstProbeFatal: Throwable? = null
     private var retainedOwner: ModelConnectionCatalog? = null
     private var retainedEditor: ModelConnectionEditor? = null
     private var retainedSecretOwner: ConnectionSecretVault? = null
     private var retainedSecretEditor: ModelConnectionSecretEditor? = null
     private val inputLock = Any()
     private var queuedSecretInput: CharArray? = null
-    val editingOrBusy: Boolean get() = active && (mutable.value.busy || mutable.value.editor != null || mutable.value.secretEditor != null || mutable.value.probeEditor != null)
+    val editingOrBusy: Boolean get() = (active && (mutable.value.busy || mutable.value.editor != null || mutable.value.secretEditor != null || mutable.value.probeEditor != null)) ||
+        synchronized(probeLock) { runningProbe != null || probeWork.isNotEmpty() }
     private fun live(session: Long): Boolean {
         val source=current()
         val owns = !disposed && active && owner!=null && source.modelConnectionOwner===owner && source.modelSecretOwner===secretOwner && source.modelCapabilityOwner===capabilityOwner &&
@@ -316,7 +330,10 @@ class ModelConnectionsController internal constructor(private val current: () ->
     }
     fun beginProbe(session: Long, rendered: ModelConnectionConfiguration) {
         val ui=mutable.value
-        if(!live(session)||!ui.probeAvailable||ui.busy||ui.error!=null||ui.capabilityError!=null||editingOrBusy||rendered.secretRef==null||rendered !in ui.configurations) return
+        if(!live(session)||!ui.probeAvailable||ui.busy||ui.error!=null||ui.capabilityError!=null||ui.editor!=null||ui.secretEditor!=null||ui.probeEditor!=null||rendered.secretRef==null||rendered !in ui.configurations) return
+        if(synchronized(probeLock){runningProbe!=null||probeWork.isNotEmpty()}) {
+            publish(session){it.copy(notice="上次检查仍在停止，请等待结束后再明确发起；未创建新的请求。")};return
+        }
         publish(session){it.copy(probeEditor=ModelCapabilityProbeEditor(rendered),notice=null)}
     }
     fun cancelProbe(session: Long, editor: ModelCapabilityProbeEditor) {
@@ -325,39 +342,67 @@ class ModelConnectionsController internal constructor(private val current: () ->
         stopProbe()
         load(session)
     }
-    /** Exactly one user-confirmed sample. Retry below can persist only this result, never send again. */
+    /** Short DB begin stays on the records owner; only the one explicitly confirmed sample waits on owned IO. */
     fun runProbe(session: Long, editor: ModelCapabilityProbeEditor) {
         val ui=mutable.value
         if(!live(session)||!ui.probeAvailable||ui.busy||ui.error!=null||ui.capabilityError!=null||ui.probeEditor!==editor||editor.busy||editor.conflict||editor.pending!=null) return
+        val run=synchronized(probeLock) {
+            if(disposed || runningProbe!=null || probeWork.isNotEmpty() || firstProbeFatal!=null) null else ProbeRun(session).also { runningProbe=it }
+        }
+        if(run==null) { probeError(session,editor,false,"上次检查仍在停止，请等待结束后再明确发起；未创建新的请求。");return }
         val pending=editor.copy(busy=true,error=null)
         publish(session){it.copy(probeEditor=pending,capabilityProfiles=it.capabilityProfiles.filter {p -> p.connection.id!=editor.expected.id})}
-        queue(session) { store ->
-            if(mutable.value.probeEditor!==pending) return@queue
-            var exchange: ModelCapabilityProbeExchange?=null
+        if(!enqueue { store ->
             try {
-                val profiles=probeRepository(store)
-                val ticket=profiles.begin(editor.expected,UUID.randomUUID().toString(),clock.millis())
-                if(!live(session)||mutable.value.probeEditor!==pending) return@queue
+                if(!acceptsProbe(run,pending)) return@enqueue
+                val ticket=probeRepository(store).begin(editor.expected,UUID.randomUUID().toString(),clock.millis())
+                if(!acceptsProbe(run,pending)) return@enqueue
                 publish(session){if(it.probeEditor!==pending)it else it.copy(
                     capabilityProfiles=it.capabilityProfiles.filter {p -> p.connection.id!=editor.expected.id}+ticket.profile)}
-                exchange=checkNotNull(capabilityProbe).newExchange(ticket)
-                val mayRun=synchronized(probeLock) {
-                    if(!live(session)||mutable.value.probeEditor!==pending) false else { runningProbe=exchange;true }
-                }
-                if(!mayRun) { exchange.cancel();return@queue }
-                val result=exchange.execute()
-                if(!live(session)||mutable.value.probeEditor!==pending) return@queue
-                val saving=pending.copy(pending=ticket to result)
-                publish(session){if(it.probeEditor===pending)it.copy(probeEditor=saving) else it}
-                if(live(session)&&mutable.value.probeEditor===saving) persistProbe(session,saving,store)
+                startProbe(run,pending,ticket)
             } catch(e: CancellationException) { throw e }
             catch(_: ModelConnectionConflict) { probeError(session,pending,true,"连接版本或探测代次已变化，请关闭并重新读取。") }
             catch(_: Exception) { probeError(session,pending,false,"探测未完成，未自动重试。请关闭并重新读取后再次明确发起。") }
+            finally { synchronized(probeLock) { if(run.worker==null && runningProbe===run) runningProbe=null } }
+        }) {
+            synchronized(probeLock) { if(runningProbe===run)runningProbe=null }
+            probeError(session,pending,false,"本机资料已关闭；未创建新的请求，请重新打开设置。")
+        }
+    }
+    private fun acceptsProbe(run: ProbeRun, editor: ModelCapabilityProbeEditor): Boolean =
+        !run.retired.get() && live(run.session) && mutable.value.probeEditor===editor
+    private fun startProbe(run: ProbeRun, pending: ModelCapabilityProbeEditor, ticket: ModelCapabilityProbeTicket) {
+        if(!acceptsProbe(run,pending)) return
+        val job=probeScope.launch(start=CoroutineStart.LAZY) {
+            var exchange: ModelCapabilityProbeExchange?=null
+            try {
+                if(!acceptsProbe(run,pending)) return@launch
+                exchange=checkNotNull(capabilityProbe).newExchange(ticket) // Factory may borrow SQL; never on records actor.
+                val mayRun=synchronized(probeLock) {
+                    run.exchange=exchange
+                    !disposed && runningProbe===run && !run.retired.get()
+                }
+                if(!mayRun || !acceptsProbe(run,pending)) return@launch
+                val result=exchange.execute()
+                if(!acceptsProbe(run,pending)) return@launch
+                val saving=pending.copy(pending=ticket to result)
+                publish(run.session){if(it.probeEditor===pending)it.copy(probeEditor=saving) else it}
+                // Never wait for this actor command from the worker: closure drains IO before closing the DB.
+                if(!enqueue { store -> if(acceptsProbe(run,saving))persistProbe(run.session,saving,store) })
+                    probeError(run.session,saving,false,"结果尚未写入；本机资料已关闭，不会再次请求服务。")
+            } catch(e: CancellationException) { throw e }
+            catch(_: ModelConnectionConflict) { probeError(run.session,pending,true,"连接版本或探测代次已变化，请关闭并重新读取。") }
+            catch(_: Exception) { probeError(run.session,pending,false,"探测未完成，未自动重试。请关闭并重新读取后再次明确发起。") }
             finally {
-                synchronized(probeLock){if(runningProbe===exchange)runningProbe=null}
-                exchange?.cancel()
+                try { exchange?.cancel() }
+                finally { synchronized(probeLock) { run.exchange=null;if(runningProbe===run)runningProbe=null } }
             }
         }
+        val accepted=synchronized(probeLock) {
+            if(disposed || runningProbe!==run || run.retired.get()) false
+            else { run.worker=job;registerProbeWork(job);true }
+        }
+        if(accepted)job.start() else job.cancel()
     }
     fun retryProbePersistence(session: Long, editor: ModelCapabilityProbeEditor) {
         if(!live(session)||mutable.value.busy||mutable.value.error!=null||mutable.value.probeEditor!==editor||editor.busy||editor.conflict||editor.pending==null) return
@@ -387,7 +432,42 @@ class ModelConnectionsController internal constructor(private val current: () ->
     private fun probeError(session: Long, editor: ModelCapabilityProbeEditor, conflict: Boolean, message: String) {
         publish(session){if(it.probeEditor!==editor)it else it.copy(probeEditor=editor.copy(busy=false,conflict=conflict,error=message))}
     }
-    private fun stopProbe() { synchronized(probeLock){runningProbe.also { runningProbe=null }}?.cancel() }
+    private fun registerProbeWork(job: Job) {
+        probeWork+=job
+        job.invokeOnCompletion { failure -> synchronized(probeLock) {
+            probeWork-=job
+            if(failure is VirtualMachineError || failure is ThreadDeath || failure is LinkageError)
+                if(firstProbeFatal==null)firstProbeFatal=failure
+        } }
+    }
+    private fun stopProbe() {
+        val cancellation=synchronized(probeLock) {
+            val run=runningProbe?:return@synchronized null
+            run.retired.set(true)
+            if(run.worker==null) { runningProbe=null;return@synchronized null }
+            val exchange=run.exchange?:return@synchronized null
+            if(run.cancellation!=null)return@synchronized null
+            probeScope.launch(start=CoroutineStart.LAZY) { exchange.cancel() }.also {
+                run.cancellation=it;registerProbeWork(it)
+            }
+        }
+        cancellation?.start() // No SQL/client callback inside the identity lock or UI caller.
+    }
+    /** Dispose retires immediately. The VM awaits all actual borrowers before closing the shared records owner. */
+    suspend fun closeAndJoin() {
+        dispose()
+        val closing=synchronized(probeLock) {
+            closingProbes?:run {
+                val pending=probeWork.toList()
+                probeScope.async<Unit>(start=CoroutineStart.LAZY) {
+                    pending.forEach { it.join() }
+                    probeLifetime.complete()
+                    synchronized(probeLock) { firstProbeFatal }?.let { throw it }
+                }.also { closingProbes=it }
+            }
+        }
+        closing.start();closing.await()
+    }
     private fun queue(session: Long, action: suspend (EntryRepository)->Unit) {
         if(!enqueue { store -> if(live(session)) action(store) }) publish(session){it.copy(busy=false,
             error="本机资料已关闭，请重新打开设置。",editor=it.editor?.copy(busy=false),probeEditor=it.probeEditor?.copy(busy=false))}

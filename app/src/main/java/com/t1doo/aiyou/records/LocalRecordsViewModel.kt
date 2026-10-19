@@ -139,6 +139,7 @@ class LocalRecordsViewModel internal constructor(
     private val extractLocalCandidates: (com.t1doo.aiyou.model.LocalCandidateJob) -> com.t1doo.aiyou.model.ExcerptDocument = com.t1doo.aiyou.domain.LocalExcerptRules::extract,
     private val decodeCapture: (ByteArray) -> AttachmentPicture = PlatformImageDecoder::thumbnail,
     private val decodeGrid: (ByteArray) -> AttachmentPicture = PlatformImageDecoder::gridThumbnail,
+    private val capabilityProbe: com.t1doo.aiyou.domain.ModelCapabilityProbe? = null,
 ) : AndroidViewModel(application) {
     constructor(application: Application) : this(application, { openProductionRecordStore(application) })
     private val mutableState = MutableStateFlow(LocalRecordUiState())
@@ -217,7 +218,7 @@ class LocalRecordsViewModel internal constructor(
     val people = ManualPeopleController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.ManualPeople(action)).isSuccess })
     val modelConnections = ModelConnectionsController(current = { mutableState.value },
-        enqueue = { action -> submit(Command.ModelConnections(action)).isSuccess })
+        enqueue = { action -> submit(Command.ModelConnections(action)).isSuccess },capabilityProbe=capabilityProbe)
     val favorites = RecordFavoriteController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.Favorites(action)).isSuccess })
     val eventDates = RecordEventDateController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -421,7 +422,7 @@ class LocalRecordsViewModel internal constructor(
                 recordPackages.dispose()
                 recycleBin.dispose()
                 try { withContext(NonCancellable + Dispatchers.IO) {
-                    try { ai.closeAndJoin() }
+                    try { try { ai.closeAndJoin() } finally { modelConnections.closeAndJoin() } }
                     finally {
                         mixedCapture.disposeOnIo()
                         try { attachments.disposeOnIo() }
@@ -450,6 +451,8 @@ class LocalRecordsViewModel internal constructor(
             val panel = proposed.localProcessing
             val scoped = if (panel != null && (editsDisposed || !proposed.ready || proposed.opening || proposed.error != null ||
                 panel.authorizationSource?.let { it.owner !== proposed.recordAuthorizationOwner } == true ||
+                panel.connectionCatalogOwner?.let { it !== proposed.modelConnectionOwner || panel.connectionSecretOwner !== proposed.modelSecretOwner ||
+                    panel.connectionCapabilityOwner !== proposed.modelCapabilityOwner } == true ||
                 proposed.entries.none { it.id == panel.source.sourceId && it.currentRevision.toLong() == panel.source.revision &&
                     com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == panel.sourceHash })) proposed.copy(localProcessing = null) else proposed
             val safe = if (scoped.supportsLocalProcessing && !scoped.localProcessingAvailable) scoped.copy(
@@ -1326,8 +1329,8 @@ class LocalRecordsViewModel internal constructor(
             local.copy(entries = entries ?: local.entries, localProcessingVersions = versions.orEmpty(), localProcessingAvailable = versions != null,
                 recordAuthorizationOwner = store.recordAuthorizations,
                 selectedQuestionAuthorizationOwner = store.selectedQuestionAuthorizations,
-                localProcessing = if (stale && !panel.busy && panel.pending == null && panel.pendingWithdrawal == null) panel.copy(
-                    snapshot = null, authorization = null, confirmation = null, withdrawalConfirmation = null,
+                localProcessing = if (stale && !panel.busy && panel.pending == null && panel.pendingWithdrawal == null && panel.pendingAuthorization == null) panel.copy(
+                    snapshot = null, authorization = null, confirmation = null, withdrawalConfirmation = null, connectionReview = null, authorizationConfirmation = null,
                     notice = null, error = "处理范围已变化，请关闭后从当前原文重新打开。") else panel)
         }
     }

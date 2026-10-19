@@ -132,7 +132,7 @@ class ModelCapabilitiesPresentationTest {
             override suspend fun revisions(entryId:String)=emptyList<OriginalRevision>()
             override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry=error("No source write")
         }
-        fun newController()=ModelConnectionsController({local},{action->runBlocking {action(store)};true},probe.takeIf {enabled},Clock.fixed(NOW,ZoneOffset.UTC))
+        fun newController()=ModelConnectionsController({local},{action->runBlocking {action(store)};true},probe.takeIf {enabled},Clock.fixed(NOW,ZoneOffset.UTC),probeDispatcher=kotlinx.coroutines.Dispatchers.Unconfined)
         var controller by mutableStateOf(newController())
     }
     private class Profiles(val config:()->ModelConnectionConfiguration):ModelCapabilityRepository {

@@ -112,7 +112,7 @@ class PersistentCapabilityFlowTest {
             profiles=SqlModelCapabilityRepository(f.records.db,catalog)
             probe=FixedTextCapabilityProbe(f.transport,profiles,LocalConnectionSecretResolver(catalog),Clock.fixed(f.records.now,ZoneOffset.UTC))
             local=LocalRecordUiState(ready=true,opening=false,text="synthetic-private-capture-draft",modelConnectionOwner=catalog,modelSecretOwner=catalog,modelCapabilityOwner=profiles)
-            controller=ModelConnectionsController({local},{queue.addLast(it);true},probe,Clock.fixed(f.records.now,ZoneOffset.UTC))
+            controller=ModelConnectionsController({local},{queue.addLast(it);true},probe,Clock.fixed(f.records.now,ZoneOffset.UTC),probeDispatcher=kotlinx.coroutines.Dispatchers.Unconfined)
         }
         private val store=object:EntryRepository {
             override val modelConnections get()=catalog

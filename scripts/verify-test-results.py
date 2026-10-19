@@ -407,6 +407,10 @@ for label, folder, minimum in targets:
             "retainedHistoryActionRejectsChangedRequestAndNewVersionNeverShowsOldPicture",
             "lateAuthenticatedReadAndGlobalFailureHideHistoricalPictureWithoutChangingOwnership",
             "narrowLargeFontHistoricalFailureRecoveryHasNoImportOrOverwriteActions")
+        additional["com.t1doo.aiyou.RecordConnectionReviewPresentationTest"] = (
+            "narrowDoubleFontDirectoryChoiceShowsDestinationVersionReferenceBoundaryAndSeparateConfirmation",
+            "cancelledRetainedReviewAndChangedConfigurationCannotGrantAnOldConnection",
+            "uncertainDecisionRetryOnlyReadsReceiptAndNeverRefreshesIntervalOrSends")
     for owner, names in additional.items():
         for name in names:
             matches = [case for case in observed_cases if case.get("classname") == owner

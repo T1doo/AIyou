@@ -47,7 +47,7 @@ class ModelCapabilityControllerTest {
             h.controller.cancelProbe(s,oldRunning)
             assertNull(h.controller.visible().probeEditor);assertTrue(h.controller.visible().busy)
         }
-        h.one();assertNull(h.controller.visible().probeEditor)
+        h.one();h.one();assertNull(h.controller.visible().probeEditor) // begin/IO handoff, then the separate result command.
         assertEquals(CapabilityState.UNKNOWN,h.controller.visible().capabilityProfiles.single().observation.state) // No late success filled it.
         h.profiles.beforeFinish=null;h.drain() // A distinct fresh SQL/port read may confirm admitted persistence.
         h.controller.beginProbe(s,h.config);val replacement=h.editor();assertNotEquals(oldRunning.reviewId,replacement.reviewId)
@@ -167,7 +167,7 @@ class ModelCapabilityControllerTest {
             override suspend fun revisions(entryId:String)=emptyList<OriginalRevision>()
             override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry=error("No original writes")
         }
-        val controller=ModelConnectionsController({local},{queue.addLast(it);true},probe.takeIf {enabled},Clock.fixed(NOW,ZoneOffset.UTC))
+        val controller=ModelConnectionsController({local},{queue.addLast(it);true},probe.takeIf {enabled},Clock.fixed(NOW,ZoneOffset.UTC),probeDispatcher=kotlinx.coroutines.Dispatchers.Unconfined)
         suspend fun open():Long=controller.open(catalog).also {drain()}
         fun editor()=checkNotNull(controller.visible().probeEditor)
         suspend fun one(){queue.removeFirst()(store)}

@@ -223,7 +223,7 @@ private fun capabilityStateLabel(value: CapabilityState) = when(value) {
     CapabilityState.SUPPORTED -> "SUPPORTED · 固定样本文本流通过"
     CapabilityState.UNSUPPORTED -> "UNSUPPORTED · 此配置的文本接口不可用"
 }
-private fun capabilityReasonLabel(value: CapabilityProbeReason) = when(value) {
+internal fun capabilityReasonLabel(value: CapabilityProbeReason) = when(value) {
     CapabilityProbeReason.IN_PROGRESS -> "检查尚未完成。若已中断，请明确发起新检查。"
     CapabilityProbeReason.TEXT_STREAM_VERIFIED -> "固定样本文本流通过，未验证其他能力。"
     CapabilityProbeReason.TEXT_ENDPOINT_UNAVAILABLE -> "所配文本接口或模型不可用（404/405/501），请核对协议、根路径与模型。"

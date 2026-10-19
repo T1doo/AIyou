@@ -64,12 +64,19 @@ class ModelConnectionRecordsIntegrationTest {
             val lease=vault.resolve(bound.secretRef!!)!!;first.closeAndAwait();assertTrue(lease.isClosed)
             val cold=open();val local=cold.localModelConnections;assertTrue(local.secrets.current(bound.secretRef!!))
             val source=SourceVersion(saved.id,1);val now=Instant.parse("2026-10-19T09:00:00Z");val connection=bound.textConnection(TextPurpose.ORGANIZATION)
-            assertNull(cold.sourceBoundText.updateAuthorization(source,0,ProcessingPolicy.REMOTE_ALLOWED,connection,
-                ConsentGrant("synthetic-native-consent",1,source,connection,TextPurpose.ORGANIZATION,now.minusSeconds(1),now.plusSeconds(60))))
+            val auth=cold.recordAuthorizations;val before=auth.readAuthorization(source)
+            val review=auth.previewConnectionAuthorization(before.binding,bound,TextPurpose.ORGANIZATION){now}
+            assertEquals(before,review.snapshot);assertNull(before.connection)
+            val decision=RecordAuthorizationChange.confirm(review,now,now.plusSeconds(3600),UUID.randomUUID().toString())
+            val receipt=auth.changeAuthorization(decision){now}
+            assertTrue(receipt.decisionStillCurrent);assertEquals(connection,receipt.current.connection)
+            assertEquals(decision.grant,auth.confirmAuthorization(decision){now}!!.current.consent)
             val job=(local.text.queue(RemoteSendIntent(source,TextPurpose.ORGANIZATION),"synthetic-native-vault",{now}) as SourceQueueOutcome.Queued).job
             assertNull(local.text.admit(job){now});local.secrets.revoke(bound,"revoke")
             val result=local.text.commit(job,DerivedTextCandidate("合成候选",listOf(OriginalTextReference(source,0,4,"合成原文")))){now}
             assertEquals(SourceCommitDenial.AUTHORIZATION_CHANGED,(result as SourceCommitOutcome.Denied).reason)
+            assertFalse(auth.previewAuthorization(auth.readAuthorization(source).binding,TextPurpose.ORGANIZATION){now}.authorizationCurrent)
+            assertFalse(auth.confirmAuthorization(decision){now}!!.decisionStillCurrent)
             assertEquals("合成原文",cold.entries().single().originalText);assertNull(cold.readDraft())
             cold.database.openHelper.writableDatabase.query("SELECT count(*) FROM text_annotations").use { assertTrue(it.moveToFirst());assertEquals(0,it.getInt(0)) }
         } finally { stores.forEach { it.closeAndAwait() };key.fill(0);directory.deleteRecursively() }

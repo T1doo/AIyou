@@ -47,7 +47,7 @@ class EncryptedEntryRepository internal constructor(
     override val editDrafts: EncryptedOriginalEditStore get() = originalEditStorage
     /** Blocking IO; shares the existing encrypted database and never enables remote processing. */
     override val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(borrowedSql)
-    override val recordAuthorizations: com.t1doo.aiyou.domain.RecordAuthorizationRepository = SqlRecordAuthorizationRepository(borrowedSql)
+    override val recordAuthorizations: com.t1doo.aiyou.domain.RecordAuthorizationRepository = SqlRecordAuthorizationRepository(borrowedSql,connectionStorage,modelCapabilities)
     private val questionAuthorizationStorage = SqlSelectedQuestionAuthorizationRepository(borrowedSql)
     override val selectedQuestionAuthorizations: com.t1doo.aiyou.domain.SelectedQuestionAuthorizationRepository
         get() = questionAuthorizationStorage

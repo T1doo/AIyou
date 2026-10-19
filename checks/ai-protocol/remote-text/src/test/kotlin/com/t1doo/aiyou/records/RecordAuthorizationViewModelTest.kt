@@ -58,7 +58,7 @@ class RecordAuthorizationViewModelTest {
         assertNull(unknown.notice);assertNull(unknown.authorization);assertEquals(1,h.receipts())
         assertEquals(before.binding.generation+1,h.read().binding.generation)
         h.vm.localProcessing.retry(ui.session,unknown.request)
-        val done=h.ui { !it.busy&&it.notice!=null };assertSame(h.changes[0],h.changes[1])
+        val done=h.ui { !it.busy&&it.notice!=null };assertEquals(1,h.changes.size)
         assertEquals(ProcessingPolicy.LOCAL_ONLY,done.snapshot!!.policy);assertEquals(1,h.receipts());h.noSending()
     } }
 
@@ -72,7 +72,7 @@ class RecordAuthorizationViewModelTest {
         assertEquals(later,reconciled.authorization!!.snapshot);assertEquals(later,h.read())
         assertEquals(ProcessingPolicy.REMOTE_ALLOWED,reconciled.snapshot!!.policy)
         assertTrue(reconciled.notice!!.contains("当前范围以本次读取为准"));assertFalse(reconciled.notice.contains("已撤回"))
-        assertSame(h.changes[0],h.changes[1]);assertEquals(1,h.receipts());h.noSending()
+        assertEquals(1,h.changes.size);assertEquals(1,h.receipts());h.noSending()
     } }
 
     @Test(timeout=12_000) fun renderedSourceAndFirstReadCannotAdoptASourceRevisionAba():Unit=Harness().use { h -> runBlocking {
