@@ -6,7 +6,7 @@ import java.io.InputStream
 data class FullBackupSummary(val backupId: String, val createdAtMillis: Long, val records: Int,
     val trash: Int, val revisions: Int, val images: Int, val imageBytes: Long, val editDrafts: Int,
     val tasksAndProposals: Int, val memoriesAndReviews: Int, val captureDrafts: Int,
-    val deletionProofs: Int)
+    val deletionProofs: Int, val audioClips:Int=0, val audioBytes:Long=0)
 
 interface FullBackupSnapshot {
     val summary: FullBackupSummary

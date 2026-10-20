@@ -12,6 +12,7 @@ internal class SqlPermanentErasureRepository(private val database: RecordsSqlDat
     private val attachments: EncryptedAttachmentStore, private val edits: EncryptedOriginalEditStore,
     private val packages: SqlRecordPackageRepository,
     private val proposalAccess: ((RecordsSqlConnection)->List<TaskProposal>)? = null,
+    private val captureGate:CaptureDraftGate?=null,
     private val checkpoint: (String) -> Unit = {}) : PermanentErasureRepository {
     private class Stored(val receipt: PermanentErasureReceipt, val plan: String, val packageProof: String)
     override fun read(entryId: String): PermanentErasureReceipt? = safe {
@@ -33,7 +34,9 @@ internal class SqlPermanentErasureRepository(private val database: RecordsSqlDat
             PermanentErasurePage(receipts,unreadable,if (rows.size > limit) rows[limit-1][0] as String else null)
         }
     }
-    override suspend fun erase(intent: PermanentErasureIntent): PermanentErasureReceipt = try {
+    override suspend fun erase(intent:PermanentErasureIntent):PermanentErasureReceipt =
+        captureGate?.destruction(intent.source.sourceId) { eraseOwned(intent) } ?: eraseOwned(intent)
+    private suspend fun eraseOwned(intent: PermanentErasureIntent): PermanentErasureReceipt = try {
         val prepared = database.transaction { sql ->
             val existing = readWithin(sql,intent.source.sourceId)
             if (existing != null) {

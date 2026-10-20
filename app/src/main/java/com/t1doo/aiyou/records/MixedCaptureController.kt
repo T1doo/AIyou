@@ -18,7 +18,8 @@ data class MixedCaptureUiState(val draft: CaptureDraft?=null,val text: String=""
     val pendingEdits: Int=0,val selection: AttachmentSelection?=null,val pictures: Map<String,AttachmentPicture> = emptyMap(),
     val error: String?=null,val notice: String?=null,val confirmDiscard: Boolean=false,val uncertainSave: Boolean=false,
     val retainJpegMetadata: Boolean=true,val discardPending: Boolean=false,
-    val supportsProcessingChoice: Boolean=false,val policyChange: CapturePolicyChange?=null) {
+    val supportsProcessingChoice: Boolean=false,val policyChange: CapturePolicyChange?=null,
+    val audio:CaptureAudioUi=CaptureAudioUi()) {
     override fun toString()="MixedCaptureUiState(busy=$busy, redacted)"
 }
 
@@ -28,15 +29,48 @@ internal data class CaptureDay(val date: LocalDate, val zone: ZoneId)
 class MixedCaptureController internal constructor(private val current: () -> LocalRecordUiState,
     private val publish: ((LocalRecordUiState)->LocalRecordUiState)->Unit,
     private val enqueue: (suspend (EntryRepository)->Unit)->Boolean,
-    private val decode: (ByteArray)->AttachmentPicture,private val clock: Clock) {
+    private val decode: (ByteArray)->AttachmentPicture,private val clock: Clock,
+    private val canStartAudio:()->Boolean={true}) {
     private var binding: CaptureDraft?=null // IO actor only
     private var pendingSave: Triple<CaptureDraft,Long,String>?=null
     private var pendingDiscard: CaptureDraft?=null // Exact original clear identity; IO actor only.
     private var prepared: Pair<AttachmentIntent,ByteArray>?=null
     private val ids=AtomicLong()
     @Volatile private var disposed=false
+    @Volatile private var captureGate:CaptureDraftGate?=null
+    val audioCapture=ControlledCaptureAudio(::ui,{ availableIgnoringFreeze() && canStartAudio() && current().recordPackage==null && current().recycleBin==null },
+        enqueue,{binding},{ actual -> binding=actual;update { it.copy(draft=actual,text=actual.text) } },
+        { value -> update { it.copy(audio=value) } })
+    private fun uiMutation(action:()->Unit) { val gate=captureGate;if(gate==null) action() else gate.uiMutation(action) }
+    private fun enqueueMutation(action:suspend(EntryRepository)->Unit):Boolean {
+        val gate=captureGate ?: return enqueue(action)
+        val permit=gate.admit() ?: return false
+        val accepted=enqueue { store -> try { gate.context(permit) { action(store) } } finally { permit.close() } }
+        if(!accepted)permit.close()
+        return accepted
+    }
+    internal suspend fun drainAudioOnIo(store:EntryRepository) { audioCapture.closeAndFinalize(store) }
+
+    fun refresh() { uiMutation { refreshUnlocked() } }
+    fun edit(text: String) { uiMutation { editUnlocked(text) } }
+    fun changePolicy(draftId: String, version: Long, target: ProcessingPolicy) { uiMutation { changePolicyUnlocked(draftId,version,target) } }
+    fun retryPolicy(requestId: Long) { uiMutation { retryPolicyUnlocked(requestId) } }
+    fun readCurrentPolicy(requestId: Long) { uiMutation { readCurrentPolicyUnlocked(requestId) } }
+    fun metadata(retain: Boolean) { uiMutation { metadataUnlocked(retain) } }
+    fun select(retryId: String?=null) { uiMutation { selectUnlocked(retryId) } }
+    fun pickerFailed(request: Long) { uiMutation { pickerFailedUnlocked(request) } }
+    fun cancelSelection() { uiMutation { cancelSelectionUnlocked() } }
+    fun selected(request: Long,source: SelectedImageSource?) { uiMutation { selectedUnlocked(request,source) } }
+    fun retryImage() { uiMutation { retryImageUnlocked() } }
+    fun remove(id: String) { uiMutation { removeUnlocked(id) } }
+    fun removeAudio() { uiMutation { mutate { store,draft -> store.captureRecords!!.removeAudio(draft) } } }
+    fun requestDiscard() { uiMutation { requestDiscardUnlocked() } }
+    fun cancelDiscard() { uiMutation { cancelDiscardUnlocked() } }
+    fun confirmDiscard() { uiMutation { confirmDiscardUnlocked() } }
+    fun save() { uiMutation { saveUnlocked() } }
     private fun ui()=current().mixedCapture
-    private fun available()=!disposed && current().ready && !current().opening && current().error==null
+    private fun availableIgnoringFreeze()=!disposed && current().ready && !current().opening && current().error==null
+    private fun available()=availableIgnoringFreeze() && captureGate?.frozen!=true
     internal fun today(zone: ZoneId = ZoneId.systemDefault()) = CaptureDay(LocalDate.now(clock.withZone(zone)), zone)
     /** Same current-source order as Memories; capture date, not a manually assigned event date. */
     internal fun recentEntries(day: CaptureDay = today()): List<StoredEntry> {
@@ -48,7 +82,15 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
     private fun update(change:(MixedCaptureUiState)->MixedCaptureUiState)=publish { local ->
         if(disposed) local else local.copy(mixedCapture=change(local.mixedCapture ?: MixedCaptureUiState()))
     }
-    suspend fun initialize(store: EntryRepository) {
+    suspend fun initialize(store:EntryRepository) {
+        val repo=store.captureRecords ?: return
+        captureGate=repo.mutationGate;audioCapture.attach(repo)
+        val gate=captureGate
+        if(gate==null)initializeOwned(store) else if(!gate.frozen) {
+            try { gate.mutation { initializeOwned(store) } } catch(_:CaptureConflict) { /* Frozen before admission. */ }
+        }
+    }
+    private suspend fun initializeOwned(store: EntryRepository) {
         // Routine record reloads must not turn a lost range ACK into an optimistic UI acknowledgement.
         if(store.captureRecords==null || disposed || ui()?.policyChange!=null) return
         try {
@@ -67,11 +109,17 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
     }
     /** Only replace an unchanged, empty initialized composer after the verified empty-target import. */
     internal suspend fun adoptFullRestore(store:EntryRepository) {
+        val gate=captureGate
+        if(gate==null)adoptFullRestoreOwned(store) else if(!gate.frozen) {
+            try { gate.mutation { adoptFullRestoreOwned(store) } } catch(_:CaptureConflict) { /* No late adoption. */ }
+        }
+    }
+    private suspend fun adoptFullRestoreOwned(store:EntryRepository) {
         val before=ui() ?: return
         val draft=before.draft
         val clean=before.text.isEmpty() && before.pendingEdits==0 && !before.busy && before.selection==null &&
             !before.uncertainSave && !before.confirmDiscard && !before.discardPending && before.policyChange==null &&
-            draft?.text.orEmpty().isEmpty() && draft?.images.orEmpty().isEmpty()
+            draft?.text.orEmpty().isEmpty() && draft?.images.orEmpty().isEmpty() && draft?.audio==null
         if(!clean) return
         val restored=store.captureRecords?.current() ?: return
         publish { local -> if(disposed || local.mixedCapture!==before) local else {
@@ -81,7 +129,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
             binding=restored;pendingSave=null;pendingDiscard=null;thumbnails(store)
         }
     }
-    fun refresh() {
+    private fun refreshUnlocked() {
         if(!available() || ui()?.busy==true) return
         ui()?.policyChange?.let { readCurrentPolicy(it.requestId);return }
         if(ui()?.discardPending==true) { confirmDiscard();return }
@@ -89,11 +137,11 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         update { it.copy(busy=true,selection=null) }
         submit { store -> try { store.captureRecords!!.recover();initialize(store) } finally { update { it.copy(busy=false) } } }
     }
-    fun edit(text: String) {
+    private fun editUnlocked(text: String) {
         val u=ui() ?: return
         if(!available() || u.busy || u.selection!=null || u.uncertainSave || u.discardPending || u.policyChange!=null || text.length>100000 || u.draft==null) return
         update { it.copy(text=text,pendingEdits=it.pendingEdits+1,error=null,notice=null) }
-        if(!enqueue { store ->
+        if(!enqueueMutation { store ->
             try {
                 val a=checkNotNull(binding);binding=store.captureRecords!!.edit(a,text)
                 update { it.copy(draft=binding,error=null) }
@@ -101,7 +149,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
             finally { update { it.copy(pendingEdits=(it.pendingEdits-1).coerceAtLeast(0)) } }
         }) update { it.copy(pendingEdits=(it.pendingEdits-1).coerceAtLeast(0),error="本机队列暂不可用，输入已保留。") }
     }
-    fun changePolicy(draftId: String, version: Long, target: ProcessingPolicy) {
+    private fun changePolicyUnlocked(draftId: String, version: Long, target: ProcessingPolicy) {
         val u=ui() ?: return;val draft=u.draft ?: return
         if(!available() || !u.supportsProcessingChoice || u.busy || u.pendingEdits>0 || u.selection!=null ||
             u.uncertainSave || u.discardPending || u.confirmDiscard || u.policyChange!=null || draft.discarding ||
@@ -111,7 +159,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         update { it.copy(policyChange=change,busy=true,notice=null) }
         submit { store -> commitPolicy(store,change) }
     }
-    fun retryPolicy(requestId: Long) {
+    private fun retryPolicyUnlocked(requestId: Long) {
         val u=ui() ?: return;val change=u.policyChange ?: return
         if(!available() || u.busy || change.requestId!=requestId || u.draft?.id!=change.expected.id) return
         update { it.copy(busy=true,error=null) }
@@ -135,7 +183,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         catch(_:Exception){if(ownsPolicy(change)) update { it.copy(error="范围保存尚未确认。请重试确认同一次选择，或重新读取当前范围；核对前不能保存记录。") }}
         finally { update { if(it.policyChange?.requestId==change.requestId) it.copy(busy=false) else it } }
     }
-    fun readCurrentPolicy(requestId: Long) {
+    private fun readCurrentPolicyUnlocked(requestId: Long) {
         val u=ui() ?: return;val change=u.policyChange ?: return
         if(!available() || u.busy || change.requestId!=requestId) return
         update { it.copy(busy=true,error=null) }
@@ -154,23 +202,24 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
             finally { update { if(it.policyChange?.requestId==requestId) it.copy(busy=false) else it } }
         }
     }
-    fun metadata(retain: Boolean) { if(available() && ui()?.busy==false && ui()?.selection==null && ui()?.discardPending==false && ui()?.policyChange==null) update { it.copy(retainJpegMetadata=retain) } }
-    fun select(retryId: String?=null) {
+    private fun metadataUnlocked(retain: Boolean) { if(available() && ui()?.busy==false && ui()?.selection==null && ui()?.discardPending==false && ui()?.policyChange==null) update { it.copy(retainJpegMetadata=retain) } }
+    private fun selectUnlocked(retryId: String?) {
         val u=ui() ?: return;val d=u.draft ?: return
         if(!available() || u.busy || u.selection!=null || u.uncertainSave || u.discardPending || u.policyChange!=null || u.pendingEdits>0 || d.discarding) return
         val item=retryId?.let { id -> d.images.singleOrNull { it.intent.id==id && it.state!=CaptureImageState.READY } ?: return }
-        if(item==null && d.images.size>=20) { update { it.copy(error="一次最多 20 张原图。") };return }
+        if(item==null && d.images.size+(if(d.audio!=null) 1 else 0)>=20) { update { it.copy(error=if(d.audio==null) "一次最多 20 张原图。" else "图片和原音合计最多 20 个附件。") };return }
         clearPrepared()
         update { it.copy(selection=AttachmentSelection(ids.incrementAndGet(),item?.intent?.id ?: UUID.randomUUID().toString(),item?.intent,retainJpegMetadata=u.retainJpegMetadata),error=null,notice=null) }
     }
-    fun claimPicker(request: Long): Boolean {
+    fun claimPicker(request:Long):Boolean = captureGate?.uiMutation { claimPickerUnlocked(request) } ?: if(captureGate==null) claimPickerUnlocked(request) else false
+    private fun claimPickerUnlocked(request: Long): Boolean {
         val s=ui()?.selection ?: return false
         if(!available() || s.requestId!=request || s.launched || s.phase!=AttachmentImportPhase.PICKING) return false
         update { it.copy(selection=s.copy(launched=true)) };return true
     }
-    fun pickerFailed(request: Long) { if(ui()?.selection?.requestId==request) update { it.copy(selection=null,error="未能选择图片，草稿已保留。") } }
-    fun cancelSelection() { val selection=ui()?.selection ?: return;if(selection.phase==AttachmentImportPhase.SAVING) return;update { it.copy(selection=null,error=null) };enqueue { clearPrepared() } }
-    fun selected(request: Long,source: SelectedImageSource?) {
+    private fun pickerFailedUnlocked(request: Long) { if(ui()?.selection?.requestId==request) update { it.copy(selection=null,error="未能选择图片，草稿已保留。") } }
+    private fun cancelSelectionUnlocked() { val selection=ui()?.selection ?: return;if(selection.phase==AttachmentImportPhase.SAVING) return;update { it.copy(selection=null,error=null) };enqueueMutation { clearPrepared() } }
+    private fun selectedUnlocked(request: Long,source: SelectedImageSource?) {
         val u=ui() ?: return;val s=u.selection ?: return;val id=u.draft?.id ?: return
         if(!available() || s.requestId!=request || s.phase!=AttachmentImportPhase.PICKING) return
         if(source==null) { cancelSelection();return }
@@ -193,7 +242,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
             finally { bytes?.fill(0) }
         }
     }
-    fun retryImage() {
+    private fun retryImageUnlocked() {
         val u=ui() ?: return;val s=u.selection ?: return;val id=u.draft?.id ?: return
         if(!available() || s.phase!=AttachmentImportPhase.FAILED) return
         if(prepared==null) { cancelSelection();return }
@@ -207,10 +256,10 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         if(owns(id,request)) update { it.copy(draft=result,selection=null,error=null,notice="图片已加密暂存在草稿；尚未保存为记录。") }
         clearPrepared();thumbnails(store)
     }
-    fun remove(id: String) { mutate { store,a ->store.captureRecords!!.remove(a.id,id) } }
-    fun requestDiscard() { if(available() && ui()?.busy==false && ui()?.selection==null && ui()?.uncertainSave==false && ui()?.discardPending==false && ui()?.policyChange==null) update { it.copy(confirmDiscard=true) } }
-    fun cancelDiscard() { update { it.copy(confirmDiscard=false) } }
-    fun confirmDiscard() { if(ui()?.confirmDiscard==true || ui()?.discardPending==true) mutate(resetText=true) { store,a ->store.captureRecords!!.discard(a.id) } }
+    private fun removeUnlocked(id: String) { mutate { store,a ->store.captureRecords!!.remove(a.id,id) } }
+    private fun requestDiscardUnlocked() { if(available() && ui()?.busy==false && ui()?.selection==null && ui()?.uncertainSave==false && ui()?.discardPending==false && ui()?.policyChange==null) update { it.copy(confirmDiscard=true) } }
+    private fun cancelDiscardUnlocked() { update { it.copy(confirmDiscard=false) } }
+    private fun confirmDiscardUnlocked() { if(ui()?.confirmDiscard==true || ui()?.discardPending==true) mutate(resetText=true) { store,a ->store.captureRecords!!.discard(a.id) } }
     private fun mutate(resetText:Boolean=false,operation: suspend (EntryRepository,CaptureDraft)->CaptureDraft) {
         val u=ui() ?: return
         if(!available() || u.busy || u.selection!=null || u.uncertainSave || u.policyChange!=null || u.pendingEdits>0 || (u.discardPending && !resetText)) return
@@ -221,6 +270,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
                 val expected=if(resetText) pendingDiscard ?: checkNotNull(binding).also { pendingDiscard=it } else checkNotNull(binding)
                 val result=operation(store,expected);binding=result;clearPrepared()
                 update { it.copy(draft=result,text=if(resetText) result.text else it.text,confirmDiscard=false,
+                    audio=if(expected.audio!=null && result.audio==null) CaptureAudioUi() else it.audio,
                     discardPending=if(resetText) false else it.discardPending,error=null,notice=null) }
                 if(resetText) pendingDiscard=null
                 thumbnails(store)
@@ -231,16 +281,18 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         }
         if(!accepted) update { it.copy(discardPending=u.discardPending) }
     }
-    fun save() {
+    private fun saveUnlocked() {
         val u=ui() ?: return
         if(!available() || u.busy || u.selection!=null || u.pendingEdits>0 || u.draft==null || u.discardPending || u.policyChange!=null) return
-        if(pendingSave==null && (u.draft.discarding || u.draft.images.any { it.state!=CaptureImageState.READY })) {
-            update { it.copy(error="图片尚未完整保存，请重试读取、重新选择同一图片或明确移除后再保存。") };return
+        if(pendingSave==null && (u.draft.discarding || u.draft.images.any { it.state!=CaptureImageState.READY } ||
+            u.draft.audio?.let { it.state!=CaptureAudioState.READY }==true)) {
+            update { it.copy(error=if(u.draft.audio==null) "图片尚未完整保存，请重试读取、重新选择同一图片或明确移除后再保存。"
+                else "附件尚未完整保存，请核对或明确移除后再保存记录。") };return
         }
         if(pendingSave==null) try { OriginalExports.hash(u.text) } catch(_:Exception) {
             update { it.copy(error="文字输入尚未完成，草稿已保留。请完成输入后再保存。") };return
         }
-        if(pendingSave==null && u.text.isBlank() && u.draft.images.isEmpty()) { update { it.copy(error="请写下文字或添加至少一张图片。") };return }
+        if(pendingSave==null && u.text.isBlank() && u.draft.images.isEmpty() && u.draft.audio==null) { update { it.copy(error="请写下文字或添加至少一张图片。") };return }
         update { it.copy(busy=true,error=null) }
         submit { store ->
             try {
@@ -275,15 +327,16 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         else update { it.copy(pictures=pictures) }
     }
     private suspend fun reconcile(store: EntryRepository) {
+        if(captureGate?.frozen==true)return
         try { val a=store.captureRecords!!.current();if(a.id==binding?.id) { binding=a;update { it.copy(draft=a) } } }
         catch(e:CancellationException){throw e} catch(_:Exception) { /* Preserve acknowledged binding and current input. */ }
     }
     private fun submit(rejectionMessage:String?=null,action:suspend(EntryRepository)->Unit):Boolean {
-        if(enqueue(action)) return true
+        if(enqueueMutation(action)) return true
         update { it.copy(busy=false,error=rejectionMessage ?: "本机操作暂不可用，文字和已选图片已保留。请重试。") };return false
     }
     private fun owns(id: String,request: Long)=available() && ui()?.draft?.id==id && ui()?.selection?.requestId==request
     private fun clearPrepared() { prepared?.second?.fill(0);prepared=null }
-    fun dispose() { disposed=true;publish { it.copy(mixedCapture=null) } }
+    fun dispose() { audioCapture.retire();disposed=true;publish { it.copy(mixedCapture=null) } }
     fun disposeOnIo() { disposed=true;clearPrepared();binding=null;pendingSave=null;pendingDiscard=null }
 }

@@ -12,6 +12,7 @@ import java.util.concurrent.CancellationException
 internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,private val key:ByteArray,
     private val media:EncryptedAttachmentStore,private val edits:EncryptedOriginalEditStore,
     private val mediaPackages:SqlRecordMediaPackageRepository,
+    private val captureGate:CaptureDraftGate?=null,
     private val checkpoint:(String)->Unit={}):FullBackupRepository {
     private val cipher=RecordMediaPackageCipher()
     override suspend fun capture(backupId:String,createdAtMillis:Long):FullBackupSnapshot = captureData(backupId,createdAtMillis,true)
@@ -19,8 +20,8 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
         edits.packageFiles { editLease ->
             val data=database.transaction { sql -> snapshot(sql,id,at,editLease.fullDrafts()) }
             try {
-                files.inventory(data.images.map(::intent))
-                if(verifyImages) data.images.forEach { image ->
+                files.inventory(data.media.map(::intent))
+                if(verifyImages) data.media.forEach { image ->
                     val bytes=files.read(intent(image))
                     try { RecordMediaPackageCipher.checkImage(image,bytes) } finally { bytes.fill(0) }
                 }
@@ -52,20 +53,22 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
         pack.data.checkLive()
         return database.transaction { sql ->
             sql.query("SELECT entryId,sourceRevision,operation,state FROM record_package_receipts WHERE id=?",listOf(PREFIX+pack.data.id))
-                .singleOrNull()==listOf(pack.data.id,8L,OP,"DONE:"+pack.digest)
+                .singleOrNull()==listOf(pack.data.id,pack.data.version.toLong(),operation(pack.data),"DONE:"+pack.digest)
         }
     }
-    override suspend fun restore(backup:VerifiedFullBackup,active:()->Boolean):FullBackupRestored {
+    override suspend fun restore(backup:VerifiedFullBackup,active:()->Boolean):FullBackupRestored =
+        captureGate?.mutation { restoreOwned(backup,active) } ?: restoreOwned(backup,active)
+    private suspend fun restoreOwned(backup:VerifiedFullBackup,active:()->Boolean):FullBackupRestored {
         val pack=backup as? AuthenticatedFullBackup ?: throw RecordPackageInvalid()
         val data=pack.data;data.checkLive();require(active());validateReceipts(data);cells { it.validatePortable(data) }
         val journalId=PREFIX+data.id
         require(data.tables[12].none { it[0]==journalId })
         fun receipt(sql:RecordsSqlConnection):String? = sql.query("SELECT entryId,sourceRevision,operation,state FROM record_package_receipts WHERE id=?",listOf(journalId))
-            .singleOrNull()?.let { require(it.take(3)==listOf(data.id,8L,OP));it[3] as String }
+            .singleOrNull()?.let { require(it.take(3)==listOf(data.id,data.version.toLong(),operation(data)));it[3] as String }
         if(database.transaction { sql -> receipt(sql)?.let { state ->
                 require(state in listOf("PENDING:"+pack.digest,"DONE:"+pack.digest));state.startsWith("DONE:")
             } ?: false }) return FullBackupRestored(data.summary,true)
-        val intents=data.images.map(::intent)
+        val intents=data.media.map(::intent)
         return media.importPackage(intents,consume={ consume -> pack.cipher.consumeFull(pack) { index,bytes ->
             require(active());consume(index,bytes)
         } },maximumImages=256,before={
@@ -81,7 +84,7 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
                         require(existingEdits.isEmpty())
                         // Inventory was empty at the first durable intent, never inferred from a retry.
                         media.fullImportInventory(emptyList())
-                        sql.execute("INSERT INTO record_package_receipts VALUES(?,?,8,?,?)",listOf(journalId,data.id,OP,"PENDING:"+pack.digest))
+                        sql.execute("INSERT INTO record_package_receipts VALUES(?,?,?,?,?)",listOf(journalId,data.id,data.version.toLong(),operation(data),"PENDING:"+pack.digest))
                     } else require(existingEdits.all { it in data.edits })
                 }
             }
@@ -90,7 +93,7 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
             edits.packageFiles { lease ->
                 data.edits.forEach { require(active());lease.installFull(it) }
                 require(lease.fullDrafts().associateBy { it.entryId }==data.edits.associateBy { it.entryId })
-                data.capture?.let { media.registerFullCapture(it.images.map { image -> image.intent }) }
+                data.capture?.let { media.registerFullCapture(it.images.map { image -> image.intent }+listOfNotNull(it.audio?.intent)) }
                 checkpoint("full-files")
                 database.transaction { sql ->
                     require(active() && receipt(sql)=="PENDING:"+pack.digest)
@@ -125,10 +128,11 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
             }
         }
     }
+    private fun operation(data:FullBackupData)=if(data.version==9) "FULL_BACKUP_IMPORT_V9" else OP
     private fun verifyRestored(expected:FullBackupData,actual:FullBackupData) {
         // Logical rows are keyed sets. SQL BINARY and the edit store have different sort orders,
         // while authenticated image frames retain their explicit document order throughout IO.
-        require(expected.images.associateBy { it.attachmentId }==actual.images.associateBy { it.attachmentId } &&
+        require(expected.media.associateBy { it.attachmentId }==actual.media.associateBy { it.attachmentId } &&
             expected.edits.associateBy { it.entryId }==actual.edits.associateBy { it.entryId } && FullBackupCodec.sameCapture(expected.capture,actual.capture))
         cells { owners -> expected.tables.forEachIndexed { index,rows ->
             val after=actual.tables[index];require(rows.size==after.size)
@@ -186,9 +190,10 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
                 }
         } }
         val capture=FullBackupCodec.decodeCapture(tables[12])
-        val images=tables[3].map { RecordPackageImage(it[1] as String,Math.toIntExact(it[2] as Long),it[0] as String,it[3] as String,it[5] as Long,it[4] as String) }+
-            capture?.images.orEmpty().map { it.intent.let { i -> RecordPackageImage(i.entryId,1,i.id,i.mediaType,i.byteSize,i.sha256) } }
-        val data=FullBackupData(id,at,tables,images,editDrafts,capture)
+        val images=tables[3].map { RecordPackageAttachments.descriptor(it[1] as String,Math.toIntExact(it[2] as Long),it[0] as String,it[3] as String,it[5] as Long,it[4] as String) }+
+            capture?.images.orEmpty().map { it.intent.let { i -> RecordPackageImage(i.entryId,1,i.id,i.mediaType,i.byteSize,i.sha256) } }+
+            listOfNotNull(capture?.audio?.intent).map { RecordPackageAudio(it.entryId,it.revision,it.id,it.mediaType,it.byteSize,it.sha256) }
+        val data=FullBackupData(id,at,tables,images.filterIsInstance<RecordPackageImage>(),editDrafts,capture,images.filterIsInstance<RecordPackageAudio>())
         try { FullBackupCodec.validate(data);validateReceipts(data);return data } catch(f:Throwable) { data.release();throw f }
     }
     private fun validateReceipts(data:FullBackupData) {
@@ -196,7 +201,7 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
         mediaPackages.validatePortableLedger(data)
         data.tables[12].forEach { row -> when(row[3]) {
             "PACKAGE_MEDIA_INTENT" -> mediaPackages.validateCompletedForFullBackup(row)
-            OP -> { RecordPackages.uuid(row[1] as String);require(row[0]==PREFIX+row[1] && row[2]==8L && (row[4] as String).matches(Regex("DONE:[0-9a-f]{64}"))) }
+            OP,"FULL_BACKUP_IMPORT_V9" -> { RecordPackages.uuid(row[1] as String);require(row[0]==PREFIX+row[1] && row[2]==(if(row[3]==OP) 8L else 9L) && (row[4] as String).matches(Regex("DONE:[0-9a-f]{64}"))) }
             "CAPTURE_SAVED","CAPTURE_DISCARDED" -> {
                 RecordPackages.uuid(row[1] as String)
                 require(row[0]==(row[3] as String)+":"+row[1] && row[2]==1L)
@@ -205,7 +210,7 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
             "CAPTURE_REMOVED" -> {
                 RecordPackages.uuid(row[1] as String);require((row[0] as String).startsWith("CAPTURE_REMOVED:") && row[2]==1L)
                 val image=(row[0] as String).removePrefix("CAPTURE_REMOVED:");RecordPackages.uuid(image);RecordPackages.digest(row[4] as String)
-                require(data.capture?.images.orEmpty().none { it.intent.id==image })
+                require((data.capture?.images.orEmpty().map { it.intent }+listOfNotNull(data.capture?.audio?.intent)).none { it.id==image })
             }
             else -> require(row[3] in FullBackupTables.receipts)
         } }
@@ -218,10 +223,10 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
                 // Read all to distinguish our journal plus the default slot from an unknown third row.
                 val all=sql.query("SELECT "+spec.columns+" FROM record_package_receipts LIMIT 4")
                 require(all.all { row ->
-                    if(row[0]==PREFIX+pack.data.id) resuming && row==listOf(PREFIX+pack.data.id,pack.data.id,8L,OP,"PENDING:"+pack.digest)
+                    if(row[0]==PREFIX+pack.data.id) resuming && row==listOf(PREFIX+pack.data.id,pack.data.id,pack.data.version.toLong(),operation(pack.data),"PENDING:"+pack.digest)
                     else if(row[0]=="CAPTURE_CURRENT" && row[3]=="CAPTURE_CURRENT" && row[2]==1L) {
                         val draft=SqlCaptureRepository.decodeForBackup(row[4] as String)
-                        row[1]==draft.id && draft.version==1L && draft.text.isEmpty() && draft.images.isEmpty() && !draft.discarding &&
+                        row[1]==draft.id && draft.version==1L && draft.text.isEmpty() && draft.images.isEmpty() && draft.audio==null && !draft.discarding &&
                             draft.policy in setOf(ProcessingPolicy.LOCAL_ONLY,ProcessingPolicy.AI_NONE)
                     } else false
                 })
@@ -235,7 +240,7 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
         require(owned.size<=1024 && (resuming || owned.isEmpty()))
         owned.forEach { row ->
             val known=when(row[0]) {
-                "ATTACHMENTS" -> pack.data.images.any { it.sourceId==row[2] && row[1] in listOf(it.attachmentId+".tmp",it.attachmentId+".aead") }
+                "ATTACHMENTS" -> pack.data.media.any { it.sourceId==row[2] && row[1] in listOf(it.attachmentId+".tmp",it.attachmentId+".aead") }
                 "EDITS" -> pack.data.edits.any { it.entryId==row[2] && row[1]==packageHex(packageHash(it.entryId.toByteArray(Charsets.UTF_8)))+".edit.partial."+it.id }
                 else -> false
             }
@@ -255,7 +260,7 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
         return try { packageHex(packageHash(bytes)) } finally { bytes.fill(0) }
     }
     private inline fun <T> cells(block:(FullBackupCells)->T):T = FullBackupCells(database,key).use(block)
-    private fun intent(image:RecordPackageImage)=AttachmentIntent(image.attachmentId,image.sourceId,image.sourceRevision,image.mediaType,image.sha256,image.byteSize)
+    private fun intent(image:RecordPackageAttachment)=AttachmentIntent(image.attachmentId,image.sourceId,image.sourceRevision,image.mediaType,image.sha256,image.byteSize)
     companion object { private const val PREFIX="FULL_BACKUP:";private const val OP="FULL_BACKUP_IMPORT_V8" }
 }
 

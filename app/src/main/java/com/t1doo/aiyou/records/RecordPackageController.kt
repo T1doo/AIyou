@@ -434,7 +434,9 @@ class RecordPackageController internal constructor(private val current: () -> Lo
     }
     private fun hasFullBackupInput(local:LocalRecordUiState)=local.text.isNotEmpty() || local.mixedCapture?.let {
         it.text.isNotEmpty() || it.pendingEdits>0 || it.busy || it.selection!=null || it.uncertainSave ||
-            it.confirmDiscard || it.discardPending || it.policyChange!=null
+            it.confirmDiscard || it.discardPending || it.policyChange!=null || it.draft?.audio!=null ||
+            it.audio.phase in setOf(CaptureAudioPhase.PREPARING,CaptureAudioPhase.STARTING,CaptureAudioPhase.RECORDING,
+                CaptureAudioPhase.FINALIZING,CaptureAudioPhase.UNKNOWN)
     }==true
     /** Data belongs to the still-open records owner even when its importing page has retired.
      * A lost commit ACK still requires reading actual committed rows; only panel completion is session-scoped. */

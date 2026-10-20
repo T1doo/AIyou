@@ -29,20 +29,23 @@ internal object FullBackupTables {
     val kinds=listOf("sllssll?l","slssl","sllnn","sslssls","slsb","slsb","slsl??","slsb","sslslllsslb","lsls","sslss","sllssss","sslss")
     val excluded=setOf("remote_text_jobs","text_annotations","local_search_fts","local_search_documents","local_search_epoch","owned_file_creations","model_configurations","model_capability_profiles","reminder_runtime_meta")
     val receipts=setOf("PACKAGE_ORIGIN","PACKAGE_RESTORE","PACKAGE_TASK_RESTORE","PACKAGE_MEDIA_INTENT",
-        "CAPTURE_CURRENT","CAPTURE_SAVED","CAPTURE_DISCARDED","CAPTURE_REMOVED","FULL_BACKUP_IMPORT_V8")
+        "CAPTURE_CURRENT","CAPTURE_SAVED","CAPTURE_DISCARDED","CAPTURE_REMOVED","FULL_BACKUP_IMPORT_V8","FULL_BACKUP_IMPORT_V9")
     val retainedJobs=setOf("ORIGINAL_EDIT_COMMIT","PACKAGE_ORIGIN","PACKAGE_RESTORE")
     val excludedJobs=setOf("LOCAL_INDEX","LOCAL_TAG_HINTS","LOCAL_SUMMARY","LOCAL_EXCERPTS","RECORD_AUTHORIZATION_V1","SELECTED_QUESTION_SEND_V1")
 }
 internal data class FullBackupSourceProof(val source:SourceVersion,val hash:String,val generation:Long,val original:String,
     val captured:Long,val zone:String,val policy:ProcessingPolicy,val deleted:Boolean)
 internal class FullBackupData(val id:String,val created:Long,val tables:List<List<List<Any?>>>,
-    val images:List<RecordPackageImage>,val edits:List<OriginalEditDraft>,val capture:CaptureDraft?) : FullBackupSnapshot {
+    val images:List<RecordPackageImage>,val edits:List<OriginalEditDraft>,val capture:CaptureDraft?,
+    val audios:List<RecordPackageAudio> = emptyList()) : FullBackupSnapshot {
+    val media:List<RecordPackageAttachment> get()=images+audios
+    val version:Int get()=if(audios.isNotEmpty() || capture?.audio!=null || tables[12].any { it[3]=="FULL_BACKUP_IMPORT_V9" }) 9 else 8
     private var released=false
     override val summary:FullBackupSummary
         get() { check(!released)
             return FullBackupSummary(id,created,tables[0].size,tables[2].count { it[2]==1L },tables[1].size,
                 images.size,images.sumOf { it.byteSize },edits.count { it.state==OriginalEditDraftState.ACTIVE },
-                tables[7].size,tables[8].size,(if(capture!=null) 1 else 0)+tables[9].size,tables[11].size)
+                tables[7].size,tables[8].size,(if(capture!=null) 1 else 0)+tables[9].size,tables[11].size,audios.size,audios.sumOf { it.byteSize })
         }
     fun checkLive() { check(!released) }
     override fun release() { if(!released) { released=true;tables.flatten().flatten().filterIsInstance<ByteArray>().forEach { it.fill(0) } } }
@@ -66,7 +69,7 @@ internal object FullBackupCodec {
     fun encode(data:FullBackupData):ByteArray {
         data.checkLive();validate(data)
         return PackageWriter(MAX_METADATA).use { w ->
-            w.string("AIyou-logical-full-v8",32);w.i32(8);w.i32(1)
+            w.string(if(data.version==9) "AIyou-logical-full-v9" else "AIyou-logical-full-v8",32);w.i32(data.version);w.i32(1)
             w.string(data.id,36);w.i64(data.created);w.i32(FullBackupTables.specs.size)
             FullBackupTables.specs.forEachIndexed { index,spec ->
                 w.string(spec.name,64);w.string(spec.columns,512)
@@ -83,6 +86,9 @@ internal object FullBackupCodec {
                 w.string(i.sourceId,512);w.i32(i.sourceRevision);w.string(i.attachmentId,36);w.string(i.mediaType,32)
                 w.i64(i.byteSize);w.raw(packageUnhex(i.sha256))
             }
+            if(data.version==9) { w.i32(data.audios.size);data.audios.forEach { a ->
+                w.string(a.sourceId,512);w.i32(a.sourceRevision);w.string(a.attachmentId,36);w.string(a.mediaType,32);w.i64(a.byteSize);w.raw(packageUnhex(a.sha256))
+            } }
             w.i32(data.edits.size);data.edits.forEach { RecordEditDraftPackageCodec.write(w,it) }
             w.bytes()
         }
@@ -92,7 +98,7 @@ internal object FullBackupCodec {
         val allocated=mutableListOf<ByteArray>()
         try {
             val r=PackageReader(bytes)
-            require(r.string(32)=="AIyou-logical-full-v8" && r.i32()==8 && r.i32()==1)
+            val name=r.string(32);val version=r.i32();require(version in setOf(8,9) && name=="AIyou-logical-full-v"+version && r.i32()==1)
             val id=r.string(36);val at=r.i64();require(r.i32()==FullBackupTables.specs.size)
             val tables=FullBackupTables.specs.map { spec ->
                 require(r.string(64)==spec.name && r.string(512)==spec.columns)
@@ -105,9 +111,10 @@ internal object FullBackupCodec {
                 } } }
             }
             val images=List(r.count(256)) { RecordPackageImage(r.string(512),r.i32(),r.string(36),r.string(32),r.i64(),packageHex(r.raw(32))) }
+            val audios=if(version==9) List(r.count(256)) { RecordPackageAudio(r.string(512),r.i32(),r.string(36),r.string(32),r.i64(),packageHex(r.raw(32))) } else emptyList()
             val edits=List(r.count(256)) { RecordEditDraftPackageCodec.read(r) };r.end()
             val capture=decodeCapture(tables[12])
-            return FullBackupData(id,at,tables,images,edits,capture).also { validate(it);allocated.clear() }
+            return FullBackupData(id,at,tables,images,edits,capture,audios).also { require(it.version==version);validate(it);allocated.clear() }
         } finally { allocated.forEach { it.fill(0) } }
     }
     fun decodeCapture(receipts:List<List<Any?>>):CaptureDraft? {
@@ -150,16 +157,20 @@ internal object FullBackupCodec {
         require(d.tables[1].all { it[0] in entries })
         d.tables[2].forEach { require(it[0] in entries && (it[1] as Long)>=0 && it[2] in setOf(0L,1L) && it[3]==null && it[4]==null) }
         val capture=decodeCapture(d.tables[12]);require(sameCapture(capture,d.capture))
-        require(capture==null || !capture.discarding && capture.images.all { it.state==CaptureImageState.READY })
+        require(capture==null || !capture.discarding && capture.images.all { it.state==CaptureImageState.READY } && (capture.audio?.state ?: CaptureAudioState.READY)==CaptureAudioState.READY)
         require(capture==null || d.tables[9].isEmpty())
         require(capture==null || capture.id !in entries)
         d.tables[9].forEach { require(it[0]==1L && (it[2] as Long)>0 && (it[3] as String).length<=100000);RecordPackages.uuid(it[1] as String) }
         val expected=d.tables[3].map { row ->
             require(row[6]=="READY" && row[1] in entries && d.tables[1].any { it[0]==row[1] && it[1]==row[2] })
-            RecordPackageImage(row[1] as String,Math.toIntExact(row[2] as Long),row[0] as String,row[3] as String,row[5] as Long,row[4] as String)
-        }+capture?.images.orEmpty().map { i -> i.intent.let { RecordPackageImage(it.entryId,it.revision,it.id,it.mediaType,it.byteSize,it.sha256) } }
-        require(d.images==expected && d.images.size<=256 && d.images.map { it.attachmentId }.distinct().size==d.images.size &&
-            d.images.sumOf { it.byteSize }<=RecordMediaPackages.MAX_IMAGE_TOTAL)
+            RecordPackageAttachments.descriptor(row[1] as String,Math.toIntExact(row[2] as Long),row[0] as String,row[3] as String,row[5] as Long,row[4] as String)
+        }+capture?.images.orEmpty().map { i -> i.intent.let { RecordPackageImage(it.entryId,it.revision,it.id,it.mediaType,it.byteSize,it.sha256) } }+
+            listOfNotNull(capture?.audio?.intent).map { RecordPackageAudio(it.entryId,it.revision,it.id,it.mediaType,it.byteSize,it.sha256) }
+        require(d.images==expected.filterIsInstance<RecordPackageImage>() && d.audios==expected.filterIsInstance<RecordPackageAudio>() && d.media.size<=256 && d.media.map { it.attachmentId }.distinct().size==d.media.size &&
+            d.media.sumOf { it.byteSize }<=RecordMediaPackages.MAX_IMAGE_TOTAL)
+        if(d.version==9) d.tables[1].filter { (it[2] as String).isBlank() }.forEach { revision ->
+            require(expected.any { it.sourceId==revision[0] && it.sourceRevision.toLong()==revision[1] })
+        }
         d.edits.forEach { e ->
             EncryptedOriginalEditStore.validateFullDraft(e)
             require(e.entryId in entries && e.baseRevision.toLong()<=(entries.getValue(e.entryId)[1] as Long))
@@ -206,7 +217,7 @@ internal object FullBackupCodec {
         d.tables[8].forEach { require(it[5] in setOf(1L,2L) && it[7] in setOf("READY","CANCELLED","INVALIDATED")) }
     }
     fun sameCapture(a:CaptureDraft?,b:CaptureDraft?):Boolean = if(a==null || b==null) a==null && b==null else
-        a.id==b.id && a.version==b.version && a.text==b.text && a.images==b.images && a.discarding==b.discarding && a.policy==b.policy
+        a.sameSnapshot(b)
     // Drafts can contain unfinished UTF-16. No implicit replacement by a UTF-8 encoder.
     private fun text(w:PackageWriter,value:String) {
         require(value.length<=MAX_METADATA/2);w.i32(value.length)

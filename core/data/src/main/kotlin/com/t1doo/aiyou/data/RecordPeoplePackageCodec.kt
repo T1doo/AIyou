@@ -53,11 +53,11 @@ internal object RecordPeoplePackageCodec {
     fun legacyPreview(preview: RecordMediaPreview): RecordMediaPreview {
         val snapshot = OriginalExportSnapshot(preview.snapshot.id, preview.snapshot.createdAtMillis,
             preview.snapshot.records.map { r -> OriginalExportRecord(r.entry, r.contentHash, r.tags,
-                r.sourceGeneration, r.imageCount, r.eventDate) }, preview.snapshot.records.isEmpty())
+                r.sourceGeneration, r.imageCount, r.eventDate,audioCount=r.audioCount) }, preview.snapshot.records.isEmpty())
         val history = preview.history?.map { r -> RecordPackageOriginal(r.sourceId, r.sourceRevision,
             r.capturedAtMillis, r.captureTimeZone, r.originalText, r.contentHash, r.sourceTagVersion,
             r.tags, true, r.history, r.eventDate) }
-        return RecordMediaPreview(snapshot, preview.images, preview.activities, history)
+        return RecordMediaPreview(snapshot, preview.images, preview.activities, history,audios=preview.audios)
     }
     private class PeoplePackage(private val base: AuthenticatedRecordPackage, records: List<RecordPackageOriginal>,
         digests: List<String>, override val digest: String) : AuthenticatedRecordPackage {

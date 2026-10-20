@@ -2,31 +2,54 @@ package com.t1doo.aiyou.model
 
 import java.util.Collections
 
+interface RecordPackageAttachment {
+    val sourceId:String
+    val sourceRevision:Int
+    val attachmentId:String
+    val mediaType:String
+    val byteSize:Long
+    val sha256:String
+}
 /** Exact original image identity and immutable source version; no package-controlled filesystem path. */
-data class RecordPackageImage(val sourceId: String, val sourceRevision: Int, val attachmentId: String,
-    val mediaType: String, val byteSize: Long, val sha256: String) {
+data class RecordPackageImage(override val sourceId: String, override val sourceRevision: Int, override val attachmentId: String,
+    override val mediaType: String, override val byteSize: Long, override val sha256: String): RecordPackageAttachment {
     init {
         ManualTags.identifier(sourceId); require(sourceRevision > 0); RecordPackages.uuid(attachmentId)
         require(mediaType in setOf("image/jpeg", "image/png"))
         require(byteSize in 1..RecordMediaPackages.MAX_IMAGE_BYTES); RecordPackages.digest(sha256)
     }
 }
+data class RecordPackageAudio(override val sourceId:String,override val sourceRevision:Int,override val attachmentId:String,
+    override val mediaType:String,override val byteSize:Long,override val sha256:String):RecordPackageAttachment {
+    init {
+        ManualTags.identifier(sourceId);require(sourceRevision>0);RecordPackages.uuid(attachmentId);RecordPackages.digest(sha256)
+        require(mediaType=="audio/wav" && byteSize in 46..LocalPcmAudio.MAX_WAV_BYTES.toLong())
+    }
+}
+object RecordPackageAttachments {
+    fun descriptor(sourceId:String,revision:Int,id:String,mime:String,size:Long,hash:String):RecordPackageAttachment =
+        if(mime=="audio/wav")RecordPackageAudio(sourceId,revision,id,mime,size,hash) else RecordPackageImage(sourceId,revision,id,mime,size,hash)
+}
 class RecordMediaPreview(val snapshot: OriginalExportSnapshot, images: List<RecordPackageImage>,
     val activities: RecordPackageActivities? = null, history: List<RecordPackageOriginal>? = null,
-    editDrafts: List<OriginalEditDraft>? = null) {
+    editDrafts: List<OriginalEditDraft>? = null, audios:List<RecordPackageAudio> = emptyList()) {
     /** Null means excluded; empty means the explicitly selected scope contains no active edits. */
     val editDrafts = editDrafts?.let { Collections.unmodifiableList(it.toList()) }
     val images = Collections.unmodifiableList(images.toList())
+    val audios=Collections.unmodifiableList(audios.toList())
+    val media:List<RecordPackageAttachment> = Collections.unmodifiableList(this.images+this.audios)
     val history = history?.let { Collections.unmodifiableList(it.toList()) }
     val imageBytes = images.sumOf { it.byteSize }
     init {
+        require(media.size<=RecordMediaPackages.MAX_IMAGES && media.sumOf { it.byteSize }<=RecordMediaPackages.MAX_IMAGE_TOTAL)
+        require(media.map { it.attachmentId }.distinct().size==media.size)
         if (editDrafts != null) RecordEditDraftPackages.validate(editDrafts, checkNotNull(history))
         require(images.size <= RecordMediaPackages.MAX_IMAGES && imageBytes <= RecordMediaPackages.MAX_IMAGE_TOTAL)
         require(images.map { it.attachmentId }.distinct().size == images.size)
         if (history == null) {
-            images.forEach { image -> require(snapshot.records.any { it.entry.id == image.sourceId && it.entry.currentRevision == image.sourceRevision }) }
+            media.forEach { image -> require(snapshot.records.any { it.entry.id == image.sourceId && it.entry.currentRevision == image.sourceRevision }) }
             snapshot.records.filter { it.entry.originalText.isBlank() }.forEach { record ->
-                require(images.any { it.sourceId==record.entry.id && it.sourceRevision==record.entry.currentRevision })
+                require(media.any { it.sourceId==record.entry.id && it.sourceRevision==record.entry.currentRevision })
             }
         } else {
             require(history.isNotEmpty() && history.size == snapshot.records.size)
@@ -39,10 +62,10 @@ class RecordMediaPreview(val snapshot: OriginalExportSnapshot, images: List<Reco
                     record.capturedAtMillis == current.entry.capturedAtMillis && record.captureTimeZone == current.entry.captureTimeZone &&
                     record.sourceTagVersion == current.tags.version && record.tags == current.tags.names && record.eventDate == current.eventDate.date)
                 record.history.filter { it.originalText.isBlank() }.forEach { revision ->
-                    require(images.any { it.sourceId == record.sourceId && it.sourceRevision == revision.revision })
+                    require(media.any { it.sourceId == record.sourceId && it.sourceRevision == revision.revision })
                 }
             }
-            images.forEach { image -> require(history.any { it.sourceId == image.sourceId && image.sourceRevision in 1..it.sourceRevision }) }
+            media.forEach { image -> require(history.any { it.sourceId == image.sourceId && image.sourceRevision in 1..it.sourceRevision }) }
         }
     }
     override fun toString() = "RecordMediaPreview(images=${images.size}, redacted)"

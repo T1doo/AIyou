@@ -88,7 +88,7 @@ val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
     from("../../../app/src/main/java/com/t1doo/aiyou/records/FactRecapController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalProcessingController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/SourceTaskController.kt")
-    listOf("MixedCaptureController.kt", "LocalOriginalSearchController.kt", "LocalOriginalSearchMatcher.kt", "RecordPackageController.kt", "RecordPackageIo.kt", "RecycleBinController.kt", "OriginalExportController.kt", "OriginalExportIo.kt", "ManualTaskController.kt", "ManualTagController.kt", "RecordFavoriteController.kt", "LocalRecordsViewModel.kt", "OriginalEditUiState.kt", "OriginalHistoryUiState.kt",
+    listOf("ControlledCaptureAudio.kt", "MixedCaptureController.kt", "LocalOriginalSearchController.kt", "LocalOriginalSearchMatcher.kt", "RecordPackageController.kt", "RecordPackageIo.kt", "RecycleBinController.kt", "OriginalExportController.kt", "OriginalExportIo.kt", "ManualTaskController.kt", "ManualTagController.kt", "RecordFavoriteController.kt", "LocalRecordsViewModel.kt", "OriginalEditUiState.kt", "OriginalHistoryUiState.kt",
         "LocalAttachmentController.kt", "PngPayloadValidator.kt", "JpegPayloadValidator.kt",
         "LocalRecordAiController.kt", "RecordAiCapability.kt", "RecordAiUiState.kt", "LocalCandidateController.kt", "SourceTagController.kt", "SourceMemoryController.kt", "SourceMemoryInboxController.kt").forEach { name ->
         from("../../../app/src/main/java/com/t1doo/aiyou/records/$name")

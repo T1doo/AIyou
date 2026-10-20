@@ -152,6 +152,7 @@ class LocalRecordsViewModel internal constructor(
     private val commands = Channel<Command>(Channel.UNLIMITED)
     private val appAccessGuard = Any()
     private val appAccessCommands = java.util.concurrent.atomic.AtomicInteger()
+    private val audioBlockedPackageCommands=java.util.concurrent.atomic.AtomicInteger()
     private val mutableAppAccessIdle = MutableStateFlow(false)
     internal val appAccessIdle = mutableAppAccessIdle.asStateFlow()
     private val appAccessClosed = kotlinx.coroutines.CompletableDeferred<Unit>()
@@ -160,9 +161,13 @@ class LocalRecordsViewModel internal constructor(
 
     private fun submit(command: Command): kotlinx.coroutines.channels.ChannelResult<Unit> = synchronized(appAccessGuard) {
         appAccessCommands.incrementAndGet()
+        if(command is Command.RecordPackage)audioBlockedPackageCommands.incrementAndGet()
         mutableAppAccessIdle.value = false
         val result = commands.trySend(command)
-        if (result.isFailure) mutableAppAccessIdle.value = appAccessCommands.decrementAndGet() == 0
+        if (result.isFailure) {
+            if(command is Command.RecordPackage)audioBlockedPackageCommands.decrementAndGet()
+            mutableAppAccessIdle.value = appAccessCommands.decrementAndGet() == 0
+        }
         result
     }
     internal fun enqueueTaskOperation(action:suspend (EntryRepository)->Unit)=submit(Command.ManualTasks(action)).isSuccess
@@ -196,7 +201,7 @@ class LocalRecordsViewModel internal constructor(
         val mixed = local.mixedCapture
         if (mixed != null) {
             val draft = mixed.draft ?: return false
-            return !mixed.busy && mixed.pendingEdits == 0 && mixed.selection == null &&
+            return !mixedCapture.audioCapture.busy && !mixed.busy && mixed.pendingEdits == 0 && mixed.selection == null &&
                 !mixed.uncertainSave && !mixed.discardPending && !mixed.confirmDiscard && mixed.policyChange == null &&
                 mixed.error == null && !draft.discarding && draft.text == mixed.text
         }
@@ -217,7 +222,8 @@ class LocalRecordsViewModel internal constructor(
     val factRecaps = FactRecapController({ mutableState.value }, { change -> update(change) },
         { action -> submit(Command.FactRecap(action)).isSuccess },clock.withZone(ZoneId.systemDefault()))
     val mixedCapture = MixedCaptureController({ mutableState.value },{ change -> update(change) },
-        { action -> submit(Command.MixedCapture(action)).isSuccess },decodeCapture,clock)
+        { action -> submit(Command.MixedCapture(action)).isSuccess },decodeCapture,clock,
+        { audioBlockedPackageCommands.get()==0 })
     val attachments = LocalAttachmentController(
         enqueue = { action -> submit(Command.Attachment(action)).isSuccess }, decodePng = decodePng,
         canUseRecord = { mutableState.value.let { it.ready && !it.opening && it.error == null &&
@@ -431,6 +437,7 @@ class LocalRecordsViewModel internal constructor(
                         if (command is Command.Save || command is Command.Revise || command is Command.ManualTags ||
                             command is Command.RecordPackage || command is Command.RecycleBin ||
                             command is Command.Retry || command is Command.RefreshSearch || command is Command.LocalProcessing) scheduleLocalIndex()
+                        if(command is Command.RecordPackage)audioBlockedPackageCommands.decrementAndGet()
                         mutableAppAccessIdle.value = appAccessCommands.decrementAndGet() == 0
                     }
                 }
@@ -459,15 +466,18 @@ class LocalRecordsViewModel internal constructor(
                 try { withContext(NonCancellable + Dispatchers.IO) {
                     try { try { ai.closeAndJoin() } finally { modelConnections.closeAndJoin() } }
                     finally {
-                        mixedCapture.disposeOnIo()
-                        try { attachments.disposeOnIo() }
+                        try { repository?.let { mixedCapture.drainAudioOnIo(it) } }
                         finally {
+                          mixedCapture.disposeOnIo()
+                          try { attachments.disposeOnIo() }
+                          finally {
                             val close={
                                 (repository as? AutoCloseable)?.close()
                                 (repository as? AwaitableRecordStorage)?.awaitClosed()
                                 repository = null
                             }
                             if(reminderRuntime!=null)reminderRuntime.closeStore(close)else close()
+                          }
                         }
                     }
                 }

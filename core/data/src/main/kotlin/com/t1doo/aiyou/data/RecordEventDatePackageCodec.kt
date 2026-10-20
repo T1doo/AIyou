@@ -57,11 +57,11 @@ internal object RecordEventDatePackageCodec {
     fun legacyPreview(preview: RecordMediaPreview): RecordMediaPreview {
         val snapshot = OriginalExportSnapshot(preview.snapshot.id, preview.snapshot.createdAtMillis,
             preview.snapshot.records.map { record -> OriginalExportRecord(record.entry, record.contentHash,
-                record.tags, record.sourceGeneration, record.imageCount) }, preview.snapshot.records.isEmpty())
+                record.tags, record.sourceGeneration, record.imageCount,audioCount=record.audioCount) }, preview.snapshot.records.isEmpty())
         val history = preview.history?.map { record -> RecordPackageOriginal(record.sourceId, record.sourceRevision,
             record.capturedAtMillis, record.captureTimeZone, record.originalText, record.contentHash,
             record.sourceTagVersion, record.tags, true, record.history) }
-        return RecordMediaPreview(snapshot, preview.images, preview.activities, history)
+        return RecordMediaPreview(snapshot, preview.images, preview.activities, history,audios=preview.audios)
     }
 
     private class EventDatePackage(private val base: AuthenticatedRecordPackage, records: List<RecordPackageOriginal>,

@@ -10,7 +10,8 @@ import java.util.concurrent.CancellationException
 internal class SqlRecordPackageRepository(private val database: RecordsSqlDatabase,
     private val tags: SqlManualTagRepository, private val maxGroups: Int = 4096,
     private val activities:SqlRecordPackageActivities? = null,
-    private val people: SqlManualPeopleRepository? = null) : RecordPackageRepository {
+    private val people: SqlManualPeopleRepository? = null,
+    private val captureGate:CaptureDraftGate?=null) : RecordPackageRepository {
     private val eventDates = SqlRecordEventDateRepository(database)
     init { require(maxGroups in 1..4096) }
     override fun restore(verified: VerifiedRecordPackage, newIds: List<String>, importedAtMillis: Long): RecordPackageRestoreResult {
@@ -18,7 +19,11 @@ internal class SqlRecordPackageRepository(private val database: RecordsSqlDataba
         return restoreWithFiles(verified,newIds,importedAtMillis) {}
     }
     internal fun restoreWithFiles(verified: VerifiedRecordPackage, newIds: List<String>, importedAtMillis: Long,
-        beforeReceipt: (RecordsSqlConnection) -> Unit): RecordPackageRestoreResult = safely {
+        beforeReceipt: (RecordsSqlConnection) -> Unit):RecordPackageRestoreResult =
+        captureGate?.syncMutation { restoreOwned(verified,newIds,importedAtMillis,beforeReceipt) }
+            ?: restoreOwned(verified,newIds,importedAtMillis,beforeReceipt)
+    private fun restoreOwned(verified: VerifiedRecordPackage,newIds:List<String>,importedAtMillis:Long,
+        beforeReceipt:(RecordsSqlConnection)->Unit):RecordPackageRestoreResult = safely {
         val pack = verified as? AuthenticatedRecordPackage ?: throw RecordPackageInvalid()
         require(pack.activities==null || activities!=null)
         require(pack.records.none { it.sourcePeopleVersion > 0 } || people != null)

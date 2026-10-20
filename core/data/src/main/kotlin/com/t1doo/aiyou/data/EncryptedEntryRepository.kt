@@ -59,7 +59,8 @@ class EncryptedEntryRepository internal constructor(
     override val factRecaps: com.t1doo.aiyou.domain.FactRecapRepository = SqlFactRecapRepository(borrowedSql, tagStorage)
     override val sourceTags: com.t1doo.aiyou.domain.SourceTagRepository = SqlSourceTagRepository(borrowedSql, tagStorage)
     private val sourceMemoryStorage = SqlSourceMemoryRepository(borrowedSql, keyBytes)
-    override val captureRecords: com.t1doo.aiyou.domain.CaptureRepository = SqlCaptureRepository(borrowedSql,attachmentStorage,tagStorage,newCapturePolicy)
+    private val captureStorage=SqlCaptureRepository(borrowedSql,attachmentStorage,tagStorage,newCapturePolicy)
+    override val captureRecords: com.t1doo.aiyou.domain.CaptureRepository get()=captureStorage
     override val sourceMemories: com.t1doo.aiyou.domain.SourceMemoryRepository get() = sourceMemoryStorage
     override val favorites: com.t1doo.aiyou.domain.RecordFavoriteRepository = SqlRecordFavoriteRepository(borrowedSql)
     override val eventDates: com.t1doo.aiyou.domain.RecordEventDateRepository = SqlRecordEventDateRepository(borrowedSql)
@@ -76,15 +77,15 @@ class EncryptedEntryRepository internal constructor(
     private val packageActivities=SqlRecordPackageActivities(borrowedSql,taskStorage,proposalStorage)
     override val originalExport: com.t1doo.aiyou.domain.OriginalExportRepository =
         SqlOriginalExportRepository(borrowedSql, tagStorage,packageActivities,peopleStorage)
-    private val packageStorage = SqlRecordPackageRepository(borrowedSql, tagStorage,activities=packageActivities, people=peopleStorage)
+    private val packageStorage = SqlRecordPackageRepository(borrowedSql, tagStorage,activities=packageActivities, people=peopleStorage,captureGate=captureStorage.mutationGate)
     private val mediaPackageStorage =
-        SqlRecordMediaPackageRepository(borrowedSql, originalExport, attachmentStorage, packageStorage,packageActivities, originalEditStorage)
+        SqlRecordMediaPackageRepository(borrowedSql, originalExport, attachmentStorage, packageStorage,packageActivities, originalEditStorage,captureGate=captureStorage.mutationGate)
     override val mediaPackages: com.t1doo.aiyou.domain.RecordMediaPackageRepository get() = mediaPackageStorage
     override val fullBackups: com.t1doo.aiyou.domain.FullBackupRepository =
-        SqlFullBackupRepository(borrowedSql,keyBytes,attachmentStorage,originalEditStorage,mediaPackageStorage)
+        SqlFullBackupRepository(borrowedSql,keyBytes,attachmentStorage,originalEditStorage,mediaPackageStorage,captureGate=captureStorage.mutationGate)
     override val recordPackages: com.t1doo.aiyou.domain.RecordPackageRepository get() = packageStorage
     override val permanentErasure: com.t1doo.aiyou.domain.PermanentErasureRepository =
-        SqlPermanentErasureRepository(borrowedSql, attachmentStorage, originalEditStorage, packageStorage, proposalStorage::readAllWithin)
+        SqlPermanentErasureRepository(borrowedSql, attachmentStorage, originalEditStorage, packageStorage, proposalStorage::readAllWithin,captureGate=captureStorage.mutationGate)
     override val recycleBin: com.t1doo.aiyou.domain.RecycleBinRepository =
         SqlRecycleBinRepository(borrowedSql, tagStorage, SqlErasureFileHooks::fenced)
 
@@ -98,19 +99,19 @@ class EncryptedEntryRepository internal constructor(
 
     override suspend fun readDraft(): TextDraft? = dao.draft()?.toModel()
 
-    override suspend fun updateDraft(text: String): TextDraft = database.withTransaction {
+    override suspend fun updateDraft(text: String): TextDraft = captureStorage.mutationGate.mutation { database.withTransaction {
         require(text.length <= MAX_TEXT_LENGTH)
         val old = dao.draft()
         DraftEntity(id = old?.id ?: newId(), version = Math.addExact(old?.version ?: 0L, 1L), text = text)
             .also { dao.putDraft(it) }.toModel()
-    }
+    } }
 
-    override suspend fun discardDraft(expected: TextDraft): Unit = database.withTransaction {
+    override suspend fun discardDraft(expected: TextDraft): Unit = captureStorage.mutationGate.mutation { database.withTransaction {
         val current = dao.draft()?.toModel() ?: return@withTransaction
         if (current != expected || dao.consumeDraft(expected.id, expected.version) != 1) throw RecordConflict()
-    }
+    } }
 
-    override suspend fun restoreDiscardedDraft(expected: TextDraft, replacement: TextDraft): TextDraft = database.withTransaction {
+    override suspend fun restoreDiscardedDraft(expected: TextDraft, replacement: TextDraft): TextDraft = captureStorage.mutationGate.mutation { database.withTransaction {
         require(replacement.id != expected.id && replacement.version == 1L &&
             replacement.text == expected.text && replacement.text.length <= MAX_TEXT_LENGTH)
         val current = dao.draft()?.toModel()
@@ -118,9 +119,9 @@ class EncryptedEntryRepository internal constructor(
         if (current != null) throw RecordConflict()
         dao.putDraft(DraftEntity(id = replacement.id, version = replacement.version, text = replacement.text))
         checkNotNull(dao.draft()).toModel()
-    }
+    } }
 
-    override suspend fun saveDraft(expected: TextDraft, capturedAtMillis: Long, captureTimeZone: String): StoredEntry = database.withTransaction {
+    override suspend fun saveDraft(expected: TextDraft, capturedAtMillis: Long, captureTimeZone: String): StoredEntry = captureStorage.mutationGate.mutation { database.withTransaction {
         require(expected.text.isNotBlank())
         ZoneId.of(captureTimeZone)
         dao.entry(expected.id)?.let { existing ->
@@ -133,7 +134,7 @@ class EncryptedEntryRepository internal constructor(
         dao.insertJob(LocalJobEntity("${expected.id}:1:LOCAL_INDEX", expected.id, 1))
         if (dao.consumeDraft(expected.id, expected.version) != 1) throw RecordConflict()
         checkNotNull(dao.entry(expected.id)).toModel()
-    }
+    } }
 
     override suspend fun entries(): List<StoredEntry> = dao.entries().map { it.toModel() }
 

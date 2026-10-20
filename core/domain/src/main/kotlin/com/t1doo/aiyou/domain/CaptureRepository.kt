@@ -4,6 +4,17 @@ import com.t1doo.aiyou.model.*
 
 /** Encrypted draft metadata + authenticated encrypted image staging; no URI or plaintext files. */
 interface CaptureRepository {
+    val mutationGate: CaptureDraftGate? get() = null
+    /** Strict read: never creates, recovers or replaces a draft. */
+    suspend fun peek(): CaptureDraft? { throw UnsupportedOperationException("Capture peek unavailable") }
+    suspend fun addAudio(request: CaptureDraftGate.Reservation, bytes: ByteArray): CaptureDraft {
+        throw UnsupportedOperationException("Capture audio unavailable")
+    }
+    suspend fun reconcileAudio(request: CaptureDraftGate.Reservation): CaptureDraft {
+        throw UnsupportedOperationException("Capture audio unavailable")
+    }
+    suspend fun audio(expected: CaptureDraft): ByteArray { throw UnsupportedOperationException("Capture audio unavailable") }
+    suspend fun removeAudio(expected: CaptureDraft): CaptureDraft { throw UnsupportedOperationException("Capture audio unavailable") }
     val supportsProcessingChoice: Boolean get() = false
     /** This exact draft only; never grants remote consent or changes a saved entry. */
     suspend fun changePolicy(expected: CaptureDraft, policy: ProcessingPolicy): CaptureDraft {

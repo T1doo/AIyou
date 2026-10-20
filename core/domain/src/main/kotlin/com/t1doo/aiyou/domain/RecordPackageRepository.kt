@@ -8,6 +8,8 @@ interface VerifiedRecordPackage {
     val records: List<RecordPackageOriginal>
     val digest: String
     val images: List<com.t1doo.aiyou.model.RecordPackageImage> get() = emptyList()
+    val audios: List<RecordPackageAudio> get() = emptyList()
+    val media: List<RecordPackageAttachment> get() = images+audios
     val activities: RecordPackageActivities? get() = null
     val includesHistory: Boolean get() = false
     val editDrafts: List<OriginalEditDraft>? get() = null

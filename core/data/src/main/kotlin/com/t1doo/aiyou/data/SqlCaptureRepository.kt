@@ -12,7 +12,80 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
     private val tags: SqlManualTagRepository,
     private val newDraftPolicy: () -> ProcessingPolicy = { ProcessingDefaults.policy }) : CaptureRepository {
     override val supportsProcessingChoice = true
-    override suspend fun changePolicy(expected: CaptureDraft, policy: ProcessingPolicy): CaptureDraft = safely {
+    override val mutationGate = CaptureDraftGate()
+    override suspend fun peek():CaptureDraft? = safely { database.transaction { read(it) } }
+    override suspend fun addAudio(request:CaptureDraftGate.Reservation,bytes:ByteArray):CaptureDraft = safely {
+        mutationGate.audioWrite(request) {
+            val base=mutationGate.requireReserved(request);val intent=mutationGate.intent(request)
+            LocalPcmAudio.inspect(bytes)
+            require(bytes.size.toLong()==intent.byteSize && packageHex(packageHash(bytes))==intent.sha256)
+            val writing=next(base,audio=CaptureDraftAudio(intent,CaptureAudioState.WRITING))
+            val ready=next(writing,audio=CaptureDraftAudio(intent,CaptureAudioState.READY))
+            val bound=database.transaction { sql ->
+                val actual=required(sql,base.id);require(!SqlErasureFileHooks.fenced(sql,base.id))
+                require(sql.query("SELECT id FROM record_package_receipts WHERE id=?",listOf(REMOVED+intent.id)).isEmpty())
+                when {
+                    actual.sameSnapshot(base) -> replace(sql,base,writing)
+                    actual.sameSnapshot(writing) || actual.sameSnapshot(ready) -> actual
+                    else -> throw CaptureConflict()
+                }
+            }
+            if(bound.sameSnapshot(ready)) { media.readCapture(intent).also { try { LocalPcmAudio.inspect(it) } finally { it.fill(0) } };ready }
+            else media.stageCapture(intent,bytes) { database.transaction { sql ->
+                same(writing,required(sql,base.id));require(!SqlErasureFileHooks.fenced(sql,base.id))
+                replace(sql,writing,ready)
+            } }
+        }
+    }
+    override suspend fun reconcileAudio(request:CaptureDraftGate.Reservation):CaptureDraft = safely {
+        mutationGate.audioWrite(request) {
+            val base=mutationGate.requireReserved(request);val intent=mutationGate.intent(request)
+            val writing=next(base,audio=CaptureDraftAudio(intent,CaptureAudioState.WRITING))
+            val ready=next(writing,audio=CaptureDraftAudio(intent,CaptureAudioState.READY))
+            val failed=next(writing,audio=CaptureDraftAudio(intent,CaptureAudioState.FAILED))
+            val actual=database.transaction { required(it,base.id) }
+            when {
+                actual.sameSnapshot(base) -> actual
+                actual.sameSnapshot(ready) -> { media.readCapture(intent).also { try { LocalPcmAudio.inspect(it) } finally { it.fill(0) } };actual }
+                actual.sameSnapshot(failed) -> actual
+                actual.sameSnapshot(writing) -> {
+                    val complete=media.recoverCapture(intent)
+                    if(complete) media.readCapture(intent).also { try { LocalPcmAudio.inspect(it) } finally { it.fill(0) } }
+                    database.transaction { sql -> same(writing,required(sql,base.id));replace(sql,writing,if(complete) ready else failed) }
+                }
+                else -> throw CaptureConflict()
+            }
+        }
+    }
+    override suspend fun audio(expected:CaptureDraft):ByteArray = safely {
+        val intent=database.transaction { sql ->
+            same(expected,required(sql,expected.id));require(!expected.discarding && expected.audio?.state==CaptureAudioState.READY)
+            checkNotNull(expected.audio).intent
+        }
+        media.readCapture(intent).also { try { LocalPcmAudio.inspect(it) } catch(e:Exception) { it.fill(0);throw e } }
+    }
+    override suspend fun removeAudio(expected:CaptureDraft):CaptureDraft = safely { mutationGate.mutation {
+        val item=checkNotNull(expected.audio)
+        val removing=if(item.state==CaptureAudioState.REMOVING) expected else next(expected,audio=item.copy(state=CaptureAudioState.REMOVING))
+        val removed=next(removing,audio=null)
+        val actual=database.transaction { sql ->
+            val actual=required(sql,expected.id)
+            if(actual.sameSnapshot(removed)) {
+                require(sql.query("SELECT state FROM record_package_receipts WHERE id=? AND operation='CAPTURE_REMOVED'",listOf(REMOVED+item.intent.id)).singleOrNull()==listOf(item.intent.sha256))
+                actual
+            } else if(actual.sameSnapshot(removing)) actual else { same(expected,actual);replace(sql,expected,removing) }
+        }
+        if(actual.sameSnapshot(removed)) actual else {
+            media.cleanupPackage(listOf(item.intent))
+            database.transaction { sql ->
+                same(removing,required(sql,expected.id))
+                if(sql.query("SELECT id FROM record_package_receipts WHERE id=?",listOf(REMOVED+item.intent.id)).isEmpty())
+                    sql.execute("INSERT INTO record_package_receipts VALUES(?,?,1,'CAPTURE_REMOVED',?)",listOf(REMOVED+item.intent.id,expected.id,item.intent.sha256))
+                replace(sql,removing,removed)
+            }
+        }
+    } }
+    override suspend fun changePolicy(expected: CaptureDraft, policy: ProcessingPolicy): CaptureDraft = safely { mutationGate.mutation {
         require(policy == ProcessingPolicy.LOCAL_ONLY || policy == ProcessingPolicy.AI_NONE)
         database.transaction { sql ->
             val actual = required(sql, expected.id); require(!actual.discarding)
@@ -24,8 +97,8 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
                 else { same(expected, actual); replace(sql, actual, changed) }
             }
         }
-    }
-    override suspend fun current(): CaptureDraft = safely { database.transaction { sql ->
+    } }
+    override suspend fun current(): CaptureDraft = safely { database.transaction { read(it) } ?: mutationGate.mutation { database.transaction { sql ->
         read(sql) ?: run {
             val legacy=sql.query("SELECT id,version,text FROM capture_draft WHERE slot=1").singleOrNull()
             // A device default applies only at creation, never to an existing or legacy draft.
@@ -36,13 +109,13 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
             if (legacy!=null) require(sql.execute("DELETE FROM capture_draft WHERE slot=1 AND id=? AND version=?",listOf(legacy[0],legacy[1]))==1)
             draft
         }
-    } }
-    override suspend fun edit(expected: CaptureDraft,text: String): CaptureDraft = safely { database.transaction { sql ->
+    } } }
+    override suspend fun edit(expected: CaptureDraft,text: String): CaptureDraft = safely { mutationGate.mutation { database.transaction { sql ->
         val actual=required(sql,expected.id);require(!actual.discarding)
-        if (actual.text==text && actual.version==expected.version+1 && actual.images==expected.images && actual.policy==expected.policy) actual
+        if (actual.text==text && actual.version==expected.version+1 && actual.images==expected.images && actual.policy==expected.policy && actual.audio==expected.audio) actual
         else { same(expected,actual);replace(sql,actual,next(actual,text=text)) }
-    } }
-    override suspend fun add(expected: CaptureDraft,intent: AttachmentIntent,bytes: ByteArray): CaptureDraft = safely {
+    } } }
+    override suspend fun add(expected: CaptureDraft,intent: AttachmentIntent,bytes: ByteArray): CaptureDraft = safely { mutationGate.mutation {
         EncryptedAttachmentStore.validate(intent)
         require(intent.entryId==expected.id && intent.revision==1 && intent.mediaType in setOf("image/png","image/jpeg"))
         require(bytes.size.toLong()==intent.byteSize && packageHex(packageHash(bytes))==intent.sha256)
@@ -55,14 +128,14 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
             else { same(expected,actual);replace(sql,actual,next(actual,images=actual.images+CaptureDraftImage(intent,CaptureImageState.WRITING))) }
         }
         if (bound.images.single { it.intent.id==intent.id }.state==CaptureImageState.READY) {
-            media.readCapture(intent).fill(0);return@safely bound
+            media.readCapture(intent).fill(0);return@mutation bound
         }
         media.stageCapture(intent,bytes) { database.transaction { sql ->
             val actual=required(sql,expected.id);require(!actual.discarding)
             val item=actual.images.single { it.intent.id==intent.id };require(item.intent==intent && item.state!=CaptureImageState.REMOVING)
             replace(sql,actual,next(actual,images=actual.images.map { if(it.intent.id==intent.id) it.copy(state=CaptureImageState.READY) else it }))
         } }
-    }
+    } }
     override suspend fun image(expected: CaptureDraft,id: String): ByteArray = safely {
         val i=database.transaction { sql ->
             val actual=required(sql,expected.id);require(!actual.discarding)
@@ -70,13 +143,13 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
         }
         media.readCapture(i)
     }
-    override suspend fun remove(draftId: String,imageId: String): CaptureDraft = safely {
+    override suspend fun remove(draftId: String,imageId: String): CaptureDraft = safely { mutationGate.mutation {
         val actual=database.transaction { sql ->
             val a=required(sql,draftId);require(!a.discarding)
             val item=a.images.singleOrNull { it.intent.id==imageId } ?: return@transaction a
             if(item.state==CaptureImageState.REMOVING) a else replace(sql,a,next(a,images=a.images.map { if(it.intent.id==imageId) it.copy(state=CaptureImageState.REMOVING) else it }))
         }
-        val item=actual.images.singleOrNull { it.intent.id==imageId } ?: return@safely actual
+        val item=actual.images.singleOrNull { it.intent.id==imageId } ?: return@mutation actual
         media.cleanupPackage(listOf(item.intent))
         database.transaction { sql ->
             val a=required(sql,draftId);require(a.images.single { it.intent.id==imageId }.state==CaptureImageState.REMOVING)
@@ -84,8 +157,8 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
                 sql.execute("INSERT INTO record_package_receipts VALUES(?,?,1,'CAPTURE_REMOVED',?)",listOf(REMOVED+imageId,draftId,item.intent.sha256))
             replace(sql,a,next(a,images=a.images.filterNot { it.intent.id==imageId }))
         }
-    }
-    override suspend fun discard(draftId: String): CaptureDraft = safely {
+    } }
+    override suspend fun discard(draftId: String): CaptureDraft = safely { mutationGate.mutation {
         val old=database.transaction { sql ->
             val a=read(sql)
             if (a?.id!=draftId) {
@@ -93,7 +166,7 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
             } else if(a.discarding) a else replace(sql,a,next(a,discarding=true))
         }
         if(old!=null) {
-            media.cleanupPackage(old.images.map { it.intent })
+            media.cleanupPackage(old.images.map { it.intent }+listOfNotNull(old.audio?.intent))
             database.transaction { sql ->
                 val a=required(sql,draftId);require(a.discarding)
                 sql.execute("INSERT INTO record_package_receipts VALUES(?,?,1,'CAPTURE_DISCARDED',?)",listOf(DISCARDED+draftId,draftId,digest(a)))
@@ -101,12 +174,12 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
             }
         }
         current()
-    }
-    override suspend fun save(expected: CaptureDraft,capturedAtMillis: Long,zone: String): CaptureSaveResult = safely {
-        ZoneId.of(zone);require(!expected.discarding && (expected.text.isNotBlank() || expected.images.isNotEmpty()) && expected.images.all { it.state==CaptureImageState.READY })
+    } }
+    override suspend fun save(expected: CaptureDraft,capturedAtMillis: Long,zone: String): CaptureSaveResult = safely { mutationGate.mutation {
+        ZoneId.of(zone);require(!expected.discarding && (expected.text.isNotBlank() || expected.images.isNotEmpty() || expected.audio!=null) && expected.images.all { it.state==CaptureImageState.READY } && (expected.audio?.state ?: CaptureAudioState.READY)==CaptureAudioState.READY)
         OriginalExports.hash(expected.text) // Completed Unicode only; unfinished input remains in the draft.
-        database.transaction { replay(it,expected) }?.let { return@safely it }
-        media.commitCapture(expected.images.map { it.intent }) { database.transaction { sql ->
+        database.transaction { replay(it,expected) }?.let { return@mutation it }
+        media.commitCapture(expected.images.map { it.intent }+listOfNotNull(expected.audio?.intent)) { database.transaction { sql ->
             replay(sql,expected)?.let { return@transaction it }
             val a=required(sql,expected.id);same(expected,a)
             require(!SqlErasureFileHooks.fenced(sql,a.id))
@@ -114,7 +187,7 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
             sql.execute("INSERT INTO entries(id,currentRevision,capturedAtMillis,captureTimeZone,privacyPolicy) VALUES(?,1,?,?,?)",listOf(a.id,capturedAtMillis,zone,a.policy.name))
             sql.execute("INSERT INTO entry_revisions VALUES(?,1,?,?,?)",listOf(a.id,a.text,OriginalExports.hash(a.text),capturedAtMillis))
             sql.execute("INSERT INTO remote_source_access VALUES(?,1,0,NULL,NULL)",listOf(a.id))
-            a.images.forEach { val i=it.intent
+            (a.images.map { it.intent }+listOfNotNull(a.audio?.intent)).forEach { i ->
                 sql.execute("INSERT INTO attachments VALUES(?,?,?,?,?,?,'READY')",listOf(i.id,i.entryId,1,i.mediaType,i.sha256,i.byteSize))
                 sql.execute("DELETE FROM owned_file_creations WHERE entryId=? AND bucket='ATTACHMENTS' AND name=?",listOf(a.id,i.id+".aead"))
             }
@@ -124,10 +197,10 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
             require(sql.execute("DELETE FROM record_package_receipts WHERE id=? AND state=?",listOf(SLOT,encode(a)))==1)
             CaptureSaveResult(a.id,false,false)
         } }
-    }
-    override suspend fun recover(): Unit = safely {
-        val a=database.transaction { read(it) } ?: return@safely
-        if(a.discarding) { discard(a.id);return@safely }
+    } }
+    override suspend fun recover(): Unit = safely { mutationGate.mutation {
+        val a=database.transaction { read(it) } ?: return@mutation
+        if(a.discarding) { discard(a.id);return@mutation }
         for(item in a.images) {
             if(item.state==CaptureImageState.REMOVING) { remove(a.id,item.intent.id);continue }
             val ready=media.recoverCapture(item.intent)
@@ -139,7 +212,19 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
                 if(found.state!=state) replace(sql,current,next(current,images=current.images.map { if(it.intent.id==item.intent.id) it.copy(state=state) else it }))
             }
         }
-    }
+        val audio=database.transaction { read(it) }?.takeIf { it.id==a.id } ?: return@mutation
+        audio.audio?.let { item ->
+            if(item.state==CaptureAudioState.REMOVING) removeAudio(audio)
+            else {
+                val ready=media.recoverCapture(item.intent)
+                if(ready) media.readCapture(item.intent).also { try { LocalPcmAudio.inspect(it) } finally { it.fill(0) } }
+                val state=if(ready) CaptureAudioState.READY else CaptureAudioState.FAILED
+                if(item.state!=state) database.transaction { sql ->
+                    same(audio,required(sql,a.id));replace(sql,audio,next(audio,audio=item.copy(state=state)))
+                }
+            }
+        }
+    } }
     private fun replay(sql: RecordsSqlConnection,expected: CaptureDraft): CaptureSaveResult? {
         val row=sql.query("SELECT entryId,state FROM record_package_receipts WHERE id=? AND operation='CAPTURE_SAVED'",listOf(SAVED+expected.id)).singleOrNull() ?: return null
         require(row==listOf(expected.id,digest(expected)))
@@ -150,7 +235,7 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
         return CaptureSaveResult(expected.id,true,deleted)
     }
     private fun next(a: CaptureDraft,text: String=a.text,images: List<CaptureDraftImage> = a.images,discarding: Boolean=a.discarding,
-        policy: ProcessingPolicy=a.policy)=CaptureDraft(a.id,Math.addExact(a.version,1),text,images,discarding,policy)
+        policy: ProcessingPolicy=a.policy,audio:CaptureDraftAudio?=a.audio)=CaptureDraft(a.id,Math.addExact(a.version,1),text,images,discarding,policy,audio)
     private fun same(a: CaptureDraft,b: CaptureDraft) { if(encode(a)!=encode(b)) throw CaptureConflict() }
     internal fun read(sql: RecordsSqlConnection): CaptureDraft? = sql.query("SELECT entryId,state FROM record_package_receipts WHERE id=? AND operation='CAPTURE_CURRENT'",listOf(SLOT)).singleOrNull()?.let { decode(it[1] as String).also { a ->require(a.id==it[0]) } }
     private fun required(sql: RecordsSqlConnection,id: String)=checkNotNull(read(sql)).also { if(it.id!=id) throw CaptureConflict() }
@@ -159,16 +244,7 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
         if(sql.execute("UPDATE record_package_receipts SET state=? WHERE id=? AND state=?",listOf(encode(b),SLOT,encode(a)))!=1) throw CaptureConflict()
         return b
     }
-    private fun encode(a: CaptureDraft): String=PackageWriter(420000).use { out ->
-        // LOCAL_ONLY retains the exact v1 bytes, including existing CAS states and save receipts.
-        // v2 adds an explicitly restricted AI_NONE draft; older readers reject it rather than weaken it.
-        out.i32(if(a.policy==ProcessingPolicy.LOCAL_ONLY) 1 else 2)
-        if(a.policy==ProcessingPolicy.AI_NONE) out.string(a.policy.name,16)
-        out.string(a.id,36);out.i64(a.version);out.i32(if(a.discarding) 1 else 0);out.i32(a.text.length)
-        a.text.forEach { out.i32(it.code) };out.i32(a.images.size)
-        a.images.forEach { val i=it.intent;out.string(i.id,36);out.string(i.mediaType,32);out.i64(i.byteSize);out.raw(packageUnhex(i.sha256));out.i32(it.state.ordinal) }
-        val bytes=out.bytes();try { Base64.getEncoder().encodeToString(bytes) } finally { bytes.fill(0) }
-    }
+    private fun encode(a:CaptureDraft):String=CaptureDraftCodec.encode(a)
     internal fun decode(encoded:String):CaptureDraft = decodeForBackup(encoded)
     private fun digest(a: CaptureDraft)=packageHex(packageHash(encode(a).toByteArray(Charsets.US_ASCII)))
     private suspend inline fun <T> safely(block: () -> T): T=try { block() } catch(e:CancellationException){throw e} catch(e:CaptureConflict){throw e} catch(_:Exception){throw CaptureStorageFailure()}

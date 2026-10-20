@@ -122,6 +122,8 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
                     item("image-summary") {
                         Text("本次范围：" + ui.snapshot?.records.orEmpty().size + " 条记录，" + ui.mediaPreview?.images.orEmpty().size +
                             " 张原图，原图合计 " + (ui.mediaPreview?.imageBytes ?: 0L) + " 字节。", modifier = Modifier.testTag("package-image-summary"))
+                        val audio=ui.mediaPreview?.audios.orEmpty()
+                        if(audio.isNotEmpty()) Text("另包含 ${audio.size} 段原音／${audio.sumOf { it.byteSize }} 字节；图片和原音合计最多 20 个附件、64 MiB。",Modifier.testTag("package-audio-summary"))
                     }
                     packageActivities(ui.mediaPreview?.activities, ui.mediaPreview?.history != null,
                         ui.snapshot?.records.orEmpty().any { it.eventDate.date != null })

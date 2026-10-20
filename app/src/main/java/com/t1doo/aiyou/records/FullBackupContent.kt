@@ -25,6 +25,7 @@ internal fun FullBackupContent(ui:RecordPackageUiState,controller:RecordPackageC
         ui.fullSummary?.let { summary -> item {
             Text("范围清单",style=MaterialTheme.typography.titleMedium)
             Text("记录 ${summary.records} 条（回收站 ${summary.trash} 条）；修订 ${summary.revisions} 个；原图 ${summary.images} 张／${summary.imageBytes} 字节。",Modifier.testTag("full-backup-summary"))
+            if(summary.audioClips>0) Text("原音 ${summary.audioClips} 段／${summary.audioBytes} 字节，包含已确认的原音草稿；不会恢复录音、播放或系统权限。",Modifier.testTag("full-backup-audio-summary"))
             Text("编辑草稿 ${summary.editDrafts} 份；捕获草稿槽 ${summary.captureDrafts} 个；任务与提案 ${summary.tasksAndProposals} 行；记忆与确认历史 ${summary.memoriesAndReviews} 行；永久删除证明 ${summary.deletionProofs} 份。")
         } }
         if(available) when(ui.phase) {

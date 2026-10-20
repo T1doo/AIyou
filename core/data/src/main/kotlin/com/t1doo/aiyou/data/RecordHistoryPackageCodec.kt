@@ -15,7 +15,7 @@ internal object RecordHistoryPackageCodec {
 
     fun encode(preview: RecordMediaPreview): ByteArray {
         val records = requireNotNull(preview.history)
-        validate(records, preview.images, preview.activities)
+        validate(records, preview.images, preview.activities,preview.audios)
         RecordPackages.uuid(preview.snapshot.id)
         val blocks = mutableListOf<ByteArray>()
         try {
@@ -47,7 +47,7 @@ internal object RecordHistoryPackageCodec {
         } finally { blocks.forEach { it.fill(0) } }
     }
 
-    fun parse(bytes: ByteArray): AuthenticatedRecordPackage {
+    fun parse(bytes: ByteArray,audios:List<RecordPackageAudio> = emptyList()): AuthenticatedRecordPackage {
         require(bytes.size <= RecordMediaPackages.MAX_METADATA)
         val input = PackageReader(bytes)
         require(input.string(32) == NAME && input.i32() == 4 && input.i32() == 1)
@@ -86,7 +86,7 @@ internal object RecordHistoryPackageCodec {
             try { RecordPackageActivityCodec.decode(raw) } finally { raw.fill(0) }
         } else null
         input.end()
-        validate(records, images, activities)
+        validate(records, images, activities,audios)
         return HistoryPackage(manifest, records, packageHex(packageHash(bytes)), hashes, images, activities)
     }
 
@@ -117,7 +117,7 @@ internal object RecordHistoryPackageCodec {
             currentHash, tagVersion, tags, true, history)
     }
 
-    private fun validate(records: List<RecordPackageOriginal>, images: List<RecordPackageImage>, activities: RecordPackageActivities?) {
+    private fun validate(records: List<RecordPackageOriginal>, images: List<RecordPackageImage>, activities: RecordPackageActivities?,audios:List<RecordPackageAudio> = emptyList()) {
         require(records.size in 1..OriginalExports.MAX_RECORDS)
         require(records.map { it.sourceId }.distinct().size == records.size)
         require(records.all { it.history.isNotEmpty() && it.capturedAtMillis >= 0 })
@@ -127,8 +127,10 @@ internal object RecordHistoryPackageCodec {
         require(images.map { it.attachmentId }.distinct().size == images.size)
         images.forEach { image -> require(records.any { it.sourceId == image.sourceId && image.sourceRevision in 1..it.sourceRevision }) }
         records.forEach { record -> record.history.filter { it.originalText.isBlank() }.forEach { revision ->
-            require(images.any { it.sourceId == record.sourceId && it.sourceRevision == revision.revision })
+            require((images+audios).any { it.sourceId == record.sourceId && it.sourceRevision == revision.revision })
         } }
+        require(images.size+audios.size<=RecordMediaPackages.MAX_IMAGES && (images+audios).sumOf { it.byteSize }<=RecordMediaPackages.MAX_IMAGE_TOTAL)
+        audios.forEach { audio -> require(records.any { it.sourceId==audio.sourceId && audio.sourceRevision in 1..it.sourceRevision }) }
         activities?.let { RecordPackageActivityCodec.validate(it, records) }
     }
 

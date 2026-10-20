@@ -15,19 +15,19 @@ enum class OriginalExportFormat(val extension: String, val mimeType: String) {
 class OriginalExportRecord(val entry: StoredEntry, val contentHash: String, val tags: ManualTagSnapshot,
     val sourceGeneration: Long = 0, val imageCount: Int = 0,
     val eventDate: RecordEventDateSnapshot = RecordEventDateSnapshot(entry.id, 0, null),
-    people: ManualPeopleSnapshot? = null) {
+    people: ManualPeopleSnapshot? = null, val audioCount:Int=0) {
     val people = people ?: ManualPeopleSnapshot(entry.id, 0, emptyList(), entry.currentRevision, contentHash, sourceGeneration)
     init {
         ManualTags.identifier(entry.id); require(entry.currentRevision > 0 && tags.entryId == entry.id)
         require(sourceGeneration >= 0 && eventDate.entryId == entry.id)
         require(this.people.entryId == entry.id && this.people.sourceRevision == entry.currentRevision &&
             this.people.sourceHash == contentHash && this.people.generation == sourceGeneration)
-        require(imageCount in 0..64 && (entry.originalText.isNotBlank() || imageCount > 0) && entry.originalText.length <= 100_000)
+        require(imageCount in 0..64 && audioCount in 0..64 && (entry.originalText.isNotBlank() || imageCount > 0 || audioCount>0) && entry.originalText.length <= 100_000)
         ZoneId.of(entry.captureTimeZone)
         require(contentHash.matches(Regex("[0-9a-f]{64}")) && OriginalExports.hash(entry.originalText) == contentHash)
     }
     fun same(other: OriginalExportRecord) = entry == other.entry && contentHash == other.contentHash &&
-        tags.version == other.tags.version && tags.names == other.tags.names && sourceGeneration == other.sourceGeneration && imageCount == other.imageCount &&
+        tags.version == other.tags.version && tags.names == other.tags.names && sourceGeneration == other.sourceGeneration && imageCount == other.imageCount && audioCount==other.audioCount &&
         eventDate.version == other.eventDate.version && eventDate.date == other.eventDate.date &&
         people.version == other.people.version && people.names == other.people.names && people.aliases == other.people.aliases
     override fun toString() = "OriginalExportRecord(redacted)"
