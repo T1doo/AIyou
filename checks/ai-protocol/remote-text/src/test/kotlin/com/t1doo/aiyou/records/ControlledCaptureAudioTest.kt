@@ -80,6 +80,19 @@ class ControlledCaptureAudioTest {
             assertEquals(0,opened.get());assertTrue(base.sameSnapshot(h.repo.peek()!!));assertNull(h.repo.peek()!!.audio)
         }
     }
+    @Test fun retirementAfterReadinessObservationStillPreventsUnadmittedOpen():Unit=runBlocking {
+        Harness().use { h ->
+            h.start();val opened=AtomicInteger();val retired=CountDownLatch(1)
+            assertTrue(h.c.audioCapture.start({opened.incrementAndGet();Input()},{
+                // Return a readiness observation that was true just before retirement won.
+                if(h.local.mixedCapture?.audio?.phase==CaptureAudioPhase.STARTING) { h.c.dispose();retired.countDown() }
+                true
+            }))
+            h.drain();assertTrue(retired.await(3,TimeUnit.SECONDS))
+            withTimeout(4000) { h.c.drainAudioOnIo(h.store) }
+            assertEquals(0,opened.get());assertNull(h.repo.peek()!!.audio)
+        }
+    }
     @Test fun forcedRetirementFinalizesWithoutEnqueueingToClosedActor():Unit=runBlocking {
         Harness().use { h ->
             h.start();assertTrue(h.c.audioCapture.start({Input(waiting=true)}));h.awaitSamples()

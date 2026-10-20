@@ -15,6 +15,8 @@
 - `ControlledCaptureAudio` 在独立 IO 协程使用有界合成端口，actor 不等采样；结束、取消和退休一次结算。
   正常完成通过原 actor 暂存；强制退休在 actor finally 直接等待实际释放并收尾，禁止向已关闭队列 enqueue 后等待自身。
   设备释放未知保留句柄和冻结状态，不开启替代输入、不伪造关闭 ACK。
+  打开资格标记与 stop/cancel/retire 在同一 monitor 排序；就绪谓词的旧观察不能越过已赢的退休。
+  标记前退休不调用端口；标记后才退休允许已准入 open 真实返回，随后立即停止/释放，关闭仍等待该 job。
 - 固定 44100 Hz/mono/16-bit PCM、60 秒，canonical WAV 最大 5292044 字节；独立 RIFF 字节夹具核对 little-endian/长度/EOF。
   不写明文 temp/cache/MediaStore，不新增数据库、key purpose、alias、依赖版本或安全权限。
 - 草稿增加独立音频 intent/state。写入只接受保留 base 的确切 WRITING/READY 后继，其他字段和版本推进不能冒充自己的回执。

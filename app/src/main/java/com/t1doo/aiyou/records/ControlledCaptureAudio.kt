@@ -33,6 +33,7 @@ class ControlledCaptureAudio internal constructor(
         @Volatile var deviceFailed=false
         @Volatile var interrupted=false
         @Volatile var reserved=false
+        var openAdmitted=false // monitor orders this admission against stop/cancel/retire.
         var job:Job?=null
         var wave:ByteArray?=null
         var quarantinedInput:ControlledPcmInput?=null
@@ -94,7 +95,11 @@ class ControlledCaptureAudio internal constructor(
         var count=0
         var input:ControlledPcmInput?=null
         try {
-            if(!retired && !r.cancelled && !r.stop && ownerReady() && r.routeCurrent()) {
+            val ready=!retired && !r.cancelled && !r.stop && ownerReady() && r.routeCurrent()
+            val admitted=synchronized(monitor) {
+                if(ready && !retired && request===r && !r.cancelled && !r.stop) { r.openAdmitted=true;true } else false
+            }
+            if(admitted) {
                 val started=nanoTime()
                 input=open()
                 update(r,CaptureAudioUi(CaptureAudioPhase.RECORDING))
@@ -188,8 +193,8 @@ class ControlledCaptureAudio internal constructor(
         if(request===r) { state=CaptureAudioUi(phase,error=error);if(!retired)publish(state);request=null }
     }
     fun retire() {
-        retired=true;gate?.retire()
-        synchronized(monitor) { request?.stop=true }
+        synchronized(monitor) { retired=true;request?.stop=true }
+        gate?.retire()
     }
     /** Called directly by the owner actor finally; never enqueue and await that same actor. */
     suspend fun closeAndFinalize(store:EntryRepository) {
