@@ -29,6 +29,8 @@ class CaptureAudioSqlTest {
             val ready=repo.addAudio(r,wave)
             assertEquals(base.version+2,ready.version);assertEquals(CaptureAudioState.READY,ready.audio!!.state)
             assertArrayEquals(wave,repo.audio(ready));assertTrue(f.db.read("SELECT id FROM entries").isEmpty())
+            fails { repo.abandonAudio(r) }
+            assertTrue(ready.sameSnapshot(repo.peek()!!));assertArrayEquals(wave,repo.audio(ready))
             assertTrue(f.db.read("SELECT id FROM attachments").isEmpty())
             val ciphertext=f.mediaRoot.resolve(ready.audio!!.intent.id+".aead").readBytes()
             assertFalse(ciphertext.toList().windowed(wave.size).any { it==wave.toList() })
@@ -62,7 +64,8 @@ class CaptureAudioSqlTest {
             val writing=repo.peek()!!
             val foreign=CaptureDraft(writing.id,writing.version,"外部合成改动",writing.images,writing.discarding,writing.policy,writing.audio)
             f.db.transaction { it.execute("UPDATE record_package_receipts SET state=? WHERE id='CAPTURE_CURRENT'",listOf(CaptureDraftCodec.encode(foreign))) }
-            fails { repo.addAudio(r,wave()) };fails { repo.reconcileAudio(r) }
+            fails { repo.addAudio(r,wave()) };fails { repo.reconcileAudio(r) };fails { repo.abandonAudio(r) }
+            assertArrayEquals(wave(),f.media.readCapture(writing.audio!!.intent))
             assertTrue(repo.mutationGate.frozen);assertEquals(foreign.text,repo.peek()!!.text)
             repo.mutationGate.retire()
         }

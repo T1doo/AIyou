@@ -145,6 +145,8 @@ class ControlledCaptureAudio internal constructor(
     fun reconcile() {
         val r=synchronized(monitor) { request?.takeIf { state.phase==CaptureAudioPhase.UNKNOWN && !it.deviceFailed } } ?: return
         enqueue { store ->
+            // Read the actor-owned disposition here, after any previously accepted discard command.
+            if(r.abandonRequested) { abandon(store,r);return@enqueue }
             try {
                 val repo=checkNotNull(store.captureRecords);val actual=repo.reconcileAudio(r.reservation)
                 if(actual.audio?.state==CaptureAudioState.FAILED && r.wave!=null && !r.abandonRequested)

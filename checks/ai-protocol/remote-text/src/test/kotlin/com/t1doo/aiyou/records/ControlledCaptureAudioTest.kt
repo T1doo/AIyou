@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -159,6 +160,35 @@ class ControlledCaptureAudioTest {
                 assertFalse(vm.mixedCapture.audioCapture.start({opened.incrementAndGet();Input()}))
                 assertEquals(0,opened.get());assertEquals(CaptureAudioPhase.IDLE,vm.state.value.mixedCapture!!.audio.phase)
             } finally { release.countDown();vm.clearForHostTest();withTimeout(4000) { vm.awaitAppAccessClosed() } }
+        }
+    }
+    @Test fun publishedCompleteWaveReconciliationContinuesAcceptedAbandonmentAfterPreCleanupFailure():Unit=runBlocking {
+        Harness().use { h ->
+            h.start();val base=h.repo.peek()!!;val encoded=AtomicReference<ByteArray>()
+            val audio=h.audio { samples,count -> LocalPcmAudio.encode(samples,count).also { encoded.set(it) } }
+            try {
+                h.f.mediaCheckpoint={if(it=="capture-published")error("synthetic publication ACK loss before SQL READY")}
+                assertTrue(audio.start({Input()}));h.await(CaptureAudioPhase.UNKNOWN)
+                val writing=h.repo.peek()!!;assertEquals(CaptureAudioState.WRITING,writing.audio!!.state)
+                val intent=writing.audio!!.intent
+                assertArrayEquals(CaptureAudioSqlTest.wave(),h.f.media.readCapture(intent))
+                val file=h.f.mediaRoot.resolve(intent.id+".aead");assertTrue(file.isFile)
+                h.f.mediaCheckpoint={if(it=="locked")error("synthetic failure before cleanup begins")}
+                audio.discardUnwritten();h.drain()
+                assertEquals(CaptureAudioPhase.UNKNOWN,h.ui.audio.phase);assertTrue(h.repo.mutationGate.frozen)
+                assertTrue(writing.sameSnapshot(h.repo.peek()!!));assertTrue(file.isFile)
+                assertArrayEquals(CaptureAudioSqlTest.wave(),encoded.get())
+                audio.reconcile();h.drain()
+                assertEquals(CaptureAudioPhase.UNKNOWN,h.ui.audio.phase);assertTrue(h.repo.mutationGate.frozen)
+                assertTrue(writing.sameSnapshot(h.repo.peek()!!));assertTrue(file.isFile)
+                assertArrayEquals(CaptureAudioSqlTest.wave(),encoded.get())
+                h.f.mediaCheckpoint={};audio.reconcile();h.drain()
+                assertEquals(CaptureAudioPhase.FAILED,h.ui.audio.phase)
+                val failed=h.repo.peek()!!;assertEquals(CaptureAudioState.FAILED,failed.audio!!.state)
+                assertEquals(intent,failed.audio!!.intent);assertEquals(base.version+2,failed.version)
+                assertFalse(file.exists());assertFalse(h.repo.mutationGate.frozen)
+                assertTrue(encoded.get().all { it==0.toByte() })
+            } finally { h.f.mediaCheckpoint={};audio.closeAndFinalize(h.store) }
         }
     }
     @Test fun incompleteRealSqlWriteReconciliationKeepsWaveAndSameIntentRetryable():Unit=runBlocking {
