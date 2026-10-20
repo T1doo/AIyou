@@ -4,6 +4,7 @@
 # To regenerate this file, run: ./gradlew :dependencies --write-locks
 androidx.annotation:annotation-jvm:1.9.1=compileClasspath,kspKotlinProcessorClasspath,testCompileClasspath,testRuntimeClasspath
 androidx.annotation:annotation:1.9.1=compileClasspath,kspKotlinProcessorClasspath,testCompileClasspath,testRuntimeClasspath
+androidx.core:core-ktx:1.18.0=androidAars
 androidx.room:room-common-jvm:2.8.5=compileClasspath,kspKotlinProcessorClasspath,testCompileClasspath,testRuntimeClasspath
 androidx.room:room-common:2.8.5=kspKotlinProcessorClasspath
 androidx.room:room-compiler-processing:2.8.5=kspKotlinProcessorClasspath

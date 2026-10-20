@@ -4,8 +4,8 @@ import android.Manifest
 import android.app.*
 import android.content.*
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
+import androidx.core.net.toUri
 import com.t1doo.aiyou.MainActivity
 import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
@@ -27,7 +27,7 @@ internal class AndroidReminderDriver(private val context:Context, private val en
         val alarm=alarms;val manager=notices
         if(alarm==null||manager==null)return TaskReminderAvailability()
         val channel=channel()
-        val allowed=(platformApi<33 || context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)&&manager.areNotificationsEnabled()
+        val allowed=(platformApi<33 || Build.VERSION.SDK_INT<33 || context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)&&manager.areNotificationsEnabled()
         val group=if(platformApi>=28 && Build.VERSION.SDK_INT>=28)channel?.group?.let{manager.getNotificationChannelGroup(it)} else null
         return TaskReminderAvailability(true,
             if(allowed)TaskReminderPermission.GRANTED else TaskReminderPermission.NOT_REQUESTED,
@@ -75,7 +75,7 @@ internal object ReminderIntents {
     const val ALARM="com.t1doo.aiyou.REMINDER_ALARM_V1"
     const val CLICK="com.t1doo.aiyou.REMINDER_CLICK_V1"
     private const val PAYLOAD="reminder-envelope-v1"
-    private fun uri(purpose:String,id:String)=Uri.parse("aiyou-reminder://$purpose/v1/$id")
+    private fun uri(purpose:String,id:String)="aiyou-reminder://$purpose/v1/$id".toUri()
     fun alarmIdentity(context:Context,id:String)=Intent(context,AlarmReminderReceiver::class.java).setAction(ALARM).setData(uri("alarm",id))
     fun alarm(context:Context,envelope:ReminderEnvelope)=alarmIdentity(context,envelope.identity).putExtra(PAYLOAD,envelope.bytes())
     fun click(context:Context,envelope:ReminderEnvelope)=Intent(context,MainActivity::class.java).setAction(CLICK).setData(uri("click",envelope.identity)).putExtra(PAYLOAD,envelope.bytes())

@@ -1,6 +1,7 @@
 package com.t1doo.aiyou.records
 
 import android.app.job.*
+import android.app.Application
 import android.content.*
 import android.os.UserManager
 import android.os.PersistableBundle
@@ -17,7 +18,7 @@ import kotlinx.coroutines.sync.withLock
 
 /** Application-context composition. No receiver, Activity, SavedState, or process restart can mint a lease. */
 internal class AndroidReminderRuntime(context:Context,createOwner:((ReminderOperationBridge)->ReminderProcessOwner)?=null) {
-    private val app=context.applicationContext
+    private val app:Application=context.applicationContext as Application
     val bridge=ReminderOperationBridge()
     val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
     val jobExecution=Mutex()

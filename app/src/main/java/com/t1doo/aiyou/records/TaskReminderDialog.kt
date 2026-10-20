@@ -2,11 +2,11 @@ package com.t1doo.aiyou.records
 
 import android.Manifest
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.net.toUri
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -93,7 +93,7 @@ fun TaskReminderDialog(local: LocalRecordUiState, controller: TaskReminderContro
                     if(editor.mode==TaskReminderMode.EXACT&&Build.VERSION.SDK_INT>=31)TextButton(enabled=canConfirm&&controller.mayRequestCapability(editor.session)&&requested==null,onClick={
                         if(ownsRoute()&&controller.mayRequestCapability(editor.session)){
                             requested=editor.session
-                            try{specialPermission.launch(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:"+context.packageName)))}
+                            try{specialPermission.launch(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,("package:"+context.packageName).toUri()))}
                             catch(_:Exception){requested=null;controller.capabilitiesChanged(editor.session)}
                         }
                     },modifier=Modifier.testTag("reminder-exact-permission")){Text("检查精确闹钟授权")}

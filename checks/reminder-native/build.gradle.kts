@@ -29,6 +29,8 @@ dependencies {
     implementation("org.robolectric:android-all:15-robolectric-13954326")
     implementation(libs.coroutines.android);implementation("androidx.room:room-common-jvm:2.8.5")
     implementation(androidJars)
+    // Same existing production pin in app/gradle.lockfile; compile its actual String.toUri inline API.
+    androidAars("androidx.core:core-ktx:1.18.0@aar")
     androidAars("androidx.room:room-runtime-android:2.8.5@aar")
     androidAars("androidx.sqlite:sqlite-android:2.7.0@aar")
     androidAars("net.zetetic:sqlcipher-android:4.19.1@aar")
