@@ -38,9 +38,8 @@ class AudioPlatformLifecycleTest {
         app.sendBroadcast(Intent(AudioManager.ACTION_AUDIO_BECOMING_NOISY));Shadows.shadowOf(Looper.getMainLooper()).idle()
         assertEquals(1,stops.get());output.close()
     }
-    @Test
     @Config(shadows=[Api35AudioServiceBluetoothSignatureShadow::class])
-    fun duckCallbackReleasesActualAdapterTrackFocusAndReceiverAndGainCannotRestart() {
+    @Test fun duckCallbackReleasesActualAdapterTrackFocusAndReceiverAndGainCannotRestart() {
         val app=RuntimeEnvironment.getApplication();val shadow=Shadows.shadowOf(app.getSystemService(AudioManager::class.java))
         val stops=AtomicInteger()
         lateinit var output:PlatformOriginalAudioOutput
