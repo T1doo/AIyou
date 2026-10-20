@@ -1,6 +1,8 @@
 # D03 短原音：无权限受控实现候选
 
 接续父侧限定设计 ACK `c597754b6979608db4ed8cd584e566fcdd8e2351`。
+首轮实现未获ACK，父侧发现四项P2；修订产品及其精确验证见[四项P2修订说明](D03_CONTROLLED_AUDIO_P2_REVIEW.md)。
+下列1358/41项是首轮候选输入的历史证据，不替代后续修订或实现独审。
 本片没有实际麦克风/AudioTrack adapter、录音按钮、系统授权或 ASR/OCR，引入的输入端口仅供受控合成样本与后续原生适配。
 它不是 D03 完成、真机验证或可用录音功能发布；原设计的许可边界继续生效。
 
@@ -43,7 +45,7 @@
 
 ## 验证状态与未验边界
 
-最终产品提交 `c9f561f24ffd0e0aa75f9f7425ee837f5acd9b3d` 的本机完整合同测试实际 **1358 项通过**：
+首轮候选提交 `c9f561f24ffd0e0aa75f9f7425ee837f5acd9b3d` 的本机完整合同测试实际 **1358 项通过**：
 `core:ai` 178、`core:domain` 71、`remote-text` 1109，失败/错误/跳过均为 0。
 命令为 `python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test :remote-text:test`，
 随后 `python3 scripts/verify-ai-protocol-results.py` 对实际方法清单、XML 新鲜度和完整源码输入严格通过。
