@@ -470,7 +470,10 @@ class LocalRecordsViewModel internal constructor(
                             if(reminderRuntime!=null)reminderRuntime.closeStore(close)else close()
                         }
                     }
-                } } catch (_: Exception) {
+                }
+                    // Physical close is authoritative even when startup was rejected by retirement.
+                    appAccessClosed.complete(Unit)
+                } catch (_: Exception) {
                     appAccessClosed.completeExceptionally(IllegalStateException("Records session closure unconfirmed"))
                 }
             }

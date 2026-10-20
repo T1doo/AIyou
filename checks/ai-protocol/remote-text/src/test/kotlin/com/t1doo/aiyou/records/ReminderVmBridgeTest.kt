@@ -54,11 +54,15 @@ class ReminderVmBridgeTest {
             val bridge=ReminderOperationBridge();val owner=bridge.gate.openOwner(true);val wiped=AtomicBoolean()
             val base=SqliteVmEntryRepository(f.db,f.db,RemoteTextTransactions(f.db)){f.meta.close();f.tasks.wipeKey();wiped.set(true)}
             val runtime=ReminderVmRuntime(bridge,owner,{owner.isAdmitted},{false})
+            val entered=CountDownLatch(1);val release=CountDownLatch(1)
+            val blocked=async(Dispatchers.Default){bridge.runtime{entered.countDown();check(release.await(5,TimeUnit.SECONDS))}}
+            assertTrue(withContext(Dispatchers.IO){entered.await(5,TimeUnit.SECONDS)})
             val vm=LocalRecordsViewModel(Application(),{error("Admitted store must not be opened twice")},reminderRuntime=runtime,admittedStore=base)
             try{
-                vm.clearForHostTest();withTimeout(5_000){vm.awaitAppAccessClosed()};assertTrue(wiped.get())
+                vm.clearForHostTest();assertNull(withTimeoutOrNull(100){vm.awaitAppAccessClosed()});assertFalse(wiped.get())
+                release.countDown();blocked.await();withTimeout(5_000){vm.awaitAppAccessClosed()};assertTrue(wiped.get())
                 val next=bridge.gate.openOwner(true);next.closeAndAwait()
-            }finally{vm.clearForHostTest();bridge.close()}
+            }finally{release.countDown();vm.clearForHostTest();withTimeout(5_000){vm.awaitAppAccessClosed()};bridge.close()}
         }
     }
 
