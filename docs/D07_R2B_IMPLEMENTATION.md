@@ -53,3 +53,6 @@ Room 主机导出先用基线源码生成 v14，与已封存文件逐字节一�
 最终执行收据见本轮 evidence；中间编译/测试失败均保留，修正针对已确认的 API、JSON 缺省字段、fixture 或生命周期原因。
 完整 Android AAR/APK、lint、Compose/Preview 仍需精确提交 CI。真实权限、通知、闹钟、OEM、重启、首解锁、设备 SQLCipher、16 KB 与性能均为 NOT RUN。
 没有安装 Android SDK、接受新 SDK 条款、真实模型调用、部署或上架。
+
+上述为实现候选时点。后续逐次审查和最小修正已提交，最终测试 SHA 的 Android lint/APK/Compose/Preview
+实际结果及原始日志见 [R2b CI 封存](D07_R2B_CI_CLOSURE.md)；设备未验边界保持不变。
