@@ -1020,6 +1020,8 @@ fun AIyouApp(
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
                 onOpenMemoryInbox = memoryInbox?.let { controller -> { if (ownsNavigation() && selected == Destination.MEMORIES &&
                     !reading && !showSettings && !demo) { navigation.advance(); clearSearch(); controller.open() } } },
+                onOpenAcceptedMemories = memoryInbox?.let { controller -> { if (ownsNavigation() && selected == Destination.MEMORIES &&
+                    !reading && !showSettings && !demo) { navigation.advance(); clearSearch(); controller.open(com.t1doo.aiyou.domain.SourceMemoryInboxSection.ACCEPTED) } } },
                 onOpenFactRecap = factRecaps?.let { controller -> { if(ownsNavigation() && selected==Destination.MEMORIES && !reading && !showSettings && !demo) {
                     navigation.advance();clearSearch();controller.open(currentDisplay.preferences.defaultRecapPeriod);recapRoute=true
                 } } },

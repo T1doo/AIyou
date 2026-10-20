@@ -48,23 +48,23 @@ class SourceMemoryInboxPresentationTest {
     private val queue = ConcurrentLinkedQueue<suspend (EntryRepository) -> Unit>()
     private var failRead = false
     private var mutations = 0
-    private class Page(override val pending: List<SourceMemorySnapshot>) : SourceMemoryInboxSnapshot {
+    private class Page(override val items: List<SourceMemorySnapshot>, override val section: SourceMemoryInboxSection) : SourceMemoryInboxSnapshot {
         override val cursor: SourceMemoryInboxCursor? = null
         override val next: SourceMemoryInboxCursor? = null
     }
     private val inbox = object : SourceMemoryInboxRepository {
-        private fun checkCurrent(s: SourceMemoryInboxSnapshot) = s is Page && s.pending ==
-            (if (saved.current!!.review == SourceMemoryReview.PROPOSED) listOf(saved) else emptyList<SourceMemorySnapshot>())
-        override fun capture(cursor: SourceMemoryInboxCursor?): SourceMemoryInboxSnapshot {
+        private fun checkCurrent(s: SourceMemoryInboxSnapshot) = s is Page && s.items ==
+            (if (saved.current!!.review == s.section.review) listOf(saved) else emptyList<SourceMemorySnapshot>())
+        override fun capture(cursor: SourceMemoryInboxCursor?, section: SourceMemoryInboxSection): SourceMemoryInboxSnapshot {
             if (failRead) throw SourceMemoryStorageFailure()
-            return Page(if (saved.current!!.review == SourceMemoryReview.PROPOSED) listOf(saved) else emptyList())
+            return Page(if (saved.current!!.review == section.review) listOf(saved) else emptyList(), section)
         }
         override fun publishCurrent(snapshot: SourceMemoryInboxSnapshot, publish: () -> Unit): Boolean {
             if (failRead) throw SourceMemoryStorageFailure()
             return if (checkCurrent(snapshot)) { publish(); true } else false
         }
         override fun resolve(snapshot: SourceMemoryInboxSnapshot, item: SourceMemorySnapshot, publish: () -> Unit): Boolean =
-            if (checkCurrent(snapshot) && snapshot.pending.any { it === item }) { publish(); true } else false
+            if (checkCurrent(snapshot) && snapshot.items.any { it === item }) { publish(); true } else false
     }
     private val memories = object : SourceMemoryRepository {
         override val inbox = this@SourceMemoryInboxPresentationTest.inbox
@@ -152,5 +152,34 @@ class SourceMemoryInboxPresentationTest {
         compose.runOnIdle { state.value = state.value.copy(entries = listOf(entry.copy(currentRevision = 2, originalText = "合成变化后的新原文"))) }
         compose.onNodeWithTag("original-text").assertDoesNotExist()
         assertNull(state.value.sourceMemories); assertEquals(0, mutations)
+    }
+    @Test fun acceptedMemoriesAreReachableAtDoubleFontAndDisappearOnlyAfterSeparateRevocationConfirmation() {
+        saved = SourceMemorySnapshot(saved.id, source, hash, 0, 2, saved.state, 70, 55, "UTC",
+            listOf(saved.current!!.copy(review = SourceMemoryReview.ACCEPTED, reviewedAtMillis = 90)))
+        compose.setContent { Screen() }
+        click("memory-accepted-open"); drain()
+        compose.onNodeWithTag("memory-inbox-count").assertTextEquals("本页已采纳 1 条")
+        compose.onNodeWithTag("memory-inbox-note-memory").performScrollTo().assertTextEquals("人工备注：私有合成备注")
+        val retained = actions.get()
+        compose.runOnIdle {
+            val raw = checkNotNull(registry).performSave().toString()
+            assertFalse(raw.contains(entry.originalText)); assertFalse(raw.contains(hash)); assertFalse(raw.contains("私有合成备注"))
+        }
+        click("memory-inbox-section-PENDING"); drain()
+        compose.onNodeWithTag("memory-inbox-count").assertTextEquals("本页待审 0 条")
+        compose.runOnIdle { retained.open.getValue("memory")(); retained.sections.getValue(SourceMemoryInboxSection.ACCEPTED)(); assertTrue(queue.isEmpty()) }
+        click("memory-inbox-section-ACCEPTED"); drain()
+        click("memory-inbox-source-memory"); drain()
+        compose.onNodeWithTag("source-memory-review-0").performScrollTo().assertTextEquals("已采纳")
+        click("source-memory-REVOKE-0"); assertEquals(0, mutations)
+        click("source-memory-cancel-confirm"); assertEquals(SourceMemoryReview.ACCEPTED, saved.current!!.review)
+        click("source-memory-REVOKE-0"); click("source-memory-confirm"); drain()
+        assertEquals(1, mutations); assertEquals(SourceMemoryReview.REVOKED, saved.current!!.review)
+        click("source-memories-close")
+        compose.onNodeWithContentDescription("返回列表").performClick()
+        click("memory-accepted-open"); drain()
+        compose.onNodeWithTag("memory-inbox-count").assertTextEquals("本页已采纳 0 条")
+        compose.onNodeWithTag("memory-inbox-quote-memory").assertDoesNotExist()
+        assertEquals(listOf(entry), state.value.entries); assertTrue(state.value.tasks.items.isEmpty())
     }
 }

@@ -8,7 +8,8 @@ import kotlinx.coroutines.CancellationException
 class SourceMemoryInboxRequest internal constructor()
 
 data class SourceMemoryInboxUiState(val session: Long, val request: SourceMemoryInboxRequest = SourceMemoryInboxRequest(), val busy: Boolean = false,
-    val snapshot: SourceMemoryInboxSnapshot? = null, val canGoBack: Boolean = false, val error: String? = null) {
+    val snapshot: SourceMemoryInboxSnapshot? = null, val canGoBack: Boolean = false, val error: String? = null,
+    val section: SourceMemoryInboxSection = SourceMemoryInboxSection.PENDING) {
     override fun toString() = "SourceMemoryInboxUiState(redacted)"
 }
 
@@ -28,11 +29,11 @@ class SourceMemoryInboxController internal constructor(private val current: () -
     private fun change(session: Long, request: SourceMemoryInboxRequest, action: (SourceMemoryInboxUiState) -> SourceMemoryInboxUiState) = publish {
         if (owns(it, session, request)) it.copy(memoryInbox = action(checkNotNull(it.memoryInbox))) else it
     }
-    fun open(): Unit = synchronized(gate) {
+    fun open(section: SourceMemoryInboxSection = SourceMemoryInboxSection.PENDING): Unit = synchronized(gate) {
         val local = current()
         if (!available(local) || local.saving || local.savePending) return
         val session = tokens.incrementAndGet(); cursors.clear(); cursors.add(null)
-        publish { if (available(it)) it.copy(memoryInbox = SourceMemoryInboxUiState(session)) else it }
+        publish { if (available(it)) it.copy(memoryInbox = SourceMemoryInboxUiState(session, section = section)) else it }
         current().memoryInbox?.takeIf { it.session == session }?.let { read(it) }
     }
     fun close(session: Long): Unit = synchronized(gate) {
@@ -42,6 +43,13 @@ class SourceMemoryInboxController internal constructor(private val current: () -
     fun refresh(session: Long, request: SourceMemoryInboxRequest): Unit = synchronized(gate) {
         if (!owns(session, request) || current().memoryInbox?.busy == true) return
         cursors.clear(); cursors.add(null); read(checkNotNull(current().memoryInbox))
+    }
+    fun selectSection(session: Long, request: SourceMemoryInboxRequest, section: SourceMemoryInboxSection): Unit = synchronized(gate) {
+        val ui = current().memoryInbox ?: return
+        if (!owns(session, request) || ui.busy || ui.section == section) return
+        cursors.clear(); cursors.add(null)
+        change(session, request) { it.copy(section = section, snapshot = null, error = null) }
+        current().memoryInbox?.takeIf { it.session == session && it.section == section }?.let { read(it) }
     }
     fun next(session: Long, request: SourceMemoryInboxRequest): Unit = synchronized(gate) {
         val ui = current().memoryInbox ?: return
@@ -60,7 +68,8 @@ class SourceMemoryInboxController internal constructor(private val current: () -
         if (!enqueue { store ->
             if (!owns(before.session, request)) return@enqueue
             try {
-                val owner = checkNotNull(store.sourceMemories?.inbox); val snapshot = owner.capture(cursor)
+                val owner = checkNotNull(store.sourceMemories?.inbox); val snapshot = owner.capture(cursor, before.section)
+                check(snapshot.section == before.section && snapshot.items.all { it.current?.review == before.section.review })
                 if (!owns(before.session, request)) return@enqueue
                 val accepted = owner.publishCurrent(snapshot) {
                     synchronized(gate) { change(before.session, request) { it.copy(busy = false, snapshot = snapshot) } }
@@ -75,7 +84,7 @@ class SourceMemoryInboxController internal constructor(private val current: () -
             val ui = current().memoryInbox ?: return
             if (!owns(session, request) || ui.busy) return
             val snapshot = ui.snapshot ?: return
-            if (snapshot.pending.none { it === item }) return
+            if (snapshot.items.none { it === item }) return
             change(session, request) { it.copy(busy = true) }; snapshot
         }
         if (!enqueue { store ->
@@ -93,12 +102,12 @@ class SourceMemoryInboxController internal constructor(private val current: () -
     }
     private fun fail(session: Long, request: SourceMemoryInboxRequest): Unit = synchronized(gate) {
         change(session, request) { it.copy(busy = false, snapshot = null,
-            error = "候选或来源已变化，或本机读取未完成。请刷新重新核对；没有显示不完整的待审结果。") }
+            error = "线索或来源已变化，或本机读取未完成。请刷新重新核对；没有显示不完整的结果。") }
     }
     fun invalidate(): Unit = synchronized(gate) {
         val ui = current().memoryInbox ?: return
         change(ui.session, ui.request) { it.copy(request = SourceMemoryInboxRequest(), busy = false, snapshot = null,
-            error = "记录或审阅结果已变化，请刷新待审线索。") }
+            error = "记录或审阅结果已变化，请刷新线索。") }
     }
     fun dispose(): Unit = synchronized(gate) { disposed = true; cursors.clear(); publish { it.copy(memoryInbox = null) } }
 }
@@ -109,12 +118,13 @@ internal fun reconcileMemoryInbox(before: LocalRecordUiState, after: LocalRecord
     if (!after.ready || after.opening || after.error != null || !after.supportsMemoryInbox ||
         after.supportsLocalProcessing && !after.localProcessingAvailable) return after.copy(memoryInbox = null)
     if (ui.snapshot == null || before.memoryInbox?.snapshot === ui.snapshot && before.entries === after.entries && before.localProcessingVersions === after.localProcessingVersions) return after
-    val valid = ui.snapshot.pending.all { card -> after.entries.any {
+    val valid = ui.snapshot.section == ui.section && ui.snapshot.items.all { card ->
+        card.current?.review == ui.section.review && after.entries.any {
         it.id == card.source.sourceId && it.currentRevision.toLong() == card.source.revision &&
             it.policy != ProcessingPolicy.AI_NONE && OriginalExports.hash(it.originalText) == card.sourceHash &&
             it.capturedAtMillis == card.capturedAtMillis && it.captureTimeZone == card.captureTimeZone
     } && (!after.supportsLocalProcessing || after.localProcessingVersions[card.source.sourceId]?.let {
         it.source == card.source && it.generation == card.generation } == true) }
     return if (valid) after else after.copy(memoryInbox = ui.copy(snapshot = null, busy = false,
-        request = SourceMemoryInboxRequest(), error = "来源已变化，请刷新待审线索。"))
+        request = SourceMemoryInboxRequest(), error = "来源已变化，请刷新线索。"))
 }

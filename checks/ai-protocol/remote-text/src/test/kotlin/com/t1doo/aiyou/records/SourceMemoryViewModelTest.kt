@@ -79,7 +79,7 @@ class SourceMemoryViewModelTest {
     @Test(timeout=10_000) fun actualInboxReaderOpensExistingSourceReviewWithoutAcceptingOrCallingModels():Unit=Harness().use { h -> runBlocking {
         h.ready();h.f.create();h.vm.memoryInbox.open()
         val page=withTimeout(2_000) { h.vm.state.first { it.memoryInbox?.snapshot!=null && it.memoryInbox.busy.not() }.memoryInbox!! }
-        val item=page.snapshot!!.pending.single()
+        val item=page.snapshot!!.items.single()
         h.vm.memoryInbox.source(page.session,page.request,item) {
             h.vm.memoryInbox.close(page.session);h.vm.sourceMemories.open(item.source.sourceId,item.source.revision.toInt());true
         }

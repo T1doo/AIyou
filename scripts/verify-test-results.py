@@ -209,7 +209,8 @@ for label, folder, minimum in targets:
             "pictureOnlyOriginalCanChooseNoInferenceWithoutInventingTextOrRemoteOption")
         additional["com.t1doo.aiyou.SourceMemoryInboxPresentationTest"] = (
             "narrowInboxReachesExactOriginalAndRequiresSeparateExistingAcceptanceAtDoubleFont",
-            "failedReadAndRestorationHidePrivateResultsAndRetireRetainedPageCallbacks")
+            "failedReadAndRestorationHidePrivateResultsAndRetireRetainedPageCallbacks",
+            "acceptedMemoriesAreReachableAtDoubleFontAndDisappearOnlyAfterSeparateRevocationConfirmation")
         additional["com.t1doo.aiyou.SourceMemoryPresentationTest"] = (
             "explicitPendingAndAcceptanceAreReachableAtDoubleFontAndSourceJumpPreservesOriginal",
             "rejectionCorrectionHistoryAndRevocationSurviveReopeningWithoutAutomaticAcceptance",

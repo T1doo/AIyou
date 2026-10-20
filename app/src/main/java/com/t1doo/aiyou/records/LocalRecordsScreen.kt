@@ -106,6 +106,7 @@ fun LocalRecordsScreen(
     onBeginRecordPackage: (() -> Unit)? = null,
     onOpenFactRecap: (() -> Unit)? = null,
     onOpenMemoryInbox: (() -> Unit)? = null,
+    onOpenAcceptedMemories: (() -> Unit)? = null,
     onBeforeSearchInput: (TextFieldState) -> Boolean = { true },
     onHistoryInputCommitted: () -> Unit = {},
     onRebuildLocalSearch: () -> Unit = {},
@@ -276,11 +277,14 @@ fun LocalRecordsScreen(
                         (onOpenRecycleBin != null && local.supportsRecycleBin) ||
                         (onBeginRecordPackage != null && local.supportsRecordPackages) ||
                         (onOpenFactRecap != null && local.supportsFactRecaps) ||
-                        (onOpenMemoryInbox != null && local.supportsMemoryInbox))) {
+                        ((onOpenMemoryInbox != null || onOpenAcceptedMemories != null) && local.supportsMemoryInbox))) {
                         Column(Modifier.fillMaxWidth()) {
                             if (onOpenMemoryInbox != null && local.supportsMemoryInbox) OutlinedButton(onOpenMemoryInbox,
                                 enabled = local.ready && !local.opening && local.error == null,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("memory-inbox-open")) { Text("待审事件与情绪") }
+                            if (onOpenAcceptedMemories != null && local.supportsMemoryInbox) OutlinedButton(onOpenAcceptedMemories,
+                                enabled = local.ready && !local.opening && local.error == null,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("memory-accepted-open")) { Text("找回已采纳事件与情绪") }
                             if(onOpenFactRecap!=null && local.supportsFactRecaps) OutlinedButton(onOpenFactRecap,
                                 enabled=local.ready && !local.opening && local.error==null,
                                 modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("recap-open")){Text("生成本机日／周回顾")}
