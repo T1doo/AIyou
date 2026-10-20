@@ -14,6 +14,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ControlledCaptureAudioTest {
+    @Test fun acceptedFilePickerSurvivesOldCompositionDisposalButRealVmRouteChangeRejectsItsSource():Unit=runBlocking {
+        for(navigate in listOf(false,true)) Harness().use { h ->
+            h.start();var oldCompositionAlive=true;var foreground=true
+            assertTrue(h.c.audioCapture.startFile({oldCompositionAlive},{foreground}));h.drain()
+            val key=checkNotNull(h.ui.audio.filePickerKey)
+            foreground=false;assertFalse(h.c.audioCapture.claimFile(key))
+            foreground=true;assertTrue(h.c.audioCapture.claimFile(key))
+            oldCompositionAlive=false // Same VM after rotation; no route event.
+            if(navigate)h.c.audioCapture.fileRouteChanged()
+            val opened=AtomicInteger()
+            h.c.audioCapture.selectedFile(key,object:SelectedWaveSource {
+                override fun open():java.io.InputStream { opened.incrementAndGet();return CaptureAudioSqlTest.wave().inputStream() }
+            })
+            h.c.audioCapture.resumeFile();h.await(if(navigate)CaptureAudioPhase.IDLE else CaptureAudioPhase.READY)
+            assertEquals(if(navigate)0 else 1,opened.get())
+            assertFalse(h.c.audioCapture.startFile({oldCompositionAlive},{true}))
+        }
+    }
     @Test(timeout=10000) fun actualVmPlaybackBlocksLegacyOptimisticInputPackageAdmissionAndLockUntilActualClose():Unit=runBlocking {
         Harness().use { h ->
             h.start();assertTrue(h.c.audioCapture.start({Input()}));h.await(CaptureAudioPhase.READY)
@@ -130,7 +148,8 @@ class ControlledCaptureAudioTest {
     @Test fun cancelledPickerKeyCannotDonateItsLateSourceToNextRequest():Unit=runBlocking {
         Harness().use { h ->
             h.start();assertTrue(h.c.audioCapture.startFile({true},{true}));h.drain()
-            val old=checkNotNull(h.ui.audio.filePickerKey);h.c.audioCapture.claimFile(old);h.c.audioCapture.cancel();h.await(CaptureAudioPhase.IDLE)
+            val old=checkNotNull(h.ui.audio.filePickerKey);h.c.audioCapture.claimFile(old);h.c.audioCapture.cancel()
+            assertFalse(h.c.audioCapture.claimFile(old));h.await(CaptureAudioPhase.IDLE)
             assertTrue(h.c.audioCapture.startFile({true},{true}));h.drain()
             val opened=AtomicInteger()
             h.c.audioCapture.selectedFile(old,object:SelectedWaveSource { override fun open():java.io.InputStream { opened.incrementAndGet();return CaptureAudioSqlTest.wave().inputStream() } })

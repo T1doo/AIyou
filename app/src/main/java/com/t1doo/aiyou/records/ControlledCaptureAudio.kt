@@ -28,6 +28,7 @@ class ControlledCaptureAudio internal constructor(
     private var request:Request?=null
     @Volatile private var retired=false
     @Volatile private var state=CaptureAudioUi()
+    @Volatile private var fileRoute=0L
     val busy:Boolean get()=state.phase in setOf(CaptureAudioPhase.PREPARING,CaptureAudioPhase.STARTING,
         CaptureAudioPhase.RECORDING,CaptureAudioPhase.PICKING,CaptureAudioPhase.IMPORTING,CaptureAudioPhase.FINALIZING,CaptureAudioPhase.UNKNOWN)
     private class Request(val reservation:CaptureDraftGate.Reservation,val visible:String,val routeCurrent:()->Boolean,
@@ -60,7 +61,16 @@ class ControlledCaptureAudio internal constructor(
     fun start(input:()->ControlledPcmInput,routeCurrent:()->Boolean={true}):Boolean {
         return begin(input,routeCurrent,false,{true})
     }
-    fun startFile(routeCurrent:()->Boolean,foreground:()->Boolean):Boolean = begin(null,routeCurrent,true,foreground)
+    fun startFile(routeCurrent:()->Boolean,foreground:()->Boolean):Boolean {
+        val route=synchronized(monitor) { if(!routeCurrent())return false else fileRoute }
+        // The click must own its composition, but the accepted request belongs to the VM route.
+        // Configuration disposal cannot invalidate the still-live VM's UUID picker request.
+        return begin(null,{fileRoute==route},true,foreground)
+    }
+    fun fileRouteChanged():Unit=synchronized(monitor) {
+        fileRoute++
+        if(request?.file==true)cancel()
+    }
     private fun begin(input:(()->ControlledPcmInput)?,routeCurrent:()->Boolean,file:Boolean,foreground:()->Boolean):Boolean {
         val g=gate ?: return false
         return g.uiMutation {
@@ -110,12 +120,12 @@ class ControlledCaptureAudio internal constructor(
     }
     fun claimFile(key:String):Boolean=synchronized(monitor) {
         val r=request ?: return false
-        if(retired || !r.file || r.pickerKey!=key || r.pickerClaimed || state.phase!=CaptureAudioPhase.PICKING)return false
+        if(retired || r.cancelled || !r.routeCurrent() || !r.foreground() || !r.file || r.pickerKey!=key || r.pickerClaimed || state.phase!=CaptureAudioPhase.PICKING)return false
         r.pickerClaimed=true;true
     }
     fun selectedFile(key:String,source:SelectedWaveSource?):Unit=synchronized(monitor) {
         val r=request ?: return
-        if(retired || !r.file || r.pickerKey!=key || !r.pickerClaimed || r.fileResultReceived || state.phase!=CaptureAudioPhase.PICKING)return
+        if(retired || r.cancelled || !r.file || r.pickerKey!=key || !r.pickerClaimed || r.fileResultReceived || state.phase!=CaptureAudioPhase.PICKING)return
         r.fileResultReceived=true
         if(source==null) { r.cancelled=true;r.fileReady.complete(null) } else { r.chosen=source;resumeFile() }
     }

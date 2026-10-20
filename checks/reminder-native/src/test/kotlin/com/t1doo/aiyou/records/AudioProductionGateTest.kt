@@ -123,7 +123,7 @@ class AudioProductionGateTest {
         }
         fun insertInterrupted(intent:AttachmentIntent) {
             db.openHelper.writableDatabase.execSQL("INSERT INTO attachments VALUES(?,?,?,?,?,?,'WRITING')",
-                arrayOf(intent.id,intent.entryId,intent.revision,intent.mediaType,intent.sha256,intent.byteSize))
+                arrayOf<Any?>(intent.id,intent.entryId,intent.revision,intent.mediaType,intent.sha256,intent.byteSize))
         }
         fun filesSnapshot()=root.walkTopDown().filter { it.isFile }.associate { it.relativeTo(root).path to hash(it.readBytes()) }
         override fun close() { repo.closeAndAwait();root.deleteRecursively() }

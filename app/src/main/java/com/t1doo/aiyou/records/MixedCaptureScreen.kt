@@ -26,6 +26,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
     defaultPolicyUnavailable: Boolean = false,audio:OriginalAudioController?=null,canImportAudio:()->Boolean={true}) {
     val ui=local.mixedCapture ?: MixedCaptureUiState()
     val playback=audio?.state?.collectAsState()?.value ?: OriginalAudioUi()
+    val foreground=audio?.foregroundState?.collectAsState()?.value==true
     val enabled=local.ready && !local.opening && local.error==null && ui.draft!=null
     val editable=enabled && !ui.busy && !controller.audioCapture.busy && !playback.busy && ui.selection==null && !ui.uncertainSave && !ui.discardPending && ui.policyChange==null && ui.draft?.discarding!=true
     val day by produceState(controller.today(),controller) {
@@ -38,7 +39,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
     val scope=rememberCoroutineScope()
     LaunchedEffect(recentIds,atTop) { if(atTop) seenIds=recentIds }
     DisposableEffect(controller) { onDispose { controller.cancelSelection() } }
-    WaveFilePicker(controller.audioCapture,ui.audio)
+    WaveFilePicker(controller.audioCapture,ui.audio,foreground)
     if(ui.confirmDiscard) AlertDialog(onDismissRequest=controller::cancelDiscard,title={Text(if(ui.discardPending) "清空结果待核对" else "清空这份草稿？")},
         text={Text(if(ui.discardPending) "清空可能已经完成。先核对这次清空，再继续记录；已清理的图片不会自动恢复。"
             else "将清理这份草稿的文字、图片和原音。已保存的记录保持不变。")},

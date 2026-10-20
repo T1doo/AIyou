@@ -20,7 +20,7 @@ private class WavePickerHandle { var launcher:ActivityResultLauncher<Intent>?=nu
 
 /** Same live VM UUID registry ownership as the existing image picker; no app SavedState/URI grant persistence. */
 @Composable
-fun WaveFilePicker(audio:ControlledCaptureAudio,ui:CaptureAudioUi) {
+fun WaveFilePicker(audio:ControlledCaptureAudio,ui:CaptureAudioUi,canLaunch:Boolean) {
     val key=ui.filePickerKey ?: return
     val registry=checkNotNull(LocalActivityResultRegistryOwner.current).activityResultRegistry
     val resolver=LocalContext.current.applicationContext.contentResolver
@@ -36,8 +36,8 @@ fun WaveFilePicker(audio:ControlledCaptureAudio,ui:CaptureAudioUi) {
         handle.launcher=registered
         onDispose { handle.launcher=null;registered.unregister() }
     }
-    LaunchedEffect(key) {
-        if(audio.claimFile(key))try {
+    LaunchedEffect(key,canLaunch) {
+        if(canLaunch && audio.claimFile(key))try {
             checkNotNull(handle.launcher).launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE);type="*/*"
                 putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("audio/wav","audio/x-wav","audio/wave","audio/vnd.wave","application/octet-stream"))

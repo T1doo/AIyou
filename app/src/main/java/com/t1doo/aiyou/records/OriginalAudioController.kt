@@ -27,6 +27,8 @@ class OriginalAudioController internal constructor(
     private val monitor=Any()
     private val mutable=MutableStateFlow(OriginalAudioUi())
     val state=mutable.asStateFlow()
+    private val mutableForeground=MutableStateFlow(false)
+    val foregroundState=mutableForeground.asStateFlow()
     @Volatile private var resumed=false
     private var route=0L
     private var foregroundEpoch=0L
@@ -44,7 +46,8 @@ class OriginalAudioController internal constructor(
     val busy get()=state.value.busy
     val isResumed get()=resumed
     fun foreground(value:Boolean)=synchronized(monitor) {
-        if(resumed!=value) { resumed=value;foregroundEpoch++;if(!value)request?.stopped=true }
+        if(retired && value)return@synchronized
+        if(resumed!=value) { resumed=value;mutableForeground.value=value;foregroundEpoch++;if(!value)request?.stopped=true }
     }
     fun routeChanged()=synchronized(monitor) { route++;request?.stopped=true }
     fun playDraft():Boolean = start(null)
@@ -186,7 +189,7 @@ class OriginalAudioController internal constructor(
         // No monitor -> gate inversion against UI's gate -> monitor admission.
         if(release)r.gate.finishPlayback(r.pin)
     }
-    fun retire()=synchronized(monitor) { retired=true;resumed=false;request?.stopped=true }
+    fun retire()=synchronized(monitor) { retired=true;resumed=false;mutableForeground.value=false;request?.stopped=true }
     suspend fun closeAndJoin() {
         retire()
         val r=synchronized(monitor) { request }

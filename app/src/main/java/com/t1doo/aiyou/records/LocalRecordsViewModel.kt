@@ -200,7 +200,7 @@ class LocalRecordsViewModel internal constructor(
                 local.originalExport==null && local.manualTagEditor==null && local.manualPeopleEditor==null && local.eventDateEditor==null
         })
     fun audioForeground(value:Boolean) { audioPlayback.foreground(value);if(value)mixedCapture.audioCapture.resumeFile() }
-    fun audioRouteChanged() { audioPlayback.routeChanged();if(mutableState.value.mixedCapture?.audio?.fileInput==true)mixedCapture.audioCapture.cancel() }
+    fun audioRouteChanged() { audioPlayback.routeChanged();mixedCapture.audioCapture.fileRouteChanged() }
     init { viewModelScope.launch { audioPlayback.state.collect { audio -> synchronized(appAccessGuard) {
         mutableAppAccessIdle.value=appAccessCommands.get()==0 && !audio.busy
     } } } }
