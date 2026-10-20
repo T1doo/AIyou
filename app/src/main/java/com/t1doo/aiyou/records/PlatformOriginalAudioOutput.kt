@@ -21,7 +21,7 @@ internal class PlatformOriginalAudioOutput(context:Context,private val stop:()->
     private val attributes=AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_UNKNOWN).build()
     private val request=AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-        .setAudioAttributes(attributes).setAcceptsDelayedFocusGain(false)
+        .setAudioAttributes(attributes).setAcceptsDelayedFocusGain(false).setWillPauseWhenDucked(true)
         .setOnAudioFocusChangeListener({ change -> if(change!=AudioManager.AUDIOFOCUS_GAIN)stop() },Handler(Looper.getMainLooper())).build()
     private var focusHeld=false
     private var registered=false

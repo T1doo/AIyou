@@ -14,6 +14,36 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ControlledCaptureAudioTest {
+    @Test(timeout=20000) fun wokenFileBeforeOpenSurvivesPauseAndResumesOnceButCancelRouteOrRetirementNeverOpen():Unit=runBlocking {
+        for(disposition in listOf("resume","cancel","route","retire")) Harness().use { h ->
+            h.start();val woke=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();val paused=CompletableDeferred<Unit>()
+            val first=java.util.concurrent.atomic.AtomicBoolean(true);val foreground=java.util.concurrent.atomic.AtomicBoolean(true)
+            val opened=AtomicInteger();val closed=AtomicInteger()
+            val audio=h.fileAudio {
+                if(first.compareAndSet(true,false)) { woke.complete(Unit);release.await() }
+            }
+            try {
+                assertTrue(audio.startFile({true},{foreground.get().also { if(!it)paused.complete(Unit) }}));h.drain()
+                val key=checkNotNull(h.ui.audio.filePickerKey);assertTrue(audio.claimFile(key))
+                audio.selectedFile(key,object:SelectedWaveSource { override fun open():java.io.InputStream {
+                    opened.incrementAndGet();return object:java.io.ByteArrayInputStream(CaptureAudioSqlTest.wave()) {
+                        override fun close() { closed.incrementAndGet();super.close() }
+                    }
+                } })
+                withTimeout(4000) { woke.await() };foreground.set(false);release.complete(Unit)
+                withTimeout(4000) { paused.await() }
+                assertEquals(0,opened.get());assertEquals(CaptureAudioPhase.PICKING,h.ui.audio.phase)
+                assertTrue(audio.busy);assertTrue(h.repo.mutationGate.frozen);assertNull(h.repo.peek()!!.audio)
+                when(disposition) {
+                    "resume" -> { foreground.set(true);audio.resumeFile();audio.resumeFile();h.await(CaptureAudioPhase.READY)
+                        assertEquals(1,opened.get());assertEquals(1,closed.get());assertArrayEquals(CaptureAudioSqlTest.wave(),h.repo.audio(h.repo.peek()!!)) }
+                    "cancel" -> { audio.cancel();h.await(CaptureAudioPhase.IDLE);assertEquals(0,opened.get()) }
+                    "route" -> { audio.fileRouteChanged();foreground.set(true);audio.resumeFile();h.await(CaptureAudioPhase.IDLE);assertEquals(0,opened.get()) }
+                    else -> { audio.retire();foreground.set(true);audio.resumeFile();audio.closeAndFinalize(h.store);assertFalse(audio.busy);assertEquals(0,opened.get()) }
+                }
+            } finally { release.complete(Unit);audio.closeAndFinalize(h.store) }
+        }
+    }
     @Test fun acceptedFilePickerSurvivesOldCompositionDisposalButRealVmRouteChangeRejectsItsSource():Unit=runBlocking {
         for(navigate in listOf(false,true)) Harness().use { h ->
             h.start();var oldCompositionAlive=true;var foreground=true
@@ -430,10 +460,12 @@ class ControlledCaptureAudioTest {
             {action->if(acceptQueue){queue.add(action);true}else false},
             {object:AttachmentPicture{override val width=1;override val height=1}},Clock.systemUTC())
         val ui get()=local.mixedCapture!!
-        fun audio(encode:(ShortArray,Int)->ByteArray)=ControlledCaptureAudio(
+        fun audio(encode:(ShortArray,Int)->ByteArray)=newAudio(encode,{})
+        fun fileAudio(before:suspend()->Unit)=newAudio(LocalPcmAudio::encode,before)
+        private fun newAudio(encode:(ShortArray,Int)->ByteArray,before:suspend()->Unit)=ControlledCaptureAudio(
             {ui},{true},{action->if(acceptQueue){queue.add(action);true}else false},{ui.draft},
             {draft->synchronized(uiLock){local=local.copy(mixedCapture=ui.copy(draft=draft,text=draft.text))}},
-            {audio->synchronized(uiLock){local=local.copy(mixedCapture=ui.copy(audio=audio))}},encodeWave=encode
+            {audio->synchronized(uiLock){local=local.copy(mixedCapture=ui.copy(audio=audio))}},beforeFileOpen=before,encodeWave=encode
         ).also { it.attach(checkNotNull(store.captureRecords)) }
         suspend fun start()=c.initialize(store)
         suspend fun drain() { while(true) { val action=queue.poll() ?: break;action(store) } }

@@ -5,6 +5,7 @@ import com.t1doo.aiyou.model.*
 import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 
 /** Nonblocking synthetic/controlled input only. No microphone adapter is installed. -1 means EOF. */
 interface ControlledPcmInput : AutoCloseable { fun read(samples:ShortArray):Int }
@@ -20,6 +21,7 @@ class ControlledCaptureAudio internal constructor(
     private val enqueue:(suspend(EntryRepository)->Unit)->Boolean,
     private val binding:()->CaptureDraft?,private val install:(CaptureDraft)->Unit,
     private val publish:(CaptureAudioUi)->Unit,private val nanoTime:()->Long=System::nanoTime,
+    private val beforeFileOpen:suspend()->Unit={},
     private val encodeWave:(ShortArray,Int)->ByteArray=LocalPcmAudio::encode,
 ) {
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
@@ -48,7 +50,7 @@ class ControlledCaptureAudio internal constructor(
         var pickerClaimed=false
         var fileResultReceived=false
         var chosen:SelectedWaveSource?=null
-        val fileReady=CompletableDeferred<SelectedWaveSource?>()
+        val fileReady=Channel<Unit>(Channel.CONFLATED) // Wake-up only; chosen stays owned until actual open admission.
     }
     internal fun attach(repository:CaptureRepository) {
         val actual=repository.mutationGate ?: return
@@ -127,12 +129,22 @@ class ControlledCaptureAudio internal constructor(
         val r=request ?: return
         if(retired || r.cancelled || !r.file || r.pickerKey!=key || !r.pickerClaimed || r.fileResultReceived || state.phase!=CaptureAudioPhase.PICKING)return
         r.fileResultReceived=true
-        if(source==null) { r.cancelled=true;r.fileReady.complete(null) } else { r.chosen=source;resumeFile() }
+        if(source==null) { r.cancelled=true;r.chosen=null;r.fileReady.trySend(Unit) } else { r.chosen=source;resumeFile() }
     }
     fun resumeFile():Unit=synchronized(monitor) {
         val r=request ?: return
-        if(!retired && r.file && !r.cancelled && r.routeCurrent() && r.foreground())r.chosen?.let {
-            r.chosen=null;r.fileReady.complete(it)
+        if(!retired && r.file && !r.cancelled && r.routeCurrent() && r.foreground() && r.chosen!=null)r.fileReady.trySend(Unit)
+    }
+    private suspend fun awaitFileOpen(r:Request):SelectedWaveSource? {
+        while(true) {
+            r.fileReady.receive()
+            beforeFileOpen() // Controlled barrier outside the admission monitor; production default is inert.
+            val source=synchronized(monitor) {
+                if(retired || request!==r || r.cancelled || !r.routeCurrent()) { r.chosen=null;return null }
+                if(r.foreground()) r.chosen?.also { r.openAdmitted=true;r.chosen=null } else null
+            }
+            if(source!=null)return source
+            // Ordinary pause retains the same choice. A later same-owner resume wakes this loop.
         }
     }
     private suspend fun captureFile(r:Request) {
@@ -140,14 +152,9 @@ class ControlledCaptureAudio internal constructor(
         val buffer=ByteArray(LocalPcmAudio.MAX_WAV_BYTES+1)
         var wave:ByteArray?=null
         try {
-            val source=r.fileReady.await()
-            val admitted=synchronized(monitor) {
-                if(source!=null && !retired && request===r && !r.cancelled && r.routeCurrent() && r.foreground()) {
-                    r.openAdmitted=true;true
-                } else false
-            }
-            if(admitted) {
-                input=checkNotNull(source).open()
+            val source=awaitFileOpen(r)
+            if(source!=null) {
+                input=source.open()
                 update(r,CaptureAudioUi(CaptureAudioPhase.IMPORTING))
                 var size=0;var eof=false
                 while(size<buffer.size && !r.cancelled && !retired && r.routeCurrent()) {
@@ -221,7 +228,7 @@ class ControlledCaptureAudio internal constructor(
     fun stop() { synchronized(monitor) { request?.stop=true } }
     fun cancel() { synchronized(monitor) {
         if(state.phase in setOf(CaptureAudioPhase.PREPARING,CaptureAudioPhase.STARTING,CaptureAudioPhase.RECORDING,CaptureAudioPhase.PICKING,CaptureAudioPhase.IMPORTING))
-            request?.let { it.cancelled=true;it.stop=true;it.chosen=null;it.fileReady.complete(null) }
+            request?.let { it.cancelled=true;it.stop=true;it.chosen=null;it.fileReady.trySend(Unit) }
     } }
     fun retry() {
         val r=claimSettlement() ?: return
@@ -322,7 +329,7 @@ class ControlledCaptureAudio internal constructor(
         if(request===r) { state=CaptureAudioUi(phase,error=error);if(!retired)publish(state);request=null }
     }
     fun retire() {
-        synchronized(monitor) { retired=true;request?.let { it.stop=true;if(it.file) { it.cancelled=true;it.chosen=null;it.fileReady.complete(null) } } }
+        synchronized(monitor) { retired=true;request?.let { it.stop=true;if(it.file) { it.cancelled=true;it.chosen=null;it.fileReady.trySend(Unit) } } }
         gate?.retire()
     }
     /** Called directly by the owner actor finally; never enqueue and await that same actor. */

@@ -14,6 +14,17 @@ import java.util.concurrent.atomic.AtomicLong
 
 /** Synthetic WAV/ports, actual SQL/JCA capture and source authentication. No audio device. */
 class OriginalAudioControllerTest {
+    @Test fun focusLossCallbackClosesQueuedAudioReleasesPinAndCannotResumeWithoutNewClick():Unit=runBlocking {
+        Harness().use { h ->
+            h.draft();assertTrue(h.player.playDraft());h.drain();h.await(OriginalAudioPhase.PLAYING)
+            h.until { h.sink.queued.get()>0 };val callback=checkNotNull(h.lossCallback)
+            callback();h.await(OriginalAudioPhase.IDLE)
+            assertEquals(0,h.sink.queued.get());assertEquals(1,h.sink.closes.get());assertFalse(h.g.frozen)
+            // Adapter DUCK maps to this exact owner callback; later focus/foreground events never resume it.
+            callback();h.player.foreground(false);h.player.foreground(true);delay(30)
+            assertEquals(1,h.sink.opened.get());assertEquals(1,h.sink.plays.get());assertEquals(OriginalAudioPhase.IDLE,h.player.state.value.phase)
+        }
+    }
     @Test fun pendingEditPrefixDrainsBeforeFullDraftBindingAndPinRejectsRealStorageWrites():Unit=runBlocking {
         Harness().use { h ->
             h.draft();val old=h.f.capture.peek()!!
@@ -158,6 +169,7 @@ class OriginalAudioControllerTest {
         @Volatile var local=LocalRecordUiState(ready=true,opening=false)
         @Volatile var attachment:AttachmentUiState?=null
         val queue=ConcurrentLinkedQueue<suspend(EntryRepository)->Unit>()
+        @Volatile var lossCallback:(()->Unit)?=null
         val store=object:EntryRepository {
             override val captureRecords=f.capture
             override val attachments=OwnerAttachmentStore(f.media,g)
@@ -175,7 +187,7 @@ class OriginalAudioControllerTest {
             override suspend fun saveDraft(expected:TextDraft,capturedAtMillis:Long,captureTimeZone:String):StoredEntry=error("unrelated")
             override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry=error("unrelated")
         }
-        val player=OriginalAudioController({local},{attachment},{g},{queue.add(it);true},{sink},{true}).also { it.foreground(true) }
+        val player=OriginalAudioController({local},{attachment},{g},{queue.add(it);true},{stop->lossCallback=stop;sink},{true}).also { it.foreground(true) }
         suspend fun draft() {
             val base=f.capture.current();val reservation=g.freeze(base.id)!!;g.reserve(reservation,base,base.text,0)
             val bytes=CaptureAudioSqlTest.wave()
