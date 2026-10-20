@@ -4,6 +4,7 @@ import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 
 /** One process authority. Queue hints contain no durable authority and cannot cross an access epoch. */
@@ -38,6 +39,7 @@ internal class ReminderProcessOwner(
         var engine:ReminderNativeEngine?=null
         var foreground:ReminderVmRuntime?=null
     }
+    private class FrontReservation {var claimed=false;var cancelled=false;var openStarted=false;var settled=false}
     private val guard=Any()
     private val bootAdmission=ReminderBootAdmission()
     val nonce=UUID.randomUUID().toString()
@@ -46,22 +48,46 @@ internal class ReminderProcessOwner(
     fun navigationGeneration():Long=synchronized(guard){navigationGeneration}
     private var phase=Phase.NO_FRONT
     private var holder:Holder?=null
+    private var frontReservation:FrontReservation?=null
     private val tickets=LinkedHashMap<String,Ticket>()
 
     /** Fast observation only: never blocks on the worker or any records IO. */
-    fun frontOpening() = transition(Phase.OPENING)
+    fun frontOpening():Unit=synchronized(guard){
+        frontReservation?.cancelled=true;frontReservation=FrontReservation()
+        transition(Phase.OPENING);holder?.owner?.seal()
+        Unit
+    }
+    /** Only worker-confirmed no-open/closed evidence can release this exact reservation. */
+    private fun finishReleasedFront(reservation:FrontReservation){
+        if(frontReservation===reservation&&reservation.cancelled&&reservation.settled&&holder==null&&phase==Phase.RELEASING){
+            frontReservation=null;phase=Phase.NO_FRONT
+        }
+    }
+    private fun confirmedFrontClose(prepared:Holder,reservation:FrontReservation)=synchronized(guard){
+        reservation.settled=true
+        if(holder===prepared)holder=null
+        finishReleasedFront(reservation)
+    }
     /** Ordinary retained-VM disposal is distinct from an explicit application lock or failed access. */
     fun releaseFront()=synchronized(guard){
         if(phase !in setOf(Phase.FRONT,Phase.OPENING))return@synchronized
         val wasFront=phase==Phase.FRONT
+        frontReservation?.cancelled=true
         phase=Phase.RELEASING;epoch++
         tickets.values.forEach{it.retire()};tickets.clear()
         holder?.owner?.seal()
+        frontReservation?.let{reservation->
+            finishReleasedFront(reservation)
+            if(!reservation.claimed&&!reservation.openStarted&&holder==null)bridge.postObservation{synchronized(guard){
+                if(!reservation.claimed&&!reservation.openStarted&&holder==null){reservation.settled=true;finishReleasedFront(reservation)}
+            }}
+        }
         if(wasFront&&holder==null)phase=Phase.NO_FRONT // The current owner's successful close was already observed.
     }
     fun locked(unknown:Boolean=false)=transition(if(unknown)Phase.UNKNOWN else Phase.LOCKED)
     private fun transition(next:Phase) = synchronized(guard) {
         if(phase==next)return@synchronized
+        if(next!=Phase.OPENING)frontReservation?.cancelled=true
         phase=next;epoch++
         tickets.values.forEach{it.retire()};tickets.clear()
         holder?.owner?.seal()
@@ -173,20 +199,31 @@ internal class ReminderProcessOwner(
     }
     /** Foreground caller owns actual repository lifecycle; runtime closes it through the same gate. */
     suspend fun <T:com.t1doo.aiyou.domain.EntryRepository> prepareFront(open:()->T):Pair<T,ReminderVmRuntime> {
-        frontOpening();closeCold();confirmFailedFrontCleanup()
+        val reservation=synchronized(guard){
+            if(phase!=Phase.OPENING||frontReservation==null||frontReservation!!.claimed)frontOpening()
+            requireNotNull(frontReservation).also{it.claimed=true}
+        }
         var candidate:Holder?=null
         var repository:T?=null
         try {
-            return requireNotNull(bridge.runtime {bridge.gate.admit({unlocked() && synchronized(guard){phase==Phase.OPENING&&holder==null}}){owner->
+            closeCold();confirmFailedFrontCleanup()
+            return requireNotNull(bridge.runtime {bridge.gate.admit({unlocked() && synchronized(guard){frontReservation===reservation&&!reservation.cancelled&&phase==Phase.OPENING&&holder==null}}){owner->
                 val prepared=Holder(owner,false).also{candidate=it}
-                synchronized(guard){holder=prepared}
-                val store=open().also{repository=it};val resources=requireNotNull(store.reminderRuntime)
+                val start=synchronized(guard){
+                    check(holder==null);holder=prepared
+                    (frontReservation===reservation&&!reservation.cancelled&&phase==Phase.OPENING&&owner.isAdmitted).also{if(it)reservation.openStarted=true}
+                }
+                if(!start)throw CancellationException("Foreground preparation retired")
+                val store=open().also{repository=it}
+                fun checkReservation(){if(!synchronized(guard){frontReservation===reservation&&!reservation.cancelled&&phase==Phase.OPENING&&holder===prepared&&owner.isAdmitted})throw CancellationException("Foreground preparation retired")}
+                checkReservation()
+                val resources=requireNotNull(store.reminderRuntime)
                 val engine=ReminderNativeEngine(resources,owner,driver(resources),clock,bootAdmission,platform).also{prepared.engine=it}
                 val runtime=ReminderVmRuntime(bridge,owner,
                     {owner.isAdmitted && synchronized(guard){holder===prepared&&phase==Phase.FRONT}},
                     {engine.turn()},
                     closed={success->synchronized(guard){if(holder===prepared){
-                        if(success){holder=null;if(phase==Phase.RELEASING)phase=Phase.NO_FRONT}
+                        if(success)confirmedFrontClose(prepared,reservation)
                         else{prepared.closureUnconfirmed=true;phase=Phase.UNKNOWN}
                     }}},
                     restored={synchronized(guard){
@@ -194,6 +231,7 @@ internal class ReminderProcessOwner(
                     }},
                     wake={engine.kick(ReminderRebuildRequest.ADMISSION)})
                 prepared.foreground=runtime
+                checkReservation()
                 store to runtime
             }})
         }catch(f:Throwable){
@@ -205,7 +243,7 @@ internal class ReminderProcessOwner(
                     // tail. Cancellation on return to the caller is not a failed database close.
                     try{
                         prepared.owner.closeAndAwait{(repository as? AutoCloseable)?.close();(repository as? AwaitableRecordStorage)?.awaitClosed()}
-                        synchronized(guard){if(holder===prepared){holder=null;if(phase==Phase.RELEASING)phase=Phase.NO_FRONT}}
+                        confirmedFrontClose(prepared,reservation)
                     }catch(close:Throwable){
                         prepared.closureUnconfirmed=true
                         throw ReminderRuntimeClosureUnconfirmed(arrayOf(repository,close)){
@@ -214,6 +252,11 @@ internal class ReminderProcessOwner(
                     }
                 }
             }
+            if(candidate==null)bridge.runtime{synchronized(guard){
+                // This attempt has left admission with no owner/physical open. An old attempt
+                // cannot reset a replacement reservation, an unknown close, or a lock transition.
+                if(!reservation.openStarted&&holder==null){reservation.settled=true;finishReleasedFront(reservation)}
+            }}
             throw f
         }
     }

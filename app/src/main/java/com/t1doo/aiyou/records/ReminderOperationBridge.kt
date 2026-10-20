@@ -15,9 +15,10 @@ internal class ReminderOperationBridge(val gate: ReminderExecutionGate = Reminde
         companion object Key : CoroutineContext.Key<Operation>
     }
     @Volatile private var worker: Thread? = null
-    private val dispatcher = Executors.newSingleThreadExecutor { action ->
+    private val executor = Executors.newSingleThreadExecutor { action ->
         Thread(action, "AIyou-reminder-operations").apply { isDaemon = true; worker = this }
-    }.asCoroutineDispatcher()
+    }
+    private val dispatcher = executor.asCoroutineDispatcher()
 
     private suspend fun checkTopLevel() { check(currentCoroutineContext()[Operation] == null && Thread.currentThread() !== worker) { "Reminder operation cannot await its own worker" } }
     suspend fun assertOutsideOperation() = checkTopLevel()
@@ -31,5 +32,8 @@ internal class ReminderOperationBridge(val gate: ReminderExecutionGate = Reminde
         return withContext(NonCancellable + dispatcher) { action() }
     }
     suspend fun closeOwner(owner: ReminderRuntimeOwner, close: () -> Unit) = runtime { owner.closeAndAwait(close) }
+    /** Queue a state-only observation after prior worker activity, without blocking lifecycle code.
+     * Uses the same executor and never falls back to a different worker if it has been closed. */
+    fun postObservation(action:()->Unit){executor.execute(action)}
     override fun close() { dispatcher.close() }
 }
