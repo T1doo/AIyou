@@ -83,12 +83,26 @@ import com.t1doo.aiyou.ui.NotebookAppBar
 import com.t1doo.aiyou.ui.NotebookNavigation
 
 class MainActivity : ComponentActivity() {
+    private val reminderClicks=com.t1doo.aiyou.records.ReminderClickNavigation()
+    private var reminderClickSignal by mutableLongStateOf(0)
+    private var reminderRoute by mutableStateOf<Pair<Long,Long>?>(null)
+    private var reminderNavigation by mutableLongStateOf(0)
+    private var reminderMessage by mutableStateOf<String?>(null)
+    private fun takeReminderClick(intent:android.content.Intent?) {
+        val envelope=com.t1doo.aiyou.records.ReminderIntents.read(intent,true)
+        reminderClicks.replace(envelope,accessOwner?.controller?.state?.value?:com.t1doo.aiyou.ui.AppAccessState(),
+            com.t1doo.aiyou.records.AndroidReminderRuntime.get(this).owners.navigationGeneration())
+        reminderClickSignal++
+        com.t1doo.aiyou.records.ReminderIntents.consume(intent)
+    }
+    override fun onNewIntent(intent:android.content.Intent){super.onNewIntent(intent);takeReminderClick(intent)}
     private var packagePicker: com.t1doo.aiyou.records.ActivityRecordPackagePicker? = null
     private var packageRecords: LocalRecordsViewModel? = null
     private var accessOwner: com.t1doo.aiyou.ui.AppAccessViewModel? = null
     internal fun admittedRecords(): LocalRecordsViewModel? = accessOwner?.admittedRecords()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        takeReminderClick(intent)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
@@ -98,6 +112,16 @@ class MainActivity : ComponentActivity() {
         val preferences = ViewModelProvider(this)[UiPreferencesViewModel::class.java]
         setContent {
             val accessState by access.controller.state.collectAsState()
+            LaunchedEffect(reminderClickSignal,accessState.phase,accessState.session,reminderRoute) {
+                val route=reminderRoute
+                val request=reminderClicks.currentForRead(accessState,route?.takeIf{it.first==accessState.session}?.second)?:return@LaunchedEffect
+                val accepted=access.reminderClick(accessState.session,request.envelope,request.restoreGeneration)
+                if(reminderClicks.finish(request,accessState.session,access.controller.state.value,reminderRoute?.takeIf{it.first==accessState.session}?.second)){
+                    reminderMessage=if(accepted)null else "提醒已变化，请在待办中查看当前状态。"
+                    reminderNavigation++
+                }
+            }
+            reminderMessage?.let{message->AlertDialog(onDismissRequest={reminderMessage=null},title={Text("待办提醒")},text={Text(message)},confirmButton={TextButton(onClick={reminderMessage=null}){Text("知道了")}})}
             SideEffect {
                 // This Activity's access gate owns FLAG_SECURE, including after configuration recreation.
                 if (accessState.preference?.enabled != false || !accessState.canReadRecords)
@@ -136,7 +160,11 @@ class MainActivity : ComponentActivity() {
         val local by records.state.collectAsState()
         val display by preferences.state.collectAsState()
         val accessIdle by records.appAccessIdle.collectAsState()
-        AIyouApp(local = local, display = display, onDisplayChange = preferences::change, onRetryDisplay = preferences::retry, onDraftChange = records::changeText, onSave = records::save, onRetry = records::retry,
+        AIyouApp(local = local, reminderNavigation = reminderNavigation,
+                onNavigationGenerationChanged={generation->
+                    if(generation==null){if(reminderRoute?.first==id)reminderRoute=null}
+                    else if(access.controller.state.value.let{it.canReadRecords&&it.session==id})reminderRoute=id to generation
+                }, display = display, onDisplayChange = preferences::change, onRetryDisplay = preferences::retry, onDraftChange = records::changeText, onSave = records::save, onRetry = records::retry,
                 onRefreshLocalSearch = records::refreshLocalSearch, onRebuildLocalSearch = records::rebuildLocalSearch,
                 onBeginOriginalEdit = records::beginOriginalEdit, onOriginalEditChange = records::changeOriginalEdit,
                 onOriginalEditSave = records::saveOriginalEdit, onOriginalEditCancel = records::cancelOriginalEdit,
@@ -179,6 +207,7 @@ class MainActivity : ComponentActivity() {
     override fun onPause() { packageRecords?.state?.value?.memoryInbox?.let { packageRecords?.memoryInbox?.close(it.session) }; packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); super.onPause() }
     override fun onSaveInstanceState(outState: Bundle) { packagePicker?.save(outState); super.onSaveInstanceState(outState) }
     override fun onDestroy() {
+        reminderClicks.clear()
         packagePicker?.let { packageRecords?.recordPackages?.detachPickerOwner(it); it.destroy() }
         packagePicker = null; packageRecords = null
         accessOwner = null
@@ -195,7 +224,7 @@ class MainActivity : ComponentActivity() {
 }
 
 /** A callback belongs to one live navigation session, including repeated opens of the same ID. */
-private class NavigationOwner {
+private class NavigationOwner(private val changed:(Long)->Unit={}) {
     private val lock = Any()
     private val current = mutableStateOf(0L)
     private var alive = true
@@ -203,10 +232,10 @@ private class NavigationOwner {
     var active: Boolean
         get() = synchronized(lock) { alive }
         set(value) = synchronized(lock) { alive = value }
-    fun advance() = synchronized(lock) { current.value = Math.addExact(current.value, 1) }
+    fun advance() = synchronized(lock) { current.value = Math.addExact(current.value, 1);changed(current.value) }
     fun tryAdvance(expected: Long): Boolean = synchronized(lock) {
         if (!alive || current.value != expected) false
-        else { current.value = Math.addExact(current.value, 1); true }
+        else { current.value = Math.addExact(current.value, 1);changed(current.value); true }
     }
     fun publish(expected: Long, action: () -> Unit) = synchronized(lock) {
         if (alive && current.value == expected) action()
@@ -298,9 +327,13 @@ fun AIyouApp(
     selectedQuestionService: com.t1doo.aiyou.domain.SelectedQuestionService? = null,
     selectedQuestionConsentFixture: com.t1doo.aiyou.records.SelectedQuestionConsentFixture? = null,
     appAccessSettings: (@Composable () -> Unit)? = null,
+    reminderNavigation:Long=0,
+    onNavigationGenerationChanged:(Long?)->Unit={},
 ) {
-    val navigation = remember { NavigationOwner() }
-    DisposableEffect(navigation) { onDispose { navigation.active = false } }
+    val currentNavigationCallback by rememberUpdatedState(onNavigationGenerationChanged)
+    val navigation = remember { NavigationOwner{currentNavigationCallback(it)} }
+    DisposableEffect(navigation) { onDispose { navigation.active = false;currentNavigationCallback(null) } }
+    SideEffect {currentNavigationCallback(navigation.generation)}
     val generation = navigation.generation
     fun ownsNavigation() = navigation.active && navigation.generation == generation
     var selectedName by rememberSaveable { mutableStateOf(previewDestination.name) }
@@ -636,6 +669,9 @@ fun AIyouApp(
             searchLocation = null
             selectedName = destination.name; detailEntryId = null; showSettings = false; showLicenses = false
         }
+    }
+    LaunchedEffect(reminderNavigation) {
+        if(reminderNavigation>0)selectDestination(Destination.TASKS)
     }
     val openEntry: (String) -> Unit = { id ->
         if (ownsNavigation() && selectedName == origin.name && !showSettings && !demo && detailEntryId == null &&

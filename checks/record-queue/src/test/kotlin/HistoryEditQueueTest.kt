@@ -21,7 +21,7 @@ class HistoryEditQueueTest {
         store.seed(entry(1, source)); store.seed(entry(2, current))
         store.draft = TextDraft("capture", 9, "合成独立此刻草稿")
         EncryptedEntryRepository.instance = store
-        val vm = LocalRecordsViewModel(Application())
+        val vm = LocalRecordsViewModel(Application(), { EncryptedEntryRepository.instance })
         try { withTimeout(5000) { vm.state.first { it.ready }; block(vm, store) } } finally { vm.scope.cancel() }
     }
     private suspend fun selected(vm: LocalRecordsViewModel) = run {

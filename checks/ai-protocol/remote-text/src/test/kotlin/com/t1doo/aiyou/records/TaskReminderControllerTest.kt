@@ -689,9 +689,18 @@ class TaskReminderControllerTest {
             override suspend fun revise(entryId: String, expectedRevision: Int, text: String, createdAtMillis: Long): StoredEntry =
                 error("Reminder actions must not revise sources")
         }
-        val controller = if (driver == null) TaskReminderController({ state }, { state = it(state) },
-            { queued.addLast(it); true }, CLOCK)
-        else TaskReminderController({ state }, { state = it(state) }, { queued.addLast(it); true }, CLOCK, driver)
+        private val controlledDriver=driver?:object:TaskReminderDriver {
+            override fun availability()=TaskReminderAvailability()
+            override fun schedule(command:TaskReminderCommand)=TaskReminderPhase.PLATFORM_UNAVAILABLE
+            override fun cancel(command:TaskReminderCommand)=TaskReminderPhase.PLATFORM_UNAVAILABLE
+        }
+        val controller:TaskReminderController=TaskReminderController({ state }, { state = it(state) },
+            { queued.addLast(it); true }, CLOCK,requestRuntime={
+                if(actual.reminderCommands().isNotEmpty())queued.addLast{entry->
+                    TaskReminderDispatcher(checkNotNull(entry.reminders),controlledDriver,CLOCK::millis).drain()
+                    controller.refreshAfterRuntime(entry)
+                }
+            })
 
         fun task(id: String, schedule: ManualTaskSchedule? = TIMED) = actual.create(
             ManualTaskCreate(id, "同名合成私密待办🙂", 55, "UTC", "create-" + id, schedule))
@@ -706,6 +715,7 @@ class TaskReminderControllerTest {
         fun initialize() {
             state = state.copy(tasks = ManualTasksUiState(supported = true, available = true, items = actual.snapshots()))
             runBlocking { controller.initialize(store) }
+            pump()
         }
 
         fun begin(task: ManualTaskSnapshot): TaskReminderEditor {

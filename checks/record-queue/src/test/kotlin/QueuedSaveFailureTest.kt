@@ -12,7 +12,7 @@ class QueuedSaveFailureTest {
     @Test fun oversizedEditPreservesDraftAndValidBoundaryEditClearsNotice() = runBlocking {
         val repository = EncryptedEntryRepository()
         EncryptedEntryRepository.instance = repository
-        val vm = LocalRecordsViewModel(Application())
+        val vm = LocalRecordsViewModel(Application(), { EncryptedEntryRepository.instance })
         try { withTimeout(5000) {
             vm.state.first { it.ready }
             val original = "a".repeat(99_999)
@@ -37,7 +37,7 @@ class QueuedSaveFailureTest {
         val repository = EncryptedEntryRepository()
         EncryptedEntryRepository.instance = repository
         repository.releaseFirstSave.complete(Unit)
-        val vm = LocalRecordsViewModel(Application())
+        val vm = LocalRecordsViewModel(Application(), { EncryptedEntryRepository.instance })
         try { withTimeout(5000) {
             vm.state.first { it.ready }
             vm.changeText("a".repeat(100_001))
@@ -59,7 +59,7 @@ class QueuedSaveFailureTest {
     @Test fun supplementaryCharactersKeepTheExistingUtf16LimitWithoutPartialTruncation() = runBlocking {
         val repository = EncryptedEntryRepository()
         EncryptedEntryRepository.instance = repository
-        val vm = LocalRecordsViewModel(Application())
+        val vm = LocalRecordsViewModel(Application(), { EncryptedEntryRepository.instance })
         try { withTimeout(5000) {
             vm.state.first { it.ready }
             val boundary = "a".repeat(99_998) + "📝"
@@ -77,7 +77,7 @@ class QueuedSaveFailureTest {
     @Test fun failedEarlierEditCannotDuplicateQueuedSaveAndLaterInputHasItsOwnIntent() = runBlocking {
         val repository = EncryptedEntryRepository(failPriorEdit = true)
         EncryptedEntryRepository.instance = repository
-        val vm = LocalRecordsViewModel(Application())
+        val vm = LocalRecordsViewModel(Application(), { EncryptedEntryRepository.instance })
         try { withTimeout(5000) {
             vm.state.first { it.ready }
             vm.changeText("synthetic first submitted text")
@@ -106,7 +106,7 @@ class QueuedSaveFailureTest {
         val repository = EncryptedEntryRepository(failFirstSave = true)
         EncryptedEntryRepository.instance = repository
         repository.releaseFirstSave.complete(Unit)
-        val vm = LocalRecordsViewModel(Application())
+        val vm = LocalRecordsViewModel(Application(), { EncryptedEntryRepository.instance })
         try { withTimeout(5000) {
             vm.state.first { it.ready }
             vm.changeText("synthetic retry text")
@@ -129,7 +129,7 @@ class QueuedSaveFailureTest {
         val repository = EncryptedEntryRepository(failFirstReadback = true)
         EncryptedEntryRepository.instance = repository
         repository.releaseFirstSave.complete(Unit)
-        val vm = LocalRecordsViewModel(Application())
+        val vm = LocalRecordsViewModel(Application(), { EncryptedEntryRepository.instance })
         try { withTimeout(5000) {
             vm.state.first { it.ready }
             vm.changeText("synthetic committed text")

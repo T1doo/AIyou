@@ -39,14 +39,18 @@ internal class AppAccessController(
     private val storage: AppAccessPreferenceStorage,
     private val scope: CoroutineScope,
     private val retireSession: () -> Boolean,
-    private val beforeOpen: suspend () -> Unit,
+    private val beforeOpen: suspend (Long) -> Unit,
     private val io: CoroutineDispatcher = Dispatchers.IO,
     private val newKey: () -> String = { "aiyou-app-access-" + UUID.randomUUID() },
     private val preferenceOperations: AppAccessPreferenceOperations = processAppAccessPreferenceOperations,
+    private val changed:(AppAccessState)->Unit={},
 ) {
     private val guard = Any()
     private val mutable = MutableStateFlow(AppAccessState())
     val state = mutable.asStateFlow()
+    private var published:AppAccessState
+        get()=mutable.value
+        set(value){mutable.value=value;changed(value)}
     private var generation = 0L
     private var sessions = 0L
     private var claimed: String? = null
@@ -58,7 +62,7 @@ internal class AppAccessController(
         val token = synchronized(guard) {
             if (disposed || mutable.value.session != 0L) return
             claimed = null
-            mutable.value = AppAccessState()
+            published = AppAccessState()
             ++generation
         }
         scope.launch {
@@ -69,7 +73,7 @@ internal class AppAccessController(
                 } }
                 synchronized(guard) {
                     if (disposed || generation != token) return@launch
-                    mutable.value = AppAccessState(if (preference.enabled) AppAccessPhase.LOCKED else AppAccessPhase.OPENING,
+                    published = AppAccessState(if (preference.enabled) AppAccessPhase.LOCKED else AppAccessPhase.OPENING,
                         preference = preference)
                 }
                 if (!preference.enabled) finishOpen(token, preference)
@@ -94,11 +98,11 @@ internal class AppAccessController(
         if (disposed || !current.canReadRecords || current.session != session || enabled == preference.enabled) return
         val retired = try { retireSession() } catch (_: Exception) {
             ++generation
-            mutable.value = AppAccessState(AppAccessPhase.FAILED, message = "资料会话关闭状态尚未确认，请重试核对。")
+            published = AppAccessState(AppAccessPhase.FAILED, message = "资料会话关闭状态尚未确认，请重试核对。")
             return
         }
         if (!retired) {
-            mutable.value = current.copy(message = "请先完成当前保存或关闭编辑，再更改启动应用锁。")
+            published = current.copy(message = "请先完成当前保存或关闭编辑，再更改启动应用锁。")
             return
         }
         request(if (enabled) AppAccessPurpose.ENABLE else AppAccessPurpose.DISABLE, preference)
@@ -107,7 +111,7 @@ internal class AppAccessController(
     private fun request(purpose: AppAccessPurpose, preference: AppAccessPreference) {
         ++generation
         claimed = null
-        mutable.value = AppAccessState(AppAccessPhase.AUTHENTICATING, preference = preference,
+        published = AppAccessState(AppAccessPhase.AUTHENTICATING, preference = preference,
             authentication = AppAccessAuthentication(newKey(), purpose))
     }
 
@@ -132,11 +136,11 @@ internal class AppAccessController(
             claimed = null
             val token = ++generation
             if (!accepted) {
-                mutable.value = AppAccessState(AppAccessPhase.LOCKED, preference = preference,
+                published = AppAccessState(AppAccessPhase.LOCKED, preference = preference,
                     mayReturn = authentication.purpose != AppAccessPurpose.UNLOCK, message = declinedMessage)
                 return
             }
-            mutable.value = AppAccessState(if (authentication.purpose == AppAccessPurpose.UNLOCK)
+            published = AppAccessState(if (authentication.purpose == AppAccessPurpose.UNLOCK)
                 AppAccessPhase.OPENING else AppAccessPhase.SAVING, preference = preference)
             Triple(token, authentication.purpose, preference)
         }
@@ -154,7 +158,7 @@ internal class AppAccessController(
                 } }
                 synchronized(guard) {
                     if (disposed || generation != token) return@launch
-                    mutable.value = AppAccessState(AppAccessPhase.OPENING, preference = confirmed)
+                    published = AppAccessState(AppAccessPhase.OPENING, preference = confirmed)
                 }
                 finishOpen(token, confirmed)
             } catch (failure: CancellationException) { throw failure }
@@ -168,7 +172,7 @@ internal class AppAccessController(
             val preference = current.preference ?: return
             if (disposed || current.phase != AppAccessPhase.LOCKED || !current.mayReturn) return
             val token = ++generation
-            mutable.value = AppAccessState(AppAccessPhase.OPENING, preference = preference)
+            published = AppAccessState(AppAccessPhase.OPENING, preference = preference)
             token to preference
         }
         scope.launch {
@@ -183,35 +187,35 @@ internal class AppAccessController(
         if (disposed || !current.canReadRecords || current.session != session || current.preference?.enabled != true) return
         val retired = try { retireSession() } catch (_: Exception) {
             ++generation
-            mutable.value = AppAccessState(AppAccessPhase.FAILED, message = "资料会话关闭状态尚未确认，请重试核对。")
+            published = AppAccessState(AppAccessPhase.FAILED, message = "资料会话关闭状态尚未确认，请重试核对。")
             return
         }
         if (!retired) {
-            mutable.value = current.copy(message = "请先完成当前保存或关闭编辑，再锁定应用。")
+            published = current.copy(message = "请先完成当前保存或关闭编辑，再锁定应用。")
             return
         }
         ++generation
-        mutable.value = AppAccessState(AppAccessPhase.LOCKED, preference = current.preference)
+        published = AppAccessState(AppAccessPhase.LOCKED, preference = current.preference)
     }
 
     private suspend fun finishOpen(token: Long, preference: AppAccessPreference) {
         if (!owned(token)) return
-        beforeOpen()
+        beforeOpen(synchronized(guard){sessions+1})
         synchronized(guard) {
             if (disposed || generation != token || mutable.value.phase != AppAccessPhase.OPENING) return
-            mutable.value = AppAccessState(AppAccessPhase.OPEN, preference = preference, session = ++sessions)
+            published = AppAccessState(AppAccessPhase.OPEN, preference = preference, session = ++sessions)
         }
     }
 
     private fun owned(token: Long) = synchronized(guard) { !disposed && generation == token }
 
     private fun fail(token: Long, message: String) = synchronized(guard) {
-        if (!disposed && generation == token) mutable.value = AppAccessState(AppAccessPhase.FAILED, message = message)
+        if (!disposed && generation == token) published = AppAccessState(AppAccessPhase.FAILED, message = message)
     }
 
     fun dispose() = synchronized(guard) {
         if (disposed) return
         disposed = true; ++generation; claimed = null
-        mutable.value = AppAccessState(AppAccessPhase.LOCKED)
+        published = AppAccessState(AppAccessPhase.LOCKED)
     }
 }

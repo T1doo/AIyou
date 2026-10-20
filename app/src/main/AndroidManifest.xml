@@ -3,6 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools">
     <!-- Keep the disabled model entry offline; reject imported library network permission. -->
     <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -12,6 +15,17 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AIyou"
         android:usesCleartextTraffic="false">
+        <receiver android:name=".records.AlarmReminderReceiver" android:exported="false" android:directBootAware="false" />
+        <receiver android:name=".records.ReminderRebuildReceiver" android:exported="false" android:directBootAware="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+        <service android:name=".records.ReminderJobService" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" android:directBootAware="false" />
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTask"

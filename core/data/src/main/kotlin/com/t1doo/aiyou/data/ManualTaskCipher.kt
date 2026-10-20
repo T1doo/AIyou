@@ -280,7 +280,7 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
             "RM_ACK" -> require(format >= 4 && task.version > 1 && reminder != null)
             "RM_FIRE" -> require(format >= 4 && task.version > 1 && task.status == ManualTaskStatus.OPEN &&
                 reminder?.phase == TaskReminderPhase.TRIGGER_ACCEPTED)
-            "RM_EVENT", "RM_CLAIM", "RM_POST", "RM_END", "RM_GC" -> require(format == 6 && task.version > 1 && reminder != null)
+            "RM_EVENT", "RM_CLAIM", "RM_POST", "RM_END", "RM_GC", "RM_REBLD" -> require(format == 6 && task.version > 1 && reminder != null)
             else -> throw IllegalArgumentException("Unknown task operation")
         }
     }
@@ -302,6 +302,6 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
         const val MAX_LEGACY_BYTES = 4096
         const val MAX_EXTENDED_BYTES = 65536
         val REMINDER_OPERATIONS = setOf("REMIND", "RM_ACK", "RM_FIRE")
-        val RUNTIME_OPERATIONS = setOf("RM_EVENT", "RM_CLAIM", "RM_POST", "RM_END", "RM_GC")
+        val RUNTIME_OPERATIONS = setOf("RM_EVENT", "RM_CLAIM", "RM_POST", "RM_END", "RM_GC", "RM_REBLD")
     }
 }

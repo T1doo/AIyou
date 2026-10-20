@@ -95,6 +95,9 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
                 database.transaction { sql ->
                     require(active() && receipt(sql)=="PENDING:"+pack.digest)
                     emptyTarget(sql,pack,true)
+                    // Execution progress never migrates with user records. Older test/backup schemas lack this table.
+                    if(sql.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='reminder_runtime_meta'").isNotEmpty())
+                        sql.execute("DELETE FROM reminder_runtime_meta")
                     // This is the only deleted row: an exactly verified, default empty initialized slot.
                     sql.execute("DELETE FROM record_package_receipts WHERE id='CAPTURE_CURRENT' AND operation='CAPTURE_CURRENT'")
                     cells { owners ->

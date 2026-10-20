@@ -396,9 +396,19 @@ class ManualTaskTitleControllerTest {
             override suspend fun revise(entryId: String, expectedRevision: Int, text: String, createdAtMillis: Long): StoredEntry = error("Title correction must not revise originals")
         }
         val controller = ManualTaskController({ state }, { state = it(state) }, { queued.addLast(it); true }, CLOCK) { "UTC" }
-        val reminders = TaskReminderController({ state }, { state = it(state) }, { queued.addLast(it); true }, CLOCK)
+        private val controlledReminderDriver=object:TaskReminderDriver {
+            override fun availability()=TaskReminderAvailability()
+            override fun schedule(command:TaskReminderCommand)=TaskReminderPhase.PLATFORM_UNAVAILABLE
+            override fun cancel(command:TaskReminderCommand)=TaskReminderPhase.PLATFORM_UNAVAILABLE
+        }
+        val reminders:TaskReminderController=TaskReminderController({ state }, { state = it(state) }, { queued.addLast(it); true }, CLOCK,requestRuntime={
+            if(actual.reminderCommands().isNotEmpty())queued.addLast{entry->
+                TaskReminderDispatcher(checkNotNull(entry.reminders),controlledReminderDriver,CLOCK::millis).drain()
+                reminders.refreshAfterRuntime(entry)
+            }
+        })
         fun task(id: String) = actual.create(ManualTaskCreate(id, "同名合成待办🙂", 55, "UTC", "create-$id", TIMED))
-        fun initialize() = runBlocking { controller.initialize(store); reminders.initialize(store) }
+        fun initialize() = runBlocking { controller.initialize(store); reminders.initialize(store);pump() }
         fun begin(task: ManualTaskSnapshot): ManualTaskTitleEditor {
             controller.beginTitle(task.id, task.version)
             return checkNotNull(state.tasks.titleEditor)

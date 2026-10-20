@@ -5,6 +5,9 @@ kotlin { jvmToolchain(17) }
 // Compile the product transaction/codec/schema, with only the platform SQL adapter replaced.
 val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
+    listOf("ReminderPrivateCiphers.kt", "ReminderRuntimeMetaSqlSchema.kt", "SqlReminderRebuildRepository.kt", "ReminderRuntimeStores.kt", "ExistingReminderOpenProtocol.kt").forEach {
+        from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
+    }
     listOf("PortableCipherCell.kt","FullBackupCodec.kt","SqlFullBackupRepository.kt","CaptureDraftCodec.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
@@ -66,6 +69,10 @@ tasks.named("compileKotlin") { dependsOn(syncProduction) }
 // Actual ViewModel/controller code, with only Android opening/lifecycle/image platform shells.
 val vmProduction = layout.buildDirectory.dir("vm-production-test-sources")
 val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
+    from("../../../app/src/main/java/com/t1doo/aiyou/records/ReminderOperationBridge.kt")
+    from("../../../app/src/main/java/com/t1doo/aiyou/records/ReminderVmRuntime.kt")
+    from("../../../app/src/main/java/com/t1doo/aiyou/records/ReminderNativeEngine.kt")
+    from("../../../app/src/main/java/com/t1doo/aiyou/records/ReminderProcessOwner.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/RecordMetadataReadingSource.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/RecordEventDateController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/CurrentImageGridController.kt")

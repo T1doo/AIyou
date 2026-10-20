@@ -17,7 +17,7 @@ class OriginalEditQueueTest {
     private suspend fun exercise(repository: EncryptedEntryRepository, block: suspend (LocalRecordsViewModel) -> Unit) {
         repository.seed(entry())
         EncryptedEntryRepository.instance = repository
-        val vm = LocalRecordsViewModel(Application())
+        val vm = LocalRecordsViewModel(Application(), { EncryptedEntryRepository.instance })
         try { withTimeout(5000) { vm.state.first { it.ready }; block(vm) } } finally { vm.scope.cancel() }
     }
 

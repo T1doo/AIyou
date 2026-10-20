@@ -90,9 +90,19 @@ class TaskReminderPresentationTest {
         override suspend fun revisions(entryId: String) = emptyList<OriginalRevision>()
         override suspend fun revise(entryId: String, expectedRevision: Int, text: String, createdAtMillis: Long): StoredEntry = error("Reminder UI must not revise originals")
     }
-    // Default production driver is disconnected: no injected fake success and no system permissions.
-    private val controller = TaskReminderController({ state.value }, { state.value = it(state.value) },
-        { queue.add(it); true }, clock)
+    // Controlled disconnected observer; no real permission, alarm or notification API is invoked.
+    private val controlledDriver=object:TaskReminderDriver {
+        override fun availability()=TaskReminderAvailability()
+        override fun schedule(command:TaskReminderCommand)=TaskReminderPhase.PLATFORM_UNAVAILABLE
+        override fun cancel(command:TaskReminderCommand)=TaskReminderPhase.PLATFORM_UNAVAILABLE
+    }
+    private val controller:TaskReminderController=TaskReminderController({ state.value }, { state.value = it(state.value) },
+        { queue.add(it); true }, clock,requestRuntime={
+            if(persisted.values.any{it.reminder?.commands?.isNotEmpty()==true})queue.add{entry->
+                TaskReminderDispatcher(checkNotNull(entry.reminders),controlledDriver,clock::millis).drain()
+                controller.refreshAfterRuntime(entry)
+            }
+        })
 
     @After fun dispose() = controller.dispose()
 

@@ -43,9 +43,13 @@ internal interface RecordsDao {
     ManualTaskEntity::class, LocalSearchFtsEntity::class, LocalSearchDocumentEntity::class,
     LocalSearchEpochEntity::class, PermanentErasureEntity::class, RecordPackageReceiptEntity::class,
     OwnedFileCreationEntity::class, LocalCandidateBatchEntity::class, RecordEventDateEntity::class, ManualPeopleEntity::class,
-    ModelConfigurationEntity::class, ModelCapabilityEntity::class], version = 14, exportSchema = true)
+    ModelConfigurationEntity::class, ModelCapabilityEntity::class, ReminderRuntimeMetaEntity::class], version = 15, exportSchema = true)
 internal abstract class RecordsDatabase : RoomDatabase() {
     abstract fun records(): RecordsDao
+}
+
+internal val recordsMigration14To15 = object : Migration(14,15) {
+    override fun migrate(db:SupportSQLiteDatabase) { ReminderRuntimeMetaSqlSchema.migration14To15.forEach(db::execSQL) }
 }
 
 /** Existing originals/drafts/jobs are untouched; media capture belongs to D03. */

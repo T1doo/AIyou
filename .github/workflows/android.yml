@@ -29,7 +29,7 @@ jobs:
           printf '%s  %s\n' \
             3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 \
             gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
-      - name: Generate actual Room v14 capability export with unchanged predecessors and native fixtures
+      - name: Generate actual Room v15 runtime export with unchanged predecessors and native fixtures
         run: |
           python3 scripts/check-sdk.py
           python3 scripts/verify-manual-tag-schema.py --capture
@@ -42,6 +42,7 @@ jobs:
           python3 scripts/verify-manual-people-schema.py --capture
           python3 scripts/verify-model-configuration-schema.py --capture
           python3 scripts/verify-model-capability-schema.py --capture
+          python3 scripts/verify-reminder-runtime-schema.py --capture
           scripts/gradle.sh :core:data:kspDebugKotlin
           python3 scripts/verify-manual-tag-schema.py --verify
           python3 scripts/verify-manual-task-schema.py --verify
@@ -53,6 +54,7 @@ jobs:
           python3 scripts/verify-manual-people-schema.py --verify
           python3 scripts/verify-model-configuration-schema.py --verify
           python3 scripts/verify-model-capability-schema.py --verify
+          python3 scripts/verify-reminder-runtime-schema.py --verify
       - name: Run actual domain and D04 JVM wire contracts
         run: |
           python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test :remote-text:test
@@ -97,6 +99,10 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/tests -v
           python3 scripts/generate-tokens.py --check
+      - name: Test actual reminder receiver and JobService chain with controlled platform ports
+        run: |
+          python3 scripts/jvm-gradle.py -p checks/reminder-native test
+          python3 scripts/verify-reminder-native-results.py
       - name: Test actual native diagnostic observer on host (no device claim)
         run: |
           scripts/gradle.sh --project-dir checks/native-trace test
@@ -463,6 +469,11 @@ jobs:
             checks/record-queue/build/test-results/test/
             checks/record-queue/build/reports/tests/test/
             checks/record-queue/build/reports/attachment-process/
+            checks/reminder-native/build/test-results/test/
+            checks/reminder-native/build/reports/tests/test/
+            checks/reminder-native/build/controlled-native-inputs.json
+            checks/reminder-native/build/controlled-native-results.json
+            checks/reminder-native/build/actual-room-export/
             checks/native-trace/build/test-results/test/
             checks/native-trace/build/reports/tests/test/
             core/designsystem/build/test-results/testDebugUnitTest/

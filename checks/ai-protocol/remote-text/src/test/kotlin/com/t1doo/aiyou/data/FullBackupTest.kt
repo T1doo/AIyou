@@ -179,7 +179,17 @@ class FullBackupTest {
                 "合成被拒绝提案",ManualTaskDateInput("2027-01-02"),10,"UTC",20,TaskProposalState.REJECTED)
             val proposalCipher=TaskProposalCipher(source.key);val proof="a".repeat(64)
             source.db.write("INSERT INTO manual_tasks VALUES(?,?,?,?)",TaskProposals.storageId(proposal.id),proposal.version,proof,proposalCipher.seal(proposal,proof));proposalCipher.wipe()
+            source.db.transaction{it.execute(ReminderRuntimeMetaSqlSchema.createTable)}
+            target.db.transaction{it.execute(ReminderRuntimeMetaSqlSchema.createTable)}
+            val sourceMeta=SqlReminderRebuildRepository(source.gateway,source.key,tasks)
+            val emptyTargetTasks=SqlManualTaskRepository(target.gateway,target.key)
+            val targetMeta=SqlReminderRebuildRepository(target.gateway,target.key,emptyTargetTasks)
+            sourceMeta.requestDrain(0,"source-runtime-drain");targetMeta.requestDrain(0,"target-runtime-drain")
+            val sourceMetaBytes=source.db.read("SELECT ciphertext FROM reminder_runtime_meta").single().single() as ByteArray
             val bytes=export(source,source.backup.capture(uuid(),due+1));val pack=target.backup.open({bytes.inputStream()},password());target.backup.restore(pack) { true }
+            assertTrue(target.db.read("SELECT * FROM reminder_runtime_meta").isEmpty())
+            assertArrayEquals(sourceMetaBytes,source.db.read("SELECT ciphertext FROM reminder_runtime_meta").single().single() as ByteArray)
+            sourceMeta.close();targetMeta.close();emptyTargetTasks.wipeKey()
             assertEquals("LOCAL_ONLY",target.db.read("SELECT privacyPolicy FROM entries WHERE id=?",id).single().single())
             assertEquals(listOf(null,null),target.db.read("SELECT connection,consent FROM remote_source_access WHERE entryId=?",id).single())
             val targetTasks=SqlManualTaskRepository(target.gateway,target.key)

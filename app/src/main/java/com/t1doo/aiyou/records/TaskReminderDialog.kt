@@ -1,5 +1,13 @@
 package com.t1doo.aiyou.records
 
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -40,6 +48,18 @@ internal fun taskReminderLabel(reminder: TaskReminderSnapshot): String =
 @Composable
 fun TaskReminderDialog(local: LocalRecordUiState, controller: TaskReminderController, ownsRoute: () -> Boolean) {
     val editor = local.reminders.editor ?: return
+    val context=LocalContext.current
+    val currentEditor by rememberUpdatedState(editor.session)
+    val route by rememberUpdatedState(ownsRoute)
+    var requested by remember { mutableStateOf<Long?>(null) }
+    val notificationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        val owner=requested;requested=null
+        if(owner==currentEditor&&route())controller.capabilitiesChanged(requireNotNull(owner))
+    }
+    val specialPermission=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val owner=requested;requested=null
+        if(owner==currentEditor&&route())controller.capabilitiesChanged(requireNotNull(owner))
+    }
     val state = local.reminders
     val ready = local.ready && !local.opening && local.error == null && local.tasks.available && !local.tasks.loading
     val canConfirm = ready && !state.busy && state.pending == null && !state.conflict &&
@@ -59,7 +79,25 @@ fun TaskReminderDialog(local: LocalRecordUiState, controller: TaskReminderContro
                 } else Text("本机待办暂不可核对，预览已隐藏，请恢复读取后再操作。")
                 if (ready && local.tasks.items.singleOrNull { it.id == editor.task.id } != editor.task)
                     Text("待办或提醒状态已变化，请关闭后重新查看，再单独确认。")
-                Text("当前版本未接入系统调度，确认仅保存本机提醒计划，不会发送通知，也不会申请系统权限。")
+                Text("确认会保存本机提醒计划，并在当前系统能力允许时安排提醒；通知是否准时或可见仍受系统限制。系统授权需点击下方按钮单独开启。")
+                if(!editor.cancelling){
+                    TextButton(enabled=canConfirm&&controller.mayRequestCapability(editor.session)&&requested==null,onClick={
+                        if(ownsRoute()&&controller.mayRequestCapability(editor.session)){
+                            requested=editor.session
+                            try{
+                                if(Build.VERSION.SDK_INT>=33)notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                else specialPermission.launch(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,context.packageName))
+                            }catch(_:Exception){requested=null;controller.capabilitiesChanged(editor.session)}
+                        }
+                    },modifier=Modifier.testTag("reminder-notification-permission")){Text("检查通知授权")}
+                    if(editor.mode==TaskReminderMode.EXACT&&Build.VERSION.SDK_INT>=31)TextButton(enabled=canConfirm&&controller.mayRequestCapability(editor.session)&&requested==null,onClick={
+                        if(ownsRoute()&&controller.mayRequestCapability(editor.session)){
+                            requested=editor.session
+                            try{specialPermission.launch(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:"+context.packageName)))}
+                            catch(_:Exception){requested=null;controller.capabilitiesChanged(editor.session)}
+                        }
+                    },modifier=Modifier.testTag("reminder-exact-permission")){Text("检查精确闹钟授权")}
+                }
                 Text("修改、延后或清除待办时间会撤销旧提醒计划；新时间需要再次单独确认。")
                 if (!editor.cancelling) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TaskReminderMode.entries.forEach { mode ->

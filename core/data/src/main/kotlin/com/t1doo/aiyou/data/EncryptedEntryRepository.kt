@@ -66,9 +66,11 @@ class EncryptedEntryRepository internal constructor(
     override val manualTags: com.t1doo.aiyou.domain.ManualTagRepository get() = tagStorage
     override val localSearch: com.t1doo.aiyou.domain.LocalSearchRepository =
         SqlLocalSearchRepository(borrowedSql, tagStorage, people = peopleStorage)
-    private val taskStorage = SqlManualTaskRepository(borrowedSql, keyBytes)
+    private val reminderStores=ReminderRuntimeStores(borrowedSql,keyBytes)
+    private val taskStorage = reminderStores.tasks
     override val manualTasks: com.t1doo.aiyou.domain.ManualTaskRepository get() = taskStorage
     override val reminders: com.t1doo.aiyou.domain.TaskReminderRepository get() = taskStorage
+    override val reminderRuntime = reminderStores.resources
     private val proposalStorage = SqlTaskProposalRepository(borrowedSql,keyBytes,taskStorage)
     override val taskProposals: com.t1doo.aiyou.domain.TaskProposalRepository get() = proposalStorage
     private val packageActivities=SqlRecordPackageActivities(borrowedSql,taskStorage,proposalStorage)
@@ -181,7 +183,7 @@ class EncryptedEntryRepository internal constructor(
     }
 
     private val lifetime = DrainingRecordsStorage(borrowedSql,attachmentStorage,originalEditStorage,
-        { database.close() }, { tagStorage.wipeKey(); peopleStorage.wipeKey(); taskStorage.wipeKey(); proposalStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); keyBytes.fill(0) })
+        { database.close() }, { reminderStores.close();tagStorage.wipeKey(); peopleStorage.wipeKey(); proposalStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); keyBytes.fill(0) })
     override fun close() { connectionStorage.close(); questionAuthorizationStorage.close(); lifetime.close() }
     override fun awaitClosed() { close(); lifetime.awaitClosed() }
     /** Known external IO owner convenience, including native cold-reopen fixtures. */
@@ -251,11 +253,12 @@ class EncryptedEntryRepository internal constructor(
             var opened = false
             try {
                 require(key.size == 32)
-                System.loadLibrary("sqlcipher")
+                SqlCipherPrivacyLog.install()
+            System.loadLibrary("sqlcipher")
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
                 val created = Room.databaseBuilder(context.applicationContext, RecordsDatabase::class.java, file.absolutePath)
                 .openHelperFactory(SupportOpenHelperFactory(key))
-                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7, recordsMigration7To8, recordsMigration8To9, recordsMigration9To10, recordsMigration10To11, recordsMigration11To12, recordsMigration12To13, recordsMigration13To14)
+                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7, recordsMigration7To8, recordsMigration8To9, recordsMigration9To10, recordsMigration10To11, recordsMigration11To12, recordsMigration12To13, recordsMigration13To14, recordsMigration14To15)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {

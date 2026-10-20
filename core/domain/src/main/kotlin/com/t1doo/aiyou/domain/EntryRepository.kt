@@ -36,6 +36,8 @@ interface EntryRepository {
     val originalExport: OriginalExportRepository? get() = null
     val manualTasks: ManualTaskRepository? get() = null
     val reminders: TaskReminderRepository? get() = null
+    /** Same-owner native reminder ports. No key bytes or independent cold owner. */
+    val reminderRuntime: ReminderRuntimeResources? get() = null
     val manualTags: ManualTagRepository? get() = null
     val manualPeople: ManualPeopleRepository? get() = null
     /** Borrowed capability over the same records database; it never enables remote processing. */

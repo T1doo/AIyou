@@ -23,18 +23,12 @@ class TaskRemindersUiState internal constructor(val supported: Boolean = false,
     override fun toString() = "TaskRemindersUiState(busy=$busy, redacted)"
 }
 
-/** The production build has no notification/alarm adapter or permission request. */
-private object DisconnectedReminderDriver : TaskReminderDriver {
-    override fun availability() = TaskReminderAvailability()
-    override fun schedule(command: TaskReminderCommand) = TaskReminderPhase.PLATFORM_UNAVAILABLE
-    override fun cancel(command: TaskReminderCommand) = TaskReminderPhase.PLATFORM_UNAVAILABLE
-}
-
 /** Explicit foreground actions only; shares the records owner's command queue and immutable retry identity. */
 class TaskReminderController internal constructor(private val current: () -> LocalRecordUiState,
     private val publish: ((LocalRecordUiState) -> LocalRecordUiState) -> Unit,
     private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean, private val clock: Clock,
-    private val driver: TaskReminderDriver = DisconnectedReminderDriver) {
+    private val mayRequestPermission:()->Boolean={false},
+    private val requestRuntime: () -> Unit = {}) {
     private val sessions = AtomicLong()
     @Volatile private var disposed = false
     private fun available(local: LocalRecordUiState = current()) = !disposed && local.ready && !local.opening && local.error == null
@@ -86,6 +80,16 @@ class TaskReminderController internal constructor(private val current: () -> Loc
     fun close(session: Long) {
         update { if (it.editor?.session == session && !it.busy) it.copy(editor = null) else it }
     }
+    fun mayRequestCapability(session:Long):Boolean {
+        val local=current();val state=local.reminders
+        val editor=state.editor?:return false
+        return available(local)&&mayRequestPermission()&&editor.session==session&&!state.busy&&state.pending==null&&
+            !taskWritePending()&&local.tasks.items.singleOrNull{it.id==editor.task.id}==editor.task
+    }
+    /** A settings return only observes current capability. It never repeats a user mutation. */
+    fun capabilitiesChanged(session:Long) {
+        if(mayRequestCapability(session))requestRuntime()
+    }
     fun retry() {
         val state = current().reminders
         if (!available() || !state.supported || state.busy) return
@@ -131,15 +135,24 @@ class TaskReminderController internal constructor(private val current: () -> Loc
         if (!available()) return
         if (taskWritePending()) { deferred(); return }
         try {
-            TaskReminderDispatcher(checkNotNull(store.reminders), driver, clock::millis).drain()
             val all = checkNotNull(store.manualTasks).snapshots()
             publish { local -> if (!available(local) || local.reminders.pending != null) local else
                 local.copy(tasks = if (local.tasks.available && !local.tasks.loading && !local.tasks.busy && local.tasks.pending == null)
                     local.tasks.copy(items = all) else local.tasks,
                     reminders = local.reminders.copy(busy = false, error = null)) }
+            requestRuntime()
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { update { it.copy(busy = false, error = "提醒计划已保留；当前调度状态暂不能核对，请重试读取。") } }
     }
+    /** Observes an already completed, separately queued runtime operation; never schedules another one. */
+    internal fun refreshAfterRuntime(store:EntryRepository) {
+        if(!available() || taskWritePending() || current().reminders.pending!=null)return
+        try {
+            val all=checkNotNull(store.manualTasks).snapshots()
+            publish{local->if(!available(local)||local.reminders.pending!=null)local else local.copy(tasks=local.tasks.copy(items=all))}
+        }catch(c:CancellationException){throw c}catch(_:Exception){update{it.copy(error="提醒状态尚未核实，请重试读取。")}}
+    }
+    internal fun runtimeUnavailable() { update{it.copy(error="系统提醒状态暂未核实；已保存的计划仍保留，请重试读取。",busy=false)} }
     private fun deferred() = update { it.copy(busy = false,
         error = "待办保存尚未确认。请先核对待办保存结果，再重试提醒状态；未推进调度命令。") }
     @Synchronized fun dispose() {

@@ -9,9 +9,13 @@ import kotlinx.coroutines.sync.withLock
  * Check owner authority after entering this boundary. Exceptions release it so a fresh read can
  * resolve an unknown acknowledgement, rather than permanently poisoning future admission.
  */
+internal interface AppAccessPreferenceRunner { suspend fun <T> run(action:suspend ()->T):T }
+
 internal class AppAccessPreferenceOperations {
+    @Volatile var runner:AppAccessPreferenceRunner?=null
     private val mutex = Mutex()
-    suspend fun <T> perform(action: () -> T): T = mutex.withLock { action() }
+    suspend fun <T> perform(action: () -> T): T = runner?.run { performDirect(action) } ?: performDirect(action)
+    suspend fun <T> performDirect(action: ()->T):T=mutex.withLock{action()}
 }
 
 internal val processAppAccessPreferenceOperations = AppAccessPreferenceOperations()

@@ -20,6 +20,22 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
         database.transaction { sql -> createWithin(sql,request) }
     }
     internal fun readWithin(sql: RecordsSqlConnection,id: String): ManualTaskSnapshot? = row(sql,id)?.payload?.task
+    internal fun reminderTaskFromCells(cells:List<Any?>):ManualTaskSnapshot = decode(cells).payload.task
+    /** Rebuild only an existing confirmed future plan, never a trigger or a new user decision. */
+    internal fun rebuildFutureWithin(sql:RecordsSqlConnection,id:String,now:Long):Boolean {
+        val old=row(sql,id)?:return false;val t=old.payload.task;val r=t.reminder?:return false
+        if(t.status!=ManualTaskStatus.OPEN || t.schedule!=r.schedule || requireNotNull(r.schedule.instant()).toEpochMilli()<=now ||
+            old.payload.runtime.any{it.token.scheduleVersion==r.scheduleVersion} || r.phase !in setOf(
+                TaskReminderPhase.PENDING,TaskReminderPhase.SCHEDULED,TaskReminderPhase.PLATFORM_UNAVAILABLE,
+                TaskReminderPhase.NOTIFICATION_REQUIRED,TaskReminderPhase.NOTIFICATION_DENIED,TaskReminderPhase.CHANNEL_DISABLED,
+                TaskReminderPhase.EXACT_REQUIRED,TaskReminderPhase.EXACT_DENIED,TaskReminderPhase.FAILED)) return false
+        if(r.phase==TaskReminderPhase.PENDING) return false
+        val command=TaskReminderCommand(TaskReminderToken(t.id,r.id,r.scheduleVersion),TaskReminderCommandKind.SCHEDULE,r.schedule,r.mode)
+        val next=t.copy(version=Math.addExact(t.version,1),updatedAtMillis=maxOf(t.updatedAtMillis,now),
+            reminder=r.copy(phase=TaskReminderPhase.PENDING,commands=r.commands+command))
+        writeWithin(sql,t,next,"rebuild:"+UUID.randomUUID(),now,"RM_REBLD",userReceipt=receiptForSystem(old))
+        return true
+    }
     internal fun exportWithin(sql:RecordsSqlConnection):List<ManualTaskSnapshot> =
         sql.query("SELECT id,version,lastMutationId,ciphertext FROM manual_tasks WHERE substr(id,1,14)!='TASK_PROPOSAL:' ORDER BY id LIMIT 257")
             .also {if(it.size>RecordPackageActivities.MAX_ITEMS) throw RecordPackageActivityLimit(RecordPackageActivityBound.FORMAL_TASKS)}

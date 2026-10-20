@@ -18,7 +18,7 @@ class OriginalHistoryQueueTest {
     private suspend fun exercise(store: EncryptedEntryRepository, block: suspend (LocalRecordsViewModel) -> Unit) {
         store.seed(entry(1, "合成旧原文🌿")); store.seed(entry(2, "合成当前原文"))
         EncryptedEntryRepository.instance = store
-        val vm = LocalRecordsViewModel(Application())
+        val vm = LocalRecordsViewModel(Application(), { EncryptedEntryRepository.instance })
         try { withTimeout(5000) { vm.state.first { it.ready }; block(vm) } } finally { vm.scope.cancel() }
     }
     private suspend fun loaded(vm: LocalRecordsViewModel) = vm.state.first { it.originalHistory?.loading == false }.originalHistory!!

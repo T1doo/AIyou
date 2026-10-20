@@ -50,7 +50,7 @@ class AppAccessPreferenceOwnerTest {
         val opens = AtomicInteger()
         val old = AppAccessController(storage, oldScope, {
             records.register(CompletableDeferred(Unit)); true
-        }, records::awaitClosed)
+        }, { records.awaitClosed() })
         var next: AppAccessController? = null
         try { withTimeout(6_000) {
             val initial = old.state.first { it.phase == AppAccessPhase.OPEN }

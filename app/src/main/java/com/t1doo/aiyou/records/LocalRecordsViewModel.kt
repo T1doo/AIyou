@@ -132,6 +132,7 @@ data class LocalRecordUiState(
 )
 
 /** All draft writes and saves share one queue, preserving edits around a save boundary. */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class,kotlinx.coroutines.DelicateCoroutinesApi::class)
 class LocalRecordsViewModel internal constructor(
     application: Application,
     private val openStore: () -> EntryRepository,
@@ -142,8 +143,10 @@ class LocalRecordsViewModel internal constructor(
     private val decodeCapture: (ByteArray) -> AttachmentPicture = PlatformImageDecoder::thumbnail,
     private val decodeGrid: (ByteArray) -> AttachmentPicture = PlatformImageDecoder::gridThumbnail,
     private val capabilityProbe: com.t1doo.aiyou.domain.ModelCapabilityProbe? = null,
+    private val reminderRuntime: ReminderVmRuntime? = null,
+    private val admittedStore:EntryRepository?=null,
 ) : AndroidViewModel(application) {
-    constructor(application: Application) : this(application, { openProductionRecordStore(application) })
+    constructor(application: Application) : this(application, { throw IllegalStateException("Records require an admitted foreground owner") })
     private val mutableState = MutableStateFlow(LocalRecordUiState())
     val state = mutableState.asStateFlow()
     private val commands = Channel<Command>(Channel.UNLIMITED)
@@ -152,6 +155,8 @@ class LocalRecordsViewModel internal constructor(
     private val mutableAppAccessIdle = MutableStateFlow(false)
     internal val appAccessIdle = mutableAppAccessIdle.asStateFlow()
     private val appAccessClosed = kotlinx.coroutines.CompletableDeferred<Unit>()
+    private val initialOpen = kotlinx.coroutines.CompletableDeferred<Unit>()
+    internal suspend fun awaitInitialOpen() = initialOpen.await()
 
     private fun submit(command: Command): kotlinx.coroutines.channels.ChannelResult<Unit> = synchronized(appAccessGuard) {
         appAccessCommands.incrementAndGet()
@@ -160,6 +165,8 @@ class LocalRecordsViewModel internal constructor(
         if (result.isFailure) mutableAppAccessIdle.value = appAccessCommands.decrementAndGet() == 0
         result
     }
+    internal fun enqueueTaskOperation(action:suspend (EntryRepository)->Unit)=submit(Command.ManualTasks(action)).isSuccess
+    internal fun enqueuePackageOperation(action:suspend (EntryRepository)->Unit)=submit(Command.RecordPackage(action)).isSuccess
 
     internal fun canRetireForAppAccess(): Boolean = synchronized(appAccessGuard) { appAccessMayRetire() }
 
@@ -167,6 +174,7 @@ class LocalRecordsViewModel internal constructor(
     internal fun retireForAppAccess(): Boolean = synchronized(appAccessGuard) {
         if (!appAccessMayRetire()) return@synchronized false
         editsDisposed = true
+        reminderRuntime?.retire()
         commands.close()
         true
     }
@@ -201,9 +209,9 @@ class LocalRecordsViewModel internal constructor(
         enqueue = { action -> submit(Command.Attachment(action)).isSuccess },
         decode = decodeGrid, current = { mutableState.value })
     val sourceTasks = SourceTaskController({ mutableState.value }, { change -> update(change) },
-        { action -> submit(Command.ManualTasks(action)).isSuccess },clock, { tasks.refresh() },{taskProposals.open(it)})
+        ::enqueueTaskOperation,clock, { tasks.refresh() },{taskProposals.open(it)})
     val taskProposals = TaskProposalController({ mutableState.value }, { change -> update(change) },
-        { action -> submit(Command.ManualTasks(action)).isSuccess },clock, { tasks.refresh() })
+        ::enqueueTaskOperation,clock, { tasks.refresh() })
     val localProcessing = LocalProcessingController({ mutableState.value }, { change -> update(change) },
         { action -> submit(Command.LocalProcessing(action)).isSuccess }, ::retireDerived, clock)
     val factRecaps = FactRecapController({ mutableState.value }, { change -> update(change) },
@@ -226,9 +234,11 @@ class LocalRecordsViewModel internal constructor(
     val eventDates = RecordEventDateController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.EventDates(action)).isSuccess })
     val tasks = ManualTaskController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> submit(Command.ManualTasks(action)).isSuccess }, clock = clock)
+        enqueue = ::enqueueTaskOperation, clock = clock)
     val reminders = TaskReminderController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> submit(Command.ManualTasks(action)).isSuccess }, clock = clock)
+        enqueue = ::enqueueTaskOperation, clock = clock,
+        mayRequestPermission={reminderRuntime?.owner?.isAdmitted==true&&!editsDisposed},
+        requestRuntime = { reminderRuntime?.requestTurn() })
     val candidates = LocalCandidateController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.LocalCandidates(action)).isSuccess },
         scope = viewModelScope, clock = clock, extract = extractLocalCandidates)
@@ -241,9 +251,9 @@ class LocalRecordsViewModel internal constructor(
     val exports = OriginalExportController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.OriginalExport(action)).isSuccess }, clock = clock, decodeImage = decodeCapture)
     val recordPackages = RecordPackageController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> submit(Command.RecordPackage(action)).isSuccess },
+        enqueue = ::enqueuePackageOperation,
         cipher = com.t1doo.aiyou.data.JcaRecordPackageCipher(), clock = clock,
-        onFullRestored = { store -> mixedCapture.adoptFullRestore(store);tasks.initialize(store);reminders.initialize(store);taskProposals.initialize(store) })
+        onFullRestored = { store -> reminderRuntime?.afterRestore();mixedCapture.adoptFullRestore(store);tasks.initialize(store);reminders.initialize(store);taskProposals.initialize(store) })
     val recycleBin = RecycleBinController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.RecycleBin(action)).isSuccess },
         canMove = { attachments.state.value == null },
@@ -252,7 +262,7 @@ class LocalRecordsViewModel internal constructor(
             attachments.state.value?.takeIf { it.entryId == id }?.let { attachments.close(it.sessionId) }
             mutableState.value.originalExport?.takeIf { it.selection.any { source -> source.sourceId == id } }?.let { exports.close(it.session) }
         })
-    private var repository: EntryRepository? = null
+    private var repository: EntryRepository? = admittedStore
     private var indexQueued = false // Existing IO actor only.
     private var indexFailed = false
     private val searchRefreshQueued = java.util.concurrent.atomic.AtomicBoolean()
@@ -296,9 +306,13 @@ class LocalRecordsViewModel internal constructor(
     private val indexRebuildQueued = java.util.concurrent.atomic.AtomicBoolean()
 
     init {
-        viewModelScope.launch(Dispatchers.IO) {
+        reminderRuntime?.attach { action -> submit(Command.ReminderRuntime(action)).isSuccess }
+        // Enter try/finally even when an admitted VM is cleared before its first IO dispatch.
+        viewModelScope.launch(Dispatchers.IO,start=kotlinx.coroutines.CoroutineStart.ATOMIC) {
             try {
-                open()
+                if(reminderRuntime!=null)reminderRuntime.userAction{open()}else open()
+                if(mutableState.value.ready)initialOpen.complete(Unit)
+                else initialOpen.completeExceptionally(IllegalStateException("Records initialization unavailable"))
                 ai.reconcileRecords()
                 scheduleLocalIndex()
                 mutableAppAccessIdle.value = appAccessCommands.get() == 0
@@ -386,11 +400,23 @@ class LocalRecordsViewModel internal constructor(
                             is Command.ModelConnections -> command.action(checkNotNull(repository))
                             is Command.Favorites -> command.action(checkNotNull(repository))
                             is Command.EventDates -> command.action(checkNotNull(repository))
-                            is Command.ManualTasks -> command.action(checkNotNull(repository))
+                            is Command.ManualTasks -> {
+                                val action:suspend ()->Unit={command.action(checkNotNull(repository))}
+                                if(reminderRuntime!=null)reminderRuntime.userAction(action)else action()
+                                reminderRuntime?.requestTurn()
+                            }
+                            is Command.ReminderRuntime -> {
+                                try{command.action();reminders.refreshAfterRuntime(checkNotNull(repository))}
+                                catch(c:CancellationException){throw c}catch(_:Exception){reminders.runtimeUnavailable()}
+                            }
                             is Command.LocalCandidates -> command.action(checkNotNull(repository))
                             is Command.MemoryInbox -> command.action(checkNotNull(repository))
                             is Command.OriginalExport -> command.action(checkNotNull(repository))
-                            is Command.RecordPackage -> command.action(checkNotNull(repository))
+                            is Command.RecordPackage -> {
+                                val action:suspend ()->Unit={command.action(checkNotNull(repository))}
+                                if(reminderRuntime!=null)reminderRuntime.userAction(action)else action()
+                                reminderRuntime?.requestTurn()
+                            }
                             is Command.RecycleBin -> command.action(checkNotNull(repository))
                             Command.IndexBatch -> runLocalIndex()
                             Command.RebuildIndex -> try { rebuildLocalIndex() } finally { indexRebuildQueued.set(false) }
@@ -410,6 +436,7 @@ class LocalRecordsViewModel internal constructor(
                 }
             } finally {
                 editsDisposed = true
+                reminderRuntime?.retire()
                 sourceTasks.dispose()
                 taskProposals.dispose()
                 localProcessing.dispose()
@@ -435,9 +462,12 @@ class LocalRecordsViewModel internal constructor(
                         mixedCapture.disposeOnIo()
                         try { attachments.disposeOnIo() }
                         finally {
-                            (repository as? AutoCloseable)?.close()
-                            (repository as? AwaitableRecordStorage)?.awaitClosed()
-                            repository = null
+                            val close={
+                                (repository as? AutoCloseable)?.close()
+                                (repository as? AwaitableRecordStorage)?.awaitClosed()
+                                repository = null
+                            }
+                            if(reminderRuntime!=null)reminderRuntime.closeStore(close)else close()
                         }
                     }
                 } } catch (_: Exception) {
@@ -445,6 +475,7 @@ class LocalRecordsViewModel internal constructor(
                 }
             }
         }.invokeOnCompletion { failure ->
+            if(!initialOpen.isCompleted)initialOpen.completeExceptionally(IllegalStateException("Records opening retired"))
             if (failure == null || failure is CancellationException) appAccessClosed.complete(Unit)
             else appAccessClosed.completeExceptionally(IllegalStateException("Records session closure unconfirmed"))
         }
@@ -1374,6 +1405,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     override fun onCleared() {
+        reminderRuntime?.retire()
         editsDisposed = true
         sourceTasks.dispose()
         taskProposals.dispose()
@@ -1405,6 +1437,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     private sealed interface Command {
+        data class ReminderRuntime(val action:suspend ()->Unit):Command
         data class LocalProcessing(val action: suspend (EntryRepository) -> Unit) : Command
         data class FactRecap(val action: suspend (EntryRepository) -> Unit) : Command
         data object IndexBatch : Command

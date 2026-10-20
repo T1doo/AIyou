@@ -18,7 +18,26 @@ class ReminderExecutionGate {
         check(depth.get() == 0 && current == null) { "Previous reminder owner not closed" }
         ReminderRuntimeOwner(this, accessAllowed).also { current = it }
     }
-    internal fun <T> perform(owner: ReminderRuntimeOwner, action: () -> T): T = execution.withLock {
+    /** Production admission: no key/store factory until access is confirmed under this same gate.
+     * A failed prepare leaves its owner sealed; the caller must confirm cleanup with closeAndAwait.
+     */
+    fun <T> admit(access: () -> Boolean, prepare: (ReminderRuntimeOwner) -> T): T? = execution.withLock {
+        check(depth.get() == 0 && current == null) { "Previous reminder owner not closed" }
+        depth.set(1)
+        try {
+            if (!access()) return@withLock null
+            val owner = ReminderRuntimeOwner(this, true).also { current = it }
+            try { prepare(owner) } catch (failure: Throwable) { owner.seal(); throw failure }
+        } finally { depth.set(0) }
+    }
+    /** Preference-only observation/admission serialization, including while a prior owner is sealed.
+     * No repository or key is supplied by this operation. Production callers use the process worker.
+     */
+    fun <T> inspectAdmission(action:()->T):T=execution.withLock {
+        check(depth.get()==0){"Cannot reenter reminder admission"};depth.set(1)
+        try{action()}finally{depth.set(0)}
+    }
+    fun <T> perform(owner: ReminderRuntimeOwner, action: () -> T): T = execution.withLock {
         check(depth.get() == 0) { "Cannot reenter reminder execution" }
         if (current !== owner || !owner.admitted()) throw ReminderAccessUnavailable()
         depth.set(1)
@@ -41,6 +60,7 @@ class ReminderRuntimeOwner internal constructor(internal val gate: ReminderExecu
     // Gate-confined ordering only, never a durable command or execution permit.
     private var drainAfter: TaskReminderToken? = null
     internal fun admitted() = accessAllowed && !sealed.get()
+    val isAdmitted: Boolean get() = admitted()
     fun capture(token: TaskReminderToken, observedAtMillis: Long): ReminderRuntimeIngress? = synchronized(pending) {
         require(observedAtMillis >= 0)
         if (!admitted()) return@synchronized null
@@ -48,7 +68,7 @@ class ReminderRuntimeOwner internal constructor(internal val gate: ReminderExecu
         if (pending.size >= 64) return@synchronized null
         ReminderRuntimeIngress(this, token, observedAtMillis).also { pending[token] = it }
     }
-    fun seal() { sealed.set(true); synchronized(pending) { pending.clear() } }
+    fun seal() { sealed.set(true); synchronized(pending) { pending.values.forEach { it.retire() }; pending.clear() } }
     fun closeAndAwait(action: () -> Unit = {}) = gate.close(this, action)
     internal fun release(ingress: ReminderRuntimeIngress) = synchronized(pending) { if (pending[ingress.token] === ingress) pending.remove(ingress.token); Unit }
     internal fun drainBatch(commands: List<TaskReminderCommand>, nowMillis: Long, limit: Int): List<TaskReminderCommand> {
@@ -68,6 +88,11 @@ class ReminderRuntimeIngress internal constructor(internal val owner: ReminderRu
     internal val observedAtMillis: Long) {
     internal val deliveries = AtomicInteger()
     internal var event: ReminderEventRequest? = null
+    private val lifetime = AtomicInteger() // 0 active, 1 platform call admitted, 2 retired, 3 finished
+    fun retire() { lifetime.compareAndSet(0, 2) }
+    internal fun mayStart() = lifetime.get() == 0
+    internal fun beginPost() = lifetime.compareAndSet(0, 1)
+    internal fun finish() { lifetime.set(3) }
     override fun toString() = "ReminderRuntimeIngress(redacted)"
 }
 
@@ -82,10 +107,12 @@ class ReminderRuntimeCoordinator(private val owner: ReminderRuntimeOwner, privat
         if (ingress.owner !== owner) return ReminderRuntimeReply(ReminderRuntimeOutcome.NO_ACCESS, null)
         return try { owner.gate.perform(owner) {
             val delivery = ingress.deliveries.getAndIncrement()
+            if (delivery == 0 && !ingress.mayStart()) { owner.release(ingress); return@perform ReminderRuntimeReply(ReminderRuntimeOutcome.RETIRED, null) }
             if (delivery > 1) { owner.release(ingress); return@perform ReminderRuntimeReply(ReminderRuntimeOutcome.RETIRED, null) }
             if (delivery > 0 && ingress.event == null) { owner.release(ingress); return@perform ReminderRuntimeReply(ReminderRuntimeOutcome.STALE, null) }
             val store = try { repository() } catch (cancelled: java.util.concurrent.CancellationException) { owner.release(ingress); throw cancelled }
             catch (_: Exception) { owner.release(ingress); return@perform ReminderRuntimeReply(ReminderRuntimeOutcome.UNKNOWN, null) }
+            if (delivery == 0 && !ingress.mayStart()) { owner.release(ingress); return@perform ReminderRuntimeReply(ReminderRuntimeOutcome.RETIRED, null) }
             if (delivery > 0) {
                 val event = ingress.event ?: return@perform ReminderRuntimeReply(ReminderRuntimeOutcome.STALE, null)
                 return@perform eventReadback(store, event) ?: ReminderRuntimeReply(ReminderRuntimeOutcome.STALE, store.runtimeView(ingress.token.taskId))
@@ -104,7 +131,7 @@ class ReminderRuntimeCoordinator(private val owner: ReminderRuntimeOwner, privat
                 if (accepted.outcome !in setOf(ReminderRuntimeOutcome.ACCEPTED, ReminderRuntimeOutcome.EXACT_REPLAY) ||
                     observed?.eventDecision != ReminderEventDecision.ACCEPTED || observed.closed != null || observed.retired != null || observed.claim != null)
                     return@perform accepted
-                if (!owner.admitted()) { end(store, event.scope.token); return@perform ReminderRuntimeReply(ReminderRuntimeOutcome.RETIRED, store.runtimeView(scope.token.taskId)) }
+                if (!owner.admitted() || !ingress.mayStart()) { end(store, event.scope.token); return@perform ReminderRuntimeReply(ReminderRuntimeOutcome.RETIRED, store.runtimeView(scope.token.taskId)) }
                 val claim = ReminderClaimRequest.create(event, accepted.view.task.version, clock(), observe())
                 val live = LiveClaimAttempt().also { attempt = it }
                 // A negative observation permanently closes this attempt even if its SQL write rolls back.
@@ -112,13 +139,14 @@ class ReminderRuntimeCoordinator(private val owner: ReminderRuntimeOwner, privat
                 val claimed = settle({ store.decideRuntimeClaim(claim) }, { claimReadback(store, claim) })
                 val claimedSlot = claimed.view?.event(event.id)
                 if (claimedSlot?.claim != claim || claimedSlot.claimDecision != ReminderClaimDecision.GRANTED || claimedSlot.closed != null ||
-                    claimedSlot.retired != null || live.consumed.get() || !owner.admitted()) {
+                    claimedSlot.retired != null || live.consumed.get() || !owner.admitted() || !ingress.mayStart()) {
                     if (claimedSlot != null && claimedSlot.closed == null) end(store, scope.token)
-                    return@perform if (!owner.admitted()) ReminderRuntimeReply(ReminderRuntimeOutcome.RETIRED, store.runtimeView(scope.token.taskId)) else claimed
+                    return@perform if (!owner.admitted() || !ingress.mayStart()) ReminderRuntimeReply(ReminderRuntimeOutcome.RETIRED, store.runtimeView(scope.token.taskId)) else claimed
                 }
                 check(live.consumed.compareAndSet(false,true)) // At most one port attempt; readback never resets it.
                 val preflight = observe()
                 if (!owner.admitted()) { end(store, scope.token); return@perform ReminderRuntimeReply(ReminderRuntimeOutcome.RETIRED, store.runtimeView(scope.token.taskId)) }
+                if (!ingress.beginPost()) { end(store, scope.token); return@perform ReminderRuntimeReply(ReminderRuntimeOutcome.RETIRED, store.runtimeView(scope.token.taskId)) }
                 val observation = if (preflight.availability.blocked(scope.mode) != null) ReminderPostObservation.NO_ATTEMPT_CAPABILITY_LOST
                 else try {
                     driver.post(scope.token, claim.specification).let {
@@ -138,6 +166,7 @@ class ReminderRuntimeCoordinator(private val owner: ReminderRuntimeOwner, privat
             catch (_: Exception) { ReminderRuntimeReply(ReminderRuntimeOutcome.UNKNOWN, safeView(store, ingress.token.taskId)) }
             finally {
                 attempt?.active?.set(false)
+                ingress.finish()
                 // If an uncertain write left runnable work, only retire it; never revive publication.
                 try { ingress.event?.let { end(store, ingress.token, it.id) } } catch (_: Exception) { /* Durable unknown remains visibly unverified. */ }
                 owner.release(ingress)
@@ -186,16 +215,24 @@ class ReminderRuntimeCoordinator(private val owner: ReminderRuntimeOwner, privat
         require(limit in 1..16)
         val commands = try { mutate { owner.drainBatch(it.reminderCommands(), clock(), limit) } }
             catch (_: ReminderAccessUnavailable) { return 0 }
+        return executeCommands(commands)
+    }
+    /** Bounded SQL page supplied by the same admitted owner. Every command is still reauthenticated. */
+    fun drainPage(page: ReminderCommandPage, proceed: () -> Boolean = { true }): Int = executeCommands(page.commands, proceed)
+    private fun executeCommands(commands: List<TaskReminderCommand>, proceed: () -> Boolean = { true }): Int {
+        require(commands.size <= 16)
         var acknowledged = 0
         for (command in commands) {
+            if (!proceed()) break
             try { mutate { s ->
+                if (!proceed()) return@mutate
                 if (command.kind == TaskReminderCommandKind.DELIVER) return@mutate
                 if (!s.isReminderCommandCurrent(command)) return@mutate
                 if (command.kind == TaskReminderCommandKind.SCHEDULE && requireNotNull(command.schedule.instant()).toEpochMilli() <= clock()) return@mutate
-                if (!owner.admitted()) return@mutate
+                if (!owner.admitted() || !proceed()) return@mutate
                 val result = if (command.kind == TaskReminderCommandKind.CANCEL) driver.cancel(command) else {
                     val blocked = driver.availability().blocked(command.mode)
-                    if (!owner.admitted()) return@mutate
+                    if (!owner.admitted() || !proceed()) return@mutate
                     // A blocking capability query may have crossed due; retain the original late-callback eligibility.
                     if (requireNotNull(command.schedule.instant()).toEpochMilli() <= clock()) return@mutate
                     blocked ?: driver.schedule(command)

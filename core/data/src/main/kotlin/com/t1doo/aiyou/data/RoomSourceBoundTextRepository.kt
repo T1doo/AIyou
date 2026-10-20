@@ -31,11 +31,11 @@ class RoomSourceBoundTextRepository internal constructor(private val sql: Draini
 
 internal class RoomRecordsSqlDatabase(private val room:RecordsDatabase):RecordsSqlDatabase {
     override fun <T> transaction(block:(RecordsSqlConnection)->T):T = room.runInTransaction(Callable {
-        block(RoomRecordsSqlConnection(room.openHelper.writableDatabase))
+        block(SupportRecordsSqlConnection(room.openHelper.writableDatabase))
     })
 }
 
-private class RoomRecordsSqlConnection(private val db:SupportSQLiteDatabase):RecordsSqlConnection {
+internal class SupportRecordsSqlConnection(private val db:SupportSQLiteDatabase):RecordsSqlConnection {
     override fun query(sql:String,args:List<Any?>):List<List<Any?>> {
         validate(args)
         return db.query(SimpleSQLiteQuery(sql,args.toTypedArray())).use { cursor ->
