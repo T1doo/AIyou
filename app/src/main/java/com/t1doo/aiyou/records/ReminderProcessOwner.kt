@@ -63,15 +63,15 @@ internal class ReminderProcessOwner(
             frontReservation=null;phase=Phase.NO_FRONT
         }
     }
-    private fun observeUnclaimedRelease(reservation:FrontReservation){
-        if(frontReservation===reservation&&reservation.cancelled&&!reservation.claimed&&!reservation.openStarted&&holder==null&&phase==Phase.RELEASING)bridge.postObservation{synchronized(guard){
-            if(frontReservation===reservation&&reservation.cancelled&&!reservation.claimed&&!reservation.openStarted&&holder==null&&phase==Phase.RELEASING){
+    private fun observeReleasedFront(reservation:FrontReservation){
+        if(frontReservation===reservation&&reservation.cancelled&&(reservation.settled||!reservation.claimed&&!reservation.openStarted)&&holder==null&&phase==Phase.RELEASING)bridge.postObservation{synchronized(guard){
+            if(frontReservation===reservation&&reservation.cancelled&&(reservation.settled||!reservation.claimed&&!reservation.openStarted)&&holder==null&&phase==Phase.RELEASING){
                 reservation.settled=true;finishReleasedFront(reservation)
             }
         }}
     }
     private fun clearConfirmedHolder(prepared:Holder)=synchronized(guard){
-        if(holder===prepared){holder=null;frontReservation?.let{observeUnclaimedRelease(it)}}
+        if(holder===prepared){holder=null;frontReservation?.let{observeReleasedFront(it)}}
     }
     private fun confirmedFrontClose(prepared:Holder,reservation:FrontReservation)=synchronized(guard){
         reservation.settled=true
@@ -88,7 +88,7 @@ internal class ReminderProcessOwner(
         holder?.owner?.seal()
         frontReservation?.let{reservation->
             finishReleasedFront(reservation)
-            observeUnclaimedRelease(reservation)
+            observeReleasedFront(reservation)
         }
         if(wasFront&&holder==null)phase=Phase.NO_FRONT // The current owner's successful close was already observed.
     }
@@ -263,7 +263,7 @@ internal class ReminderProcessOwner(
             if(candidate==null)bridge.runtime{synchronized(guard){
                 // This attempt has left admission with no owner/physical open. An old attempt
                 // cannot reset a replacement reservation, an unknown close, or a lock transition.
-                if(!reservation.openStarted&&holder==null){reservation.settled=true;finishReleasedFront(reservation)}
+                if(!reservation.openStarted){reservation.settled=true;finishReleasedFront(reservation)}
             }}
             throw f
         }
