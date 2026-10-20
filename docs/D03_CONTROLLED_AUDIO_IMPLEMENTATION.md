@@ -36,14 +36,34 @@
 - 选择包恢复新建身份；完整备份维持既有 F08 空目标逻辑身份/回执合同，当前设备重新加密并清运行资格。
   正式附件与音频草稿均进入加密备份；完整目标不能把仅音频草稿当空白。
 - 图片与音频用独立类型，不改称图片数量；预览在有音频时另列计数/字节。
+  纯原音允许按手工标签进入原文搜索，但不产生转写、关键词或图片命中。
+  事实回顾保存独立音频清单证据，发布时连同状态重新核对；原音不阻断其他原文回顾，也不被解读为文字或图片。
   当前开放图片 ZIP 不支持音频，遇到音频明确整体拒绝，不静默遗漏原音。
   原文两份方案、Manifest、Room v15 schema 和生产依赖版本未改。
 
 ## 验证状态与未验边界
 
-中间轮次编译失败、旧 current() 只读行为失败、v9 附件委托/计数/回执兼容失败和修正日志均保留。
-最后一次中间定向实际 77 项通过（失败/错误/跳过 0），包括独立旧 Node/OpenSSL v2 夹具及旧完整备份；该轮是未提交工作树输入，不能冒称最终提交全量通过。
-提交前审查又补充了恢复实际命令计数、恢复/删除门与少量生命周期回归；最终完整 SHA、实际套件/方法/XML/输入指纹见随交付封存的验证收据。
+最终产品提交 `c9f561f24ffd0e0aa75f9f7425ee837f5acd9b3d` 的本机完整合同测试实际 **1358 项通过**：
+`core:ai` 178、`core:domain` 71、`remote-text` 1109，失败/错误/跳过均为 0。
+命令为 `python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test :remote-text:test`，
+随后 `python3 scripts/verify-ai-protocol-results.py` 对实际方法清单、XML 新鲜度和完整源码输入严格通过。
+输入 SHA256 `d19a71294449fcd7b3bbb64585958a8107b42787798d4e1ca773928adffd3dfa`。
+其中 27 项新增方法覆盖 canonical WAV、冻结排空/CAS/UNKNOWN、恢复删除实际入口、actor 退出/打开退休竞态、合成资源释放、v9 往返/重放与旧格式严格边界、纯原音搜索与事实回顾。
+沿用的旧图片包独立 Node/OpenSSL 字节夹具和旧完整备份也在本轮实际执行。
+
+因果日志包含早期编译错误、只读 current() 回归、v9 委托/回执与 journal MIME 拒绝、退休前旧就绪观察的打开竞态、纯原音搜索/回顾旧图片假设。
+对应修复及失败 XML 均保留；不把中间失败轮或缓存旧 XML 计作本次通过。先前 `f9f8203c807a8a179e78ffb8db1dc97f044a20c2` 的 1355 项和
+`6d28e975d39b2342dba876fabf494ebcbce718c6` 的 1356 项仅是各自输入版本证据，不替代最终轮。
+同一产品提交执行 `python3 scripts/jvm-gradle.py -p checks/reminder-native :test`，随后
+`python3 scripts/verify-reminder-native-results.py` 严格通过：实际 **41 项**，失败/错误/跳过 0。
+该构件包含实际整个 data 源码、Android 提醒 adapter/receiver/service/broker 和实际 Room KSP；仅未使用的 Activity/R 是受控壳。
+原生构件输入 SHA256 `77fcfa25d16a0f47858c2743a362c4e46b3e744e310ea80986bbca1dd4dce8f1`，
+生成的 Room v15 与已提交 schema 逐字节一致。它不包含新录音适配器，也不是 SQLCipher 原生运行或设备通知证据。
+
+本轮成功与失败日志、最终 XML/输入清单及方法核验收据见
+[本地验证证据 ZIP](evidence/D03_CONTROLLED_AUDIO_LOCAL_EVIDENCE.zip)：838884 字节，
+SHA256 `374bab52e1ec09f16d52deed13ff3879869f779db31e10f9f403e1871258335e`，675 项文件清单逐项核验。
+独审包的外层交付 SHA 单独记录；文档/证据封存不改上述产品测试输入。
 
 本地 SDK 只读 gate 未满足 `ANDROID_HOME` 指向已接受许可 SDK 的条件，没有安装 SDK、接受条款或启动设备。
 Android metadata/APK/lint、Compose/Preview、真实录音/播放/权限/后台/OEM/SQLCipher/16 KB/性能/可访问性 **NOT RUN**。
