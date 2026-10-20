@@ -63,7 +63,13 @@ class ReminderJobService:JobService() {
                         yield()
                     }
                 }catch(_:Exception){
-                    // Do not manufacture a completion ACK for unknown work/Binder outcomes.
+                    // An exceptional queue cannot reach its final empty dequeue. Release the OS
+                    // lease without completing work or claiming any product/platform effect ACK.
+                    try{withContext(NonCancellable+Dispatchers.Main.immediate){synchronized(guard){
+                        if(running===run&&run.active.get())runtime.finishFailedRun(run.key){
+                            if(run.active.compareAndSet(true,false))jobFinished(run.parameters,false)
+                        }
+                    }}}catch(_:Exception){/* The framework finish outcome is unknown; do not repeat it. */}
                 }finally{
                     run.active.set(false);runtime.endRun(run.key);runtime.owners.stop(run.tickets)
                     try{runtime.owners.closeCold(onlyIfIdle=true)}catch(_:Exception){/* Unconfirmed close keeps its sealed owner. */}

@@ -52,11 +52,12 @@ internal class ReminderProcessOwner(
     fun frontOpening() = transition(Phase.OPENING)
     /** Ordinary retained-VM disposal is distinct from an explicit application lock or failed access. */
     fun releaseFront()=synchronized(guard){
-        if(phase!=Phase.FRONT)return@synchronized
+        if(phase !in setOf(Phase.FRONT,Phase.OPENING))return@synchronized
+        val wasFront=phase==Phase.FRONT
         phase=Phase.RELEASING;epoch++
         tickets.values.forEach{it.retire()};tickets.clear()
         holder?.owner?.seal()
-        if(holder==null)phase=Phase.NO_FRONT // The current owner's successful close was already observed.
+        if(wasFront&&holder==null)phase=Phase.NO_FRONT // The current owner's successful close was already observed.
     }
     fun locked(unknown:Boolean=false)=transition(if(unknown)Phase.UNKNOWN else Phase.LOCKED)
     private fun transition(next:Phase) = synchronized(guard) {
@@ -199,14 +200,18 @@ internal class ReminderProcessOwner(
             candidate?.let{prepared->
                 prepared.owner.seal()
                 if(f is ReminderRuntimeClosureUnconfirmed){prepared.closureUnconfirmed=true;prepared.quarantine=f}
-                else try{
-                    bridge.closeOwner(prepared.owner){(repository as? AutoCloseable)?.close();(repository as? AwaitableRecordStorage)?.awaitClosed()}
-                    synchronized(guard){if(holder===prepared)holder=null}
-                }catch(close:Throwable){
-                    prepared.closureUnconfirmed=true
-                    throw ReminderRuntimeClosureUnconfirmed(arrayOf(repository,close)){
-                        (repository as? AutoCloseable)?.close();(repository as? AwaitableRecordStorage)?.awaitClosed()
-                    }.also{prepared.quarantine=it}
+                else bridge.runtime {
+                    // Physical closure and registry acknowledgement are one non-cancellable worker
+                    // tail. Cancellation on return to the caller is not a failed database close.
+                    try{
+                        prepared.owner.closeAndAwait{(repository as? AutoCloseable)?.close();(repository as? AwaitableRecordStorage)?.awaitClosed()}
+                        synchronized(guard){if(holder===prepared){holder=null;if(phase==Phase.RELEASING)phase=Phase.NO_FRONT}}
+                    }catch(close:Throwable){
+                        prepared.closureUnconfirmed=true
+                        throw ReminderRuntimeClosureUnconfirmed(arrayOf(repository,close)){
+                            (repository as? AutoCloseable)?.close();(repository as? AwaitableRecordStorage)?.awaitClosed()
+                        }.also{prepared.quarantine=it}
+                    }
                 }
             }
             throw f

@@ -167,10 +167,12 @@ class QueueSchedulerShadow {
 @Implements(JobParameters::class)
 class QueueParametersShadow {
     var job:JobInfo?=null
+    var beforeDequeue:(()->Unit)?=null
     @Implementation fun getJobId():Int=job?.id?:AndroidReminderRuntime.JOB
     @Implementation fun getExtras():android.os.PersistableBundle=job?.extras?:android.os.PersistableBundle()
     private val executing=java.util.Collections.newSetFromMap(java.util.IdentityHashMap<JobWorkItem,Boolean>())
     @Implementation fun dequeueWork():JobWorkItem?{
+        beforeDequeue?.invoke()
         val generation=job?.extras?.getString(AndroidReminderRuntime.GENERATION)
         val item=QueueBinder.queue.firstOrNull{QueueBinder.workOwners[it]?.extras?.getString(AndroidReminderRuntime.GENERATION).let{owner->owner==null||owner==generation}}
         if(item!=null&&QueueBinder.queue.remove(item)){executing.add(item);return item}

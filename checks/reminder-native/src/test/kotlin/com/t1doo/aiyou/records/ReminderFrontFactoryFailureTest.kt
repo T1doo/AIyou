@@ -5,7 +5,12 @@ import com.t1doo.aiyou.data.*
 import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
 import java.nio.file.Files
-import kotlinx.coroutines.runBlocking
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.*
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -61,6 +66,56 @@ class ReminderFrontFactoryFailureTest {
                 val prepared=owners.prepareFront{factories++;f.foregroundRecords()};assertEquals(2,factories)
                 prepared.second.closeStore{}
             }finally{key.fill(0);bridge.close()}
+        }
+    }
+    @Test fun cancellationDuringFactoryClosesAndClearsOnTheProductionWorkerBeforeSameProcessReopen():Unit=runBlocking {
+        cancellationDuringFactory(failClose=false)
+    }
+    @Test fun cancellationDuringFactoryWithActualCloseFailureKeepsSealedResourcesAndRejectsAnotherFactory():Unit=runBlocking {
+        cancellationDuringFactory(failClose=true)
+    }
+    private suspend fun cancellationDuringFactory(failClose:Boolean){
+        NativeSqlFixture().use{f->
+            val bridge=ReminderOperationBridge();val owners=owners(f,bridge)
+            val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
+            val entered=CountDownLatch(1);val release=CountDownLatch(1)
+            val factories=AtomicInteger();val closes=AtomicInteger();val returned=AtomicBoolean()
+            val failure=AtomicReference<Throwable?>();val openThread=AtomicReference<Thread>();val closeThread=AtomicReference<Thread>()
+            val key=ByteArray(32){11};val db=AtomicReference<SQLiteDatabase>()
+            val opening=scope.async {
+                try{
+                    owners.prepareFront {
+                        factories.incrementAndGet();openThread.set(Thread.currentThread());db.set(SQLiteDatabase.create(null))
+                        entered.countDown();check(release.await(5,TimeUnit.SECONDS))
+                        object:EntryRepository by f.foregroundRecords(),AutoCloseable,AwaitableRecordStorage {
+                            override fun close(){closes.incrementAndGet();closeThread.set(Thread.currentThread())}
+                            override fun awaitClosed(){
+                                if(failClose)error("Synthetic actual close failure after opening cancellation")
+                                db.get().close();key.fill(0)
+                            }
+                        }
+                    }.also{returned.set(true)}
+                }catch(caught:Throwable){failure.set(caught);throw caught}
+            }
+            try{
+                assertTrue(withContext(Dispatchers.IO){entered.await(5,TimeUnit.SECONDS)})
+                opening.cancel(CancellationException("Synthetic factory caller cancelled"));release.countDown()
+                withTimeout(5_000){opening.join()}
+                assertTrue(opening.isCancelled);assertFalse(returned.get());assertNotNull(failure.get())
+                assertEquals(1,factories.get());assertEquals(1,closes.get())
+                assertSame(openThread.get(),closeThread.get());assertTrue(closeThread.get().name.startsWith("AIyou-reminder-operations"))
+                if(failClose){
+                    assertTrue(db.get().isOpen);assertArrayEquals(ByteArray(32){11},key)
+                    assertTrue(runCatching{owners.prepareFront{factories.incrementAndGet();f.foregroundRecords()}}.isFailure)
+                    assertEquals(1,factories.get());assertTrue(db.get().isOpen);assertArrayEquals(ByteArray(32){11},key)
+                    assertThrows(IllegalStateException::class.java){bridge.gate.openOwner(true)}
+                }else{
+                    assertFalse(db.get().isOpen);assertTrue(key.all{it==0.toByte()})
+                    val fresh=owners.prepareFront{factories.incrementAndGet();f.foregroundRecords()}
+                    assertEquals(2,factories.get());fresh.second.closeStore{}
+                    assertTrue(failure.get() is CancellationException)
+                }
+            }finally{release.countDown();opening.cancel();opening.join();scope.cancel();db.get()?.close();key.fill(0);bridge.close()}
         }
     }
 }

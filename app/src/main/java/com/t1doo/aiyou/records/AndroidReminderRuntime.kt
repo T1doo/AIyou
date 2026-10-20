@@ -24,7 +24,7 @@ internal class AndroidReminderRuntime(context:Context,createOwner:((ReminderOper
     private val enqueueGate=Mutex()
     private var initialized=false
     private val submissions=Any()
-    private class Submission(val key:String,val info:JobInfo){var active=true;var claimed=false}
+    private class Submission(val key:String,val info:JobInfo){var active=true;var claimed=false;var finishing=false}
     private var submission:Submission?=null
     private fun submissionKey(params:JobParameters):String?=try{
         if(params.jobId!=JOB||params.extras.getString(NONCE)!=owners.nonce)null
@@ -49,6 +49,13 @@ internal class AndroidReminderRuntime(context:Context,createOwner:((ReminderOper
     fun endRun(key:String){
         synchronized(submissions){submission?.takeIf{it.key==key}?.active=false}
         owners.endSubmission(key)
+    }
+    /** Main-loop terminal claim. The callback only queues JobServiceEngine's local finish message;
+     * no business ACK, Binder wait, or repository IO is performed under this admission guard. */
+    fun finishFailedRun(key:String,finish:()->Unit)=synchronized(submissions){
+        val current=submission?.takeIf{it.key==key&&it.claimed&&!it.finishing}?:return@synchronized
+        current.finishing=true;current.active=false;owners.endSubmission(key)
+        finish()
     }
     private fun unlocked()=app.getSystemService(UserManager::class.java)?.isUserUnlocked==true
     private val preferences=FileAppAccessPreference(File(app.filesDir,"access/startup"))

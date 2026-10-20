@@ -72,6 +72,51 @@ class ReminderFrontLifecycleTest {
             }finally{bridge.close()}
         }
     }
+    @Test fun ordinaryDisposeWhileInitialReadIsPendingReleasesOpeningOnlyAfterConfirmedClose():Unit=runBlocking {
+        for(kind in listOf("ordinary","protected","unknown-preference","explicit-lock","unknown-access","failed-close"))NativeSqlFixture().use{f->
+            val bridge=ReminderOperationBridge();val reads=AtomicInteger();val factories=AtomicInteger()
+            val owners=ReminderProcessOwner(bridge,{true},{reads.incrementAndGet();if(kind=="unknown-preference")error("Synthetic uncertain preference");kind!="protected"},{f.open()},{driver(f)},{f.now}){f.fingerprint}
+            val old=requireNotNull(owners.capture())
+            val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
+            val prepared=CompletableDeferred<ReminderVmRuntime>();val initialRead=CompletableDeferred<Unit>()
+            lateinit var front:ReminderVmRuntime
+            val preferences=object:AppAccessPreferenceStorage {
+                override fun read()=AppAccessPreference(0,false)
+                override fun write(expected:AppAccessPreference,enabled:Boolean):AppAccessPreference=error("No preference write")
+            }
+            val controller=AppAccessController(preferences,scope,{true},{
+                val pair=owners.prepareFront{factories.incrementAndGet();f.foregroundRecords()}
+                front=pair.second;front.attach{false};prepared.complete(front);initialRead.await()
+            },preferenceOperations=AppAccessPreferenceOperations(),disposedSession=owners::releaseFront,
+                changed={state->when(state.phase){AppAccessPhase.OPENING->owners.frontOpening();AppAccessPhase.OPEN->owners.frontReady(front);AppAccessPhase.LOADING,AppAccessPhase.FAILED->owners.locked(true);else->owners.locked()}})
+            val entered=CountDownLatch(1);val release=CountDownLatch(1)
+            try{
+                val port=withTimeout(5_000){prepared.await()}
+                assertEquals(AppAccessPhase.OPENING,controller.state.value.phase);assertFalse(old.active);assertNull(owners.capture())
+                when(kind){"explicit-lock"->owners.locked();"unknown-access"->owners.locked(true)}
+                controller.dispose()
+                val closing=async(Dispatchers.Default){runCatching{port.closeStore{
+                    entered.countDown();check(release.await(5,TimeUnit.SECONDS))
+                    if(kind=="failed-close")error("Synthetic opening store close failure")
+                    f.stores.close()
+                }}}
+                assertTrue(withContext(Dispatchers.IO){entered.await(5,TimeUnit.SECONDS)})
+                assertNull(owners.capture());assertEquals(0,reads.get());assertEquals(0,f.opened.get())
+                release.countDown();val closed=closing.await()
+                assertEquals(kind!="failed-close",closed.isSuccess)
+                val fresh=owners.capture()
+                if(kind in setOf("ordinary","protected","unknown-preference")){
+                    assertNotNull("No fresh candidate after confirmed OPENING release: $kind",fresh)
+                    assertFalse(owners.execute(old));assertEquals(0,reads.get())
+                    if(kind=="ordinary")f.storesForRead()
+                    runCatching{owners.execute(fresh!!)}
+                    assertEquals(1,reads.get());assertEquals(if(kind=="ordinary")1 else 0,f.opened.get())
+                    if(kind=="ordinary"){owners.forget(fresh!!);owners.closeCold()}else assertNull(owners.capture())
+                }else{assertNull(fresh);assertEquals(0,reads.get());assertEquals(0,f.opened.get())}
+                assertEquals(1,factories.get());assertNull(owners.find(old.nonce,old.id))
+            }finally{release.countDown();controller.dispose();initialRead.complete(Unit);scope.cancel();bridge.close()}
+        }
+    }
 }
 
 internal fun NativeSqlFixture.foregroundRecords():EntryRepository=object:EntryRepository {
