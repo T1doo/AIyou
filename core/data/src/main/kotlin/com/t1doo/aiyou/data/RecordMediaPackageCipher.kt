@@ -206,7 +206,7 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
         }
         if (preview.snapshot.records.any { it.eventDate.date != null }) {
             val baseVersion = if (preview.history != null) 4 else if (preview.activities != null) 3 else 2
-            val base = metadata(RecordEventDatePackageCodec.legacyPreview(preview))
+            val base = legacyMetadata(RecordEventDatePackageCodec.legacyPreview(preview))
             return try { RecordEventDatePackageCodec.encode(preview, baseVersion, base) } finally { base.fill(0) }
         }
         if(preview.history!=null) return RecordHistoryPackageCodec.encode(preview)

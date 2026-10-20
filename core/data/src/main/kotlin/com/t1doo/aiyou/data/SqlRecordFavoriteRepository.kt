@@ -83,7 +83,7 @@ internal class SqlRecordFavoriteRepository(private val database: RecordsSqlDatab
             listOf(mutation.entryId, mutation.sourceRevision)).singleOrNull() ?: throw RecordFavoriteUnavailable()
         val text = cells[0] as String; val hash = cells[1] as String
         require(text.length <= 100_000 && OriginalExports.hash(text) == hash)
-        require(text.isNotBlank() || sql.query("SELECT id FROM attachments WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg') LIMIT 1",listOf(mutation.entryId,mutation.sourceRevision)).isNotEmpty())
+        require(text.isNotBlank() || sql.query("SELECT id FROM attachments WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg','audio/wav') LIMIT 1",listOf(mutation.entryId,mutation.sourceRevision)).isNotEmpty())
         if (hash != mutation.sourceHash) throw RecordFavoriteConflict()
     }
 

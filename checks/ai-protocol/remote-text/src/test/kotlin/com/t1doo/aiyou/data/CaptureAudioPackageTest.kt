@@ -160,6 +160,68 @@ class CaptureAudioPackageTest {
             } finally { pack.release() }
         } }
     }
+    @Test fun audioAndEventDateCurrentSelectionAndFullBackupRoundTrip():Unit=runBlocking { datedRoundTrip(0) }
+    @Test fun audioAndEventDateActivitiesSelectionRoundTrip():Unit=runBlocking { datedRoundTrip(1) }
+    @Test fun audioAndEventDateHistoryPeopleAndEditScopesRoundTrip():Unit=runBlocking {
+        for(mode in 2..4)datedRoundTrip(mode)
+    }
+    private suspend fun datedRoundTrip(mode:Int) {
+        FullFixture().use { source -> FullFixture(10+mode).use { target ->
+            val ready=audio(source);source.capture.save(ready,1,"UTC")
+            val date=RecordEventDate("2024-02-29","Pacific/Kiritimati")
+            val (originals,repo)=datedPorts(source)
+            val before=originals.capture(listOf(SourceVersion(ready.id,1)),uuid(),5).records.single()
+            SqlRecordEventDateRepository(source.gateway).set(RecordEventDateMutation(ready.id,1,before.contentHash,0,date,uuid(),before.sourceGeneration))
+            if(mode==4) {
+                source.db.transaction { SqlManualPeopleRepository(source.gateway,source.key).createWithin(it,ready.id,listOf("合成日期人物"),uuid()) }
+                source.edits.write(null,OriginalEditDraft(uuid(),ready.id,1,1,1,"","合成日期编辑"))
+            }
+            val snapshot=originals.capture(listOf(SourceVersion(ready.id,1)),uuid(),10)
+            val preview=when(mode) {
+                0 -> repo.preview(snapshot)
+                1 -> repo.previewActivities(snapshot)
+                2 -> repo.previewHistory(snapshot,false)
+                3 -> repo.previewHistory(snapshot,true)
+                else -> repo.previewEditDrafts(snapshot,true)
+            }
+            val bytes=document(repo.seal(preview,password()))
+            assertEquals("AIYOUPK9",String(bytes.copyOfRange(0,8),Charsets.US_ASCII))
+            val pack=repo.open({bytes.inputStream()},password())
+            try {
+                assertEquals(date,pack.records.single().eventDate);assertEquals(1,pack.audios.size)
+                assertEquals(mode>=2,pack.includesHistory)
+                assertEquals(mode==1 || mode>=3,pack.activities!=null)
+                val copy=uuid();val destination=datedPorts(target).second
+                assertFalse(destination.restore(pack,listOf(copy),20).replayed)
+                assertTrue(destination.restore(pack,listOf(copy),30).replayed)
+                assertEquals(date,SqlRecordEventDateRepository(target.gateway).read(copy).date)
+                assertArrayEquals(CaptureAudioSqlTest.wave(),target.media.read(target.media.list(copy,1).single().intent.id))
+                if(mode==4) {
+                    assertEquals(listOf("合成日期人物"),SqlManualPeopleRepository(target.gateway,target.key).read(copy).names)
+                    assertEquals("合成日期编辑",target.edits.read(copy)!!.text)
+                }
+                if(mode==0) FullFixture(20).use { fullTarget ->
+                    val full=target.backup.capture(uuid(),40)
+                    val fullBytes=try { document(target.backup.seal(full,password())) } finally { full.release() }
+                    val fullPack=fullTarget.backup.open({fullBytes.inputStream()},password())
+                    try {
+                        assertFalse(fullTarget.backup.restore(fullPack){true}.replayed)
+                        assertTrue(fullTarget.backup.restore(fullPack){true}.replayed)
+                        assertEquals(date,SqlRecordEventDateRepository(fullTarget.gateway).read(copy).date)
+                        assertArrayEquals(CaptureAudioSqlTest.wave(),fullTarget.media.read(fullTarget.media.list(copy,1).single().intent.id))
+                    } finally { fullPack.release() }
+                }
+            } finally { pack.release() }
+        } }
+    }
+    private fun datedPorts(f:FullFixture):Pair<SqlOriginalExportRepository,SqlRecordMediaPackageRepository> {
+        val tasks=SqlManualTaskRepository(f.gateway,f.key)
+        val activities=SqlRecordPackageActivities(f.gateway,tasks,SqlTaskProposalRepository(f.gateway,f.key,tasks))
+        val people=SqlManualPeopleRepository(f.gateway,f.key)
+        val originals=SqlOriginalExportRepository(f.gateway,f.tags,people=people)
+        val packages=SqlRecordPackageRepository(f.gateway,f.tags,activities=activities,people=people)
+        return originals to SqlRecordMediaPackageRepository(f.gateway,originals,f.media,packages,activities,f.edits)
+    }
     private suspend fun fails(action:suspend()->Any?) { var failed=false;try { action() } catch(_:Exception) { failed=true };assertTrue("Expected rejection",failed) }
     private suspend fun audio(f:FullFixture,base:CaptureDraft?=null):CaptureDraft {
         val r=CaptureAudioSqlTest.reserve(f.capture,base ?: f.capture.current(),CaptureAudioSqlTest.wave())

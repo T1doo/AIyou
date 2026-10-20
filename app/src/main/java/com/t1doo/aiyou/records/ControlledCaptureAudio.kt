@@ -18,6 +18,7 @@ class ControlledCaptureAudio internal constructor(
     private val enqueue:(suspend(EntryRepository)->Unit)->Boolean,
     private val binding:()->CaptureDraft?,private val install:(CaptureDraft)->Unit,
     private val publish:(CaptureAudioUi)->Unit,private val nanoTime:()->Long=System::nanoTime,
+    private val encodeWave:(ShortArray,Int)->ByteArray=LocalPcmAudio::encode,
 ) {
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
     private val monitor=Any()
@@ -33,6 +34,7 @@ class ControlledCaptureAudio internal constructor(
         @Volatile var deviceFailed=false
         @Volatile var interrupted=false
         @Volatile var reserved=false
+        var abandonRequested=false // Owner actor: explicit consent survives an abandonment ACK loss.
         var openAdmitted=false // monitor orders this admission against stop/cancel/retire.
         var job:Job?=null
         var wave:ByteArray?=null
@@ -118,11 +120,15 @@ class ControlledCaptureAudio internal constructor(
         finally {
             withContext(NonCancellable) {
                 try { input?.close() } catch(_:Exception) { r.deviceFailed=true;r.quarantinedInput=input }
-                try {
-                    if(!r.cancelled && count>0) r.wave=LocalPcmAudio.encode(samples,count)
+                val encoded=try {
+                    if(!r.cancelled && count>0) encodeWave(samples,count) else null
                 } finally { samples.fill(0);scratch.fill(0) }
-                update(r,CaptureAudioUi(if(r.deviceFailed) CaptureAudioPhase.UNKNOWN else CaptureAudioPhase.FINALIZING,count,
-                    if(r.deviceFailed) "录音设备释放尚未确认，不能开始下一段。" else null))
+                synchronized(monitor) {
+                    // Encoding may take time: cancel wins until this single admission boundary.
+                    if(r.cancelled) encoded?.fill(0) else r.wave=encoded
+                    update(r,CaptureAudioUi(if(r.deviceFailed) CaptureAudioPhase.UNKNOWN else CaptureAudioPhase.FINALIZING,count,
+                        if(r.deviceFailed) "录音设备释放尚未确认，不能开始下一段。" else null))
+                }
                 if(!r.deviceFailed) enqueue { store -> settle(store,r) }
             }
         }
@@ -141,27 +147,30 @@ class ControlledCaptureAudio internal constructor(
         enqueue { store ->
             try {
                 val repo=checkNotNull(store.captureRecords);val actual=repo.reconcileAudio(r.reservation)
-                if(actual.sameSnapshot(r.reservation.base) && r.wave!=null && !r.cancelled)
-                    update(r,CaptureAudioUi(CaptureAudioPhase.UNKNOWN,error="此段尚未写入草稿；可重试保存，或明确放弃未写入片段。"))
+                if(actual.audio?.state==CaptureAudioState.FAILED && r.wave!=null && !r.abandonRequested)
+                    update(r,CaptureAudioUi(CaptureAudioPhase.UNKNOWN,error="草稿标记失败，原音仍保留；请明确处理这次未完成保存。"))
+                else if(r.wave!=null && !r.cancelled && (actual.sameSnapshot(r.reservation.base) || actual.audio?.state==CaptureAudioState.WRITING))
+                    update(r,CaptureAudioUi(CaptureAudioPhase.UNKNOWN,error="此段尚未完整写入草稿；可重试保存，或明确放弃未完成片段。"))
                 else finish(store,r,actual)
             } catch(_:Exception) { update(r,CaptureAudioUi(CaptureAudioPhase.UNKNOWN,error="原音保存结果仍待核对，请保留这次操作。")) }
         }
     }
-    /** Explicit discard is permitted only after a strict read proves no audio intent was committed. */
+    /** Explicit discard settles only the base or this reservation's incomplete intent; never READY. */
     fun discardUnwritten() {
         val r=synchronized(monitor) { request?.takeIf { state.phase==CaptureAudioPhase.UNKNOWN && !it.deviceFailed } } ?: return
         enqueue { store ->
-            try {
-                val actual=checkNotNull(store.captureRecords?.peek())
-                require(actual.sameSnapshot(r.reservation.base))
-                r.cancelled=true;r.wave?.fill(0);r.wave=null
-                finish(store,r,actual)
-            } catch(_:Exception) { update(r,CaptureAudioUi(CaptureAudioPhase.UNKNOWN,error="无法确认未写入；请先核对同一次保存。")) }
+            r.abandonRequested=true
+            abandon(store,r)
         }
+    }
+    private suspend fun abandon(store:EntryRepository,r:Request) {
+        try { finish(store,r,checkNotNull(store.captureRecords).abandonAudio(r.reservation)) }
+        catch(_:Exception) { update(r,CaptureAudioUi(CaptureAudioPhase.UNKNOWN,error="放弃结果尚未确认；原音仍保留，请重试或核对同一次放弃。")) }
     }
     private suspend fun settle(store:EntryRepository,r:Request) {
         if(synchronized(monitor) { request!==r })return
         if(r.deviceFailed)throw IllegalStateException("Audio resource closure unconfirmed")
+        if(r.abandonRequested) { abandon(store,r);return }
         try {
             val repo=checkNotNull(store.captureRecords);val g=checkNotNull(gate)
             val wave=r.wave

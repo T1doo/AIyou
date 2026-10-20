@@ -13,6 +13,10 @@ interface CaptureRepository {
     suspend fun reconcileAudio(request: CaptureDraftGate.Reservation): CaptureDraft {
         throw UnsupportedOperationException("Capture audio unavailable")
     }
+    /** Explicit user abandonment of only this reservation's base/incomplete intent, never READY. */
+    suspend fun abandonAudio(request: CaptureDraftGate.Reservation): CaptureDraft {
+        throw UnsupportedOperationException("Capture audio unavailable")
+    }
     suspend fun audio(expected: CaptureDraft): ByteArray { throw UnsupportedOperationException("Capture audio unavailable") }
     suspend fun removeAudio(expected: CaptureDraft): CaptureDraft { throw UnsupportedOperationException("Capture audio unavailable") }
     val supportsProcessingChoice: Boolean get() = false

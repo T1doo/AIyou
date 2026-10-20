@@ -170,6 +170,17 @@ class LocalRecordsViewModel internal constructor(
         }
         result
     }
+    private class CapturePermit(val gate:com.t1doo.aiyou.domain.CaptureDraftGate,
+        val mutation:com.t1doo.aiyou.domain.CaptureDraftGate.Mutation)
+    private fun captureUi(action:()->Unit) {
+        val gate=repository?.captureRecords?.mutationGate
+        if(gate==null)action() else gate.uiMutation(action)
+    }
+    private fun submitCapture(command:(CapturePermit?)->Command) {
+        val gate=repository?.captureRecords?.mutationGate
+        val permit=if(gate==null)null else CapturePermit(gate,gate.admit() ?: return)
+        if(submit(command(permit)).isFailure)permit?.mutation?.close()
+    }
     internal fun enqueueTaskOperation(action:suspend (EntryRepository)->Unit)=submit(Command.ManualTasks(action)).isSuccess
     internal fun enqueuePackageOperation(action:suspend (EntryRepository)->Unit)=submit(Command.RecordPackage(action)).isSuccess
 
@@ -325,6 +336,7 @@ class LocalRecordsViewModel internal constructor(
                 for (command in commands) {
                     val previousEntries = mutableState.value.entries
                     try {
+                        val dispatch:suspend ()->Unit = dispatch@ {
                         if(command is Command.Save || command is Command.Revise ||
                             command is Command.RecordPackage || command is Command.RecycleBin ||
                             command is Command.MixedCapture || command is Command.Retry || command is Command.RefreshSearch) factRecaps.invalidate()
@@ -342,7 +354,7 @@ class LocalRecordsViewModel internal constructor(
                                 }
                             }
                             is Command.Save -> {
-                                if (pendingIntent.get() !== command.intent) continue
+                                if (pendingIntent.get() !== command.intent) return@dispatch
                                 val store = checkNotNull(repository)
                                 val draft = pendingCommit ?: persistedDraft?.takeIf { !captureDraftMayBeConsumed && it.text == command.intent.text }
                                     ?: store.updateDraft(command.intent.text)
@@ -428,9 +440,13 @@ class LocalRecordsViewModel internal constructor(
                             Command.RebuildIndex -> try { rebuildLocalIndex() } finally { indexRebuildQueued.set(false) }
                             Command.RefreshSearch -> try { refreshSearchSource() } finally { searchRefreshQueued.set(false) }
                         }
+                        }
+                        val permit=command.capturePermit
+                        if(permit==null)dispatch() else permit.gate.context(permit.mutation,dispatch)
                     } catch (failure: CancellationException) { throw failure }
                     catch (failure: Exception) { failed(failure, preserveQueuedSave = command is Command.Edit) }
                     finally {
+                        command.capturePermit?.mutation?.close()
                         if (previousEntries != mutableState.value.entries || command is Command.LocalProcessing ||
                             command is Command.Retry || command is Command.RefreshSearch) refreshProcessingVersions()
                         ai.reconcileRecords()
@@ -573,7 +589,9 @@ class LocalRecordsViewModel internal constructor(
     fun stopAiSession(sessionId: Long) = ai.stop(sessionId)
     fun closeAiSession(sessionId: Long) = ai.leave(sessionId)
 
-    fun changeText(text: String) {
+    fun changeText(text: String) { captureUi { changeTextOwned(text) } }
+
+    private fun changeTextOwned(text: String) {
         val current = mutableState.value
         if (editsDisposed || !current.ready || current.opening || current.saving || current.savePending || current.captureDiscard?.busy == true || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         if (text.length > EncryptedEntryRepository.MAX_TEXT_LENGTH) {
@@ -586,18 +604,22 @@ class LocalRecordsViewModel internal constructor(
         val generation = editGeneration.incrementAndGet()
         discardIntent = null
         update { it.copy(text = text, draftNotice = "正在保存草稿", saveNotice = null, inputNotice = null, captureDiscard = null) }
-        submit(Command.Edit(text, generation))
+        submitCapture { Command.Edit(text, generation,it) }
     }
 
-    fun save() {
+    fun save() { captureUi { saveOwned() } }
+
+    private fun saveOwned() {
         val current = mutableState.value
         if (editsDisposed || !current.ready || current.captureDiscard != null || current.saving || current.text.isBlank() || current.originalEdit != null || current.originalHistory != null || attachments.state.value != null) return
         val intent = pendingIntent.get() ?: SaveIntent(current.text, editGeneration.get()).also { pendingIntent.set(it) }
         update { it.copy(saving = true, savePending = true, saveNotice = null, error = null, inputNotice = null) }
-        submit(Command.Save(intent))
+        submitCapture { Command.Save(intent,it) }
     }
 
-    fun retry() {
+    fun retry() { captureUi { retryOwned() } }
+
+    private fun retryOwned() {
         val current = mutableState.value
         if (current.captureDiscard != null) return
         if (current.editDraftError != null && current.ready) {
@@ -608,7 +630,7 @@ class LocalRecordsViewModel internal constructor(
             if (!current.ready || current.opening || current.error == null || current.originalEdit?.saving == true) return
             // Recover the prior capture write without replacing this editor or routing through changeText.
             update { it.copy(opening = true) }
-            submit(Command.RecoverDraft(current.text, editGeneration.get()))
+            submitCapture { Command.RecoverDraft(current.text, editGeneration.get(),it) }
         } else if (!current.ready && !current.opening) {
             update { it.copy(opening = true, error = null) }
             submit(Command.Retry)
@@ -616,7 +638,9 @@ class LocalRecordsViewModel internal constructor(
         else if (mutableState.value.ready) changeText(mutableState.value.text)
     }
 
-    fun requestCaptureDiscard() {
+    fun requestCaptureDiscard() { captureUi { requestCaptureDiscardOwned() } }
+
+    private fun requestCaptureDiscardOwned() {
         val current = mutableState.value
         if (editsDisposed || !current.ready || current.opening || current.saving || current.savePending ||
             current.text.isEmpty() || current.captureDiscard != null || current.originalEdit != null ||
@@ -626,7 +650,9 @@ class LocalRecordsViewModel internal constructor(
         update { it.copy(captureDiscard = CaptureDiscardUiState(intent.id)) }
     }
 
-    fun cancelCaptureDiscard(requestId: Long) {
+    fun cancelCaptureDiscard(requestId: Long) { captureUi { cancelCaptureDiscardOwned(requestId) } }
+
+    private fun cancelCaptureDiscardOwned(requestId: Long) {
         val active = mutableState.value.captureDiscard ?: return
         if (active.requestId != requestId || active.busy) return
         if (active.recoveryRequired && !active.recoveryFailed) {
@@ -638,7 +664,9 @@ class LocalRecordsViewModel internal constructor(
             draftNotice = if (active.recoveryFailed) "当前输入未确认保存在本机，退出应用可能丢失。" else it.draftNotice) }
     }
 
-    fun confirmCaptureDiscard(requestId: Long) {
+    fun confirmCaptureDiscard(requestId: Long) { captureUi { confirmCaptureDiscardOwned(requestId) } }
+
+    private fun confirmCaptureDiscardOwned(requestId: Long) {
         val current = mutableState.value
         val active = current.captureDiscard ?: return
         val intent = discardIntent ?: return
@@ -646,7 +674,7 @@ class LocalRecordsViewModel internal constructor(
             intent.generation != editGeneration.get() || intent.text != current.text) return
         if (active.recoveryFailed) { queueCaptureRecovery(requestId); return }
         update { it.copy(captureDiscard = active.copy(busy = true, error = null)) }
-        submit(Command.DiscardCapture(intent))
+        submitCapture { Command.DiscardCapture(intent,it) }
     }
 
     private fun queueCaptureRecovery(requestId: Long) {
@@ -656,7 +684,7 @@ class LocalRecordsViewModel internal constructor(
         if (editsDisposed || active.requestId != requestId || active.busy || intent.id != requestId ||
             intent.generation != editGeneration.get() || intent.text != current.text || !active.recoveryRequired) return
         update { it.copy(captureDiscard = active.copy(busy = true, recovering = true, error = null)) }
-        submit(Command.RestoreCapture(intent))
+        submitCapture { Command.RestoreCapture(intent,it) }
     }
 
     private suspend fun restoreCapture(intent: DiscardIntent) {
@@ -1450,6 +1478,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     private sealed interface Command {
+        val capturePermit:CapturePermit? get()=null
         data class ReminderRuntime(val action:suspend ()->Unit):Command
         data class LocalProcessing(val action: suspend (EntryRepository) -> Unit) : Command
         data class FactRecap(val action: suspend (EntryRepository) -> Unit) : Command
@@ -1475,12 +1504,12 @@ class LocalRecordsViewModel internal constructor(
         data class ReleaseEdit(val sessionId: Long) : Command
         data class MixedCapture(val action: suspend (EntryRepository) -> Unit) : Command
         data class Attachment(val action: suspend (EntryRepository) -> Unit) : Command
-        data class Edit(val text: String, val generation: Long) : Command
-        data class Save(val intent: SaveIntent) : Command
-        data class DiscardCapture(val intent: DiscardIntent) : Command
-        data class RestoreCapture(val intent: DiscardIntent) : Command
+        data class Edit(val text: String, val generation: Long, override val capturePermit:CapturePermit? = null) : Command
+        data class Save(val intent: SaveIntent, override val capturePermit:CapturePermit? = null) : Command
+        data class DiscardCapture(val intent: DiscardIntent, override val capturePermit:CapturePermit? = null) : Command
+        data class RestoreCapture(val intent: DiscardIntent, override val capturePermit:CapturePermit? = null) : Command
         data object Retry : Command
-        data class RecoverDraft(val text: String, val generation: Long) : Command
+        data class RecoverDraft(val text: String, val generation: Long, override val capturePermit:CapturePermit? = null) : Command
         data class Revise(val sessionId: Long, val entryId: String, val expectedRevision: Int, val text: String) : Command
         data class ReadHistory(val sessionId: Long, val requestId: Long) : Command
     }

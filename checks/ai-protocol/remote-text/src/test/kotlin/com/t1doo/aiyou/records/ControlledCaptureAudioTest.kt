@@ -161,6 +161,63 @@ class ControlledCaptureAudioTest {
             } finally { release.countDown();vm.clearForHostTest();withTimeout(4000) { vm.awaitAppAccessClosed() } }
         }
     }
+    @Test fun incompleteRealSqlWriteReconciliationKeepsWaveAndSameIntentRetryable():Unit=runBlocking {
+        Harness().use { h ->
+            h.start();val base=h.repo.peek()!!
+            h.f.mediaCheckpoint={if(it=="created")error("synthetic partial ciphertext")}
+            assertTrue(h.c.audioCapture.start({Input()}));h.await(CaptureAudioPhase.UNKNOWN)
+            val writing=h.repo.peek()!!;assertEquals(CaptureAudioState.WRITING,writing.audio!!.state)
+            h.f.mediaCheckpoint={};h.c.audioCapture.reconcile();h.drain()
+            assertEquals(CaptureAudioPhase.UNKNOWN,h.ui.audio.phase);assertTrue(h.repo.mutationGate.frozen)
+            h.c.audioCapture.retry();h.await(CaptureAudioPhase.READY)
+            val ready=h.repo.peek()!!;assertEquals(writing.audio!!.intent,ready.audio!!.intent)
+            assertEquals(base.version+2,ready.version);assertArrayEquals(CaptureAudioSqlTest.wave(),h.repo.audio(ready))
+        }
+    }
+    @Test fun incompleteRealSqlWriteCanOnlyDiscardWaveAfterExplicitDurableAbandonment():Unit=runBlocking {
+        Harness().use { h ->
+            h.start();h.f.mediaCheckpoint={if(it=="created")error("synthetic partial ciphertext")}
+            assertTrue(h.c.audioCapture.start({Input()}));h.await(CaptureAudioPhase.UNKNOWN)
+            val writing=h.repo.peek()!!;h.f.mediaCheckpoint={};h.c.audioCapture.reconcile();h.drain()
+            assertEquals(CaptureAudioPhase.UNKNOWN,h.ui.audio.phase)
+            h.f.mediaCheckpoint={if(it=="package-cleaned")error("synthetic lost cleanup ACK")}
+            h.c.audioCapture.discardUnwritten();h.drain()
+            assertEquals(CaptureAudioPhase.UNKNOWN,h.ui.audio.phase);assertTrue(h.repo.mutationGate.frozen)
+            assertEquals(CaptureAudioState.WRITING,h.repo.peek()!!.audio!!.state)
+            h.f.mediaCheckpoint={};h.c.audioCapture.retry();h.await(CaptureAudioPhase.FAILED)
+            assertEquals(writing.audio!!.intent,h.repo.peek()!!.audio!!.intent)
+            assertFalse(h.repo.mutationGate.frozen)
+            assertTrue(h.f.mediaRoot.listFiles().orEmpty().none { it.name.endsWith(".aead") || it.name.endsWith(".tmp") })
+        }
+    }
+    @Test(timeout=10000) fun cancelDuringEncodingDiscardsWaveBeforeAnyAudioIntentOrFileWrite():Unit=runBlocking {
+        Harness().use { h ->
+            h.start();val base=h.repo.peek()!!;val encoding=CountDownLatch(1);val release=CountDownLatch(1)
+            val audio=h.audio { samples,count ->
+                encoding.countDown();check(release.await(3,TimeUnit.SECONDS));LocalPcmAudio.encode(samples,count)
+            }
+            try {
+                assertTrue(audio.start({Input()}));h.drain();assertTrue(encoding.await(3,TimeUnit.SECONDS))
+                audio.cancel();assertTrue(h.repo.mutationGate.frozen);assertNull(h.repo.peek()!!.audio)
+                release.countDown()
+                withTimeout(4000) { while(h.queue.isEmpty())delay(5) };h.drain()
+                assertEquals(CaptureAudioPhase.IDLE,h.ui.audio.phase)
+                assertTrue(base.sameSnapshot(h.repo.peek()!!));assertFalse(h.repo.mutationGate.frozen)
+                assertTrue(h.f.mediaRoot.listFiles().orEmpty().none { it.name.endsWith(".aead") })
+            } finally { release.countDown();audio.closeAndFinalize(h.store) }
+        }
+    }
+    @Test fun cancelAfterFinalizingAdmissionCannotRetractConfirmedSave():Unit=runBlocking {
+        Harness().use { h ->
+            h.start();val audio=h.audio(LocalPcmAudio::encode)
+            try {
+                assertTrue(audio.start({Input()}));h.drain()
+                withTimeout(4000) { while(h.ui.audio.phase!=CaptureAudioPhase.FINALIZING || h.queue.isEmpty())delay(5) }
+                audio.cancel();h.drain();assertEquals(CaptureAudioPhase.READY,h.ui.audio.phase)
+                assertArrayEquals(CaptureAudioSqlTest.wave(),h.repo.audio(h.repo.peek()!!))
+            } finally { audio.closeAndFinalize(h.store) }
+        }
+    }
     private class Input(val waiting:Boolean=false,val closed:()->Unit={}):ControlledPcmInput {
         private var sent=false
         override fun read(samples:ShortArray):Int {
@@ -200,6 +257,11 @@ class ControlledCaptureAudioTest {
             {action->if(acceptQueue){queue.add(action);true}else false},
             {object:AttachmentPicture{override val width=1;override val height=1}},Clock.systemUTC())
         val ui get()=local.mixedCapture!!
+        fun audio(encode:(ShortArray,Int)->ByteArray)=ControlledCaptureAudio(
+            {ui},{true},{action->if(acceptQueue){queue.add(action);true}else false},{ui.draft},
+            {draft->synchronized(uiLock){local=local.copy(mixedCapture=ui.copy(draft=draft,text=draft.text))}},
+            {audio->synchronized(uiLock){local=local.copy(mixedCapture=ui.copy(audio=audio))}},encodeWave=encode
+        ).also { it.attach(checkNotNull(store.captureRecords)) }
         suspend fun start()=c.initialize(store)
         suspend fun drain() { while(true) { val action=queue.poll() ?: break;action(store) } }
         suspend fun await(phase:CaptureAudioPhase)=withTimeout(5000) { while(ui.audio.phase!=phase) { drain();delay(5) } }

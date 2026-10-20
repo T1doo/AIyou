@@ -67,12 +67,15 @@ class CaptureAudioSqlTest {
             repo.mutationGate.retire()
         }
     }
-    @Test fun interruptedCiphertextBecomesKnownFailedThenExplicitRemovalIsReplaySafe():Unit=runBlocking {
+    @Test fun incompleteCiphertextStaysRetryableUntilExplicitAbandonmentThenRemovalIsReplaySafe():Unit=runBlocking {
         FullFixture().use { f ->
             val repo=f.capture;val base=repo.current();val r=reserve(repo,base,wave())
             f.mediaCheckpoint={if(it=="created")error("synthetic incomplete ciphertext")}
             fails { repo.addAudio(r,wave()) };f.mediaCheckpoint={}
-            val failed=repo.reconcileAudio(r);assertEquals(CaptureAudioState.FAILED,failed.audio!!.state)
+            val writing=repo.reconcileAudio(r);assertEquals(CaptureAudioState.WRITING,writing.audio!!.state)
+            assertEquals(base.version+1,writing.version);assertTrue(repo.mutationGate.frozen)
+            val failed=repo.abandonAudio(r);assertEquals(CaptureAudioState.FAILED,failed.audio!!.state)
+            assertTrue(failed.sameSnapshot(repo.abandonAudio(r)))
             repo.mutationGate.finish(r,failed);fails { repo.audio(failed) }
             val removed=repo.removeAudio(failed);assertNull(removed.audio)
             assertTrue(repo.removeAudio(failed).sameSnapshot(removed))
@@ -126,6 +129,23 @@ class CaptureAudioSqlTest {
             var published=false;assertTrue(repo.publishCurrent(snapshot){published=true});assertTrue(published)
             f.db.transaction { it.execute("UPDATE attachments SET state='CORRUPT' WHERE id=?",listOf(ready.audio!!.intent.id)) }
             assertFalse(repo.publishCurrent(snapshot){fail("Stale audio evidence published")})
+        }
+    }
+    @Test fun pureAudioFavoriteAndRecycleRoundTripKeepOriginalIdentityAndBytes():Unit=runBlocking {
+        FullFixture().use { f ->
+            val base=f.capture.current();val r=reserve(f.capture,base,wave());val ready=f.capture.addAudio(r,wave())
+            f.capture.mutationGate.finish(r,ready);f.capture.save(ready,100,"UTC")
+            val original=SqlOriginalExportRepository(f.gateway,f.tags).capture(listOf(SourceVersion(ready.id,1)),UUID.randomUUID().toString(),101).records.single()
+            val favorites=SqlRecordFavoriteRepository(f.gateway)
+            assertTrue(favorites.set(RecordFavoriteMutation(ready.id,1,original.contentHash,0,true,UUID.randomUUID().toString(),original.sourceGeneration)).isFavorite)
+            val bin=SqlRecycleBinRepository(f.gateway,f.tags);val before=bin.read(ready.id)
+            val trash=RecycleMutation(SourceVersion(ready.id,1),before.generation,false,UUID.randomUUID().toString())
+            val deleted=bin.apply(trash);assertTrue(deleted.deleted);assertTrue(bin.apply(trash).deleted)
+            assertEquals(listOf(ready.id),bin.records().map { it.entry.id })
+            val restore=RecycleMutation(SourceVersion(ready.id,1),deleted.generation,true,UUID.randomUUID().toString())
+            assertFalse(bin.apply(restore).deleted);assertFalse(bin.apply(restore).deleted)
+            assertTrue(favorites.read(ready.id).isFavorite);assertEquals(1,bin.read(ready.id).attachmentCount)
+            assertArrayEquals(wave(),f.media.read(ready.audio!!.intent.id))
         }
     }
     private suspend fun fails(action:suspend()->Any?) { var thrown=false;try { action() } catch(_:Exception) { thrown=true };assertTrue("Expected rejection",thrown) }

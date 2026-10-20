@@ -57,7 +57,7 @@ internal class SqlRecycleBinRepository(private val database: RecordsSqlDatabase,
             ?: throw RecycleConflict()
         val text = row[2] as String
         require(text.length <= 100_000 && OriginalExports.hash(text) == row[3])
-        require(text.isNotBlank() || sql.query("SELECT id FROM attachments WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg') LIMIT 1",listOf(id,row[1])).isNotEmpty())
+        require(text.isNotBlank() || sql.query("SELECT id FROM attachments WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg','audio/wav') LIMIT 1",listOf(id,row[1])).isNotEmpty())
         ZoneId.of(row[5] as String)
         val deleted = row[8] as Long; require(deleted in 0..1)
         val entry = StoredEntry(row[0] as String, Math.toIntExact(row[1] as Long), text, row[4] as Long,

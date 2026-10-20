@@ -51,9 +51,28 @@ internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,pri
                 actual.sameSnapshot(writing) -> {
                     val complete=media.recoverCapture(intent)
                     if(complete) media.readCapture(intent).also { try { LocalPcmAudio.inspect(it) } finally { it.fill(0) } }
-                    database.transaction { sql -> same(writing,required(sql,base.id));replace(sql,writing,if(complete) ready else failed) }
+                    // The active owner may still hold the only complete waveform in RAM.
+                    // Do not consume its retry position just because ciphertext is incomplete.
+                    database.transaction { sql -> same(writing,required(sql,base.id));if(complete) replace(sql,writing,ready) else writing }
                 }
                 else -> throw CaptureConflict()
+            }
+        }
+    }
+    override suspend fun abandonAudio(request:CaptureDraftGate.Reservation):CaptureDraft = safely {
+        mutationGate.audioWrite(request) {
+            val base=mutationGate.requireReserved(request);val intent=mutationGate.intent(request)
+            val writing=next(base,audio=CaptureDraftAudio(intent,CaptureAudioState.WRITING))
+            val failed=next(writing,audio=CaptureDraftAudio(intent,CaptureAudioState.FAILED))
+            val actual=database.transaction { sql ->
+                val actual=required(sql,base.id);require(!SqlErasureFileHooks.fenced(sql,base.id))
+                require(actual.sameSnapshot(base) || actual.sameSnapshot(writing) || actual.sameSnapshot(failed));actual
+            }
+            if(actual.sameSnapshot(base)) actual else {
+                media.cleanupPackage(listOf(intent))
+                database.transaction { sql ->
+                    same(actual,required(sql,base.id));if(actual.sameSnapshot(writing)) replace(sql,writing,failed) else failed
+                }
             }
         }
     }
