@@ -25,7 +25,8 @@
 回忆/原文详情按版本播放同一原音；备份恢复后仍可播放，删除遵守现有传播链。
 
 最多一段 60 秒原音/草稿；加入原音后与图片合计最多 20 个附件、64 MiB，单个附件仍不超过 16 MiB。
-已有音频须先明确移除再重录，不静默替换。录音时暂停选图、正文保存、清空与处理范围变更，正文和既有素材保留。
+已有音频须先明确移除再重录，不静默替换。从开始前的冻结排空到录音、最终化及结果未知期间，
+冻结正文编辑、附件增删/重试、保存、清空、范围变更及会替换草稿的恢复；正文和既有素材保留。下文规定命令准入和 actor 校验，不能只禁用按钮。
 纯音频记录允许空正文，但必须存在本版本已完整认证的原音；列表显示“音频记录”，不生成虚构转写或检索词。
 失败提示留在录音卡片；拒绝/撤销许可或硬件不可用仍可继续文字、图片输入。
 
@@ -58,6 +59,51 @@
 每次录音绑定不可变 `(records owner, draft id/version, route generation, request id)`；许可结果不是录音授权的替身。
 旧许可回调、旧路由、换 owner、清空后的旧草稿不能开麦或写入新草稿；获许可后也不自动开始，必须有新的明确点击。
 初次启动不弹许可，返回设置不自动开始，无后台/长录音/前台服务。
+
+### 开始前排空与草稿版本保留（父侧 P2 修正）
+
+基线 `MixedCaptureController.edit` 先改 UI text、增加 pendingEdits，再排 actor 调用 repo.edit 推进版本。
+因此不能在点击时把当时的 `draft.version` 当作录音最终版本，也不能仅凭 pendingEdits 一次取值开始采集。
+本设计选择冻结全部其他草稿变更，不采用正文可并行推进版本的方案：
+
+1. 权限待定时尚不保留草稿，仍可正常编辑；权限返回不会开麦。已获许可后新的“开始”点击，
+   在 owner 的同一命令准入边界原子建立唯一 `PREPARING` reservation，冻结新变更并截取已接收的草稿 mutation 序号上界及可见 text。
+   每个草稿变更的 optimistic UI 更新和命令接收也必须在该准入边界一起决定；因冻结被拒绝的编辑不得先改 UI text。
+   普通队列失败仍按既有合同保留用户输入并标未确认，不能为开始录音而清掉或伪造这次编辑成功。
+   此时只保留 owner/draft id/request/route 和冻结序号，**不绑定点击时的旧版本，也不开麦**。
+2. 在同一 VM actor 排入排空 barrier。冻结前已接收、序号不大于上界的命令先按原语义真实结算，包括 SQL 回执和 pendingEdits 更新；
+   PREPARING 不能因“已冻结”拒绝这些已准入的正文编辑。后到的旧 picker/重试/恢复 callback 没有新的写资格。
+   起始若有选图、保存/清空/范围待核对、附件非 READY 或恢复操作在途，直接拒绝开始；不把未完成工作迁入录音 session。
+3. barrier 执行时必须已排空该前缀，pendingEdits=0，且没有失败/未知变更、未结算回执或新的 optimistic edit。
+   在短 SQL 读取中**不创建/修复草稿**，核对当前 id、完整持久草稿与 actor binding 一致，
+   以及冻结的可见 text = 当前 UI text = 持久 text。失败则撤销这次 reservation、保留输入和原操作恢复入口，不开麦，不自动重发编辑。
+   不在 actor 内轮询/await 一个还需要同一 actor 才能完成的编辑 ACK。
+4. 同一 actor 及已冻结的变更准入边界内，核对 owner/request/route 仍有效，将读回的最终版本和完整草稿快照原子发布为 `RESERVED`。
+   SQL 读取与保留发布之间没有其他获准草稿写者；不持准入 guard 等 SQL，也不通过先释放冻结再二次读取模拟原子性。
+   麦克风 STARTING 只接受这份已确认 reservation，真正创建/启动前再查当前前台、许可和相同身份。
+5. 冻结覆盖 PREPARING、RESERVED、STARTING、RECORDING、FINALIZING、UNKNOWN，直到设备释放及本段结算都得到确认。
+   每个入口在 optimistic UI 更新/入队前检查，actor 在任何 SQL/文件变更前再次校验命令的 owner、draft、序号与 reservation。
+   barrier 之前只允许上述已接收前缀；barrier 之后拒绝所有其他草稿变更，不能以更新 binding、自动 rebase 或忽略 version 来容忍迟到编辑。
+   旧 ACK 不能回填当前 binding、覆写冻结 UI 或重复递减已结算 pendingEdits。
+
+唯一例外是本 reservation 的音频最终化/同一次核对：以保留的完整草稿作首次 CAS，只能增加本段确定 intent 的音频 WRITING/READY 状态。
+如果其内部步骤推进版本，必须记录并核对同一 intent/回执所产生的确切后继快照；正文、图片、范围及其他字段保持冻结快照一致。
+未知结果只读回同一 intent 和回执，不调用会推进其他附件的通用 recover，不从“版本变大了”推断是自己的写入。
+成功读回或明确取消/未执行后，原子安装已确认后继快照再解除冻结；UNKNOWN 不准开始新编辑、清空或第二段录音。
+退出前只释放自己的 reservation；不能清空另一个请求的冻结，也不能为解锁而覆盖/清理结果未知的原音。
+重启读到音频未结算状态时先核对持久 intent/回执，不能因内存 reservation 已不存在就视为 IDLE；不能自动开麦或重放已丢失的 RAM 片段。
+
+| 必须核对的变更入口 | 冻结期间的准入与 actor/存储校验 |
+| --- | --- |
+| `edit`、save 内补写正文、legacy Edit/Save/RecoverDraft/DiscardCapture | 同一 owner 下凡会写/消费当前草稿都受冻结门约束；旧入口不能绕过 MixedCapture。仅排空前缀可在 barrier 前完成。 |
+| select/selected/retryImage/commitImage、remove、音频新增/移除、metadata | 开始时排除在途选择/写入；冻结后拒绝新动作和迟到 callback，文件写入前复核资格，不能先落文件后才检查 UI。 |
+| request/confirm/cancelDiscard、pendingSave、change/retry/readCurrentPolicy | 冻结前排除待确认状态；冻结后不清空、不换草稿、不重放旧确认，不修改范围或恢复 binding。停止/取消录音仍有独立入口。 |
+| refresh/recover/initialize/reconcile、adoptFullRestore | `current()`/recover 可能创建或推进状态，不能视作纯读绕门；已保留时只读同一快照，不替换 binding 或修复其他附件。初始化恢复必须在开放开始录音前结束。 |
+| 选择包/完整备份恢复及其重试、onFullRestored | 不能只依赖 hasFullBackupInput 或页面预检；命令入队及真正恢复提交前核同一 owner 的冻结门。冻结时拒绝会替换/删除 CAPTURE_CURRENT 的恢复，包括旧确认回调。 |
+| 清空/删除/回收/永久删除及文件清理 | 任何会触碰保留 draft id、其 intent、创建登记或删除 fence 的路径先拒绝，不能先删文件再发现冻结；不相关记录操作仍沿用原资格。强制退休只执行下面已准入音频的收尾与抹除规则。 |
+
+以上是同一生产 owner 的所有草稿写者必须遵守的合同；repository CAS、完整快照与删除 fence 仍是提交边界，UI 状态不能代替它们。
+不为了录音持有长 SQL 事务或 D07 执行锁。异常外部变化不能被重绑定到新草稿；它是明确冲突，不是把正常迟到 edit ACK 当成丢弃整段的理由。
 
 | 状态/事件 | 必须处理 |
 | --- | --- |
@@ -117,6 +163,8 @@
 | 因果验收 | 必须证据 |
 | --- | --- |
 | 无许可/无设备/初始化失败、旧许可回调 | 不开麦、不建附件，不丢正文/图片；页面给可继续操作。 |
+| 正文输入后立即开始、迟到编辑 ACK | 受控 actor 屏障复现 pendingEdits>0 和持久版本推进：先排空并核 UI/持久 text，再绑定最终版本；录音结束不因正常旧 ACK 清零原音。编辑失败/未知或文本不一致时不开麦，保留输入。 |
+| 草稿冻结绕过 UI | 直接调用正文、附件增删/重试、清空、范围、refresh/recover、恢复/删除命令及旧 callback；actor/提交前拒绝，不落文件/SQL，不改变冻结 UI/binding。最终化 UNKNOWN 同样冻结。 |
 | 分片/空读/错误/最大样本、格式边界 | 实际 canonical WAV 和独立样本夹具一致；长度/样本/EOF/溢出/多余数据均校验，不用只有实现镜像的断言。 |
 | 结束/取消/ON_STOP/退休竞争 | 一次停止结算、最多一次发布；原 owner 关闭前实际排空，旧会话不写新草稿。 |
 | 文件与 SQL 各持久点失败/回执丢失 | 真 SQL/JCA、冷重开、同 intent 重试；未完整认证不 READY、不重复记录，不清其他素材。 |

@@ -81,6 +81,30 @@
     "app/src/main/java/com/t1doo/aiyou/records/LocalRecordsViewModel.kt": {
       "bytes": 101180,
       "sha256": "959ba5eb73f8a96a74b59bf445e323b319e5e00cbea306b93467ffca1120b05b"
+    },
+    "app/src/main/java/com/t1doo/aiyou/records/RecordPackageController.kt": {
+      "bytes": 40080,
+      "sha256": "ef8c05329e3d7b4527979054f64dcbb2a036e38a3884dfebd3a75859ecb932ad"
+    },
+    "app/src/main/java/com/t1doo/aiyou/records/RecycleBinController.kt": {
+      "bytes": 18339,
+      "sha256": "612e09e79c4f6ad800d24581b142441017e19fdfc4291c1513001868b467428c"
+    },
+    "core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedEntryRepository.kt": {
+      "bytes": 22706,
+      "sha256": "0ba51d1fd1131f8bf7f3f5bb053bb100e1179feda74cf474db07687ddc27ef77"
+    },
+    "core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlPermanentErasureRepository.kt": {
+      "bytes": 15871,
+      "sha256": "ad9979a0215b40463d0796a90c12f5b8f140ff64503a85599f5606a2d3ed1cef"
+    },
+    "core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlRecordMediaPackageRepository.kt": {
+      "bytes": 26524,
+      "sha256": "8efb71dd426e9b889618ad790cbd6fca139d6ccadff7babc834f588538ab9a92"
+    },
+    "core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlRecordPackageRepository.kt": {
+      "bytes": 26641,
+      "sha256": "fb119030d19d977ee44a437dc3cad2f51c4f69958496ba6bacea6d0bd60fea46"
     }
   },
   "observations": {
@@ -129,5 +153,48 @@
     "https://developer.android.com/reference/android/media/AudioTrack",
     "https://developer.android.com/reference/android/media/MediaRecorder",
     "https://developer.android.com/media/platform/mediarecorder"
-  ]
+  ],
+  "review_revision": {
+    "prior_design_sha": "cdd2a0c0f2fd7af095c114a0e105e8a47f8ad3f0",
+    "finding": "Parent independent review P2: edit updates UI before actor advances durable draft version; a late pre-start edit ACK could invalidate a recording tied to the clicked version.",
+    "resolution": "Freeze admission before draining accepted mutation prefix; actor verifies pendingEdits=0, visible/UI/persisted text and full snapshot before reserving final version. Freeze all other draft changes through UNKNOWN, with actor/commit checks.",
+    "implementation_changed": false,
+    "new_tests_or_ci": false,
+    "independent_ack": "NOT YET RECEIVED for this revision"
+  },
+  "reviewed_mutation_paths": {
+    "text": [
+      "MixedCaptureController.edit",
+      "MixedCaptureController.save inline repo.edit",
+      "LocalRecordsViewModel legacy Edit/Save/RecoverDraft/DiscardCapture"
+    ],
+    "attachments": [
+      "select/selected/retryImage/commitImage/remove",
+      "future audio add/remove",
+      "metadata selection"
+    ],
+    "clear_and_policy": [
+      "request/confirm/cancelDiscard",
+      "pendingSave retry",
+      "changePolicy/retryPolicy/readCurrentPolicy"
+    ],
+    "recovery": [
+      "refresh/recover/initialize/reconcile",
+      "adoptFullRestore",
+      "EncryptedEntryRepository.recover",
+      "RecordPackageController full restore and retry",
+      "SqlFullBackupRepository CAPTURE_CURRENT replacement"
+    ],
+    "deletion": [
+      "capture remove/discard",
+      "RecycleBinController",
+      "SqlPermanentErasureRepository and attachment creation/deletion fences"
+    ],
+    "enforcement": [
+      "shared command admission including optimistic UI freeze decision",
+      "actor pre-mutation identity/sequence/reservation validation",
+      "actual restore/destructive commit check",
+      "existing repository full-snapshot CAS and deletion fence"
+    ]
+  }
 }
