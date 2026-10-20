@@ -1,5 +1,8 @@
 # D03 受控原音：独审四项 P2 修订候选
 
+后续父侧复审发现放弃后的 reconcile 仍可转 READY；本轮1369/41项不覆盖该遗漏。
+残留 P2 的最小修订及新精确产品定向结果见[放弃后核对分流](D03_ABANDON_RECONCILE_REVIEW.md)，实现 ACK 仍待确认。
+
 接续未获实现 ACK 的 `94905dfa0fb346864d2cd5602221d8adf15e6099`。本片不推送、不启动 CI，不新增权限、录音/播放 adapter、SDK、凭据或模型调用。
 
 1. 编码在 monitor 外进行。编码返回后，接纳/清零波形与转换 FINALIZING 在同一个 cancel monitor 仲裁。
