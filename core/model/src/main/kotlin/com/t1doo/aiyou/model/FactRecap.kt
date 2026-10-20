@@ -18,14 +18,16 @@ data class FactRecapRange(val date: LocalDate, val period: FactRecapPeriod, val 
 }
 
 data class FactRecapImage(val intent: AttachmentIntent, val state: AttachmentState)
+data class FactRecapAudio(val intent: AttachmentIntent, val state: AttachmentState)
 
 /** Bounded original excerpt; never an invented summary or an image interpretation. */
 data class FactRecapCard(val source: SourceVersion, val capturedAtMillis: Long, val captureZone: String,
     val contentHash: String, val sourceGeneration: Long, val excerpt: String, val hasMore: Boolean,
-    val tags: ManualTagSnapshot, val images: List<FactRecapImage>, val policy: ProcessingPolicy) {
+    val tags: ManualTagSnapshot, val images: List<FactRecapImage>, val policy: ProcessingPolicy,
+    val audios: List<FactRecapAudio> = emptyList()) {
     fun same(other: FactRecapCard)=source==other.source && capturedAtMillis==other.capturedAtMillis &&
         captureZone==other.captureZone && contentHash==other.contentHash && sourceGeneration==other.sourceGeneration &&
         excerpt==other.excerpt && hasMore==other.hasMore && tags.version==other.tags.version &&
-        tags.names==other.tags.names && images==other.images && policy==other.policy
+        tags.names==other.tags.names && images==other.images && audios==other.audios && policy==other.policy
     override fun toString()="FactRecapCard(redacted)"
 }

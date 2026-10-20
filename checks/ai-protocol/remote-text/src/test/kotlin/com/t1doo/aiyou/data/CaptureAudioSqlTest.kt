@@ -101,6 +101,33 @@ class CaptureAudioSqlTest {
             assertFalse(entered);assertTrue(base.sameSnapshot(repo.current()));permit.close()
         }
     }
+    @Test fun pureAudioCanBeIndexedAndFoundByManualTagWithoutInventingTranscript():Unit=runBlocking {
+        FullFixture().use { f ->
+            val base=f.capture.current();val r=reserve(f.capture,base,wave());val ready=f.capture.addAudio(r,wave())
+            f.capture.mutationGate.finish(r,ready);f.capture.save(ready,100,"UTC")
+            val tags=f.tags.read(ready.id);f.tags.replace(ManualTagMutation(ready.id,tags.version,listOf("合成原音"),"SYNTHETIC_AUDIO_TAG"))
+            val search=SqlLocalSearchRepository(f.gateway,f.tags);search.rebuild()
+            val progress=search.batch();assertEquals(1,progress.processed);assertFalse(progress.remaining)
+            val found=search.candidates(LocalSearchRequest("",tag="合成原音"))
+            assertEquals(listOf(ready.id),found.entries.map { it.id });assertEquals("",found.entries.single().originalText)
+            assertTrue(search.candidates(LocalSearchRequest("转写")).entries.isEmpty())
+            assertTrue(search.candidates(LocalSearchRequest("",onlyImages=true)).entries.isEmpty())
+        }
+    }
+    @Test fun factualRecapIncludesRawAudioEvidenceWithoutInventedExcerpt():Unit=runBlocking {
+        FullFixture().use { f ->
+            val base=f.capture.current();val r=reserve(f.capture,base,wave());val ready=f.capture.addAudio(r,wave())
+            f.capture.mutationGate.finish(r,ready);f.capture.save(ready,100,"UTC")
+            val repo=SqlFactRecapRepository(f.gateway,f.tags)
+            val snapshot=repo.capture(FactRecapRange(java.time.LocalDate.ofEpochDay(0),FactRecapPeriod.DAY,"UTC"))
+            assertEquals(ready.id,snapshot.cards.single().source.sourceId)
+            assertEquals("",snapshot.cards.single().excerpt);assertTrue(snapshot.cards.single().images.isEmpty())
+            assertEquals(ready.audio!!.intent,snapshot.cards.single().audios.single().intent)
+            var published=false;assertTrue(repo.publishCurrent(snapshot){published=true});assertTrue(published)
+            f.db.transaction { it.execute("UPDATE attachments SET state='CORRUPT' WHERE id=?",listOf(ready.audio!!.intent.id)) }
+            assertFalse(repo.publishCurrent(snapshot){fail("Stale audio evidence published")})
+        }
+    }
     private suspend fun fails(action:suspend()->Any?) { var thrown=false;try { action() } catch(_:Exception) { thrown=true };assertTrue("Expected rejection",thrown) }
     companion object {
         fun wave()=LocalPcmAudio.encode(shortArrayOf(0x1234,-2,1000,-1000))

@@ -334,7 +334,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                     AttachmentState.valueOf(image[5] as String))
             }
         } else null
-        require(text.isNotBlank() || sql.query("SELECT id FROM attachments WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg') LIMIT 1",listOf(id,row[1])).isNotEmpty())
+        require(text.isNotBlank() || sql.query("SELECT id FROM attachments WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg','audio/wav') LIMIT 1",listOf(id,row[1])).isNotEmpty())
         val tagVersion = row[7] as Long; val visibility = row[8] as Long
         require(revision > 0 && tagVersion >= 0 && visibility >= 0)
         ZoneId.of(row[5] as String)

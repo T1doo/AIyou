@@ -36,7 +36,7 @@ internal class SqlFactRecapRepository(private val database: RecordsSqlDatabase,
             "AND e.capturedAtMillis>=? AND e.capturedAtMillis<? ORDER BY e.capturedAtMillis,e.id LIMIT 1001",
             listOf(range.startMillis,range.endMillis))
         if(rows.size>1000 || rows.sumOf { it[6] as Long }>8_000_000) throw FactRecapTooBroad()
-        var units=0L;var imageCount=0
+        var units=0L;var attachmentCount=0
         return rows.map { r ->
             val id=r[0] as String;ManualTags.identifier(id)
             val revision=Math.toIntExact(r[1] as Long);require(revision>0)
@@ -45,18 +45,24 @@ internal class SqlFactRecapRepository(private val database: RecordsSqlDatabase,
             val body=sql.query("SELECT originalText FROM entry_revisions WHERE entryId=? AND revision=?",listOf(id,revision)).single().single() as String
             units+=body.length; if(units>2_000_000) throw FactRecapTooBroad()
             require(body.length<=100_000 && OriginalExports.hash(body)==r[4]);ZoneId.of(r[3] as String)
-            val imageRows=sql.query("SELECT id,mediaType,sha256,byteSize,state FROM attachments WHERE entryId=? AND revision=? ORDER BY id LIMIT 65",listOf(id,revision))
-            imageCount+=imageRows.size;if(imageCount>20_000 || imageRows.size>64) throw FactRecapTooBroad()
-            val images=imageRows.map { image ->
-                val intent=AttachmentIntent(image[0] as String,id,revision,image[1] as String,image[2] as String,image[3] as Long)
-                ManualTags.identifier(intent.id);require(intent.mediaType in setOf("image/png","image/jpeg") && intent.byteSize in 1..16_777_216 && intent.sha256.matches(Regex("[0-9a-f]{64}")))
-                FactRecapImage(intent,AttachmentState.valueOf(image[4] as String))
+            val attachmentRows=sql.query("SELECT id,mediaType,sha256,byteSize,state FROM attachments WHERE entryId=? AND revision=? ORDER BY id LIMIT 65",listOf(id,revision))
+            attachmentCount+=attachmentRows.size;if(attachmentCount>20_000 || attachmentRows.size>64) throw FactRecapTooBroad()
+            val images=mutableListOf<FactRecapImage>();val audios=mutableListOf<FactRecapAudio>()
+            attachmentRows.forEach { row ->
+                val intent=AttachmentIntent(row[0] as String,id,revision,row[1] as String,row[2] as String,row[3] as Long)
+                ManualTags.identifier(intent.id);require(intent.sha256.matches(Regex("[0-9a-f]{64}")))
+                val state=AttachmentState.valueOf(row[4] as String)
+                when(intent.mediaType) {
+                    "image/png","image/jpeg" -> { require(intent.byteSize in 1..16_777_216);images+=FactRecapImage(intent,state) }
+                    "audio/wav" -> { require(intent.byteSize in 46..LocalPcmAudio.MAX_WAV_BYTES.toLong());audios+=FactRecapAudio(intent,state) }
+                    else -> error("Unsupported original attachment")
+                }
             }
-            require(body.isNotBlank() || images.isNotEmpty())
+            require(body.isNotBlank() || images.isNotEmpty() || audios.isNotEmpty())
             val label=tags.readWithin(sql,id)
             val end=body.offsetByCodePoints(0,minOf(240,body.codePointCount(0,body.length)))
             FactRecapCard(SourceVersion(id,revision.toLong()),r[2] as Long,r[3] as String,r[4] as String,r[5] as Long,
-                body.substring(0,end),end<body.length,label,Collections.unmodifiableList(images),ProcessingPolicy.valueOf(r[7] as String))
+                body.substring(0,end),end<body.length,label,Collections.unmodifiableList(images),ProcessingPolicy.valueOf(r[7] as String),Collections.unmodifiableList(audios))
         }
     }
     private inline fun <T> safely(block: ()->T): T = try { block() }
