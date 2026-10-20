@@ -1,0 +1,133 @@
+{
+  "baseline_sha": "791f2ecfc599a36230648e27634599e33fa39f4b",
+  "kind": "Read-only source audit; design candidate, no product implementation or test execution",
+  "files": {
+    "AGENTS.md": {
+      "bytes": 2699,
+      "sha256": "3a342a45b810aafe73e9183b5b0ee4ee46f2d64dba8b8751acca6027f0759f79"
+    },
+    "docs/AIyou_Master_Plan.md": {
+      "bytes": 54957,
+      "sha256": "a9c647e0555cd57a4511e58506a4ad8516d5c329ada7bc5329cdd61839a54e9b"
+    },
+    "docs/AIyou_Product_Architecture.docx": {
+      "bytes": 71150,
+      "sha256": "2d28784231148af980512bd87115bb1c1d243be0c3825f61b441934f76727c94"
+    },
+    "app/src/main/AndroidManifest.xml": {
+      "bytes": 2333,
+      "sha256": "e689a45b68d0056e7b0392b36d5cf651ba58e13318c63df3c39ff847063c7e29"
+    },
+    "core/model/src/main/kotlin/com/t1doo/aiyou/model/CaptureDraft.kt": {
+      "bytes": 1243,
+      "sha256": "a098da416c569cf4fc59652d66a3c12115b8d311eb91d52a06694b4d10f0071a"
+    },
+    "core/model/src/main/kotlin/com/t1doo/aiyou/model/LocalAttachment.kt": {
+      "bytes": 458,
+      "sha256": "2cce3612b917bdc76106c3e2d3547573219e321442b52c9cd83b433872935234"
+    },
+    "core/model/src/main/kotlin/com/t1doo/aiyou/model/RecordPackageImage.kt": {
+      "bytes": 3722,
+      "sha256": "58e8ff69a6ae6fd1ccdd62ab4518327370fece620746a668a9a4f0ce6ecc5fa8"
+    },
+    "core/domain/src/main/kotlin/com/t1doo/aiyou/domain/CaptureRepository.kt": {
+      "bytes": 1217,
+      "sha256": "dbb33942664ce9e4e4c8900b598aa23f13d9a16e416ad0323b206f25c892e3b0"
+    },
+    "core/domain/src/main/kotlin/com/t1doo/aiyou/domain/AttachmentStore.kt": {
+      "bytes": 863,
+      "sha256": "42fd72a776d168b0942847775b3f7415a144cd93f19b18b529c8003373a822e9"
+    },
+    "core/data/src/main/kotlin/com/t1doo/aiyou/data/CaptureDraftCodec.kt": {
+      "bytes": 1473,
+      "sha256": "3f2b949b434e9b21ca80975c91e1627573d2b70c8cbad1d67be9c41f0a1e059a"
+    },
+    "core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedAttachmentStore.kt": {
+      "bytes": 23877,
+      "sha256": "900c45e4330e3113224c2ec0194fb32938f70c52c42618219b451cb94c0209ab"
+    },
+    "core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlCaptureRepository.kt": {
+      "bytes": 13643,
+      "sha256": "86b1c61ddc4c91e79581bb468ddffb259e9d98c6c1be333a1f4a51bd5ac5c918"
+    },
+    "core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordMediaPackageCipher.kt": {
+      "bytes": 20747,
+      "sha256": "7b6f3e79483375250e83efa735fb79f7826c158c7699c83a53f06e00ce39981c"
+    },
+    "core/data/src/main/kotlin/com/t1doo/aiyou/data/FullBackupCodec.kt": {
+      "bytes": 15097,
+      "sha256": "90bc04bca3c2fab4796b7bbd3719511a2211860bafa290ff7ab37fde855fc751"
+    },
+    "core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlFullBackupRepository.kt": {
+      "bytes": 21584,
+      "sha256": "066ddadc5987fcd7dfb6793326b26510a3dfca97ed753afc42cbf1d5198a031d"
+    },
+    "app/src/main/java/com/t1doo/aiyou/records/MixedCaptureController.kt": {
+      "bytes": 20943,
+      "sha256": "2c63e77b5be80483dc578b0b7d88dc34a8ba559122509dfa6de42e7e1ae2800c"
+    },
+    "app/src/main/java/com/t1doo/aiyou/records/MixedCaptureScreen.kt": {
+      "bytes": 9854,
+      "sha256": "e247113eb46d91976bf58c2672f8b0f3f291e41a3064706cd7bb999e35b8a7a6"
+    },
+    "app/src/main/java/com/t1doo/aiyou/records/LocalAttachmentController.kt": {
+      "bytes": 21635,
+      "sha256": "e7ec5e0a581d26e9bdde8b599861e3807c10d582fe540dfe5a149c2ebd1ab6f5"
+    },
+    "app/src/main/java/com/t1doo/aiyou/records/LocalAttachmentScreen.kt": {
+      "bytes": 16269,
+      "sha256": "36bde9d7b876953fc6345a269b147ce43df412292ddbcc9a0d67be4b141e203e"
+    },
+    "app/src/main/java/com/t1doo/aiyou/records/LocalRecordsViewModel.kt": {
+      "bytes": 101180,
+      "sha256": "959ba5eb73f8a96a74b59bf445e323b319e5e00cbea306b93467ffca1120b05b"
+    }
+  },
+  "observations": {
+    "capture_draft_formats": [
+      1,
+      2
+    ],
+    "media_package_versions": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "full_backup_version": 8,
+    "attachment_store_existing_audio_mimes": [
+      "audio/wav",
+      "audio/mp4",
+      "audio/ogg"
+    ],
+    "attachment_store_max_bytes": 16777216,
+    "capture_current_image_only": true,
+    "production_bindAi_default": null,
+    "production_capabilityProbe_default": null,
+    "manifest_RECORD_AUDIO": false,
+    "manifest_INTERNET_removed": true
+  },
+  "proposal": {
+    "clip_max_seconds": 60,
+    "sample_rate_hz": 44100,
+    "channels": 1,
+    "sample_bits": 16,
+    "max_samples": 2646000,
+    "max_pcm_bytes": 5292000,
+    "max_canonical_wav_bytes": 5292044,
+    "new_dependencies": false,
+    "new_permissions_in_this_delivery": false
+  },
+  "tests": "NOT RUN (design only; no unchanged suite rerun)",
+  "ci": "NOT RUN (design-only skip-ci commit planned)",
+  "device": "NOT RUN",
+  "official_reference_urls": [
+    "https://developer.android.com/reference/android/media/AudioRecord.html",
+    "https://developer.android.com/reference/android/media/AudioTrack",
+    "https://developer.android.com/reference/android/media/MediaRecorder",
+    "https://developer.android.com/media/platform/mediarecorder"
+  ]
+}
