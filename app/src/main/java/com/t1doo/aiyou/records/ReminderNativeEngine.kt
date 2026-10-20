@@ -39,6 +39,9 @@ internal class ReminderNativeEngine(val resources:ReminderRuntimeResources,val o
             page.unownedRuntime.forEach{if(proceed())coordinator.reconcile(it)}
             coordinator.drainPage(page,proceed)
             if(!proceed())return false
+            // Separate gate operation after precise cancellation ACK; ACK itself never collects.
+            page.unownedRuntime.forEach{if(proceed())coordinator.collect(it)}
+            if(!proceed())return false
             coordinator.mutate {
                 // Checkpoint replay is independently authenticated by the metadata cell.
                 settle({resources.rebuild.checkpoint(page)}){resources.rebuild.read().takeIf{it.version>page.metaVersion && it.drain?.next==page.next}}

@@ -61,8 +61,9 @@ internal class SqlReminderRebuildRepository(private val database:RecordsSqlDatab
         val commands=mutableListOf<TaskReminderCommand>();val unowned=mutableListOf<String>();var next=cursor;var scanned=0;var errors=0
         for(row in rows){
             scanned++;val id=row[0] as String
-            val task=try{tasks.reminderTaskFromCells(row)}catch(c:CancellationException){throw c}catch(_:Exception){errors++;next=ReminderScanCursor(id);continue}
-            if(task.reminder?.phase in setOf(TaskReminderPhase.TRIGGER_ACCEPTED,TaskReminderPhase.POSTING))unowned+=id
+            val view=try{tasks.reminderRuntimeFromCells(row)}catch(c:CancellationException){throw c}catch(_:Exception){errors++;next=ReminderScanCursor(id);continue}
+            val task=view.task
+            if(view.receipts.isNotEmpty())unowned+=id
             val eligible=task.reminder?.commands.orEmpty().filter{c->
                 (id!=cursor?.taskId || cursor.rowExhausted || c.token.scheduleVersion>requireNotNull(cursor.afterGeneration)) &&
                     (c.kind==TaskReminderCommandKind.CANCEL || c.kind==TaskReminderCommandKind.SCHEDULE && requireNotNull(c.schedule.instant()).toEpochMilli()>nowMillis)

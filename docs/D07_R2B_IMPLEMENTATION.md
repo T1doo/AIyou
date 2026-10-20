@@ -21,6 +21,7 @@
   固定上界按 SQLite BINARY 分页，每页最多 16 行/16 命令；同一任务的 32 命令按 numeric generation 继续。
   新一轮从空游标开始，未完成轮次恢复游标，dirty 只增加一轮有限扫描；无需环绕即可满足至多一圈的有界合同。
   过期 SCHEDULE/DELIVER 不占执行名额；坏行及失败前缀会推进，停止中途不 checkpoint 未完成页。
+  精确 CANCEL 已 ACK 后另取执行门显式回收用户已退休且已关闭的槽位；ACK 本身不回收，旧 token 仍受当前代次约束。
 - AlarmManager 使用 RTC_WAKEUP：EXACT 调用 setExactAndAllowWhileIdle；用户明确选择的大约模式才调用 setAndAllowWhileIdle。
   最后一次 due 检查位于能力/封装/PI 准备之后；跨期不调 set、不伪造 ACK、不撤销原合法迟到 PI。
   通用通知只含固定打开提示，CLICK 与 ALARM 使用不同 AEAD 用途和完整 HMAC URI 身份；单 token 撤销两端均返回才 ACK。

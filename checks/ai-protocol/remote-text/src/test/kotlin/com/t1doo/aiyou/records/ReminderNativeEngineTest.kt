@@ -81,4 +81,33 @@ class ReminderNativeEngineTest {
         }finally{codec.close()}
     }
 
+    @Test fun userRetiredSlotsAreCollectedOnlyAfterPreciseCancellationSoMoreThanFourRealGenerationsCanRun():Unit=RebuildFixture().use{f->
+        f.pending("recurring-user");var now=RuntimeFixture.DUE_MILLIS;var posts=0;var cancels=0
+        val owner=ReminderExecutionGate().openOwner(true);val codec=ReminderEnvelopeCipher(LocalCandidateFixture.KEY)
+        val driver=object:ReminderRuntimeDriver {
+            override fun availability()=RuntimeFixture.AVAILABLE
+            override fun schedule(command:TaskReminderCommand)=TaskReminderPhase.SCHEDULED
+            override fun cancel(command:TaskReminderCommand):TaskReminderPhase{cancels++;return TaskReminderPhase.REVOKED}
+            override fun post(token:TaskReminderToken,specification:String):ReminderPostObservation{posts++;return ReminderPostObservation.POST_RETURNED}
+        }
+        val engine=ReminderNativeEngine(ReminderRuntimeResources(f.tasks,f.meta,codec),owner,driver,{now}){f.fingerprint}
+        try{repeat(5){cycle->
+            val task=f.tasks.runtimeView("recurring-user")!!.task;val r=task.reminder!!
+            val old=codec.seal(TaskReminderToken(task.id,r.id,r.scheduleVersion),ReminderEnvelopePurpose.ALARM)
+            engine.handle(old,now,{})
+            assertEquals(cycle+1,posts)
+            val current=f.tasks.runtimeView(task.id)!!.task
+            val change=ManualTaskScheduleMutation(task.id,current.version,ManualTaskDateOperation.SET,RuntimeFixture.date(cycle+1L),now+1,"next-date-$cycle")
+            f.tasks.reschedule(change)
+            engine.kick(ReminderRebuildRequest.USER);var more=true;repeat(8){if(more)more=engine.turn()};assertFalse(more)
+            val retired=f.tasks.runtimeView(task.id)!!
+            assertTrue(retired.receipts.isEmpty());assertEquals(cycle+1,cancels)
+            val before=f.taskBytes(task.id);f.tasks.reschedule(change);assertArrayEquals(before,f.taskBytes(task.id))
+            f.tasks.changeReminder(TaskReminderMutation(retired.task,TaskReminderMode.EXACT,now+2,"confirm-next-$cycle"))
+            engine.handle(old,now,{}) // Collected old generation remains stale against the current token.
+            assertEquals(cycle+1,posts)
+            now=RuntimeFixture.date(cycle+1L).instant()!!.toEpochMilli()
+        }}finally{owner.closeAndAwait();codec.close()}
+    }
+
 }

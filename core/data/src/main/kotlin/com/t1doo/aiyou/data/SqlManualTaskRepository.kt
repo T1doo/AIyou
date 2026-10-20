@@ -20,7 +20,7 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
         database.transaction { sql -> createWithin(sql,request) }
     }
     internal fun readWithin(sql: RecordsSqlConnection,id: String): ManualTaskSnapshot? = row(sql,id)?.payload?.task
-    internal fun reminderTaskFromCells(cells:List<Any?>):ManualTaskSnapshot = decode(cells).payload.task
+    internal fun reminderRuntimeFromCells(cells:List<Any?>):ReminderRuntimeView = decode(cells).payload.let{ReminderRuntimeView(it.task,it.runtime)}
     /** Rebuild only an existing confirmed future plan, never a trigger or a new user decision. */
     internal fun rebuildFutureWithin(sql:RecordsSqlConnection,id:String,now:Long):Boolean {
         val old=row(sql,id)?:return false;val t=old.payload.task;val r=t.reminder?:return false
