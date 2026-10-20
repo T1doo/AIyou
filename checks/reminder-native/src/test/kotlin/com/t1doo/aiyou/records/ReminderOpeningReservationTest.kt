@@ -159,6 +159,33 @@ class ReminderOpeningReservationTest {
             }finally{release.countDown();withTimeout(5_000){while(!a.isCompleted){paused.runQueued();delay(5)}};port?.closeStore{};scope.cancel();bridge.close()}
         }
     }
+    @Test fun cancelledUnclaimedIntentWaitsForPriorOwnerCloseAndOnlyThenObservesItsOwnRelease():Unit=runBlocking {
+        for(kind in listOf("front","cold","unknown-close"))NativeSqlFixture().use{f->
+            val bridge=ReminderOperationBridge();val reads=AtomicInteger();val owners=owners(f,bridge,reads)
+            var prior:ReminderVmRuntime?=null
+            try{
+                if(kind=="cold"){
+                    val start=requireNotNull(owners.capture());owners.execute(start);owners.forget(start)
+                }else{
+                    prior=owners.prepareFront{f.foregroundRecords()}.second;prior.attach{false};owners.frontReady(prior)
+                }
+                val beforeReads=reads.get();val beforeOpens=f.opened.get()
+                owners.frontOpening();owners.releaseFront();bridge.runtime{}
+                assertNull(owners.capture());assertEquals(beforeReads,reads.get())
+                if(kind=="unknown-close"){
+                    assertTrue(runCatching{prior!!.closeStore{error("Synthetic prior close not confirmed")}}.isFailure)
+                    bridge.runtime{};assertNull(owners.capture());assertEquals(beforeReads,reads.get());assertEquals(beforeOpens,f.opened.get())
+                    assertThrows(IllegalStateException::class.java){bridge.gate.openOwner(true)}
+                }else{
+                    if(kind=="cold")owners.closeCold()else prior!!.closeStore{f.stores.close()}
+                    bridge.runtime{};f.storesForRead()
+                    val fresh=owners.capture();assertNotNull("Prior confirmed close stranded unclaimed intent: $kind",fresh)
+                    owners.execute(fresh!!);assertEquals(beforeReads+1,reads.get());assertEquals(beforeOpens+1,f.opened.get())
+                    owners.forget(fresh);owners.closeCold()
+                }
+            }finally{bridge.close()}
+        }
+    }
     private class PausedContinuation:CoroutineDispatcher(){
         private val queue=ConcurrentLinkedQueue<Runnable>()
         override fun dispatch(context:CoroutineContext,block:Runnable){queue.add(block)}

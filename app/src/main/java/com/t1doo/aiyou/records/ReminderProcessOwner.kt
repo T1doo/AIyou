@@ -63,9 +63,19 @@ internal class ReminderProcessOwner(
             frontReservation=null;phase=Phase.NO_FRONT
         }
     }
+    private fun observeUnclaimedRelease(reservation:FrontReservation){
+        if(frontReservation===reservation&&reservation.cancelled&&!reservation.claimed&&!reservation.openStarted&&holder==null&&phase==Phase.RELEASING)bridge.postObservation{synchronized(guard){
+            if(frontReservation===reservation&&reservation.cancelled&&!reservation.claimed&&!reservation.openStarted&&holder==null&&phase==Phase.RELEASING){
+                reservation.settled=true;finishReleasedFront(reservation)
+            }
+        }}
+    }
+    private fun clearConfirmedHolder(prepared:Holder)=synchronized(guard){
+        if(holder===prepared){holder=null;frontReservation?.let{observeUnclaimedRelease(it)}}
+    }
     private fun confirmedFrontClose(prepared:Holder,reservation:FrontReservation)=synchronized(guard){
         reservation.settled=true
-        if(holder===prepared)holder=null
+        clearConfirmedHolder(prepared)
         finishReleasedFront(reservation)
     }
     /** Ordinary retained-VM disposal is distinct from an explicit application lock or failed access. */
@@ -78,9 +88,7 @@ internal class ReminderProcessOwner(
         holder?.owner?.seal()
         frontReservation?.let{reservation->
             finishReleasedFront(reservation)
-            if(!reservation.claimed&&!reservation.openStarted&&holder==null)bridge.postObservation{synchronized(guard){
-                if(!reservation.claimed&&!reservation.openStarted&&holder==null){reservation.settled=true;finishReleasedFront(reservation)}
-            }}
+            observeUnclaimedRelease(reservation)
         }
         if(wasFront&&holder==null)phase=Phase.NO_FRONT // The current owner's successful close was already observed.
     }
@@ -149,7 +157,7 @@ internal class ReminderProcessOwner(
                         if(f is ReminderRuntimeClosureUnconfirmed){candidate.closureUnconfirmed=true;candidate.quarantine=f}
                         else try {
                             candidate.owner.closeAndAwait{candidate.store?.let{it.close();it.awaitClosed()}}
-                            synchronized(guard){if(holder===candidate)holder=null}
+                            clearConfirmedHolder(candidate)
                         }catch(close:Throwable){candidate.closureUnconfirmed=true;candidate.quarantine=close;throw close}
                     }
                     throw f
@@ -185,7 +193,7 @@ internal class ReminderProcessOwner(
                 if(old.closureUnconfirmed)throw ReminderRuntimeClosureUnconfirmed()
                 try{old.owner.closeAndAwait{old.store?.let{it.close();it.awaitClosed()}}}
                 catch(f:Throwable){old.closureUnconfirmed=true;old.quarantine=f;throw f}
-                synchronized(guard){if(holder===old)holder=null}
+                clearConfirmedHolder(old)
             }
         }
     }
@@ -194,7 +202,7 @@ internal class ReminderProcessOwner(
             val failed=synchronized(guard){holder?.takeIf{!it.cold&&it.foreground==null&&it.closureUnconfirmed}}?:return@runtime
             val failure=failed.quarantine as? ReminderRuntimeClosureUnconfirmed?:throw ReminderRuntimeClosureUnconfirmed()
             failed.owner.closeAndAwait{failure.confirmCleanup()}
-            synchronized(guard){if(holder===failed)holder=null}
+            clearConfirmedHolder(failed)
         }
     }
     /** Foreground caller owns actual repository lifecycle; runtime closes it through the same gate. */
