@@ -214,4 +214,105 @@ class ReminderRuntimeGateTest {
         assertEquals(ReminderRuntimeOutcome.RETIRED,f.store.recordRuntimeResult(result!!,authority!!).outcome)
         f.reopen();f.fire();f.coordinator().reconcile("one");assertEquals(1,f.posts.get());assertNull(f.view().receipts.single().result)
     }
+
+    @Test fun expiredSchedulesAndResidualDeliveryCannotStarveFutureSchedulesOrCancellations(): Unit {
+        for (limit in listOf(1, 16)) RuntimeFixture().use { f ->
+            val expired = (0 until 20).map { pending(f, "a-expired-%02d".format(it)) }
+            val delivery = pending(f, "b-delivery")
+            val future = pending(f, "z-future", 1)
+            val cancelled = pending(f, "z-cancelled")
+            f.store.changeReminder(TaskReminderMutation(cancelled, null, 100, "revoke-cancelled"))
+            f.now = RuntimeFixture.DUE_MILLIS
+            val reminder = requireNotNull(delivery.reminder)
+            val event = ReminderEventRequest.create(ReminderRuntimeScope(
+                TaskReminderToken(delivery.id, reminder.id, reminder.scheduleVersion), reminder.schedule, reminder.mode),
+                delivery.version, f.now, f.observation())
+            f.store.acceptRuntimeEvent(event)
+            val preserved = expired.map { it.id } + delivery.id
+            val before = preserved.associateWith { taskBytes(f, it) }
+            var snapshots = 0
+            var currentChecks = 0
+            f.port = object : ReminderRuntimeRepository by f.store {
+                override fun reminderCommands(): List<TaskReminderCommand> { snapshots++; return f.store.reminderCommands() }
+                override fun isReminderCommandCurrent(command: TaskReminderCommand): Boolean {
+                    currentChecks++; return f.store.isReminderCommandCurrent(command)
+                }
+            }
+            var acknowledged = 0
+            repeat(2) {
+                val portsBefore = f.schedules.get() + f.cancels.get()
+                val checksBefore = currentChecks
+                acknowledged += f.coordinator().drain(limit)
+                assertTrue(f.schedules.get() + f.cancels.get() - portsBefore <= limit)
+                assertTrue(currentChecks - checksBefore <= limit)
+            }
+            assertEquals(2, acknowledged); assertEquals(2, snapshots)
+            assertEquals(1, f.schedules.get()); assertEquals(1, f.cancels.get()); assertEquals(0, f.posts.get())
+            assertEquals(TaskReminderPhase.SCHEDULED, f.store.runtimeView(future.id)!!.task.reminder!!.phase)
+            assertTrue(f.store.runtimeView(cancelled.id)!!.task.reminder!!.commands.isEmpty())
+            before.forEach { (id, bytes) -> assertArrayEquals(bytes, taskBytes(f, id)) }
+            assertNull(f.store.runtimeView(delivery.id)!!.receipts.single().closed)
+            assertEquals(20, f.store.reminderCommands().count { it.kind == TaskReminderCommandKind.SCHEDULE })
+            assertEquals(1, f.store.reminderCommands().count { it.kind == TaskReminderCommandKind.DELIVER })
+        }
+    }
+
+    @Test fun failedEligibleCommandsCannotStarveLaterWorkAcrossCoordinatorInstancesForTheSameOwner(): Unit {
+        for (limit in listOf(1, 16)) RuntimeFixture().use { f ->
+            val stuck = (0 until 17).map { pending(f, "a-stuck-%02d".format(it)) }
+            val cancelled = pending(f, "z-cancelled")
+            f.store.changeReminder(TaskReminderMutation(cancelled, null, 100, "revoke-cancelled"))
+            val future = pending(f, "z-future")
+            val attempts = mutableListOf<String>()
+            var snapshots = 0
+            f.port = object : ReminderRuntimeRepository by f.store {
+                override fun reminderCommands(): List<TaskReminderCommand> { snapshots++; return f.store.reminderCommands() }
+            }
+            val controlled = object : ReminderRuntimeDriver by f.driver {
+                override fun schedule(command: TaskReminderCommand): TaskReminderPhase {
+                    attempts += command.token.taskId
+                    assertEquals(0, f.sqlDepth.get())
+                    if (command.token.taskId.startsWith("a-stuck-")) throw ManualTaskStorageFailure()
+                    return f.driver.schedule(command)
+                }
+                override fun cancel(command: TaskReminderCommand): TaskReminderPhase {
+                    attempts += command.token.taskId
+                    return f.driver.cancel(command)
+                }
+            }
+            val rounds = (19 + limit - 1) / limit
+            repeat(rounds) {
+                val before = attempts.size
+                ReminderRuntimeCoordinator(f.owner, { f.port }, controlled) { f.now }.drain(limit)
+                assertTrue(attempts.size - before <= limit)
+            }
+            assertEquals(rounds, snapshots)
+            assertTrue(attempts.containsAll(stuck.map { it.id }))
+            assertEquals(1, f.schedules.get()); assertEquals(1, f.cancels.get()); assertEquals(0, f.posts.get())
+            assertEquals(TaskReminderPhase.SCHEDULED, f.store.runtimeView(future.id)!!.task.reminder!!.phase)
+            assertTrue(f.store.runtimeView(cancelled.id)!!.task.reminder!!.commands.isEmpty())
+            stuck.forEach { assertEquals(it, f.store.runtimeView(it.id)!!.task) }
+        }
+    }
+
+    @Test fun capabilityQueryCrossingDueCannotScheduleOrAckPastAlarmAndLateCallbackStillWorks(): Unit = RuntimeFixture().use { f ->
+        f.confirm(); f.now = RuntimeFixture.DUE_MILLIS - 1
+        val before = f.blob()
+        f.capability = { n -> if (n == 1) f.now = RuntimeFixture.DUE_MILLIS; RuntimeFixture.AVAILABLE }
+        assertEquals(0, f.coordinator().drain())
+        assertEquals(1, f.availabilityCalls.get()); assertEquals(0, f.schedules.get()); assertEquals(0, f.posts.get())
+        assertArrayEquals(before, f.blob())
+        assertEquals(TaskReminderPhase.PENDING, f.current().reminder!!.phase)
+        assertEquals(TaskReminderCommandKind.SCHEDULE, f.current().reminder!!.commands.single().kind)
+        assertTrue(f.view().receipts.isEmpty())
+        f.fire(); assertEquals(0, f.schedules.get()); assertEquals(1, f.posts.get())
+        assertEquals(TaskReminderPhase.NOTIFICATION_POSTED, f.current().reminder!!.phase)
+    }
+
+    private fun pending(f: RuntimeFixture, id: String, days: Long = 0): ManualTaskSnapshot {
+        val task = f.store.create(ManualTaskCreate(id, "合成排空回归", 55, "UTC", "create-$id", RuntimeFixture.date(days)))
+        return f.store.changeReminder(TaskReminderMutation(task, TaskReminderMode.EXACT, 99, "confirm-$id"))
+    }
+    private fun taskBytes(f: RuntimeFixture, id: String): ByteArray = f.local.db.read(
+        "SELECT ciphertext FROM manual_tasks WHERE id='" + id + "'").single().single() as ByteArray
 }

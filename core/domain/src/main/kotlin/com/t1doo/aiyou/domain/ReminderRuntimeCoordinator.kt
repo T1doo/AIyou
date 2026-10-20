@@ -7,6 +7,7 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 private class ReminderAccessUnavailable : IllegalStateException()
+private val reminderTokenOrder = compareBy<TaskReminderToken>({ it.taskId }, { it.reminderId }, { it.scheduleVersion })
 
 /** Process-local execution and retirement boundary. No Activity, key, Android API or persistent permit. */
 class ReminderExecutionGate {
@@ -37,6 +38,8 @@ class ReminderExecutionGate {
 class ReminderRuntimeOwner internal constructor(internal val gate: ReminderExecutionGate, private val accessAllowed: Boolean) {
     private val sealed = AtomicBoolean()
     private val pending = LinkedHashMap<TaskReminderToken, ReminderRuntimeIngress>()
+    // Gate-confined ordering only, never a durable command or execution permit.
+    private var drainAfter: TaskReminderToken? = null
     internal fun admitted() = accessAllowed && !sealed.get()
     fun capture(token: TaskReminderToken, observedAtMillis: Long): ReminderRuntimeIngress? = synchronized(pending) {
         require(observedAtMillis >= 0)
@@ -48,6 +51,15 @@ class ReminderRuntimeOwner internal constructor(internal val gate: ReminderExecu
     fun seal() { sealed.set(true); synchronized(pending) { pending.clear() } }
     fun closeAndAwait(action: () -> Unit = {}) = gate.close(this, action)
     internal fun release(ingress: ReminderRuntimeIngress) = synchronized(pending) { if (pending[ingress.token] === ingress) pending.remove(ingress.token); Unit }
+    internal fun drainBatch(commands: List<TaskReminderCommand>, nowMillis: Long, limit: Int): List<TaskReminderCommand> {
+        val eligible = commands.filter { it.kind == TaskReminderCommandKind.CANCEL ||
+            it.kind == TaskReminderCommandKind.SCHEDULE && requireNotNull(it.schedule.instant()).toEpochMilli() > nowMillis }
+            .sortedWith { a, b -> reminderTokenOrder.compare(a.token, b.token) }
+        if (eligible.isEmpty()) return emptyList()
+        val after = drainAfter
+        val start = if (after == null) 0 else eligible.indexOfFirst { reminderTokenOrder.compare(it.token, after) > 0 }.let { if (it < 0) 0 else it }
+        return List(minOf(limit, eligible.size)) { eligible[(start + it) % eligible.size] }.also { drainAfter = it.last().token }
+    }
     override fun toString() = "ReminderRuntimeOwner(redacted)"
 }
 
@@ -169,10 +181,10 @@ class ReminderRuntimeCoordinator(private val owner: ReminderRuntimeOwner, privat
         return ReminderRuntimeReply(ReminderRuntimeOutcome.EXACT_REPLAY, v)
     }
 
-    /** Bounded future schedules/cancellations; a DELIVER is never automatically resumed. */
+    /** One snapshot, at most limit attempts; ineligible work is retained without occupying a batch slot. */
     fun drain(limit: Int = 16): Int {
         require(limit in 1..16)
-        val commands = try { mutate { it.reminderCommands().sortedBy { c -> if (c.kind == TaskReminderCommandKind.SCHEDULE) 0 else 1 }.take(limit) } }
+        val commands = try { mutate { owner.drainBatch(it.reminderCommands(), clock(), limit) } }
             catch (_: ReminderAccessUnavailable) { return 0 }
         var acknowledged = 0
         for (command in commands) {
@@ -184,6 +196,8 @@ class ReminderRuntimeCoordinator(private val owner: ReminderRuntimeOwner, privat
                 val result = if (command.kind == TaskReminderCommandKind.CANCEL) driver.cancel(command) else {
                     val blocked = driver.availability().blocked(command.mode)
                     if (!owner.admitted()) return@mutate
+                    // A blocking capability query may have crossed due; retain the original late-callback eligibility.
+                    if (requireNotNull(command.schedule.instant()).toEpochMilli() <= clock()) return@mutate
                     blocked ?: driver.schedule(command)
                 }
                 if (s.acknowledgeReminder(command, result, clock())) acknowledged++
