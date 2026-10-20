@@ -34,13 +34,16 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
         val expected = ManualTaskSnapshot(request.id, 1, request.title, ManualTaskStatus.OPEN,
             request.createdAtMillis, request.creationTimeZone, request.createdAtMillis, request.schedule, receipt)
         val old = row(sql, request.id)
+        val hash = cipher.requestProof(request, receipt)
         return if (old != null) {
+            replay(old, "CREATE", request.mutationId, hash)?.let { return it }
             if (old.mutationId != request.mutationId || old.payload.task != expected ||
                 old.payload.requestedAtMillis != request.createdAtMillis ||
                 old.payload.operation != null && old.payload.operation != "CREATE") throw ManualTaskConflict()
             old.payload.task
         } else {
-            val bytes = cipher.seal(expected, request.mutationId, request.createdAtMillis)
+            val bytes = cipher.seal(expected, request.mutationId, request.createdAtMillis,
+                userReceipt = cipher.receipt(expected, "CREATE", request.mutationId, 0, request.createdAtMillis, hash))
             sql.execute("INSERT INTO manual_tasks(id,version,lastMutationId,ciphertext) VALUES(?,?,?,?)",
                 listOf(request.id, 1, request.mutationId, bytes))
             checkNotNull(row(sql, request.id)).payload.task.also { check(it == expected) }
@@ -50,6 +53,8 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
         database.transaction { sql ->
             val old = row(sql, request.id) ?: throw ManualTaskConflict()
             val current = old.payload.task
+            val hash = cipher.requestProof(request)
+            replay(old, "STATUS", request.mutationId, hash)?.let { return@transaction it }
             if (old.mutationId == request.mutationId) {
                 if (current.version != request.expectedVersion + 1 || current.status != request.status ||
                     old.payload.requestedAtMillis != request.requestedAtMillis ||
@@ -59,7 +64,8 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
                 if (current.version != request.expectedVersion || current.status != ManualTaskStatus.OPEN) throw ManualTaskConflict()
                 val next = current.copy(version = Math.addExact(current.version, 1), status = request.status,
                     updatedAtMillis = maxOf(current.updatedAtMillis, request.requestedAtMillis), reminder = TaskReminders.revoke(current))
-                val bytes = cipher.seal(next, request.mutationId, request.requestedAtMillis)
+                val bytes = cipher.seal(next, request.mutationId, request.requestedAtMillis,
+                    userReceipt = cipher.receipt(next, "STATUS", request.mutationId, request.expectedVersion, request.requestedAtMillis, hash))
                 if (sql.execute("UPDATE manual_tasks SET version=?,lastMutationId=?,ciphertext=? WHERE id=? AND version=?",
                     listOf(next.version, request.mutationId, bytes, request.id, request.expectedVersion)) != 1) throw ManualTaskConflict()
                 checkNotNull(row(sql, request.id)).payload.task.also { check(it == next) }
@@ -70,6 +76,8 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
         database.transaction { sql ->
             val old = row(sql, request.id) ?: throw ManualTaskConflict()
             val current = old.payload.task
+            val hash = cipher.requestProof(request)
+            replay(old, request.operation.name, request.mutationId, hash)?.let { return@transaction it }
             if (current.status != ManualTaskStatus.OPEN) throw ManualTaskConflict()
             if (old.mutationId == request.mutationId) {
                 if (current.version != request.expectedVersion + 1 || current.schedule != request.schedule ||
@@ -81,7 +89,8 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
                 ManualTaskDates.validate(request.operation, current.schedule, request.schedule)
                 val next = current.copy(version = Math.addExact(current.version, 1), schedule = request.schedule,
                     updatedAtMillis = maxOf(current.updatedAtMillis, request.requestedAtMillis), reminder = TaskReminders.revoke(current))
-                val bytes = cipher.seal(next, request.mutationId, request.requestedAtMillis, request.operation.name)
+                val bytes = cipher.seal(next, request.mutationId, request.requestedAtMillis, request.operation.name,
+                    userReceipt = cipher.receipt(next, request.operation.name, request.mutationId, request.expectedVersion, request.requestedAtMillis, hash))
                 if (sql.execute("UPDATE manual_tasks SET version=?,lastMutationId=?,ciphertext=? WHERE id=? AND version=?",
                     listOf(next.version, request.mutationId, bytes, request.id, request.expectedVersion)) != 1) throw ManualTaskConflict()
                 checkNotNull(row(sql, request.id)).payload.task.also { check(it == next) }
@@ -92,6 +101,8 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
         database.transaction { sql ->
             val old = row(sql, request.id) ?: throw ManualTaskConflict()
             val current = old.payload.task
+            val hash = cipher.requestProof(request)
+            replay(old, "RENAME", request.mutationId, hash)?.let { return@transaction it }
             if (current.status != ManualTaskStatus.OPEN) throw ManualTaskConflict()
             if (old.mutationId == request.mutationId) {
                 if (old.payload.operation != "RENAME" || current.version != request.expectedVersion + 1 ||
@@ -102,7 +113,8 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
                 if (current.version != request.expectedVersion || current.title == request.title) throw ManualTaskConflict()
                 val next = current.copy(version = Math.addExact(current.version, 1), title = request.title,
                     updatedAtMillis = maxOf(current.updatedAtMillis, request.requestedAtMillis))
-                writeWithin(sql, current, next, request.mutationId, request.requestedAtMillis, "RENAME")
+                writeWithin(sql, current, next, request.mutationId, request.requestedAtMillis, "RENAME",
+                    userReceipt = cipher.receipt(next, "RENAME", request.mutationId, request.expectedVersion, request.requestedAtMillis, hash))
             }
         }
     }
@@ -116,6 +128,8 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
                 if (due.toEpochMilli() <= request.requestedAtMillis) throw ManualTaskConflict()
             }
             val proof = cipher.reminderRequestProof(request)
+            val hash = cipher.requestProof(request)
+            replay(old, "REMIND", request.mutationId, hash)?.let { return@transaction it }
             if (old.mutationId == request.mutationId) {
                 // A lost COMMIT acknowledgement is replayed byte-for-byte only for the complete original request.
                 if (old.payload.operation != "REMIND" || old.payload.reminderRequestProof != proof ||
@@ -124,7 +138,9 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
                 current
             } else {
                 if (current != request.task) throw ManualTaskConflict()
-                writeWithin(sql, current, reminderNext(request), request.mutationId, request.requestedAtMillis, "REMIND", proof)
+                val next = reminderNext(request)
+                writeWithin(sql, current, next, request.mutationId, request.requestedAtMillis, "REMIND", proof,
+                    cipher.receipt(next, "REMIND", request.mutationId, request.task.version, request.requestedAtMillis, hash))
             }
         }
     }
@@ -145,7 +161,8 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
     override fun acknowledgeReminder(command: TaskReminderCommand, result: TaskReminderPhase, atMillis: Long): Boolean = safely {
         require(atMillis >= 0)
         database.transaction { sql ->
-            val current = row(sql, command.token.taskId)?.payload?.task ?: return@transaction false
+            val old = row(sql, command.token.taskId) ?: return@transaction false
+            val current = old.payload.task
             val reminder = current.reminder ?: return@transaction false
             if (command !in reminder.commands) return@transaction false
             val isCurrent = TaskReminders.commandCurrent(current, command)
@@ -166,27 +183,50 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
             val next = current.copy(version = Math.addExact(current.version, 1),
                 updatedAtMillis = maxOf(current.updatedAtMillis, atMillis),
                 reminder = reminder.copy(phase = phase, commands = reminder.commands.filterNot { it == command }))
-            writeWithin(sql, current, next, "reminder-ack:" + UUID.randomUUID(), atMillis, "RM_ACK")
+            writeWithin(sql, current, next, "reminder-ack:" + UUID.randomUUID(), atMillis, "RM_ACK", userReceipt = receiptForSystem(old))
             true
         }
     }
     override fun acceptReminderTrigger(token: TaskReminderToken, nowMillis: Long, availability: TaskReminderAvailability): Boolean = safely {
         database.transaction { sql ->
-            val current = row(sql, token.taskId)?.payload?.task ?: return@transaction false
+            val old = row(sql, token.taskId) ?: return@transaction false
+            val current = old.payload.task
             if (!TaskReminders.canAccept(current, token, nowMillis, availability)) return@transaction false
             val next = current.copy(version = Math.addExact(current.version, 1),
                 updatedAtMillis = maxOf(current.updatedAtMillis, nowMillis),
                 reminder = checkNotNull(current.reminder).copy(phase = TaskReminderPhase.TRIGGER_ACCEPTED))
-            writeWithin(sql, current, next, "reminder-fire:" + UUID.randomUUID(), nowMillis, "RM_FIRE")
+            writeWithin(sql, current, next, "reminder-fire:" + UUID.randomUUID(), nowMillis, "RM_FIRE", userReceipt = receiptForSystem(old))
             true
         }
     }
     private fun writeWithin(sql: RecordsSqlConnection, current: ManualTaskSnapshot, next: ManualTaskSnapshot,
-        mutation: String, requestedAtMillis: Long, operation: String, proof: String? = null): ManualTaskSnapshot {
-        val bytes = cipher.seal(next, mutation, requestedAtMillis, operation, proof)
+        mutation: String, requestedAtMillis: Long, operation: String, proof: String? = null,
+        userReceipt: ManualTaskCipher.UserReceipt? = null): ManualTaskSnapshot {
+        val bytes = cipher.seal(next, mutation, requestedAtMillis, operation, proof, userReceipt)
         if (sql.execute("UPDATE manual_tasks SET version=?,lastMutationId=?,ciphertext=? WHERE id=? AND version=?",
             listOf(next.version, mutation, bytes, current.id, current.version)) != 1) throw ManualTaskConflict()
         return checkNotNull(row(sql, current.id)).payload.task.also { check(it == next) }
+    }
+    private fun replay(row: Row, op: String, mutation: String, hash: String): ManualTaskSnapshot? {
+        val r = row.payload.userReceipt ?: return null
+        if (r.mutationId != mutation) return null
+        if (r.operation != op || r.requestHash != hash) throw ManualTaskConflict()
+        return row.payload.task
+    }
+    /** Upgrade only an unambiguous latest legacy user operation; never invent a lost historical receipt. */
+    private fun receiptForSystem(row: Row): ManualTaskCipher.UserReceipt? {
+        row.payload.userReceipt?.let { return it }
+        val p = row.payload; val t = p.task; val op = p.operation ?: return null
+        val expected = t.version - 1; val at = p.requestedAtMillis; val m = row.mutationId
+        val hash = when (op) {
+            "CREATE" -> cipher.requestProof(ManualTaskCreate(t.id, t.title, t.createdAtMillis, t.creationTimeZone, m, t.schedule), t.sourceReceipt)
+            "STATUS" -> cipher.requestProof(ManualTaskMutation(t.id, expected, t.status, at, m))
+            "RENAME" -> cipher.requestProof(ManualTaskRename(t.id, expected, t.title, at, m))
+            "SET", "POSTPONE", "CLEAR" -> cipher.requestProof(ManualTaskScheduleMutation(t.id, expected, ManualTaskDateOperation.valueOf(op), t.schedule, at, m))
+            "REMIND" -> cipher.reminderUserProof(t.id, m, expected, at, checkNotNull(p.reminderRequestProof))
+            else -> return null
+        }
+        return cipher.receipt(t, op, m, expected, at, hash)
     }
     private fun row(sql: RecordsSqlConnection, id: String): Row? {
         if(id.startsWith(TaskProposals.PREFIX)) throw ManualTaskConflict()

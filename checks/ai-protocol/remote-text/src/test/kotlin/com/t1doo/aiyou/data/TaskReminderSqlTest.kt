@@ -39,13 +39,13 @@ class TaskReminderSqlTest {
         assertEquals(1, f.tasks.reminderCommands().size)
     }
 
-    @Test fun v4EncryptedOutboxAndSourceReceiptSurviveColdReopenWithoutTouchingOtherTables(): Unit = Fixture().use { f ->
+    @Test fun v5UserReceiptAndOutboxSurviveColdReopenWithoutTouchingOtherTables(): Unit = Fixture().use { f ->
         val unrelated = f.local.snapshotOld().filterNot { it.startsWith("manual_tasks:") }
         val receipt = SourceTaskReceipt(TaskSourceBinding(f.local.source, OriginalExports.hash(f.local.original), 1, 0, 2), "a".repeat(64))
         val initial = f.local.db.transaction { sql -> f.tasks.createWithin(sql, create("one"), receipt) }
-        assertEquals(3.toByte(), f.blob("one")[0])
+        assertEquals(5.toByte(), f.blob("one")[0])
         val saved = f.tasks.changeReminder(mutation(initial))
-        assertEquals(4.toByte(), f.blob("one")[0]); val bytes = f.blob("one")
+        assertEquals(5.toByte(), f.blob("one")[0]); val bytes = f.blob("one")
         val commands = f.tasks.reminderCommands()
         assertThrows(UnsupportedOperationException::class.java) { (commands as MutableList).clear() }
         assertThrows(UnsupportedOperationException::class.java) { (saved.reminder!!.commands as MutableList).clear() }

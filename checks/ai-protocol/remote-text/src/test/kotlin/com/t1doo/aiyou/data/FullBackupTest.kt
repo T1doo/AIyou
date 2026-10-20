@@ -153,7 +153,8 @@ class FullBackupTest {
             val tasks=SqlManualTaskRepository(source.gateway,source.key)
             val schedule=ManualTaskDateInput("2027-01-01","12:00","UTC").parse()!!
             val task=tasks.create(ManualTaskCreate("task","合成提醒",10,"UTC","create",schedule))
-            tasks.changeReminder(TaskReminderMutation(task,TaskReminderMode.EXACT,20,"remind"))
+            val originalReminderRequest=TaskReminderMutation(task,TaskReminderMode.EXACT,20,"remind")
+            tasks.changeReminder(originalReminderRequest)
             val proposal=TaskProposal("p".repeat(128),3,TaskSourceBinding(SourceVersion(id,1),OriginalExports.hash("合成原文"),
                 source.db.read("SELECT generation FROM remote_source_access WHERE entryId=?",id).single().single() as Long,0,2),
                 "合成被拒绝提案",ManualTaskDateInput("2027-01-02"),10,"UTC",20,TaskProposalState.REJECTED)
@@ -168,6 +169,11 @@ class FullBackupTest {
             assertEquals(proposal,targetProposals.list().single().proposal);targetProposals.wipeKey()
             assertEquals(TaskReminderPhase.REVOKED,restored.reminder!!.phase);assertEquals(TaskReminderMode.EXACT,restored.reminder!!.mode)
             assertTrue(restored.reminder!!.commands.isEmpty());assertTrue(target.db.read("SELECT * FROM remote_text_jobs").isEmpty())
+            val row=target.db.read("SELECT version,lastMutationId,ciphertext FROM manual_tasks WHERE id='task'").single()
+            val restoredCipher=ManualTaskCipher(target.key)
+            try { assertNull(restoredCipher.open("task",row[0] as Long,row[1] as String,row[2] as ByteArray).userReceipt) }
+            finally { restoredCipher.wipe() }
+            assertThrows(ManualTaskConflict::class.java) { targetTasks.changeReminder(originalReminderRequest) }
             tasks.wipeKey();targetTasks.wipeKey();pack.release()
         } }
     }

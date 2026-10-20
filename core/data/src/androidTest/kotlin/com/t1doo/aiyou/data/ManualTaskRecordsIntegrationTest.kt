@@ -186,7 +186,7 @@ class ManualTaskRecordsIntegrationTest {
         assertArrayEquals(legacy, ciphertext(store, "legacy"))
         val set = schedule("legacy", 1, ManualTaskDateOperation.SET, due("2042-11-19"))
         store.manualTasks.reschedule(set); val dated = ciphertext(store, "legacy")
-        assertEquals(2.toByte(), dated[0]); store.manualTasks.reschedule(set)
+        assertEquals(5.toByte(), dated[0]); store.manualTasks.reschedule(set)
         assertArrayEquals(dated, ciphertext(store, "legacy"))
         store.manualTasks.reschedule(schedule("legacy", 2, ManualTaskDateOperation.POSTPONE, due("2042-11-20")))
         store.manualTasks.reschedule(schedule("legacy", 3, ManualTaskDateOperation.CLEAR, null))

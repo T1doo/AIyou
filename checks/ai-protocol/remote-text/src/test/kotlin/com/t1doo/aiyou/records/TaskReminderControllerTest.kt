@@ -13,6 +13,30 @@ import org.junit.Test
 /** Actual foreground controller + product SQL/AEAD. No Android alarm or notification is installed. */
 class TaskReminderControllerTest {
     @Test(timeout = 15_000)
+    fun unknownUiReadbackRetriesItsOriginalRequestAfterIndependentSystemAck() = Harness().use { h ->
+        val task = h.task("one"); h.initialize(); val editor = h.begin(task)
+        h.afterWrite = { h.failReadback = true }
+        h.controller.confirm(editor.session); h.pump()
+        val original = h.requests.single()
+        assertNotNull(h.state.reminders.pending); assertNull(h.state.reminders.notice)
+        var schedules = 0
+        val driver = object : TaskReminderDriver {
+            override fun availability() = TaskReminderAvailability(true, TaskReminderPermission.GRANTED, TaskReminderPermission.GRANTED)
+            override fun schedule(command: TaskReminderCommand): TaskReminderPhase { schedules++; return TaskReminderPhase.SCHEDULED }
+            override fun cancel(command: TaskReminderCommand) = TaskReminderPhase.REVOKED
+        }
+        assertEquals(1, TaskReminderDispatcher(h.actual, driver) { NOW }.drain())
+        val durable = h.actual.snapshots().single(); val bytes = h.blob(task.id)
+        h.afterWrite = null; h.failReadback = false
+        h.controller.retry(); h.pump()
+        assertEquals(2, h.requests.size); assertSame(original, h.requests.last())
+        assertNull(h.state.reminders.pending); assertFalse(h.state.reminders.conflict)
+        assertNotNull(h.state.reminders.notice); assertNull(h.state.reminders.editor)
+        assertEquals(durable, h.state.tasks.items.single()); assertArrayEquals(bytes, h.blob(task.id))
+        assertEquals(1, schedules); assertEquals("尚未提交合成输入", h.state.text)
+        h.assertFreshReader(durable)
+    }
+    @Test(timeout = 15_000)
     fun previewAndModeNeverWriteAndExplicitConfirmationPreservesDraftSourcesAndPrivateInput() = Harness().use { h ->
         val task = h.task("one")
         val proposal = h.draft()

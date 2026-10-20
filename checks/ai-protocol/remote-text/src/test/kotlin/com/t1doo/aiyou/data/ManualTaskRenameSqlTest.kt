@@ -42,7 +42,7 @@ class ManualTaskRenameSqlTest {
         assertEquals(initial.copy(version = 2, title = request.title), saved)
         assertFalse(before.contentEquals(f.blob("one")))
         assertFalse(before.copyOfRange(1, 13).contentEquals(f.blob("one").copyOfRange(1, 13)))
-        assertEquals(2.toByte(), f.blob("one")[0]); val ciphertext = f.blob("one")
+        assertEquals(5.toByte(), f.blob("one")[0]); val ciphertext = f.blob("one")
         f.reopen(); assertEquals(saved, f.store.snapshots().single())
         assertEquals(saved, f.store.rename(request)); assertArrayEquals(ciphertext, f.blob("one"))
         assertEquals(unrelated, f.legacy())
@@ -156,7 +156,7 @@ class ManualTaskRenameSqlTest {
         val request = rename("legacy", 1, "合成明确纠正旧版任务")
         val saved = f.store.rename(request); val bytes = f.blob("legacy")
         assertEquals(old.copy(version = 2, title = request.title, updatedAtMillis = 99), saved)
-        assertEquals(2.toByte(), bytes[0]); f.reopen()
+        assertEquals(5.toByte(), bytes[0]); f.reopen()
         assertEquals(saved, f.store.rename(request)); assertArrayEquals(bytes, f.blob("legacy")); assertEquals(oldTables, f.legacy())
     }
 
@@ -194,7 +194,7 @@ class ManualTaskRenameSqlTest {
             val request = rename(initial.id, initial.version, "合成用户纠正的正式任务")
             val corrected = tasks.rename(request); val receipt = initial.sourceReceipt
             assertEquals(receipt, corrected.sourceReceipt); assertTrue(proposals.list().isEmpty())
-            assertEquals(3.toByte(), taskBytes(f.db, initial.id)[0])
+            assertEquals(5.toByte(), taskBytes(f.db, initial.id)[0])
             proposals.wipeKey(); tasks.wipeKey(); f.reopen()
             tasks = SqlManualTaskRepository(f.gateway, LocalCandidateFixture.KEY)
             proposals = SqlTaskProposalRepository(f.gateway, LocalCandidateFixture.KEY, tasks)
@@ -220,7 +220,7 @@ class ManualTaskRenameSqlTest {
         val corrected = f.store.rename(request); val bytes = f.blob("one")
         assertEquals(pending.copy(version = pending.version + 1, title = request.title, updatedAtMillis = 99), corrected)
         assertEquals(pending.reminder, corrected.reminder); assertEquals(2, corrected.reminder!!.commands.size)
-        assertEquals(4.toByte(), bytes[0]); f.reopen()
+        assertEquals(5.toByte(), bytes[0]); f.reopen()
         assertEquals(corrected, f.store.rename(request)); assertArrayEquals(bytes, f.blob("one"))
         assertEquals(pending.reminder!!.commands, f.store.reminderCommands())
         val schedule = corrected.reminder!!.commands.single { it.kind == TaskReminderCommandKind.SCHEDULE }
