@@ -207,6 +207,9 @@ for label, folder, minimum in targets:
             "unknownReadbackHasNoSuccessAndRetryUsesTheIdenticalRequestWithoutAnotherGeneration",
             "cancelRestorationAndNavigationRetirePrivateConfirmationsAndSavedStateContainsNoSource",
             "pictureOnlyOriginalCanChooseNoInferenceWithoutInventingTextOrRemoteOption")
+        additional["com.t1doo.aiyou.SourceMemoryInboxPresentationTest"] = (
+            "narrowInboxReachesExactOriginalAndRequiresSeparateExistingAcceptanceAtDoubleFont",
+            "failedReadAndRestorationHidePrivateResultsAndRetireRetainedPageCallbacks")
         additional["com.t1doo.aiyou.SourceMemoryPresentationTest"] = (
             "explicitPendingAndAcceptanceAreReachableAtDoubleFontAndSourceJumpPreservesOriginal",
             "rejectionCorrectionHistoryAndRevocationSurviveReopeningWithoutAutomaticAcceptance",

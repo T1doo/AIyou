@@ -46,6 +46,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalCandidateController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/SourceTagController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/SourceMemoryController.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/SourceMemoryInboxController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchMatcher.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalSearchPreview.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchController.kt")

@@ -76,6 +76,18 @@ class SourceMemoryViewModelTest {
         withTimeout(2_000) { h.vm.state.first { it.entries.any { e -> e.id=="source"&&e.policy==ProcessingPolicy.AI_NONE } } }
         assertNull(h.vm.state.value.sourceMemories);h.vm.sourceMemories.confirm(fresh.session,later);assertTrue(h.creates.isEmpty());assertEquals(0,h.remoteCalls)
     } }
+    @Test(timeout=10_000) fun actualInboxReaderOpensExistingSourceReviewWithoutAcceptingOrCallingModels():Unit=Harness().use { h -> runBlocking {
+        h.ready();h.f.create();h.vm.memoryInbox.open()
+        val page=withTimeout(2_000) { h.vm.state.first { it.memoryInbox?.snapshot!=null && it.memoryInbox.busy.not() }.memoryInbox!! }
+        val item=page.snapshot!!.pending.single()
+        h.vm.memoryInbox.source(page.session,page.request,item) {
+            h.vm.memoryInbox.close(page.session);h.vm.sourceMemories.open(item.source.sourceId,item.source.revision.toInt());true
+        }
+        val review=h.ui { !it.busy && it.preview!=null }
+        assertNull(h.vm.state.value.memoryInbox);assertEquals(item.id,review.memories.single().id)
+        assertEquals(SourceMemoryReview.PROPOSED,review.memories.single().current!!.review)
+        assertTrue(h.creates.isEmpty());assertEquals(0,h.remoteCalls)
+    } }
     private class Harness:AutoCloseable {
         val f=SourceMemoryFixture();val creates=CopyOnWriteArrayList<SourceMemoryCreate>()
         @Volatile var loseAck=false;@Volatile var failRead=false;var remoteCalls=0

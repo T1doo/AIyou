@@ -4,6 +4,7 @@ import com.t1doo.aiyou.model.*
 
 /** Manual source review only. There is no model, network or task-execution authority. */
 interface SourceMemoryRepository {
+    val inbox: SourceMemoryInboxRepository? get() = null
     fun preview(source: SourceVersion): SourceMemoryPreview
     fun memories(source: SourceVersion): List<SourceMemorySnapshot>
     fun create(request: SourceMemoryCreate): SourceMemorySnapshot

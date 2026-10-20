@@ -105,6 +105,7 @@ fun LocalRecordsScreen(
     onOpenRecycleBin: (() -> Unit)? = null,
     onBeginRecordPackage: (() -> Unit)? = null,
     onOpenFactRecap: (() -> Unit)? = null,
+    onOpenMemoryInbox: (() -> Unit)? = null,
     onBeforeSearchInput: (TextFieldState) -> Boolean = { true },
     onHistoryInputCommitted: () -> Unit = {},
     onRebuildLocalSearch: () -> Unit = {},
@@ -274,8 +275,12 @@ fun LocalRecordsScreen(
                     if (destination == Destination.MEMORIES && ((onBeginExport != null && local.supportsOriginalExport) ||
                         (onOpenRecycleBin != null && local.supportsRecycleBin) ||
                         (onBeginRecordPackage != null && local.supportsRecordPackages) ||
-                        (onOpenFactRecap != null && local.supportsFactRecaps))) {
+                        (onOpenFactRecap != null && local.supportsFactRecaps) ||
+                        (onOpenMemoryInbox != null && local.supportsMemoryInbox))) {
                         Column(Modifier.fillMaxWidth()) {
+                            if (onOpenMemoryInbox != null && local.supportsMemoryInbox) OutlinedButton(onOpenMemoryInbox,
+                                enabled = local.ready && !local.opening && local.error == null,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("memory-inbox-open")) { Text("待审事件与情绪") }
                             if(onOpenFactRecap!=null && local.supportsFactRecaps) OutlinedButton(onOpenFactRecap,
                                 enabled=local.ready && !local.opening && local.error==null,
                                 modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("recap-open")){Text("生成本机日／周回顾")}

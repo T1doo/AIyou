@@ -158,7 +158,7 @@ class MainActivity : ComponentActivity() {
                 favorites = records.favorites, eventDates = records.eventDates,
                 candidates = records.candidates,
                 sourceTags = records.sourceTags, people = records.people, modelConnections = records.modelConnections,
-                sourceMemories = records.sourceMemories,
+                sourceMemories = records.sourceMemories, memoryInbox = records.memoryInbox,
                 sourceTasks = records.sourceTasks,
                 taskProposals = records.taskProposals,
                 reminders = records.reminders,
@@ -176,7 +176,7 @@ class MainActivity : ComponentActivity() {
                     accessIdle && access.retirementReady(id)) })
     }
     override fun onResume() { super.onResume(); packagePicker?.resumed() }
-    override fun onPause() { packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); super.onPause() }
+    override fun onPause() { packageRecords?.state?.value?.memoryInbox?.let { packageRecords?.memoryInbox?.close(it.session) }; packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); super.onPause() }
     override fun onSaveInstanceState(outState: Bundle) { packagePicker?.save(outState); super.onSaveInstanceState(outState) }
     override fun onDestroy() {
         packagePicker?.let { packageRecords?.recordPackages?.detachPickerOwner(it); it.destroy() }
@@ -245,6 +245,7 @@ fun AIyouApp(
     attachments: LocalAttachmentController? = null,
     mixedCapture: com.t1doo.aiyou.records.MixedCaptureController? = null,
     factRecaps: com.t1doo.aiyou.records.FactRecapController? = null,
+    memoryInbox: com.t1doo.aiyou.records.SourceMemoryInboxController? = null,
     display: UiPreferencesState = UiPreferencesState(),
     onDisplayChange: (UiPreferences) -> Unit = {},
     onRetryDisplay: () -> Unit = {},
@@ -319,6 +320,9 @@ fun AIyouApp(
     val recapList = remember { LazyListState() }
     var recapRoute by remember { mutableStateOf(false) }
     var taskSourceRoute by remember { mutableStateOf(false) }
+    // This bit only makes a restored private source route fail closed; no source proof enters Bundle.
+    var inboxSourceRoute by rememberSaveable { mutableStateOf(false) }
+    DisposableEffect(memoryInbox) { onDispose { currentRecords?.invoke()?.memoryInbox?.let { memoryInbox?.close(it.session) } } }
     DisposableEffect(factRecaps) { onDispose { factRecaps?.close() } }
     val currentLocal by rememberUpdatedState(local)
     val currentDisplay by rememberUpdatedState(display)
@@ -408,7 +412,15 @@ fun AIyouApp(
     val browsingPackage = packageUi != null && selected == Destination.MEMORIES && detailEntryId == null && !showSettings && !demo
     val recycleUi = local?.recycleBin
     val browsingRecycle = recycleUi?.browsing == true && selected == Destination.MEMORIES && detailEntryId == null && !showSettings && !demo
-    val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS && !browsingRecycle
+    val lostInboxSource = inboxSourceRoute && detailEntryId != null && searchLocation == null
+    LaunchedEffect(lostInboxSource) {
+        if (lostInboxSource) {
+            navigation.advance()
+            (currentRecordsProvider?.invoke() ?: currentLocal)?.sourceMemories?.let { sourceMemories?.close(it.session) }
+            detailEntryId = null; inboxSourceRoute = false
+        }
+    }
+    val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS && !browsingRecycle && !lostInboxSource
     val currentAnswerFixture by rememberUpdatedState(evidenceAnswerFixture)
     val evidenceAnswers = remember(evidence, evidenceAnswerFixture) {
         com.t1doo.aiyou.records.LocalEvidenceAnswerController(evidence,
@@ -576,6 +588,7 @@ fun AIyouApp(
                 tailReturnRequest = if (!readerFromSearch && latest?.ready == true && !latest.opening && latest.error == null && last?.id == readerId)
                     TailReturnRequest(origin, checkNotNull(readerId), navigation.generation) else null
                 detailEntryId = null
+                inboxSourceRoute = false
                 searchLocation = null
                 if(recapRoute) { tailReturnRequest=null;factRecaps?.validate() }
                 if (readerFromSearch && origin == Destination.MEMORIES) {
@@ -583,6 +596,32 @@ fun AIyouApp(
                     searchReturnSource = search.state.value.entries
                 }
             }
+        }
+    }
+    val inboxUi = local?.memoryInbox
+    val inboxAvailable = !demo && !showSettings && !reading && selected == Destination.MEMORIES && !recapRoute &&
+        local?.let { it.ready && !it.opening && it.error == null && (!it.supportsLocalProcessing || it.localProcessingAvailable) } == true
+    LaunchedEffect(inboxAvailable, inboxUi?.session) {
+        if (!inboxAvailable) inboxUi?.let { memoryInbox?.close(it.session) }
+    }
+    if (inboxUi != null && memoryInbox != null && inboxAvailable) {
+        fun ownsInbox() = ownsNavigation() && selectedName == Destination.MEMORIES.name && detailEntryId == null &&
+            !showSettings && !demo && !recapRoute && currentLocal?.memoryInbox?.session == inboxUi.session
+        com.t1doo.aiyou.records.SourceMemoryInboxDialog(inboxUi, memoryInbox, ::ownsInbox) { item ->
+            val routeGeneration = generation
+            var opened = false
+            navigation.publish(routeGeneration) {
+                val entry = currentLocal?.entries?.singleOrNull { it.id == item.source.sourceId && it.currentRevision.toLong() == item.source.revision }
+                if (ownsInbox() && currentLocal?.saving == false && currentLocal?.savePending == false && entry != null && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE &&
+                    com.t1doo.aiyou.model.OriginalExports.hash(entry.originalText) == item.sourceHash && sourceMemories != null) {
+                    memoryInbox.close(inboxUi.session); navigation.advance(); search.pause(); readerFromSearch = false; tailReturnRequest = null
+                    val ref = checkNotNull(item.current).content.reference
+                    searchLocation = com.t1doo.aiyou.records.OriginalReadingLocation(item.source.sourceId, item.source.revision.toInt(), item.sourceHash, ref.start, ref.end)
+                    inboxSourceRoute = true; detailEntryId = item.source.sourceId
+                    sourceMemories.open(item.source.sourceId, item.source.revision.toInt()); opened = true
+                }
+            }
+            opened
         }
     }
     val selectDestination: (Destination) -> Unit = { destination ->
@@ -601,7 +640,7 @@ fun AIyouApp(
     val openEntry: (String) -> Unit = { id ->
         if (ownsNavigation() && selectedName == origin.name && !showSettings && !demo && detailEntryId == null &&
             navigation.tryAdvance(generation)) {
-            taskSourceRoute=false
+            taskSourceRoute=false;inboxSourceRoute=false
             readerFromSearch = origin == Destination.MEMORIES && searchState.stage == OriginalSearchStage.READY
             search.pause()
             tailReturnRequest = null
@@ -893,9 +932,9 @@ fun AIyouApp(
                 onOpenTags = { id, revision -> if (canCopy(id, revision)) onOpenTags(id, revision) },
                 onOpenPeople = people?.let { controller -> { source -> if (canCopy(source.version.sourceId, source.version.revision.toInt())) controller.open(source) } },
                 location = searchLocation,
-                requiredSource = if(recapRoute||taskSourceRoute) searchLocation else null,
-                requiredSourceTitle = if(taskSourceRoute) "待办来源版本已变化" else "回顾来源版本已变化",
-                requiredSourceMessage = if(taskSourceRoute) "请返回待办重新核对来源，没有将新版本冒充旧摘录。" else "请返回回顾并重新生成，没有将新版本冒充旧摘录。",
+                requiredSource = if(recapRoute||taskSourceRoute||inboxSourceRoute) searchLocation else null,
+                requiredSourceTitle = if(inboxSourceRoute) "候选来源版本已变化" else if(taskSourceRoute) "待办来源版本已变化" else "回顾来源版本已变化",
+                requiredSourceMessage = if(inboxSourceRoute) "请返回回忆刷新待审线索，再核对原文。" else if(taskSourceRoute) "请返回待办重新核对来源，没有将新版本冒充旧摘录。" else "请返回回顾并重新生成，没有将新版本冒充旧摘录。",
                 eventDateController = eventDates, canUseEventDate = canCopy,
                 candidateController = candidates,
                 sourceTagController = sourceTags,
@@ -979,6 +1018,8 @@ fun AIyouApp(
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
+                onOpenMemoryInbox = memoryInbox?.let { controller -> { if (ownsNavigation() && selected == Destination.MEMORIES &&
+                    !reading && !showSettings && !demo) { navigation.advance(); clearSearch(); controller.open() } } },
                 onOpenFactRecap = factRecaps?.let { controller -> { if(ownsNavigation() && selected==Destination.MEMORIES && !reading && !showSettings && !demo) {
                     navigation.advance();clearSearch();controller.open(currentDisplay.preferences.defaultRecapPeriod);recapRoute=true
                 } } },

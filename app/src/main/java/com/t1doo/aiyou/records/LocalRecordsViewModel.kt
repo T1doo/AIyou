@@ -79,6 +79,8 @@ data class LocalRecordUiState(
     val sourceTags: SourceTagUiState? = null,
     val supportsSourceMemories: Boolean = false,
     val sourceMemories: SourceMemoryUiState? = null,
+    val supportsMemoryInbox: Boolean = false,
+    val memoryInbox: SourceMemoryInboxUiState? = null,
     val candidates: LocalCandidateUiState? = null,
     val supportsManualPeople: Boolean = false,
     val manualPeopleOwner: com.t1doo.aiyou.domain.ManualPeopleRepository? = null,
@@ -175,7 +177,7 @@ class LocalRecordsViewModel internal constructor(
         if (editsDisposed || appAccessCommands.get() != 0 || !local.ready || local.opening || local.error != null ||
             local.saving || local.savePending || local.captureDiscard != null || local.localIndexBusy ||
             local.originalEdit != null || local.originalHistory != null || attachments.state.value != null ||
-            local.ai != null || local.sourceTask != null || local.sourceTags != null || local.sourceMemories != null ||
+            local.ai != null || local.sourceTask != null || local.sourceTags != null || local.sourceMemories != null || local.memoryInbox != null ||
             local.localProcessing != null || local.factRecap != null || local.candidates != null ||
             local.originalExport != null || local.recordPackage != null || local.recycleBin != null ||
             local.manualTagEditor != null || local.manualPeopleEditor != null || local.eventDateEditor != null ||
@@ -232,6 +234,8 @@ class LocalRecordsViewModel internal constructor(
         scope = viewModelScope, clock = clock, extract = extractLocalCandidates)
     val sourceTags = SourceTagController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock = clock)
+    val memoryInbox = SourceMemoryInboxController({ mutableState.value }, { change -> update(change) },
+        { action -> submit(Command.MemoryInbox(action)).isSuccess })
     val sourceMemories = SourceMemoryController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock = clock)
     val exports = OriginalExportController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -304,6 +308,9 @@ class LocalRecordsViewModel internal constructor(
                         if(command is Command.Save || command is Command.Revise ||
                             command is Command.RecordPackage || command is Command.RecycleBin ||
                             command is Command.MixedCapture || command is Command.Retry || command is Command.RefreshSearch) factRecaps.invalidate()
+                        if (command is Command.Save || command is Command.Revise || command is Command.RecordPackage ||
+                            command is Command.RecycleBin || command is Command.MixedCapture || command is Command.Retry ||
+                            command is Command.RefreshSearch || command is Command.LocalCandidates || command is Command.LocalProcessing) memoryInbox.invalidate()
                         when (command) {
                             is Command.LocalProcessing -> command.action(checkNotNull(repository))
                             is Command.FactRecap -> command.action(checkNotNull(repository))
@@ -381,6 +388,7 @@ class LocalRecordsViewModel internal constructor(
                             is Command.EventDates -> command.action(checkNotNull(repository))
                             is Command.ManualTasks -> command.action(checkNotNull(repository))
                             is Command.LocalCandidates -> command.action(checkNotNull(repository))
+                            is Command.MemoryInbox -> command.action(checkNotNull(repository))
                             is Command.OriginalExport -> command.action(checkNotNull(repository))
                             is Command.RecordPackage -> command.action(checkNotNull(repository))
                             is Command.RecycleBin -> command.action(checkNotNull(repository))
@@ -417,7 +425,7 @@ class LocalRecordsViewModel internal constructor(
                 reminders.dispose()
                 candidates.dispose()
                 sourceTags.dispose()
-                sourceMemories.dispose()
+                sourceMemories.dispose(); memoryInbox.dispose()
                 exports.dispose()
                 recordPackages.dispose()
                 recycleBin.dispose()
@@ -457,7 +465,7 @@ class LocalRecordsViewModel internal constructor(
                     com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == panel.sourceHash })) proposed.copy(localProcessing = null) else proposed
             val safe = if (scoped.supportsLocalProcessing && !scoped.localProcessingAvailable) scoped.copy(
                 candidates = null, sourceTags = null, sourceMemories = null, ai = null, factRecap = null) else scoped
-            val candidate = reconcileFactRecap(previous,safe)
+            val candidate = reconcileMemoryInbox(previous, reconcileFactRecap(previous,safe))
             val transformed = if (candidate.supportsFavorites && candidate.favoritesAvailable &&
                 candidate.entries.any { !candidate.favorites.containsKey(it.id) }) candidate.copy(
                     favoritesAvailable = false, favoritesError = "记录列表已变化，请重新读取收藏状态。") else candidate
@@ -1208,6 +1216,7 @@ class LocalRecordsViewModel internal constructor(
                 supportsCandidates = store.localCandidates != null,
                 supportsSourceTags = store.sourceTags != null,
                 supportsSourceMemories = store.sourceMemories != null,
+                supportsMemoryInbox = store.sourceMemories?.inbox != null,
                 supportsManualPeople = store.manualPeople != null, manualPeopleOwner = store.manualPeople, manualPeople = peopleValues.orEmpty(),
                 modelConnectionOwner = store.modelConnections,
                 modelSecretOwner = store.localModelConnections?.secrets,
@@ -1381,7 +1390,7 @@ class LocalRecordsViewModel internal constructor(
         reminders.dispose()
         candidates.dispose()
         sourceTags.dispose()
-        sourceMemories.dispose()
+        sourceMemories.dispose(); memoryInbox.dispose()
         exports.dispose()
         recordPackages.dispose()
         recycleBin.dispose()
@@ -1405,6 +1414,7 @@ class LocalRecordsViewModel internal constructor(
         data class RecycleBin(val action: suspend (EntryRepository) -> Unit) : Command
         data class OriginalExport(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualTasks(val action: suspend (EntryRepository) -> Unit) : Command
+        data class MemoryInbox(val action: suspend (EntryRepository) -> Unit) : Command
         data class LocalCandidates(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualPeople(val action: suspend (EntryRepository) -> Unit) : Command
         data class ModelConnections(val action: suspend (EntryRepository) -> Unit) : Command

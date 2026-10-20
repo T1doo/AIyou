@@ -11,6 +11,58 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
     private val cipher=SourceMemoryCipher(key)
     private data class Row(val id:String,val source:SourceVersion,val hash:String,val generation:Long,
         val profile:Int,val version:Long,val state:String,val mutation:String,val created:Long,val bytes:ByteArray)
+    private inner class InboxProof(override val cursor:SourceMemoryInboxCursor?,
+        override val next:SourceMemoryInboxCursor?, values:List<SourceMemorySnapshot>, val signatures:List<String>) : SourceMemoryInboxSnapshot {
+        val owner=this@SqlSourceMemoryRepository
+        override val pending=java.util.Collections.unmodifiableList(values.toList())
+        override fun toString()="SourceMemoryInboxSnapshot(redacted)"
+    }
+    override val inbox:SourceMemoryInboxRepository=object:SourceMemoryInboxRepository {
+        override fun capture(cursor:SourceMemoryInboxCursor?):SourceMemoryInboxSnapshot = safe {
+            database.transaction { readInbox(it,cursor) }
+        }
+        override fun publishCurrent(snapshot:SourceMemoryInboxSnapshot,publish:()->Unit)=verifyInbox(snapshot,null,publish)
+        override fun resolve(snapshot:SourceMemoryInboxSnapshot,item:SourceMemorySnapshot,publish:()->Unit)=verifyInbox(snapshot,item,publish)
+    }
+    private fun verifyInbox(snapshot:SourceMemoryInboxSnapshot,item:SourceMemorySnapshot?,publish:()->Unit):Boolean = safe {
+        val proof=snapshot as? InboxProof ?: return@safe false
+        if(proof.owner!==this || item!=null && proof.pending.none { it===item }) return@safe false
+        database.transaction { sql ->
+            val fresh=readInbox(sql,proof.cursor)
+            if(fresh.signatures!=proof.signatures || fresh.next!=proof.next) false else { publish();true }
+        }
+    }
+    private fun readInbox(sql:RecordsSqlConnection,cursor:SourceMemoryInboxCursor?):InboxProof {
+        val args=if(cursor==null) emptyList() else listOf(cursor.createdAtMillis,cursor.createdAtMillis,cursor.id)
+        val page=if(cursor==null) "" else " AND (c.createdAtMillis<? OR (c.createdAtMillis=? AND c.id>?))"
+        // Filter eligibility before loading any original or ciphertext. One lookahead row proves more pages.
+        val metadata=sql.query("SELECT c.id,c.entryId,c.sourceRevision,c.createdAtMillis,length(c.payload),length(CAST(r.originalText AS BLOB)) "+
+            "FROM local_candidate_batches c JOIN entries e ON e.id=c.entryId "+
+            "JOIN entry_revisions r ON r.entryId=e.id AND r.revision=e.currentRevision "+
+            "LEFT JOIN remote_source_access a ON a.entryId=e.id "+
+            "WHERE c.ruleVersion=2 AND c.state='READY' AND c.sourceRevision=e.currentRevision "+
+            "AND e.privacyPolicy IN ('LOCAL_ONLY','REMOTE_ALLOWED') AND COALESCE(a.deleted,0)=0 "+
+            "AND NOT EXISTS(SELECT 1 FROM permanent_erasure_receipts p WHERE p.entryId=e.id)"+page+
+            " ORDER BY c.createdAtMillis DESC,c.id LIMIT 21",args)
+        val selected=metadata.take(20)
+        require(selected.sumOf { it[4] as Long }<=2_097_152 &&
+            selected.distinctBy { it[1] }.sumOf { it[5] as Long }<=8_000_000)
+        val sources=mutableMapOf<SourceVersion,SourceMemoryPreview>()
+        val pending=mutableListOf<SourceMemorySnapshot>();val signatures=mutableListOf<String>()
+        selected.forEach { cells ->
+            val id=cells[0] as String;val row=checkNotNull(row(sql,id))
+            val source=sources.getOrPut(row.source) { readSource(sql,row.source) }
+            val saved=snapshot(row,payload(row,source)) // Authenticate every selected row, including non-pending rows.
+            signatures+=receipt { w ->
+                w.string(row.id,512);w.string(row.hash,64);w.i64(row.generation);w.i64(row.version);w.i64(row.created)
+                w.string(MessageDigest.getInstance("SHA-256").digest(row.bytes).joinToString("") { "%02x".format(it.toInt() and 255) },64)
+                w.i64(source.capturedAtMillis);w.string(source.captureTimeZone,128);w.string(source.policy.name,32)
+            }
+            if(saved.current?.review==SourceMemoryReview.PROPOSED) pending+=saved
+        }
+        val next=if(metadata.size>20) selected.last().let { SourceMemoryInboxCursor(it[3] as Long,it[0] as String) } else null
+        return InboxProof(cursor,next,pending,signatures)
+    }
     override fun preview(source:SourceVersion):SourceMemoryPreview = safe { database.transaction { readSource(it,source) } }
     override fun memories(source:SourceVersion):List<SourceMemorySnapshot> = safe { database.transaction { sql ->
         val current=readSource(sql,source)

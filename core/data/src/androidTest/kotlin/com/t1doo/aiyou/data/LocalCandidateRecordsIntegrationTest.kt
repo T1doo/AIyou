@@ -102,15 +102,22 @@ class LocalCandidateRecordsIntegrationTest {
         val memoryCreate = SourceMemoryCreate("native-memory",memoryPreview,memoryContent,"native-memory-create",100)
         val pendingMemory = store.sourceMemories.create(memoryCreate)
         store.sourceMemories.create(memoryCreate)
+        val inbox = checkNotNull(store.sourceMemories.inbox)
+        val pendingPage = inbox.capture()
+        assertEquals(listOf(pendingMemory.id), pendingPage.pending.map { it.id })
+        assertTrue(inbox.resolve(pendingPage, pendingPage.pending.single()) {})
         val acceptMemory = SourceMemoryMutation(pendingMemory.id,source,pendingMemory.sourceHash,pendingMemory.generation,pendingMemory.version,1,
             SourceMemoryReview.PROPOSED,SourceMemoryAction.ACCEPT,null,"native-memory-accept",101)
         val acceptedMemory = store.sourceMemories.mutate(acceptMemory)
+        assertFalse(inbox.publishCurrent(pendingPage) {})
+        assertTrue(inbox.capture().pending.isEmpty())
         val memoryCorrection = SourceMemoryMutation(acceptedMemory.id,source,acceptedMemory.sourceHash,acceptedMemory.generation,acceptedMemory.version,1,
             SourceMemoryReview.ACCEPTED,SourceMemoryAction.CORRECT,memoryContent.copy(kind=SourceMemoryKind.OCCASION_EMOTION,assertion=SourceMemoryAssertion.CONTEXT,note="纠正：只是本次原文线索"),"native-memory-correct",102)
         store.sourceMemories.mutate(memoryCorrection)
         store.closeAndAwait(); store = open()
         val memoryRead = store.sourceMemories.memories(source).single()
         assertEquals(SourceMemoryReview.PROPOSED,memoryRead.current!!.review)
+        assertEquals(memoryRead.id, checkNotNull(store.sourceMemories.inbox).capture().pending.single().id)
         assertEquals(SourceMemoryReview.ACCEPTED,memoryRead.versions.first().priorReview)
         assertEquals(SourceMemoryReview.SUPERSEDED,memoryRead.versions.first().review)
         assertThrows(SourceMemoryConflict::class.java) { store.sourceMemories.mutate(acceptMemory) }
