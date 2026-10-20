@@ -16,7 +16,8 @@ import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.model.*
 
 /** Observe the exact memory-only business actions, independently of a clickable node's lifetime. */
-internal class CandidateDialogActions(val confirm: () -> Unit, val cancelConfirmation: () -> Unit)
+internal class CandidateDialogActions(val confirm: () -> Unit, val cancelConfirmation: () -> Unit,
+    val resume: Map<String, () -> Unit>)
 internal fun interface CandidateDialogObserver { fun onActions(actions: CandidateDialogActions) }
 internal val LocalCandidateDialogObserver = staticCompositionLocalOf<CandidateDialogObserver?> { null }
 
@@ -30,7 +31,10 @@ internal fun LocalCandidateDialog(ui: LocalCandidateUiState, controller: LocalCa
     val confirmation = ui.confirmation
     val actions = CandidateDialogActions(
         confirm = { if (allowed() && confirmation != null) controller.confirm(ui.session, confirmation) },
-        cancelConfirmation = { if (allowed() && confirmation != null) controller.cancelConfirmation(ui.session, confirmation) })
+        cancelConfirmation = { if (allowed() && confirmation != null) controller.cancelConfirmation(ui.session, confirmation) },
+        resume = ui.batches.filter { it.state == LocalCandidateState.RUNNING }.associate { batch ->
+            batch.id to { if (allowed()) controller.resume(ui.session, batch.id, batch.version) }
+        })
     LocalCandidateDialogObserver.current?.let { observer -> SideEffect { observer.onActions(actions) } }
     Dialog(onDismissRequest = { if (allowed()) controller.close(ui.session) },
         properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -78,7 +82,7 @@ internal fun LocalCandidateDialog(ui: LocalCandidateUiState, controller: LocalCa
                                         Text("这批本机摘录尚未完成。恢复沿用本批来源，完成后仍需另行采纳；也可取消本批。")
                                         if (!ui.computing) TextButton(
                                             enabled = !ui.loading && !ui.busy && ui.pending == null && !ui.retiringComputation,
-                                            onClick = { if (allowed()) controller.resume(ui.session, batch.id, batch.version) },
+                                            onClick = actions.resume.getValue(batch.id),
                                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
                                                 .testTag("local-candidate-resume-" + batch.id)) { Text("恢复本批本机摘录") }
                                     }

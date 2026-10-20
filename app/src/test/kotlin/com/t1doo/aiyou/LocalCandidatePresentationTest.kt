@@ -188,14 +188,14 @@ class LocalCandidatePresentationTest {
         port.complete(job, LocalExcerptRules.extract(job))
     }
 
-    @Test fun narrowInterruptedBatchWaitsForExplicitSameBatchResumeAndSeparateAcceptance() {
+    @Test @Config(sdk = [35], qualifiers = "w320dp-h640dp")
+    fun narrowInterruptedBatchWaitsForExplicitSameBatchResumeAndSeparateAcceptance() {
         port.begin(LocalCandidateStart("interrupted", SourceVersion("one", 1), 55))
         compose.setContent { Screen(large = true) }; openReader(); openCandidates()
         val tag = "local-candidate-resume-interrupted"
         compose.onNodeWithTag(tag).performScrollTo().assertIsEnabled()
         assertTrue(resumes.isEmpty()); assertEquals(LocalCandidateState.RUNNING, durable.single().state)
-        val bounds = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
-        assertTrue(bounds.height >= with(compose.density) { 48.dp.toPx() })
+        assertTrue(compose.onNodeWithTag(tag).getUnclippedBoundsInRoot().height >= 48.dp)
         click(tag); drain()
         compose.waitUntil(3_000) { queue.isNotEmpty() || state.value.candidates?.batches?.any { it.state == LocalCandidateState.READY } == true }
         drain()
@@ -213,11 +213,11 @@ class LocalCandidatePresentationTest {
         port.begin(LocalCandidateStart("interrupted", SourceVersion("one", 1), 55))
         compose.setContent { Screen() }; openReader(); openCandidates()
         compose.onNodeWithTag("local-candidate-resume-interrupted").performScrollTo()
-        val old = action("local-candidate-resume-interrupted")
+        val old = business().resume.getValue("interrupted")
         click("local-candidates-close"); openCandidates()
         compose.runOnIdle { old(); assertTrue(queue.isEmpty()); assertTrue(resumes.isEmpty()) }
         compose.onNodeWithTag("local-candidate-resume-interrupted").performScrollTo()
-        val fresh = action("local-candidate-resume-interrupted")
+        val fresh = business().resume.getValue("interrupted")
         click("local-candidate-cancel-interrupted"); drain()
         compose.runOnIdle { fresh(); assertTrue(queue.isEmpty()); assertTrue(resumes.isEmpty()) }
         assertEquals(LocalCandidateState.CANCELLED, durable.single().state)
