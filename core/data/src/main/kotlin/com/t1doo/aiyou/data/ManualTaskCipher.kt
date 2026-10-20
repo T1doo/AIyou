@@ -33,10 +33,12 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
     }
     fun seal(task: ManualTaskSnapshot, mutationId: String, requestedAtMillis: Long,
         operation: String = if (task.version == 1L) "CREATE" else "STATUS", reminderRequestProof: String? = null,
-        userReceipt: UserReceipt? = null): ByteArray {
-        val format = if (userReceipt != null) 5 else if (task.reminder != null || operation in REMINDER_OPERATIONS) 4 else if (task.sourceReceipt == null) 2 else 3
+        userReceipt: UserReceipt? = null, runtime: List<ReminderRuntimeReceipt> = emptyList()): ByteArray {
+        val format = if (runtime.isNotEmpty() || operation in RUNTIME_OPERATIONS || task.reminder?.phase in ReminderRuntimeReceipts.phases || task.reminder?.phase == TaskReminderPhase.TIME_PASSED) 6
+            else if (userReceipt != null) 5 else if (task.reminder != null || operation in REMINDER_OPERATIONS) 4 else if (task.sourceReceipt == null) 2 else 3
         validateOperation(task, operation, format, reminderRequestProof)
         validateUserReceipt(task, mutationId, requestedAtMillis, operation, reminderRequestProof, userReceipt)
+        ReminderRuntimeReceipts.validate(task, runtime)
         require(requestedAtMillis in 0..task.updatedAtMillis)
         val plain = ByteArrayOutputStream().use { bytes ->
             DataOutputStream(bytes).use { out ->
@@ -52,11 +54,13 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
                     out.writeBoolean(reminderRequestProof != null)
                     reminderRequestProof?.let { writeText(out, it) }
                 }
+                if (format == 6) out.writeBoolean(userReceipt != null)
                 userReceipt?.let { r ->
                     writeText(out, r.taskId); writeText(out, r.operation); writeText(out, r.mutationId)
                     out.writeLong(r.expectedVersion); out.writeLong(r.requestedAtMillis)
                     writeText(out, r.requestHash); writeText(out, r.decisionHash)
                 }
+                if (format == 6) ReminderRuntimeCipherFields.write(out, runtime)
             }
             bytes.toByteArray()
         }
@@ -72,7 +76,7 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
     }
     fun open(id: String, version: Long, mutationId: String, bytes: ByteArray): Payload {
         require(bytes.size >= 29)
-        val format = bytes[0].toInt(); require(format in 1..5)
+        val format = bytes[0].toInt(); require(format in 1..6)
         require(bytes.size <= if (format >= 4) MAX_EXTENDED_BYTES else MAX_LEGACY_BYTES)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, bytes.copyOfRange(1, 13)))
@@ -91,18 +95,20 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
                     task = task.copy(reminder = readReminder(input))
                     if (flag(input)) proof = readText(input, 64)
                 }
-                val user = if (format == 5) UserReceipt(readText(input, 512), readText(input, 8), readText(input, 512),
+                val user = if (format == 5 || format == 6 && flag(input)) UserReceipt(readText(input, 512), readText(input, 8), readText(input, 512),
                     input.readLong(), input.readLong(), readText(input, 64), readText(input, 64)) else null
+                val runtime = if (format == 6) ReminderRuntimeCipherFields.read(input) else emptyList()
                 // Validate only after all authenticated fields, including reminder/outbox, have been decoded.
                 if (operation != null) validateOperation(task, operation, format, proof)
                 validateUserReceipt(task, mutationId, requested, operation, proof, user)
+                ReminderRuntimeReceipts.validate(task, runtime)
                 require(requested in 0..task.updatedAtMillis && input.available() == 0)
-                Payload(task, requested, operation, proof, user)
+                Payload(task, requested, operation, proof, user, runtime)
             }
         } finally { plain.fill(0) }
     }
     internal fun portable(id: String, version: Long, mutation: String, bytes: ByteArray, restoring: Boolean): ByteArray {
-        require(bytes.isNotEmpty() && bytes[0].toInt() in 1..5)
+        require(bytes.isNotEmpty() && bytes[0].toInt() in 1..6)
         if (!restoring) open(id,version,mutation,bytes)
         if (!restoring) return PortableCipherCell.open(key,aad(id,version,mutation,bytes[0].toInt()),bytes,MAX_EXTENDED_BYTES)
         val encrypted=PortableCipherCell.seal(key,aad(id,version,mutation,bytes[0].toInt()),bytes,MAX_EXTENDED_BYTES)
@@ -178,7 +184,7 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
         if (op in USER_OPERATIONS) {
             require(r.operation == op && r.mutationId == mutation && r.requestedAtMillis == at && r.expectedVersion + 1 == t.version)
             if (op == "REMIND") require(r.requestHash == reminderUserProof(t.id, mutation, r.expectedVersion, at, checkNotNull(proof)))
-        } else require(op in setOf("RM_ACK", "RM_FIRE") && r.expectedVersion + 1 < t.version)
+        } else require((op in setOf("RM_ACK", "RM_FIRE") || op in RUNTIME_OPERATIONS) && r.expectedVersion + 1 < t.version)
     }
     private fun writeCore(out: DataOutputStream, task: ManualTaskSnapshot) {
         writeText(out, task.title); writeText(out, task.status.name)
@@ -256,6 +262,8 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
         require((operation == "REMIND") == (proof != null))
         proof?.let { require(it.matches(Regex("[a-f0-9]{64}"))) }
         if (format < 4) require(reminder == null && proof == null && operation !in REMINDER_OPERATIONS)
+        if (format < 6) require(operation !in RUNTIME_OPERATIONS && reminder?.phase !in ReminderRuntimeReceipts.phases && reminder?.phase != TaskReminderPhase.TIME_PASSED &&
+            reminder?.commands?.none { it.kind == TaskReminderCommandKind.DELIVER } != false)
         when (operation) {
             "RESTORE" -> require(reminder == null || reminder.phase == TaskReminderPhase.REVOKED && reminder.commands.isEmpty())
             "IMPORT" -> require(task.version == 1L && reminder == null)
@@ -272,6 +280,7 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
             "RM_ACK" -> require(format >= 4 && task.version > 1 && reminder != null)
             "RM_FIRE" -> require(format >= 4 && task.version > 1 && task.status == ManualTaskStatus.OPEN &&
                 reminder?.phase == TaskReminderPhase.TRIGGER_ACCEPTED)
+            "RM_EVENT", "RM_CLAIM", "RM_POST", "RM_END", "RM_GC" -> require(format == 6 && task.version > 1 && reminder != null)
             else -> throw IllegalArgumentException("Unknown task operation")
         }
     }
@@ -283,7 +292,9 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
         bytes.toByteArray()
     }
     internal class Payload(val task: ManualTaskSnapshot, val requestedAtMillis: Long, val operation: String?,
-        val reminderRequestProof: String? = null, val userReceipt: UserReceipt? = null)
+        val reminderRequestProof: String? = null, val userReceipt: UserReceipt? = null, runtime: List<ReminderRuntimeReceipt> = emptyList()) {
+        val runtime: List<ReminderRuntimeReceipt> = java.util.Collections.unmodifiableList(runtime.toList())
+    }
     /** Records owner only, after the shared SQL gateway is sealed and drained. */
     fun wipe() = key.fill(0)
     private companion object {
@@ -291,5 +302,6 @@ internal class ManualTaskCipher(databaseKey: ByteArray) {
         const val MAX_LEGACY_BYTES = 4096
         const val MAX_EXTENDED_BYTES = 65536
         val REMINDER_OPERATIONS = setOf("REMIND", "RM_ACK", "RM_FIRE")
+        val RUNTIME_OPERATIONS = setOf("RM_EVENT", "RM_CLAIM", "RM_POST", "RM_END", "RM_GC")
     }
 }

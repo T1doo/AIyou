@@ -155,23 +155,49 @@ class FullBackupTest {
             val task=tasks.create(ManualTaskCreate("task","合成提醒",10,"UTC","create",schedule))
             val originalReminderRequest=TaskReminderMutation(task,TaskReminderMode.EXACT,20,"remind")
             tasks.changeReminder(originalReminderRequest)
+            val available=TaskReminderAvailability(true,TaskReminderPermission.GRANTED,TaskReminderPermission.GRANTED)
+            val due=schedule.instant()!!.toEpochMilli()
+            val pending=tasks.snapshots().single()
+            val event=ReminderEventRequest.create(ReminderRuntimeScope(TaskReminderToken(pending.id,pending.reminder!!.id,1),schedule,TaskReminderMode.EXACT),
+                pending.version,due,ReminderCapabilityObservation(due,available))
+            tasks.acceptRuntimeEvent(event)
+            assertTrue(tasks.runtimeView("task")!!.receipts.isNotEmpty());assertTrue(tasks.reminderCommands().any{it.kind==TaskReminderCommandKind.DELIVER})
+            val postedTask=tasks.create(ManualTaskCreate("posted-task","合成已发布调用",10,"UTC","create-posted",schedule))
+            tasks.changeReminder(TaskReminderMutation(postedTask,TaskReminderMode.EXACT,20,"confirm-posted"))
+            val gate=ReminderExecutionGate();val owner=gate.openOwner(accessAllowed = true);var posts=0
+            val driver=object:ReminderRuntimeDriver {
+                override fun availability()=available
+                override fun schedule(command:TaskReminderCommand)=TaskReminderPhase.SCHEDULED
+                override fun cancel(command:TaskReminderCommand)=TaskReminderPhase.REVOKED
+                override fun post(token:TaskReminderToken,specification:String):ReminderPostObservation{posts++;return ReminderPostObservation.POST_RETURNED}
+            }
+            val posted=tasks.snapshots().single{it.id=="posted-task"}
+            ReminderRuntimeCoordinator(owner,{tasks},driver){due}.handle(owner.capture(TaskReminderToken(posted.id,posted.reminder!!.id,1),due)!!)
+            owner.closeAndAwait();assertEquals(1,posts);assertEquals(TaskReminderPhase.NOTIFICATION_POSTED,tasks.runtimeView("posted-task")!!.task.reminder!!.phase)
             val proposal=TaskProposal("p".repeat(128),3,TaskSourceBinding(SourceVersion(id,1),OriginalExports.hash("合成原文"),
                 source.db.read("SELECT generation FROM remote_source_access WHERE entryId=?",id).single().single() as Long,0,2),
                 "合成被拒绝提案",ManualTaskDateInput("2027-01-02"),10,"UTC",20,TaskProposalState.REJECTED)
             val proposalCipher=TaskProposalCipher(source.key);val proof="a".repeat(64)
             source.db.write("INSERT INTO manual_tasks VALUES(?,?,?,?)",TaskProposals.storageId(proposal.id),proposal.version,proof,proposalCipher.seal(proposal,proof));proposalCipher.wipe()
-            val bytes=export(source);val pack=target.backup.open({bytes.inputStream()},password());target.backup.restore(pack) { true }
+            val bytes=export(source,source.backup.capture(uuid(),due+1));val pack=target.backup.open({bytes.inputStream()},password());target.backup.restore(pack) { true }
             assertEquals("LOCAL_ONLY",target.db.read("SELECT privacyPolicy FROM entries WHERE id=?",id).single().single())
             assertEquals(listOf(null,null),target.db.read("SELECT connection,consent FROM remote_source_access WHERE entryId=?",id).single())
             val targetTasks=SqlManualTaskRepository(target.gateway,target.key)
-            val restored=targetTasks.snapshots().single();assertEquals(schedule,restored.schedule)
+            val restored=targetTasks.snapshots().single{it.id=="task"};assertEquals(schedule,restored.schedule)
             val targetProposals=SqlTaskProposalRepository(target.gateway,target.key,targetTasks)
             assertEquals(proposal,targetProposals.list().single().proposal);targetProposals.wipeKey()
             assertEquals(TaskReminderPhase.REVOKED,restored.reminder!!.phase);assertEquals(TaskReminderMode.EXACT,restored.reminder!!.mode)
             assertTrue(restored.reminder!!.commands.isEmpty());assertTrue(target.db.read("SELECT * FROM remote_text_jobs").isEmpty())
             val row=target.db.read("SELECT version,lastMutationId,ciphertext FROM manual_tasks WHERE id='task'").single()
             val restoredCipher=ManualTaskCipher(target.key)
-            try { assertNull(restoredCipher.open("task",row[0] as Long,row[1] as String,row[2] as ByteArray).userReceipt) }
+            try {
+                val decoded=restoredCipher.open("task",row[0] as Long,row[1] as String,row[2] as ByteArray)
+                assertNull(decoded.userReceipt);assertTrue(decoded.runtime.isEmpty())
+                val postedRow=target.db.read("SELECT version,lastMutationId,ciphertext FROM manual_tasks WHERE id='posted-task'").single()
+                val restoredPosted=restoredCipher.open("posted-task",postedRow[0] as Long,postedRow[1] as String,postedRow[2] as ByteArray)
+                assertEquals(TaskReminderPhase.REVOKED,restoredPosted.task.reminder!!.phase);assertTrue(restoredPosted.task.reminder!!.commands.isEmpty())
+                assertTrue(restoredPosted.runtime.isEmpty());assertNull(restoredPosted.userReceipt)
+            }
             finally { restoredCipher.wipe() }
             assertThrows(ManualTaskConflict::class.java) { targetTasks.changeReminder(originalReminderRequest) }
             tasks.wipeKey();targetTasks.wipeKey();pack.release()

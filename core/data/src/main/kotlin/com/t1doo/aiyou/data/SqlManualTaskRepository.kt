@@ -7,7 +7,7 @@ import java.util.UUID
 import java.util.concurrent.CancellationException
 
 /** CAS, authenticated readback and stable latest-operation replay share one real transaction. */
-internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase, key: ByteArray) : ManualTaskRepository, TaskReminderRepository {
+internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase, key: ByteArray) : ManualTaskRepository, ReminderRuntimeRepository {
     private val cipher = ManualTaskCipher(key)
     override fun snapshots(): List<ManualTaskSnapshot> = safely {
         database.transaction { sql ->
@@ -64,11 +64,8 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
                 if (current.version != request.expectedVersion || current.status != ManualTaskStatus.OPEN) throw ManualTaskConflict()
                 val next = current.copy(version = Math.addExact(current.version, 1), status = request.status,
                     updatedAtMillis = maxOf(current.updatedAtMillis, request.requestedAtMillis), reminder = TaskReminders.revoke(current))
-                val bytes = cipher.seal(next, request.mutationId, request.requestedAtMillis,
+                writeWithin(sql, current, next, request.mutationId, request.requestedAtMillis, "STATUS",
                     userReceipt = cipher.receipt(next, "STATUS", request.mutationId, request.expectedVersion, request.requestedAtMillis, hash))
-                if (sql.execute("UPDATE manual_tasks SET version=?,lastMutationId=?,ciphertext=? WHERE id=? AND version=?",
-                    listOf(next.version, request.mutationId, bytes, request.id, request.expectedVersion)) != 1) throw ManualTaskConflict()
-                checkNotNull(row(sql, request.id)).payload.task.also { check(it == next) }
             }
         }
     }
@@ -89,11 +86,8 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
                 ManualTaskDates.validate(request.operation, current.schedule, request.schedule)
                 val next = current.copy(version = Math.addExact(current.version, 1), schedule = request.schedule,
                     updatedAtMillis = maxOf(current.updatedAtMillis, request.requestedAtMillis), reminder = TaskReminders.revoke(current))
-                val bytes = cipher.seal(next, request.mutationId, request.requestedAtMillis, request.operation.name,
+                writeWithin(sql, current, next, request.mutationId, request.requestedAtMillis, request.operation.name,
                     userReceipt = cipher.receipt(next, request.operation.name, request.mutationId, request.expectedVersion, request.requestedAtMillis, hash))
-                if (sql.execute("UPDATE manual_tasks SET version=?,lastMutationId=?,ciphertext=? WHERE id=? AND version=?",
-                    listOf(next.version, request.mutationId, bytes, request.id, request.expectedVersion)) != 1) throw ManualTaskConflict()
-                checkNotNull(row(sql, request.id)).payload.task.also { check(it == next) }
             }
         }
     }
@@ -138,6 +132,7 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
                 current
             } else {
                 if (current != request.task) throw ManualTaskConflict()
+                if (request.mode != null && old.payload.runtime.size >= ReminderRuntimeReceipts.MAX_SLOTS) throw ReminderRuntimeLimit()
                 val next = reminderNext(request)
                 writeWithin(sql, current, next, request.mutationId, request.requestedAtMillis, "REMIND", proof,
                     cipher.receipt(next, "REMIND", request.mutationId, request.task.version, request.requestedAtMillis, hash))
@@ -167,6 +162,7 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
             if (command !in reminder.commands) return@transaction false
             val isCurrent = TaskReminders.commandCurrent(current, command)
             val phase = when (command.kind) {
+                TaskReminderCommandKind.DELIVER -> return@transaction false
                 TaskReminderCommandKind.CANCEL -> {
                     if (result != TaskReminderPhase.REVOKED) return@transaction false
                     reminder.phase
@@ -199,10 +195,156 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
             true
         }
     }
+    override fun runtimeView(taskId: String): ReminderRuntimeView? = safely {
+        ManualTags.identifier(taskId)
+        database.transaction { sql -> row(sql, taskId)?.let(::runtimeView) }
+    }
+    private fun runtimeView(row: Row) = ReminderRuntimeView(row.payload.task, row.payload.runtime)
+    private fun runtimeReply(outcome: ReminderRuntimeOutcome, row: Row?) = ReminderRuntimeReply(outcome, row?.let(::runtimeView))
+    private fun runtimeCurrent(t: ManualTaskSnapshot, scope: ReminderRuntimeScope): Boolean = t.status == ManualTaskStatus.OPEN &&
+        t.id == scope.token.taskId && t.reminder?.let { it.id == scope.token.reminderId && it.scheduleVersion == scope.token.scheduleVersion &&
+            it.schedule == scope.schedule && it.mode == scope.mode && t.schedule == scope.schedule } == true
+    private fun runtimeCas(row: Row, expected: Long) { if (row.payload.task.version != expected) throw ReminderRuntimeConflict() }
+    private fun runtimeWrite(sql: RecordsSqlConnection, old: Row, phase: TaskReminderPhase, commands: List<TaskReminderCommand>,
+        ledger: List<ReminderRuntimeReceipt>, mutation: String, at: Long, operation: String): Row {
+        val current = old.payload.task
+        val next = current.copy(version = Math.addExact(current.version, 1), updatedAtMillis = maxOf(current.updatedAtMillis, at),
+            reminder = requireNotNull(current.reminder).copy(phase = phase, commands = commands))
+        writeWithin(sql, current, next, mutation, at, operation, userReceipt = receiptForSystem(old), runtime = ledger)
+        return requireNotNull(row(sql, current.id))
+    }
+    override fun acceptRuntimeEvent(request: ReminderEventRequest): ReminderRuntimeReply = safely {
+        database.transaction { sql ->
+            val old = row(sql, request.scope.token.taskId) ?: return@transaction runtimeReply(ReminderRuntimeOutcome.MISSING, null)
+            val existing = old.payload.runtime.singleOrNull { it.event.id == request.id }
+            if (existing != null) {
+                if (existing.event != request) throw ReminderRuntimeConflict()
+                return@transaction runtimeReply(if (existing.retired != null) ReminderRuntimeOutcome.RETIRED else ReminderRuntimeOutcome.EXACT_REPLAY, old)
+            }
+            if (old.payload.runtime.any { it.token == request.scope.token }) return@transaction runtimeReply(ReminderRuntimeOutcome.ALREADY_OBSERVED, old)
+            val t = old.payload.task; val r = t.reminder
+            if (!runtimeCurrent(t, request.scope) || r == null || r.phase !in setOf(TaskReminderPhase.PENDING, TaskReminderPhase.SCHEDULED))
+                return@transaction runtimeReply(ReminderRuntimeOutcome.STALE, old)
+            val schedule = TaskReminderCommand(request.scope.token, TaskReminderCommandKind.SCHEDULE, request.scope.schedule, request.scope.mode)
+            if (r.phase == TaskReminderPhase.PENDING && !TaskReminders.commandCurrent(t, schedule)) return@transaction runtimeReply(ReminderRuntimeOutcome.STALE, old)
+            runtimeCas(old, request.expectedVersion)
+            if (request.observedAtMillis < requireNotNull(request.scope.schedule.instant()).toEpochMilli()) return@transaction runtimeReply(ReminderRuntimeOutcome.TOO_EARLY, old)
+            if (old.payload.runtime.size >= ReminderRuntimeReceipts.MAX_SLOTS) throw ReminderRuntimeLimit()
+            val blocked = request.capability.availability.blocked(request.scope.mode) != null
+            val receipt = ReminderRuntimeReceipt(request, if (blocked) ReminderEventDecision.TRIGGER_BLOCKED else ReminderEventDecision.ACCEPTED,
+                closed = if (blocked) ReminderRuntimeClosure(request.observedAtMillis, ReminderClosureReason.CAPABILITY_UNAVAILABLE_AT_TRIGGER) else null)
+            val commands = r.commands.filterNot { it == schedule } + if (blocked) emptyList() else listOf(schedule.copy(kind = TaskReminderCommandKind.DELIVER))
+            val saved = runtimeWrite(sql, old, if (blocked) TaskReminderPhase.TRIGGER_BLOCKED else TaskReminderPhase.TRIGGER_ACCEPTED,
+                commands, old.payload.runtime + receipt, request.id, request.observedAtMillis, "RM_EVENT")
+            runtimeReply(if (blocked) ReminderRuntimeOutcome.BLOCKED else ReminderRuntimeOutcome.ACCEPTED, saved)
+        }
+    }
+    override fun decideRuntimeClaim(request: ReminderClaimRequest): ReminderRuntimeReply = safely {
+        database.transaction { sql ->
+            val old = row(sql, request.event.scope.token.taskId) ?: return@transaction runtimeReply(ReminderRuntimeOutcome.MISSING, null)
+            val slot = old.payload.runtime.singleOrNull { it.event.id == request.event.id } ?: return@transaction runtimeReply(ReminderRuntimeOutcome.STALE, old)
+            if (slot.event != request.event) throw ReminderRuntimeConflict()
+            slot.claim?.let {
+                if (it == request) return@transaction runtimeReply(if (slot.retired != null) ReminderRuntimeOutcome.RETIRED else ReminderRuntimeOutcome.EXACT_REPLAY, old)
+                if (slot.closed != null) return@transaction runtimeReply(ReminderRuntimeOutcome.RETIRED, old)
+                throw ReminderRuntimeConflict()
+            }
+            if (slot.closed != null || slot.retired != null) return@transaction runtimeReply(ReminderRuntimeOutcome.RETIRED, old)
+            val t = old.payload.task; val r = requireNotNull(t.reminder)
+            val deliver = TaskReminderCommand(slot.token, TaskReminderCommandKind.DELIVER, slot.event.scope.schedule, slot.event.scope.mode)
+            if (!runtimeCurrent(t, request.event.scope) || r.phase != TaskReminderPhase.TRIGGER_ACCEPTED || !TaskReminders.commandCurrent(t, deliver))
+                return@transaction runtimeReply(ReminderRuntimeOutcome.STALE, old)
+            runtimeCas(old, request.expectedVersion)
+            val blocked = request.capability.availability.blocked(request.event.scope.mode) != null
+            val nextSlot = slot.copy(claim = request, claimDecision = if (blocked) ReminderClaimDecision.BLOCKED_CAPABILITY else ReminderClaimDecision.GRANTED,
+                closed = if (blocked) ReminderRuntimeClosure(request.claimAtMillis, ReminderClosureReason.CAPABILITY_UNAVAILABLE_BEFORE_POST) else null)
+            val saved = runtimeWrite(sql, old, if (blocked) TaskReminderPhase.DELIVERY_BLOCKED else TaskReminderPhase.POSTING,
+                r.commands.filterNot { it == deliver }, old.payload.runtime.map { if (it == slot) nextSlot else it },
+                request.id, request.claimAtMillis, "RM_CLAIM")
+            runtimeReply(if (blocked) ReminderRuntimeOutcome.BLOCKED else ReminderRuntimeOutcome.ACCEPTED, saved)
+        }
+    }
+    override fun recordRuntimeResult(request: ReminderResultRequest, authority: ReminderResultAuthority): ReminderRuntimeReply = safely {
+        database.transaction { sql ->
+            val old = row(sql, request.claim.event.scope.token.taskId) ?: return@transaction runtimeReply(ReminderRuntimeOutcome.MISSING, null)
+            val slot = old.payload.runtime.singleOrNull { it.event.id == request.claim.event.id } ?: return@transaction runtimeReply(ReminderRuntimeOutcome.STALE, old)
+            if (slot.claim != request.claim) throw ReminderRuntimeConflict()
+            slot.result?.let {
+                if (it != request) throw ReminderRuntimeConflict()
+                return@transaction runtimeReply(if (slot.retired != null) ReminderRuntimeOutcome.RETIRED else ReminderRuntimeOutcome.EXACT_REPLAY, old)
+            }
+            if (slot.closed != null || slot.retired != null) return@transaction runtimeReply(ReminderRuntimeOutcome.RETIRED, old)
+            val t = old.payload.task; val r = requireNotNull(t.reminder)
+            if (!authority.authorizes(request) || !runtimeCurrent(t, request.claim.event.scope) || r.phase != TaskReminderPhase.POSTING)
+                return@transaction runtimeReply(ReminderRuntimeOutcome.STALE, old)
+            runtimeCas(old, request.expectedVersion)
+            val (phase, cause) = when (request.observation) {
+                ReminderPostObservation.POST_RETURNED -> TaskReminderPhase.NOTIFICATION_POSTED to ReminderClosureReason.OPERATION_FINISHED
+                ReminderPostObservation.CALL_FAILED -> TaskReminderPhase.POST_FAILED to ReminderClosureReason.OPERATION_FINISHED
+                ReminderPostObservation.CALL_OUTCOME_UNKNOWN -> TaskReminderPhase.POST_UNKNOWN to ReminderClosureReason.OUTCOME_UNCONFIRMED
+                ReminderPostObservation.NO_ATTEMPT_CAPABILITY_LOST -> TaskReminderPhase.DELIVERY_BLOCKED to ReminderClosureReason.CAPABILITY_LOST_AFTER_CLAIM
+            }
+            val nextSlot = slot.copy(result = request, closed = ReminderRuntimeClosure(request.observedAtMillis, cause))
+            val saved = runtimeWrite(sql, old, phase, r.commands, old.payload.runtime.map { if (it == slot) nextSlot else it },
+                request.id, request.observedAtMillis, "RM_POST")
+            runtimeReply(ReminderRuntimeOutcome.ACCEPTED, saved)
+        }
+    }
+    override fun endRuntime(token: TaskReminderToken, expectedVersion: Long, atMillis: Long, reason: ReminderClosureReason): Boolean = safely {
+        require(atMillis >= 0 && reason in setOf(ReminderClosureReason.OWNER_RETIRED, ReminderClosureReason.OUTCOME_UNCONFIRMED))
+        database.transaction { sql ->
+            val old = row(sql, token.taskId) ?: return@transaction false
+            val slot = old.payload.runtime.singleOrNull { it.token == token } ?: return@transaction false
+            if (slot.closed != null || slot.retired != null) return@transaction false
+            require(slot.claim != null || reason == ReminderClosureReason.OWNER_RETIRED)
+            val t = old.payload.task; val r = requireNotNull(t.reminder)
+            if (r.scheduleVersion != token.scheduleVersion) return@transaction false
+            runtimeCas(old, expectedVersion)
+            val phase = if (slot.claim == null) TaskReminderPhase.TRIGGER_UNDELIVERED else TaskReminderPhase.POST_UNKNOWN
+            val closure = if (slot.claim == null) reason else ReminderClosureReason.OUTCOME_UNCONFIRMED
+            val nextSlot = slot.copy(closed = ReminderRuntimeClosure(atMillis, closure))
+            runtimeWrite(sql, old, phase, r.commands.filterNot { it.token == token && it.kind == TaskReminderCommandKind.DELIVER },
+                old.payload.runtime.map { if (it == slot) nextSlot else it }, "runtime-end:" + UUID.randomUUID(), atMillis, "RM_END")
+            true
+        }
+    }
+    override fun markKnownLostPast(token: TaskReminderToken, expectedVersion: Long, atMillis: Long): Boolean = safely {
+        require(atMillis >= 0)
+        database.transaction { sql ->
+            val old = row(sql, token.taskId) ?: return@transaction false
+            val t = old.payload.task; val r = t.reminder ?: return@transaction false
+            if (t.status != ManualTaskStatus.OPEN || r.id != token.reminderId || r.scheduleVersion != token.scheduleVersion ||
+                r.phase !in setOf(TaskReminderPhase.PENDING, TaskReminderPhase.SCHEDULED) || requireNotNull(r.schedule.instant()).toEpochMilli() > atMillis ||
+                old.payload.runtime.any { it.token == token }) return@transaction false
+            runtimeCas(old, expectedVersion)
+            runtimeWrite(sql, old, TaskReminderPhase.TIME_PASSED, r.commands.filterNot { it.kind == TaskReminderCommandKind.SCHEDULE },
+                old.payload.runtime, "runtime-past:" + UUID.randomUUID(), atMillis, "RM_END")
+            true
+        }
+    }
+    override fun collectRetiredRuntime(taskId: String, expectedVersion: Long, atMillis: Long): Int = safely {
+        require(atMillis >= 0)
+        database.transaction { sql ->
+            val old = row(sql, taskId) ?: return@transaction 0
+            runtimeCas(old, expectedVersion)
+            val r = old.payload.task.reminder ?: return@transaction 0
+            val remaining = old.payload.runtime.filterNot { s -> s.retired != null && s.closed != null && r.commands.none { it.token == s.token } }
+            val count = old.payload.runtime.size - remaining.size
+            if (count > 0) runtimeWrite(sql, old, r.phase, r.commands, remaining, "runtime-gc:" + UUID.randomUUID(), atMillis, "RM_GC")
+            count
+        }
+    }
     private fun writeWithin(sql: RecordsSqlConnection, current: ManualTaskSnapshot, next: ManualTaskSnapshot,
         mutation: String, requestedAtMillis: Long, operation: String, proof: String? = null,
-        userReceipt: ManualTaskCipher.UserReceipt? = null): ManualTaskSnapshot {
-        val bytes = cipher.seal(next, mutation, requestedAtMillis, operation, proof, userReceipt)
+        userReceipt: ManualTaskCipher.UserReceipt? = null, runtime: List<ReminderRuntimeReceipt>? = null): ManualTaskSnapshot {
+        val prior = row(sql, current.id) ?: throw ManualTaskConflict()
+        if (prior.payload.task != current) throw ManualTaskConflict()
+        val ledger = runtime ?: prior.payload.runtime.map { receipt ->
+            if (receipt.token.scheduleVersion < requireNotNull(next.reminder).scheduleVersion) receipt.copy(
+                closed = receipt.closed ?: ReminderRuntimeClosure(requestedAtMillis, ReminderClosureReason.USER_DECISION),
+                retired = receipt.retired ?: ReminderRuntimeRetirement(requestedAtMillis)) else receipt
+        }
+        val bytes = cipher.seal(next, mutation, requestedAtMillis, operation, proof, userReceipt, ledger)
         if (sql.execute("UPDATE manual_tasks SET version=?,lastMutationId=?,ciphertext=? WHERE id=? AND version=?",
             listOf(next.version, mutation, bytes, current.id, current.version)) != 1) throw ManualTaskConflict()
         return checkNotNull(row(sql, current.id)).payload.task.also { check(it == next) }
@@ -244,6 +386,8 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
         catch (conflict: ManualTaskConflict) { throw conflict }
         catch (invalid: ManualTaskDateInvalid) { throw invalid }
         catch (limit: TaskReminderLimit) { throw limit }
+        catch (conflict: ReminderRuntimeConflict) { throw conflict }
+        catch (limit: ReminderRuntimeLimit) { throw limit }
         catch (_: Exception) { throw ManualTaskStorageFailure() }
     fun wipeKey() = cipher.wipe()
     private companion object {

@@ -7,8 +7,10 @@ enum class TaskReminderMode { EXACT, APPROXIMATE }
 enum class TaskReminderPhase {
     PENDING, SCHEDULED, REVOKED, TRIGGER_ACCEPTED, PLATFORM_UNAVAILABLE,
     NOTIFICATION_REQUIRED, NOTIFICATION_DENIED, CHANNEL_DISABLED, EXACT_REQUIRED, EXACT_DENIED, FAILED,
+    TRIGGER_BLOCKED, DELIVERY_BLOCKED, POSTING, NOTIFICATION_POSTED, POST_FAILED, POST_UNKNOWN,
+    TRIGGER_UNDELIVERED, TIME_PASSED,
 }
-enum class TaskReminderCommandKind { SCHEDULE, CANCEL }
+enum class TaskReminderCommandKind { SCHEDULE, CANCEL, DELIVER }
 enum class TaskReminderPermission { NOT_REQUESTED, DENIED, GRANTED }
 
 /** Contains identity only, never the task title or original record. */
@@ -42,11 +44,14 @@ class TaskReminderSnapshot(val id: String, val scheduleVersion: Long, val mode: 
                 it.token.scheduleVersion == scheduleVersion && it.schedule == schedule && it.mode == mode
             }) { "Invalid pending reminder command" }
         } else require(schedules.isEmpty()) { "Only a pending reminder can schedule" }
+        val deliveries = commands.filter { it.kind == TaskReminderCommandKind.DELIVER }
+        require(deliveries.isEmpty() || phase == TaskReminderPhase.TRIGGER_ACCEPTED && deliveries.size == 1 &&
+            deliveries.single().let { it.token.scheduleVersion == scheduleVersion && it.schedule == schedule && it.mode == mode })
         require(commands.filter { it.kind == TaskReminderCommandKind.CANCEL }.all {
             it.token.scheduleVersion < scheduleVersion
         }) { "Only a previous reminder version can be cancelled" }
         // Reserve the current version's cancellation slot, so completing a task can always revoke it.
-        if (phase != TaskReminderPhase.PENDING && phase != TaskReminderPhase.REVOKED)
+        if (phase != TaskReminderPhase.PENDING && phase != TaskReminderPhase.REVOKED && deliveries.isEmpty())
             require(commands.size < MAX_COMMANDS) { "Missing reminder cancellation capacity" }
     }
     fun copy(id: String = this.id, scheduleVersion: Long = this.scheduleVersion, mode: TaskReminderMode = this.mode,
@@ -123,6 +128,9 @@ object TaskReminders {
         val reminder = task?.reminder ?: return false
         if (task.id != command.token.taskId || reminder.id != id(task.id) || command !in reminder.commands) return false
         if (command.kind == TaskReminderCommandKind.CANCEL) return true
+        if (command.kind == TaskReminderCommandKind.DELIVER) return task.status == ManualTaskStatus.OPEN &&
+            reminder.phase == TaskReminderPhase.TRIGGER_ACCEPTED && command.token.scheduleVersion == reminder.scheduleVersion &&
+            command.schedule == reminder.schedule && command.mode == reminder.mode && task.schedule == reminder.schedule
         return task.status == ManualTaskStatus.OPEN && reminder.phase == TaskReminderPhase.PENDING &&
             command.token.scheduleVersion == reminder.scheduleVersion && command.token.reminderId == reminder.id &&
             command.schedule == reminder.schedule && command.mode == reminder.mode && task.schedule == reminder.schedule
@@ -145,7 +153,7 @@ object TaskReminders {
 
     private fun cancellations(taskId: String, old: TaskReminderSnapshot?): List<TaskReminderCommand> {
         if (old == null) return emptyList()
-        val commands = old.commands.map { if (it.kind == TaskReminderCommandKind.SCHEDULE) it.copy(kind = TaskReminderCommandKind.CANCEL) else it }
+        val commands = old.commands.map { if (it.kind != TaskReminderCommandKind.CANCEL) it.copy(kind = TaskReminderCommandKind.CANCEL) else it }
             .toMutableList()
         if (old.phase != TaskReminderPhase.REVOKED) {
             val token = TaskReminderToken(taskId, old.id, old.scheduleVersion)

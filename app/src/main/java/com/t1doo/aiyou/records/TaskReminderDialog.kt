@@ -28,6 +28,13 @@ internal fun taskReminderLabel(reminder: TaskReminderSnapshot): String =
     TaskReminderPhase.EXACT_REQUIRED -> "精确提醒未安排 · 尚未获得精确闹钟授权"
     TaskReminderPhase.EXACT_DENIED -> "精确提醒未安排 · 精确闹钟授权已拒绝，可另行明确选择大约提醒"
     TaskReminderPhase.FAILED -> "提醒未确认安排 · 请重新读取状态后再决定是否重新确认"
+    TaskReminderPhase.TRIGGER_BLOCKED -> "触发时能力不可用 · 未发布通知"
+    TaskReminderPhase.DELIVERY_BLOCKED -> "发布前能力不可用 · 未发布，不会自动补发"
+    TaskReminderPhase.POSTING, TaskReminderPhase.POST_UNKNOWN -> "通知发布结果未核实 · 不会自动重发"
+    TaskReminderPhase.NOTIFICATION_POSTED -> "通知发布调用已返回 · 不证明已看见"
+    TaskReminderPhase.POST_FAILED -> "通知发布失败 · 未自动重发"
+    TaskReminderPhase.TRIGGER_UNDELIVERED -> "触发已记录 · 未发布，不会自动补发"
+    TaskReminderPhase.TIME_PASSED -> "时间已过 · 未重新安排，通知结果未核实"
 }
 
 @Composable

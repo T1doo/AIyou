@@ -30,6 +30,9 @@ class TaskReminderDispatcher(private val repository: TaskReminderRepository, pri
         // Cancellation is scoped to its old token, so ordering cannot revoke a newer schedule.
         for (command in repository.reminderCommands().sortedBy { if (it.kind == TaskReminderCommandKind.SCHEDULE) 0 else 1 }.take(limit)) {
             try {
+                // A persistent trigger is not a fresh live publication permit.
+                if (command.kind == TaskReminderCommandKind.DELIVER) continue
+                if (command.kind == TaskReminderCommandKind.SCHEDULE && requireNotNull(command.schedule.instant()).toEpochMilli() <= clock()) continue
                 if (!repository.isReminderCommandCurrent(command)) {
                     if (command.kind == TaskReminderCommandKind.SCHEDULE &&
                         repository.acknowledgeReminder(command, TaskReminderPhase.REVOKED, clock())) acknowledged++
