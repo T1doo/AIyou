@@ -22,7 +22,15 @@ class ReminderCommandPage(val metaVersion:Long,val passId:String,commands:List<T
     init { require(scannedRows in 0..16 && commands.size<=16 && failedRows in 0..scannedRows && unownedRuntime.size<=scannedRows);unownedRuntime.forEach(ManualTags::identifier) }
     override fun toString()="ReminderCommandPage(scannedRows=$scannedRows, done=$done)"
 }
-class ReminderRuntimeClosureUnconfirmed(private val quarantine:Any?=null):IllegalStateException("Reminder storage closure unconfirmed")
+class ReminderRuntimeClosureUnconfirmed(private val quarantine:Any?=null,private val cleanup:(()->Unit)?=null):IllegalStateException("Reminder storage closure unconfirmed") {
+    private var confirmed=false
+    /** Closing capability only. The owning process worker must hold its sealed owner's close gate. */
+    @Synchronized fun confirmCleanup(){
+        if(confirmed)return
+        val action=cleanup?:throw this
+        try{action();confirmed=true}catch(_:Throwable){throw this}
+    }
+}
 class ReminderMetaStorageFailure : IllegalStateException("Reminder runtime metadata unavailable")
 interface ReminderRebuildRepository {
     fun read():ReminderRuntimeMeta

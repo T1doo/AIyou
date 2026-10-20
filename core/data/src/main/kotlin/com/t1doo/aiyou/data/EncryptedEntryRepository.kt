@@ -231,7 +231,7 @@ class EncryptedEntryRepository internal constructor(
                         checkNotNull(current.required[RepositoryKeyPurpose.ATTACHMENTS]) || existingRows)
                 })
             } catch (failure: Throwable) {
-                key.fill(0)
+                if(failure !is com.t1doo.aiyou.domain.ReminderRuntimeClosureUnconfirmed)key.fill(0)
                 throw failure
             }
         }
@@ -254,7 +254,7 @@ class EncryptedEntryRepository internal constructor(
             try {
                 require(key.size == 32)
                 SqlCipherPrivacyLog.install()
-            System.loadLibrary("sqlcipher")
+                System.loadLibrary("sqlcipher")
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
                 val created = Room.databaseBuilder(context.applicationContext, RecordsDatabase::class.java, file.absolutePath)
                 .openHelperFactory(SupportOpenHelperFactory(key))
@@ -294,11 +294,11 @@ class EncryptedEntryRepository internal constructor(
                     newCapturePolicy = newCapturePolicy).also { opened = true }
             } finally {
                 if (!opened) {
-                    gateway?.seal(); storage?.close(); edits?.close()
-                    try {
+                    RecordOpenFailureProtocol.cleanup(key,arrayOf(database,storage,edits,gateway)){
+                        gateway?.seal(); storage?.close(); edits?.close()
                         gateway?.checkExternalWait(); storage?.checkExternalWait(); edits?.checkExternalWait()
                         storage?.awaitIdle(); edits?.awaitIdle(); gateway?.awaitIdle(); database?.close()
-                    } finally { key.fill(0) }
+                    }
                 }
             }
         }

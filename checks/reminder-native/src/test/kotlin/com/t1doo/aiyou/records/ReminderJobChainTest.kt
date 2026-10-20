@@ -30,7 +30,7 @@ import org.robolectric.shadows.ShadowJobService
 class ReminderJobChainTest {
     private val app:Application get()=RuntimeEnvironment.getApplication()
     private var runtime:AndroidReminderRuntime?=null
-    @Before fun reset(){QueueBinder.queue.clear();QueueBinder.completed.set(0);QueueBinder.cancelled.set(0);QueueBinder.entered=null;QueueBinder.release=null}
+    @Before fun reset(){QueueBinder.queue.clear();QueueBinder.completed.set(0);QueueBinder.cancelled.set(0);QueueBinder.entered=null;QueueBinder.release=null;QueueBinder.returned.set(0);QueueBinder.lastItem=null;QueueBinder.lastJob=null;QueueBinder.workOwners.clear();QueueBinder.autoStops.set(0);QueueBinder.outcome=JobScheduler.RESULT_SUCCESS;QueueBinder.throwOnEnqueue=false;QueueBinder.publishBeforeReturn=false}
     @After fun cleanup(){runtime?.let{it.scope.cancel();it.bridge.close()};AndroidReminderRuntime.replaceForTest(null);com.t1doo.aiyou.ui.processAppAccessPreferenceOperations.runner=null}
     private fun install(f:NativeSqlFixture,driver:ReminderRuntimeDriver,unlocked:()->Boolean={true},access:suspend ()->Boolean={true}):AndroidReminderRuntime {
         val runtime=AndroidReminderRuntime(app){bridge->ReminderProcessOwner(bridge,unlocked,access,{f.open()}, {driver},{f.now}){f.fingerprint}}
@@ -63,16 +63,16 @@ class ReminderJobChainTest {
         QueueBinder.queue.add(JobWorkItem(Intent().putExtra(AndroidReminderRuntime.NONCE,"old-process").putExtra(AndroidReminderRuntime.TICKET,"old")))
         install(f,driver)
         val envelope=f.stores.resources.envelopes.seal(token,ReminderEnvelopePurpose.ALARM)
-        receive(envelope);waitFor{QueueBinder.queue.size==1};receive(envelope)
-        waitFor{QueueBinder.queue.size==2};assertEquals(1,QueueBinder.cancelled.get())
+        receive(envelope);waitFor{QueueBinder.returned.get()==1&&QueueBinder.queue.size==1};receive(envelope)
+        assertEquals(1,QueueBinder.queue.size);assertEquals(1,QueueBinder.cancelled.get())
         val controller=Robolectric.buildService(ReminderJobService::class.java).create();val service=controller.get()
         try{
-            assertTrue(service.onStartJob(Shadow.newInstanceOf(JobParameters::class.java)))
+            assertTrue(service.onStartJob(QueueBinder.parameters()))
             waitFor{f.closed.get()==1}
             assertEquals(1,posts.get());assertTrue(schedules.get() in 18..36)
             assertEquals(TaskReminderPhase.NOTIFICATION_POSTED,f.storesForRead().resources.tasks.runtimeView("trigger")!!.task.reminder!!.phase)
-            assertEquals(2,QueueBinder.completed.get())
-            assertTrue(Shadows.shadowOf(service).isJobFinished)
+            assertEquals(1,QueueBinder.completed.get())
+            assertFalse(Shadows.shadowOf(service).isJobFinished);assertTrue(QueueBinder.autoStops.get()>0)
         }finally{controller.destroy()}
     }}
     @Test fun stoppingDuringActualPortWaitsForOriginalReturnAndNeverStartsNextCommand(){NativeSqlFixture().use{f->
@@ -85,7 +85,7 @@ class ReminderJobChainTest {
             override fun post(token:TaskReminderToken,specification:String):ReminderPostObservation{calls.incrementAndGet();entered.countDown();check(release.await(5,TimeUnit.SECONDS));return ReminderPostObservation.POST_RETURNED}
         }
         install(f,driver);receive(f.stores.resources.envelopes.seal(token,ReminderEnvelopePurpose.ALARM));waitFor{QueueBinder.queue.isNotEmpty()}
-        val controller=Robolectric.buildService(ReminderJobService::class.java).create();val service=controller.get();val params=Shadow.newInstanceOf(JobParameters::class.java)
+        val controller=Robolectric.buildService(ReminderJobService::class.java).create();val service=controller.get();val params=QueueBinder.parameters()
         try{
             service.onStartJob(params);assertTrue(entered.await(5,TimeUnit.SECONDS));assertFalse(service.onStopJob(params))
             assertEquals(0,f.closed.get());assertEquals(0,QueueBinder.completed.get())
@@ -110,7 +110,7 @@ class ReminderJobChainTest {
             Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(3))
             release.countDown();waitFor{QueueBinder.queue.isNotEmpty()}
             val controller=Robolectric.buildService(ReminderJobService::class.java).create();val service=controller.get()
-            try{service.onStartJob(Shadow.newInstanceOf(JobParameters::class.java));waitFor{Shadows.shadowOf(service).isJobFinished};assertEquals(0,f.opened.get());assertEquals(1,QueueBinder.completed.get())}
+            try{service.onStartJob(QueueBinder.parameters());waitFor{QueueBinder.loopEnded(service)};assertEquals(0,f.opened.get());assertEquals(1,QueueBinder.completed.get())}
             finally{controller.destroy()}
         }finally{release.countDown();QueueBinder.entered=null;QueueBinder.release=null}
     }}
@@ -125,13 +125,25 @@ class ReminderJobChainTest {
         receive(f.stores.resources.envelopes.seal(token,ReminderEnvelopePurpose.ALARM));assertTrue(QueueBinder.queue.isEmpty())
         QueueBinder.queue.add(JobWorkItem(Intent().putExtra(AndroidReminderRuntime.NONCE,"retired-process").putExtra(AndroidReminderRuntime.TICKET,"stale")))
         val controller=Robolectric.buildService(ReminderJobService::class.java).create();val service=controller.get()
-        try{service.onStartJob(Shadow.newInstanceOf(JobParameters::class.java));waitFor{Shadows.shadowOf(service).isJobFinished};assertEquals(0,reads.get());assertEquals(0,f.opened.get());assertEquals(1,QueueBinder.completed.get())}
+        try{assertFalse(service.onStartJob(QueueBinder.parameters()));assertFalse(Shadows.shadowOf(service).isJobFinished);assertEquals(0,reads.get());assertEquals(0,f.opened.get());assertEquals(0,QueueBinder.completed.get())}
         finally{controller.destroy()}
     }}
 }
 
 internal object QueueBinder {
     @Volatile var entered:CountDownLatch?=null;@Volatile var release:CountDownLatch?=null
+    val workOwners=ConcurrentHashMap<JobWorkItem,JobInfo>()
+    val autoStops=AtomicInteger()
+    fun loopEnded(service:ReminderJobService)=org.robolectric.util.ReflectionHelpers.getField<Any?>(service,"running")==null
+    @Volatile var lastJob:JobInfo?=null
+    fun parameters(job:JobInfo?=lastJob):JobParameters=Shadow.newInstanceOf(JobParameters::class.java).also{
+        org.robolectric.shadow.api.Shadow.extract<QueueParametersShadow>(it).job=job
+    }
+    @Volatile var lastItem:JobWorkItem?=null
+    @Volatile var outcome=JobScheduler.RESULT_SUCCESS
+    @Volatile var throwOnEnqueue=false
+    @Volatile var publishBeforeReturn=false
+    val returned=AtomicInteger()
     val queue=ConcurrentLinkedQueue<JobWorkItem>();val completed=AtomicInteger();val cancelled=AtomicInteger()
 }
 @Implements(className="android.app.JobSchedulerImpl",isInAndroidSdk=false)
@@ -140,14 +152,32 @@ class QueueSchedulerShadow {
     @Implementation fun enqueue(job:JobInfo,work:JobWorkItem):Int{
         check(!job.isPersisted && job.id==AndroidReminderRuntime.JOB && job.networkType==JobInfo.NETWORK_TYPE_NONE)
         check(work.intent.extras!!.keySet()==setOf(AndroidReminderRuntime.NONCE,AndroidReminderRuntime.TICKET))
-        QueueBinder.entered?.countDown();QueueBinder.release?.let{check(it.await(5,TimeUnit.SECONDS))}
-        QueueBinder.queue.add(work);return JobScheduler.RESULT_SUCCESS
+        val outcome=QueueBinder.outcome;val throwing=QueueBinder.throwOnEnqueue;val early=QueueBinder.publishBeforeReturn
+        QueueBinder.lastJob=job;QueueBinder.lastItem=work;QueueBinder.workOwners[work]=job
+        if(early)QueueBinder.queue.add(work)
+        QueueBinder.entered?.countDown()
+        try{
+            QueueBinder.release?.let{check(it.await(5,TimeUnit.SECONDS))}
+            if(throwing)error("Synthetic late enqueue failure")
+            if(outcome==JobScheduler.RESULT_SUCCESS&&!early)QueueBinder.queue.add(work)
+            return outcome
+        }finally{QueueBinder.returned.incrementAndGet()}
     }
 }
 @Implements(JobParameters::class)
 class QueueParametersShadow {
-    @Implementation fun dequeueWork():JobWorkItem?=QueueBinder.queue.poll()
-    @Implementation fun completeWork(work:JobWorkItem){QueueBinder.completed.incrementAndGet()}
+    var job:JobInfo?=null
+    @Implementation fun getJobId():Int=job?.id?:AndroidReminderRuntime.JOB
+    @Implementation fun getExtras():android.os.PersistableBundle=job?.extras?:android.os.PersistableBundle()
+    private val executing=java.util.Collections.newSetFromMap(java.util.IdentityHashMap<JobWorkItem,Boolean>())
+    @Implementation fun dequeueWork():JobWorkItem?{
+        val generation=job?.extras?.getString(AndroidReminderRuntime.GENERATION)
+        val item=QueueBinder.queue.firstOrNull{QueueBinder.workOwners[it]?.extras?.getString(AndroidReminderRuntime.GENERATION).let{owner->owner==null||owner==generation}}
+        if(item!=null&&QueueBinder.queue.remove(item)){executing.add(item);return item}
+        if(executing.isEmpty())QueueBinder.autoStops.incrementAndGet()
+        return null
+    }
+    @Implementation fun completeWork(work:JobWorkItem){check(executing.remove(work));QueueBinder.workOwners.remove(work);QueueBinder.completed.incrementAndGet()}
 }
 
 internal class NativeSqlFixture:AutoCloseable {

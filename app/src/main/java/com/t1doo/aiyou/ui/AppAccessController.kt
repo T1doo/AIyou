@@ -44,6 +44,7 @@ internal class AppAccessController(
     private val newKey: () -> String = { "aiyou-app-access-" + UUID.randomUUID() },
     private val preferenceOperations: AppAccessPreferenceOperations = processAppAccessPreferenceOperations,
     private val changed:(AppAccessState)->Unit={},
+    private val disposedSession:()->Unit={},
 ) {
     private val guard = Any()
     private val mutable = MutableStateFlow(AppAccessState())
@@ -216,6 +217,7 @@ internal class AppAccessController(
     fun dispose() = synchronized(guard) {
         if (disposed) return
         disposed = true; ++generation; claimed = null
-        published = AppAccessState(AppAccessPhase.LOCKED)
+        mutable.value = AppAccessState(AppAccessPhase.LOCKED)
+        disposedSession()
     }
 }

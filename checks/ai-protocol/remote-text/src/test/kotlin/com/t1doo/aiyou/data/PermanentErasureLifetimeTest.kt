@@ -61,4 +61,18 @@ class PermanentErasureLifetimeTest {
             owner.awaitClosed(); assertTrue(closed.get())
         } finally { pool.shutdownNow(); assertTrue(pool.awaitTermination(3,TimeUnit.SECONDS)); media.close(); edits.close() }
     }
+    @Test fun failedDatabaseCloseNeverWipesSharedKeyOrTurnsASecondAwaitIntoAnAcknowledgement():Unit=PermanentErasureFixture().use{f->
+        val media=EncryptedAttachmentStore(f.mediaRoot,PermanentErasureFixture.Ledger(f.gateway),PermanentErasureFixture.KEY.copyOf())
+        val edits=EncryptedOriginalEditStore(f.editRoot,PermanentErasureFixture.KEY.copyOf())
+        val shared=ByteArray(32){9};var closes=0;var wipes=0
+        val owner=DrainingRecordsStorage(f.gateway,media,edits,{closes++;error("Synthetic native close outcome unknown")},{wipes++;shared.fill(0)})
+        try{
+            val first=assertThrows(ReminderRuntimeClosureUnconfirmed::class.java){owner.awaitClosed()}
+            assertArrayEquals(ByteArray(32){9},shared);assertEquals(0,wipes)
+            assertSame(first,assertThrows(ReminderRuntimeClosureUnconfirmed::class.java){owner.awaitClosed()})
+            assertEquals(1,closes);assertEquals(0,wipes)
+            assertThrows(IllegalStateException::class.java){f.gateway.transaction{}}
+        }finally{media.close();edits.close();shared.fill(0)}
+    }
+
 }

@@ -26,6 +26,7 @@ internal class AppAccessViewModel internal constructor(application: Application,
     private var runtime:ReminderVmRuntime?=null
     private val reminders=AndroidReminderRuntime.get(application)
     val controller = AppAccessController(storage, viewModelScope, ::retire, ::prepare,
+        disposedSession={reminders.owners.releaseFront()},
         changed={state->when(state.phase){
             AppAccessPhase.OPENING->reminders.owners.frontOpening()
             AppAccessPhase.OPEN->runtime?.let{reminders.owners.frontReady(it)}

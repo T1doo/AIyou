@@ -16,11 +16,15 @@ internal class ReminderProcessOwner(
     private val clock: () -> Long,
     private val platform: () -> ReminderPlatformFingerprint,
 ) {
-    enum class Phase { NO_FRONT, OPENING, FRONT, LOCKED, UNKNOWN }
+    enum class Phase { NO_FRONT, OPENING, FRONT, RELEASING, LOCKED, UNKNOWN }
     class Ticket internal constructor(val nonce:String, val id:String, internal val epoch:Long,
         internal val owner:ReminderRuntimeOwner?, val envelope:ReminderEnvelope?, val observedAt:Long, val reasons:Int) {
         private val stopped=AtomicBoolean()
+        private val handoffClaimed=AtomicBoolean()
+        internal fun claimHandoff()=handoffClaimed.compareAndSet(false,true)
         internal var started=false
+        internal var submission:String?=null
+        internal var enqueued=false
         @Volatile private var ingress:ReminderRuntimeIngress?=null
         val active:Boolean get()=!stopped.get()
         fun retire(){stopped.set(true);ingress?.retire()}
@@ -46,6 +50,14 @@ internal class ReminderProcessOwner(
 
     /** Fast observation only: never blocks on the worker or any records IO. */
     fun frontOpening() = transition(Phase.OPENING)
+    /** Ordinary retained-VM disposal is distinct from an explicit application lock or failed access. */
+    fun releaseFront()=synchronized(guard){
+        if(phase!=Phase.FRONT)return@synchronized
+        phase=Phase.RELEASING;epoch++
+        tickets.values.forEach{it.retire()};tickets.clear()
+        holder?.owner?.seal()
+        if(holder==null)phase=Phase.NO_FRONT // The current owner's successful close was already observed.
+    }
     fun locked(unknown:Boolean=false)=transition(if(unknown)Phase.UNKNOWN else Phase.LOCKED)
     private fun transition(next:Phase) = synchronized(guard) {
         if(phase==next)return@synchronized
@@ -63,9 +75,21 @@ internal class ReminderProcessOwner(
             if(envelope!=null)tickets.values.firstOrNull{it.envelope?.identity==envelope.identity&&valid(it)}?.let{return@synchronized it}
             if(tickets.size>=64)return@synchronized null
             val current=holder
-            if(phase==Phase.FRONT && current?.owner?.isAdmitted!=true)return@synchronized null
+            if(current!=null&&!current.owner.isAdmitted || phase==Phase.FRONT&&current==null)return@synchronized null
             Ticket(nonce,UUID.randomUUID().toString(),epoch,current?.owner,envelope,clock(),reasons).also{tickets[it.id]=it}
         }
+    }
+    fun beginHandoff(ticket:Ticket):Boolean=synchronized(guard){valid(ticket)&&ticket.claimHandoff()}
+    fun bindSubmission(ticket:Ticket,key:String):Boolean=synchronized(guard){
+        if(!valid(ticket)||ticket.submission?.let{it!=key}==true)false else {ticket.submission=key;true}
+    }
+    fun markEnqueued(ticket:Ticket,key:String):Boolean=synchronized(guard){
+        if(!valid(ticket)||ticket.submission!=key)false else{ticket.enqueued=true;true}
+    }
+    fun hasReadySubmission(key:String):Boolean=synchronized(guard){tickets.values.any{it.submission==key&&it.enqueued&&valid(it)}}
+    fun hasPendingSubmission(key:String):Boolean=synchronized(guard){tickets.values.any{it.submission==key&&valid(it)}}
+    fun endSubmission(key:String)=synchronized(guard){
+        tickets.entries.removeAll{(_,ticket)->(ticket.submission==key).also{if(it)ticket.retire()}}
     }
     fun find(processNonce:String,id:String):Ticket?=synchronized(guard){if(processNonce!=nonce)null else tickets[id]?.takeIf{valid(it)}}
     private fun valid(ticket:Ticket)=ticket.active && ticket.epoch==epoch && tickets[ticket.id]===ticket &&
@@ -121,11 +145,14 @@ internal class ReminderProcessOwner(
         }
         return admitted.foreground?.dispatch(action)?.await() ?: bridge.runtime(action)
     }
-    suspend fun closeCold() {
-        val old=synchronized(guard){holder?.takeIf{it.cold}?.also { _ ->
+    suspend fun closeCold(onlyIfIdle:Boolean=false) {
+        val old=synchronized(guard){
+            val current=holder?.takeIf{it.cold}?:return@synchronized null
+            if(onlyIfIdle&&tickets.values.any{valid(it)})return@synchronized null
+            current.owner.seal()
             tickets.values.forEach{it.retire()};tickets.clear();epoch++
-        }}?:return
-        old.owner.seal()
+            current
+        }?:return
         bridge.runtime {
             if(synchronized(guard){holder===old}){
                 if(old.closureUnconfirmed)throw ReminderRuntimeClosureUnconfirmed()
@@ -135,9 +162,17 @@ internal class ReminderProcessOwner(
             }
         }
     }
+    private suspend fun confirmFailedFrontCleanup(){
+        bridge.runtime {
+            val failed=synchronized(guard){holder?.takeIf{!it.cold&&it.foreground==null&&it.closureUnconfirmed}}?:return@runtime
+            val failure=failed.quarantine as? ReminderRuntimeClosureUnconfirmed?:throw ReminderRuntimeClosureUnconfirmed()
+            failed.owner.closeAndAwait{failure.confirmCleanup()}
+            synchronized(guard){if(holder===failed)holder=null}
+        }
+    }
     /** Foreground caller owns actual repository lifecycle; runtime closes it through the same gate. */
     suspend fun <T:com.t1doo.aiyou.domain.EntryRepository> prepareFront(open:()->T):Pair<T,ReminderVmRuntime> {
-        frontOpening();closeCold()
+        frontOpening();closeCold();confirmFailedFrontCleanup()
         var candidate:Holder?=null
         var repository:T?=null
         try {
@@ -149,7 +184,10 @@ internal class ReminderProcessOwner(
                 val runtime=ReminderVmRuntime(bridge,owner,
                     {owner.isAdmitted && synchronized(guard){holder===prepared&&phase==Phase.FRONT}},
                     {engine.turn()},
-                    closed={success->if(success)synchronized(guard){if(holder===prepared)holder=null}},
+                    closed={success->synchronized(guard){if(holder===prepared){
+                        if(success){holder=null;if(phase==Phase.RELEASING)phase=Phase.NO_FRONT}
+                        else{prepared.closureUnconfirmed=true;phase=Phase.UNKNOWN}
+                    }}},
                     restored={synchronized(guard){
                         if(holder===prepared){epoch++;navigationGeneration++;tickets.values.forEach{it.retire()};tickets.clear()}
                     }},
@@ -158,7 +196,19 @@ internal class ReminderProcessOwner(
                 store to runtime
             }})
         }catch(f:Throwable){
-            candidate?.let{prepared->bridge.closeOwner(prepared.owner){(repository as? AutoCloseable)?.close();(repository as? AwaitableRecordStorage)?.awaitClosed()};synchronized(guard){if(holder===prepared)holder=null}}
+            candidate?.let{prepared->
+                prepared.owner.seal()
+                if(f is ReminderRuntimeClosureUnconfirmed){prepared.closureUnconfirmed=true;prepared.quarantine=f}
+                else try{
+                    bridge.closeOwner(prepared.owner){(repository as? AutoCloseable)?.close();(repository as? AwaitableRecordStorage)?.awaitClosed()}
+                    synchronized(guard){if(holder===prepared)holder=null}
+                }catch(close:Throwable){
+                    prepared.closureUnconfirmed=true
+                    throw ReminderRuntimeClosureUnconfirmed(arrayOf(repository,close)){
+                        (repository as? AutoCloseable)?.close();(repository as? AwaitableRecordStorage)?.awaitClosed()
+                    }.also{prepared.quarantine=it}
+                }
+            }
             throw f
         }
     }

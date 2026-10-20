@@ -36,15 +36,20 @@ class ReminderRebuildReceiver:BroadcastReceiver() {
 }
 /** Two seconds is only a handoff budget. Timeout retires RAM authority; it cannot cancel Binder IO. */
 private fun handoffReminder(receiver:BroadcastReceiver,runtime:AndroidReminderRuntime,ticket:ReminderProcessOwner.Ticket){
+    if(!runtime.owners.beginHandoff(ticket))return
     val result=receiver.goAsync();val finished=AtomicBoolean();val handler=Handler(Looper.getMainLooper())
     val deadline=SystemClock.elapsedRealtime()+2000
     fun finish(){if(finished.compareAndSet(false,true))result.finish()}
-    val expiry=Runnable{ticket.retire();finish()}
+    val expiry=Runnable{runtime.owners.forget(ticket);finish()}
     handler.postDelayed(expiry,2000)
     runtime.scope.launch {
         try{
             if(SystemClock.elapsedRealtime()>=deadline || !runtime.enqueue(ticket))runtime.owners.forget(ticket)
         }catch(_:Exception){runtime.owners.forget(ticket)}
-        finally{handler.removeCallbacks(expiry);finish()}
+        finally{
+            // A late Binder return can precede main-looper expiry. Neither path may retain capacity.
+            if(SystemClock.elapsedRealtime()>=deadline||!ticket.active)runtime.owners.forget(ticket)
+            handler.removeCallbacks(expiry);finish()
+        }
     }
 }

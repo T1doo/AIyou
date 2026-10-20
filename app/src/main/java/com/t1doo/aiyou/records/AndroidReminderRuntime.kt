@@ -3,6 +3,8 @@ package com.t1doo.aiyou.records
 import android.app.job.*
 import android.content.*
 import android.os.UserManager
+import android.os.PersistableBundle
+import java.util.UUID
 import android.provider.Settings
 import com.t1doo.aiyou.data.ExistingReminderStore
 import com.t1doo.aiyou.model.*
@@ -21,6 +23,33 @@ internal class AndroidReminderRuntime(context:Context,createOwner:((ReminderOper
     val jobExecution=Mutex()
     private val enqueueGate=Mutex()
     private var initialized=false
+    private val submissions=Any()
+    private class Submission(val key:String,val info:JobInfo){var active=true;var claimed=false}
+    private var submission:Submission?=null
+    private fun submissionKey(params:JobParameters):String?=try{
+        if(params.jobId!=JOB||params.extras.getString(NONCE)!=owners.nonce)null
+        else params.extras.getString(GENERATION)?.takeIf{it.matches(Regex("[a-f0-9-]{36}"))}
+    }catch(_:Exception){null}
+    fun runKey(params:JobParameters):String?=submissionKey(params)
+    fun claimRun(params:JobParameters):String? {
+        val key=submissionKey(params)?:return null
+        return synchronized(submissions){submission?.takeIf{it.key==key&&it.active&&!it.claimed}?.also{it.claimed=true}?.key}
+    }
+    /** 0 reads the owned OS queue, 1 waits for an in-flight enqueue, 2 rejects an old generation.
+     * Close new admission before the final empty dequeue; dequeueWork itself auto-stops the job. */
+    fun dequeueState(key:String,first:Boolean):Int=synchronized(submissions){
+        val current=submission
+        when{
+            current==null||current.key!=key->2
+            first||!current.active||owners.hasReadySubmission(key)->0
+            owners.hasPendingSubmission(key)->1
+            else->{current.active=false;0}
+        }
+    }
+    fun endRun(key:String){
+        synchronized(submissions){submission?.takeIf{it.key==key}?.active=false}
+        owners.endSubmission(key)
+    }
     private fun unlocked()=app.getSystemService(UserManager::class.java)?.isUserUnlocked==true
     private val preferences=FileAppAccessPreference(File(app.filesDir,"access/startup"))
     val owners=createOwner?.invoke(bridge)?:ReminderProcessOwner(bridge,::unlocked,
@@ -43,13 +72,22 @@ internal class AndroidReminderRuntime(context:Context,createOwner:((ReminderOper
         val scheduler=app.getSystemService(JobScheduler::class.java)?:return@withLock false
         if(!initialized){scheduler.cancel(JOB);initialized=true}
         if(!ticket.active)return@withLock false
+        val batch=synchronized(submissions){
+            val current=submission?.takeIf{it.active}?:run{
+                val key=UUID.randomUUID().toString()
+                val extras=PersistableBundle().apply{putString(NONCE,owners.nonce);putString(GENERATION,key)}
+                Submission(key,JobInfo.Builder(JOB,ComponentName(app,ReminderJobService::class.java))
+                    .setOverrideDeadline(0).setPersisted(false).setExtras(extras).build()).also{submission=it}
+            }
+            current.takeIf{owners.bindSubmission(ticket,it.key)}
+        }?:return@withLock false
         val item=JobWorkItem(Intent().putExtra(NONCE,ticket.nonce).putExtra(TICKET,ticket.id))
-        val job=JobInfo.Builder(JOB,ComponentName(app,ReminderJobService::class.java)).setOverrideDeadline(0).setPersisted(false).build()
-        scheduler.enqueue(job,item)==JobScheduler.RESULT_SUCCESS
+        val accepted=scheduler.enqueue(batch.info,item)==JobScheduler.RESULT_SUCCESS
+        if(!accepted||!synchronized(submissions){batch.active&&owners.markEnqueued(ticket,batch.key)}){owners.forget(ticket);false}else true
     }}
     companion object {
         const val JOB=0x41495952
-        const val NONCE="process-nonce";const val TICKET="ram-ticket"
+        const val NONCE="process-nonce";const val TICKET="ram-ticket";const val GENERATION="job-generation"
         @Volatile private var instance:AndroidReminderRuntime?=null
         internal fun replaceForTest(runtime:AndroidReminderRuntime?):AndroidReminderRuntime?=synchronized(this){instance.also{instance=runtime}}
         fun get(context:Context):AndroidReminderRuntime=instance?:synchronized(this){instance?:AndroidReminderRuntime(context).also{instance=it}}
