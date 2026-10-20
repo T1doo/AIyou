@@ -34,4 +34,4 @@ CI内APK路径：`app/build/outputs/apk/debug/app-debug.apk`；本地未下载AP
 CLI gh的401路径未重试；本次只读核验通过现有授权GitHub连接成功完成。
 
 R2a封存后仅进入R2b设计。Android receiver／JobService、cold owner、前台同门接线、权限UI与重建epoch
-仍未实现；生产仍使用断开驱动。LOCAL_ONLY、无后台、无模型真实调用及两份原方案保持不变。
+仍未实现；生产仍使用断开驱动。LOCAL_ONLY、无自建后台、无模型真实调用及两份原方案保持不变。
