@@ -177,6 +177,9 @@ class SourceMemoryInboxPresentationTest {
         assertEquals(1, mutations); assertEquals(SourceMemoryReview.REVOKED, saved.current!!.review)
         click("source-memories-close")
         compose.onNodeWithText("返回列表").assertIsDisplayed().assertHasClickAction().performClick()
+        compose.waitForIdle()
+        // Returning from the last original restores the tail; summary must be composed before querying its child.
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
         click("memory-accepted-open"); drain()
         compose.onNodeWithTag("memory-inbox-count").assertTextEquals("本页已采纳 0 条")
         compose.onNodeWithTag("memory-inbox-quote-memory").assertDoesNotExist()
