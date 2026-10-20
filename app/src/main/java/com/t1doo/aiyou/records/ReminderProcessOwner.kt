@@ -5,6 +5,8 @@ import com.t1doo.aiyou.model.*
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runBlocking
 
 /** One process authority. Queue hints contain no durable authority and cannot cross an access epoch. */
@@ -207,7 +209,9 @@ internal class ReminderProcessOwner(
     }
     /** Foreground caller owns actual repository lifecycle; runtime closes it through the same gate. */
     suspend fun <T:com.t1doo.aiyou.domain.EntryRepository> prepareFront(open:()->T):Pair<T,ReminderVmRuntime> {
+        val caller=currentCoroutineContext()
         val reservation=synchronized(guard){
+            caller.ensureActive() // A cancelled old caller cannot replace the current intent/owner.
             if(phase!=Phase.OPENING||frontReservation==null||frontReservation!!.claimed)frontOpening()
             requireNotNull(frontReservation).also{it.claimed=true}
         }

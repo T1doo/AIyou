@@ -208,6 +208,24 @@ class ReminderOpeningReservationTest {
             }finally{preparing.join();scope.cancel();bridge.close()}
         }
     }
+    @Test fun alreadyCancelledPreparationCallerCannotRetireTheCurrentForegroundOwnerOrItsTicket():Unit=runBlocking {
+        NativeSqlFixture().use{f->
+            val bridge=ReminderOperationBridge();val reads=AtomicInteger();val owners=owners(f,bridge,reads)
+            val current=owners.prepareFront{f.foregroundRecords()}.second;current.attach{false};owners.frontReady(current)
+            val fresh=requireNotNull(owners.capture());val factories=AtomicInteger();val caught=AtomicReference<Throwable?>()
+            val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
+            val stale=scope.async(start=CoroutineStart.UNDISPATCHED){
+                currentCoroutineContext().cancel(java.util.concurrent.CancellationException("Synthetic already cancelled old caller"))
+                runCatching{owners.prepareFront{factories.incrementAndGet();f.foregroundRecords()}}.onFailure{caught.set(it)}
+            }
+            try{
+                withTimeout(5_000){stale.join()};assertTrue(stale.isCancelled);assertTrue(caught.get() is java.util.concurrent.CancellationException)
+                assertEquals(0,factories.get());assertEquals(0,reads.get());assertEquals(0,f.opened.get())
+                assertTrue("A cancelled caller retired the current foreground owner",current.owner.isAdmitted)
+                assertTrue(fresh.active);assertSame(fresh,owners.find(fresh.nonce,fresh.id));owners.forget(fresh)
+            }finally{stale.join();current.closeStore{};scope.cancel();bridge.close()}
+        }
+    }
     private class PausedContinuation:CoroutineDispatcher(){
         private val queue=ConcurrentLinkedQueue<Runnable>()
         override fun dispatch(context:CoroutineContext,block:Runnable){queue.add(block)}
