@@ -170,7 +170,7 @@ class SourceMemoryInboxPresentationTest {
         compose.runOnIdle { retained.open.getValue("memory")(); retained.sections.getValue(SourceMemoryInboxSection.ACCEPTED)(); assertTrue(queue.isEmpty()) }
         click("memory-inbox-section-ACCEPTED"); drain()
         click("memory-inbox-source-memory"); drain()
-        compose.onNodeWithTag("source-memory-review-0").performScrollTo().assertTextEquals("已采纳")
+        compose.onNodeWithTag("source-memory-review-0").performScrollTo().assertTextEquals("人工已采纳线索")
         click("source-memory-REVOKE-0"); assertEquals(0, mutations)
         click("source-memory-cancel-confirm"); assertEquals(SourceMemoryReview.ACCEPTED, saved.current!!.review)
         click("source-memory-REVOKE-0"); click("source-memory-confirm"); drain()
