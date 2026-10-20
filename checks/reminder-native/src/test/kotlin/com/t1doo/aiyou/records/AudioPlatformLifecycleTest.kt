@@ -12,6 +12,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.Implements
 import org.robolectric.util.ReflectionHelpers
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -37,7 +38,9 @@ class AudioPlatformLifecycleTest {
         app.sendBroadcast(Intent(AudioManager.ACTION_AUDIO_BECOMING_NOISY));Shadows.shadowOf(Looper.getMainLooper()).idle()
         assertEquals(1,stops.get());output.close()
     }
-    @Test fun duckCallbackReleasesActualAdapterTrackFocusAndReceiverAndGainCannotRestart() {
+    @Test
+    @Config(shadows=[Api35AudioServiceBluetoothSignatureShadow::class])
+    fun duckCallbackReleasesActualAdapterTrackFocusAndReceiverAndGainCannotRestart() {
         val app=RuntimeEnvironment.getApplication();val shadow=Shadows.shadowOf(app.getSystemService(AudioManager::class.java))
         val stops=AtomicInteger()
         lateinit var output:PlatformOriginalAudioOutput
@@ -71,3 +74,10 @@ class AudioPlatformLifecycleTest {
         assertEquals(0,stops.get())
     }
 }
+
+/** API35 audio-service null-proxy metadata must not load the default shadow's later BluetoothAddress type.
+ * Only this test replaces unrelated Bluetooth signature reflection; AudioTrack/focus/receiver use their normal shadows.
+ * No Bluetooth device lookup, permission, routing or hardware behavior is asserted.
+ */
+@Implements(className="android.bluetooth.BluetoothDevice",minSdk=35,maxSdk=35)
+class Api35AudioServiceBluetoothSignatureShadow
