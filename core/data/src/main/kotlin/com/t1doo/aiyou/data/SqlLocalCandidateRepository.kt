@@ -36,6 +36,21 @@ internal class SqlLocalCandidateRepository(private val database: RecordsSqlDatab
         }
     }
 
+    override fun resume(expected: LocalCandidateBatch): LocalCandidateJob = safe {
+        database.transaction { sql ->
+            if (expected.state != LocalCandidateState.RUNNING || expected.version != 0L || expected.items.isNotEmpty())
+                throw LocalCandidateConflict()
+            val source = readSource(sql, expected.source)
+            val old = row(sql, expected.id) ?: throw LocalCandidateConflict()
+            bindRequest(old, source, expected.sourceHash, expected.generation)
+            if (old.state != expected.state || old.version != expected.version || old.created != expected.createdAtMillis)
+                throw LocalCandidateConflict()
+            payload(old, source)
+            LocalCandidateJob(LocalCandidateStart(old.id, old.source, old.created), source.hash, source.generation,
+                source.original, source.captured, source.zone)
+        }
+    }
+
     override fun complete(job: LocalCandidateJob, document: ExcerptDocument): LocalCandidateBatch = safe {
         database.transaction { sql ->
             val source = readSource(sql, job.start.source)

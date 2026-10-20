@@ -216,6 +216,8 @@ for label, folder, minimum in targets:
             "lostReadbackHasNoFalseSuccessAndRetriesTheSameMemoryOnlyRequest",
             "cancelledAndRestoredOrNavigatedConfirmationsCannotReusePrivatePreviewAuthority")
         additional["com.t1doo.aiyou.LocalCandidatePresentationTest"] = (
+            "narrowInterruptedBatchWaitsForExplicitSameBatchResumeAndSeparateAcceptance",
+            "retainedResumeActionsCannotRestartReopenedOrCancelledBatches",
             "narrowCorrectionFlowPreviewsCancelsReopensAndRequiresASeparateNewAcceptance",
             "correctionConfirmationRestorationAndReopenedTokensCannotExecuteRetainedActions",
             "actualReaderGeneratesPreviewsConfirmsAndReturnsToExactOriginalWithoutTaskSideEffects",

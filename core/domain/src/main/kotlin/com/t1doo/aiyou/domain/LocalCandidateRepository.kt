@@ -5,6 +5,8 @@ import com.t1doo.aiyou.model.*
 /** Blocking IO over the same encrypted records owner. No credentials or remote authority. */
 interface LocalCandidateRepository {
     fun begin(request: LocalCandidateStart): LocalCandidateJob
+    /** Read an existing authenticated RUNNING/0 batch; never create or restart a terminal batch. */
+    fun resume(expected: LocalCandidateBatch): LocalCandidateJob
     fun complete(job: LocalCandidateJob, document: ExcerptDocument): LocalCandidateBatch
     fun batches(source: SourceVersion): List<LocalCandidateBatch>
     fun review(request: ExcerptReviewRequest): LocalCandidateBatch

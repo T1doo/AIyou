@@ -49,6 +49,7 @@ internal fun LocalCandidateDialog(ui: LocalCandidateUiState, controller: LocalCa
                     if (ui.loading) Text("正在读取已保存的候选与审阅结果。")
                     if (ui.busy) Text("正在确认本机存储回执。")
                     if (ui.computing) Text("正在本机生成摘录，原文保存可继续。")
+                    if (ui.retiringComputation) Text("正在结束上次本机计算，结束后可明确恢复未完成的批次。")
                     if (confirmation != null) {
                         val batch = ui.batches.singleOrNull { it.id == confirmation.batchId && it.version == confirmation.version }
                         val item = batch?.items?.singleOrNull { it.id == confirmation.itemId }
@@ -73,7 +74,14 @@ internal fun LocalCandidateDialog(ui: LocalCandidateUiState, controller: LocalCa
                                 when (batch.state) {
                                     LocalCandidateState.INVALIDATED -> Text("一批旧候选已因来源或处理资格变化失效，摘录内容已清除。")
                                     LocalCandidateState.CANCELLED -> Text("一批候选已取消。")
-                                    LocalCandidateState.RUNNING -> Text("这批提取尚未完成，可明确取消后重新生成。")
+                                    LocalCandidateState.RUNNING -> {
+                                        Text("这批本机摘录尚未完成。恢复沿用本批来源，完成后仍需另行采纳；也可取消本批。")
+                                        if (!ui.computing) TextButton(
+                                            enabled = !ui.loading && !ui.busy && ui.pending == null && !ui.retiringComputation,
+                                            onClick = { if (allowed()) controller.resume(ui.session, batch.id, batch.version) },
+                                            modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
+                                                .testTag("local-candidate-resume-" + batch.id)) { Text("恢复本批本机摘录") }
+                                    }
                                     LocalCandidateState.READY -> batch.items.forEach { item ->
                                         key(batch.id, item.id) {
                                             val suffix = batch.id + "-" + item.id

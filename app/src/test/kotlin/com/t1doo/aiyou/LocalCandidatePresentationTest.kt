@@ -50,6 +50,7 @@ class LocalCandidatePresentationTest {
     private val reviews = mutableListOf<ExcerptReviewRequest>()
     private val cancels = mutableListOf<CandidateCancelRequest>()
     private val reopens = mutableListOf<ExcerptReopenRequest>()
+    private val resumes = mutableListOf<LocalCandidateBatch>()
     private var failRead = false
     private var loseReviewReadback = false
     private var lastReview: ExcerptReviewRequest? = null
@@ -64,6 +65,14 @@ class LocalCandidatePresentationTest {
             durable += LocalCandidateBatch(request.id, request.source, hash, 0, 0,
                 LocalCandidateState.RUNNING, request.requestedAtMillis, emptyList())
             return LocalCandidateJob(request, hash, 0, original, 55, "UTC")
+        }
+        override fun resume(expected: LocalCandidateBatch): LocalCandidateJob {
+            val old = durable.single { it.id == expected.id }
+            check(old === expected && old.state == LocalCandidateState.RUNNING && old.version == 0L)
+            resumes += expected
+            val original = state.value.entries.single { it.id == old.source.sourceId }.originalText
+            return LocalCandidateJob(LocalCandidateStart(old.id, old.source, old.createdAtMillis), old.sourceHash,
+                old.generation, original, 55, "UTC")
         }
         override fun complete(job: LocalCandidateJob, document: ExcerptDocument): LocalCandidateBatch {
             LocalExcerptRules.validate(document, job.start.source, job.sourceHash, job.original)
@@ -177,6 +186,42 @@ class LocalCandidatePresentationTest {
     private fun seed() {
         val job = port.begin(LocalCandidateStart("synthetic-private-batch", SourceVersion("one", 1), 55))
         port.complete(job, LocalExcerptRules.extract(job))
+    }
+
+    @Test fun narrowInterruptedBatchWaitsForExplicitSameBatchResumeAndSeparateAcceptance() {
+        port.begin(LocalCandidateStart("interrupted", SourceVersion("one", 1), 55))
+        compose.setContent { Screen(large = true) }; openReader(); openCandidates()
+        val tag = "local-candidate-resume-interrupted"
+        compose.onNodeWithTag(tag).performScrollTo().assertIsEnabled()
+        assertTrue(resumes.isEmpty()); assertEquals(LocalCandidateState.RUNNING, durable.single().state)
+        val bounds = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+        assertTrue(bounds.height >= with(compose.density) { 48.dp.toPx() })
+        click(tag); drain()
+        compose.waitUntil(3_000) { queue.isNotEmpty() || state.value.candidates?.batches?.any { it.state == LocalCandidateState.READY } == true }
+        drain()
+        val batch = durable.single(); assertEquals("interrupted", batch.id); assertEquals(55L, batch.createdAtMillis)
+        assertEquals(1L, batch.version); assertEquals(ExcerptReview.PROPOSED, batch.items.single().review)
+        assertEquals(1, resumes.size); assertTrue(reviews.isEmpty())
+        compose.onNodeWithTag("local-candidate-review-" + suffix(batch)).performScrollTo().assertTextEquals("待确认摘录")
+        click("local-candidate-accept-" + suffix(batch)); assertTrue(reviews.isEmpty())
+        click("local-candidate-cancel-confirm"); assertTrue(reviews.isEmpty())
+        val saved = registry?.performSave().toString()
+        assertFalse(saved.contains(one.originalText)); assertFalse(saved.contains("interrupted"))
+    }
+
+    @Test fun retainedResumeActionsCannotRestartReopenedOrCancelledBatches() {
+        port.begin(LocalCandidateStart("interrupted", SourceVersion("one", 1), 55))
+        compose.setContent { Screen() }; openReader(); openCandidates()
+        compose.onNodeWithTag("local-candidate-resume-interrupted").performScrollTo()
+        val old = action("local-candidate-resume-interrupted")
+        click("local-candidates-close"); openCandidates()
+        compose.runOnIdle { old(); assertTrue(queue.isEmpty()); assertTrue(resumes.isEmpty()) }
+        compose.onNodeWithTag("local-candidate-resume-interrupted").performScrollTo()
+        val fresh = action("local-candidate-resume-interrupted")
+        click("local-candidate-cancel-interrupted"); drain()
+        compose.runOnIdle { fresh(); assertTrue(queue.isEmpty()); assertTrue(resumes.isEmpty()) }
+        assertEquals(LocalCandidateState.CANCELLED, durable.single().state)
+        compose.onNodeWithTag("local-candidate-resume-interrupted").assertDoesNotExist()
     }
 
     @Test fun actualReaderGeneratesPreviewsConfirmsAndReturnsToExactOriginalWithoutTaskSideEffects() {

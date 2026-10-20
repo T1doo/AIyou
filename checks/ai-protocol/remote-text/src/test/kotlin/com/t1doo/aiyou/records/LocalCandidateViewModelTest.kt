@@ -206,17 +206,92 @@ class LocalCandidateViewModelTest {
             assertTrue(h.reviews.isEmpty()); assertNull(h.vm.state.value.candidates?.notice)
         } finally { release.countDown() }
     } }
+    @Test(timeout = 15_000) fun interruptedBatchWaitsForExplicitResumeKeepsItsIdentityAndNeverAcceptsAutomatically(): Unit = Harness().use { h -> runBlocking {
+        h.ready(); h.f.store.begin(h.f.start()); val ui = h.open()
+        assertEquals(LocalCandidateState.RUNNING, ui.batches.single().state); assertTrue(h.resumes.isEmpty())
+        assertEquals(0, h.productions.get())
+        h.vm.candidates.resume(ui.session, "batch", 0)
+        val ready = h.ui { it.pending == null && !it.computing && it.batches.any { b -> b.state == LocalCandidateState.READY } }
+        assertEquals("batch", ready.batches.single().id); assertEquals(20L, ready.batches.single().createdAtMillis)
+        assertEquals(1L, ready.batches.single().version); assertEquals(ExcerptReview.PROPOSED, ready.batches.single().items.single().review)
+        assertEquals(1, h.resumes.size); assertTrue(h.reviews.isEmpty()); assertEquals(1, h.productions.get())
+        assertTrue(h.f.db.read("SELECT id FROM manual_tasks").isEmpty()); assertTrue(h.f.db.read("SELECT * FROM entry_manual_tags").isEmpty())
+        assertEquals(0, h.remoteReads); assertEquals(0, h.remoteOpens)
+    } }
+    @Test(timeout = 15_000) fun resumedCompletionLostAckRetriesOnlyTheIdenticalResultWithoutAnotherProducer(): Unit = Harness().use { h -> runBlocking {
+        h.ready(); h.f.store.begin(h.f.start()); val ui = h.open(); h.loseCompleteReadback = true
+        h.vm.candidates.resume(ui.session, "batch", 0)
+        val unknown = h.ui { it.error != null && !it.busy }
+        assertTrue(unknown.pending is LocalCandidateIntent.Complete); assertNull(unknown.notice)
+        val committed = (h.f.row()[3] as ByteArray).copyOf(); val first = h.completions.single()
+        h.loseCompleteReadback = false; h.failRead = false
+        h.vm.candidates.retry(unknown.session, unknown.request)
+        h.ui { it.pending == null && it.notice?.contains("尚未采纳") == true }
+        assertEquals(1, h.productions.get()); assertEquals(1, h.resumes.size); assertEquals(2, h.completions.size)
+        assertSame(first.first, h.completions[1].first); assertSame(first.second, h.completions[1].second)
+        assertArrayEquals(committed, h.f.row()[3] as ByteArray); assertEquals(1L, h.f.row()[0]); assertTrue(h.reviews.isEmpty())
+    } }
+    @Test(timeout = 15_000) fun repeatedReopeningCannotStartWhileCancelledProducerStillRunsAndLocalSavingRemainsAvailable(): Unit = Harness().use { h -> runBlocking {
+        val entered = CountDownLatch(1); val release = CountDownLatch(1); val active = java.util.concurrent.atomic.AtomicInteger()
+        val maximum = java.util.concurrent.atomic.AtomicInteger()
+        h.producer = { job ->
+            val count = active.incrementAndGet(); maximum.accumulateAndGet(count, ::maxOf)
+            try { entered.countDown(); check(release.await(6, TimeUnit.SECONDS)); LocalExcerptRules.extract(job) }
+            finally { active.decrementAndGet() }
+        }
+        try {
+            h.ready(); h.f.store.begin(h.f.start()); var ui = h.open(); h.vm.candidates.resume(ui.session, "batch", 0)
+            assertTrue(entered.await(2, TimeUnit.SECONDS))
+            repeat(3) {
+                h.vm.candidates.close(ui.session); ui = h.open(); assertTrue(ui.retiringComputation)
+                h.vm.candidates.resume(ui.session, "batch", 0); h.vm.candidates.generate(ui.session)
+            }
+            assertEquals(1, h.productions.get()); assertEquals(1, h.resumes.size)
+            h.vm.changeText("合成恢复期间仍能保存"); h.vm.save()
+            withTimeout(2_000) { h.vm.state.first { it.saveNotice != null && !it.saving } }
+            release.countDown(); ui = h.ui { !it.retiringComputation }
+            assertEquals(LocalCandidateState.RUNNING, h.f.store.batches(h.f.source).single().state)
+            h.vm.candidates.resume(ui.session, "batch", 0)
+            h.ui { it.pending == null && it.batches.any { b -> b.state == LocalCandidateState.READY } }
+            assertEquals(1, maximum.get()); assertEquals(2, h.productions.get()); assertEquals(1, h.f.store.batches(h.f.source).size)
+        } finally { release.countDown() }
+    } }
+    @Test(timeout = 15_000) fun resumedProducerCannotPublishAfterCancellationAndReopenedSession(): Unit = Harness().use { h -> runBlocking {
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        h.producer = { job -> entered.countDown(); check(release.await(5, TimeUnit.SECONDS)); LocalExcerptRules.extract(job) }
+        try {
+            h.ready(); h.f.store.begin(h.f.start()); val ui = h.open(); h.vm.candidates.resume(ui.session, "batch", 0)
+            assertTrue(entered.await(2, TimeUnit.SECONDS))
+            h.vm.candidates.cancelBatch(ui.session, "batch", 0); h.ui { it.notice?.contains("已取消") == true }
+            h.vm.candidates.close(ui.session)
+            h.open(); release.countDown(); h.ui { !it.retiringComputation }
+            assertEquals("CANCELLED", h.f.row()[1])
+            assertTrue(h.f.store.batches(h.f.source).all { it.state == LocalCandidateState.CANCELLED && it.items.isEmpty() })
+            assertTrue(h.completions.isEmpty()); assertEquals(0, h.remoteReads); assertEquals(0, h.remoteOpens)
+        } finally { release.countDown() }
+    } }
     private fun fRevised(h: Harness) = h.f.revise()
 
     private class Harness : AutoCloseable {
         val f = LocalCandidateFixture()
         @Volatile var failRead = false
         @Volatile var loseReviewReadback = false
+        @Volatile var loseCompleteReadback = false
         @Volatile var producer: (LocalCandidateJob) -> ExcerptDocument = LocalExcerptRules::extract
         val reviews = CopyOnWriteArrayList<ExcerptReviewRequest>()
         val reopens = CopyOnWriteArrayList<ExcerptReopenRequest>()
+        val resumes = CopyOnWriteArrayList<LocalCandidateBatch>()
+        val completions = CopyOnWriteArrayList<Pair<LocalCandidateJob, ExcerptDocument>>()
+        val productions = java.util.concurrent.atomic.AtomicInteger()
         var remoteReads = 0; var remoteOpens = 0
         private val port = object : LocalCandidateRepository by f.store {
+            override fun resume(expected: LocalCandidateBatch): LocalCandidateJob {
+                resumes.add(expected); return f.store.resume(expected)
+            }
+            override fun complete(job: LocalCandidateJob, document: ExcerptDocument): LocalCandidateBatch {
+                completions.add(job to document)
+                return f.store.complete(job, document).also { if (loseCompleteReadback) failRead = true }
+            }
             override fun reopen(request: ExcerptReopenRequest): LocalCandidateBatch {
                 reopens.add(request)
                 return f.store.reopen(request).also { if (loseReviewReadback) failRead = true }
@@ -240,7 +315,7 @@ class LocalCandidateViewModelTest {
             override fun close() = base.close()
         }
         val vm = LocalRecordsViewModel(Application(), { store }, Clock.fixed(Instant.ofEpochMilli(50), ZoneOffset.UTC),
-            bindAi = { remoteOpens++; error("No remote exchange expected") }, extractLocalCandidates = { producer(it) })
+            bindAi = { remoteOpens++; error("No remote exchange expected") }, extractLocalCandidates = { productions.incrementAndGet(); producer(it) })
         suspend fun ready() = withTimeout(2_000) { vm.state.first { it.ready && !it.opening && it.supportsCandidates } }
         suspend fun open(): LocalCandidateUiState { vm.candidates.open("source",1); return ui { !it.loading } }
         suspend fun generate(session: Long): LocalCandidateUiState {

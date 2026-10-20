@@ -9,6 +9,10 @@ import kotlinx.coroutines.*
 
 sealed interface LocalCandidateIntent {
     data class Generate(val request: LocalCandidateStart) : LocalCandidateIntent
+    data class Resume(val batch: LocalCandidateBatch) : LocalCandidateIntent
+    class Complete(val job: LocalCandidateJob, val document: ExcerptDocument) : LocalCandidateIntent {
+        override fun toString() = "Complete(redacted)"
+    }
     data class Review(val request: ExcerptReviewRequest) : LocalCandidateIntent
     data class Reopen(val request: ExcerptReopenRequest) : LocalCandidateIntent
     data class Cancel(val request: CandidateCancelRequest) : LocalCandidateIntent
@@ -18,7 +22,8 @@ data class ExcerptConfirmation(val token: Long, val batchId: String, val version
 data class LocalCandidateUiState(val session: Long, val source: SourceVersion, val sourceHash: String,
     val loading: Boolean = true, val busy: Boolean = false, val computing: Boolean = false,
     val batches: List<LocalCandidateBatch> = emptyList(), val error: String? = null, val notice: String? = null,
-    val pending: LocalCandidateIntent? = null, val confirmation: ExcerptConfirmation? = null, val request: Long = 0) {
+    val pending: LocalCandidateIntent? = null, val confirmation: ExcerptConfirmation? = null, val request: Long = 0,
+    val retiringComputation: Boolean = false) {
     override fun toString() = "LocalCandidateUiState(session=" + session + ", redacted)"
 }
 
@@ -35,6 +40,8 @@ class LocalCandidateController(
     private val confirmations = AtomicLong()
     @Volatile private var disposed = false
     @Volatile private var worker: Job? = null
+    private val producerGuard = Any()
+    private fun producerInFlight() = synchronized(producerGuard) { worker?.isCompleted == false }
     private fun usable(ui: LocalCandidateUiState): Boolean {
         val local = current()
         return !disposed && local.ready && !local.opening && local.error == null && local.hasLocalProcessingProof(ui.source) &&
@@ -55,8 +62,12 @@ class LocalCandidateController(
         if (!local.hasLocalProcessingProof(SourceVersion(id, revision.toLong())) || local.localProcessing != null) return
         val entry = local.entries.singleOrNull { it.id == id && it.currentRevision == revision && it.policy != ProcessingPolicy.AI_NONE } ?: return
         worker?.cancel()
-        val ui = LocalCandidateUiState(sessions.incrementAndGet(), SourceVersion(id, revision.toLong()), OriginalExports.hash(entry.originalText))
+        val ui = LocalCandidateUiState(sessions.incrementAndGet(), SourceVersion(id, revision.toLong()), OriginalExports.hash(entry.originalText),
+            retiringComputation = producerInFlight())
         publish { it.copy(candidates = ui) }
+        // Completion can clear the old slot before this new panel is published. Reconcile after
+        // publication too; completion handles exits occurring after this check.
+        if (!producerInFlight()) update(ui.session) { it.copy(retiringComputation = false) }
         refresh(ui.session)
     }
     fun close(session: Long) {
@@ -80,9 +91,17 @@ class LocalCandidateController(
     }
     fun generate(session: Long) {
         val ui = current().candidates ?: return
-        if (!owns(session) || ui.loading || ui.busy || ui.computing || ui.pending != null ||
+        if (!actionable(ui, session) || ui.retiringComputation || producerInFlight() ||
             ui.batches.any { it.state == LocalCandidateState.RUNNING || it.state == LocalCandidateState.READY }) return
         submit(session, LocalCandidateIntent.Generate(LocalCandidateStart(UUID.randomUUID().toString(), ui.source, clock.millis())))
+    }
+    fun resume(session: Long, batchId: String, version: Long) {
+        val ui = current().candidates ?: return
+        if (!actionable(ui, session) || ui.retiringComputation || producerInFlight()) return
+        val batch = ui.batches.singleOrNull { it.id == batchId && it.version == version &&
+            it.state == LocalCandidateState.RUNNING && it.version == 0L && it.items.isEmpty() &&
+            it.source == ui.source && it.sourceHash == ui.sourceHash } ?: return
+        submit(session, LocalCandidateIntent.Resume(batch))
     }
     fun requestAccept(session: Long, batchId: String, version: Long, itemId: String) {
         val ui = current().candidates ?: return
@@ -128,7 +147,9 @@ class LocalCandidateController(
     }
     fun cancelBatch(session: Long, batchId: String, version: Long) {
         val ui = current().candidates ?: return
-        if (!owns(session) || ui.loading || ui.busy || ui.pending != null && ui.pending !is LocalCandidateIntent.Generate) return
+        if (!owns(session) || ui.loading || ui.busy || ui.pending != null &&
+            ui.pending !is LocalCandidateIntent.Generate && ui.pending !is LocalCandidateIntent.Resume &&
+            ui.pending !is LocalCandidateIntent.Complete) return
         val batch = ui.batches.singleOrNull { it.id == batchId && it.version == version } ?: return
         if (batch.state !in setOf(LocalCandidateState.RUNNING, LocalCandidateState.READY) ||
             batch.items.any { it.review != ExcerptReview.PROPOSED }) return
@@ -161,28 +182,16 @@ class LocalCandidateController(
                 val repository = checkNotNull(store.localCandidates)
                 when (intent) {
                     is LocalCandidateIntent.Generate -> {
+                        check(!producerInFlight())
                         val job = repository.begin(intent.request)
-                        val values = repository.batches(ui.source)
-                        if (!owns(session, request)) return@enqueue
-                        update(session) { it.copy(busy = false, loading = false, computing = true, batches = values) }
-                        worker = scope.launch(Dispatchers.Default) {
-                            try {
-                                if (!owns(session, request)) return@launch
-                                val document = extract(job)
-                                ensureActive()
-                                if (owns(session, request) && !enqueue complete@{ currentStore ->
-                                    if (!owns(session, request)) return@complete
-                                    try {
-                                        val owner = checkNotNull(currentStore.localCandidates)
-                                        val result = owner.complete(job, document)
-                                        acknowledge(session, request, ui.source, owner, result, "候选已保存在本机，尚未采纳。")
-                                    } catch (cancelled: CancellationException) { throw cancelled }
-                                    catch (failure: Exception) { failed(session, request, failure) }
-                                }) failed(session, request, IllegalStateException())
-                            } catch (cancelled: CancellationException) { throw cancelled }
-                            catch (failure: Exception) { failed(session, request, failure) }
-                        }
+                        compute(session, request, ui.source, repository, job)
                     }
+                    is LocalCandidateIntent.Resume -> {
+                        check(!producerInFlight())
+                        compute(session, request, ui.source, repository, repository.resume(intent.batch))
+                    }
+                    is LocalCandidateIntent.Complete -> acknowledge(session, request, ui.source, repository,
+                        repository.complete(intent.job, intent.document), "候选已保存在本机，尚未采纳。")
                     is LocalCandidateIntent.Review -> acknowledge(session, request, ui.source, repository,
                         repository.review(intent.request), if (intent.request.decision == ExcerptReview.ACCEPTED)
                             "已采纳原文摘录。没有创建事实、标签或待办。" else "已拒绝摘录，原文未改变。")
@@ -194,6 +203,44 @@ class LocalCandidateController(
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { failed(session, request, failure) }
         }) failed(session, request, IllegalStateException())
+    }
+    private fun compute(session: Long, request: Long, source: SourceVersion, repository: LocalCandidateRepository,
+        job: LocalCandidateJob) {
+        val values = repository.batches(source)
+        if (!owns(session, request)) return
+        update(session) { it.copy(busy = false, loading = false, computing = true, batches = values) }
+        synchronized(producerGuard) {
+            check(worker?.isCompleted != false)
+            val next = scope.launch(Dispatchers.Default, start = CoroutineStart.LAZY) {
+                try {
+                    if (!owns(session, request)) return@launch
+                    val document = extract(job)
+                    ensureActive()
+                    if (owns(session, request) && !enqueue complete@{ store ->
+                        if (!owns(session, request)) return@complete
+                        // Retain the exact computed result before committing. A lost ACK retries only
+                        // complete's authenticated receipt, never another producer or a new batch.
+                        val completion = LocalCandidateIntent.Complete(job, document)
+                        update(session) { it.copy(busy = true, computing = false, pending = completion) }
+                        try {
+                            val owner = checkNotNull(store.localCandidates)
+                            acknowledge(session, request, source, owner, owner.complete(job, document),
+                                "候选已保存在本机，尚未采纳。")
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (failure: Exception) { failed(session, request, failure) }
+                    }) failed(session, request, IllegalStateException())
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (failure: Exception) { failed(session, request, failure) }
+            }
+            worker = next
+            next.invokeOnCompletion {
+                synchronized(producerGuard) { if (worker === next) worker = null }
+                publish { local -> val ui = local.candidates
+                    if (disposed || ui == null || !ui.retiringComputation) local
+                    else local.copy(candidates = ui.copy(retiringComputation = false)) }
+            }
+            next.start()
+        }
     }
     private fun acknowledge(session: Long, request: Long, source: SourceVersion, repository: LocalCandidateRepository,
         result: LocalCandidateBatch, notice: String) {
