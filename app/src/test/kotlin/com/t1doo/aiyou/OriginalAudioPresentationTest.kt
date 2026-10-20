@@ -63,7 +63,7 @@ class OriginalAudioPresentationTest {
     }
     private fun click(tag:String) {
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag(tag))
-        compose.onNodeWithTag(tag).assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertIsEnabled().performClick()
+        compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertIsEnabled().performClick()
     }
     private fun drain()=compose.runOnIdle { runBlocking {
         while(true) { val action=f.queue.pollFirst() ?: break;action(f.store) }
