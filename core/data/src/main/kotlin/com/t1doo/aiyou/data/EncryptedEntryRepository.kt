@@ -35,20 +35,21 @@ class EncryptedEntryRepository internal constructor(
     private val newCapturePolicy: () -> ProcessingPolicy = { ProcessingDefaults.policy },
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) : EntryRepository, AwaitableRecordStorage {
+    private val sourceGate=com.t1doo.aiyou.domain.CaptureDraftGate().also { attachmentStorage.installSourceGate(it) }
     private val dao get() = database.records()
     private val connectionStorage = SqlModelConnectionCatalog(borrowedSql,keyBytes)
     override val modelConnections: com.t1doo.aiyou.domain.ModelConnectionCatalog = connectionStorage
     override val modelCapabilities: com.t1doo.aiyou.domain.ModelCapabilityRepository = SqlModelCapabilityRepository(borrowedSql,connectionStorage)
     override val localModelConnections = com.t1doo.aiyou.domain.LocalModelConnectionServices(connectionStorage,
-        RemoteTextTransactions(borrowedSql,connectionCurrent=connectionStorage::connectionCurrent))
-    override val localProcessing: com.t1doo.aiyou.domain.LocalProcessingRepository = SqlLocalProcessingRepository(borrowedSql)
+        RemoteTextTransactions(borrowedSql,connectionCurrent=connectionStorage::connectionCurrent,captureGate=sourceGate))
+    override val localProcessing: com.t1doo.aiyou.domain.LocalProcessingRepository = SqlLocalProcessingRepository(borrowedSql,sourceGate)
     override val sourceTasks: com.t1doo.aiyou.domain.SourceTaskRepository by lazy { SqlSourceTaskRepository(borrowedSql, taskStorage) }
-    override val attachments: AttachmentStore get() = attachmentStorage
+    override val attachments: AttachmentStore = OwnerAttachmentStore(attachmentStorage,sourceGate)
     override val editDrafts: EncryptedOriginalEditStore get() = originalEditStorage
     /** Blocking IO; shares the existing encrypted database and never enables remote processing. */
-    override val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(borrowedSql)
-    override val recordAuthorizations: com.t1doo.aiyou.domain.RecordAuthorizationRepository = SqlRecordAuthorizationRepository(borrowedSql,connectionStorage,modelCapabilities)
-    private val questionAuthorizationStorage = SqlSelectedQuestionAuthorizationRepository(borrowedSql)
+    override val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(borrowedSql,sourceGate)
+    override val recordAuthorizations: com.t1doo.aiyou.domain.RecordAuthorizationRepository = SqlRecordAuthorizationRepository(borrowedSql,connectionStorage,modelCapabilities,sourceGate)
+    private val questionAuthorizationStorage = SqlSelectedQuestionAuthorizationRepository(borrowedSql,sourceGate)
     override val selectedQuestionAuthorizations: com.t1doo.aiyou.domain.SelectedQuestionAuthorizationRepository
         get() = questionAuthorizationStorage
     private val candidateStorage = SqlLocalCandidateRepository(borrowedSql, keyBytes)
@@ -59,7 +60,7 @@ class EncryptedEntryRepository internal constructor(
     override val factRecaps: com.t1doo.aiyou.domain.FactRecapRepository = SqlFactRecapRepository(borrowedSql, tagStorage)
     override val sourceTags: com.t1doo.aiyou.domain.SourceTagRepository = SqlSourceTagRepository(borrowedSql, tagStorage)
     private val sourceMemoryStorage = SqlSourceMemoryRepository(borrowedSql, keyBytes)
-    private val captureStorage=SqlCaptureRepository(borrowedSql,attachmentStorage,tagStorage,newCapturePolicy)
+    private val captureStorage=SqlCaptureRepository(borrowedSql,attachmentStorage,tagStorage,newCapturePolicy,sourceGate)
     override val captureRecords: com.t1doo.aiyou.domain.CaptureRepository get()=captureStorage
     override val sourceMemories: com.t1doo.aiyou.domain.SourceMemoryRepository get() = sourceMemoryStorage
     override val favorites: com.t1doo.aiyou.domain.RecordFavoriteRepository = SqlRecordFavoriteRepository(borrowedSql)
@@ -87,9 +88,9 @@ class EncryptedEntryRepository internal constructor(
     override val permanentErasure: com.t1doo.aiyou.domain.PermanentErasureRepository =
         SqlPermanentErasureRepository(borrowedSql, attachmentStorage, originalEditStorage, packageStorage, proposalStorage::readAllWithin,captureGate=captureStorage.mutationGate)
     override val recycleBin: com.t1doo.aiyou.domain.RecycleBinRepository =
-        SqlRecycleBinRepository(borrowedSql, tagStorage, SqlErasureFileHooks::fenced)
+        SqlRecycleBinRepository(borrowedSql, tagStorage, SqlErasureFileHooks::fenced,sourceGate)
 
-    override suspend fun prepare() {
+    override suspend fun prepare() = sourceGate.sourceMutation {
         // Bounded resume before ordinary media recovery. A failed deletion remains visible for retry.
         resumePermanentErasure(permanentErasure)
         captureRecords.recover()
@@ -143,7 +144,9 @@ class EncryptedEntryRepository internal constructor(
         OriginalRevision(it.entryId, it.revision, it.originalText, it.contentHash, it.createdAtMillis)
     }
 
-    override suspend fun revise(entryId: String, expectedRevision: Int, text: String, createdAtMillis: Long): StoredEntry = database.withTransaction {
+    override suspend fun revise(entryId: String, expectedRevision: Int, text: String, createdAtMillis: Long): StoredEntry =
+        sourceGate.sourceMutation { reviseOwned(entryId,expectedRevision,text,createdAtMillis) }
+    private suspend fun reviseOwned(entryId: String, expectedRevision: Int, text: String, createdAtMillis: Long): StoredEntry = database.withTransaction {
         require(text.isNotBlank() && text.length <= MAX_TEXT_LENGTH)
         val entry = dao.entry(entryId) ?: throw RecordConflict()
         if (entry.currentRevision != expectedRevision) throw RecordConflict()
@@ -154,7 +157,9 @@ class EncryptedEntryRepository internal constructor(
         checkNotNull(dao.entry(entryId)).toModel()
     }
 
-    override suspend fun reviseFromDraft(draft: OriginalEditDraft, createdAtMillis: Long): StoredEntry {
+    override suspend fun reviseFromDraft(draft: OriginalEditDraft, createdAtMillis: Long): StoredEntry =
+        sourceGate.sourceMutation { reviseFromDraftOwned(draft,createdAtMillis) }
+    private suspend fun reviseFromDraftOwned(draft: OriginalEditDraft, createdAtMillis: Long): StoredEntry {
         require(draft.state == OriginalEditDraftState.ACTIVE)
         committedEdit(draft)?.let { return it }
         return originalEditStorage.packageFiles { lease ->
@@ -185,7 +190,7 @@ class EncryptedEntryRepository internal constructor(
 
     private val lifetime = DrainingRecordsStorage(borrowedSql,attachmentStorage,originalEditStorage,
         { database.close() }, { reminderStores.close();tagStorage.wipeKey(); peopleStorage.wipeKey(); proposalStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); keyBytes.fill(0) })
-    override fun close() { connectionStorage.close(); questionAuthorizationStorage.close(); lifetime.close() }
+    override fun close() { sourceGate.retire();connectionStorage.close(); questionAuthorizationStorage.close(); lifetime.close() }
     override fun awaitClosed() { close(); lifetime.awaitClosed() }
     /** Known external IO owner convenience, including native cold-reopen fixtures. */
     fun closeAndAwait() { close(); awaitClosed() }

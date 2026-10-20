@@ -49,7 +49,8 @@ internal fun LocalRecordUiState.hasLocalProcessingProof(source: SourceVersion): 
 class LocalProcessingController(private val current: () -> LocalRecordUiState,
     private val publish: ((LocalRecordUiState) -> LocalRecordUiState) -> Unit,
     private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
-    private val retireDerived: (String) -> Unit, private val clock: Clock = Clock.systemUTC()) {
+    private val retireDerived: (String) -> Unit, private val clock: Clock = Clock.systemUTC(),
+    private val sourceUi:((()->Unit)->Unit)={it()}) {
     private val sessions = AtomicLong()
     @Volatile private var disposed = false
     private fun owns(session: Long, request: Long? = null): Boolean {
@@ -68,13 +69,15 @@ class LocalProcessingController(private val current: () -> LocalRecordUiState,
     private fun update(session: Long, change: (LocalProcessingUiState) -> LocalProcessingUiState) = publish {
         if (!owns(it, session)) it else it.copy(localProcessing = change(checkNotNull(it.localProcessing)))
     }
-    fun open(id: String, revision: Int) {
+    fun open(id: String, revision: Int) { sourceUi { openSourceOwned(id,revision) } }
+    private fun openSourceOwned(id: String, revision: Int) {
         if (current().recordAuthorizationOwner != null) {
             current().authorizationReadingSource(id, revision)?.let(::open); return
         }
         openWithin(id, revision, null)
     }
-    fun open(source: RecordAuthorizationReadingSource) {
+    fun open(source: RecordAuthorizationReadingSource) { sourceUi { openSourceOwned(source) } }
+    private fun openSourceOwned(source: RecordAuthorizationReadingSource) {
         val id = source.binding.source.sourceId; val revision = source.binding.source.revision.toInt()
         if (!source.same(current().authorizationReadingSource(id, revision))) return
         openWithin(id, revision, source)
@@ -93,22 +96,26 @@ class LocalProcessingController(private val current: () -> LocalRecordUiState,
     fun close(session: Long) {
         if (!disposed) publish { if (it.localProcessing?.session == session) it.copy(localProcessing = null) else it }
     }
-    fun prepare(session: Long, target: LocalProcessingChoice) {
+    fun prepare(session: Long, target: LocalProcessingChoice) { sourceUi { prepareSourceOwned(session,target) } }
+    private fun prepareSourceOwned(session: Long, target: LocalProcessingChoice) {
         val ui = current().localProcessing ?: return; val snapshot = ui.snapshot ?: return
         if (!owns(session) || !canPrepare(ui) || ui.busy || ui.pending != null || ui.pendingWithdrawal != null || ui.pendingAuthorization != null || snapshot.policy.name == target.name ||
             snapshot.policy == ProcessingPolicy.REMOTE_ALLOWED || snapshot.generation == Long.MAX_VALUE) return
         update(session) { it.copy(confirmation = LocalProcessingChange(snapshot, target, UUID.randomUUID().toString()), withdrawalConfirmation = null, connectionReview = null, authorizationConfirmation = null, error = null, notice = null) }
     }
-    fun cancel(session: Long, expected: LocalProcessingChange) {
+    fun cancel(session: Long, expected: LocalProcessingChange) { sourceUi { cancelSourceOwned(session,expected) } }
+    private fun cancelSourceOwned(session: Long, expected: LocalProcessingChange) {
         if (owns(session)) update(session) { if (it.busy || it.confirmation != expected) it else it.copy(confirmation = null) }
     }
-    fun confirm(session: Long, expected: LocalProcessingChange) {
+    fun confirm(session: Long, expected: LocalProcessingChange) { sourceUi { confirmSourceOwned(session,expected) } }
+    private fun confirmSourceOwned(session: Long, expected: LocalProcessingChange) {
         val ui = current().localProcessing ?: return
         if (!owns(session) || !canPrepare(ui) || ui.busy || ui.pending != null || ui.pendingWithdrawal != null || ui.pendingAuthorization != null || ui.confirmation != expected || ui.snapshot != expected.expected) return
         retireDerived(ui.source.sourceId)
         execute(ui, expected)
     }
-    fun retry(session: Long, request: Long) {
+    fun retry(session: Long, request: Long) { sourceUi { retrySourceOwned(session,request) } }
+    private fun retrySourceOwned(session: Long, request: Long) {
         val ui = current().localProcessing ?: return
         if (owns(session, request) && !ui.busy) {
             if (ui.authorizationSource != null) executeManaged(ui, ui.pending, ui.pendingWithdrawal, ui.pendingAuthorization,
@@ -142,7 +149,8 @@ class LocalProcessingController(private val current: () -> LocalRecordUiState,
     private fun canPrepare(ui: LocalProcessingUiState): Boolean = ui.authorizationSource?.let {
         it.same(current().authorizationReadingSource(ui.source.sourceId, ui.source.revision.toInt())) && ui.authorization?.snapshot?.binding == it.binding
     } ?: true
-    fun prepareWithdrawal(session: Long) {
+    fun prepareWithdrawal(session: Long) { sourceUi { prepareWithdrawalSourceOwned(session) } }
+    private fun prepareWithdrawalSourceOwned(session: Long) {
         val ui = current().localProcessing ?: return
         val snapshot = ui.authorization?.snapshot ?: return
         if (!owns(session) || !canPrepare(ui) || ui.busy || ui.pending != null || ui.pendingWithdrawal != null || ui.pendingAuthorization != null ||
@@ -150,17 +158,20 @@ class LocalProcessingController(private val current: () -> LocalRecordUiState,
         update(session) { it.copy(confirmation = null, connectionReview = null, authorizationConfirmation = null, withdrawalConfirmation = RecordAuthorizationChange.withdraw(snapshot,
             ProcessingPolicy.LOCAL_ONLY, UUID.randomUUID().toString()), error = null, notice = null) }
     }
-    fun cancelWithdrawal(session: Long, expected: RecordAuthorizationChange) {
+    fun cancelWithdrawal(session: Long, expected: RecordAuthorizationChange) { sourceUi { cancelWithdrawalSourceOwned(session,expected) } }
+    private fun cancelWithdrawalSourceOwned(session: Long, expected: RecordAuthorizationChange) {
         if (owns(session)) update(session) { if (it.busy || it.withdrawalConfirmation !== expected) it else it.copy(withdrawalConfirmation = null) }
     }
-    fun confirmWithdrawal(session: Long, expected: RecordAuthorizationChange) {
+    fun confirmWithdrawal(session: Long, expected: RecordAuthorizationChange) { sourceUi { confirmWithdrawalSourceOwned(session,expected) } }
+    private fun confirmWithdrawalSourceOwned(session: Long, expected: RecordAuthorizationChange) {
         val ui = current().localProcessing ?: return
         if (!owns(session) || !canPrepare(ui) || ui.busy || ui.pending != null || ui.pendingWithdrawal != null || ui.pendingAuthorization != null ||
             ui.withdrawalConfirmation !== expected || ui.authorization?.snapshot != expected.expected) return
         retireDerived(ui.source.sourceId)
         executeManaged(ui, null, expected)
     }
-    fun prepareAuthorization(session: Long, configuration: ModelConnectionConfiguration, purpose: TextPurpose) {
+    fun prepareAuthorization(session: Long, configuration: ModelConnectionConfiguration, purpose: TextPurpose) { sourceUi { prepareAuthorizationSourceOwned(session,configuration,purpose) } }
+    private fun prepareAuthorizationSourceOwned(session: Long, configuration: ModelConnectionConfiguration, purpose: TextPurpose) {
         val ui=current().localProcessing?:return
         val source=ui.authorizationSource?:return
         if(!owns(session)||!canPrepare(ui)||ui.busy||ui.pending!=null||ui.pendingWithdrawal!=null||ui.pendingAuthorization!=null||
@@ -185,10 +196,12 @@ class LocalProcessingController(private val current: () -> LocalRecordUiState,
             catch(failure: Exception){failed(session,request,failure)}
         })failed(session,request,RecordAuthorizationStorageFailure())
     }
-    fun cancelAuthorization(session: Long, expected: RecordAuthorizationChange) {
+    fun cancelAuthorization(session: Long, expected: RecordAuthorizationChange) { sourceUi { cancelAuthorizationSourceOwned(session,expected) } }
+    private fun cancelAuthorizationSourceOwned(session: Long, expected: RecordAuthorizationChange) {
         if(owns(session))update(session){if(it.busy||it.authorizationConfirmation!==expected)it else it.copy(connectionReview=null,authorizationConfirmation=null)}
     }
-    fun confirmAuthorization(session: Long, expected: RecordAuthorizationChange) {
+    fun confirmAuthorization(session: Long, expected: RecordAuthorizationChange) { sourceUi { confirmAuthorizationSourceOwned(session,expected) } }
+    private fun confirmAuthorizationSourceOwned(session: Long, expected: RecordAuthorizationChange) {
         val ui=current().localProcessing?:return
         if(!owns(session)||!canPrepare(ui)||ui.busy||ui.pending!=null||ui.pendingWithdrawal!=null||ui.pendingAuthorization!=null||
             ui.authorizationConfirmation!==expected||ui.authorization?.snapshot!=expected.expected||

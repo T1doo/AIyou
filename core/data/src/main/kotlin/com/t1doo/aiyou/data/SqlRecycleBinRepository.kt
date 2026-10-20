@@ -8,7 +8,8 @@ import java.util.concurrent.CancellationException
 /** Uses v6 tombstone/generation and the existing encrypted operation ledger; no new schema. */
 internal class SqlRecycleBinRepository(private val database: RecordsSqlDatabase,
     private val tags: SqlManualTagRepository,
-    private val isErasing: (RecordsSqlConnection, String) -> Boolean = { _, _ -> false }) : RecycleBinRepository {
+    private val isErasing: (RecordsSqlConnection, String) -> Boolean = { _, _ -> false },
+    private val sourceGate:CaptureDraftGate?=null) : RecycleBinRepository {
     override fun records(): List<RecycleRecord> = safely {
         database.transaction { sql -> sql.query(
             "SELECT e.id FROM entries e JOIN remote_source_access a ON a.entryId=e.id WHERE a.deleted=1 ORDER BY e.capturedAtMillis DESC,e.id"
@@ -18,7 +19,9 @@ internal class SqlRecycleBinRepository(private val database: RecordsSqlDatabase,
         ManualTags.identifier(entryId)
         database.transaction { readWithin(it, entryId) }
     }
-    override fun apply(mutation: RecycleMutation): RecycleRecord = safely {
+    override fun apply(mutation: RecycleMutation): RecycleRecord =
+        if(sourceGate==null) applyOwned(mutation) else sourceGate.syncSourceMutation { applyOwned(mutation) }
+    private fun applyOwned(mutation: RecycleMutation): RecycleRecord = safely {
         database.transaction { sql ->
             if (isErasing(sql, mutation.source.sourceId)) throw RecycleConflict()
             val current = readWithin(sql, mutation.source.sourceId)

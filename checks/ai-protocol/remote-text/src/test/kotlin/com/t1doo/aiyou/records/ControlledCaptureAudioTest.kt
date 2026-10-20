@@ -14,6 +14,130 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ControlledCaptureAudioTest {
+    @Test(timeout=10000) fun actualVmPlaybackBlocksLegacyOptimisticInputPackageAdmissionAndLockUntilActualClose():Unit=runBlocking {
+        Harness().use { h ->
+            h.start();assertTrue(h.c.audioCapture.start({Input()}));h.await(CaptureAudioPhase.READY)
+            val closing=CountDownLatch(1);val release=CountDownLatch(1)
+            val vm=LocalRecordsViewModel(android.app.Application(),{h.store},audioOutput={object:OriginalAudioOutput {
+                override fun focus()=true
+                override fun open() {}
+                override fun play() {}
+                override fun write(samples:ShortArray,count:Int)=count
+                override fun playedFrames()=0L
+                override fun close() { closing.countDown();check(release.await(4,TimeUnit.SECONDS)) }
+            }})
+            try {
+                withTimeout(4000) { while(vm.state.value.mixedCapture?.draft==null)delay(5) }
+                vm.audioForeground(true);assertTrue(vm.audioPlayback.playDraft())
+                withTimeout(4000) { while(vm.audioPlayback.state.value.phase!=OriginalAudioPhase.PLAYING)delay(5) }
+                val before=vm.state.value
+                vm.changeText("冻结后的legacy输入");vm.mixedCapture.edit("冻结后的此刻输入")
+                assertEquals(before.text,vm.state.value.text);assertEquals(before.mixedCapture!!.text,vm.state.value.mixedCapture!!.text)
+                assertFalse(vm.enqueuePackageOperation { error("must not execute while pinned") })
+                assertFalse(vm.canRetireForAppAccess());assertFalse(vm.appAccessIdle.value);assertNull(vm.state.value.error)
+                vm.audioPlayback.stop();assertTrue(closing.await(4,TimeUnit.SECONDS))
+                assertTrue(h.repo.mutationGate.frozen);assertFalse(vm.canRetireForAppAccess())
+                release.countDown();withTimeout(4000) { while(vm.audioPlayback.busy || !vm.appAccessIdle.value)delay(5) }
+                assertFalse(h.repo.mutationGate.frozen);assertTrue(vm.canRetireForAppAccess());assertNull(vm.state.value.error)
+            } finally { release.countDown();vm.clearForHostTest();withTimeout(4000) { vm.awaitAppAccessClosed() } }
+        }
+    }
+    @Test fun explicitSameResourceCloseRetryDoesNotUnlockOrSaveUntilDispositionAndPreIntentAbandonWorks():Unit=runBlocking {
+        for(save in listOf(true,false)) Harness().use { h ->
+            h.start();val closes=AtomicInteger();val opened=AtomicInteger()
+            assertTrue(h.c.audioCapture.startFile({true},{true}));h.drain()
+            val key=checkNotNull(h.ui.audio.filePickerKey);h.c.audioCapture.claimFile(key)
+            h.c.audioCapture.selectedFile(key,object:SelectedWaveSource {
+                override fun open():java.io.InputStream { opened.incrementAndGet();return object:java.io.ByteArrayInputStream(CaptureAudioSqlTest.wave()) {
+                    override fun close() { if(closes.incrementAndGet()==1)error("synthetic close ACK lost");super.close() }
+                } }
+            })
+            h.await(CaptureAudioPhase.UNKNOWN);assertTrue(h.ui.audio.resourceClosureUnknown)
+            h.c.audioCapture.retryResourceClose()
+            withTimeout(5000) { while(h.ui.audio.resourceClosureUnknown)delay(5) }
+            assertEquals(2,closes.get());assertEquals(1,opened.get());assertTrue(h.repo.mutationGate.frozen)
+            assertNull(h.repo.peek()!!.audio);assertEquals(CaptureAudioPhase.UNKNOWN,h.ui.audio.phase)
+            if(save)h.c.audioCapture.retry()else h.c.audioCapture.discardUnwritten()
+            h.await(if(save)CaptureAudioPhase.READY else CaptureAudioPhase.IDLE)
+            if(save)assertArrayEquals(CaptureAudioSqlTest.wave(),h.repo.audio(h.repo.peek()!!)) else assertNull(h.repo.peek()!!.audio)
+            assertFalse(h.repo.mutationGate.frozen)
+        }
+    }
+    @Test fun filePickerDrainsEditsAndResultBeforeResumeCannotOpenUntilSameOwnerResumes():Unit=runBlocking {
+        Harness().use { h ->
+            h.start();h.c.edit("合成文件导入前文字")
+            var foreground=true;val opened=AtomicInteger();val closed=AtomicInteger()
+            assertTrue(h.c.audioCapture.startFile({true},{foreground}));h.drain()
+            val key=checkNotNull(h.ui.audio.filePickerKey);assertTrue(h.c.audioCapture.claimFile(key))
+            assertFalse(h.c.audioCapture.claimFile(key));foreground=false
+            h.c.audioCapture.selectedFile(key,object:SelectedWaveSource {
+                override fun open():java.io.InputStream { opened.incrementAndGet();return object:java.io.ByteArrayInputStream(CaptureAudioSqlTest.wave()) {
+                    override fun close() { closed.incrementAndGet();super.close() }
+                } }
+            })
+            delay(30);assertEquals(0,opened.get());assertTrue(h.repo.mutationGate.frozen)
+            h.c.edit("被拒绝的迟到文字");assertEquals("合成文件导入前文字",h.ui.text)
+            foreground=true;h.c.audioCapture.resumeFile();h.await(CaptureAudioPhase.READY)
+            assertEquals(1,opened.get());assertEquals(1,closed.get())
+            assertEquals("合成文件导入前文字",h.repo.peek()!!.text)
+            assertArrayEquals(CaptureAudioSqlTest.wave(),h.repo.audio(h.repo.peek()!!))
+        }
+    }
+    @Test fun fileStrictEofCanonicalProfileAndSizeFailuresNeverPublishPartialAudio():Unit=runBlocking {
+        val wave=CaptureAudioSqlTest.wave()
+        val badRate=wave.copyOf().also { it[24]=0 }
+        for(bytes in listOf(wave.copyOf(wave.size-2),wave+byteArrayOf(0),badRate,byteArrayOf(),ByteArray(LocalPcmAudio.MAX_WAV_BYTES+1))) {
+            Harness().use { h ->
+                h.start();assertTrue(h.c.audioCapture.startFile({true},{true}));h.drain()
+                val key=checkNotNull(h.ui.audio.filePickerKey);assertTrue(h.c.audioCapture.claimFile(key))
+                h.c.audioCapture.selectedFile(key,object:SelectedWaveSource { override fun open()=bytes.inputStream() })
+                h.await(CaptureAudioPhase.IDLE)
+                assertNull(h.repo.peek()!!.audio);assertNotNull(h.ui.audio.error)
+                assertFalse(h.repo.mutationGate.frozen)
+                assertTrue(h.f.db.read("SELECT id FROM attachments").isEmpty())
+                assertTrue(h.f.mediaRoot.listFiles().orEmpty().none { it.name.endsWith(".aead") })
+            }
+        }
+    }
+    @Test fun cancelWhileActualFileCloseIsBlockedWinsBeforeFinalizationAndCannotUnlockEarly():Unit=runBlocking {
+        Harness().use { h ->
+            h.start();val closing=CountDownLatch(1);val release=CountDownLatch(1)
+            assertTrue(h.c.audioCapture.startFile({true},{true}));h.drain()
+            val key=checkNotNull(h.ui.audio.filePickerKey);h.c.audioCapture.claimFile(key)
+            h.c.audioCapture.selectedFile(key,object:SelectedWaveSource { override fun open()=object:java.io.ByteArrayInputStream(CaptureAudioSqlTest.wave()) {
+                override fun close() { closing.countDown();check(release.await(4,TimeUnit.SECONDS));super.close() }
+            } })
+            try {
+                assertTrue(closing.await(4,TimeUnit.SECONDS));h.c.audioCapture.cancel();h.drain()
+                assertTrue(h.c.audioCapture.busy);assertTrue(h.repo.mutationGate.frozen);assertNull(h.repo.peek()!!.audio)
+            } finally { release.countDown() }
+            h.await(CaptureAudioPhase.IDLE);assertNull(h.repo.peek()!!.audio);assertFalse(h.repo.mutationGate.frozen)
+        }
+    }
+    @Test fun failedActualFileCloseQuarantinesOwnerAndNeverSettlesOrOpensSecondSource():Unit=runBlocking {
+        Harness().use { h ->
+            h.allowUnconfirmedClose=true;h.start();assertTrue(h.c.audioCapture.startFile({true},{true}));h.drain()
+            val key=checkNotNull(h.ui.audio.filePickerKey);h.c.audioCapture.claimFile(key)
+            h.c.audioCapture.selectedFile(key,object:SelectedWaveSource { override fun open()=object:java.io.ByteArrayInputStream(CaptureAudioSqlTest.wave()) {
+                override fun close() { error("synthetic close outcome unknown") }
+            } })
+            h.await(CaptureAudioPhase.UNKNOWN);h.c.audioCapture.reconcile();h.c.audioCapture.retry();h.drain()
+            assertTrue(h.repo.mutationGate.frozen);assertNull(h.repo.peek()!!.audio)
+            assertFalse(h.c.audioCapture.startFile({true},{true}))
+            assertThrows(IllegalStateException::class.java) { runBlocking { h.c.drainAudioOnIo(h.store) } }
+        }
+    }
+    @Test fun cancelledPickerKeyCannotDonateItsLateSourceToNextRequest():Unit=runBlocking {
+        Harness().use { h ->
+            h.start();assertTrue(h.c.audioCapture.startFile({true},{true}));h.drain()
+            val old=checkNotNull(h.ui.audio.filePickerKey);h.c.audioCapture.claimFile(old);h.c.audioCapture.cancel();h.await(CaptureAudioPhase.IDLE)
+            assertTrue(h.c.audioCapture.startFile({true},{true}));h.drain()
+            val opened=AtomicInteger()
+            h.c.audioCapture.selectedFile(old,object:SelectedWaveSource { override fun open():java.io.InputStream { opened.incrementAndGet();return CaptureAudioSqlTest.wave().inputStream() } })
+            delay(20);assertEquals(0,opened.get());assertEquals(CaptureAudioPhase.PICKING,h.ui.audio.phase)
+            h.c.audioCapture.cancel();h.await(CaptureAudioPhase.IDLE)
+        }
+    }
     @Test fun immediateStartDrainsTypedTextBeforeBindingAndNeverDropsAudioOnOldAck():Unit=runBlocking {
         Harness().use { h ->
             h.start();val version=h.ui.draft!!.version

@@ -132,7 +132,7 @@ class LocalProcessingPresentationTest {
         actual=StoredEntry("one",1,"",55,"UTC",ProcessingPolicy.LOCAL_ONLY)
         state.value=state.value.copy(entries=listOf(actual,two))
         compose.setContent { Screen() };openReader();open()
-        compose.onNodeWithTag("local-processing-source").performScrollTo().assertTextEquals("图片记录 · 无文字正文")
+        compose.onNodeWithTag("local-processing-source").performScrollTo().assertTextEquals("附件记录 · 无文字正文")
         click("local-processing-none");click("local-processing-confirm");drain()
         assertEquals("",actual.originalText);assertEquals(ProcessingPolicy.AI_NONE,actual.policy)
         compose.onAllNodesWithText("REMOTE_ALLOWED").assertCountEquals(0)

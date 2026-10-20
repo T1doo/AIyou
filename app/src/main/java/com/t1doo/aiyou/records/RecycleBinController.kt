@@ -38,6 +38,7 @@ class RecycleBinController internal constructor(
     private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
     private val canMove: () -> Boolean = { true },
     private val onCommittedMove: (String) -> Unit = {},
+    private val sourceUi:((()->Unit)->Unit)={it()},
 ) {
     private val sessions = AtomicLong()
     private val confirmations = AtomicLong()
@@ -49,7 +50,8 @@ class RecycleBinController internal constructor(
     private fun update(session: Long, change: (RecycleBinUiState) -> RecycleBinUiState) = publish { local ->
         if (disposed || local.recycleBin?.session != session) local else local.copy(recycleBin = change(local.recycleBin))
     }
-    fun open() {
+    fun open() { sourceUi { openSourceOwned() } }
+    private fun openSourceOwned() {
         val local = current()
         if (!available(local) || !canMove() || local.recordPackage != null || local.recycleBin != null || local.originalEdit != null || local.originalHistory != null ||
             local.saving || local.savePending) return
@@ -57,7 +59,8 @@ class RecycleBinController internal constructor(
         publish { latest -> if (available(latest) && latest.recycleBin == null) latest.copy(recycleBin = ui) else latest }
         load(ui.session)
     }
-    fun requestMove(id: String, revision: Int) {
+    fun requestMove(id: String, revision: Int) { sourceUi { requestMoveSourceOwned(id,revision) } }
+    private fun requestMoveSourceOwned(id: String, revision: Int) {
         val local = current()
         if (!available(local) || !canMove() || local.recordPackage != null || local.recycleBin != null || local.originalEdit != null || local.originalHistory != null ||
             local.manualTagEditor != null || local.saving || local.savePending ||
@@ -85,13 +88,15 @@ class RecycleBinController internal constructor(
         if (!owns(session, local) || ui == null || ui.busy || ui.confirmation != null ||
             (id != null && ui.records.none { it.entry.id == id })) local else local.copy(recycleBin = ui.copy(selectedId = id))
     }
-    fun requestRestore(session: Long, id: String, generation: Long) = publish { local ->
+    fun requestRestore(session: Long, id: String, generation: Long) { sourceUi { requestRestoreSourceOwned(session,id,generation) } }
+    private fun requestRestoreSourceOwned(session: Long, id: String, generation: Long) = publish { local ->
         val ui = local.recycleBin
         val record = ui?.records?.singleOrNull { it.entry.id == id && it.generation == generation && it.deleted }
         if (!owns(session, local) || ui == null || !ui.browsing || ui.busy || ui.confirmation != null || record == null || ui.selectedId != id || id in ui.erasures) local
         else local.copy(recycleBin = ui.copy(confirmation = confirmation(record)))
     }
-    fun requestErasure(session: Long, id: String, generation: Long) = publish { local ->
+    fun requestErasure(session: Long, id: String, generation: Long) { sourceUi { requestErasureSourceOwned(session,id,generation) } }
+    private fun requestErasureSourceOwned(session: Long, id: String, generation: Long) = publish { local ->
         val ui = local.recycleBin
         val record = ui?.records?.singleOrNull { it.entry.id == id && it.generation == generation && it.deleted }
         if (!owns(session,local) || !local.supportsPermanentErasure || ui == null || !ui.browsing || ui.busy ||
@@ -134,7 +139,8 @@ class RecycleBinController internal constructor(
                 error = "回收站读取失败，加密数据已保留。请重试读取。") } }
         }) update(session) { it.copy(loading = false, error = "本机队列不可用，请重试读取。") }
     }
-    fun confirm(session: Long, id: Long) {
+    fun confirm(session: Long, id: Long) { sourceUi { confirmSourceOwned(session,id) } }
+    private fun confirmSourceOwned(session: Long, id: Long) {
         val ui = current().recycleBin ?: return
         val intent = ui.confirmation ?: return
         if (!owns(session) || ui.loading || intent.id != id || intent.busy || intent.conflict) return

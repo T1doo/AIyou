@@ -10,9 +10,11 @@ import java.util.concurrent.CancellationException
 /** One encrypted draft slot; durable file intents precede any IO. No entry exists until all media authenticate. */
 internal class SqlCaptureRepository(private val database: RecordsSqlDatabase,private val media: EncryptedAttachmentStore,
     private val tags: SqlManualTagRepository,
-    private val newDraftPolicy: () -> ProcessingPolicy = { ProcessingDefaults.policy }) : CaptureRepository {
+    private val newDraftPolicy: () -> ProcessingPolicy = { ProcessingDefaults.policy },
+    override val mutationGate:CaptureDraftGate) : CaptureRepository {
+    internal constructor(database:RecordsSqlDatabase,media:EncryptedAttachmentStore,tags:SqlManualTagRepository,
+        newDraftPolicy:()->ProcessingPolicy={ProcessingDefaults.policy}):this(database,media,tags,newDraftPolicy,CaptureDraftGate())
     override val supportsProcessingChoice = true
-    override val mutationGate = CaptureDraftGate()
     override suspend fun peek():CaptureDraft? = safely { database.transaction { read(it) } }
     override suspend fun addAudio(request:CaptureDraftGate.Reservation,bytes:ByteArray):CaptureDraft = safely {
         mutationGate.audioWrite(request) {

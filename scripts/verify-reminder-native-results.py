@@ -13,7 +13,7 @@ project = root / 'checks/reminder-native'
 receipt = project / 'build/controlled-native-inputs.json'
 app_names = ['AndroidReminderDriver.kt', 'AndroidReminderRuntime.kt', 'ReminderReceivers.kt',
              'ReminderJobService.kt', 'ReminderOperationBridge.kt', 'ReminderVmRuntime.kt',
-             'ReminderNativeEngine.kt', 'ReminderProcessOwner.kt']
+             'ReminderNativeEngine.kt', 'ReminderProcessOwner.kt', 'OriginalAudioOutput.kt', 'PlatformOriginalAudioOutput.kt']
 ui_names = ['AppAccessController.kt', 'AppAccessPreferenceOperations.kt', 'FileAppAccessPreference.kt']
 
 def inputs():

@@ -48,7 +48,8 @@ internal class AppAccessViewModel internal constructor(application: Application,
             val factory=object:ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST") override fun <T:ViewModel> create(modelClass:Class<T>):T {
                     check(modelClass==LocalRecordsViewModel::class.java)
-                    return LocalRecordsViewModel(getApplication(),{store},reminderRuntime=port,admittedStore=store) as T
+                    return LocalRecordsViewModel(getApplication(),{store},reminderRuntime=port,admittedStore=store,
+                        audioOutput={ stop -> com.t1doo.aiyou.records.PlatformOriginalAudioOutput(getApplication(),stop) }) as T
                 }
             }
             records=ViewModelProvider(owner,factory)[LocalRecordsViewModel::class.java]

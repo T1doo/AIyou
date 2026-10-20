@@ -134,7 +134,7 @@ class MixedCapturePresentationTest {
         val saved=f.local.value.entries.single().id
         openRecent(saved)
         compose.onNodeWithText("记录原文").assertExists()
-        compose.onNodeWithText("图片记录 · 无文字正文；请打开附件查看原图。").assertExists()
+        compose.onNodeWithText("附件记录 · 无文字正文；请打开附件查看原始素材。").assertExists()
         compose.onNodeWithText("返回列表").performClick()
         compose.onNodeWithTag("mixed-list").assertExists()
     }

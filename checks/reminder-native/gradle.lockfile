@@ -4,6 +4,9 @@
 # To regenerate this file, run: ./gradlew :dependencies --write-locks
 androidx.annotation:annotation-jvm:1.9.1=compileClasspath,kspKotlinProcessorClasspath,testCompileClasspath,testRuntimeClasspath
 androidx.annotation:annotation:1.9.1=compileClasspath,kspKotlinProcessorClasspath,testCompileClasspath,testRuntimeClasspath
+androidx.arch.core:core-common:2.2.0=compileClasspath,testCompileClasspath,testRuntimeClasspath
+androidx.arch.core:core-runtime:2.2.0=androidAars
+androidx.collection:collection-jvm:1.5.0=compileClasspath,testCompileClasspath,testRuntimeClasspath
 androidx.core:core-ktx:1.18.0=androidAars
 androidx.room:room-common-jvm:2.8.5=compileClasspath,kspKotlinProcessorClasspath,testCompileClasspath,testRuntimeClasspath
 androidx.room:room-common:2.8.5=kspKotlinProcessorClasspath
@@ -14,6 +17,7 @@ androidx.room:room-migration-jvm:2.8.5=kspKotlinProcessorClasspath
 androidx.room:room-migration:2.8.5=kspKotlinProcessorClasspath
 androidx.room:room-runtime-android:2.8.5=androidAars
 androidx.sqlite:sqlite-android:2.7.0=androidAars
+androidx.sqlite:sqlite-framework-android:2.7.0=androidAars
 androidx.test.espresso:espresso-idling-resource:3.7.0=androidAars,testRuntimeClasspath
 androidx.test:monitor:1.8.0=androidAars,testCompileClasspath,testRuntimeClasspath
 com.almworks.sqlite4java:sqlite4java:1.0.392=testCompileClasspath,testRuntimeClasspath

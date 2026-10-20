@@ -21,11 +21,18 @@ class RemoteTextTransactions private constructor(
     private val database: RecordsSqlDatabase,
     private val newId: () -> String,
     private val connectionCurrent: ((RecordsSqlConnection,ProviderConnection,TextPurpose)->Boolean)?,
+    private val captureGate:com.t1doo.aiyou.domain.CaptureDraftGate?,
 ) : SourceBoundTextRepository {
-    constructor(database: RecordsSqlDatabase, newId: ()->String = { UUID.randomUUID().toString() }) : this(database,newId,null)
+    constructor(database: RecordsSqlDatabase, newId: ()->String = { UUID.randomUUID().toString() }) : this(database,newId,null,null)
+    internal constructor(database:RecordsSqlDatabase,captureGate:com.t1doo.aiyou.domain.CaptureDraftGate?) :
+        this(database,{UUID.randomUUID().toString()},null,captureGate)
     internal constructor(database: RecordsSqlDatabase,
         connectionCurrent: (RecordsSqlConnection,ProviderConnection,TextPurpose)->Boolean) :
-        this(database,{UUID.randomUUID().toString()},connectionCurrent)
+        this(database,{UUID.randomUUID().toString()},connectionCurrent,null)
+    internal constructor(database: RecordsSqlDatabase,
+        connectionCurrent: (RecordsSqlConnection,ProviderConnection,TextPurpose)->Boolean,
+        captureGate:com.t1doo.aiyou.domain.CaptureDraftGate?) :
+        this(database,{UUID.randomUUID().toString()},connectionCurrent,captureGate)
     /** Read current metadata for a later generation-CAS action; originals are never returned. */
     fun readAccess(sourceId: String): SourceAccessSnapshot? {
         try {
@@ -139,6 +146,10 @@ class RemoteTextTransactions private constructor(
     /** Explicit generation-CAS authorization change; new records continue to default LOCAL_ONLY. */
     fun updateAuthorization(source:SourceVersion,expectedGeneration:Long,policy:ProcessingPolicy,
                             connection:ProviderConnection?,consent:ConsentGrant?):SourceCommitDenial? =
+        if(captureGate==null) updateAuthorizationOwned(source,expectedGeneration,policy,connection,consent) else
+            captureGate.syncSourceMutation { updateAuthorizationOwned(source,expectedGeneration,policy,connection,consent) }
+    private fun updateAuthorizationOwned(source:SourceVersion,expectedGeneration:Long,policy:ProcessingPolicy,
+                            connection:ProviderConnection?,consent:ConsentGrant?):SourceCommitDenial? =
         safe(SourceCommitDenial.STORAGE_UNAVAILABLE) { database.transaction { db ->
             val current=readSource(db,source.sourceId) ?: return@transaction SourceCommitDenial.SOURCE_CHANGED
             if(current.state.deleted) return@transaction SourceCommitDenial.SOURCE_DELETED
@@ -156,6 +167,8 @@ class RemoteTextTransactions private constructor(
         } }
 
     fun tombstone(source:SourceVersion,expectedGeneration:Long):SourceCommitDenial? =
+        if(captureGate==null) tombstoneOwned(source,expectedGeneration) else captureGate.syncSourceMutation { tombstoneOwned(source,expectedGeneration) }
+    private fun tombstoneOwned(source:SourceVersion,expectedGeneration:Long):SourceCommitDenial? =
         safe(SourceCommitDenial.STORAGE_UNAVAILABLE) { database.transaction { db ->
             val current=readSource(db,source.sourceId) ?: return@transaction SourceCommitDenial.SOURCE_CHANGED
             if(current.source!=source) return@transaction SourceCommitDenial.SOURCE_CHANGED

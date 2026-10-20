@@ -272,7 +272,9 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         return packages.restoreWithFiles(pack, plan.ids, plan.imported) {}
     }
 
-    override suspend fun recover(): Unit = safely {
+    override suspend fun recover():Unit =
+        if(captureGate==null) recoverOwned() else captureGate.sourceMutation { recoverOwned() }
+    private suspend fun recoverOwned(): Unit = safely {
         val plans = database.transaction { sql ->
             val rows = sql.query("SELECT state FROM record_package_receipts WHERE operation=? ORDER BY id LIMIT 4097",listOf(OP))
             require(rows.size <= 4096); rows.map { decode(it.single() as String) }.filter { it.phase == "PENDING" }

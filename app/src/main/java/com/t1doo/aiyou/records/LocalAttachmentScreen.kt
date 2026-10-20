@@ -26,6 +26,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Checkbox
 import android.os.Build
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -100,7 +101,9 @@ fun LocalAttachmentScreen(
     onRetryRecords: (() -> Unit)? = null,
     onMetadataChoice: (Boolean) -> Unit = {},
     showPictureClose: Boolean = true,
+    audio:OriginalAudioController?=null,
 ) {
+    val playback=audio?.state?.collectAsState()?.value ?: OriginalAudioUi()
     // The list remains owned by this exact panel while the viewer replaces its composition.
     val listScroll = key(panel.sessionId) { rememberScrollState() }
     var showLimits by remember(panel.sessionId) { mutableStateOf(false) }
@@ -184,6 +187,11 @@ fun LocalAttachmentScreen(
                             (item.intent.mediaType != "image/jpeg" || Build.VERSION.SDK_INT >= 28)) {
                             TextButton(onClick = { onView(item.intent.id) }, enabled = !panel.busy && panel.selection == null && !panel.unavailable,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("查看图片") }
+                        } else if(item.state==AttachmentState.READY && item.intent.mediaType=="audio/wav" && audio!=null) {
+                            Text("原音未转写 · 原文版本 ${panel.revision}",style=MaterialTheme.typography.bodySmall)
+                            TextButton(onClick={audio.playAttachment(panel.sessionId,item.intent.id)},
+                                enabled=!playback.busy && !panel.busy && panel.selection==null && !panel.unavailable && panel.error==null,
+                                modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("attachment-audio-play:"+item.intent.id)) { Text("播放原音") }
                         } else if (!panel.readOnly && item.state == AttachmentState.FAILED && item.intent.mediaType in LocalAttachmentController.IMAGE_TYPES) {
                             TextButton(onClick = { onSelect(item.intent.id) }, enabled = !panel.busy && panel.selection == null && !panel.unavailable && panel.error == null,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("重新选择同一图片") }

@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.ime
@@ -151,7 +152,9 @@ class MainActivity : ComponentActivity() {
             val active = com.t1doo.aiyou.records.ActivityRecordPackagePicker(this@MainActivity, restore)
             records.recordPackages.attachPickerOwner(active)
             packageRecords = records; packagePicker = active; picker = active
+            records.audioForeground(lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))
             onDispose {
+                records.audioForeground(false)
                 records.recordPackages.detachPickerOwner(active)
                 active.destroy(); picker = null
                 if (packagePicker === active) { packagePicker = null; packageRecords = null }
@@ -178,6 +181,7 @@ class MainActivity : ComponentActivity() {
                 onEditOriginalHistory = records::editOriginalHistory,
                 onConfirmHistoryReplacement = records::confirmHistoryReplacement,
                 onCancelHistoryReplacement = records::cancelHistoryReplacement, attachments = records.attachments, mixedCapture = records.mixedCapture,
+                audioPlayback=records.audioPlayback,onAudioRouteChanged=records::audioRouteChanged,
                 imageGrid = records.imageGrid, storageUsage = storageUsage.controller,
                 onOpenAiSession = { id, revision -> records.openAiSession(id, revision) },
                 onStartAiSession = records::startAiSession, onStopAiSession = records::stopAiSession,
@@ -203,8 +207,8 @@ class MainActivity : ComponentActivity() {
                 appAccessSettings = { com.t1doo.aiyou.ui.AppAccessSettings(access.controller, id,
                     accessIdle && access.retirementReady(id)) })
     }
-    override fun onResume() { super.onResume(); packagePicker?.resumed() }
-    override fun onPause() { packageRecords?.state?.value?.memoryInbox?.let { packageRecords?.memoryInbox?.close(it.session) }; packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); super.onPause() }
+    override fun onResume() { super.onResume(); packageRecords?.audioForeground(true);packagePicker?.resumed() }
+    override fun onPause() { packageRecords?.audioForeground(false);packageRecords?.state?.value?.memoryInbox?.let { packageRecords?.memoryInbox?.close(it.session) }; packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); super.onPause() }
     override fun onSaveInstanceState(outState: Bundle) { packagePicker?.save(outState); super.onSaveInstanceState(outState) }
     override fun onDestroy() {
         reminderClicks.clear()
@@ -273,6 +277,8 @@ fun AIyouApp(
     onCancelHistoryReplacement: (Long, Long, Long) -> Unit = { _, _, _ -> },
     attachments: LocalAttachmentController? = null,
     mixedCapture: com.t1doo.aiyou.records.MixedCaptureController? = null,
+    audioPlayback:com.t1doo.aiyou.records.OriginalAudioController?=null,
+    onAudioRouteChanged:()->Unit={},
     factRecaps: com.t1doo.aiyou.records.FactRecapController? = null,
     memoryInbox: com.t1doo.aiyou.records.SourceMemoryInboxController? = null,
     display: UiPreferencesState = UiPreferencesState(),
@@ -331,7 +337,9 @@ fun AIyouApp(
     onNavigationGenerationChanged:(Long?)->Unit={},
 ) {
     val currentNavigationCallback by rememberUpdatedState(onNavigationGenerationChanged)
-    val navigation = remember { NavigationOwner{currentNavigationCallback(it)} }
+    val currentAudioRouteCallback by rememberUpdatedState(onAudioRouteChanged)
+    val navigation = remember { NavigationOwner{currentAudioRouteCallback();currentNavigationCallback(it)} }
+    DisposableEffect(audioPlayback) { onDispose { audioPlayback?.stop() } }
     DisposableEffect(navigation) { onDispose { navigation.active = false;currentNavigationCallback(null) } }
     SideEffect {currentNavigationCallback(navigation.generation)}
     val generation = navigation.generation
@@ -892,6 +900,7 @@ fun AIyouApp(
     Scaffold(
         modifier = Modifier.imePadding().onSizeChanged { scaffoldHeightPx = it.height },
         topBar = {
+          Column {
             NotebookAppBar(
                 if (browsingPackage) "加密原文包" else if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else if(recapRoute) "本机回顾" else "爱忆 AIyou",
                 if (browsingPackage) "返回列表" else if (viewingPicture) "返回附件列表" else if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
@@ -912,6 +921,8 @@ fun AIyouApp(
                     if (showLicenses) showLicenses = false else showSettings = !showSettings
                 }
             }
+            audioPlayback?.let { com.t1doo.aiyou.records.OriginalAudioStatus(it) }
+          }
         },
         bottomBar = {
             if (!imeVisible && !reading) {
@@ -952,7 +963,7 @@ fun AIyouApp(
                 onRetrySave = { attachments.retrySave(panel.sessionId) }, onView = { attachments.view(panel.sessionId, it) },
                 onClosePicture = { attachments.closePicture(panel.sessionId) }, modifier = modifier,
                 onRetryRecords = if (local.ready && local.error != null && !local.opening) retryReading else null,
-                onMetadataChoice = { attachments.setJpegMetadataChoice(panel.sessionId, it) }, showPictureClose = false)
+                onMetadataChoice = { attachments.setJpegMetadataChoice(panel.sessionId, it) }, showPictureClose = false,audio=audioPlayback)
         } else if (history != null && local != null) {
             OriginalHistoryScreen(history, local, historyList, selectHistory, backHistory, retryHistory,
                 retryReading, copyHistory, canCopyHistory, modifier, editHistory, confirmHistoryReplacement, cancelHistoryReplacement,
@@ -1048,7 +1059,8 @@ fun AIyouApp(
             com.t1doo.aiyou.records.MixedCapturePicker(mixedCapture,local.mixedCapture?.selection)
             com.t1doo.aiyou.records.MixedCaptureScreen(local,mixedCapture,modifier,
                 listState=nowList,onOpenEntry=openEntry,selectedEntryId=selectedNowId,
-                defaultPolicyUnavailable=!display.ready && display.error!=null)
+                defaultPolicyUnavailable=!display.ready && display.error!=null,audio=audioPlayback,
+                canImportAudio={ownsNavigation() && selectedName==Destination.NOW.name && !showSettings && !demo && !reading})
         } else if (!demo && local != null && selected != Destination.TASKS) {
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }

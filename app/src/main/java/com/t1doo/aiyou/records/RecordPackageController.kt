@@ -38,7 +38,8 @@ class RecordPackageController internal constructor(private val current: () -> Lo
     private val publish: ((LocalRecordUiState) -> LocalRecordUiState) -> Unit,
     private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
     private val cipher: RecordPackageCipher, private val clock: Clock,
-    private val onFullRestored:suspend (EntryRepository)->Unit = {}) {
+    private val onFullRestored:suspend (EntryRepository)->Unit = {},
+    private val sourceUi:((()->Unit)->Unit)={it()}) {
     private class Work(val session: Long, val epoch: Long, val key: String = UUID.randomUUID().toString(),
         val snapshot: OriginalExportSnapshot? = null, val mediaPreview: RecordMediaPreview? = null) {
         val cancelled = AtomicBoolean()
@@ -96,7 +97,8 @@ class RecordPackageController internal constructor(private val current: () -> Lo
         pickerOwner = owner
     }
     fun detachPickerOwner(owner: Any) { if (pickerOwner === owner) { current().recordPackage?.let { cancel(it.session) }; pickerOwner = null } }
-    fun open() {
+    fun open() { sourceUi { openSourceOwned() } }
+    private fun openSourceOwned() {
         val local = current()
         if (!available(local) || local.recordPackage != null || local.originalExport != null || local.recycleBin != null ||
             local.originalEdit != null || local.originalHistory != null || local.manualTagEditor != null || local.saving || local.savePending ||
@@ -131,7 +133,8 @@ class RecordPackageController internal constructor(private val current: () -> Lo
         update(session) { it.copy(selection = if (selected) it.selection.filterNot { s -> s.sourceId == id }
             else it.selection + SourceVersion(id, revision.toLong()), error = null) }
     }
-    fun prepare(session: Long) {
+    fun prepare(session: Long) { sourceUi { prepareSourceOwned(session) } }
+    private fun prepareSourceOwned(session: Long) {
         val ui = panel(session) ?: return
         if (!available() || ui.phase != RecordPackagePhase.SELECTING || ui.selection.isEmpty()&&!ui.includeActivities) return
         if (ui.includeHistory && ui.selection.isEmpty()) {
@@ -265,7 +268,8 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             }) fail(active, "本机操作暂不可用。")
         } finally { password.fill('\u0000') }
     }
-    fun confirmRestore(session: Long, backupId: String, digest: String, epoch: Long) {
+    fun confirmRestore(session: Long, backupId: String, digest: String, epoch: Long) { sourceUi { confirmRestoreSourceOwned(session,backupId,digest,epoch) } }
+    private fun confirmRestoreSourceOwned(session: Long, backupId: String, digest: String, epoch: Long) {
         val active = work.get() ?: return; val ui = panel(session) ?: return; val verified = active.verified ?: return
         if (!owned(active) || ui.phase !in setOf(RecordPackagePhase.RESTORE_PREVIEW, RecordPackagePhase.UNCERTAIN) ||
             ui.epoch != epoch || verified.manifest.backupId != backupId || verified.digest != digest || ui.verified !== verified) return
@@ -319,7 +323,8 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             }
         }) { updateOwned(active, RecordPackagePhase.IMPORTING) { it.copy(phase = RecordPackagePhase.UNCERTAIN, error = "恢复结果尚未确认，请保留同一包并重试核对。") } }
     }
-    fun fullHome(session:Long) {
+    fun fullHome(session:Long) { sourceUi { fullHomeSourceOwned(session) } }
+    private fun fullHomeSourceOwned(session:Long) {
         val ui=panel(session) ?: return
         if(!available() || !current().supportsFullBackup || ui.busy) return
         retire();update(session) { RecordPackageUiState(session,epoch=it.epoch+1,fullMode=true) }
@@ -389,7 +394,8 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             finally { active.endFull() }
         }) fail(active,"本机操作暂不可用。")
     }
-    fun restoreFull(session:Long,id:String,digest:String,epoch:Long) {
+    fun restoreFull(session:Long,id:String,digest:String,epoch:Long) { sourceUi { restoreFullSourceOwned(session,id,digest,epoch) } }
+    private fun restoreFullSourceOwned(session:Long,id:String,digest:String,epoch:Long) {
         val ui=panel(session) ?: return;val active=work.get() ?: return
         if(!owned(active) || !ui.fullMode || ui.phase !in setOf(RecordPackagePhase.RESTORE_PREVIEW,RecordPackagePhase.UNCERTAIN) ||
             ui.epoch!=epoch || ui.fullSummary?.backupId!=id || ui.fullDigest!=digest) return

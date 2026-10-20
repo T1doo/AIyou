@@ -10,10 +10,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** Reuses record grants, remote source jobs and local_jobs receipts. No new schema/permission store.
  * Nested product calls share this exact outer SQL transaction. Callbacks never run inside it.
  */
-internal class SqlSelectedQuestionAuthorizationRepository(private val database: RecordsSqlDatabase) :
+internal class SqlSelectedQuestionAuthorizationRepository(private val database: RecordsSqlDatabase, private val sourceGate:CaptureDraftGate?=null) :
     SelectedQuestionAuthorizationRepository, AutoCloseable {
-    private val access = RemoteTextTransactions(database)
-    private val records = SqlRecordAuthorizationRepository(database)
+    private val access = RemoteTextTransactions(database,captureGate=sourceGate)
+    private val records = SqlRecordAuthorizationRepository(database,sourceGate=sourceGate)
     private val sessionId = UUID.randomUUID().toString()
     private val closed = AtomicBoolean()
 

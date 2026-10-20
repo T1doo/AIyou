@@ -9,9 +9,10 @@ import java.time.Instant
 import java.util.concurrent.Callable
 
 /** Blocking IO adapter over the SAME encrypted Room database as original records. */
-class RoomSourceBoundTextRepository internal constructor(private val sql: DrainingRecordsSqlDatabase) : SourceBoundTextRepository {
+class RoomSourceBoundTextRepository internal constructor(private val sql: DrainingRecordsSqlDatabase,
+    private val sourceGate:com.t1doo.aiyou.domain.CaptureDraftGate?=null) : SourceBoundTextRepository {
     internal constructor(database: RecordsDatabase) : this(DrainingRecordsSqlDatabase(RoomRecordsSqlDatabase(database)))
-    private val storage = RemoteTextTransactions(sql)
+    private val storage = RemoteTextTransactions(sql,captureGate=sourceGate)
     /** The records owner calls this after its AI operations have finished, before Room close. */
     internal fun stopAndAwaitSqlIdle() = sql.stopAndAwaitIdle()
     override fun queue(intent:RemoteSendIntent,promptVersion:String,clock:()->Instant)=storage.queue(intent,promptVersion,clock)

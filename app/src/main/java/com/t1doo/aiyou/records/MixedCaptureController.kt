@@ -74,7 +74,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
     internal fun today(zone: ZoneId = ZoneId.systemDefault()) = CaptureDay(LocalDate.now(clock.withZone(zone)), zone)
     /** Same current-source order as Memories; capture date, not a manually assigned event date. */
     internal fun recentEntries(day: CaptureDay = today()): List<StoredEntry> {
-        if (!available()) return emptyList()
+        if (!availableIgnoringFreeze()) return emptyList()
         val start = day.date.atStartOfDay(day.zone).toInstant().toEpochMilli()
         val end = day.date.plusDays(1).atStartOfDay(day.zone).toInstant().toEpochMilli()
         return current().entries.asSequence().filter { it.capturedAtMillis >= start && it.capturedAtMillis < end }.take(5).toList()
@@ -292,7 +292,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         if(pendingSave==null) try { OriginalExports.hash(u.text) } catch(_:Exception) {
             update { it.copy(error="文字输入尚未完成，草稿已保留。请完成输入后再保存。") };return
         }
-        if(pendingSave==null && u.text.isBlank() && u.draft.images.isEmpty() && u.draft.audio==null) { update { it.copy(error="请写下文字或添加至少一张图片。") };return }
+        if(pendingSave==null && u.text.isBlank() && u.draft.images.isEmpty() && u.draft.audio==null) { update { it.copy(error="请写下文字或添加图片、原音文件。") };return }
         update { it.copy(busy=true,error=null) }
         submit { store ->
             try {

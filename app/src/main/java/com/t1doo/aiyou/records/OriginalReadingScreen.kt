@@ -66,7 +66,7 @@ data class OriginalReadingLocation(val entryId: String, val revision: Int, val c
 
 /** Bounded presentation excerpt only. Never passed to a repository or clipboard. */
 internal fun originalPreview(text: String): String {
-    if (text.isBlank()) return "图片记录 · 无文字正文"
+    if (text.isBlank()) return "附件记录 · 无文字正文"
     var end = 0
     var points = 0
     while (end < text.length && points < 240) {
@@ -341,7 +341,7 @@ fun OriginalReadingScreen(
                     }
                     if (copyDenied) Text("无法复制，原文已保留。", color = AIyouColors.error,
                         style = MaterialTheme.typography.bodySmall)
-                    if (entry.originalText.isBlank()) Text("图片记录 · 无文字正文；请打开附件查看原图。")
+                    if (entry.originalText.isBlank()) Text("附件记录 · 无文字正文；请打开附件查看原始素材。")
                     key(entry.id, entry.currentRevision) {
                         val id = entry.id
                         val revision = entry.currentRevision

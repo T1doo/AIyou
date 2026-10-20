@@ -6,7 +6,8 @@ kotlin.sourceSets.main { kotlin.srcDir("../../core/data/src/main/kotlin") }
 val production=layout.buildDirectory.dir("app-production")
 val syncProduction=tasks.register<Sync>("syncProduction") {
     listOf("AndroidReminderDriver.kt","AndroidReminderRuntime.kt","ReminderReceivers.kt","ReminderJobService.kt",
-        "ReminderOperationBridge.kt","ReminderVmRuntime.kt","ReminderNativeEngine.kt","ReminderProcessOwner.kt").forEach {
+        "ReminderOperationBridge.kt","ReminderVmRuntime.kt","ReminderNativeEngine.kt","ReminderProcessOwner.kt",
+        "OriginalAudioOutput.kt","PlatformOriginalAudioOutput.kt").forEach {
         from("../../app/src/main/java/com/t1doo/aiyou/records/$it")
     }
     listOf("AppAccessController.kt","AppAccessPreferenceOperations.kt","FileAppAccessPreference.kt").forEach{
@@ -28,11 +29,16 @@ dependencies {
     implementation(project(":core:model"));implementation(project(":core:domain"))
     implementation("org.robolectric:android-all:15-robolectric-13954326")
     implementation(libs.coroutines.android);implementation("androidx.room:room-common-jvm:2.8.5")
+    // Existing app runtime pins: the production-owner DI regression opens actual controlled Room.
+    implementation("androidx.collection:collection-jvm:1.5.0")
+    implementation("androidx.arch.core:core-common:2.2.0")
     implementation(androidJars)
     // Same existing production pin in app/gradle.lockfile; compile its actual String.toUri inline API.
     androidAars("androidx.core:core-ktx:1.18.0@aar")
     androidAars("androidx.room:room-runtime-android:2.8.5@aar")
     androidAars("androidx.sqlite:sqlite-android:2.7.0@aar")
+    androidAars("androidx.sqlite:sqlite-framework-android:2.7.0@aar")
+    androidAars("androidx.arch.core:core-runtime:2.2.0@aar")
     androidAars("net.zetetic:sqlcipher-android:4.19.1@aar")
     androidAars("androidx.test:monitor:1.8.0@aar")
     androidAars("androidx.test.espresso:espresso-idling-resource:3.7.0@aar")

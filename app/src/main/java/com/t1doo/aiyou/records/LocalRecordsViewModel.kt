@@ -28,6 +28,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -145,6 +146,7 @@ class LocalRecordsViewModel internal constructor(
     private val capabilityProbe: com.t1doo.aiyou.domain.ModelCapabilityProbe? = null,
     private val reminderRuntime: ReminderVmRuntime? = null,
     private val admittedStore:EntryRepository?=null,
+    private val audioOutput:((()->Unit)->OriginalAudioOutput)?=null,
 ) : AndroidViewModel(application) {
     constructor(application: Application) : this(application, { throw IllegalStateException("Records require an admitted foreground owner") })
     private val mutableState = MutableStateFlow(LocalRecordUiState())
@@ -153,6 +155,7 @@ class LocalRecordsViewModel internal constructor(
     private val appAccessGuard = Any()
     private val appAccessCommands = java.util.concurrent.atomic.AtomicInteger()
     private val audioBlockedPackageCommands=java.util.concurrent.atomic.AtomicInteger()
+    private val sourcePermits=java.util.concurrent.ConcurrentHashMap<Command,com.t1doo.aiyou.domain.CaptureDraftGate.SourceLease>()
     private val mutableAppAccessIdle = MutableStateFlow(false)
     internal val appAccessIdle = mutableAppAccessIdle.asStateFlow()
     private val appAccessClosed = kotlinx.coroutines.CompletableDeferred<Unit>()
@@ -166,7 +169,7 @@ class LocalRecordsViewModel internal constructor(
         val result = commands.trySend(command)
         if (result.isFailure) {
             if(command is Command.RecordPackage)audioBlockedPackageCommands.decrementAndGet()
-            mutableAppAccessIdle.value = appAccessCommands.decrementAndGet() == 0
+            mutableAppAccessIdle.value = appAccessCommands.decrementAndGet() == 0 && !audioPlayback.busy
         }
         result
     }
@@ -176,13 +179,38 @@ class LocalRecordsViewModel internal constructor(
         val gate=repository?.captureRecords?.mutationGate
         if(gate==null)action() else gate.uiMutation(action)
     }
+    private fun sourceUi(action:()->Unit) {
+        val g=repository?.captureRecords?.mutationGate
+        if(g==null)action()else g.sourceUi(action)
+    }
+    private fun enqueueSource(command:((suspend(EntryRepository)->Unit)->Command),action:suspend(EntryRepository)->Unit):Boolean {
+        val g=repository?.captureRecords?.mutationGate
+        val lease=try { g?.sourceLease() } catch(_:com.t1doo.aiyou.domain.CaptureConflict) { return false }
+        val queued=command { store -> try { action(store) } finally { lease?.close() } }
+        if(lease!=null)sourcePermits[queued]=lease
+        val accepted=submit(queued).isSuccess
+        if(!accepted)sourcePermits.remove(queued)?.close()
+        return accepted
+    }
+    val audioPlayback:OriginalAudioController=OriginalAudioController({mutableState.value},{attachments.state.value},
+        {repository?.captureRecords?.mutationGate},{action -> submit(Command.Audio(action)).isSuccess},audioOutput,{
+            val local=mutableState.value
+            !editsDisposed && audioBlockedPackageCommands.get()==0 && local.recordPackage==null && local.recycleBin==null &&
+                local.originalEdit==null && local.localProcessing==null && local.ai==null &&
+                local.originalExport==null && local.manualTagEditor==null && local.manualPeopleEditor==null && local.eventDateEditor==null
+        })
+    fun audioForeground(value:Boolean) { audioPlayback.foreground(value);if(value)mixedCapture.audioCapture.resumeFile() }
+    fun audioRouteChanged() { audioPlayback.routeChanged();if(mutableState.value.mixedCapture?.audio?.fileInput==true)mixedCapture.audioCapture.cancel() }
+    init { viewModelScope.launch { audioPlayback.state.collect { audio -> synchronized(appAccessGuard) {
+        mutableAppAccessIdle.value=appAccessCommands.get()==0 && !audio.busy
+    } } } }
     private fun submitCapture(command:(CapturePermit?)->Command) {
         val gate=repository?.captureRecords?.mutationGate
         val permit=if(gate==null)null else CapturePermit(gate,gate.admit() ?: return)
         if(submit(command(permit)).isFailure)permit?.mutation?.close()
     }
     internal fun enqueueTaskOperation(action:suspend (EntryRepository)->Unit)=submit(Command.ManualTasks(action)).isSuccess
-    internal fun enqueuePackageOperation(action:suspend (EntryRepository)->Unit)=submit(Command.RecordPackage(action)).isSuccess
+    internal fun enqueuePackageOperation(action:suspend (EntryRepository)->Unit)=enqueueSource({Command.RecordPackage(it)},action)
 
     internal fun canRetireForAppAccess(): Boolean = synchronized(appAccessGuard) { appAccessMayRetire() }
 
@@ -197,7 +225,7 @@ class LocalRecordsViewModel internal constructor(
 
     private fun appAccessMayRetire(): Boolean {
         val local = mutableState.value
-        if (modelConnections.editingOrBusy) return false
+        if (modelConnections.editingOrBusy || audioPlayback.busy) return false
         if (editsDisposed || appAccessCommands.get() != 0 || !local.ready || local.opening || local.error != null ||
             local.saving || local.savePending || local.captureDiscard != null || local.localIndexBusy ||
             local.originalEdit != null || local.originalHistory != null || attachments.state.value != null ||
@@ -229,17 +257,17 @@ class LocalRecordsViewModel internal constructor(
     val taskProposals = TaskProposalController({ mutableState.value }, { change -> update(change) },
         ::enqueueTaskOperation,clock, { tasks.refresh() })
     val localProcessing = LocalProcessingController({ mutableState.value }, { change -> update(change) },
-        { action -> submit(Command.LocalProcessing(action)).isSuccess }, ::retireDerived, clock)
+        { action -> enqueueSource({Command.LocalProcessing(it)},action) }, ::retireDerived, clock, ::sourceUi)
     val factRecaps = FactRecapController({ mutableState.value }, { change -> update(change) },
         { action -> submit(Command.FactRecap(action)).isSuccess },clock.withZone(ZoneId.systemDefault()))
     val mixedCapture = MixedCaptureController({ mutableState.value },{ change -> update(change) },
         { action -> submit(Command.MixedCapture(action)).isSuccess },decodeCapture,clock,
         { audioBlockedPackageCommands.get()==0 })
     val attachments = LocalAttachmentController(
-        enqueue = { action -> submit(Command.Attachment(action)).isSuccess }, decodePng = decodePng,
+        enqueue = { action -> enqueueSource({Command.Attachment(it)},action) }, decodePng = decodePng,
         canUseRecord = { mutableState.value.let { it.ready && !it.opening && it.error == null &&
             !it.saving && !it.savePending && it.captureDiscard == null && it.recycleBin == null } },
-        canUsePanel = { it.hasRecordAccess(mutableState.value) })
+        canUsePanel = { it.hasRecordAccess(mutableState.value) },sourceUi=::sourceUi,onPanelClose=audioPlayback::stop)
     val tags = ManualTagController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.ManualTags(action)).isSuccess })
     val people = ManualPeopleController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -270,11 +298,11 @@ class LocalRecordsViewModel internal constructor(
     val recordPackages = RecordPackageController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = ::enqueuePackageOperation,
         cipher = com.t1doo.aiyou.data.JcaRecordPackageCipher(), clock = clock,
-        onFullRestored = { store -> reminderRuntime?.afterRestore();mixedCapture.adoptFullRestore(store);tasks.initialize(store);reminders.initialize(store);taskProposals.initialize(store) })
+        onFullRestored = { store -> reminderRuntime?.afterRestore();mixedCapture.adoptFullRestore(store);tasks.initialize(store);reminders.initialize(store);taskProposals.initialize(store) },sourceUi=::sourceUi)
     val recycleBin = RecycleBinController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> submit(Command.RecycleBin(action)).isSuccess },
+        enqueue = { action -> enqueueSource({Command.RecycleBin(it)},action) },
         canMove = { attachments.state.value == null },
-        onCommittedMove = { id ->
+        sourceUi=::sourceUi,onCommittedMove = { id ->
             ai.reconcileRecords()
             attachments.state.value?.takeIf { it.entryId == id }?.let { attachments.close(it.sessionId) }
             mutableState.value.originalExport?.takeIf { it.selection.any { source -> source.sourceId == id } }?.let { exports.close(it.session) }
@@ -332,7 +360,7 @@ class LocalRecordsViewModel internal constructor(
                 else initialOpen.completeExceptionally(IllegalStateException("Records initialization unavailable"))
                 ai.reconcileRecords()
                 scheduleLocalIndex()
-                mutableAppAccessIdle.value = appAccessCommands.get() == 0
+                mutableAppAccessIdle.value = appAccessCommands.get() == 0 && !audioPlayback.busy
                 for (command in commands) {
                     val previousEntries = mutableState.value.entries
                     try {
@@ -409,6 +437,7 @@ class LocalRecordsViewModel internal constructor(
                                 factRecaps.checkCurrent(store)
                                 try { command.action(store) } finally { factRecaps.checkCurrent(store) }
                             }
+                            is Command.Audio -> command.action(checkNotNull(repository))
                             is Command.ManualTags -> {
                                 val store=checkNotNull(repository)
                                 factRecaps.checkCurrent(store)
@@ -446,6 +475,7 @@ class LocalRecordsViewModel internal constructor(
                     } catch (failure: CancellationException) { throw failure }
                     catch (failure: Exception) { failed(failure, preserveQueuedSave = command is Command.Edit) }
                     finally {
+                        sourcePermits.remove(command)?.close()
                         command.capturePermit?.mutation?.close()
                         if (previousEntries != mutableState.value.entries || command is Command.LocalProcessing ||
                             command is Command.Retry || command is Command.RefreshSearch) refreshProcessingVersions()
@@ -454,16 +484,19 @@ class LocalRecordsViewModel internal constructor(
                             command is Command.RecordPackage || command is Command.RecycleBin ||
                             command is Command.Retry || command is Command.RefreshSearch || command is Command.LocalProcessing) scheduleLocalIndex()
                         if(command is Command.RecordPackage)audioBlockedPackageCommands.decrementAndGet()
-                        mutableAppAccessIdle.value = appAccessCommands.decrementAndGet() == 0
+                        mutableAppAccessIdle.value = appAccessCommands.decrementAndGet() == 0 && !audioPlayback.busy
                     }
                 }
             } finally {
+                repository?.captureRecords?.mutationGate?.retire()
+                sourcePermits.values.forEach { it.close() };sourcePermits.clear()
                 editsDisposed = true
                 reminderRuntime?.retire()
                 sourceTasks.dispose()
                 taskProposals.dispose()
                 localProcessing.dispose()
                 factRecaps.dispose()
+                audioPlayback.retire()
                 mixedCapture.dispose()
                 ai.markDisposed()
                 attachments.markDisposed()
@@ -482,12 +515,13 @@ class LocalRecordsViewModel internal constructor(
                 try { withContext(NonCancellable + Dispatchers.IO) {
                     try { try { ai.closeAndJoin() } finally { modelConnections.closeAndJoin() } }
                     finally {
-                        try { repository?.let { mixedCapture.drainAudioOnIo(it) } }
+                        try { audioPlayback.closeAndJoin();repository?.let { mixedCapture.drainAudioOnIo(it) } }
                         finally {
                           mixedCapture.disposeOnIo()
                           try { attachments.disposeOnIo() }
                           finally {
                             val close={
+                                check(!audioPlayback.busy && !mixedCapture.audioCapture.busy) { "Audio closure unconfirmed" }
                                 (repository as? AutoCloseable)?.close()
                                 (repository as? AwaitableRecordStorage)?.awaitClosed()
                                 repository = null
@@ -745,7 +779,8 @@ class LocalRecordsViewModel internal constructor(
         }
     }
 
-    fun beginOriginalEdit(entryId: String, expectedRevision: Int) {
+    fun beginOriginalEdit(entryId: String, expectedRevision: Int) { sourceUi { beginOriginalEditSourceOwned(entryId,expectedRevision) } }
+    private fun beginOriginalEditSourceOwned(entryId: String, expectedRevision: Int) {
         if (editsDisposed) return
         val current = mutableState.value
         if (current.captureDiscard != null || current.recycleBin != null || current.recordPackage != null) return
@@ -758,7 +793,8 @@ class LocalRecordsViewModel internal constructor(
         if (current.supportsEditDrafts) submit(Command.OpenEdit(edit, false))
     }
 
-    fun resumeOriginalEdit(entryId: String, draftId: String) {
+    fun resumeOriginalEdit(entryId: String, draftId: String) { sourceUi { resumeOriginalEditSourceOwned(entryId,draftId) } }
+    private fun resumeOriginalEditSourceOwned(entryId: String, draftId: String) {
         val current = mutableState.value
         if (current.captureDiscard != null || current.recycleBin != null || current.recordPackage != null) return
         if (current.supportsRecycleBin && current.entries.none { it.id == entryId }) return
@@ -773,7 +809,8 @@ class LocalRecordsViewModel internal constructor(
         submit(Command.OpenEdit(edit, false, draftId))
     }
 
-    fun changeOriginalEdit(sessionId: Long, text: String) {
+    fun changeOriginalEdit(sessionId: Long, text: String) { sourceUi { changeOriginalEditSourceOwned(sessionId,text) } }
+    private fun changeOriginalEditSourceOwned(sessionId: Long, text: String) {
         if (editsDisposed) return
         var accepted = false
         update { current ->
@@ -791,7 +828,8 @@ class LocalRecordsViewModel internal constructor(
         if (accepted && mutableState.value.supportsEditDrafts) submit(Command.PersistEdit(sessionId, text))
     }
 
-    fun keepOriginalEdit(sessionId: Long) {
+    fun keepOriginalEdit(sessionId: Long) { sourceUi { keepOriginalEditSourceOwned(sessionId) } }
+    private fun keepOriginalEditSourceOwned(sessionId: Long) {
         if (editsDisposed) return
         val current = mutableState.value
         val edit = current.originalEdit ?: return
@@ -804,7 +842,8 @@ class LocalRecordsViewModel internal constructor(
             submit(Command.KeepEdit(sessionId, edit.text))
     }
 
-    fun cancelOriginalEdit(sessionId: Long) {
+    fun cancelOriginalEdit(sessionId: Long) { sourceUi { cancelOriginalEditSourceOwned(sessionId) } }
+    private fun cancelOriginalEditSourceOwned(sessionId: Long) {
         if (editsDisposed) return
         val active = mutableState.value.originalEdit ?: return
         if (active.sessionId != sessionId || !active.canCancel || mutableState.value.originalHistory != null) return
@@ -822,7 +861,8 @@ class LocalRecordsViewModel internal constructor(
         if (mutableState.value.supportsEditDrafts) submit(Command.ReleaseEdit(sessionId))
     }
 
-    fun saveOriginalEdit(sessionId: Long) {
+    fun saveOriginalEdit(sessionId: Long) { sourceUi { saveOriginalEditSourceOwned(sessionId) } }
+    private fun saveOriginalEditSourceOwned(sessionId: Long) {
         if (editsDisposed) return
         val current = mutableState.value
         val edit = current.originalEdit ?: return
@@ -871,7 +911,8 @@ class LocalRecordsViewModel internal constructor(
         else update { if (it.originalHistory?.sessionId == sessionId) it.copy(originalHistory = null) else it }
     }
 
-    fun editOriginalHistory(sessionId: Long, requestId: Long, revision: Int, expectedCurrentRevision: Int) {
+    fun editOriginalHistory(sessionId: Long, requestId: Long, revision: Int, expectedCurrentRevision: Int) { sourceUi { editOriginalHistorySourceOwned(sessionId,requestId,revision,expectedCurrentRevision) } }
+    private fun editOriginalHistorySourceOwned(sessionId: Long, requestId: Long, revision: Int, expectedCurrentRevision: Int) {
         val beforeEditId = mutableState.value.originalEdit?.sessionId
         update { current ->
             if (!canEditHistory(current, sessionId, requestId, revision, expectedCurrentRevision)) current
@@ -883,7 +924,8 @@ class LocalRecordsViewModel internal constructor(
         queueHistoricalDraft(beforeEditId)
     }
 
-    fun confirmHistoryReplacement(sessionId: Long, requestId: Long, replacementId: Long) {
+    fun confirmHistoryReplacement(sessionId: Long, requestId: Long, replacementId: Long) { sourceUi { confirmHistoryReplacementSourceOwned(sessionId,requestId,replacementId) } }
+    private fun confirmHistoryReplacementSourceOwned(sessionId: Long, requestId: Long, replacementId: Long) {
         val beforeEditId = mutableState.value.originalEdit?.sessionId
         update { current ->
             val history = current.originalHistory ?: return@update current
@@ -902,7 +944,8 @@ class LocalRecordsViewModel internal constructor(
         }
     }
 
-    fun cancelHistoryReplacement(sessionId: Long, requestId: Long, replacementId: Long) {
+    fun cancelHistoryReplacement(sessionId: Long, requestId: Long, replacementId: Long) { sourceUi { cancelHistoryReplacementSourceOwned(sessionId,requestId,replacementId) } }
+    private fun cancelHistoryReplacementSourceOwned(sessionId: Long, requestId: Long, replacementId: Long) {
         if (attachments.state.value != null) return
         update { current ->
             val history = current.originalHistory
@@ -1446,6 +1489,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     override fun onCleared() {
+        audioPlayback.retire()
         reminderRuntime?.retire()
         editsDisposed = true
         sourceTasks.dispose()
@@ -1478,6 +1522,7 @@ class LocalRecordsViewModel internal constructor(
     }
 
     private sealed interface Command {
+        class Audio(val action:suspend(EntryRepository)->Unit):Command
         val capturePermit:CapturePermit? get()=null
         data class ReminderRuntime(val action:suspend ()->Unit):Command
         data class LocalProcessing(val action: suspend (EntryRepository) -> Unit) : Command

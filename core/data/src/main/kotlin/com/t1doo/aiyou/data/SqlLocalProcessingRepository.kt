@@ -5,7 +5,7 @@ import com.t1doo.aiyou.model.*
 import kotlinx.coroutines.CancellationException
 
 /** Reuses source generations, existing invalidation triggers and operation receipts. No schema change. */
-internal class SqlLocalProcessingRepository(private val database: RecordsSqlDatabase) : LocalProcessingRepository {
+internal class SqlLocalProcessingRepository(private val database: RecordsSqlDatabase, private val sourceGate:CaptureDraftGate?=null) : LocalProcessingRepository {
     override fun read(source: SourceVersion): LocalProcessingSnapshot = safely {
         database.transaction { readWithin(it, source) }
     }
@@ -17,7 +17,9 @@ internal class SqlLocalProcessingRepository(private val database: RecordsSqlData
                 source.sourceId to LocalProcessingVersion(source, generation)
             }
     } }
-    override fun change(request: LocalProcessingChange): LocalProcessingSnapshot = safely { database.transaction { sql ->
+    override fun change(request: LocalProcessingChange): LocalProcessingSnapshot =
+        if(sourceGate==null) changeOwned(request) else sourceGate.syncSourceMutation { changeOwned(request) }
+    private fun changeOwned(request: LocalProcessingChange): LocalProcessingSnapshot = safely { database.transaction { sql ->
         val before = request.expected
         val current = readWithin(sql, before.source) // Reject deletion/fences even for an old receipt.
         val next = Math.addExact(before.generation, 1)

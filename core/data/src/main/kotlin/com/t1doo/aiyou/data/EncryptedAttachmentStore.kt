@@ -47,6 +47,14 @@ internal class EncryptedAttachmentStore(
     private val keyBytes: ByteArray,
     private val checkpoint: (String) -> Unit = {},
 ) : AttachmentStore, AutoCloseable {
+    private var sourceGate:com.t1doo.aiyou.domain.CaptureDraftGate?=null
+    internal fun installSourceGate(gate:com.t1doo.aiyou.domain.CaptureDraftGate) {
+        check(sourceGate==null || sourceGate===gate);sourceGate=gate
+    }
+    private suspend fun <T> sourceBorrow(action:suspend()->T):T {
+        val gate=sourceGate
+        return if(gate==null)action()else gate.sourceMutation(action)
+    }
     private val lifecycle = java.lang.Object()
     private var erasureHooks: ErasureFileHooks = NoErasureFileHooks
     private val creations = mutableMapOf<String, String>()
@@ -83,13 +91,15 @@ internal class EncryptedAttachmentStore(
         ledger.transition(row, AttachmentState.READY).also { checkpoint("ready") }
     }
 
-    override suspend fun list(entryId: String, revision: Int): List<LocalAttachment> = locked {
+    override suspend fun list(entryId:String,revision:Int):List<LocalAttachment> = sourceBorrow { listOwned(entryId,revision) }
+    private suspend fun listOwned(entryId: String, revision: Int): List<LocalAttachment> = locked {
         if (erasureHooks.fenced(entryId)) throw AttachmentConflict()
         recoverLocked()
         ledger.all().filter { it.intent.entryId == entryId && it.intent.revision == revision }
     }
 
-    override suspend fun read(id: String): ByteArray = locked {
+    override suspend fun read(id:String):ByteArray = sourceBorrow { readOwned(id) }
+    private suspend fun readOwned(id: String): ByteArray = locked {
         val row = ledger.find(id) ?: throw AttachmentConflict()
         if (erasureHooks.fenced(row.intent.entryId)) throw AttachmentConflict()
         validate(row.intent)
@@ -99,6 +109,19 @@ internal class EncryptedAttachmentStore(
             ledger.transition(row, AttachmentState.CORRUPT)
             throw failure
         }
+    }
+
+    /** Playback/owner reads cannot repair metadata or run recovery under a read pin. */
+    internal suspend fun listReadOnly(entryId:String,revision:Int):List<LocalAttachment> = locked {
+        if(erasureHooks.fenced(entryId))throw AttachmentConflict()
+        ledger.all().filter { it.intent.entryId==entryId && it.intent.revision==revision }
+    }
+    internal suspend fun readReadOnly(id:String):ByteArray = locked {
+        val row=ledger.find(id) ?: throw AttachmentConflict()
+        if(erasureHooks.fenced(row.intent.entryId))throw AttachmentConflict()
+        validate(row.intent)
+        if(row.state!=AttachmentState.READY)throw AttachmentIntegrityFailure()
+        authenticated(file(row.intent,false),row.intent)
     }
 
     override suspend fun recover(): Unit = locked { recoverLocked() }

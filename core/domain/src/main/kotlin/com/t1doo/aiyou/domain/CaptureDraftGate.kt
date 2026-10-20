@@ -15,8 +15,42 @@ class CaptureDraftGate {
     private var reservation: Reservation?=null
     private var retired=false
     private var running=0
+    private var playback: PlaybackPin?=null
+    private var sourceWriters=0
     private val destructive=mutableMapOf<String,Int>()
-    val frozen: Boolean @Synchronized get()=reservation!=null || retired
+    val frozen: Boolean @Synchronized get()=reservation!=null || playback!=null || retired
+    val playbackBusy: Boolean @Synchronized get()=playback!=null
+    class PlaybackPin internal constructor(internal val gate:CaptureDraftGate) {
+        internal var active=false
+        override fun toString()="PlaybackPin(redacted)"
+    }
+    class SourceLease internal constructor(private val gate:CaptureDraftGate):AutoCloseable {
+        private var closed=false
+        override fun close()=synchronized(gate) { if(!closed) { closed=true;gate.sourceWriters-- };Unit }
+    }
+    /** PREPARING closes UI only; previously accepted synchronous nested writes can drain. */
+    @Synchronized fun preparePlayback():PlaybackPin? {
+        if(retired || playback!=null || reservation!=null)return null
+        return PlaybackPin(this).also { playback=it }
+    }
+    @Synchronized fun activatePlayback(pin:PlaybackPin) {
+        check(playback===pin && !retired && reservation==null && admitted.isEmpty() && running==0 &&
+            sourceWriters==0 && destructive.isEmpty())
+        pin.active=true
+    }
+    @Synchronized fun finishPlayback(pin:PlaybackPin) { check(playback===pin);playback=null }
+    @Synchronized fun <T> sourceUi(action:()->T):T? = if(playback!=null || retired)null else action()
+    /** Source-only writers do not change the capture reservation/cutoff contract. */
+    @Synchronized fun sourceLease():SourceLease {
+        if(retired || playback?.active==true)throw CaptureConflict()
+        sourceWriters++;return SourceLease(this)
+    }
+    suspend fun <T> sourceMutation(action:suspend ()->T):T {
+        val lease=sourceLease();return try { action() } finally { lease.close() }
+    }
+    fun <T> syncSourceMutation(action:()->T):T {
+        val lease=sourceLease();return try { action() } finally { lease.close() }
+    }
 
     class Mutation internal constructor(internal val gate:CaptureDraftGate,internal val sequence:Long):
         AbstractCoroutineContextElement(Key),AutoCloseable {
@@ -31,12 +65,12 @@ class CaptureDraftGate {
         val base:CaptureDraft get()=synchronized(gate) { checkNotNull(snapshot) }
         override fun toString()="CaptureReservation(redacted)"
     }
-    @Synchronized fun <T> uiMutation(action:()->T):T? = if(reservation!=null || retired) null else action()
-    @Synchronized fun admit():Mutation? = if(reservation!=null || retired) null else
+    @Synchronized fun <T> uiMutation(action:()->T):T? = if(reservation!=null || playback!=null || retired) null else action()
+    @Synchronized fun admit():Mutation? = if(reservation!=null || playback?.active==true || retired) null else
         Mutation(this,Math.addExact(sequence,1).also { sequence=it }).also { admitted.add(it) }
     @Synchronized private fun release(mutation:Mutation) { admitted.remove(mutation) }
     @Synchronized private fun validate(mutation:Mutation) {
-        check(!retired && mutation.gate===this && mutation in admitted)
+        check(!retired && playback?.active!=true && mutation.gate===this && mutation in admitted)
         val r=reservation
         check(r==null || (r.snapshot==null && mutation.sequence<=r.cutoff))
     }
@@ -64,7 +98,7 @@ class CaptureDraftGate {
         })
     }
     @Synchronized fun freeze(draftId:String):Reservation? {
-        if(retired || reservation!=null || destructive.getOrDefault(draftId,0)>0)return null
+        if(retired || playback!=null || reservation!=null || destructive.getOrDefault(draftId,0)>0)return null
         return Reservation(this,draftId,sequence).also { reservation=it }
     }
     @Synchronized fun reserve(request:Reservation,actual:CaptureDraft,visibleText:String,pendingEdits:Int) {
@@ -108,7 +142,7 @@ class CaptureDraftGate {
     @Synchronized fun retire() { retired=true }
     suspend fun <T> destruction(draftId:String,action:suspend ()->T):T {
         synchronized(this) {
-            if(retired || reservation?.draftId==draftId)throw CaptureConflict()
+            if(retired || playback?.active==true || reservation?.draftId==draftId)throw CaptureConflict()
             destructive[draftId]=destructive.getOrDefault(draftId,0)+1
         }
         return try { action() } finally { synchronized(this) {

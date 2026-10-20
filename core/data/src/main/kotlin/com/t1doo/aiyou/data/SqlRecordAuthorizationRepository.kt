@@ -12,9 +12,10 @@ import java.util.concurrent.CancellationException
  */
 internal class SqlRecordAuthorizationRepository(private val database: RecordsSqlDatabase,
     private val catalog: SqlModelConnectionCatalog? = null,
-    private val capabilities: ModelCapabilityRepository? = null) : RecordAuthorizationRepository {
+    private val capabilities: ModelCapabilityRepository? = null,
+    private val sourceGate:CaptureDraftGate?=null) : RecordAuthorizationRepository {
     override val supportsConnectionReview get() = catalog != null
-    private val access = RemoteTextTransactions(database)
+    private val access = RemoteTextTransactions(database,captureGate=sourceGate)
 
     override fun readAuthorization(source: SourceVersion): RecordAuthorizationSnapshot = safely {
         database.transaction { readWithin(it, source) }
@@ -58,7 +59,9 @@ internal class SqlRecordAuthorizationRepository(private val database: RecordsSql
         }
     }
 
-    override fun changeAuthorization(request: RecordAuthorizationChange, clock: () -> Instant): RecordAuthorizationReceipt = safely {
+    override fun changeAuthorization(request: RecordAuthorizationChange, clock: () -> Instant): RecordAuthorizationReceipt =
+        if(sourceGate==null) changeOwned(request,clock) else sourceGate.syncSourceMutation { changeOwned(request,clock) }
+    private fun changeOwned(request: RecordAuthorizationChange, clock: () -> Instant): RecordAuthorizationReceipt = safely {
         database.transaction { sql ->
             val before = request.expected
             val current = readWithin(sql, before.binding.source)

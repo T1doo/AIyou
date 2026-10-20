@@ -69,6 +69,8 @@ class LocalAttachmentController(
     private val decodePng: (ByteArray) -> AttachmentPicture,
     private val canUseRecord: () -> Boolean = { true },
     private val canUsePanel: (AttachmentUiState) -> Boolean = { true },
+    private val sourceUi:((()->Unit)->Unit)={it()},
+    private val onPanelClose:()->Unit={},
 ) {
     private val mutable = MutableStateFlow<AttachmentUiState?>(null)
     val state = mutable.asStateFlow()
@@ -79,11 +81,13 @@ class LocalAttachmentController(
     private data class Prepared(val sessionId: Long, val requestId: Long,
         val intent: AttachmentIntent, val bytes: ByteArray)
 
-    fun open(entryId: String, revision: Int) {
+    fun open(entryId: String, revision: Int) { sourceUi { openSourceOwned(entryId,revision) } }
+    private fun openSourceOwned(entryId: String, revision: Int) {
         openPanel(entryId, revision, null)
     }
 
-    fun openHistorical(entryId: String, revision: Int, owner: AttachmentHistoryOwner) {
+    fun openHistorical(entryId: String, revision: Int, owner: AttachmentHistoryOwner) { sourceUi { openHistoricalSourceOwned(entryId,revision,owner) } }
+    private fun openHistoricalSourceOwned(entryId: String, revision: Int, owner: AttachmentHistoryOwner) {
         if (owner.sessionId <= 0 || owner.requestId <= 0 || owner.currentRevision < revision) return
         openPanel(entryId, revision, owner)
     }
@@ -97,10 +101,12 @@ class LocalAttachmentController(
     fun close(sessionId: Long) {
         val panel = mutable.value ?: return
         if (panel.sessionId != sessionId || panel.saving) return
+        onPanelClose()
         if (mutable.compareAndSet(panel, null)) enqueue { discard(sessionId) }
     }
 
-    fun refresh(sessionId: Long) {
+    fun refresh(sessionId: Long) { sourceUi { refreshSourceOwned(sessionId) } }
+    private fun refreshSourceOwned(sessionId: Long) {
         val panel = mutable.value ?: return
         if (panel.sessionId != sessionId || panel.saving || panel.selection != null || panel.readingId != null) return
         update(sessionId) { it.copy(loading = true, error = null, picture = null) }
@@ -120,7 +126,8 @@ class LocalAttachmentController(
         }
     }
 
-    fun select(sessionId: Long, failedId: String? = null) {
+    fun select(sessionId: Long, failedId: String? = null) { sourceUi { selectSourceOwned(sessionId,failedId) } }
+    private fun selectSourceOwned(sessionId: Long, failedId: String? = null) {
         val panel = mutable.value ?: return
         if (panel.readOnly || panel.sessionId != sessionId || panel.busy || panel.selection != null || panel.error != null || panel.unavailable) return
         val prior = failedId?.let { id -> panel.items.singleOrNull {
@@ -131,7 +138,8 @@ class LocalAttachmentController(
                 retainJpegMetadata = it.retainJpegMetadata)) }
     }
 
-    fun setJpegMetadataChoice(sessionId: Long, retain: Boolean) {
+    fun setJpegMetadataChoice(sessionId: Long, retain: Boolean) { sourceUi { setJpegMetadataChoiceSourceOwned(sessionId,retain) } }
+    private fun setJpegMetadataChoiceSourceOwned(sessionId: Long, retain: Boolean) {
         val panel = mutable.value ?: return
         if (panel.sessionId != sessionId || panel.readOnly || panel.busy || panel.selection != null || panel.error != null || panel.unavailable) return
         update(sessionId) { it.copy(retainJpegMetadata = retain) }
@@ -145,14 +153,16 @@ class LocalAttachmentController(
         return mutable.compareAndSet(panel, panel.copy(selection = selected.copy(launched = true)))
     }
 
-    fun pickerFailed(requestId: Long) {
+    fun pickerFailed(requestId: Long) { sourceUi { pickerFailedSourceOwned(requestId) } }
+    private fun pickerFailedSourceOwned(requestId: Long) {
         val panel = mutable.value ?: return
         if (panel.readOnly) return
         if (panel.selection?.requestId == requestId) failed(panel.sessionId, IllegalStateException(),
             "无法打开图片选择器。原文与附件已保留，请重新选择。", requestId)
     }
 
-    fun selected(requestId: Long, source: SelectedImageSource?) {
+    fun selected(requestId: Long, source: SelectedImageSource?) { sourceUi { selectedSourceOwned(requestId,source) } }
+    private fun selectedSourceOwned(requestId: Long, source: SelectedImageSource?) {
         val panel = mutable.value ?: return
         val selected = panel.selection ?: return
         if (panel.readOnly) return
@@ -191,7 +201,8 @@ class LocalAttachmentController(
         }
     }
 
-    fun cancel(sessionId: Long) {
+    fun cancel(sessionId: Long) { sourceUi { cancelSourceOwned(sessionId) } }
+    private fun cancelSourceOwned(sessionId: Long) {
         val panel = mutable.value ?: return
         if (panel.readOnly || panel.sessionId != sessionId || panel.saving) return
         update(sessionId) { it.copy(selection = null, error = null, notice = "未继续添加图片，原文与已有附件已保留。") }
@@ -199,7 +210,8 @@ class LocalAttachmentController(
         refresh(sessionId)
     }
 
-    fun retrySave(sessionId: Long) {
+    fun retrySave(sessionId: Long) { sourceUi { retrySaveSourceOwned(sessionId) } }
+    private fun retrySaveSourceOwned(sessionId: Long) {
         val panel = mutable.value ?: return
         val selected = panel.selection ?: return
         if (panel.readOnly || panel.sessionId != sessionId || selected.phase != AttachmentImportPhase.FAILED || !selected.retryable || panel.unavailable) return
@@ -254,7 +266,8 @@ class LocalAttachmentController(
         }
     }
 
-    fun view(sessionId: Long, id: String) {
+    fun view(sessionId: Long, id: String) { sourceUi { viewSourceOwned(sessionId,id) } }
+    private fun viewSourceOwned(sessionId: Long, id: String) {
         val panel = mutable.value ?: return
         if (panel.sessionId != sessionId || panel.busy || panel.selection != null || panel.unavailable) return
         val item = panel.items.singleOrNull { it.intent.id == id && it.state == AttachmentState.READY && it.intent.mediaType in IMAGE_TYPES } ?: return
