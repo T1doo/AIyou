@@ -42,7 +42,7 @@ R1的1267项主机结果和完整CI仍以其原有不可变证据为准；本次
 
 ## 一、PENDING唯一触发的认证与原子受理
 
-拟新增内部`ReminderTriggerRequest`：完整token、此次实际入口的随机event ID、观测时间，
+拟新增内部`ReminderTriggerRequest`：完整token、此次实际入口nonce及完整请求摘要绑定的event ID、观测时间，
 以及仅在内存有效的入口／owner执行资格。它是系统观察，不是另一份用户决定。
 生产入口只接受本应用显式、不可变PendingIntent指向的非导出alarm receiver；
 UI、普通恢复扫描、备份和任意旧WorkItem不能自行构造“已触发”。
@@ -58,7 +58,7 @@ UI、普通恢复扫描、备份和任意旧WorkItem不能自行构造“已触�
 4. 若真实回调时缺通知／渠道／精确资格，仍记录此真实触发已观察，但写TRIGGER_BLOCKED，
    消费当前SCHEDULE且不建DELIVER。历史只记“触发受阻、未发布”；当前通知／渠道／精确资格分别显示，
    不从当前能力反推当时的拒绝原因。恢复权限不会自动发布这个过去的提醒。
-5. 同一event的COMMIT结果未知时，在门内用原event mutation ID读回认证结果；确证后才继续。
+5. 同一event的COMMIT结果未知时，在门内用独立运行时槽中的原event ID及完整请求摘要读回认证结果；确证后才继续。
    不同event对同一token只得到ALREADY_OBSERVED；不得再造DELIVER或发布资格。
 
 区分返回结果：ACCEPTED、EXACT_EVENT_REPLAY、ALREADY_OBSERVED、STALE／MISSING、
@@ -157,7 +157,7 @@ broker有前台port时：先取得port快照，释放登记guard，入VM队列�
 ### notify前的一次调用认领
 
 为明确“结果未知”而非猜测恰好一次，拟增加DELIVER命令及系统阶段：
-TRIGGER_BLOCKED、POSTING、NOTIFICATION_POSTED、POST_FAILED、POST_UNKNOWN、TRIGGER_UNDELIVERED、TIME_PASSED。
+TRIGGER_BLOCKED、DELIVERY_BLOCKED、POSTING、NOTIFICATION_POSTED、POST_FAILED、POST_UNKNOWN、TRIGGER_UNDELIVERED、TIME_PASSED。
 既有TRIGGER_ACCEPTED作为持久触发事实。DELIVER与已消费的同token SCHEDULE不同时存在；
 仍为每token最多一条当前命令，旧CANCEL保留，并为当前代次撤回保留容量。
 现有32条上限不放宽：PENDING的当前SCHEDULE和TRIGGER_ACCEPTED的当前DELIVER均可在撤回时
@@ -166,9 +166,10 @@ TRIGGER_BLOCKED、POSTING、NOTIFICATION_POSTED、POST_FAILED、POST_UNKNOWN、T
 
 当前活跃入口在同一门和owner租约内继续：
 
-1. 重新认证当前token、OPEN、原模式和能力，SQL把TRIGGER_ACCEPTED+DELIVER变为POSTING，消费DELIVER；
-   写入事先生成的claim mutation ID，返回认证读回。认领COMMIT未知则按同claim ID核对，未确证不调用notify。
-2. 仅当前入口获得不可序列化的LivePostPermit。它绑定owner lease／进程／event／token／claim，
+1. 重新认证当前token、OPEN、原模式和能力；可用则SQL保存独立ClaimReceipt并把TRIGGER_ACCEPTED+DELIVER变为POSTING，消费DELIVER。
+   不可用则同事务保存BLOCKED_CAPABILITY claim、消费DELIVER并进入DELIVERY_BLOCKED终态，恢复不再发布。
+   认领COMMIT未知按原claim ID／完整摘要核对，不依赖lastMutationId，未确证GRANTED不调用notify。
+2. 仅当前入口的既存、尚未消费的LiveClaimAttempt可以取得一次不可序列化的LivePostPermit。它绑定owner lease／进程／event／token／claim，
    不能由仅持有一个DB token、冷扫描或ALREADY_OBSERVED构造；离开当前操作／资格退休即销毁。
 3. 关闭SQL事务后仍持门，调用一次通用通知发布。tag/id固定于reminder ID+代次，only-alert-once仅作系统提示配置。
 4. 返回成功才在独立事务记录NOTIFICATION_POSTED；明确失败写POST_FAILED；未知写POST_UNKNOWN或保留POSTING，
@@ -191,11 +192,16 @@ Binder返回也不能证明OS呈现／撤销时序，保证仅限应用自己的
 
 R2a拟采用有界v6密文：沿用原manual_tasks表、已有purpose key与AES-GCM，AAD仍绑定格式、id、行版本及物理mutation。
 v1–v5解码／AAD与R1规范化用户请求摘要保持原字节，读取不重写；新增状态／DELIVER只由v6写入。
-v6在既有提醒／命令字段后显式编码用户回执是否存在及原回执字段；没有可证旧用户回执时不伪造。
+v6在既有提醒／命令字段后显式编码用户回执是否存在及原回执字段，再编码有界RuntimeLedger；没有可证旧用户回执时不伪造。
 本阶段不增加TaskReminderSnapshot运行时字段；新的阶段／命令仍由原完整REMIND请求摘要绑定，
 因此R1旧请求重放不因重新定义摘要而失效。扩展系统操作白名单及严格阶段／命令不变量，保留EOF／大小校验。
 系统写保留R1用户回执；恢复清除用户执行回执、DELIVER和发布资格，提醒REVOKED，无旧通知自动发布。
 新格式是拟议设计，具体编码仍须独审；不承诺旧二进制读v6。
+
+父级已ACK R2a方向，另要求先补两项P2持久合同再复审实施。
+独立event／claim／结果认证槽、精确字段绑定／保留退休规则，以及能力失效原子终态详见
+[R2a持久回执补充](D07_R2A_PERSISTENT_RECEIPTS_ADDENDUM.md)，其具体约束优先于本文件概述。
+新增DELIVERY_BLOCKED终态和运行时槽不更改R1请求摘要字节，不允许由持久claim重建发布资格。
 
 独审后先实施R2a：纯模型／领域、实际SQL持久合同、平台端口协调器与受控驱动的三组因果回归。
 这是运行时闭环的核心前置，不宣称系统已经接线。其后R2b再独审Android端口、receiver／JobService、

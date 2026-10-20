@@ -1,0 +1,21 @@
+{
+  "kind": "static_design_field_budget_not_v6_serialization_test",
+  "design_baseline": "3cacbe62dd428bbc26e2b7e10b7a0d731cf61deb",
+  "text_formula": "4-byte UTF-8 length prefix plus bounded bytes; i64=8, u8=1",
+  "schedule": 161,
+  "command": 785,
+  "public_fields_plus_user_receipt": 28674,
+  "slot_common": 774,
+  "event_fields": 206,
+  "claim_with_presence": 295,
+  "result_with_presence": 412,
+  "two_lifecycle_flags_with_max_fields": 154,
+  "slot_event_prefix": 980,
+  "slot_remainder": 861,
+  "slot_total": 1841,
+  "four_max_slot_bodies_with_framing": 12308,
+  "ledger_budget": 16384,
+  "ciphertext_budget": 65536,
+  "conservative_ciphertext_upper_bound": 45087,
+  "history": "Initial manual subtotal overcounted claim presence by one byte (predicted remainder862/slot1842); arithmetic guard rejected it. Recomputed actual remainder861/slot1841. No product or codec implementation was run or changed."
+}
