@@ -29,11 +29,13 @@ import org.junit.Assert.*
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Production UI/controllers and bounded platform PNG decode; inference output is explicitly synthetic.
  * These tests are JVM simulations, not OCR, Activity recreation, or device acceptance. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[35],qualifiers="w320dp-h640dp")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ImageTextPresentationTest {
     @get:Rule val compose=createComposeRule()
     private val entry=StoredEntry("synthetic-image-a",1,"合成甲图原文。",5,"UTC",ProcessingPolicy.LOCAL_ONLY)
