@@ -101,7 +101,7 @@ class ImageTextPresentationTest {
         compose.onNodeWithTag("attachment-"+i.id).performScrollTo();compose.onNode(hasText("查看图片") and hasAnyAncestor(hasTestTag("attachment-"+i.id))).performClick();drain()
         assertEquals(i.id,attachments.state.value!!.pictureId);compose.onNodeWithTag("attachment-picture").assertIsDisplayed()
     }
-    private fun form(i:AttachmentIntent){click("image-text-open:"+i.id);drain()}
+    private fun form(i:AttachmentIntent){compose.onNodeWithTag("image-text-open:"+i.id).assertIsDisplayed().performClick();drain()}
     private fun extract(){click("image-text-extract");drain();compose.onNodeWithTag("image-text-origin").performScrollTo().assertTextContains("非真实 OCR");assertTrue(lastInput!!.all{it==0.toByte()})}
     private fun backToSearch(){
         click("image-text-close")
