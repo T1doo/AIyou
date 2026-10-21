@@ -12,9 +12,9 @@ permissions:
 jobs:
   d01:
     runs-on: ubuntu-24.04
-    # Actual v13 bootstrap plus evidence preservation measured29m54s.
-    # Budget the whole job; individual test deadlines and all gates stay fixed.
-    timeout-minutes: 35
+    # Run39531711787 took36m6s including evidence/post steps; prior35m bound cancelled it.
+    # One bounded40m job; individual test deadlines, resources and all gates stay fixed.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
