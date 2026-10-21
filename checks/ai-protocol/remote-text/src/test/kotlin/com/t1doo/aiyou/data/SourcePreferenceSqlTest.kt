@@ -186,11 +186,74 @@ class SourcePreferenceSqlTest {
         assertTrue(f.store.preferences(other).single().same(accepted))
         f.store.mutate(change(accepted,PreferenceAction.REVOKE));assertTrue(f.store.capture(PreferenceReview.ACCEPTED).items.isEmpty())
     }
+    @Test fun keywordFindsAcceptedBehindRawPagesAndAuthenticatesQueryBeforeSourceJump():Unit=Fixture().use {f ->
+        val accepted=f.store.mutate(change(f.store.create(f.request(at=10)),PreferenceAction.ACCEPT))
+        val other=SourceVersion("other",1);val preview=f.store.preview(other)
+        repeat(20) {f.store.create(PreferenceCreate(id(),preview,id(),"合成较新主题",PreferenceContent(SourceMemoryRules.reference(preview,"同名合成来源")),true,id(),100+it.toLong()))}
+        assertTrue(f.store.capture(PreferenceReview.ACCEPTED).items.isEmpty()) // Old raw first page.
+        val quote=f.store.searchAccepted("咖啡🙂");assertEquals(listOf(accepted.id),quote.items.map {it.id});assertNull(quote.next);assertEquals("咖啡🙂",quote.keyword)
+        assertEquals(accepted.id,f.store.searchAccepted("合成口味").items.single().id)
+        assertTrue(f.store.searchAccepted("同名合成来源").items.isEmpty()) // Pending never becomes evidence.
+        var opened=false;assertTrue(f.store.resolve(quote,quote.items.single()) {opened=true});assertTrue(opened)
+        val foreign=SqlSourcePreferenceRepository(f.base.gateway,LocalCandidateFixture.KEY)
+        try {assertFalse(foreign.resolve(quote) {fail("Foreign proof")})} finally {foreign.wipeKey()}
+        f.store.mutate(change(accepted,PreferenceAction.REVOKE))
+        assertFalse(f.store.resolve(quote,quote.items.single()) {fail("Revoked source jump")})
+        assertTrue(f.store.searchAccepted("咖啡").items.isEmpty())
+        f.reopen();assertTrue(f.store.searchAccepted("合成口味").items.isEmpty())
+    }
+    @Test fun keywordPagesOnlyMatchedAcceptedRowsAndNeverResurrectsUnavailableSources():Unit {
+        for(mode in 0..2) Fixture().use {f ->
+            val made=mutableListOf<SourcePreferenceSnapshot>()
+            for(source in listOf(f.source,SourceVersion("other",1))) {
+                val p=f.store.preview(source);val quote=if(source==f.source)"我不喝咖啡🙂" else "同名合成来源"
+                repeat(if(source==f.source)20 else 2) {index ->
+                    val row=f.store.create(PreferenceCreate(id(),p,id(),"合成共同关键词",PreferenceContent(SourceMemoryRules.reference(p,quote)),true,id(),if(source==f.source)10+index.toLong() else 100+index.toLong()))
+                    made+=f.store.mutate(change(row,PreferenceAction.ACCEPT))
+                }
+            }
+            val first=f.store.searchAccepted("共同");val second=f.store.searchAccepted("共同",first.next)
+            assertEquals(20,first.items.size);assertEquals(2,second.items.size);assertNull(second.next)
+            assertEquals(made.map {it.id}.toSet(),(first.items+second.items).map {it.id}.toSet())
+            when(mode) {
+                0 -> {val policy=SqlLocalProcessingRepository(f.base.gateway);policy.change(LocalProcessingChange(policy.read(f.source),LocalProcessingChoice.AI_NONE,"search-off"))}
+                1 -> f.base.revise()
+                else -> f.base.db.write("INSERT INTO remote_source_access VALUES('source',1,1,NULL,NULL)")
+            }
+            assertFalse(f.store.resolve(first) {fail("Invalidated proof")})
+            val fresh=f.store.searchAccepted("共同");assertEquals(2,fresh.items.size);assertTrue(fresh.items.none {it.source==f.source})
+            assertNull(fresh.next)
+        }
+    }
+    @Test fun keywordUsesOnlyCurrentAcceptedContentWithLiteralCaseSensitiveMatching():Unit=Fixture().use {f ->
+        val a=f.store.mutate(change(f.store.create(f.request()),PreferenceAction.ACCEPT))
+        val b=f.store.create(f.request(a));val accepted=f.store.mutate(change(b,PreferenceAction.ACCEPT,a))
+        f.store.mutate(change(f.store.create(f.request()),PreferenceAction.REJECT))
+        val d=f.store.mutate(change(f.store.create(f.request()),PreferenceAction.ACCEPT))
+        val corrected=PreferenceContent(d.current!!.content.reference,PreferenceInterval("2026-10-21",null,"UTC"))
+        f.store.mutate(change(d,PreferenceAction.CORRECT,content=corrected))
+        assertEquals(listOf(accepted.id),f.store.searchAccepted("咖啡").items.map {it.id})
+        val p=f.store.preview(f.source)
+        val english=f.store.create(PreferenceCreate(id(),p,id(),"Coffee 普通口味",PreferenceContent(SourceMemoryRules.reference(p,"我不喝咖啡🙂")),true,id(),60))
+        f.store.mutate(change(english,PreferenceAction.ACCEPT))
+        assertEquals(english.id,f.store.searchAccepted("Coffee").items.single().id)
+        assertTrue(f.store.searchAccepted("coffee").items.isEmpty())
+        assertTrue(f.store.searchAccepted("咖 啡").items.isEmpty())
+    }
+    @Test fun keywordReadRejectsUnauthenticatedNonMatchingCipherAndMalformedInput():Unit=Fixture().use {f ->
+        val row=f.store.create(f.request())
+        assertTrue(f.store.searchAccepted("不存在").items.isEmpty())
+        for(keyword in listOf("字".repeat(65),"\uD800","\uDC00","茶\n"))assertThrows(IllegalArgumentException::class.java) {f.store.searchAccepted(keyword)}
+        assertTrue(f.store.searchAccepted("🙂".repeat(64)).items.isEmpty())
+        val bytes=f.bytes(row.id);bytes[bytes.lastIndex]=(bytes.last().toInt() xor 1).toByte()
+        f.base.db.write("UPDATE local_candidate_batches SET version=version+1,payload=? WHERE id=?",bytes,row.id)
+        assertThrows(PreferenceUnavailable::class.java) {f.store.searchAccepted("不存在")}
+    }
     private class Fixture:AutoCloseable {
         val base=LocalCandidateFixture();val source=base.source
         var store=SqlSourcePreferenceRepository(base.gateway,LocalCandidateFixture.KEY)
-        fun request(topic:SourcePreferenceSnapshot?=null):PreferenceCreate { val p=store.preview(source)
-            return PreferenceCreate(id(),p,topic?.topicId ?: id(),topic?.topicLabel ?: "合成口味",PreferenceContent(SourceMemoryRules.reference(p,"我不喝咖啡🙂")),true,id(),40,topic)
+        fun request(topic:SourcePreferenceSnapshot?=null,at:Long=40):PreferenceCreate { val p=store.preview(source)
+            return PreferenceCreate(id(),p,topic?.topicId ?: id(),topic?.topicLabel ?: "合成口味",PreferenceContent(SourceMemoryRules.reference(p,"我不喝咖啡🙂")),true,id(),at,topic)
         }
         fun bytes(id:String)=base.db.read("SELECT payload FROM local_candidate_batches WHERE id=?",id).single().single() as ByteArray
         fun reopen() {store.wipeKey();base.reopen();store=SqlSourcePreferenceRepository(base.gateway,LocalCandidateFixture.KEY)}

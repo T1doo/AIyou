@@ -14,7 +14,7 @@ sealed interface PreferenceIntent {
 data class PreferenceConfirmation(val token:Long,val intent:PreferenceIntent) { override fun toString()="PreferenceConfirmation(redacted)" }
 data class PreferenceUiState(val session:Long,val source:SourceVersion?,val sourceHash:String?,val request:Long=0,
     val sourcePage:PreferenceSourcePage?=null,val page:PreferencePage?=null,val items:List<SourcePreferenceSnapshot> = emptyList(),
-    val section:PreferenceReview=PreferenceReview.PROPOSED,val cursor:PreferenceCursor?=null,val canPrevious:Boolean=false,
+    val section:PreferenceReview=PreferenceReview.PROPOSED,val cursor:PreferenceCursor?=null,val canPrevious:Boolean=false,val keyword:String="",
     val quote:String="",val topicId:String=UUID.randomUUID().toString(),val topicLabel:String="",val topicExpected:SourcePreferenceSnapshot?=null,
     val from:String="",val until:String="",val zone:String="",val affirmed:Boolean=false,val editing:SourcePreferenceSnapshot?=null,
     val busy:Boolean=false,val confirmation:PreferenceConfirmation?=null,val pending:PreferenceIntent?=null,
@@ -60,8 +60,8 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
         val local=current();val ui=local.sourcePreferences ?: return false
         return available(local) && ui.session==session && (request==null || request==ui.request) && local.canRetainPreferenceSources(ui)
     }
-    private fun update(session:Long,change:(PreferenceUiState)->PreferenceUiState)=publish { local ->
-        if(!owns(session))local else {
+    private fun update(session:Long,request:Long?=null,change:(PreferenceUiState)->PreferenceUiState)=publish { local ->
+        if(!available(local) || local.sourcePreferences?.session!=session || (request!=null && local.sourcePreferences.request!=request) || !local.canRetainPreferenceSources(local.sourcePreferences))local else {
             val next=change(checkNotNull(local.sourcePreferences))
             // Validate the proposed state in the same publication/CAS as its private content.
             // A delayed comparison must authenticate both sources against the latest observed UI.
@@ -121,7 +121,7 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
                 val other=checkNotNull(store.sourcePreferences).acceptedForTopic(item).takeIf { action==PreferenceAction.ACCEPT }
                 if(!owns(session,req))return@enqueue
                 val intent=PreferenceIntent.Mutate(PreferenceMutation(item,action,null,other,UUID.randomUUID().toString(),clock.millis()))
-                update(session) { it.copy(busy=false,confirmation=PreferenceConfirmation(tokens.incrementAndGet(),intent)) }
+                update(session,req) { it.copy(busy=false,confirmation=PreferenceConfirmation(tokens.incrementAndGet(),intent)) }
             } catch(c:CancellationException) { throw c } catch(_:Exception) { failed(session,req,null) }
         })failed(session,req,null)
     }
@@ -135,9 +135,24 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
     fun cancel(session:Long,confirmation:PreferenceConfirmation) { if(owns(session))update(session) { if(it.confirmation!==confirmation)it else it.copy(confirmation=null) } }
     fun retry(session:Long) { val ui=current().sourcePreferences ?: return;if(owns(session) && !ui.busy)execute(ui,ui.pending) }
     fun refresh(session:Long) { val ui=current().sourcePreferences ?: return;if(owns(session) && !ui.busy)execute(ui,null) }
+    fun keyword(session:Long,value:String) {
+        val ui=current().sourcePreferences ?: return
+        if(!owns(session) || ui.source!=null || ui.section!=PreferenceReview.ACCEPTED || ui.pending!=null || ui.confirmation!=null || value.length>256 || value==ui.keyword)return
+        // Retire the old query immediately. Queued/in-flight reads still release their real
+        // lease, but their request generation can no longer publish or open an old source.
+        cursors.clear();cursors.add(null)
+        update(session) {it.copy(keyword=value,request=tokens.incrementAndGet(),busy=false,page=null,items=emptyList(),cursor=null,canPrevious=false,historyId=null,error=null,notice=null)}
+    }
+    fun search(session:Long) {
+        val ui=current().sourcePreferences ?: return
+        if(!owns(session) || ui.source!=null || ui.section!=PreferenceReview.ACCEPTED || ui.busy || ui.pending!=null || ui.confirmation!=null)return
+        try {PreferenceKeywords.validate(ui.keyword)} catch(_:IllegalArgumentException) {update(session) {it.copy(error="关键词最多64字，不能含控制字符或不完整字符。")};return}
+        cursors.clear();cursors.add(null)
+        val next=ui.copy(cursor=null,canPrevious=false);update(session) {next};execute(next,null)
+    }
     fun section(session:Long,value:PreferenceReview) {
         val ui=current().sourcePreferences ?: return
-        if(!owns(session) || ui.busy || ui.source!=null || ui.pending!=null || ui.confirmation!=null)return
+        if(!owns(session) || ui.busy || ui.source!=null || ui.pending!=null || ui.confirmation!=null || value !in setOf(PreferenceReview.PROPOSED,PreferenceReview.ACCEPTED))return
         cursors.clear();cursors.add(null);val next=ui.copy(section=value,cursor=null,canPrevious=false);update(session) { next };execute(next,null)
     }
     fun next(session:Long,previous:Boolean=false) {
@@ -156,14 +171,23 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
             if(!owns(session,req))return@enqueue
             try { checkNotNull(store.sourcePreferences).resolveEndpoint(item,edge) { target ->
                 if(owns(session,req)) {
-                    if(target==null)update(session) { it.copy(busy=false,notice="历史取代关系的原项已不可用；没有恢复旧内容或旧采纳。") }
+                    if(target==null)update(session,req) { it.copy(busy=false,notice="历史取代关系的原项已不可用；没有恢复旧内容或旧采纳。") }
                     else {
                         val ref=target.contents.single { it.revision==edge.contentRevision }.content.reference
-                        close(session);onLocate(OriginalReadingLocation(target.source.sourceId,target.source.revision.toInt(),target.sourceHash,ref.start,ref.end))
+                        publishLocation(session,req,OriginalReadingLocation(target.source.sourceId,target.source.revision.toInt(),target.sourceHash,ref.start,ref.end),onLocate)
                     }
                 }
             } } catch(c:CancellationException) { throw c } catch(_:Exception) { failed(session,req,null) }
         })failed(session,req,null)
+    }
+    private fun publishLocation(session:Long,request:Long,location:OriginalReadingLocation,onLocate:(OriginalReadingLocation)->Unit) {
+        var admitted=false
+        publish { local ->
+            val ui=local.sourcePreferences
+            admitted=ui!=null && ui.session==session && ui.request==request && available(local) && local.canRetainPreferenceSources(ui)
+            if(admitted)local.copy(sourcePreferences=null) else local
+        }
+        if(admitted)onLocate(location)
     }
     fun locate(session:Long,item:SourcePreferenceSnapshot,onLocate:(OriginalReadingLocation)->Unit) {
         val ui=current().sourcePreferences ?: return
@@ -175,7 +199,7 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
                 val repo=checkNotNull(store.sourcePreferences)
                 val publish={ if(owns(session,req)) {
                     val ref=checkNotNull(item.current).content.reference
-                    close(session);onLocate(OriginalReadingLocation(item.source.sourceId,item.source.revision.toInt(),item.sourceHash,ref.start,ref.end))
+                    publishLocation(session,req,OriginalReadingLocation(item.source.sourceId,item.source.revision.toInt(),item.sourceHash,ref.start,ref.end),onLocate)
                 } }
                 val accepted=ui.sourcePage?.let { repo.resolveSource(it,publish) } ?: ui.page?.let { repo.resolve(it,item,publish) } ?: false
                 if(!accepted)failed(session,req,null)
@@ -193,7 +217,7 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
                 fun result(page:PreferenceSourcePage?,browse:PreferencePage?) {
                     if(!owns(before.session,req))return
                     val form=intent is PreferenceIntent.Create || intent is PreferenceIntent.Mutate && intent.request.action==PreferenceAction.CORRECT
-                    update(before.session) { it.copy(sourcePage=page,page=browse,items=page?.items ?: checkNotNull(browse).items,busy=false,pending=null,confirmation=null,
+                    update(before.session,req) { it.copy(sourcePage=page,page=browse,items=page?.items ?: checkNotNull(browse).items,busy=false,pending=null,confirmation=null,
                         editing=if(form)null else it.editing,quote=if(form)"" else it.quote,affirmed=if(form)false else it.affirmed,
                         topicId=if(form)UUID.randomUUID().toString() else it.topicId,topicLabel=if(form)"" else it.topicLabel,topicExpected=if(form)null else it.topicExpected,
                         from=if(form)"" else it.from,until=if(form)"" else it.until,zone=if(form)"" else it.zone,
@@ -204,14 +228,14 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
                     if(saved!=null)require(page.items.singleOrNull { it.id==saved.id }?.same(saved)==true)
                     if(!repo.resolveSource(page) { result(page,null) })throw PreferenceConflict()
                 } else {
-                    val page=repo.capture(before.section,before.cursor)
+                    val page=if(before.section==PreferenceReview.ACCEPTED)repo.searchAccepted(before.keyword,before.cursor) else repo.capture(before.section,before.cursor)
                     if(!repo.resolve(page) { result(null,page) })throw PreferenceConflict()
                 }
             } catch(c:CancellationException) { throw c } catch(_:Exception) { failed(before.session,req,intent) }
         })failed(before.session,req,intent)
     }
     private fun failed(session:Long,request:Long,intent:PreferenceIntent?) {
-        if(owns(session,request))update(session) { it.copy(busy=false,items=emptyList(),sourcePage=null,page=null,confirmation=null,pending=intent,
+        if(owns(session,request))update(session,request) { it.copy(busy=false,items=emptyList(),sourcePage=null,page=null,confirmation=null,pending=intent,
             notice=null,error="读取或写入结果尚未核对，未显示成功或空列表。可核对同次请求，或仅刷新实际状态；来源变化时旧请求会被拒绝。") }
     }
     fun dispose() { disposed=true;publish { it.copy(sourcePreferences=null) };cursors.clear() }

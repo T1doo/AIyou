@@ -217,7 +217,8 @@ for label, folder, minimum in targets:
         additional["com.t1doo.aiyou.SourcePreferencePresentationTest"] = (
             "doubleFontPendingSeparateAcceptanceCorrectionSourceJumpAndRevokeCancellationReachProductionRoutes",
             "privateFormRestorationAndClosedConfirmationHaveNoRetainedWriteAuthority",
-            "failedGlobalReadHidesCountAndNeverPresentsAnUnverifiedEmptyPage")
+            "failedGlobalReadHidesCountAndNeverPresentsAnUnverifiedEmptyPage",
+            "doubleFontKeywordLookupClearsOldResultsAndOpensHighlightedOriginalWithoutSavingQuery")
         additional["com.t1doo.aiyou.SourceMemoryPresentationTest"] = (
             "explicitPendingAndAcceptanceAreReachableAtDoubleFontAndSourceJumpPreservesOriginal",
             "rejectionCorrectionHistoryAndRevocationSurviveReopeningWithoutAutomaticAcceptance",

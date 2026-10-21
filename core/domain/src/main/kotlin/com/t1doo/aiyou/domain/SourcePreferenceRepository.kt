@@ -8,6 +8,8 @@ data class PreferenceCursor(val createdAtMillis: Long, val id: String) {
 }
 interface PreferencePage {
     val section: PreferenceReview
+    /** Null for legacy browsing; otherwise the exact literal keyword, including empty. */
+    val keyword: String? get() = null
     val cursor: PreferenceCursor?
     val next: PreferenceCursor?
     val items: List<SourcePreferenceSnapshot>
@@ -27,6 +29,7 @@ interface SourcePreferenceRepository {
     fun create(request: PreferenceCreate): SourcePreferenceSnapshot
     fun mutate(request: PreferenceMutation): SourcePreferenceSnapshot
     fun capture(section: PreferenceReview, cursor: PreferenceCursor? = null): PreferencePage
+    fun searchAccepted(keyword: String, cursor: PreferenceCursor? = null): PreferencePage
     /** Reauthenticate the same bounded page before publishing or opening a source. */
     fun resolve(page: PreferencePage, item: SourcePreferenceSnapshot? = null, publish: () -> Unit): Boolean
 }
@@ -43,5 +46,19 @@ object PreferenceRules {
     }
     fun validate(content: PreferenceContent, preview: SourceMemoryPreview) {
         SourceMemoryRules.validate(SourceMemoryContent(content.reference, SourceMemoryKind.EVENT, SourceMemoryAssertion.SELF_REPORT, ""), preview.source, preview.original)
+    }
+}
+
+/** Bounded, literal input only; no tokenization, inference or persistent query index. */
+object PreferenceKeywords {
+    fun validate(value: String) {
+        require(value.length<=128 && value.codePointCount(0,value.length)<=64)
+        var i=0
+        while(i<value.length) {
+            val c=value[i]
+            require(!Character.isISOControl(c) && !Character.isLowSurrogate(c))
+            if(Character.isHighSurrogate(c)) { require(i+1<value.length && Character.isLowSurrogate(value[i+1]));i++ }
+            i++
+        }
     }
 }

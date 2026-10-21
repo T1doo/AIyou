@@ -60,10 +60,16 @@ internal fun SourcePreferenceDialog(ui:PreferenceUiState,controller:SourcePrefer
                         TextButton(onClick={if(canUse())controller.cancel(ui.session,confirmation)},enabled=!ui.busy,modifier=Modifier.heightIn(min=48.dp).testTag("preference-cancel")) { Text("取消，保持原样") }
                     } else {
                         if(ui.source==null) {
-                            Row { listOf(PreferenceReview.PROPOSED,PreferenceReview.ACCEPTED).forEach { section ->
+                            Column { listOf(PreferenceReview.PROPOSED,PreferenceReview.ACCEPTED).forEach { section ->
                                 TextButton(onClick={if(canUse())controller.section(ui.session,section)},enabled=editable,modifier=Modifier.heightIn(min=48.dp).testTag("preference-section-"+section.name)) { Text(section.label()) }
                             } }
-                            if(ui.page!=null)Text("当前页 ${ui.items.size} 条；空页仍可能有更早内容，不是全库总数。",Modifier.testTag("preferences-count"))
+                            if(ui.section==PreferenceReview.ACCEPTED) {
+                                Text("按主题或当前引用逐字包含查找；区分大小写，不是语义检索或 AI 问答。留空可看全部已采纳自述。")
+                                OutlinedTextField(ui.keyword,{if(canUse())controller.keyword(ui.session,it)},label={Text("关键词（最多64字）")},enabled=ui.pending==null && ui.confirmation==null,modifier=Modifier.fillMaxWidth().testTag("preference-keyword"))
+                                TextButton(onClick={if(canUse())controller.search(ui.session)},enabled=editable,modifier=Modifier.heightIn(min=48.dp).testTag("preference-search")) { Text("查找已采纳自述") }
+                                if(ui.page!=null && ui.items.isEmpty())Text("没有找到逐字包含此关键词的已采纳普通自述。",Modifier.testTag("preference-no-match"))
+                            }
+                            if(ui.page!=null)Text(if(ui.section==PreferenceReview.ACCEPTED)"当前匹配页 ${ui.items.size} 条；不是全库总数。" else "当前页 ${ui.items.size} 条；空页仍可能有更早内容，不是全库总数。",Modifier.testTag("preferences-count"))
                         }
                         if(ui.sourcePage!=null) {
                             val original=ui.sourcePage.preview.original

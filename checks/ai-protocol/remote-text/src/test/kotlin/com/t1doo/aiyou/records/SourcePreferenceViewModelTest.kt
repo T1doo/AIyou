@@ -152,6 +152,67 @@ class SourcePreferenceViewModelTest {
             assertNull(local.get().sourcePreferences);assertEquals(0,confirmations.get());assertTrue(h.mutations.isEmpty())
         } finally {release.countDown();controller.dispose()}
     }}
+    @Test(timeout=15_000) fun realActorKeywordFindsOldAcceptedSourceAndRejectsOldItemAfterQueryChange():Unit=Harness().use {h ->runBlocking {
+        h.ready();val (old,_)=h.seedComparison();h.observeSources()
+        h.vm.sourcePreferences.open(section=PreferenceReview.ACCEPTED);val ui=h.ui {it.page!=null&&!it.busy}
+        h.vm.sourcePreferences.keyword(ui.session,"咖啡🙂");assertNull(h.value().page);assertTrue(h.value().items.isEmpty())
+        h.vm.sourcePreferences.search(ui.session);val found=h.ui {it.page?.keyword=="咖啡🙂"&&!it.busy};val item=found.items.single()
+        assertEquals(old.id,item.id)
+        h.vm.sourcePreferences.keyword(ui.session,"淡茶");h.vm.sourcePreferences.locate(ui.session,item) {fail("Old query retains no jump authority")}
+        h.vm.sourcePreferences.search(ui.session);h.ui {it.page?.keyword=="淡茶"&&!it.busy};assertTrue(h.value().items.isEmpty())
+        h.vm.sourcePreferences.keyword(ui.session,"合成口味");h.vm.sourcePreferences.search(ui.session);val topic=h.ui {it.page?.keyword=="合成口味"&&!it.busy}
+        val location=kotlinx.coroutines.CompletableDeferred<OriginalReadingLocation>()
+        h.vm.sourcePreferences.locate(ui.session,topic.items.single()) {location.complete(it)}
+        val target=withTimeout(3_000) {location.await()};assertEquals(old.source.sourceId,target.entryId)
+        assertEquals(0,target.startCodePoint);assertEquals(6,target.endCodePoint);assertEquals(0,h.remoteCalls)
+    }}
+    @Test(timeout=20_000) fun delayedAuthenticatedKeywordReadCannotPublishAfterQuerySwitchOrObservedSourceInvalidation():Unit=runBlocking {
+        for(invalidate in listOf(false,true)) Harness().use {h ->
+            h.ready();val (old,_)=h.seedComparison();h.observeSources()
+            val local=java.util.concurrent.atomic.AtomicReference(h.vm.state.value)
+            val entered=java.util.concurrent.CountDownLatch(1);val release=java.util.concurrent.CountDownLatch(1)
+            val queue=java.util.concurrent.ConcurrentLinkedQueue<suspend(EntryRepository)->Unit>()
+            val exposed=java.util.concurrent.atomic.AtomicInteger()
+            val port=object:SourcePreferenceRepository by h.store {
+                override fun searchAccepted(keyword:String,cursor:PreferenceCursor?):PreferencePage {
+                    val page=h.store.searchAccepted(keyword,cursor)
+                    if(keyword=="咖啡") {entered.countDown();check(release.await(3,TimeUnit.SECONDS))}
+                    return page
+                }
+            }
+            val owner=object:EntryRepository by h.owner {override val sourcePreferences=port}
+            val controller=SourcePreferenceController({local.get()},{change ->
+                val next=local.updateAndGet(change);if(next.sourcePreferences?.page?.keyword=="咖啡")exposed.incrementAndGet()
+            },{queue.add(it);true},Clock.fixed(Instant.ofEpochMilli(50),ZoneOffset.UTC))
+            try {
+                controller.open(section=PreferenceReview.ACCEPTED);checkNotNull(queue.poll())(owner)
+                val session=local.get().sourcePreferences!!.session
+                controller.keyword(session,"咖啡");controller.search(session)
+                val read=checkNotNull(queue.poll());val job=async(kotlinx.coroutines.Dispatchers.IO) {read(owner)}
+                try {
+                    assertTrue(entered.await(3,TimeUnit.SECONDS))
+                    if(invalidate) {
+                        h.invalidate(old.source,0)
+                        val entries=h.owner.entries();val versions=SqlLocalProcessingRepository(h.f.gateway).versions()
+                        local.updateAndGet {it.copy(entries=entries,localProcessingVersions=versions)}
+                    } else {
+                        controller.keyword(session,"淡茶");controller.search(session)
+                        assertTrue(local.get().sourcePreferences!!.items.isEmpty());assertNull(local.get().sourcePreferences!!.page)
+                    }
+                } finally {release.countDown()}
+                withTimeout(3_000) {job.await()};assertEquals(0,exposed.get())
+                if(invalidate) {
+                    // The proof never entered UI state: reauthentication fails closed with an
+                    // unverified-read error, rather than publishing a verified empty result.
+                    val rejected=local.get().sourcePreferences!!;assertNotNull(rejected.error);assertNull(rejected.page);assertTrue(rejected.items.isEmpty());assertFalse(rejected.busy)
+                } else {
+                    checkNotNull(queue.poll())(owner)
+                    val fresh=local.get().sourcePreferences!!;assertEquals("淡茶",fresh.page!!.keyword);assertTrue(fresh.items.isEmpty());assertFalse(fresh.busy)
+                }
+                assertTrue(h.mutations.isEmpty());assertEquals(0,h.remoteCalls)
+            } finally {release.countDown();controller.dispose()}
+        }
+    }
     private class Harness:AutoCloseable {
         val f=LocalCandidateFixture();val store=SqlSourcePreferenceRepository(f.gateway,LocalCandidateFixture.KEY)
         val creates=CopyOnWriteArrayList<PreferenceCreate>();val mutations=CopyOnWriteArrayList<PreferenceMutation>()

@@ -45,7 +45,7 @@ internal class SqlSourcePreferenceRepository(private val database: RecordsSqlDat
         publish(result);true
     } }
     private inner class Page(override val section:PreferenceReview,override val cursor:PreferenceCursor?,override val next:PreferenceCursor?,
-        values:List<SourcePreferenceSnapshot>,val signatures:List<String>):PreferencePage {
+        values:List<SourcePreferenceSnapshot>,val signatures:List<String>,override val keyword:String?=null):PreferencePage {
         val owner=this@SqlSourcePreferenceRepository
         override val items=java.util.Collections.unmodifiableList(values.toList())
         override fun toString()="PreferencePage(redacted)"
@@ -149,10 +149,26 @@ internal class SqlSourcePreferenceRepository(private val database: RecordsSqlDat
         return Page(section,cursor,if(rows.size>20)selected.last().let { PreferenceCursor(it.created,it.id) } else null,
             items.filter { it.review?.review==section },selected.map { it.id+":"+it.version+":"+hash(it.bytes) })
     }
+    override fun searchAccepted(keyword:String,cursor:PreferenceCursor?):PreferencePage {
+        PreferenceKeywords.validate(keyword)
+        return safe { database.transaction { searchAccepted(it,keyword,cursor) } }
+    }
+    private fun searchAccepted(sql:RecordsSqlConnection,keyword:String,cursor:PreferenceCursor?):Page {
+        // Authenticate the entire bounded live set and graph BEFORE matching and paging.
+        // Filtering a raw LIMIT 21 page would silently miss older accepted statements.
+        val all=live(sql);validateGraph(all)
+        val matches=all.filter { it.payload.reviews.last().review==PreferenceReview.ACCEPTED &&
+            (it.payload.topicLabel.contains(keyword) || it.payload.contents.last().content.reference.quote.contains(keyword)) }
+            .sortedWith(compareByDescending<Item> { it.row.created }.thenBy { it.row.id })
+            .filter { cursor==null || it.row.created<cursor.createdAtMillis || it.row.created==cursor.createdAtMillis && it.row.id>cursor.id }
+        val selected=matches.take(20)
+        return Page(PreferenceReview.ACCEPTED,cursor,if(matches.size>20)selected.last().row.let {PreferenceCursor(it.created,it.id)} else null,
+            selected.map {snapshot(it.row,it.payload)},all.map {it.row.id+":"+it.row.version+":"+hash(it.row.bytes)},keyword)
+    }
     override fun resolve(page:PreferencePage,item:SourcePreferenceSnapshot?,publish:()->Unit):Boolean = safe {
         val p=page as? Page ?: return@safe false
         if(p.owner!==this || item!=null && p.items.none { it===item })return@safe false
-        database.transaction { sql -> val fresh=capture(sql,p.section,p.cursor)
+        database.transaction { sql -> val fresh=p.keyword?.let {searchAccepted(sql,it,p.cursor)} ?: capture(sql,p.section,p.cursor)
             if(fresh.signatures!=p.signatures || fresh.next!=p.next)false else { publish();true }
         }
     }

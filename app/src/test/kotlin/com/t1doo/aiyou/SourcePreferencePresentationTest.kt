@@ -74,6 +74,11 @@ class SourcePreferencePresentationTest {
             check(!failRead);val values=listOfNotNull(saved).filter {it.review!!.review==section}
             return object:PreferencePage {override val section=section;override val cursor=cursor;override val next:PreferenceCursor?=null;override val items=values}
         }
+        override fun searchAccepted(keyword:String,cursor:PreferenceCursor?):PreferencePage {
+            check(!failRead);PreferenceKeywords.validate(keyword)
+            val values=listOfNotNull(saved).filter {it.review!!.review==PreferenceReview.ACCEPTED && (it.topicLabel!!.contains(keyword) || it.current!!.content.reference.quote.contains(keyword))}
+            return object:PreferencePage {override val section=PreferenceReview.ACCEPTED;override val keyword=keyword;override val cursor=cursor;override val next:PreferenceCursor?=null;override val items=values}
+        }
         override fun resolve(page:PreferencePage,item:SourcePreferenceSnapshot?,publish:()->Unit):Boolean {if(failRead)return false;publish();return true}
     }
     private val owner=object:EntryRepository {
@@ -127,6 +132,27 @@ class SourcePreferencePresentationTest {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("preferences-open"));compose.onNodeWithTag("preferences-open").performClick();drain()
         click("preference-section-ACCEPTED");drain();assertTrue(state.value.sourcePreferences!!.items.isEmpty())
         assertEquals(listOf(entry),state.value.entries);assertTrue(state.value.tasks.items.isEmpty())
+    }
+    @Test fun doubleFontKeywordLookupClearsOldResultsAndOpensHighlightedOriginalWithoutSavingQuery() {
+        compose.setContent {Screen()};reader();open();form();click("preference-save");confirm();accept();click("preference-close")
+        compose.onNodeWithText("返回列表").assertIsDisplayed().performClick();compose.waitForIdle()
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("preferences-open"));compose.onNodeWithTag("preferences-open").performClick();drain()
+        click("preference-section-ACCEPTED");drain()
+        val keyword=compose.onNodeWithTag("preference-keyword").performScrollTo().assertIsDisplayed()
+        keyword.performTextReplacement("合成口味");compose.onNodeWithTag("preferences-count").assertDoesNotExist()
+        val search=compose.onNodeWithTag("preference-search").performScrollTo().assertIsDisplayed()
+        assertTrue(search.getUnclippedBoundsInRoot().height>=48.dp);search.performClick();drain()
+        assertEquals(saved!!.id,state.value.sourcePreferences!!.items.single().id)
+        compose.onNodeWithTag("preference-keyword").performScrollTo().performTextReplacement("不存在")
+        compose.onNodeWithTag("preference-source:"+saved!!.id).assertDoesNotExist();click("preference-search");drain()
+        compose.onNodeWithTag("preference-no-match").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("preference-keyword").performScrollTo().performTextReplacement("淡茶");click("preference-search");drain()
+        compose.runOnIdle {assertFalse(checkNotNull(registry).performSave().toString().contains("淡茶"))}
+        click("preference-source:"+saved!!.id);drain()
+        val text=compose.onNodeWithTag("original-text").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].single()
+        assertEquals(entry.originalText,text.text);assertTrue(text.spanStyles.isNotEmpty());assertNull(state.value.sourcePreferences)
+        assertEquals(2,writes);assertEquals(listOf(entry),state.value.entries)
     }
     @Test fun failedGlobalReadHidesCountAndNeverPresentsAnUnverifiedEmptyPage() {
         compose.setContent {Screen()}
