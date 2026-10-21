@@ -60,10 +60,11 @@ class SourcePreferenceViewModelTest {
         h.ready();val p=h.store.preview(h.f.source)
         val created=h.store.create(PreferenceCreate(java.util.UUID.randomUUID().toString(),p,java.util.UUID.randomUUID().toString(),"合成口味",PreferenceContent(SourceMemoryRules.reference(p,"我不喝咖啡🙂")),true,java.util.UUID.randomUUID().toString(),40))
         h.store.mutate(SourcePreferenceSqlTest.change(created,PreferenceAction.ACCEPT))
-        h.vm.sourcePreferences.open(section=PreferenceReview.ACCEPTED);val ui=h.ui {it.page!=null&&!it.busy};var location:OriginalReadingLocation?=null
-        h.vm.sourcePreferences.locate(ui.session,ui.items.single()) {location=it}
+        h.vm.sourcePreferences.open(section=PreferenceReview.ACCEPTED);val ui=h.ui {it.page!=null&&!it.busy};val located=kotlinx.coroutines.CompletableDeferred<OriginalReadingLocation>()
+        h.vm.sourcePreferences.locate(ui.session,ui.items.single()) {located.complete(it)}
         withTimeout(3_000) {h.vm.state.first {it.sourcePreferences==null}}
-        assertEquals(0,location!!.startCodePoint);assertEquals(6,location!!.endCodePoint);assertEquals(OriginalExports.hash(h.f.original),location!!.contentHash)
+        val location=withTimeout(3_000) {located.await()}
+        assertEquals(0,location.startCodePoint);assertEquals(6,location.endCodePoint);assertEquals(OriginalExports.hash(h.f.original),location.contentHash)
         assertEquals(0,h.remoteCalls)
     } }
     private class Harness:AutoCloseable {
