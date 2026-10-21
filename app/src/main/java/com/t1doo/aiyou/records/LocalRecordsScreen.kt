@@ -105,6 +105,7 @@ fun LocalRecordsScreen(
     onOpenRecycleBin: (() -> Unit)? = null,
     onBeginRecordPackage: (() -> Unit)? = null,
     onOpenFactRecap: (() -> Unit)? = null,
+    onOpenPreferences: (() -> Unit)? = null,
     onOpenMemoryInbox: (() -> Unit)? = null,
     onOpenAcceptedMemories: (() -> Unit)? = null,
     onBeforeSearchInput: (TextFieldState) -> Boolean = { true },
@@ -277,8 +278,12 @@ fun LocalRecordsScreen(
                         (onOpenRecycleBin != null && local.supportsRecycleBin) ||
                         (onBeginRecordPackage != null && local.supportsRecordPackages) ||
                         (onOpenFactRecap != null && local.supportsFactRecaps) ||
+                        (onOpenPreferences != null && local.supportsSourcePreferences) ||
                         ((onOpenMemoryInbox != null || onOpenAcceptedMemories != null) && local.supportsMemoryInbox))) {
                         Column(Modifier.fillMaxWidth()) {
+                            if (onOpenPreferences != null && local.supportsSourcePreferences) OutlinedButton(onOpenPreferences,
+                                enabled = local.ready && !local.opening && local.error == null,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("preferences-open")) { Text("普通偏好自述与人工审阅") }
                             if (onOpenMemoryInbox != null && local.supportsMemoryInbox) OutlinedButton(onOpenMemoryInbox,
                                 enabled = local.ready && !local.opening && local.error == null,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("memory-inbox-open")) { Text("待审事件与情绪") }

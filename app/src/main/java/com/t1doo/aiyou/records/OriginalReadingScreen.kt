@@ -58,12 +58,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
-/** Memory-only source binding/offsets. No original/query text or Saver. */
-data class OriginalReadingLocation(val entryId: String, val revision: Int, val contentHash: String,
-    val startCodePoint: Int, val endCodePoint: Int) {
-    override fun toString() = "OriginalReadingLocation(redacted)"
-}
-
 /** Bounded presentation excerpt only. Never passed to a repository or clipboard. */
 internal fun originalPreview(text: String): String {
     if (text.isBlank()) return "附件记录 · 无文字正文"
@@ -152,6 +146,7 @@ fun OriginalReadingScreen(
     canUseEventDate: (String, Int) -> Boolean = { _, _ -> false },
     candidateController: LocalCandidateController? = null,
     sourceTagController: SourceTagController? = null,
+    sourcePreferenceController: SourcePreferenceController? = null,
     sourceMemoryController: SourceMemoryController? = null,
     localProcessingController: LocalProcessingController? = null,
     sourceTaskController: SourceTaskController? = null,
@@ -305,6 +300,11 @@ fun OriginalReadingScreen(
                                 onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-tags")) { Text("从原文添加标签") }
                         }
+                        sourcePreferenceController?.let { controller ->
+                            TextButton(enabled = local.supportsSourcePreferences && !local.saving && !local.savePending && entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
+                                onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(com.t1doo.aiyou.model.SourceVersion(entry.id, entry.currentRevision.toLong())) },
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-preferences")) { Text("普通偏好自述") }
+                        }
                         sourceMemoryController?.let { controller ->
                             TextButton(enabled = local.supportsSourceMemories && !local.saving && !local.savePending && entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
                                 onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
@@ -331,6 +331,11 @@ fun OriginalReadingScreen(
                         }
                     }
                     local.sourceMemories?.takeIf { it.source.sourceId == entry.id && it.source.revision == entry.currentRevision.toLong() }?.let { ui ->
+                        sourcePreferenceController?.let { controller ->
+                            TextButton(enabled = local.supportsSourcePreferences && !local.saving && !local.savePending && entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
+                                onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(com.t1doo.aiyou.model.SourceVersion(entry.id, entry.currentRevision.toLong())) },
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-preferences")) { Text("普通偏好自述") }
+                        }
                         sourceMemoryController?.let { controller ->
                             SourceMemoryDialog(ui, controller, { canUseCandidates(entry.id, entry.currentRevision) }, onCandidateLocation)
                         }

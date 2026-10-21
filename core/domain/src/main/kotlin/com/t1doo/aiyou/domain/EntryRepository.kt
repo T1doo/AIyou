@@ -24,6 +24,7 @@ interface EntryRepository {
     val captureRecords: CaptureRepository? get() = null
     val sourceTags: SourceTagRepository? get() = null
     val sourceMemories: SourceMemoryRepository? get() = null
+    val sourcePreferences: SourcePreferenceRepository? get() = null
     val localCandidates: LocalCandidateRepository? get() = null
     val favorites: RecordFavoriteRepository? get() = null
     val eventDates: RecordEventDateRepository? get() = null

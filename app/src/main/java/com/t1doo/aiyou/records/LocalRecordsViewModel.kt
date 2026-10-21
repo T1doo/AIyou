@@ -78,6 +78,8 @@ data class LocalRecordUiState(
     val supportsCandidates: Boolean = false,
     val supportsSourceTags: Boolean = false,
     val sourceTags: SourceTagUiState? = null,
+    val supportsSourcePreferences: Boolean = false,
+    val sourcePreferences: PreferenceUiState? = null,
     val supportsSourceMemories: Boolean = false,
     val sourceMemories: SourceMemoryUiState? = null,
     val supportsMemoryInbox: Boolean = false,
@@ -229,7 +231,7 @@ class LocalRecordsViewModel internal constructor(
         if (editsDisposed || appAccessCommands.get() != 0 || !local.ready || local.opening || local.error != null ||
             local.saving || local.savePending || local.captureDiscard != null || local.localIndexBusy ||
             local.originalEdit != null || local.originalHistory != null || attachments.state.value != null ||
-            local.ai != null || local.sourceTask != null || local.sourceTags != null || local.sourceMemories != null || local.memoryInbox != null ||
+            local.ai != null || local.sourceTask != null || local.sourceTags != null || local.sourceMemories != null || local.memoryInbox != null || local.sourcePreferences != null ||
             local.localProcessing != null || local.factRecap != null || local.candidates != null ||
             local.originalExport != null || local.recordPackage != null || local.recycleBin != null ||
             local.manualTagEditor != null || local.manualPeopleEditor != null || local.eventDateEditor != null ||
@@ -293,6 +295,8 @@ class LocalRecordsViewModel internal constructor(
         { action -> submit(Command.MemoryInbox(action)).isSuccess })
     val sourceMemories = SourceMemoryController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock = clock)
+    val sourcePreferences = SourcePreferenceController({ mutableState.value }, { change -> update(change) },
+        { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock)
     val exports = OriginalExportController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.OriginalExport(action)).isSuccess }, clock = clock, decodeImage = decodeCapture)
     val recordPackages = RecordPackageController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -508,7 +512,7 @@ class LocalRecordsViewModel internal constructor(
                 reminders.dispose()
                 candidates.dispose()
                 sourceTags.dispose()
-                sourceMemories.dispose(); memoryInbox.dispose()
+                sourceMemories.dispose(); memoryInbox.dispose(); sourcePreferences.dispose()
                 exports.dispose()
                 recordPackages.dispose()
                 recycleBin.dispose()
@@ -558,8 +562,8 @@ class LocalRecordsViewModel internal constructor(
                 proposed.entries.none { it.id == panel.source.sourceId && it.currentRevision.toLong() == panel.source.revision &&
                     com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == panel.sourceHash })) proposed.copy(localProcessing = null) else proposed
             val safe = if (scoped.supportsLocalProcessing && !scoped.localProcessingAvailable) scoped.copy(
-                candidates = null, sourceTags = null, sourceMemories = null, ai = null, factRecap = null) else scoped
-            val candidate = reconcileMemoryInbox(previous, reconcileFactRecap(previous,safe))
+                candidates = null, sourceTags = null, sourceMemories = null, sourcePreferences = null, ai = null, factRecap = null) else scoped
+            val candidate = reconcilePreferences(reconcileMemoryInbox(previous, reconcileFactRecap(previous,safe)))
             val transformed = if (candidate.supportsFavorites && candidate.favoritesAvailable &&
                 candidate.entries.any { !candidate.favorites.containsKey(it.id) }) candidate.copy(
                     favoritesAvailable = false, favoritesError = "记录列表已变化，请重新读取收藏状态。") else candidate
@@ -607,6 +611,21 @@ class LocalRecordsViewModel internal constructor(
                     selected.phase == RecordAiPhase.BLOCKED && selected.preview.isEmpty() && selected.annotation == null)) reviewed
             else reviewed.copy(ai = null)
         }
+    }
+
+    private fun reconcilePreferences(local: LocalRecordUiState): LocalRecordUiState {
+        val ui = local.sourcePreferences ?: return local
+        fun valid(source: com.t1doo.aiyou.model.SourceVersion, hash: String, generation: Long? = null): Boolean =
+            local.hasLocalProcessingProof(source) && local.entries.any {
+                it.id == source.sourceId && it.currentRevision.toLong() == source.revision &&
+                    it.policy != ProcessingPolicy.AI_NONE && com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == hash &&
+                    (generation == null || !local.supportsLocalProcessing || local.localProcessingVersions[source.sourceId]?.generation == generation)
+            }
+        return if (editsDisposed || !local.ready || local.opening || local.error != null ||
+            ui.source?.let { !valid(it, checkNotNull(ui.sourceHash)) } == true ||
+            ui.sourcePage?.preview?.let { !valid(it.source, it.sourceHash, it.generation) } == true ||
+            (ui.items + ui.sourcePage?.topics.orEmpty()).any { !valid(it.source, it.sourceHash, it.generation) || local.entries.none { entry ->
+                entry.id == it.source.sourceId && entry.capturedAtMillis == it.capturedAtMillis && entry.captureTimeZone == it.captureTimeZone && entry.policy == it.policy } }) local.copy(sourcePreferences = null) else local
     }
 
     /** Opens a memory-only session over one already persisted current original. Never sends. */
@@ -1330,6 +1349,7 @@ class LocalRecordsViewModel internal constructor(
                 supportsMixedCapture = store.captureRecords != null,
                 supportsCandidates = store.localCandidates != null,
                 supportsSourceTags = store.sourceTags != null,
+                supportsSourcePreferences = store.sourcePreferences != null,
                 supportsSourceMemories = store.sourceMemories != null,
                 supportsMemoryInbox = store.sourceMemories?.inbox != null,
                 supportsManualPeople = store.manualPeople != null, manualPeopleOwner = store.manualPeople, manualPeople = peopleValues.orEmpty(),
@@ -1428,6 +1448,7 @@ class LocalRecordsViewModel internal constructor(
         sourceTasks.invalidateSource(id)
         mutableState.value.candidates?.takeIf { it.source.sourceId == id }?.let { candidates.close(it.session) }
         mutableState.value.sourceTags?.takeIf { it.source.sourceId == id }?.let { sourceTags.close(it.session) }
+        mutableState.value.sourcePreferences?.takeIf { it.source?.sourceId == id || it.items.any { item -> item.source.sourceId == id } }?.let { sourcePreferences.close(it.session) }
         mutableState.value.sourceMemories?.takeIf { it.source.sourceId == id }?.let { sourceMemories.close(it.session) }
         mutableState.value.ai?.takeIf { it.source.sourceId == id }?.let { ai.leave(it.sessionId) }
         factRecaps.close()
@@ -1507,7 +1528,7 @@ class LocalRecordsViewModel internal constructor(
         reminders.dispose()
         candidates.dispose()
         sourceTags.dispose()
-        sourceMemories.dispose(); memoryInbox.dispose()
+        sourceMemories.dispose(); memoryInbox.dispose(); sourcePreferences.dispose()
         exports.dispose()
         recordPackages.dispose()
         recycleBin.dispose()

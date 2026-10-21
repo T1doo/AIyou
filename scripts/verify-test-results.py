@@ -214,6 +214,9 @@ for label, folder, minimum in targets:
             "narrowInboxReachesExactOriginalAndRequiresSeparateExistingAcceptanceAtDoubleFont",
             "failedReadAndRestorationHidePrivateResultsAndRetireRetainedPageCallbacks",
             "acceptedMemoriesAreReachableAtDoubleFontAndDisappearOnlyAfterSeparateRevocationConfirmation")
+        additional["com.t1doo.aiyou.SourcePreferencePresentationTest"] = (
+            "doubleFontPendingSeparateAcceptanceCorrectionSourceJumpAndRevokeCancellationReachProductionRoutes",
+            "privateFormRestorationAndClosedConfirmationHaveNoRetainedWriteAuthority")
         additional["com.t1doo.aiyou.SourceMemoryPresentationTest"] = (
             "explicitPendingAndAcceptanceAreReachableAtDoubleFontAndSourceJumpPreservesOriginal",
             "rejectionCorrectionHistoryAndRevocationSurviveReopeningWithoutAutomaticAcceptance",

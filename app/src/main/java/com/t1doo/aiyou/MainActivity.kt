@@ -190,7 +190,7 @@ class MainActivity : ComponentActivity() {
                 favorites = records.favorites, eventDates = records.eventDates,
                 candidates = records.candidates,
                 sourceTags = records.sourceTags, people = records.people, modelConnections = records.modelConnections,
-                sourceMemories = records.sourceMemories, memoryInbox = records.memoryInbox,
+                sourceMemories = records.sourceMemories, memoryInbox = records.memoryInbox, sourcePreferences = records.sourcePreferences,
                 sourceTasks = records.sourceTasks,
                 taskProposals = records.taskProposals,
                 reminders = records.reminders,
@@ -208,7 +208,7 @@ class MainActivity : ComponentActivity() {
                     accessIdle && access.retirementReady(id)) })
     }
     override fun onResume() { super.onResume(); packageRecords?.audioForeground(true);packagePicker?.resumed() }
-    override fun onPause() { packageRecords?.audioForeground(false);packageRecords?.state?.value?.memoryInbox?.let { packageRecords?.memoryInbox?.close(it.session) }; packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); super.onPause() }
+    override fun onPause() { packageRecords?.audioForeground(false);packageRecords?.state?.value?.sourcePreferences?.let { packageRecords?.sourcePreferences?.close(it.session) };packageRecords?.state?.value?.memoryInbox?.let { packageRecords?.memoryInbox?.close(it.session) }; packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); super.onPause() }
     override fun onSaveInstanceState(outState: Bundle) { packagePicker?.save(outState); super.onSaveInstanceState(outState) }
     override fun onDestroy() {
         reminderClicks.clear()
@@ -280,6 +280,7 @@ fun AIyouApp(
     audioPlayback:com.t1doo.aiyou.records.OriginalAudioController?=null,
     onAudioRouteChanged:()->Unit={},
     factRecaps: com.t1doo.aiyou.records.FactRecapController? = null,
+    sourcePreferences: com.t1doo.aiyou.records.SourcePreferenceController? = null,
     memoryInbox: com.t1doo.aiyou.records.SourceMemoryInboxController? = null,
     display: UiPreferencesState = UiPreferencesState(),
     onDisplayChange: (UiPreferences) -> Unit = {},
@@ -363,6 +364,7 @@ fun AIyouApp(
     var taskSourceRoute by remember { mutableStateOf(false) }
     // This bit only makes a restored private source route fail closed; no source proof enters Bundle.
     var inboxSourceRoute by rememberSaveable { mutableStateOf(false) }
+    DisposableEffect(sourcePreferences) { onDispose { currentRecords?.invoke()?.sourcePreferences?.let { sourcePreferences?.close(it.session) } } }
     DisposableEffect(memoryInbox) { onDispose { currentRecords?.invoke()?.memoryInbox?.let { memoryInbox?.close(it.session) } } }
     DisposableEffect(factRecaps) { onDispose { factRecaps?.close() } }
     val currentLocal by rememberUpdatedState(local)
@@ -457,6 +459,7 @@ fun AIyouApp(
     LaunchedEffect(lostInboxSource) {
         if (lostInboxSource) {
             navigation.advance()
+            (currentRecordsProvider?.invoke() ?: currentLocal)?.sourcePreferences?.let { sourcePreferences?.close(it.session) }
             (currentRecordsProvider?.invoke() ?: currentLocal)?.sourceMemories?.let { sourceMemories?.close(it.session) }
             detailEntryId = null; inboxSourceRoute = false
         }
@@ -635,6 +638,28 @@ fun AIyouApp(
                 if (readerFromSearch && origin == Destination.MEMORIES) {
                     search.sync(true)
                     searchReturnSource = search.state.value.entries
+                }
+            }
+        }
+    }
+    val preferenceUi = local?.sourcePreferences
+    val preferenceRoute = !demo && !showSettings && !recapRoute && local?.let { it.ready && !it.opening && it.error == null } == true &&
+        preferenceUi?.let { ui -> if (ui.source == null) !reading && selected == Destination.MEMORIES
+            else reading && detailEntryId == ui.source.sourceId && local?.entries?.any { it.id == ui.source.sourceId && it.currentRevision.toLong() == ui.source.revision } == true } == true
+    LaunchedEffect(preferenceRoute, preferenceUi?.session) { if (!preferenceRoute) preferenceUi?.let { sourcePreferences?.close(it.session) } }
+    if (preferenceUi != null && sourcePreferences != null && preferenceRoute) {
+        fun ownsPreference() = ownsNavigation() && !showSettings && !demo && !recapRoute &&
+            currentLocal?.sourcePreferences?.session == preferenceUi.session &&
+            (if (preferenceUi.source == null) detailEntryId == null && selectedName == Destination.MEMORIES.name
+             else detailEntryId == preferenceUi.source.sourceId)
+        com.t1doo.aiyou.records.SourcePreferenceDialog(preferenceUi, sourcePreferences, ::ownsPreference) { location ->
+            // Controller has already retired the panel after authenticating its source under the owner lease.
+            navigation.publish(generation) {
+                val entry = currentLocal?.entries?.singleOrNull { it.id == location.entryId && it.currentRevision == location.revision }
+                if (ownsNavigation() && !showSettings && !demo && entry != null && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE &&
+                    com.t1doo.aiyou.model.OriginalExports.hash(entry.originalText) == location.contentHash) {
+                    navigation.advance(); search.pause(); readerFromSearch = false; tailReturnRequest = null
+                    searchLocation = location; inboxSourceRoute = true; detailEntryId = location.entryId
                 }
             }
         }
@@ -985,6 +1010,7 @@ fun AIyouApp(
                 eventDateController = eventDates, canUseEventDate = canCopy,
                 candidateController = candidates,
                 sourceTagController = sourceTags,
+                sourcePreferenceController = sourcePreferences,
                 sourceMemoryController = sourceMemories,
                 localProcessingController = localProcessing,
                 sourceTaskController = sourceTasks,
@@ -1066,6 +1092,8 @@ fun AIyouApp(
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
+                onOpenPreferences = sourcePreferences?.let { controller -> { if (ownsNavigation() && selected == Destination.MEMORIES &&
+                    !reading && !showSettings && !demo) { navigation.advance(); clearSearch(); controller.open() } } },
                 onOpenMemoryInbox = memoryInbox?.let { controller -> { if (ownsNavigation() && selected == Destination.MEMORIES &&
                     !reading && !showSettings && !demo) { navigation.advance(); clearSearch(); controller.open() } } },
                 onOpenAcceptedMemories = memoryInbox?.let { controller -> { if (ownsNavigation() && selected == Destination.MEMORIES &&

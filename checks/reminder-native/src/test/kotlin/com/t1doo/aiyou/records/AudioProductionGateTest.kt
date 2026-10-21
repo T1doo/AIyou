@@ -96,6 +96,23 @@ class AudioProductionGateTest {
             assertEquals(AttachmentState.CORRUPT,recovered[intent.id]);assertEquals(AttachmentState.FAILED,recovered[writing.id])
         }
     }
+    @Test fun actualProductionPreferenceCapabilitySharesOwnerAndOriginalInvalidation():Unit=runBlocking(Dispatchers.IO) {
+        Fixture().use { f ->
+            val repo=f.repo;val draft=repo.updateDraft("合成本人自述：我平时更喜欢淡茶。")
+            val entry=repo.saveDraft(draft,1,"UTC");val source=SourceVersion(entry.id,1)
+            val preferences=repo.sourcePreferences;val preview=preferences.preview(source)
+            val candidate=preferences.create(PreferenceCreate(uuid(),preview,uuid(),"合成口味",PreferenceContent(SourceMemoryRules.reference(preview,"我平时更喜欢淡茶")),true,uuid(),2))
+            val accepted=preferences.mutate(PreferenceMutation(candidate,PreferenceAction.ACCEPT,null,null,uuid(),3))
+            assertEquals(PreferenceReview.ACCEPTED,preferences.preferences(source).single().review!!.review)
+            val gate=checkNotNull(repo.captureRecords.mutationGate);val pin=checkNotNull(gate.preparePlayback());gate.activatePlayback(pin)
+            val before=f.sqlSnapshot()
+            try {assertThrows(CaptureConflict::class.java) {runBlocking {repo.revise(entry.id,1,"合成修改",4)}};assertEquals(before,f.sqlSnapshot())}
+            finally {gate.finishPlayback(pin)}
+            repo.revise(entry.id,1,"合成修改",4)
+            assertThrows(PreferenceConflict::class.java) {preferences.mutate(PreferenceMutation(accepted,PreferenceAction.REVOKE,null,null,uuid(),5))}
+            assertTrue(preferences.preferences(SourceVersion(entry.id,2)).isEmpty())
+        }
+    }
     private class Fixture:AutoCloseable {
         val root=Files.createTempDirectory("aiyou-r1-synthetic-room-").toFile()
         val mediaDir=root.resolve("media")

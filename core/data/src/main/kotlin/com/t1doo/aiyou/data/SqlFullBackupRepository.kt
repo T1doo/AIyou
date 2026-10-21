@@ -128,7 +128,7 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
             }
         }
     }
-    private fun operation(data:FullBackupData)=if(data.version==9) "FULL_BACKUP_IMPORT_V9" else OP
+    private fun operation(data:FullBackupData)=when(data.version) { 8 -> OP;9 -> "FULL_BACKUP_IMPORT_V9";10 -> "FULL_BACKUP_IMPORT_V10";else -> error("Unknown full version") }
     private fun verifyRestored(expected:FullBackupData,actual:FullBackupData) {
         // Logical rows are keyed sets. SQL BINARY and the edit store have different sort orders,
         // while authenticated image frames retain their explicit document order throughout IO.
@@ -201,7 +201,7 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
         mediaPackages.validatePortableLedger(data)
         data.tables[12].forEach { row -> when(row[3]) {
             "PACKAGE_MEDIA_INTENT" -> mediaPackages.validateCompletedForFullBackup(row)
-            OP,"FULL_BACKUP_IMPORT_V9" -> { RecordPackages.uuid(row[1] as String);require(row[0]==PREFIX+row[1] && row[2]==(if(row[3]==OP) 8L else 9L) && (row[4] as String).matches(Regex("DONE:[0-9a-f]{64}"))) }
+            OP,"FULL_BACKUP_IMPORT_V9","FULL_BACKUP_IMPORT_V10" -> { RecordPackages.uuid(row[1] as String);require(row[0]==PREFIX+row[1] && row[2]==(if(row[3]==OP) 8L else if(row[3]=="FULL_BACKUP_IMPORT_V9") 9L else 10L) && (row[4] as String).matches(Regex("DONE:[0-9a-f]{64}"))) }
             "CAPTURE_SAVED","CAPTURE_DISCARDED" -> {
                 RecordPackages.uuid(row[1] as String)
                 require(row[0]==(row[3] as String)+":"+row[1] && row[2]==1L)
@@ -272,9 +272,11 @@ private class FullBackupCells(database:RecordsSqlDatabase,key:ByteArray):AutoClo
     private val proposals=TaskProposalCipher(key)
     private val candidates=SqlLocalCandidateRepository(database,key)
     private val memories=SqlSourceMemoryRepository(database,key)
+    private val preferences=SqlSourcePreferenceRepository(database,key)
     /** Parse and bind portable cells entirely in memory before exposing a restore preview or writing an intent. */
     fun validatePortable(data:FullBackupData) {
-        data.tables.forEachIndexed { index,rows ->
+        val retained=mutableListOf<Pair<List<Any?>,FullBackupSourceProof?>>()
+        try { data.tables.forEachIndexed { index,rows ->
             val spec=FullBackupTables.specs[index]
             rows.forEach { row ->
                 val sealed=transform(spec.name,row,true)
@@ -290,13 +292,15 @@ private class FullBackupCells(database:RecordsSqlDatabase,key:ByteArray):AutoClo
                                 access?.get(1) as? Long ?: 0,original[2] as String,entry[2] as Long,entry[3] as String,
                                 ProcessingPolicy.valueOf(entry[4] as String),access?.get(2)==1L)
                         }
-                        when(row[5]) { 1L -> candidates.validateFullPortableRow(sealed,proof);2L -> memories.validateFullPortableRow(sealed,proof);else -> error("Unknown memory profile") }
+                        when(row[5]) { 1L -> candidates.validateFullPortableRow(sealed,proof);2L -> memories.validateFullPortableRow(sealed,proof);3L -> { preferences.validateFullPortableRow(sealed,proof);retained+=sealed to proof };else -> error("Unknown memory profile") }
                     }
-                } finally { if(sealed!==row) sealed.filterIsInstance<ByteArray>().forEach { it.fill(0) } }
+                } finally { if(sealed!==row && retained.none { it.first===sealed }) sealed.filterIsInstance<ByteArray>().forEach { it.fill(0) } }
             }
         }
+        preferences.validatePortableGraph(retained)
+        } finally { retained.forEach { it.first.filterIsInstance<ByteArray>().forEach { bytes -> bytes.fill(0) } } }
     }
-    fun validateWithin(sql:RecordsSqlConnection) { candidates.validateFullWithin(sql);memories.validateFullWithin(sql) }
+    fun validateWithin(sql:RecordsSqlConnection) { candidates.validateFullWithin(sql);memories.validateFullWithin(sql);preferences.validateFullWithin(sql) }
     fun transform(table:String,row:List<Any?>,restoring:Boolean):List<Any?> {
         val index=when(table) { "entry_manual_tags","entry_manual_people","manual_tasks" -> 3;"local_candidate_batches" -> 10;else -> return row }
         val bytes=row[index] as ByteArray
@@ -305,9 +309,9 @@ private class FullBackupCells(database:RecordsSqlDatabase,key:ByteArray):AutoClo
             "entry_manual_people" -> people.portable(row[0] as String,row[1] as Long,row[2] as String,bytes,restoring)
             "manual_tasks" -> if((row[0] as String).startsWith(TaskProposals.PREFIX)) proposals.portable((row[0] as String).removePrefix(TaskProposals.PREFIX),row[1] as Long,row[2] as String,bytes,restoring)
                 else tasks.portable(row[0] as String,row[1] as Long,row[2] as String,bytes,restoring)
-            else -> when(row[5]) { 1L -> candidates.portable(row,restoring);2L -> memories.portable(row,restoring);else -> error("Unknown memory profile") }
+            else -> when(row[5]) { 1L -> candidates.portable(row,restoring);2L -> memories.portable(row,restoring);3L -> preferences.portable(row,restoring);else -> error("Unknown memory profile") }
         }
         return row.toMutableList().also { it[index]=value }
     }
-    override fun close() { tags.wipe();people.wipe();tasks.wipe();proposals.wipe();candidates.wipeKey();memories.wipeKey() }
+    override fun close() { tags.wipe();people.wipe();tasks.wipe();proposals.wipe();candidates.wipeKey();memories.wipeKey();preferences.wipeKey() }
 }

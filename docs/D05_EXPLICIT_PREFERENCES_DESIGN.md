@@ -1,8 +1,10 @@
 # D05：普通偏好自述的最小人工确认闭环
 
-状态：设计待独审，未实现。基线 `88f9cec7c585e2d51da0b58fde3d11043aa4c3df`。
-父侧已核该 SHA 的 [CI39537117845](https://github.com/T1doo/AIyou/actions/runs/39537117845) in_progress；
-根侧不重试 CLI401。此设计不代表 R1 整体 CI、完整 D05 或任何设备验收通过，不推送触发新 CI。
+状态：设计已获限定独审 ACK；当前实现与待验边界见 `D05_EXPLICIT_PREFERENCES.md`。
+设计基线 `88f9cec7c585e2d51da0b58fde3d11043aa4c3df`。
+父侧于2026-10-21 03:39UTC经正常 GitHub connector 核
+[CI39537117845](https://github.com/T1doo/AIyou/actions/runs/39537117845) completed/success，精确匹配该基线；
+该结果不覆盖本片实现或设备验收。根侧保持停止 CLI401，不据此重复运行已过 CI。
 
 ## 真实缺口与本片范围
 
@@ -173,5 +175,5 @@ v10是完整资料库命名空间，不能与选定记录包的audio-media-v9或
 - 实际 controller/VM队列和两套Sync生产源；UI双倍字体的存待审→单独采纳→纠正再确认→撤回取消/确认→原文高亮，
   失败/恢复/旧闭包/冲突比较与精确一次写入。Compose是JVM模拟，原生编译/DEX不是设备执行。
 
-本轮只做设计独审，无运行代码、schema/codec、依赖、权限或模型变更；无本地测试或新 CI。
-R1整体结果仍以88f9的实际新CI终态为准，设备与完整D00–D09不据此扩大验收。
+原设计提交阶段仅含设计，无运行代码、schema/codec、依赖、权限或模型变更；未运行本地测试或新 CI。
+后续实现与真实测试分别记录，设备与完整D00–D09不据此扩大验收。
