@@ -47,6 +47,9 @@ for label, folder, minimum in targets:
     print(f"PASS: {label} tests={total} actual={cases} failures=0 errors=0 skipped=0")
     additional = {}
     if label == "host queue":
+        additional["com.t1doo.aiyou.records.FocusedAudioPanelLifecycleTest"] = (
+            "retiringFocusedCandidateStopsAcceptedPlaybackWithoutFakingGateReleaseAndAllowsExactB",
+            "lateFocusedARefreshCannotRefillOrBlockBAndOldRetirementCannotClearB")
         additional["com.t1doo.aiyou.ui.AppAccessPreferenceOwnerTest"] = (
             "retiredBlockedEnableCannotLeaveNewOwnerOpenWithDisabledSnapshot",)
         additional["com.t1doo.aiyou.ui.AppAccessPreferenceOperationTest"] = (
@@ -216,7 +219,8 @@ for label, folder, minimum in targets:
             "acceptedMemoriesAreReachableAtDoubleFontAndDisappearOnlyAfterSeparateRevocationConfirmation")
         additional["com.t1doo.aiyou.AudioTranscriptPresentationTest"] = (
             "doubleFontManualCorrectionWithdrawalAndKeywordJumpReachExactAudioWithoutChangingOriginal",
-            "unsavedManualTextAndRetiredSessionDoNotSurviveRestorationAsWriteAuthority")
+            "unsavedManualTextAndRetiredSessionDoNotSurviveRestorationAsWriteAuthority",
+            "recreatedPrivateAudioRouteRetiresRetainedFocusBeforeOpeningOrLocatingAnotherRecord")
         additional["com.t1doo.aiyou.SourcePreferencePresentationTest"] = (
             "doubleFontPendingSeparateAcceptanceCorrectionSourceJumpAndRevokeCancellationReachProductionRoutes",
             "privateFormRestorationAndClosedConfirmationHaveNoRetainedWriteAuthority",

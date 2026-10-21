@@ -342,7 +342,8 @@ fun AIyouApp(
 ) {
     val currentNavigationCallback by rememberUpdatedState(onNavigationGenerationChanged)
     val currentAudioRouteCallback by rememberUpdatedState(onAudioRouteChanged)
-    val navigation = remember { NavigationOwner{currentAudioRouteCallback();currentNavigationCallback(it)} }
+    val currentAttachments by rememberUpdatedState(attachments)
+    val navigation = remember { NavigationOwner{currentAudioRouteCallback();currentAttachments?.state?.value?.takeIf{panel->panel.focusAudio!=null}?.let{panel->currentAttachments?.retireFocusedAudio(panel.sessionId)};currentNavigationCallback(it)} }
     DisposableEffect(audioPlayback) { onDispose { audioPlayback?.stop() } }
     DisposableEffect(navigation) { onDispose { navigation.active = false;currentNavigationCallback(null) } }
     SideEffect {currentNavigationCallback(navigation.generation)}
@@ -466,7 +467,7 @@ fun AIyouApp(
         if (lostInboxSource) {
             navigation.advance()
             (currentRecordsProvider?.invoke() ?: currentLocal)?.audioTranscripts?.let { audioTranscripts?.close(it.session) }
-            if(audioSourceAnchor!=null)attachments?.state?.value?.let{attachments?.close(it.sessionId)}
+            attachments?.state?.value?.takeIf{it.focusAudio!=null}?.let{attachments?.retireFocusedAudio(it.sessionId)}
             audioSourceAnchor=null
             (currentRecordsProvider?.invoke() ?: currentLocal)?.sourcePreferences?.let { sourcePreferences?.close(it.session) }
             (currentRecordsProvider?.invoke() ?: currentLocal)?.sourceMemories?.let { sourceMemories?.close(it.session) }
@@ -563,7 +564,13 @@ fun AIyouApp(
     val imeVisible = imeBottomPx > 0
     val origin = selected
     val readerId = detailEntryId
-    val attachmentPanel = attachments?.state?.collectAsState()?.value
+    val observedAttachmentPanel = attachments?.state?.collectAsState()?.value
+    val attachmentPanel = observedAttachmentPanel?.takeIf{panel->reading&&panel.entryId==detailEntryId&&
+        (panel.focusAudio==null || audioSourceAnchor?.let{anchor->anchor.intent==panel.focusAudio&&local?.currentTranscriptSource(anchor)==true}==true)}
+    LaunchedEffect(observedAttachmentPanel?.sessionId,reading,detailEntryId,audioSourceAnchor,local){
+        val panel=observedAttachmentPanel
+        if(panel?.focusAudio!=null && (attachmentPanel?.sessionId!=panel.sessionId || local?.let{panel.hasRecordAccess(it)}!=true))attachments?.retireFocusedAudio(panel.sessionId)
+    }
     val editing = if (reading) local?.originalEdit?.takeIf { it.entryId == readerId } else null
     val history = if (reading) local?.originalHistory?.takeIf { it.entryId == readerId } else null
     val visibleAiSession = local?.ai?.takeIf { reading && editing == null && history == null &&
@@ -1011,7 +1018,9 @@ fun AIyouApp(
                 onRetrySave = { attachments.retrySave(panel.sessionId) }, onView = { attachments.view(panel.sessionId, it) },
                 onClosePicture = { attachments.closePicture(panel.sessionId) }, modifier = modifier,
                 onRetryRecords = if (local.ready && local.error != null && !local.opening) retryReading else null,
-                onMetadataChoice = { attachments.setJpegMetadataChoice(panel.sessionId, it) }, showPictureClose = false,audio=audioPlayback,transcripts=audioTranscripts)
+                onMetadataChoice = { attachments.setJpegMetadataChoice(panel.sessionId, it) }, showPictureClose = false,audio=audioPlayback,transcripts=audioTranscripts,
+                canUse={ownsNavigation()&&reading&&detailEntryId==panel.entryId&&attachments.state.value?.let{live->live.sessionId==panel.sessionId&&live.entryId==detailEntryId&&live.revision==panel.revision&&!live.unavailable&&currentLocal?.let{live.hasRecordAccess(it)}==true&&
+                    (live.focusAudio==null||audioSourceAnchor?.let{it.intent==live.focusAudio&&currentLocal?.currentTranscriptSource(it)==true}==true)}==true})
         } else if (history != null && local != null) {
             OriginalHistoryScreen(history, local, historyList, selectHistory, backHistory, retryHistory,
                 retryReading, copyHistory, canCopyHistory, modifier, editHistory, confirmHistoryReplacement, cancelHistoryReplacement,

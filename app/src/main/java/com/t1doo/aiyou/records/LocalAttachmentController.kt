@@ -99,6 +99,19 @@ class LocalAttachmentController(
         if (mutable.compareAndSet(null, panel)) refresh(panel.sessionId)
     }
 
+    /** Lost private proof retires the real candidate, including an in-flight read. Playback
+     * stop/close retains its existing resource ACK gate; this never fakes a native release. */
+    fun retireFocusedAudio(sessionId:Long) {
+        while(true) {
+            val panel=mutable.value ?: return
+            if(panel.sessionId!=sessionId || panel.focusAudio==null)return
+            if(mutable.compareAndSet(panel,null)) {
+                onPanelClose()
+                enqueue {discard(sessionId)}
+                return
+            }
+        }
+    }
     fun close(sessionId: Long) {
         val panel = mutable.value ?: return
         if (panel.sessionId != sessionId || panel.saving) return
@@ -130,7 +143,7 @@ class LocalAttachmentController(
     fun select(sessionId: Long, failedId: String? = null) { sourceUi { selectSourceOwned(sessionId,failedId) } }
     private fun selectSourceOwned(sessionId: Long, failedId: String? = null) {
         val panel = mutable.value ?: return
-        if (panel.readOnly || panel.sessionId != sessionId || panel.busy || panel.selection != null || panel.error != null || panel.unavailable) return
+        if (panel.readOnly || panel.focusAudio!=null || panel.sessionId != sessionId || panel.busy || panel.selection != null || panel.error != null || panel.unavailable) return
         val prior = failedId?.let { id -> panel.items.singleOrNull {
             it.intent.id == id && it.state == AttachmentState.FAILED && it.intent.mediaType in IMAGE_TYPES
         }?.intent ?: return }
@@ -142,13 +155,13 @@ class LocalAttachmentController(
     fun setJpegMetadataChoice(sessionId: Long, retain: Boolean) { sourceUi { setJpegMetadataChoiceSourceOwned(sessionId,retain) } }
     private fun setJpegMetadataChoiceSourceOwned(sessionId: Long, retain: Boolean) {
         val panel = mutable.value ?: return
-        if (panel.sessionId != sessionId || panel.readOnly || panel.busy || panel.selection != null || panel.error != null || panel.unavailable) return
+        if (panel.sessionId != sessionId || panel.readOnly || panel.focusAudio!=null || panel.busy || panel.selection != null || panel.error != null || panel.unavailable) return
         update(sessionId) { it.copy(retainJpegMetadata = retain) }
     }
 
     fun claimPicker(requestId: Long): Boolean {
         val panel = mutable.value ?: return false
-        if (panel.readOnly) return false
+        if (panel.readOnly || panel.focusAudio!=null) return false
         val selected = panel.selection ?: return false
         if (selected.requestId != requestId || selected.phase != AttachmentImportPhase.PICKING || selected.launched) return false
         return mutable.compareAndSet(panel, panel.copy(selection = selected.copy(launched = true)))
@@ -157,7 +170,7 @@ class LocalAttachmentController(
     fun pickerFailed(requestId: Long) { sourceUi { pickerFailedSourceOwned(requestId) } }
     private fun pickerFailedSourceOwned(requestId: Long) {
         val panel = mutable.value ?: return
-        if (panel.readOnly) return
+        if (panel.readOnly || panel.focusAudio!=null) return
         if (panel.selection?.requestId == requestId) failed(panel.sessionId, IllegalStateException(),
             "无法打开图片选择器。原文与附件已保留，请重新选择。", requestId)
     }
@@ -166,7 +179,7 @@ class LocalAttachmentController(
     private fun selectedSourceOwned(requestId: Long, source: SelectedImageSource?) {
         val panel = mutable.value ?: return
         val selected = panel.selection ?: return
-        if (panel.readOnly) return
+        if (panel.readOnly || panel.focusAudio!=null) return
         if (selected.requestId != requestId || selected.phase != AttachmentImportPhase.PICKING) return
         if (source == null) { cancel(panel.sessionId); return }
         if (!mutable.compareAndSet(panel, panel.copy(selection = selected.copy(phase = AttachmentImportPhase.PREPARING)))) return
@@ -205,7 +218,7 @@ class LocalAttachmentController(
     fun cancel(sessionId: Long) { sourceUi { cancelSourceOwned(sessionId) } }
     private fun cancelSourceOwned(sessionId: Long) {
         val panel = mutable.value ?: return
-        if (panel.readOnly || panel.sessionId != sessionId || panel.saving) return
+        if (panel.readOnly || panel.focusAudio!=null || panel.sessionId != sessionId || panel.saving) return
         update(sessionId) { it.copy(selection = null, error = null, notice = "未继续添加图片，原文与已有附件已保留。") }
         enqueue { discard(sessionId) }
         refresh(sessionId)
@@ -215,7 +228,7 @@ class LocalAttachmentController(
     private fun retrySaveSourceOwned(sessionId: Long) {
         val panel = mutable.value ?: return
         val selected = panel.selection ?: return
-        if (panel.readOnly || panel.sessionId != sessionId || selected.phase != AttachmentImportPhase.FAILED || !selected.retryable || panel.unavailable) return
+        if (panel.readOnly || panel.focusAudio!=null || panel.sessionId != sessionId || selected.phase != AttachmentImportPhase.FAILED || !selected.retryable || panel.unavailable) return
         enqueue { repository ->
             if (!owns(sessionId, selected.requestId)) return@enqueue
             if (prepared?.requestId == selected.requestId) commit(repository, sessionId, selected.requestId)
@@ -230,7 +243,7 @@ class LocalAttachmentController(
         val input = prepared?.takeIf { it.sessionId == sessionId && it.requestId == requestId } ?: return
         val panel = mutable.value ?: return
         val selected = panel.selection ?: return
-        if (panel.readOnly) return
+        if (panel.readOnly || panel.focusAudio!=null) return
         if (!owns(sessionId, requestId)) return
         try {
             current(repository, panel)
@@ -270,6 +283,7 @@ class LocalAttachmentController(
     fun view(sessionId: Long, id: String) { sourceUi { viewSourceOwned(sessionId,id) } }
     private fun viewSourceOwned(sessionId: Long, id: String) {
         val panel = mutable.value ?: return
+        if(panel.focusAudio!=null)return
         if (panel.sessionId != sessionId || panel.busy || panel.selection != null || panel.unavailable) return
         val item = panel.items.singleOrNull { it.intent.id == id && it.state == AttachmentState.READY && it.intent.mediaType in IMAGE_TYPES } ?: return
         update(sessionId) { it.copy(readingId = id, picture = null, error = null) }

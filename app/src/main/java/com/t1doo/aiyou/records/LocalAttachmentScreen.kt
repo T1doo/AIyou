@@ -103,6 +103,7 @@ fun LocalAttachmentScreen(
     showPictureClose: Boolean = true,
     audio:OriginalAudioController?=null,
     transcripts:AudioTranscriptController?=null,
+    canUse:()->Boolean={true},
 ) {
     val playback=audio?.state?.collectAsState()?.value ?: OriginalAudioUi()
     // The list remains owned by this exact panel while the viewer replaces its composition.
@@ -190,10 +191,10 @@ fun LocalAttachmentScreen(
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("查看图片") }
                         } else if(item.state==AttachmentState.READY && item.intent.mediaType=="audio/wav" && (audio!=null || transcripts!=null)) {
                             Text("原音 · 原文版本 ${panel.revision}",style=MaterialTheme.typography.bodySmall)
-                            TextButton(onClick={audio?.playAttachment(panel.sessionId,item.intent.id)},
+                            TextButton(onClick={if(canUse())audio?.playAttachment(panel.sessionId,item.intent.id)},
                                 enabled=audio!=null && !playback.busy && !panel.busy && panel.selection==null && !panel.unavailable && panel.error==null,
                                 modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("attachment-audio-play:"+item.intent.id)) { Text("播放原音") }
-                            if(!panel.readOnly && transcripts!=null)TextButton(onClick={transcripts.open(item.intent)},enabled=!playback.busy && !panel.busy && panel.selection==null && !panel.unavailable && panel.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("attachment-transcript:"+item.intent.id)){Text("人工补转写／纠正")}
+                            if(!panel.readOnly && transcripts!=null)TextButton(onClick={if(canUse())transcripts.open(item.intent)},enabled=!playback.busy && !panel.busy && panel.selection==null && !panel.unavailable && panel.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("attachment-transcript:"+item.intent.id)){Text("人工补转写／纠正")}
                         } else if (!panel.readOnly && item.state == AttachmentState.FAILED && item.intent.mediaType in LocalAttachmentController.IMAGE_TYPES) {
                             TextButton(onClick = { onSelect(item.intent.id) }, enabled = !panel.busy && panel.selection == null && !panel.unavailable && panel.error == null,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("重新选择同一图片") }

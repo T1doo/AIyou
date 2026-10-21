@@ -69,7 +69,9 @@ internal class SqlAudioTranscriptRepository(private val database:RecordsSqlDatab
         PreferenceKeywords.validate(keyword)
         val initial=database.transaction{sql->val rows=live(sql);rows.map{it.second.anchor} to rows.map{it.first.id+":"+it.first.version+":"+hash(it.first.bytes)}}
         val anchors=initial.first
-        if(anchors.sumOf{it.intent.byteSize}>64L*1024*1024)throw AudioTranscriptLimit()
+        // One-clip batches: live() admits at most 128 canonical WAVs, each <= MAX_WAV_BYTES.
+        // preview() authenticates and wipes each buffer before the next read. The independent
+        // full-backup media bound must not shrink this repository's legal saved-data domain.
         for(a in anchors)if(preview(a.intent)!=a)throw AudioTranscriptConflict()
         database.transaction{page(it,keyword,cursor).also{p->if(p.signatures!=initial.second)throw AudioTranscriptConflict()}}
     }
