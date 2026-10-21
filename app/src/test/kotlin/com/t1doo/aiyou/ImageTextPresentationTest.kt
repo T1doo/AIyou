@@ -104,7 +104,7 @@ class ImageTextPresentationTest {
         assertEquals(i.id,attachments.state.value!!.pictureId);compose.onNodeWithTag("attachment-picture").assertIsDisplayed()
     }
     private fun form(i:AttachmentIntent){compose.onNodeWithTag("image-text-open:"+i.id).assertIsDisplayed().performClick();drain()}
-    private fun extract(){click("image-text-extract");drain();compose.onNodeWithTag("image-text-origin").performScrollTo().assertTextContains("非真实 OCR");assertTrue(lastInput!!.all{it==0.toByte()})}
+    private fun extract(){click("image-text-extract");drain();compose.onNodeWithTag("image-text-origin").performScrollTo().assertTextEquals("合成端口测试结果 · 非真实 OCR");assertTrue(lastInput!!.all{it==0.toByte()})}
     private fun backToSearch(){
         click("image-text-close")
         if(compose.onAllNodesWithText("返回附件列表").fetchSemanticsNodes().isNotEmpty()){compose.onNodeWithText("返回附件列表").assertIsDisplayed().performClick();compose.waitForIdle()}
@@ -116,9 +116,9 @@ class ImageTextPresentationTest {
     @Test fun unavailableModelAndAiNoneNeverInferCreateManualReplacementOrChangeOriginal(){
         compose.setContent{Screen()};record(entry);viewImage(intent);form(intent)
         compose.onNodeWithTag("image-text-value").assertDoesNotExist();click("image-text-extract")
-        compose.onNodeWithTag("image-text-error").performScrollTo().assertTextContains("未运行 OCR");assertEquals(0,engineCalls);assertEquals(0,writes)
+        compose.onNodeWithTag("image-text-error").performScrollTo().assertTextEquals("当前未安装可用的本地中文文字提取能力，原图已保留；未运行 OCR，也未生成文字。");assertEquals(0,engineCalls);assertEquals(0,writes)
         click("image-text-close");compose.runOnIdle{state.value=state.value.copy(entries=listOf(entry.copy(policy=ProcessingPolicy.AI_NONE),entryB));engineEnabled=true};form(intent)
-        click("image-text-extract");compose.onNodeWithTag("image-text-error").performScrollTo().assertTextContains("不使用 AI")
+        click("image-text-extract");compose.onNodeWithTag("image-text-error").performScrollTo().assertTextEquals("此记录设置为不使用 AI。请先明确改为仅本机处理，再主动提取；当前未运行 OCR。")
         assertEquals(0,engineCalls);assertTrue(saved.isEmpty());assertEquals(0,writes);assertArrayEquals(bytes,runBlocking{media.read(intent.id)})
     }
     @Test fun doubleFontControlledExtractionCorrectionKeywordJumpAndConfirmedDeletionReachExactOriginal(){
