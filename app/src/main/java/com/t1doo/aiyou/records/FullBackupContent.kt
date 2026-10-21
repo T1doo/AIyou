@@ -17,7 +17,7 @@ internal fun FullBackupContent(ui:RecordPackageUiState,controller:RecordPackageC
     clearPasswords:()->Unit,modifier:Modifier) {
     LazyColumn(modifier.fillMaxSize().padding(16.dp).testTag("full-backup"),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item { Text("完整资料库备份",style=MaterialTheme.typography.headlineSmall)
-            Text("包含全部记录与回收站、完整修订和原图、收藏、手工人物／标签／事件日期、正式待办及提案、手工记忆及候选确认历史、捕获草稿和已保留编辑草稿、完成回执与删除证明。未保存的表单输入不在资料库中。")
+            Text("包含全部记录与回收站、完整修订和原图、收藏、手工人物／标签／事件日期、正式待办及提案、手工记忆及候选确认历史、原音及人工转写版本、捕获草稿和已保留编辑草稿、完成回执与删除证明。未保存的表单输入不在资料库中。")
             Text("不包含模型结果、搜索索引、联网授权、任何密钥、设备锁及显示偏好；不是设备镜像。恢复后保持本机处理，提醒意图保留为已撤销，须重新确认。")
             Text("上限：256 条记录、4096 个修订、256 张 JPEG/PNG 原图；单图16 MiB、原图共64 MiB、资料清单16 MiB，任务／提案与记忆／确认各4096行。超限、损坏或未完成操作会整体拒绝。")
             Text("仅恢复到严格空资料库，保留原身份、版本和回收站状态。已有资料、删除证明或未保存输入会阻止导入；请先保全现有内容。本入口不提供覆盖和清库。")

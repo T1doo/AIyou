@@ -51,7 +51,7 @@ fun FactRecapScreen(local: LocalRecordUiState,controller: FactRecapController,li
             item("totals") { Text("${s.range.firstDay} 至 ${s.range.endDay} 前 · ${s.range.zone}")
                 Text("${s.recordCount} 条记录 · ${s.imageCount} 张图片来源",modifier=Modifier.testTag("recap-totals"))
                 val audioCount=s.cards.sumOf { it.audios.size }
-                if(audioCount>0) Text("${audioCount} 段原音来源；尚未转写，不计入图片数。")
+                if(audioCount>0) Text("${audioCount} 段原音来源；人工转写另行查看，不计入图片数。")
                 Text("图片数来自已保存的附件清单，不代表画面内容；打开原图时另行认证文件。")
                 val tags=s.cards.flatMap { it.tags.names }.groupingBy { it }.eachCount().toSortedMap()
                 Text(if(tags.isEmpty()) "此范围没有手工标签。" else "手工标签（记录数）："+tags.entries.joinToString("；"){"${it.key} · ${it.value}"})
@@ -65,7 +65,7 @@ fun FactRecapScreen(local: LocalRecordUiState,controller: FactRecapController,li
                         Column(Modifier.fillMaxWidth()) {
                             Text("记录时间：${Instant.ofEpochMilli(card.capturedAtMillis).atZone(ZoneId.of(s.range.zone))} · 原文 v${card.source.revision}")
                             Text(if(card.excerpt.isEmpty()) {
-                                if(card.audios.isNotEmpty()) "附件记录：没有文字正文；原音尚未转写。" else "图片记录：没有文字正文。"
+                                if(card.audios.isNotEmpty()) "附件记录：没有文字正文；原音与人工转写分开查看。" else "图片记录：没有文字正文。"
                             } else card.excerpt,modifier=Modifier.testTag("recap-excerpt:"+card.source.sourceId))
                             if(card.hasMore) Text("以上为原文开头摘录，全文可在原记录阅读。")
                             Text("手工标签："+card.tags.names.takeIf { it.isNotEmpty() }?.joinToString("、").orEmpty().ifEmpty { "无" })

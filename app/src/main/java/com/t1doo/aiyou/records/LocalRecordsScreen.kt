@@ -105,6 +105,7 @@ fun LocalRecordsScreen(
     onOpenRecycleBin: (() -> Unit)? = null,
     onBeginRecordPackage: (() -> Unit)? = null,
     onOpenFactRecap: (() -> Unit)? = null,
+    onOpenTranscripts:(()->Unit)?=null,
     onOpenPreferences: (() -> Unit)? = null,
     onOpenMemoryInbox: (() -> Unit)? = null,
     onOpenAcceptedMemories: (() -> Unit)? = null,
@@ -278,9 +279,11 @@ fun LocalRecordsScreen(
                         (onOpenRecycleBin != null && local.supportsRecycleBin) ||
                         (onBeginRecordPackage != null && local.supportsRecordPackages) ||
                         (onOpenFactRecap != null && local.supportsFactRecaps) ||
+                        (onOpenTranscripts != null && local.supportsAudioTranscripts) ||
                         (onOpenPreferences != null && local.supportsSourcePreferences) ||
                         ((onOpenMemoryInbox != null || onOpenAcceptedMemories != null) && local.supportsMemoryInbox))) {
                         Column(Modifier.fillMaxWidth()) {
+                            if(onOpenTranscripts!=null && local.supportsAudioTranscripts)OutlinedButton(onOpenTranscripts,enabled=local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("transcripts-open")){Text("找回人工转写与原音")}
                             if (onOpenPreferences != null && local.supportsSourcePreferences) OutlinedButton(onOpenPreferences,
                                 enabled = local.ready && !local.opening && local.error == null,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("preferences-open")) { Text("普通偏好自述与人工审阅") }

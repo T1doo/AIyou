@@ -50,7 +50,7 @@ fun RecordPackageScreen(local: LocalRecordUiState, ui: RecordPackageUiState, con
         verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         item("scope") {
             Text("加密原文包", style = MaterialTheme.typography.headlineSmall)
-            Text("默认包含选定的当前原文、手工标签、手工人物称呼、手填事件日期及 IANA 时区和当前版本已完整保存的 JPEG/PNG 原图；可另选这些记录的完整历史、已保留的记录编辑草稿，或本机全部正式待办与待办建议草稿。正在输入但未保留的内容、AI 结果及所有密钥不包含在内；这不是整库备份，普通偏好自述仅包含在完整资料库备份中。")
+            Text("默认包含选定的当前原文、手工标签、手工人物称呼、手填事件日期及 IANA 时区和当前版本已完整保存的 JPEG/PNG 原图；可另选这些记录的完整历史、已保留的记录编辑草稿，或本机全部正式待办与待办建议草稿。正在输入但未保留的内容、AI 结果及所有密钥不包含在内；这不是整库备份，普通偏好自述和人工转写仅包含在完整资料库备份中。")
             Text("事件日期只迁移当前值，不迁移日期修改历史或操作回执；未知与已清除在新副本中都为未补记。")
             Text("恢复会创建新副本，不覆盖旧记录；初始设置为不参与 AI。同一包重复恢复只核对第一次回执。")
             Text("一次最多 20 条记录、20 张原图；单图最多 16 MiB，图片合计最多 64 MiB。任务和待办建议草稿各最多 256 条；记录编辑草稿每条至多一份、共最多20份。超限整体失败，不会少带。旧 v1–v6 包仍可恢复；缺少事件日期时保持未知。")

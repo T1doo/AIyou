@@ -33,6 +33,7 @@ def input_fingerprint():
         "app/src/test/kotlin/com/t1doo/aiyou/LocalCandidatePresentationTest.kt",
         "app/src/test/kotlin/com/t1doo/aiyou/SourceMemoryInboxPresentationTest.kt",
         "app/src/test/kotlin/com/t1doo/aiyou/SourcePreferencePresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/AudioTranscriptPresentationTest.kt",
         "app/src/test/kotlin/com/t1doo/aiyou/RecordConnectionReviewPresentationTest.kt"))
     inputs.extend((root / "schemas").glob("*.json"))
     inputs.append(root / "scripts/verify-local-candidate-schema.py")

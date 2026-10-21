@@ -78,6 +78,8 @@ data class LocalRecordUiState(
     val supportsCandidates: Boolean = false,
     val supportsSourceTags: Boolean = false,
     val sourceTags: SourceTagUiState? = null,
+    val supportsAudioTranscripts:Boolean=false,
+    val audioTranscripts:AudioTranscriptUi?=null,
     val supportsSourcePreferences: Boolean = false,
     val sourcePreferences: PreferenceUiState? = null,
     val supportsSourceMemories: Boolean = false,
@@ -198,7 +200,7 @@ class LocalRecordsViewModel internal constructor(
         {repository?.captureRecords?.mutationGate},{action -> submit(Command.Audio(action)).isSuccess},audioOutput,{
             val local=mutableState.value
             !editsDisposed && audioBlockedPackageCommands.get()==0 && local.recordPackage==null && local.recycleBin==null &&
-                local.originalEdit==null && local.localProcessing==null && local.ai==null &&
+                local.audioTranscripts==null && local.originalEdit==null && local.localProcessing==null && local.ai==null &&
                 local.originalExport==null && local.manualTagEditor==null && local.manualPeopleEditor==null && local.eventDateEditor==null
         })
     fun audioForeground(value:Boolean) { audioPlayback.foreground(value);if(value)mixedCapture.audioCapture.resumeFile() }
@@ -231,7 +233,7 @@ class LocalRecordsViewModel internal constructor(
         if (editsDisposed || appAccessCommands.get() != 0 || !local.ready || local.opening || local.error != null ||
             local.saving || local.savePending || local.captureDiscard != null || local.localIndexBusy ||
             local.originalEdit != null || local.originalHistory != null || attachments.state.value != null ||
-            local.ai != null || local.sourceTask != null || local.sourceTags != null || local.sourceMemories != null || local.memoryInbox != null || local.sourcePreferences != null ||
+            local.ai != null || local.sourceTask != null || local.sourceTags != null || local.sourceMemories != null || local.memoryInbox != null || local.sourcePreferences != null || local.audioTranscripts != null ||
             local.localProcessing != null || local.factRecap != null || local.candidates != null ||
             local.originalExport != null || local.recordPackage != null || local.recycleBin != null ||
             local.manualTagEditor != null || local.manualPeopleEditor != null || local.eventDateEditor != null ||
@@ -295,6 +297,7 @@ class LocalRecordsViewModel internal constructor(
         { action -> submit(Command.MemoryInbox(action)).isSuccess })
     val sourceMemories = SourceMemoryController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock = clock)
+    val audioTranscripts=AudioTranscriptController({mutableState.value},{change->update(change)},{action->submit(Command.LocalCandidates(action)).isSuccess},clock,::sourceUi)
     val sourcePreferences = SourcePreferenceController({ mutableState.value }, { change -> update(change) },
         { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock)
     val exports = OriginalExportController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -512,7 +515,7 @@ class LocalRecordsViewModel internal constructor(
                 reminders.dispose()
                 candidates.dispose()
                 sourceTags.dispose()
-                sourceMemories.dispose(); memoryInbox.dispose(); sourcePreferences.dispose()
+                sourceMemories.dispose(); memoryInbox.dispose(); sourcePreferences.dispose();audioTranscripts.dispose()
                 exports.dispose()
                 recordPackages.dispose()
                 recycleBin.dispose()
@@ -563,7 +566,9 @@ class LocalRecordsViewModel internal constructor(
                     com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == panel.sourceHash })) proposed.copy(localProcessing = null) else proposed
             val safe = if (scoped.supportsLocalProcessing && !scoped.localProcessingAvailable) scoped.copy(
                 candidates = null, sourceTags = null, sourceMemories = null, sourcePreferences = null, ai = null, factRecap = null) else scoped
-            val candidate = reconcilePreferences(reconcileMemoryInbox(previous, reconcileFactRecap(previous,safe)))
+            val preference = reconcilePreferences(reconcileMemoryInbox(previous, reconcileFactRecap(previous,safe)))
+            val transcript=preference.audioTranscripts
+            val candidate=if(transcript!=null&&(editsDisposed||!preference.canRetainTranscripts(transcript)))preference.copy(audioTranscripts=null)else preference
             val transformed = if (candidate.supportsFavorites && candidate.favoritesAvailable &&
                 candidate.entries.any { !candidate.favorites.containsKey(it.id) }) candidate.copy(
                     favoritesAvailable = false, favoritesError = "记录列表已变化，请重新读取收藏状态。") else candidate
@@ -1339,6 +1344,7 @@ class LocalRecordsViewModel internal constructor(
                 supportsMixedCapture = store.captureRecords != null,
                 supportsCandidates = store.localCandidates != null,
                 supportsSourceTags = store.sourceTags != null,
+                supportsAudioTranscripts=store.audioTranscripts!=null,
                 supportsSourcePreferences = store.sourcePreferences != null,
                 supportsSourceMemories = store.sourceMemories != null,
                 supportsMemoryInbox = store.sourceMemories?.inbox != null,

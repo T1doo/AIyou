@@ -41,7 +41,7 @@ data class AttachmentUiState(val sessionId: Long, val entryId: String, val revis
     val selection: AttachmentSelection? = null, val readingId: String? = null,
     val picture: AttachmentPicture? = null, val error: String? = null,
     val notice: String? = null, val unavailable: Boolean = false,
-    val historyOwner: AttachmentHistoryOwner? = null, val retainJpegMetadata: Boolean = true) {
+    val historyOwner: AttachmentHistoryOwner? = null, val retainJpegMetadata: Boolean = true, val focusAudio:AttachmentIntent?=null) {
     val readOnly get() = historyOwner != null
     val saving get() = selection?.phase == AttachmentImportPhase.SAVING
     val busy get() = loading || readingId != null || selection?.phase in
@@ -92,9 +92,10 @@ class LocalAttachmentController(
         openPanel(entryId, revision, owner)
     }
 
-    private fun openPanel(entryId: String, revision: Int, owner: AttachmentHistoryOwner?) {
+    fun openAudio(intent:AttachmentIntent) {sourceUi {if(intent.mediaType=="audio/wav")openPanel(intent.entryId,intent.revision,null,intent)}}
+    private fun openPanel(entryId: String, revision: Int, owner: AttachmentHistoryOwner?,focus:AttachmentIntent?=null) {
         if (disposed || mutable.value != null || revision <= 0) return
-        val panel = AttachmentUiState(ids.incrementAndGet(), entryId, revision, historyOwner = owner)
+        val panel = AttachmentUiState(ids.incrementAndGet(), entryId, revision, historyOwner = owner,focusAudio=focus)
         if (mutable.compareAndSet(null, panel)) refresh(panel.sessionId)
     }
 
@@ -342,6 +343,7 @@ class LocalAttachmentController(
         if (!canUsePanel(panel) || !live(panel.sessionId)) throw RecordConflict()
     }
     private fun verifyRows(panel: AttachmentUiState, rows: List<LocalAttachment>) {
+        panel.focusAudio?.let{expected->if(rows.singleOrNull{it.intent==expected&&it.state==AttachmentState.READY}==null)throw AttachmentIntegrityFailure()}
         if (rows.any { it.intent.entryId != panel.entryId || it.intent.revision != panel.revision } ||
             rows.map { it.intent.id }.distinct().size != rows.size) throw AttachmentIntegrityFailure()
     }

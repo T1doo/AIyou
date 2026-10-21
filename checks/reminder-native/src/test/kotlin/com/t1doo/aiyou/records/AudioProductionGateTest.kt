@@ -113,6 +113,17 @@ class AudioProductionGateTest {
             assertTrue(preferences.preferences(SourceVersion(entry.id,2)).isEmpty())
         }
     }
+    @Test fun actualProductionManualTranscriptUsesSamePlaybackGateAndSourceInvalidation():Unit=runBlocking(Dispatchers.IO){
+        Fixture().use{f->val repo=f.repo;val capture=repo.captureRecords;val base=capture.current();val wave=LocalPcmAudio.encode(shortArrayOf(1,-2,3,-4))
+            val gate=checkNotNull(capture.mutationGate);val reservation=checkNotNull(gate.freeze(base.id));gate.reserve(reservation,base,base.text,0)
+            gate.bindIntent(reservation,AttachmentIntent(uuid(),base.id,1,"audio/wav",hash(wave),wave.size.toLong()));val ready=capture.addAudio(reservation,wave);gate.finish(reservation,ready);capture.save(ready,100,"UTC")
+            val intent=repo.attachments.list(base.id,1).single().intent;val transcripts=repo.audioTranscripts;val anchor=transcripts.preview(intent)
+            val first=transcripts.write(AudioTranscriptWrite(uuid(),anchor,null,"合成人工文字",false,uuid(),101));assertTrue(transcripts.read(anchor)!!.same(first))
+            val pin=checkNotNull(gate.preparePlayback());gate.activatePlayback(pin);val sql=f.sqlSnapshot();val files=f.filesSnapshot()
+            try{assertThrows(AudioTranscriptUnavailable::class.java){runBlocking{transcripts.write(AudioTranscriptWrite(first.id,anchor,first,"播放中禁止修改",false,uuid(),102))}};assertEquals(sql,f.sqlSnapshot());assertEquals(files,f.filesSnapshot())}finally{gate.finishPlayback(pin)}
+            repo.revise(base.id,1,"合成新原文",103);assertTrue(transcripts.search("").items.isEmpty());assertThrows(AudioTranscriptConflict::class.java){runBlocking{transcripts.read(anchor)}}
+        }
+    }
     private class Fixture:AutoCloseable {
         val root=Files.createTempDirectory("aiyou-r1-synthetic-room-").toFile()
         val mediaDir=root.resolve("media")

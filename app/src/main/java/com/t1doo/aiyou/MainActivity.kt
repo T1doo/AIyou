@@ -1,5 +1,7 @@
 package com.t1doo.aiyou
 
+import com.t1doo.aiyou.records.currentTranscriptSource
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -190,7 +192,7 @@ class MainActivity : ComponentActivity() {
                 favorites = records.favorites, eventDates = records.eventDates,
                 candidates = records.candidates,
                 sourceTags = records.sourceTags, people = records.people, modelConnections = records.modelConnections,
-                sourceMemories = records.sourceMemories, memoryInbox = records.memoryInbox, sourcePreferences = records.sourcePreferences,
+                sourceMemories = records.sourceMemories, memoryInbox = records.memoryInbox, sourcePreferences = records.sourcePreferences, audioTranscripts=records.audioTranscripts,
                 sourceTasks = records.sourceTasks,
                 taskProposals = records.taskProposals,
                 reminders = records.reminders,
@@ -208,7 +210,7 @@ class MainActivity : ComponentActivity() {
                     accessIdle && access.retirementReady(id)) })
     }
     override fun onResume() { super.onResume(); packageRecords?.audioForeground(true);packagePicker?.resumed() }
-    override fun onPause() { packageRecords?.audioForeground(false);packageRecords?.state?.value?.sourcePreferences?.let { packageRecords?.sourcePreferences?.close(it.session) };packageRecords?.state?.value?.memoryInbox?.let { packageRecords?.memoryInbox?.close(it.session) }; packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); super.onPause() }
+    override fun onPause() { packageRecords?.audioForeground(false);packageRecords?.state?.value?.sourcePreferences?.let { packageRecords?.sourcePreferences?.close(it.session) };packageRecords?.state?.value?.memoryInbox?.let { packageRecords?.memoryInbox?.close(it.session) }; packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); packageRecords?.state?.value?.audioTranscripts?.let{packageRecords?.audioTranscripts?.close(it.session)}; super.onPause() }
     override fun onSaveInstanceState(outState: Bundle) { packagePicker?.save(outState); super.onSaveInstanceState(outState) }
     override fun onDestroy() {
         reminderClicks.clear()
@@ -280,6 +282,7 @@ fun AIyouApp(
     audioPlayback:com.t1doo.aiyou.records.OriginalAudioController?=null,
     onAudioRouteChanged:()->Unit={},
     factRecaps: com.t1doo.aiyou.records.FactRecapController? = null,
+    audioTranscripts: com.t1doo.aiyou.records.AudioTranscriptController?=null,
     sourcePreferences: com.t1doo.aiyou.records.SourcePreferenceController? = null,
     memoryInbox: com.t1doo.aiyou.records.SourceMemoryInboxController? = null,
     display: UiPreferencesState = UiPreferencesState(),
@@ -455,10 +458,16 @@ fun AIyouApp(
     val browsingPackage = packageUi != null && selected == Destination.MEMORIES && detailEntryId == null && !showSettings && !demo
     val recycleUi = local?.recycleBin
     val browsingRecycle = recycleUi?.browsing == true && selected == Destination.MEMORIES && detailEntryId == null && !showSettings && !demo
-    val lostInboxSource = inboxSourceRoute && detailEntryId != null && searchLocation == null
+    var audioSourceAnchor by remember { mutableStateOf<com.t1doo.aiyou.model.AudioTranscriptSource?>(null) }
+    val lostAudioSource=audioSourceAnchor?.let{local?.currentTranscriptSource(it)!=true}==true
+    val lostInboxSource = inboxSourceRoute && detailEntryId != null && (searchLocation == null && audioSourceAnchor==null || lostAudioSource)
+    LaunchedEffect(inboxSourceRoute,detailEntryId){if(!inboxSourceRoute||detailEntryId!=audioSourceAnchor?.intent?.entryId)audioSourceAnchor=null}
     LaunchedEffect(lostInboxSource) {
         if (lostInboxSource) {
             navigation.advance()
+            (currentRecordsProvider?.invoke() ?: currentLocal)?.audioTranscripts?.let { audioTranscripts?.close(it.session) }
+            if(audioSourceAnchor!=null)attachments?.state?.value?.let{attachments?.close(it.sessionId)}
+            audioSourceAnchor=null
             (currentRecordsProvider?.invoke() ?: currentLocal)?.sourcePreferences?.let { sourcePreferences?.close(it.session) }
             (currentRecordsProvider?.invoke() ?: currentLocal)?.sourceMemories?.let { sourceMemories?.close(it.session) }
             detailEntryId = null; inboxSourceRoute = false
@@ -639,6 +648,20 @@ fun AIyouApp(
                     search.sync(true)
                     searchReturnSource = search.state.value.entries
                 }
+            }
+        }
+    }
+    val transcriptUi=local?.audioTranscripts
+    val transcriptRoute=!demo&&!showSettings&&!recapRoute&&transcriptUi!=null&&local?.let{it.ready&&!it.opening&&it.error==null}==true&&
+        (if(transcriptUi.selected==null)!reading&&selected==Destination.MEMORIES else reading&&detailEntryId==transcriptUi.selected.entryId&&attachmentPanel?.entryId==transcriptUi.selected.entryId&&attachmentPanel?.revision==transcriptUi.selected.revision)
+    LaunchedEffect(transcriptRoute,transcriptUi?.session){if(!transcriptRoute)transcriptUi?.let{audioTranscripts?.close(it.session)}}
+    DisposableEffect(audioTranscripts){onDispose{currentRecords?.invoke()?.audioTranscripts?.let{audioTranscripts?.close(it.session)}}}
+    if(transcriptUi!=null&&audioTranscripts!=null&&transcriptRoute){
+        fun ownsTranscript()=ownsNavigation()&&!showSettings&&!demo&&!recapRoute&&currentLocal?.audioTranscripts?.session==transcriptUi.session
+        com.t1doo.aiyou.records.AudioTranscriptDialog(transcriptUi,audioTranscripts,::ownsTranscript){anchor->
+            val intent=anchor.intent
+            navigation.publish(generation){val entry=currentLocal?.entries?.singleOrNull{it.id==intent.entryId&&it.currentRevision==intent.revision}
+                if(ownsNavigation()&&!showSettings&&!demo&&entry!=null&&currentLocal?.currentTranscriptSource(anchor)==true){navigation.advance();search.pause();readerFromSearch=false;tailReturnRequest=null;searchLocation=null;audioSourceAnchor=anchor;inboxSourceRoute=true;detailEntryId=intent.entryId;attachments?.openAudio(intent)}
             }
         }
     }
@@ -988,7 +1011,7 @@ fun AIyouApp(
                 onRetrySave = { attachments.retrySave(panel.sessionId) }, onView = { attachments.view(panel.sessionId, it) },
                 onClosePicture = { attachments.closePicture(panel.sessionId) }, modifier = modifier,
                 onRetryRecords = if (local.ready && local.error != null && !local.opening) retryReading else null,
-                onMetadataChoice = { attachments.setJpegMetadataChoice(panel.sessionId, it) }, showPictureClose = false,audio=audioPlayback)
+                onMetadataChoice = { attachments.setJpegMetadataChoice(panel.sessionId, it) }, showPictureClose = false,audio=audioPlayback,transcripts=audioTranscripts)
         } else if (history != null && local != null) {
             OriginalHistoryScreen(history, local, historyList, selectHistory, backHistory, retryHistory,
                 retryReading, copyHistory, canCopyHistory, modifier, editHistory, confirmHistoryReplacement, cancelHistoryReplacement,
@@ -1092,6 +1115,7 @@ fun AIyouApp(
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
+                onOpenTranscripts=audioTranscripts?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
                 onOpenPreferences = sourcePreferences?.let { controller -> { if (ownsNavigation() && selected == Destination.MEMORIES &&
                     !reading && !showSettings && !demo) { navigation.advance(); clearSearch(); controller.open() } } },
                 onOpenMemoryInbox = memoryInbox?.let { controller -> { if (ownsNavigation() && selected == Destination.MEMORIES &&
