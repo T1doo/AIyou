@@ -63,7 +63,7 @@ internal fun SourcePreferenceDialog(ui:PreferenceUiState,controller:SourcePrefer
                             Row { listOf(PreferenceReview.PROPOSED,PreferenceReview.ACCEPTED).forEach { section ->
                                 TextButton(onClick={if(canUse())controller.section(ui.session,section)},enabled=editable,modifier=Modifier.heightIn(min=48.dp).testTag("preference-section-"+section.name)) { Text(section.label()) }
                             } }
-                            Text("当前页 ${ui.items.size} 条；空页仍可能有更早内容，不是全库总数。")
+                            if(ui.page!=null)Text("当前页 ${ui.items.size} 条；空页仍可能有更早内容，不是全库总数。",Modifier.testTag("preferences-count"))
                         }
                         if(ui.sourcePage!=null) {
                             val original=ui.sourcePage.preview.original

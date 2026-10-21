@@ -127,6 +127,15 @@ class SourcePreferencePresentationTest {
         click("preference-section-ACCEPTED");drain();assertTrue(state.value.sourcePreferences!!.items.isEmpty())
         assertEquals(listOf(entry),state.value.entries);assertTrue(state.value.tasks.items.isEmpty())
     }
+    @Test fun failedGlobalReadHidesCountAndNeverPresentsAnUnverifiedEmptyPage() {
+        compose.setContent {Screen()}
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("preferences-open"));compose.onNodeWithTag("preferences-open").performClick();drain()
+        compose.onNodeWithTag("preferences-count").performScrollTo().assertIsDisplayed()
+        compose.runOnIdle {failRead=true}
+        compose.onNodeWithText("仅刷新实际状态，不重复原请求").performScrollTo().performClick();drain()
+        compose.onNodeWithTag("preferences-error").performScrollTo().assertIsDisplayed();compose.onNodeWithTag("preferences-count").assertDoesNotExist()
+        assertEquals(0,writes);assertNull(state.value.sourcePreferences!!.notice)
+    }
     @Test fun privateFormRestorationAndClosedConfirmationHaveNoRetainedWriteAuthority() {
         val restoration=StateRestorationTester(compose);restoration.setContent {Screen()};reader();open();form();click("preference-save")
         val old=state.value.sourcePreferences!!;val confirmation=old.confirmation!!

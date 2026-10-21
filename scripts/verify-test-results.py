@@ -216,7 +216,8 @@ for label, folder, minimum in targets:
             "acceptedMemoriesAreReachableAtDoubleFontAndDisappearOnlyAfterSeparateRevocationConfirmation")
         additional["com.t1doo.aiyou.SourcePreferencePresentationTest"] = (
             "doubleFontPendingSeparateAcceptanceCorrectionSourceJumpAndRevokeCancellationReachProductionRoutes",
-            "privateFormRestorationAndClosedConfirmationHaveNoRetainedWriteAuthority")
+            "privateFormRestorationAndClosedConfirmationHaveNoRetainedWriteAuthority",
+            "failedGlobalReadHidesCountAndNeverPresentsAnUnverifiedEmptyPage")
         additional["com.t1doo.aiyou.SourceMemoryPresentationTest"] = (
             "explicitPendingAndAcceptanceAreReachableAtDoubleFontAndSourceJumpPreservesOriginal",
             "rejectionCorrectionHistoryAndRevocationSurviveReopeningWithoutAutomaticAcceptance",
