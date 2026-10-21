@@ -46,7 +46,7 @@ internal fun LocalProcessingDialog(ui: LocalProcessingUiState, entry: StoredEntr
                     Text("这条记录的处理范围", style = MaterialTheme.typography.titleLarge)
                     Text("原文版本 ${ui.source.revision} · ${entry.captureTimeZone} · ${java.time.Instant.ofEpochMilli(entry.capturedAtMillis)}")
                     val excerpt = entry.originalText.let { it.substring(0, it.offsetByCodePoints(0, minOf(160, it.codePointCount(0, it.length)))) }
-                    Text(excerpt.ifBlank { "图片记录 · 无文字正文" }, modifier = Modifier.testTag("local-processing-source"))
+                    Text(excerpt.ifBlank { "附件记录 · 无文字正文" }, modifier = Modifier.testTag("local-processing-source"))
                     Text("仅影响这条记录。原文、附件、收藏、手工标签及人工待办保留。切换会清除相关 AI 派生内容并使旧候选失效。")
                     Text("本操作不发送记录，也不会自动生成或恢复旧结论。已另存的文件和服务商数据无法由此撤回。")
                     if (ui.busy) Text("正在核对本机处理范围…")
