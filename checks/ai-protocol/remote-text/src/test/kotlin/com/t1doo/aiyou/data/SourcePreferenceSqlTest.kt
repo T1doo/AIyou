@@ -169,6 +169,23 @@ class SourcePreferenceSqlTest {
             assertEquals(listOf("excerpt"),f.base.store.batches(f.source).map {it.id})
         } finally {memories.wipeKey()}
     }
+    @Test fun crossSourceReplacementSurvivesOldSourceErasureButCannotReplayItsLostReceipt():Unit=Fixture().use { f ->
+        val a=f.store.mutate(change(f.store.create(f.request()),PreferenceAction.ACCEPT))
+        val other=SourceVersion("synthetic-second-source",1);val text="合成本人自述：我平时更喜欢淡茶。"
+        f.base.db.transaction {sql ->
+            sql.execute("INSERT INTO entries(id,currentRevision,capturedAtMillis,captureTimeZone,privacyPolicy) VALUES(?,1,6,'UTC','LOCAL_ONLY')",listOf(other.sourceId))
+            sql.execute("INSERT INTO entry_revisions VALUES(?,1,?,?,6)",listOf(other.sourceId,text,OriginalExports.hash(text)))
+        }
+        val p=f.store.preview(other)
+        val b=f.store.create(PreferenceCreate(id(),p,a.topicId!!,a.topicLabel!!,PreferenceContent(SourceMemoryRules.reference(p,"我平时更喜欢淡茶")),true,id(),60,a))
+        val replace=change(b,PreferenceAction.ACCEPT,a);val accepted=f.store.mutate(replace)
+        f.base.revise();assertEquals(accepted.id,f.store.capture(PreferenceReview.ACCEPTED).items.single().id)
+        assertThrows(PreferenceConflict::class.java) {f.store.mutate(replace)}
+        var unavailable=false;f.store.resolveEndpoint(accepted,accepted.review!!.predecessor!!) {unavailable=it==null};assertTrue(unavailable)
+        f.base.db.write("DELETE FROM local_candidate_batches WHERE entryId='source'")
+        assertTrue(f.store.preferences(other).single().same(accepted))
+        f.store.mutate(change(accepted,PreferenceAction.REVOKE));assertTrue(f.store.capture(PreferenceReview.ACCEPTED).items.isEmpty())
+    }
     private class Fixture:AutoCloseable {
         val base=LocalCandidateFixture();val source=base.source
         var store=SqlSourcePreferenceRepository(base.gateway,LocalCandidateFixture.KEY)
