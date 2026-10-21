@@ -27,6 +27,7 @@ class ReminderFrontLifecycleTest {
             val bridge=ReminderOperationBridge();val reads=AtomicInteger();val factories=AtomicInteger()
             val owners=ReminderProcessOwner(bridge,{true},{reads.incrementAndGet();true},{f.open()},{driver(f)},{f.now}){f.fingerprint}
             val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default);lateinit var port:ReminderVmRuntime
+            val readyEntered=CountDownLatch(1);val allowReady=CountDownLatch(1);val frontReady=CompletableDeferred<Unit>()
             val preferences=object:AppAccessPreferenceStorage {
                 override fun read()=AppAccessPreference(0,false)
                 override fun write(expected:AppAccessPreference,enabled:Boolean):AppAccessPreference=error("No preference write")
@@ -35,10 +36,18 @@ class ReminderFrontLifecycleTest {
                 val prepared=owners.prepareFront{factories.incrementAndGet();f.foregroundRecords()}
                 port=prepared.second;port.attach{false}
             },preferenceOperations=AppAccessPreferenceOperations(),disposedSession=owners::releaseFront,
-                changed={state->when(state.phase){AppAccessPhase.OPENING->owners.frontOpening();AppAccessPhase.OPEN->owners.frontReady(port);AppAccessPhase.LOADING,AppAccessPhase.FAILED->owners.locked(true);else->owners.locked()}})
+                changed={state->when(state.phase){AppAccessPhase.OPENING->owners.frontOpening();AppAccessPhase.OPEN->{
+                    readyEntered.countDown();check(allowReady.await(5,TimeUnit.SECONDS))
+                    owners.frontReady(port);frontReady.complete(Unit)
+                };AppAccessPhase.LOADING,AppAccessPhase.FAILED->owners.locked(true);else->owners.locked()}})
             val entered=CountDownLatch(1);val release=CountDownLatch(1)
             try{
                 withTimeout(5_000){controller.state.first{it.canReadRecords}}
+                assertTrue(withContext(Dispatchers.IO){readyEntered.await(5,TimeUnit.SECONDS)})
+                // OPEN is emitted before changed() completes: record-read readiness is
+                // not an acknowledgement that the reminder owner has reached FRONT.
+                assertNull(owners.capture())
+                allowReady.countDown();withTimeout(5_000){frontReady.await()}
                 val old=requireNotNull(owners.capture())
                 controller.dispose();assertFalse(old.active);assertNull(owners.capture())
                 val closing=async(Dispatchers.Default){port.closeStore{entered.countDown();check(release.await(5,TimeUnit.SECONDS));f.stores.close()}}
@@ -50,7 +59,7 @@ class ReminderFrontLifecycleTest {
                 owners.execute(fresh);assertEquals(1,reads.get());assertEquals(1,f.opened.get());assertEquals(1,factories.get())
                 owners.forget(fresh);owners.closeCold()
                 assertNull(owners.find(old.nonce,old.id))
-            }finally{release.countDown();controller.dispose();scope.cancel();bridge.close()}
+            }finally{allowReady.countDown();release.countDown();controller.dispose();scope.cancel();bridge.close()}
         }
     }
     @Test fun protectedUnknownExplicitlyLockedAndFailedClosureNeverColdOpen():Unit=runBlocking {
