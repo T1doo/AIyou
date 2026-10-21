@@ -53,7 +53,7 @@ class OriginalAudioController internal constructor(
     fun playDraft():Boolean = start(null)
     fun playAttachment(session:Long,id:String):Boolean {
         val p=panel() ?: return false
-        if(p.sessionId!=session || p.focusAudio?.id?.let{it!=id}==true || !p.hasRecordAccess(current()) || p.busy || p.selection!=null || p.error!=null || p.unavailable ||
+        if(p.sessionId!=session || p.focusedIntent?.id?.let{it!=id}==true || !p.hasRecordAccess(current()) || p.busy || p.selection!=null || p.error!=null || p.unavailable ||
             p.items.none { it.intent.id==id && it.intent.mediaType=="audio/wav" && it.state==AttachmentState.READY })return false
         return start(p,id)
     }

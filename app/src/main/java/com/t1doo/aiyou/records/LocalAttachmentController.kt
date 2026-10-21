@@ -41,7 +41,9 @@ data class AttachmentUiState(val sessionId: Long, val entryId: String, val revis
     val selection: AttachmentSelection? = null, val readingId: String? = null,
     val picture: AttachmentPicture? = null, val error: String? = null,
     val notice: String? = null, val unavailable: Boolean = false,
-    val historyOwner: AttachmentHistoryOwner? = null, val retainJpegMetadata: Boolean = true, val focusAudio:AttachmentIntent?=null) {
+    val historyOwner: AttachmentHistoryOwner? = null, val retainJpegMetadata: Boolean = true, val focusAudio:AttachmentIntent?=null, val focusImage:AttachmentIntent?=null,val pictureId:String?=null) {
+    init { require(focusAudio==null||focusImage==null) }
+    val focusedIntent get()=focusAudio?:focusImage
     val readOnly get() = historyOwner != null
     val saving get() = selection?.phase == AttachmentImportPhase.SAVING
     val busy get() = loading || readingId != null || selection?.phase in
@@ -93,18 +95,22 @@ class LocalAttachmentController(
     }
 
     fun openAudio(intent:AttachmentIntent) {sourceUi {if(intent.mediaType=="audio/wav")openPanel(intent.entryId,intent.revision,null,intent)}}
-    private fun openPanel(entryId: String, revision: Int, owner: AttachmentHistoryOwner?,focus:AttachmentIntent?=null) {
+    private fun openPanel(entryId: String, revision: Int, owner: AttachmentHistoryOwner?,focus:AttachmentIntent?=null,image:AttachmentIntent?=null) {
         if (disposed || mutable.value != null || revision <= 0) return
-        val panel = AttachmentUiState(ids.incrementAndGet(), entryId, revision, historyOwner = owner,focusAudio=focus)
+        val panel = AttachmentUiState(ids.incrementAndGet(), entryId, revision, historyOwner = owner,focusAudio=focus,focusImage=image)
         if (mutable.compareAndSet(null, panel)) refresh(panel.sessionId)
     }
 
+    fun openImage(intent:AttachmentIntent) {sourceUi {if(intent.mediaType in IMAGE_TYPES)openPanel(intent.entryId,intent.revision,null,image=intent)}}
+
     /** Lost private proof retires the real candidate, including an in-flight read. Playback
      * stop/close retains its existing resource ACK gate; this never fakes a native release. */
-    fun retireFocusedAudio(sessionId:Long) {
+    fun retireFocusedAudio(sessionId:Long) {if(mutable.value?.takeIf{it.sessionId==sessionId}?.focusAudio!=null)retireFocusedSource(sessionId)}
+    fun retireFocusedImage(sessionId:Long) {if(mutable.value?.takeIf{it.sessionId==sessionId}?.focusImage!=null)retireFocusedSource(sessionId)}
+    fun retireFocusedSource(sessionId:Long) {
         while(true) {
             val panel=mutable.value ?: return
-            if(panel.sessionId!=sessionId || panel.focusAudio==null)return
+            if(panel.sessionId!=sessionId || panel.focusedIntent==null)return
             if(mutable.compareAndSet(panel,null)) {
                 onPanelClose()
                 enqueue {discard(sessionId)}
@@ -123,7 +129,7 @@ class LocalAttachmentController(
     private fun refreshSourceOwned(sessionId: Long) {
         val panel = mutable.value ?: return
         if (panel.sessionId != sessionId || panel.saving || panel.selection != null || panel.readingId != null) return
-        update(sessionId) { it.copy(loading = true, error = null, picture = null) }
+        update(sessionId) { it.copy(loading = true, error = null, picture = null, pictureId=null) }
         enqueue { repository ->
             if (!live(sessionId)) return@enqueue
             try {
@@ -135,6 +141,7 @@ class LocalAttachmentController(
                 verifyRows(panel, rows)
                 current(repository, panel)
                 update(sessionId) { it.copy(loading = false, items = rows.toList(), error = null) }
+                panel.focusImage?.let{focus->if(live(sessionId))view(sessionId,focus.id)}
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { failed(sessionId, failure, "附件暂不可读取。原文与文件已保留，可以重试。") }
         }
@@ -143,11 +150,11 @@ class LocalAttachmentController(
     fun select(sessionId: Long, failedId: String? = null) { sourceUi { selectSourceOwned(sessionId,failedId) } }
     private fun selectSourceOwned(sessionId: Long, failedId: String? = null) {
         val panel = mutable.value ?: return
-        if (panel.readOnly || panel.focusAudio!=null || panel.sessionId != sessionId || panel.busy || panel.selection != null || panel.error != null || panel.unavailable) return
+        if (panel.readOnly || panel.focusedIntent!=null || panel.sessionId != sessionId || panel.busy || panel.selection != null || panel.error != null || panel.unavailable) return
         val prior = failedId?.let { id -> panel.items.singleOrNull {
             it.intent.id == id && it.state == AttachmentState.FAILED && it.intent.mediaType in IMAGE_TYPES
         }?.intent ?: return }
-        update(sessionId) { it.copy(picture = null, error = null, notice = null,
+        update(sessionId) { it.copy(picture = null, pictureId=null, error = null, notice = null,
             selection = AttachmentSelection(ids.incrementAndGet(), prior?.id ?: UUID.randomUUID().toString(), prior,
                 retainJpegMetadata = it.retainJpegMetadata)) }
     }
@@ -155,13 +162,13 @@ class LocalAttachmentController(
     fun setJpegMetadataChoice(sessionId: Long, retain: Boolean) { sourceUi { setJpegMetadataChoiceSourceOwned(sessionId,retain) } }
     private fun setJpegMetadataChoiceSourceOwned(sessionId: Long, retain: Boolean) {
         val panel = mutable.value ?: return
-        if (panel.sessionId != sessionId || panel.readOnly || panel.focusAudio!=null || panel.busy || panel.selection != null || panel.error != null || panel.unavailable) return
+        if (panel.sessionId != sessionId || panel.readOnly || panel.focusedIntent!=null || panel.busy || panel.selection != null || panel.error != null || panel.unavailable) return
         update(sessionId) { it.copy(retainJpegMetadata = retain) }
     }
 
     fun claimPicker(requestId: Long): Boolean {
         val panel = mutable.value ?: return false
-        if (panel.readOnly || panel.focusAudio!=null) return false
+        if (panel.readOnly || panel.focusedIntent!=null) return false
         val selected = panel.selection ?: return false
         if (selected.requestId != requestId || selected.phase != AttachmentImportPhase.PICKING || selected.launched) return false
         return mutable.compareAndSet(panel, panel.copy(selection = selected.copy(launched = true)))
@@ -170,7 +177,7 @@ class LocalAttachmentController(
     fun pickerFailed(requestId: Long) { sourceUi { pickerFailedSourceOwned(requestId) } }
     private fun pickerFailedSourceOwned(requestId: Long) {
         val panel = mutable.value ?: return
-        if (panel.readOnly || panel.focusAudio!=null) return
+        if (panel.readOnly || panel.focusedIntent!=null) return
         if (panel.selection?.requestId == requestId) failed(panel.sessionId, IllegalStateException(),
             "无法打开图片选择器。原文与附件已保留，请重新选择。", requestId)
     }
@@ -179,7 +186,7 @@ class LocalAttachmentController(
     private fun selectedSourceOwned(requestId: Long, source: SelectedImageSource?) {
         val panel = mutable.value ?: return
         val selected = panel.selection ?: return
-        if (panel.readOnly || panel.focusAudio!=null) return
+        if (panel.readOnly || panel.focusedIntent!=null) return
         if (selected.requestId != requestId || selected.phase != AttachmentImportPhase.PICKING) return
         if (source == null) { cancel(panel.sessionId); return }
         if (!mutable.compareAndSet(panel, panel.copy(selection = selected.copy(phase = AttachmentImportPhase.PREPARING)))) return
@@ -218,7 +225,7 @@ class LocalAttachmentController(
     fun cancel(sessionId: Long) { sourceUi { cancelSourceOwned(sessionId) } }
     private fun cancelSourceOwned(sessionId: Long) {
         val panel = mutable.value ?: return
-        if (panel.readOnly || panel.focusAudio!=null || panel.sessionId != sessionId || panel.saving) return
+        if (panel.readOnly || panel.focusedIntent!=null || panel.sessionId != sessionId || panel.saving) return
         update(sessionId) { it.copy(selection = null, error = null, notice = "未继续添加图片，原文与已有附件已保留。") }
         enqueue { discard(sessionId) }
         refresh(sessionId)
@@ -228,7 +235,7 @@ class LocalAttachmentController(
     private fun retrySaveSourceOwned(sessionId: Long) {
         val panel = mutable.value ?: return
         val selected = panel.selection ?: return
-        if (panel.readOnly || panel.focusAudio!=null || panel.sessionId != sessionId || selected.phase != AttachmentImportPhase.FAILED || !selected.retryable || panel.unavailable) return
+        if (panel.readOnly || panel.focusedIntent!=null || panel.sessionId != sessionId || selected.phase != AttachmentImportPhase.FAILED || !selected.retryable || panel.unavailable) return
         enqueue { repository ->
             if (!owns(sessionId, selected.requestId)) return@enqueue
             if (prepared?.requestId == selected.requestId) commit(repository, sessionId, selected.requestId)
@@ -243,7 +250,7 @@ class LocalAttachmentController(
         val input = prepared?.takeIf { it.sessionId == sessionId && it.requestId == requestId } ?: return
         val panel = mutable.value ?: return
         val selected = panel.selection ?: return
-        if (panel.readOnly || panel.focusAudio!=null) return
+        if (panel.readOnly || panel.focusedIntent!=null) return
         if (!owns(sessionId, requestId)) return
         try {
             current(repository, panel)
@@ -283,10 +290,10 @@ class LocalAttachmentController(
     fun view(sessionId: Long, id: String) { sourceUi { viewSourceOwned(sessionId,id) } }
     private fun viewSourceOwned(sessionId: Long, id: String) {
         val panel = mutable.value ?: return
-        if(panel.focusAudio!=null)return
+        if(panel.focusAudio!=null || panel.focusImage?.let{it.id!=id}==true)return
         if (panel.sessionId != sessionId || panel.busy || panel.selection != null || panel.unavailable) return
         val item = panel.items.singleOrNull { it.intent.id == id && it.state == AttachmentState.READY && it.intent.mediaType in IMAGE_TYPES } ?: return
-        update(sessionId) { it.copy(readingId = id, picture = null, error = null) }
+        update(sessionId) { it.copy(readingId = id, picture = null, pictureId=null, error = null) }
         enqueue { repository ->
             if (!live(sessionId)) return@enqueue
             try {
@@ -309,7 +316,7 @@ class LocalAttachmentController(
                     while (true) {
                         val state = mutable.value
                         if (state == null || disposed || state.sessionId != sessionId || state.readingId != id) break
-                        if (mutable.compareAndSet(state, state.copy(readingId = null, picture = picture, error = null))) {
+                        if (mutable.compareAndSet(state, state.copy(readingId = null, picture = picture, pictureId=id, error = null))) {
                             published = true; break
                         }
                     }
@@ -318,13 +325,13 @@ class LocalAttachmentController(
             catch (failure: Exception) {
                 val rows = if (failure is RecordConflict || failure is LocalRecordUnavailable) null
                     else try { access(repository).list(panel.entryId, panel.revision).also { verifyRows(panel, it) } } catch (_: Exception) { null }
-                update(sessionId) { it.copy(items = rows ?: it.items, picture = null) }
+                update(sessionId) { it.copy(items = rows ?: it.items, picture = null, pictureId=null) }
                 failed(sessionId, failure, "图片暂不可查看，原文件已保留。请重试读取；损坏的附件不会显示。")
             }
         }
     }
 
-    fun closePicture(sessionId: Long) = update(sessionId) { it.copy(picture = null) }
+    fun closePicture(sessionId: Long) = update(sessionId) { it.copy(picture = null, pictureId=null) }
     fun markDisposed() { disposed = true; mutable.value = null }
     fun disposeOnIo() { prepared?.bytes?.fill(0); prepared = null }
     private fun discard(sessionId: Long) { if (prepared?.sessionId == sessionId) disposeOnIo() }
@@ -335,7 +342,7 @@ class LocalAttachmentController(
     }
     private fun failed(sessionId: Long, failure: Exception, message: String, requestId: Long? = null) {
         if (requestId != null && !owns(sessionId, requestId)) return
-        update(sessionId) { it.copy(loading = false, readingId = null, picture = null,
+        update(sessionId) { it.copy(loading = false, readingId = null, picture = null, pictureId=null,
             unavailable = failure is RecordConflict || it.unavailable,
             error = when (failure) {
                 is RecordConflict -> "原文版本已变化或不可用。附件保留在原版本，请返回原文。"
@@ -357,7 +364,7 @@ class LocalAttachmentController(
         if (!canUsePanel(panel) || !live(panel.sessionId)) throw RecordConflict()
     }
     private fun verifyRows(panel: AttachmentUiState, rows: List<LocalAttachment>) {
-        panel.focusAudio?.let{expected->if(rows.singleOrNull{it.intent==expected&&it.state==AttachmentState.READY}==null)throw AttachmentIntegrityFailure()}
+        panel.focusedIntent?.let{expected->if(rows.singleOrNull{it.intent==expected&&it.state==AttachmentState.READY}==null)throw AttachmentIntegrityFailure()}
         if (rows.any { it.intent.entryId != panel.entryId || it.intent.revision != panel.revision } ||
             rows.map { it.intent.id }.distinct().size != rows.size) throw AttachmentIntegrityFailure()
     }

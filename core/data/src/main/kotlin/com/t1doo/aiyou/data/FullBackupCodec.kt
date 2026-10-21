@@ -29,7 +29,7 @@ internal object FullBackupTables {
     val kinds=listOf("sllssll?l","slssl","sllnn","sslssls","slsb","slsb","slsl??","slsb","sslslllsslb","lsls","sslss","sllssss","sslss")
     val excluded=setOf("remote_text_jobs","text_annotations","local_search_fts","local_search_documents","local_search_epoch","owned_file_creations","model_configurations","model_capability_profiles","reminder_runtime_meta")
     val receipts=setOf("PACKAGE_ORIGIN","PACKAGE_RESTORE","PACKAGE_TASK_RESTORE","PACKAGE_MEDIA_INTENT",
-        "CAPTURE_CURRENT","CAPTURE_SAVED","CAPTURE_DISCARDED","CAPTURE_REMOVED","FULL_BACKUP_IMPORT_V8","FULL_BACKUP_IMPORT_V9","FULL_BACKUP_IMPORT_V10","FULL_BACKUP_IMPORT_V11")
+        "CAPTURE_CURRENT","CAPTURE_SAVED","CAPTURE_DISCARDED","CAPTURE_REMOVED","FULL_BACKUP_IMPORT_V8","FULL_BACKUP_IMPORT_V9","FULL_BACKUP_IMPORT_V10","FULL_BACKUP_IMPORT_V11","FULL_BACKUP_IMPORT_V12")
     val retainedJobs=setOf("ORIGINAL_EDIT_COMMIT","PACKAGE_ORIGIN","PACKAGE_RESTORE")
     val excludedJobs=setOf("LOCAL_INDEX","LOCAL_TAG_HINTS","LOCAL_SUMMARY","LOCAL_EXCERPTS","RECORD_AUTHORIZATION_V1","SELECTED_QUESTION_SEND_V1")
 }
@@ -39,7 +39,7 @@ internal class FullBackupData(val id:String,val created:Long,val tables:List<Lis
     val images:List<RecordPackageImage>,val edits:List<OriginalEditDraft>,val capture:CaptureDraft?,
     val audios:List<RecordPackageAudio> = emptyList()) : FullBackupSnapshot {
     val media:List<RecordPackageAttachment> get()=images+audios
-    val version:Int get()=if(tables[8].any {it[5]==4L} || tables[12].any {it[3]=="FULL_BACKUP_IMPORT_V11"}) 11 else if(tables[8].any { it[5]==3L } || tables[12].any { it[3]=="FULL_BACKUP_IMPORT_V10" }) 10 else if(audios.isNotEmpty() || capture?.audio!=null || tables[12].any { it[3]=="FULL_BACKUP_IMPORT_V9" }) 9 else 8
+    val version:Int get()=if(tables[8].any {it[5]==5L} || tables[12].any {it[3]=="FULL_BACKUP_IMPORT_V12"}) 12 else if(tables[8].any {it[5]==4L} || tables[12].any {it[3]=="FULL_BACKUP_IMPORT_V11"}) 11 else if(tables[8].any { it[5]==3L } || tables[12].any { it[3]=="FULL_BACKUP_IMPORT_V10" }) 10 else if(audios.isNotEmpty() || capture?.audio!=null || tables[12].any { it[3]=="FULL_BACKUP_IMPORT_V9" }) 9 else 8
     private var released=false
     override val summary:FullBackupSummary
         get() { check(!released)
@@ -98,7 +98,7 @@ internal object FullBackupCodec {
         val allocated=mutableListOf<ByteArray>()
         try {
             val r=PackageReader(bytes)
-            val name=r.string(32);val version=r.i32();require(version in setOf(8,9,10,11) && name=="AIyou-logical-full-v"+version && r.i32()==1)
+            val name=r.string(32);val version=r.i32();require(version in setOf(8,9,10,11,12) && name=="AIyou-logical-full-v"+version && r.i32()==1)
             val id=r.string(36);val at=r.i64();require(r.i32()==FullBackupTables.specs.size)
             val tables=FullBackupTables.specs.map { spec ->
                 require(r.string(64)==spec.name && r.string(512)==spec.columns)
@@ -214,7 +214,7 @@ internal object FullBackupCodec {
             RecordEventDateSnapshot(row[0] as String,row[1] as Long,date)
         }
         for(index in listOf(4,5,6,8)) require(d.tables[index].all { it[if(index==8) 1 else 0] in entries })
-        d.tables[8].forEach { require(it[5] in (if(d.version==11) setOf(1L,2L,3L,4L) else if(d.version==10) setOf(1L,2L,3L) else setOf(1L,2L)) && it[7] in setOf("READY","CANCELLED","INVALIDATED")) }
+        d.tables[8].forEach { require(it[5] in (if(d.version==12) setOf(1L,2L,3L,4L,5L) else if(d.version==11) setOf(1L,2L,3L,4L) else if(d.version==10) setOf(1L,2L,3L) else setOf(1L,2L)) && it[7] in setOf("READY","CANCELLED","INVALIDATED")) }
     }
     fun sameCapture(a:CaptureDraft?,b:CaptureDraft?):Boolean = if(a==null || b==null) a==null && b==null else
         a.sameSnapshot(b)

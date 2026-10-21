@@ -104,8 +104,10 @@ fun LocalAttachmentScreen(
     audio:OriginalAudioController?=null,
     transcripts:AudioTranscriptController?=null,
     canUse:()->Boolean={true},
+    imageTexts:ImageTextController?=null,
 ) {
     val playback=audio?.state?.collectAsState()?.value ?: OriginalAudioUi()
+    val imageTextBusy=imageTexts?.inFlight?.collectAsState()?.value==true
     // The list remains owned by this exact panel while the viewer replaces its composition.
     val listScroll = key(panel.sessionId) { rememberScrollState() }
     var showLimits by remember(panel.sessionId) { mutableStateOf(false) }
@@ -135,6 +137,9 @@ fun LocalAttachmentScreen(
                 // Bounded viewport + Fit displays the complete picture, regardless of its aspect ratio.
                 Image(picture.image, "图片附件，关联原文版本 ${panel.revision}", contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxWidth().weight(1f).testTag("attachment-picture"))
+                val selected=panel.items.singleOrNull{it.intent.id==panel.pictureId&&it.state==AttachmentState.READY&&it.intent.mediaType in LocalAttachmentController.IMAGE_TYPES}
+                if(imageTexts!=null&&!panel.readOnly&&selected!=null)TextButton(onClick={if(canUse())imageTexts.open(selected.intent)},enabled=!imageTextBusy&&!panel.busy&&panel.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("image-text-open:"+selected.intent.id)){Text("提取／纠正此图文字")}
+                if(imageTextBusy)Text("上一图片提取仍在结束，等待资源释放后可再次打开文字。")
                 TextButton(onClick = { showLimits = true },
                     modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("attachment-limits")) { Text("图片格式与保存说明") }
             }
@@ -172,7 +177,7 @@ fun LocalAttachmentScreen(
                 StatusNotice("这个版本还没有附件", if (panel.readOnly) "此版本只读，当前版本的图片不会显示在这里。"
                     else "选择支持格式的图片，原文与草稿保持不变。", state = ComponentState.EMPTY)
             }
-            panel.items.filter{panel.focusAudio==null||it.intent==panel.focusAudio}.forEachIndexed { index, item ->
+            panel.items.filter{panel.focusedIntent==null||it.intent==panel.focusedIntent}.forEachIndexed { index, item ->
                 key(item.intent.id) {
                     Column(Modifier.fillMaxWidth().testTag("attachment-${item.intent.id}"),
                         verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
@@ -204,7 +209,7 @@ fun LocalAttachmentScreen(
                     }
                 }
             }
-            if (!panel.readOnly && panel.focusAudio==null) {
+            if (!panel.readOnly && panel.focusedIntent==null) {
                 Text("添加图片", style = MaterialTheme.typography.titleMedium)
                 Text(if (Build.VERSION.SDK_INT >= 28) "JPEG 或静态 PNG · 每张不超过 16 MiB" else "静态 PNG · 每张不超过 16 MiB",
                     style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)

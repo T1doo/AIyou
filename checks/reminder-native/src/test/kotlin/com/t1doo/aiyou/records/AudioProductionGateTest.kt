@@ -124,6 +124,18 @@ class AudioProductionGateTest {
             repo.revise(base.id,1,"合成新原文",103);assertTrue(transcripts.search("").items.isEmpty());assertThrows(AudioTranscriptConflict::class.java){runBlocking{transcripts.read(anchor)}}
         }
     }
+    @Test fun actualProductionImageTextUsesSameOwnerGateAndOriginalInvalidationWithoutAnyOcrSdk():Unit=runBlocking(Dispatchers.IO){
+        Fixture().use{f->val repo=f.repo;val draft=repo.updateDraft("合成图片原文");val entry=repo.saveDraft(draft,100,"UTC")
+            val bytes=java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=")
+            val intent=AttachmentIntent(uuid(),entry.id,1,"image/png",hash(bytes),bytes.size.toLong());repo.attachments.save(intent){bytes.inputStream()}
+            val texts=repo.imageTexts;val anchor=texts.preview(intent)
+            val first=texts.write(ImageTextWrite(uuid(),anchor,null,ImageTextExtraction(ImageTextEngine("synthetic-native-test-port","1",true),"合成端口文字，非 OCR"),null,false,uuid(),101))!!
+            assertTrue(texts.read(anchor)!!.same(first));assertTrue(first.engine.synthetic)
+            val gate=checkNotNull(repo.captureRecords.mutationGate);val pin=checkNotNull(gate.preparePlayback());gate.activatePlayback(pin);val sql=f.sqlSnapshot();val files=f.filesSnapshot()
+            try{assertThrows(ImageTextUnavailable::class.java){runBlocking{texts.write(ImageTextWrite(first.id,anchor,first,null,"播放中禁止改写",false,uuid(),102))}};assertEquals(sql,f.sqlSnapshot());assertEquals(files,f.filesSnapshot())}finally{gate.finishPlayback(pin)}
+            repo.revise(entry.id,1,"合成原文修订",103);assertTrue(texts.search("").items.isEmpty());assertThrows(ImageTextConflict::class.java){runBlocking{texts.read(anchor)}}
+        }
+    }
     private class Fixture:AutoCloseable {
         val root=Files.createTempDirectory("aiyou-r1-synthetic-room-").toFile()
         val mediaDir=root.resolve("media")

@@ -133,6 +133,8 @@ fun LocalRecordsScreen(
     onCancelEvidenceAnswer: () -> Unit = {},
     onOpenAnswerSource: (com.t1doo.aiyou.model.OriginalTextReference) -> Unit = {},
     evidenceQuestion: (@Composable () -> Unit)? = null,
+    onOpenImageTexts:(()->Unit)?=null,
+    imageTextBusy:Boolean=false,
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -280,9 +282,12 @@ fun LocalRecordsScreen(
                         (onBeginRecordPackage != null && local.supportsRecordPackages) ||
                         (onOpenFactRecap != null && local.supportsFactRecaps) ||
                         (onOpenTranscripts != null && local.supportsAudioTranscripts) ||
+                        (onOpenImageTexts != null && local.supportsImageTexts) ||
                         (onOpenPreferences != null && local.supportsSourcePreferences) ||
                         ((onOpenMemoryInbox != null || onOpenAcceptedMemories != null) && local.supportsMemoryInbox))) {
                         Column(Modifier.fillMaxWidth()) {
+                            if(onOpenImageTexts!=null && local.supportsImageTexts)OutlinedButton(onOpenImageTexts,enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("image-texts-open")){Text("找回图片文字与原图")}
+                            if(imageTextBusy)Text("上一图片提取仍在结束，文字入口等待资源释放。")
                             if(onOpenTranscripts!=null && local.supportsAudioTranscripts)OutlinedButton(onOpenTranscripts,enabled=local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("transcripts-open")){Text("找回人工转写与原音")}
                             if (onOpenPreferences != null && local.supportsSourcePreferences) OutlinedButton(onOpenPreferences,
                                 enabled = local.ready && !local.opening && local.error == null,

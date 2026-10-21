@@ -61,6 +61,8 @@ class EncryptedEntryRepository internal constructor(
     override val sourceTags: com.t1doo.aiyou.domain.SourceTagRepository = SqlSourceTagRepository(borrowedSql, tagStorage)
     private val sourceMemoryStorage = SqlSourceMemoryRepository(borrowedSql, keyBytes)
     private val transcriptStorage=SqlAudioTranscriptRepository(borrowedSql,keyBytes,attachments,sourceGate)
+    private val imageTextStorage=SqlImageTextRepository(borrowedSql,keyBytes,attachments,sourceGate)
+    override val imageTexts:com.t1doo.aiyou.domain.ImageTextRepository get()=imageTextStorage
     override val audioTranscripts:com.t1doo.aiyou.domain.AudioTranscriptRepository get()=transcriptStorage
     private val preferenceStorage = SqlSourcePreferenceRepository(borrowedSql, keyBytes)
     override val sourcePreferences: com.t1doo.aiyou.domain.SourcePreferenceRepository get() = preferenceStorage
@@ -193,7 +195,7 @@ class EncryptedEntryRepository internal constructor(
     }
 
     private val lifetime = DrainingRecordsStorage(borrowedSql,attachmentStorage,originalEditStorage,
-        { database.close() }, { reminderStores.close();tagStorage.wipeKey(); peopleStorage.wipeKey(); proposalStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); preferenceStorage.wipeKey();transcriptStorage.wipeKey(); keyBytes.fill(0) })
+        { database.close() }, { reminderStores.close();tagStorage.wipeKey(); peopleStorage.wipeKey(); proposalStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); preferenceStorage.wipeKey();transcriptStorage.wipeKey();imageTextStorage.wipeKey(); keyBytes.fill(0) })
     override fun close() { sourceGate.retire();connectionStorage.close(); questionAuthorizationStorage.close(); lifetime.close() }
     override fun awaitClosed() { close(); lifetime.awaitClosed() }
     /** Known external IO owner convenience, including native cold-reopen fixtures. */

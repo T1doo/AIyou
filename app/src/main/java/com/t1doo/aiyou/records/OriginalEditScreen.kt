@@ -53,6 +53,7 @@ fun OriginalEditScreen(
                     color = AIyouColors.textSecondary)
                 Text("保存创建新版本，旧原文仍保留。", style = MaterialTheme.typography.bodySmall,
                     color = AIyouColors.textSecondary)
+                if(local.supportsImageTexts)Text("保存新原文版本会清除此版本原图的提取文字与纠正历史。原图仍属于旧版本；需要保留文字时可先完整备份。",style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
                 if (!edit.dirty && edit.sourceRevision != edit.baseRevision) Text("文本与当前原文相同，无需保存新版本。",
                     style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                 OutlinedTextField(value = edit.text, onValueChange = { onChange(edit.sessionId, it) },

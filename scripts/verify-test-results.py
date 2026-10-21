@@ -47,6 +47,9 @@ for label, folder, minimum in targets:
     print(f"PASS: {label} tests={total} actual={cases} failures=0 errors=0 skipped=0")
     additional = {}
     if label == "host queue":
+        additional["com.t1doo.aiyou.records.FocusedImagePanelLifecycleTest"] = (
+            "exactFocusedImageRejectsOtherViewsAndImageWritesAndRetiresBeforeOpeningB",
+            "lateFocusedAImageReadCannotPublishOverBAndItsAuthenticatedBytesAreWiped")
         additional["com.t1doo.aiyou.records.FocusedAudioPanelLifecycleTest"] = (
             "retiringFocusedCandidateStopsAcceptedPlaybackWithoutFakingGateReleaseAndAllowsExactB",
             "lateFocusedARefreshCannotRefillOrBlockBAndOldRetirementCannotClearB")
@@ -217,6 +220,10 @@ for label, folder, minimum in targets:
             "narrowInboxReachesExactOriginalAndRequiresSeparateExistingAcceptanceAtDoubleFont",
             "failedReadAndRestorationHidePrivateResultsAndRetireRetainedPageCallbacks",
             "acceptedMemoriesAreReachableAtDoubleFontAndDisappearOnlyAfterSeparateRevocationConfirmation")
+        additional["com.t1doo.aiyou.ImageTextPresentationTest"] = (
+            "unavailableModelAndAiNoneNeverInferCreateManualReplacementOrChangeOriginal",
+            "doubleFontControlledExtractionCorrectionKeywordJumpAndConfirmedDeletionReachExactOriginal",
+            "restoredPrivateImageSourceRetiresRetainedAThenBViewerAndLookupCannotDisplayA")
         additional["com.t1doo.aiyou.AudioTranscriptPresentationTest"] = (
             "doubleFontManualCorrectionWithdrawalAndKeywordJumpReachExactAudioWithoutChangingOriginal",
             "unsavedManualTextAndRetiredSessionDoNotSurviveRestorationAsWriteAuthority",
