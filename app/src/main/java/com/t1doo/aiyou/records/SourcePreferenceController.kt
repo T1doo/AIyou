@@ -22,6 +22,30 @@ data class PreferenceUiState(val session:Long,val source:SourceVersion?,val sour
     override fun toString()="PreferenceUiState(redacted)"
 }
 
+/** Every retained private proof counts, including intents whose rows are outside the visible page. */
+internal fun LocalRecordUiState.canRetainPreferenceSources(ui:PreferenceUiState):Boolean {
+    if(!ready || opening || error!=null || !supportsSourcePreferences || supportsLocalProcessing && !localProcessingAvailable)return false
+    fun source(version:SourceVersion,hash:String,generation:Long?=null,captured:Long?=null,zone:String?=null,policy:ProcessingPolicy?=null):Boolean =
+        hasLocalProcessingProof(version) && entries.any { entry ->
+            entry.id==version.sourceId && entry.currentRevision.toLong()==version.revision && entry.policy!=ProcessingPolicy.AI_NONE &&
+                OriginalExports.hash(entry.originalText)==hash && (captured==null || entry.capturedAtMillis==captured) &&
+                (zone==null || entry.captureTimeZone==zone) && (policy==null || entry.policy==policy) &&
+                (generation==null || !supportsLocalProcessing || localProcessingVersions[version.sourceId]?.generation==generation)
+        }
+    fun preview(p:SourceMemoryPreview)=source(p.source,p.sourceHash,p.generation,p.capturedAtMillis,p.captureTimeZone,p.policy)
+    fun snapshot(s:SourcePreferenceSnapshot)=s.availability==PreferenceAvailability.AVAILABLE && s.capturedAtMillis!=null &&
+        s.captureTimeZone!=null && s.policy!=null && source(s.source,s.sourceHash,s.generation,s.capturedAtMillis,s.captureTimeZone,s.policy)
+    fun intent(value:PreferenceIntent)=when(value) {
+        is PreferenceIntent.Create -> preview(value.request.preview) && (value.request.topicExpected?.let(::snapshot) ?: true)
+        is PreferenceIntent.Mutate -> snapshot(value.request.expected) && (value.request.replacing?.let(::snapshot) ?: true)
+    }
+    return (ui.source?.let { version -> ui.sourceHash?.let {source(version,it)} ?: false } ?: true) &&
+        (ui.sourcePage?.let {preview(it.preview) && it.items.all(::snapshot) && it.topics.all(::snapshot)} ?: true) &&
+        ui.items.all(::snapshot) && (ui.page?.items?.all(::snapshot) ?: true) &&
+        (ui.topicExpected?.let(::snapshot) ?: true) && (ui.editing?.let(::snapshot) ?: true) &&
+        (ui.confirmation?.intent?.let(::intent) ?: true) && (ui.pending?.let(::intent) ?: true)
+}
+
 /** No authority is saved; the same serial records actor rechecks each queued session before SQL. */
 class SourcePreferenceController(private val current:()->LocalRecordUiState,
     private val publish:((LocalRecordUiState)->LocalRecordUiState)->Unit,
@@ -34,13 +58,17 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
         local.entries.any { it.id==s.sourceId && it.currentRevision.toLong()==s.revision && it.policy!=ProcessingPolicy.AI_NONE && OriginalExports.hash(it.originalText)==hash }
     private fun owns(session:Long,request:Long?=null):Boolean {
         val local=current();val ui=local.sourcePreferences ?: return false
-        return available(local) && ui.session==session && (request==null || request==ui.request) &&
-            (ui.source==null || sourceCurrent(ui.source,checkNotNull(ui.sourceHash),local)) &&
-            (ui.sourcePage?.let { page -> !local.supportsLocalProcessing || local.localProcessingVersions[page.preview.source.sourceId]?.let { it.source==page.preview.source && it.generation==page.preview.generation }==true } ?: true)
+        return available(local) && ui.session==session && (request==null || request==ui.request) && local.canRetainPreferenceSources(ui)
     }
     private fun update(session:Long,change:(PreferenceUiState)->PreferenceUiState)=publish { local ->
-        if(!owns(session))local else local.copy(sourcePreferences=change(checkNotNull(local.sourcePreferences)))
+        if(!owns(session))local else {
+            val next=change(checkNotNull(local.sourcePreferences))
+            // Validate the proposed state in the same publication/CAS as its private content.
+            // A delayed comparison must authenticate both sources against the latest observed UI.
+            local.copy(sourcePreferences=next.takeIf {local.canRetainPreferenceSources(it)})
+        }
     }
+
     fun open(source:SourceVersion?=null,section:PreferenceReview=PreferenceReview.PROPOSED) {
         val local=current()
         if(!available(local) || local.saving || local.savePending || local.sourcePreferences!=null || local.sourceMemories!=null || local.memoryInbox!=null || local.localProcessing!=null || local.recordPackage!=null || local.recycleBin!=null || local.originalEdit!=null || local.originalHistory!=null || local.ai!=null || local.sourceTask!=null || local.sourceTags!=null || local.candidates!=null || local.factRecap!=null || local.originalExport!=null || local.manualTagEditor!=null || local.manualPeopleEditor!=null || local.eventDateEditor!=null)return
@@ -100,7 +128,9 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
     fun confirm(session:Long,confirmation:PreferenceConfirmation) {
         val ui=current().sourcePreferences ?: return
         if(!owns(session) || ui.busy || ui.pending!=null || ui.confirmation!==confirmation)return
-        update(session) { it.copy(confirmation=null) };execute(checkNotNull(current().sourcePreferences),confirmation.intent)
+        update(session) { it.copy(confirmation=null) }
+        val next=current().sourcePreferences?.takeIf {it.session==session} ?: return
+        execute(next,confirmation.intent)
     }
     fun cancel(session:Long,confirmation:PreferenceConfirmation) { if(owns(session))update(session) { if(it.confirmation!==confirmation)it else it.copy(confirmation=null) } }
     fun retry(session:Long) { val ui=current().sourcePreferences ?: return;if(owns(session) && !ui.busy)execute(ui,ui.pending) }
@@ -154,6 +184,7 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
     }
     private fun execute(before:PreferenceUiState,intent:PreferenceIntent?) {
         val req=tokens.incrementAndGet();update(before.session) { it.copy(request=req,busy=true,items=emptyList(),sourcePage=null,page=null,pending=intent,confirmation=null,error=null,notice=null) }
+        if(!owns(before.session,req))return
         if(!enqueue { store ->
             if(!owns(before.session,req))return@enqueue
             try {

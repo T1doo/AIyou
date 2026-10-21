@@ -615,17 +615,7 @@ class LocalRecordsViewModel internal constructor(
 
     private fun reconcilePreferences(local: LocalRecordUiState): LocalRecordUiState {
         val ui = local.sourcePreferences ?: return local
-        fun valid(source: com.t1doo.aiyou.model.SourceVersion, hash: String, generation: Long? = null): Boolean =
-            local.hasLocalProcessingProof(source) && local.entries.any {
-                it.id == source.sourceId && it.currentRevision.toLong() == source.revision &&
-                    it.policy != ProcessingPolicy.AI_NONE && com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == hash &&
-                    (generation == null || !local.supportsLocalProcessing || local.localProcessingVersions[source.sourceId]?.generation == generation)
-            }
-        return if (editsDisposed || !local.ready || local.opening || local.error != null ||
-            ui.source?.let { !valid(it, checkNotNull(ui.sourceHash)) } == true ||
-            ui.sourcePage?.preview?.let { !valid(it.source, it.sourceHash, it.generation) } == true ||
-            (ui.items + ui.sourcePage?.topics.orEmpty()).any { !valid(it.source, it.sourceHash, it.generation) || local.entries.none { entry ->
-                entry.id == it.source.sourceId && entry.capturedAtMillis == it.capturedAtMillis && entry.captureTimeZone == it.captureTimeZone && entry.policy == it.policy } }) local.copy(sourcePreferences = null) else local
+        return if(editsDisposed || !local.canRetainPreferenceSources(ui))local.copy(sourcePreferences=null) else local
     }
 
     /** Opens a memory-only session over one already persisted current original. Never sends. */

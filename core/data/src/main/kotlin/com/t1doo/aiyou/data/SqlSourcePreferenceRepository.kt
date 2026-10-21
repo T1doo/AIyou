@@ -188,6 +188,7 @@ internal class SqlSourcePreferenceRepository(private val database: RecordsSqlDat
         if(p==null)PreferenceAvailability.INVALIDATED else PreferenceAvailability.AVAILABLE,row.created,p?.captured,p?.zone,p?.policy,p?.topicId,p?.topicLabel,p?.contents.orEmpty(),p?.reviews.orEmpty())
     private fun validateGraph(items:List<Item>) {
         require(items.size<=128)
+        if(items.groupingBy { it.row.source }.eachCount().values.any { it>20 })throw PreferenceLimit()
         items.groupBy { it.payload.topicId }.values.forEach { group ->
             require(group.map { it.payload.topicLabel }.distinct().size==1 && group.count { it.payload.reviews.last().review==PreferenceReview.ACCEPTED }<=1)
         }

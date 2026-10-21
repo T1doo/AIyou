@@ -136,6 +136,58 @@ class SourcePreferenceBackupTest {
             } finally {repo.wipeKey();dest.wipeKey()}
         } }
     }
+    @Test fun perSourceTwentyRestoresButAuthenticatedTwentyFirstIsRejectedBeforeIntentAndByDatabaseValidation():Unit=runBlocking {
+        FullFixture().use { source ->
+            val repo=SqlSourcePreferenceRepository(source.gateway,source.key)
+            try {
+                val first=SourceVersion(source.entry(text="我平时更喜欢淡茶。"),1)
+                repeat(20) {create(repo,first)}
+                FullFixture(72).use { target ->
+                    val bytes=export(source);val pack=target.backup.open({bytes.inputStream()},FullBackupTest.password())
+                    try {
+                        assertFalse(target.backup.restore(pack){true}.replayed)
+                        val restored=SqlSourcePreferenceRepository(target.gateway,target.key)
+                        try {assertEquals(20,restored.preferences(first).size);assertEquals(20,restored.captureSource(first).items.size)} finally {restored.wipeKey()}
+                    } finally {pack.release()}
+                }
+                // Start from 21 independently valid records spread over two legal sources, then
+                // authenticate an adversarial document rebinding the last record to the first.
+                // Both originals and immutable source metadata are identical; no other invariant fails.
+                val second=SourceVersion(source.entry(text="我平时更喜欢淡茶。"),1);val last=create(repo,second)
+                val base=source.backup.capture(id(),100) as FullBackupData
+                try {
+                    val rebound=base.tables[8].single {it[0]==last.id}.toMutableList().also {it[1]=first.sourceId}
+                    val tables=base.tables.mapIndexed { index,rows -> if(index==8)rows.map {if(it[0]==last.id)rebound else it} else rows }
+                    val document=FullBackupData(base.id,base.created,tables,base.images,base.edits,base.capture,base.audios)
+                    val prepared=RecordMediaPackageCipher().sealFull(document,FullBackupTest.password(),{error("No media in capacity fixture")},{true})
+                    val bytes=try {ByteArrayOutputStream().also {prepared.writeTo(it){true}}.toByteArray()} finally {prepared.release()}
+                    FullFixture(73).use { target ->
+                        fun state()=target.db.read("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").flatMap { row ->
+                            val table=row.single() as String
+                            target.db.read("SELECT * FROM "+table+" ORDER BY 1").map { cells ->table+":"+cells.joinToString("|") {if(it is ByteArray)packageHex(packageHash(it)) else it.toString()} }
+                        }
+                        val before=state();val checkpoints=mutableListOf<String>();target.checkpoint={checkpoints+=it}
+                        assertThrows(PreferenceLimit::class.java) {runBlocking {target.backup.open({bytes.inputStream()},FullBackupTest.password())}}
+                        assertTrue(checkpoints.isEmpty());assertEquals(before,state())
+                        assertTrue(target.db.read("SELECT * FROM record_package_receipts").isEmpty())
+                        assertTrue(target.mediaRoot.walkTopDown().filter {it.isFile}.toList().isEmpty())
+                    }
+                    // Exercise the shared live-database/export path with the same individually
+                    // authenticated record. Bypass only the public creation capacity check here.
+                    val installed=rebound.toMutableList().also {it[10]=repo.portable(rebound,true)}
+                    try {
+                        source.db.transaction {sql ->
+                            sql.execute("DELETE FROM local_candidate_batches WHERE id=?",listOf(last.id))
+                            sql.execute("INSERT INTO local_candidate_batches(id,entryId,sourceRevision,sourceHash,generation,ruleVersion,version,state,lastMutationId,createdAtMillis,payload) VALUES(?,?,?,?,?,?,?,?,?,?,?)",installed)
+                        }
+                        assertEquals(21L,source.db.read("SELECT count(*) FROM local_candidate_batches WHERE entryId=? AND ruleVersion=3 AND state='READY'",first.sourceId).single().single())
+                        assertThrows(PreferenceLimit::class.java) {repo.captureSource(first)}
+                        assertThrows(PreferenceLimit::class.java) {runBlocking {source.backup.capture(id(),101)}}
+                    } finally {(installed[10] as ByteArray).fill(0)}
+                } finally {base.release()}
+            } finally {repo.wipeKey()}
+        }
+    }
     private fun create(repo:SqlSourcePreferenceRepository,source:SourceVersion,topic:SourcePreferenceSnapshot?=null):SourcePreferenceSnapshot {
         val preview=repo.preview(source)
         return repo.create(PreferenceCreate(id(),preview,topic?.topicId ?: id(),topic?.topicLabel ?: "合成口味",PreferenceContent(SourceMemoryRules.reference(preview,"我平时更喜欢淡茶")),true,id(),40,topic))
