@@ -224,6 +224,7 @@ for label, folder, minimum in targets:
             "doubleFontFourTypedResultsOpenExactOriginalAndPreferenceThenRequeryWithoutChangingSources",
             "literalNoResultClearAndRestoreNeverSaveQueryOrRetainOldSession",
             "restoredExactImageProofRetiresAPanelBeforeBLookupAndRejectsRetainedAAction",
+            "landscapeDoubleFontScrollsToFocusedQuerySearchAndExactSourceWithoutHiddenActions",
         )
         additional["com.t1doo.aiyou.ImageTextPresentationTest"] = (
             "unavailableModelAndAiNoneNeverInferCreateManualReplacementOrChangeOriginal",

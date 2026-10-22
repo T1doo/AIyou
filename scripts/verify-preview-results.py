@@ -24,7 +24,7 @@ reports = list((root / "app/build/test-results/validateDebugScreenshotTest").rgl
 cases = []
 for report in reports:
     cases.extend(ET.parse(report).getroot().iter("testcase"))
-expected = 4 * len(target_methods) if targeted else 394  # Includes four production capture-discard confirmation renders.
+expected = 4 * len(target_methods) if targeted else 398  # Existing394 plus4 exact unified-lookup body renders.
 if len(cases) != expected:
     raise SystemExit(f"FAIL: expected {expected} actual Preview smoke tests, found {len(cases)}")
 if any(any(case.find(tag) is not None for tag in ("failure", "error", "skipped")) for case in cases):
@@ -66,6 +66,12 @@ for method in (target_methods if targeted else local_methods + attachment_method
     production = [item for item in manifest if "/" + method + "_" in item["file"]]
     if len(production) != 4:
         raise SystemExit(f"FAIL: require all four actual production sizes for {method}, found {len(production)}")
+if not targeted:
+    for method in ("UnifiedKeywordHeaderRender", "UnifiedKeywordResultsRender"):
+        actual = [case for case in cases if case.get("name", "").startswith(method + "_")]
+        images = [item for item in manifest if "/" + method + "_" in item["file"]]
+        if len(actual) != 2 or len(images) != 2:
+            raise SystemExit(f"FAIL: require both200% portrait/landscape production lookup renders for {method}")
 target = root / ("app/build/reports/d02-original-edit-preview-manifest.json" if args.original_edit_only else "app/build/reports/d02-capture-recovery-preview-manifest.json" if args.capture_discard_only else "app/build/reports/d02-production-tasks-preview-manifest.json" if args.production_tasks_only
                  else "app/build/reports/d01-preview-manifest.json")
 target.parent.mkdir(parents=True, exist_ok=True)

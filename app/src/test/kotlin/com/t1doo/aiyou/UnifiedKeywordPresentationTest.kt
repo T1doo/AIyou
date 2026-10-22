@@ -5,6 +5,8 @@ import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -86,6 +88,21 @@ class UnifiedKeywordPresentationTest {
         open();query("清水");val b=f.local.value.unifiedKeyword!!.snapshot!!.groups.single().items.filterIsInstance<UnifiedKeywordEvidence.Image>().single()
         result(b);compose.onNodeWithTag("attachment-picture").assertIsDisplayed()
         compose.runOnIdle{assertEquals(b.value.anchor.intent,f.attachments.state.value!!.focusImage);assertNotEquals(a.value.anchor.intent,b.value.anchor.intent);assertEquals(0,f.writes)}
+    }
+    @Test @Config(qualifiers="w640dp-h320dp-land")
+    fun landscapeDoubleFontScrollsToFocusedQuerySearchAndExactSourceWithoutHiddenActions(){
+        content();open()
+        compose.onNodeWithTag("unified-query").performScrollTo().performClick().assertIsFocused().performTextInput("淡茶")
+        val search=compose.onNodeWithTag("unified-search").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        search.performSemanticsAction(SemanticsActions.RequestFocus){assertTrue(it())}
+        search.assertIsFocused().performKeyInput{pressKey(Key.Enter)};drain()
+        val item=f.local.value.unifiedKeyword!!.snapshot!!.groups.single().items.filterIsInstance<UnifiedKeywordEvidence.Original>().single()
+        compose.onNodeWithTag("unified-results").performScrollToIndex(1)
+        val source=compose.onNodeWithTag("unified-source:"+item.key).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        source.performSemanticsAction(SemanticsActions.RequestFocus){assertTrue(it())}
+        source.assertIsFocused().performKeyInput{pressKey(Key.Enter)};drain()
+        compose.onNodeWithTag("original-text").assertTextEquals(item.entry.originalText)
+        compose.runOnIdle{assertEquals(0,f.writes)}
     }
     private class Fixture {
         private fun id()=UUID.randomUUID().toString()

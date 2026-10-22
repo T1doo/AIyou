@@ -10,7 +10,7 @@ import zipfile
 
 GROUPS = {"now": ("此刻", 28), "memories": ("回忆", 28), "tasks": ("待办", 28),
           "components": ("八种组件", 112), "shell": ("主导航", 2),
-          "complete": ("完整长文本", 14), "review": ("白蓝手机页面与正式本机状态", 118),
+          "complete": ("完整长文本", 14), "review": ("白蓝手机页面与正式本机状态", 122),
           "attachments": ("本机附件与历史版本只读状态", 60), "drafts": ("新记录草稿清空确认", 4)}
 METHODS = {"NowRender": "now", "MemoriesRender": "memories", "TasksRender": "tasks",
            "ShellRender": "shell", **dict.fromkeys(
@@ -21,6 +21,7 @@ METHODS = {"NowRender": "now", "MemoriesRender": "memories", "TasksRender": "tas
                             "ProviderCompleteRender"), "complete"),
            "ReviewNowRender": "review", "ReviewMemoriesRender": "review",
            "LocalCaptureDiscardRender": "drafts",
+           "UnifiedKeywordHeaderRender": "review", "UnifiedKeywordResultsRender": "review",
            **dict.fromkeys(("LocalTasksRender", "LocalSettingsRender", "LocalCompanionRender", "LocalEmptyRender", "LocalRestoredRender", "LocalSavingRender", "LocalSaveFailedRender",
                             "LocalReadFailedRender", "LocalSavedRender", "LocalRejectedInputRender", "LocalMemoriesRender",
                             "LocalLongListRender", "LocalOriginalReadRender", "LocalMissingOriginalRender", "LocalOriginalReadFailureRender",
@@ -62,11 +63,11 @@ def read_png(reference, item, maximum):
 
 def metadata(group, label, pngs, part, parts, source_kind="unspecified source; no render acceptance"):
     manifest = {"group": group, "label": label, "part": part, "parts": parts,
-                "group_count": GROUPS[group][1], "source_count": 394, "source_kind": source_kind,
+                "group_count": GROUPS[group][1], "source_count": sum(count for _, count in GROUPS.values()), "source_kind": source_kind,
                 "count": len(pngs), "pngs": pngs,
                 "visual_inspection": "NOT RUN", "approved_goldens": False}
     readme = (f"D01 {label}：第 {part}/{parts} 包，本包 {len(pngs)} 张，本组 {GROUPS[group][1]} 张原始 PNG。\n"
-              "无缩放、重编码或降质。全套394张的完整清单与分包对应见INDEX.json。\n"
+              f"无缩放、重编码或降质。全套{sum(count for _, count in GROUPS.values())}张的完整清单与分包对应见INDEX.json。\n"
               f"来源：{source_kind}。尚未视觉验收，也不是已批准 golden。\n"
               "MANIFEST.json 保留原文件名、尺寸、字节数、SHA-256及本组分包序号。\n"
               "每个ZIP独立上传；请核查截断、重叠、可读性和内容分区。\n")
