@@ -46,16 +46,16 @@ class VisualDeliveryTests(unittest.TestCase):
                               "sha256": hashlib.sha256(data).hexdigest()})
         report = root / "app/build/reports/d01-preview-manifest.json"
         report.parent.mkdir(parents=True)
-        report.write_text(json.dumps({"kind": "synthetic packaging regression fixtures, not Preview renders", "count": 402, "pngs": items}))
+        report.write_text(json.dumps({"kind": "synthetic packaging regression fixtures, not Preview renders", "count": 404, "pngs": items}))
         return reference, report, items
 
-    def test_all_402_original_bytes_and_lists_are_preserved_in_small_zips(self):
+    def test_all_404_original_bytes_and_lists_are_preserved_in_small_zips(self):
         with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()):
             root = Path(temp)
             reference, _, _ = self.fixture(root)
             index = delivery.package(root)
-            self.assertEqual(402, sum(p["count"] for p in index["packs"]))
-            self.assertEqual([28, 28, 28, 112, 2, 14, 126, 60, 4], [p["count"] for p in index["packs"]])
+            self.assertEqual(404, sum(p["count"] for p in index["packs"]))
+            self.assertEqual([28, 28, 28, 112, 2, 14, 128, 60, 4], [p["count"] for p in index["packs"]])
             for pack in index["packs"]:
                 target = root / "app/build/outputs/d01-visual-packs" / pack["file"]
                 self.assertEqual(pack["bytes"], target.stat().st_size)
@@ -72,7 +72,7 @@ class VisualDeliveryTests(unittest.TestCase):
             reference, _, items = self.fixture(root)
             with self.assertRaisesRegex(ValueError, "exceeds"):
                 delivery.package(root, max_zip_bytes=100)
-            self.assertEqual(402, len(list(reference.glob("*.png"))))
+            self.assertEqual(404, len(list(reference.glob("*.png"))))
             self.assertEqual([], list((root / "app/build/outputs/d01-visual-packs").glob("*.zip")))
 
     def test_changed_png_and_unsafe_duplicate_or_unknown_paths_rejected(self):
@@ -89,7 +89,7 @@ class VisualDeliveryTests(unittest.TestCase):
                 else:
                     (reference / "UnknownRender_0.png").write_bytes((reference / items[0]["file"]).read_bytes())
                     items[0]["file"] = "UnknownRender_0.png"
-                report.write_text(json.dumps({"kind": "synthetic packaging regression fixtures, not Preview renders", "count": 402, "pngs": items}))
+                report.write_text(json.dumps({"kind": "synthetic packaging regression fixtures, not Preview renders", "count": 404, "pngs": items}))
                 with self.assertRaises(ValueError):
                     delivery.package(root)
 
@@ -105,12 +105,12 @@ class VisualDeliveryTests(unittest.TestCase):
                     new = original.replace("NowRender", "TasksRender") + "_extra.png"
                     (reference / new).write_bytes((reference / original).read_bytes())
                     items[0]["file"] = new
-                report.write_text(json.dumps({"kind": "synthetic packaging regression fixtures, not Preview renders", "count": 402, "pngs": items}))
+                report.write_text(json.dumps({"kind": "synthetic packaging regression fixtures, not Preview renders", "count": 404, "pngs": items}))
                 with self.assertRaises(ValueError):
                     delivery.package(root)
 
     def save_report(self, report, items):
-        report.write_text(json.dumps({"kind": "synthetic packaging regression fixtures, not Preview renders", "count": 402, "pngs": items}))
+        report.write_text(json.dumps({"kind": "synthetic packaging regression fixtures, not Preview renders", "count": 404, "pngs": items}))
 
     def pad_review(self, reference, report, items):
         for item in items:
@@ -120,12 +120,12 @@ class VisualDeliveryTests(unittest.TestCase):
                 item["sha256"] = hashlib.sha256(data).hexdigest()
         self.save_report(report, items)
 
-    def test_review_over_original_17mb_limit_splits_all_126_without_changing_any_png(self):
+    def test_review_over_original_17mb_limit_splits_all_128_without_changing_any_png(self):
         with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()):
             root=Path(temp);reference,report,items=self.fixture(root);self.pad_review(reference,report,items)
             index=delivery.package(root);review=[p for p in index["packs"] if p["group"]=="review"]
-            self.assertGreater(len(review),1);self.assertEqual(126,sum(p["count"] for p in review))
-            self.assertEqual(402,len(index["pngs"]));self.assertEqual(402,sum(p["count"] for p in index["packs"]))
+            self.assertGreater(len(review),1);self.assertEqual(128,sum(p["count"] for p in review))
+            self.assertEqual(404,len(index["pngs"]));self.assertEqual(404,sum(p["count"] for p in index["packs"]))
             self.assertGreater(sum(i["bytes"] for i in index["pngs"] if delivery.group_for(i["file"])=="review"),delivery.MAX_ZIP_BYTES)
             found=[]
             for part in review:
@@ -179,7 +179,7 @@ class VisualDeliveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);reference,report,items=self.fixture(root)
             with self.assertRaisesRegex(ValueError,"single PNG.*exceeds"):delivery.package(root,max_zip_bytes=500)
-            self.assertEqual(402,len(list(reference.glob("*.png"))))
+            self.assertEqual(404,len(list(reference.glob("*.png"))))
             with self.assertRaisesRegex(ValueError,"cannot be raised"):delivery.package(root,max_zip_bytes=17000001)
             data=png(b"X"*17000000);(reference/items[0]["file"]).write_bytes(data);items[0]["sha256"]=hashlib.sha256(data).hexdigest();self.save_report(report,items)
             with self.assertRaisesRegex(ValueError,"single PNG exceeds"):delivery.package(root)

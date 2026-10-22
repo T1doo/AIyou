@@ -298,12 +298,115 @@ class UnifiedKeywordViewModelTest {
         }finally{h.release.countDown()}
         work.await();assertEquals(0,navigations);h.controller.resume();assertNull(h.state.get().unifiedKeyword)
     }}
+    @Test fun openedUnselectedChooserRetiresOnTagOrNonmatchingSourceObservationInEveryScope():Unit=runBlocking{
+        for(sourceChange in listOf(false,true))for(scope in UnifiedKeywordScope.entries)Harness().use{h->
+            h.ready();val other=h.data.f.entry(text="合成非命中来源");h.vm.refreshLocalSearch()
+            withTimeout(4000){h.vm.state.first{it.entries.any{e->e.id==other}}}
+            h.vm.unifiedKeywords.open();val u=h.value();h.vm.unifiedKeywords.scope(u.session,scope);h.vm.unifiedKeywords.openTags(u.session)
+            h.ui{it.tagPicker&&!it.tagBusy&&it.tagPage!=null};assertNull(h.value().tag)
+            if(sourceChange)h.data.f.revise(other,"合成新版本")else UnifiedManualTagSqlTest.set(h.data,other,listOf("新增标签"))
+            h.vm.refreshLocalSearch()
+            withTimeout(4000){h.vm.state.first{if(sourceChange)it.entries.any{e->e.id==other&&e.currentRevision==2}else it.manualTags[other]?.names==listOf("新增标签")}}
+            assertNull("Even no-selection chooser must retire: $scope source=$sourceChange",h.vm.state.value.unifiedKeyword)
+            h.vm.unifiedKeywords.closeTags(u.session);h.vm.unifiedKeywords.resume();assertNull(h.vm.state.value.unifiedKeyword)
+        }
+    }
+    @Test fun observedTagSnapshotsCompareMeaningAndRetireSelectedEmptyProofOnNonmatchingChange():Unit=runBlocking{Harness().use{h->
+        h.ready();UnifiedManualTagSqlTest.set(h.data,h.id,listOf("合成标签"));h.vm.refreshLocalSearch()
+        withTimeout(4000){h.vm.state.first{it.manualTags[h.id]?.version==1L}}
+        h.vm.unifiedKeywords.open();val session=h.value().session;h.vm.unifiedKeywords.scope(session,UnifiedKeywordScope.PREFERENCE)
+        h.vm.unifiedKeywords.openTags(session);var u=h.ui{it.tagPage!=null&&!it.tagBusy}
+        h.vm.unifiedKeywords.selectTag(session,u.tagPage!!.choices.single());h.ui{it.tag!=null&&!it.tagBusy}
+        h.vm.unifiedKeywords.keyword(session,"无匹配");h.vm.unifiedKeywords.search(session);u=h.ui{it.snapshot!=null&&!it.busy}
+        assertTrue(u.snapshot!!.groups.isEmpty());val oldSnapshot=h.vm.state.value.manualTags[h.id]
+        h.vm.refreshLocalSearch();withTimeout(4000){h.vm.state.first{it.manualTags[h.id]!==oldSnapshot}}
+        assertEquals(session,h.value().session);assertSame(u.snapshot,h.value().snapshot)
+        val other=h.data.f.entry(text="合成非匹配");UnifiedManualTagSqlTest.set(h.data,other,listOf("别的标签"));h.vm.refreshLocalSearch()
+        withTimeout(4000){h.vm.state.first{it.manualTags.containsKey(other)}};assertNull(h.vm.state.value.unifiedKeyword)
+    }}
+    @Test fun lateChooserCompletionAfterClosePauseAndNewSessionNeverRepopulatesOrSelectsOldChoice():Unit=runBlocking{Harness().use{h->
+        h.ready();UnifiedManualTagSqlTest.set(h.data,h.id,listOf("合成标签"))
+        h.vm.unifiedKeywords.open();val old=h.value();h.block=true;h.vm.unifiedKeywords.openTags(old.session)
+        withTimeout(4000){h.entered.await()};assertTrue(h.value().tagBusy);assertNull(h.value().tagPage)
+        h.vm.unifiedKeywords.retire();h.vm.unifiedKeywords.open();val fresh=h.value();assertNotEquals(old.session,fresh.session)
+        h.release.complete(Unit);h.vm.unifiedKeywords.openTags(fresh.session);h.ui{it.tagPage!=null&&!it.tagBusy}
+        assertEquals(fresh.session,h.value().session);assertNull(h.value().tag)
+        h.vm.unifiedKeywords.selectTag(old.session,h.value().tagPage!!.choices.single());assertNull(h.value().tag)
+        h.vm.unifiedKeywords.closeTags(fresh.session);assertFalse(h.value().tagPicker);assertNull(h.value().tagPage)
+    }}
+    @Test fun tagSelectionSwitchRejectsOldPageAndAbaRequestsAndNeverSearchesAutomatically():Unit=runBlocking{HandoffFixture().use{h->
+        UnifiedManualTagSqlTest.set(h.data,h.id,listOf("A","B"));h.controller.open();val session=h.state.get().unifiedKeyword!!.session
+        h.controller.openTags(session);h.queue.removeFirst()(h.owner);val old=h.state.get().unifiedKeyword!!.tagPage!!
+        h.controller.selectTag(session,old.choices.first());h.queue.removeFirst()(h.owner)
+        assertEquals("A",h.state.get().unifiedKeyword!!.tag!!.name);assertTrue(h.queue.isEmpty())
+        h.controller.openTags(session);h.queue.removeFirst()(h.owner);val next=h.state.get().unifiedKeyword!!.tagPage!!
+        h.controller.selectTag(session,old.choices.last());assertTrue(h.queue.isEmpty())
+        h.controller.selectTag(session,next.choices.last());h.queue.removeFirst()(h.owner);assertEquals("B",h.state.get().unifiedKeyword!!.tag!!.name)
+        h.controller.openTags(session);h.queue.removeFirst()(h.owner);val last=h.state.get().unifiedKeyword!!.tagPage!!
+        h.controller.selectTag(session,last.choices.first());h.queue.removeFirst()(h.owner)
+        assertEquals("A",h.state.get().unifiedKeyword!!.tag!!.name);assertNull(h.state.get().unifiedKeyword!!.snapshot);assertTrue(h.queue.isEmpty())
+    }}
+    @Test fun confirmedTagReturnGetsFreshSelectionAndProofAndManualEditorAdmissionClearsSeed():Unit=runBlocking{Harness().use{h->
+        h.ready();UnifiedManualTagSqlTest.set(h.data,h.id,listOf("合成标签"));h.vm.refreshLocalSearch()
+        withTimeout(4000){h.vm.state.first{it.manualTags[h.id]!=null}}
+        h.vm.unifiedKeywords.open();val session=h.value().session;h.vm.unifiedKeywords.openTags(session)
+        h.vm.unifiedKeywords.selectTag(session,h.ui{it.tagPage!=null&&!it.tagBusy}.tagPage!!.choices.single());h.ui{it.tag!=null&&!it.tagBusy}
+        h.vm.unifiedKeywords.keyword(session,"淡茶");h.vm.unifiedKeywords.search(session);val old=h.ui{it.snapshot!=null&&!it.busy}
+        val done=CompletableDeferred<Unit>();h.vm.unifiedKeywords.locate(session,old.visibleGroups.single().items.first()){_,confirm->assertTrue(confirm{done.complete(Unit)})}
+        withTimeout(4000){done.await()};h.vm.unifiedKeywords.close(session);h.vm.unifiedKeywords.resume()
+        val fresh=h.ui{it.snapshot!=null&&!it.busy};assertNotSame(old.tag,fresh.tag);assertNotSame(old.snapshot,fresh.snapshot);assertEquals(old.tag!!.id,fresh.tag!!.id)
+        val again=CompletableDeferred<Unit>();h.vm.unifiedKeywords.locate(fresh.session,fresh.visibleGroups.single().items.first()){_,confirm->assertTrue(confirm{again.complete(Unit)})}
+        withTimeout(4000){again.await()};h.vm.tags.open(h.id,1);withTimeout(4000){h.vm.state.first{it.manualTagEditor?.snapshot!=null&&!it.manualTagEditor.busy}}
+        h.vm.tags.close(h.vm.state.value.manualTagEditor!!.session);h.vm.unifiedKeywords.resume();assertNull(h.vm.state.value.unifiedKeyword)
+    }}
+    @Test fun taggedQueryRowGuardsNeverReadEntriesOrUiManualTagMapsEvenWithRetainedProof():Unit=runBlocking{
+        var entryReads=0;var tagReads=0;var guards=0
+        fun guard(actual:()->Unit):()->Unit={val e=entryReads;val t=tagReads;actual();assertEquals(e,entryReads);assertEquals(t,tagReads);guards++}
+        HandoffFixture{actual->object:UnifiedKeywordRepository by actual{
+            override suspend fun tagChoices(after:UnifiedTagPage?,checkCurrent:()->Unit)=actual.tagChoices(after,guard(checkCurrent))
+            override suspend fun selectTag(page:UnifiedTagPage,choice:UnifiedTagChoice,checkCurrent:()->Unit)=actual.selectTag(page,choice,guard(checkCurrent))
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,checkCurrent:()->Unit)=actual.search(keyword,scope,captureRange,tag,guard(checkCurrent))
+            override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,checkCurrent:()->Unit,admit:()->Unit)=actual.resolve(snapshot,item,guard(checkCurrent),admit)
+        }}.use{h->
+            UnifiedManualTagSqlTest.set(h.data,h.id,listOf("合成标签"));val rows=h.state.get().entries
+            val counted=object:AbstractList<StoredEntry>(){override val size:Int get(){entryReads++;return rows.size};override fun get(index:Int):StoredEntry{entryReads++;return rows[index]}}
+            val labels=object:AbstractMap<String,ManualTagSnapshot>(){override val entries:Set<Map.Entry<String,ManualTagSnapshot>> get(){tagReads++;return emptySet()}}
+            h.state.set(h.state.get().copy(entries=counted,manualTags=labels));h.controller.open();val session=h.state.get().unifiedKeyword!!.session
+            h.controller.openTags(session);h.queue.removeFirst()(h.owner);h.controller.selectTag(session,h.state.get().unifiedKeyword!!.tagPage!!.choices.single());h.queue.removeFirst()(h.owner)
+            h.controller.keyword(session,"淡茶");h.controller.search(session);h.queue.removeFirst()(h.owner)
+            val u=h.state.get().unifiedKeyword!!;assertNotNull(u.snapshot);var navigations=0
+            h.controller.locate(session,u.visibleGroups.single().items.single()){_,confirm->assertTrue(confirm{navigations++})};h.queue.removeFirst()(h.owner)
+            assertEquals(1,navigations);assertTrue(guards>20);assertTrue(entryReads>0);assertEquals(0,tagReads)
+            println("TAG_REQUEST_GUARDS checks=$guards guardEntryReads=0 guardUiTagReads=0 fullBoundaryEntryReads=$entryReads")
+        }
+    }
+    @Test fun clearingTagDuringActualPendingQueryRetiresOldRequestAndKeepsNewUnfilteredQueryUsable():Unit=runBlocking{Harness().use{h->
+        h.ready();UnifiedManualTagSqlTest.set(h.data,h.id,listOf("合成标签"))
+        h.vm.unifiedKeywords.open();val session=h.value().session;h.vm.unifiedKeywords.openTags(session)
+        h.vm.unifiedKeywords.selectTag(session,h.ui{it.tagPage!=null&&!it.tagBusy}.tagPage!!.choices.single());h.ui{it.tag!=null&&!it.tagBusy}
+        h.vm.unifiedKeywords.keyword(session,"淡茶");h.block=true;h.vm.unifiedKeywords.search(session)
+        withTimeout(4000){h.entered.await()};assertTrue(h.value().busy);assertNotNull(h.value().tag)
+        h.vm.unifiedKeywords.clearTag(session)
+        assertFalse("Clearing a filter must also retire the old query's busy state",h.value().busy)
+        assertNull(h.value().tag);assertNull(h.value().snapshot)
+        h.vm.unifiedKeywords.search(session);h.release.complete(Unit)
+        val fresh=h.ui{it.snapshot!=null&&!it.busy};assertNotSame(h.first,fresh.snapshot);assertNull(fresh.snapshot!!.tag)
+        assertEquals("淡茶",fresh.keyword);assertEquals(2,h.calls)
+    }}
     private class Harness(extra:Int=0,withMemory:Boolean=false):AutoCloseable {
         val data=UnifiedKeywordFixture();val id=data.f.entry(text="合成淡茶")
         val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();var block=false
         var first:UnifiedKeywordSnapshot?=null;var calls=0
         init{runBlocking{data.audio(id);repeat(extra){data.audio(data.f.entry(text="合成淡茶"))};if(withMemory)AcceptedMemoryKeywordSqlTest.memory(data,id,"备注专词")}}
         val port:UnifiedKeywordRepository=object:UnifiedKeywordRepository by data.repo{
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+                calls++;val result=data.repo.search(keyword,scope,captureRange,tag,checkCurrent)
+                if(block){block=false;first=result;entered.complete(Unit);release.await()};return result
+            }
+            override suspend fun tagChoices(after:UnifiedTagPage?,checkCurrent:()->Unit):UnifiedTagPage {
+                val result=data.repo.tagChoices(after,checkCurrent)
+                if(block){block=false;entered.complete(Unit);release.await()};return result
+            }
             override suspend fun search(keyword:String,scope:UnifiedKeywordScope)=search(keyword,scope,{})
             override suspend fun search(keyword:String,scope:UnifiedKeywordScope,checkCurrent:()->Unit)=search(keyword,scope,UnifiedCaptureRange(),checkCurrent)
             override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
@@ -314,6 +417,7 @@ class UnifiedKeywordViewModelTest {
         private val base=SqliteVmEntryRepository(data.f.db,data.f.gateway,RemoteTextTransactions(data.f.gateway)){data.f.media.close();data.f.media.awaitIdle();data.f.gateway.stopAndAwaitIdle()}
         val owner:EntryRepository=object:EntryRepository by base,AutoCloseable{
             override val unifiedKeywords=port
+            override val manualTags=data.f.tags
             override val sourceMemories=if(withMemory)data.memories else null
             override suspend fun prepare(){check(data.f.db.read("PRAGMA user_version").single().single()==12L)}
             override fun close()=base.close()

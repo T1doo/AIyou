@@ -16,9 +16,13 @@ internal class KeywordSet<T>(items:List<T>,sources:List<SourceVersion>,
 internal class SqlUnifiedKeywordRepository(private val database:RecordsSqlDatabase,
     private val originals:SqlLocalSearchRepository,private val audio:SqlAudioTranscriptRepository,
     private val images:SqlImageTextRepository,private val preferences:SqlSourcePreferenceRepository,
-    private val memories:SqlSourceMemoryRepository):UnifiedKeywordRepository {
+    private val memories:SqlSourceMemoryRepository,tagStorage:SqlManualTagRepository):UnifiedKeywordRepository {
+    private val tags=UnifiedManualTags(database,tagStorage)
+    override suspend fun tagChoices(after:UnifiedTagPage?,checkCurrent:()->Unit)=tags.choices(after,checkCurrent)
+    override suspend fun selectTag(page:UnifiedTagPage,choice:UnifiedTagChoice,checkCurrent:()->Unit)=tags.select(page,choice,checkCurrent)
+    override suspend fun refreshTag(selection:UnifiedTagSelection,checkCurrent:()->Unit)=tags.refresh(selection,checkCurrent)
     private inner class Proof(override val keyword:String,override val scope:UnifiedKeywordScope,override val captureRange:UnifiedCaptureRange,
-        val original:LocalSearchSnapshot?,val audioSet:KeywordSet<AudioTranscriptSnapshot>?,
+        override val tag:UnifiedTagSelection?,val original:LocalSearchSnapshot?,val audioSet:KeywordSet<AudioTranscriptSnapshot>?,
         val imageSet:KeywordSet<ImageTextSnapshot>?,val preferenceSet:KeywordSet<SourcePreferenceSnapshot>?,
         val memorySet:KeywordSet<AcceptedMemoryKeywordHit>?,
         bindings:List<UnifiedKeywordBinding>,groups:List<UnifiedKeywordGroup>):UnifiedKeywordSnapshot {
@@ -31,19 +35,24 @@ internal class SqlUnifiedKeywordRepository(private val database:RecordsSqlDataba
     override suspend fun search(keyword:String,scope:UnifiedKeywordScope)=search(keyword,scope,{})
     override suspend fun search(keyword:String,scope:UnifiedKeywordScope,checkCurrent:()->Unit)=search(keyword,scope,UnifiedCaptureRange(),checkCurrent)
     override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+        return search(keyword,scope,captureRange,null,checkCurrent)
+    }
+    override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
         checkCurrent()
         PreferenceKeywords.validate(keyword);require(keyword.isNotBlank())
+        val tagName=tag?.let{database.transaction{sql->tags.validate(sql,it,checkCurrent)}}
         // Existing FTS/alias candidates are only a superset. The final full literal check below
         // never turns a tag/alias candidate into an original-body match.
-        val o=if(selected(scope,UnifiedKeywordScope.ORIGINAL))originals.candidates(LocalSearchRequest(keyword,from=captureRange.from?.toString().orEmpty(),through=captureRange.through?.toString().orEmpty(),dateBasis=RecordDateBasis.CAPTURED))else null
+        val o=if(selected(scope,UnifiedKeywordScope.ORIGINAL))originals.candidates(LocalSearchRequest(keyword,from=captureRange.from?.toString().orEmpty(),through=captureRange.through?.toString().orEmpty(),dateBasis=RecordDateBasis.CAPTURED,tag=tagName))else null
         val a=if(selected(scope,UnifiedKeywordScope.AUDIO))audio.keywordSet(keyword)else null
         val i=if(selected(scope,UnifiedKeywordScope.IMAGE))images.keywordSet(keyword)else null
         val p=if(selected(scope,UnifiedKeywordScope.PREFERENCE))preferences.keywordSet(keyword)else null
         checkCurrent()
-        val m=if(selected(scope,UnifiedKeywordScope.ACCEPTED_MEMORY))memories.keywordSet(keyword,captureRange,checkCurrent)else null
+        val m=if(selected(scope,UnifiedKeywordScope.ACCEPTED_MEMORY))memories.keywordSet(keyword,captureRange,checkCurrent,tag?.let{t->{sql,source->tags.matches(sql,source,t)}})else null
         return database.transaction { sql ->
             checkCurrent()
             if(o!=null&&!originals.keywordCurrentWithin(sql,o)||a?.current(sql,checkCurrent)==false||i?.current(sql,checkCurrent)==false||p?.current(sql,checkCurrent)==false||m?.current(sql,checkCurrent)==false)throw UnifiedKeywordConflict()
+            if(tag!=null)tags.validate(sql,tag,checkCurrent)
             val sources=(o?.entries.orEmpty().map{SourceVersion(it.id,it.currentRevision.toLong())}+a?.sources.orEmpty()+i?.sources.orEmpty()+p?.sources.orEmpty()+m?.sources.orEmpty()).distinct()
             val bindings=sources.map{binding(sql,it)}
             val bySource=bindings.associateBy{it.source}
@@ -55,9 +64,9 @@ internal class SqlUnifiedKeywordRepository(private val database:RecordsSqlDataba
             p?.items?.forEach{evidence+=UnifiedKeywordEvidence.Preference(bound(it.source),it)}
             m?.items?.forEach{require(it.binding==bound(it.binding.source));evidence+=UnifiedKeywordEvidence.AcceptedMemory(it)}
             require(evidence.map{it.key}.distinct().size==evidence.size)
-            val groups=evidence.filter{captureRange.contains(it.binding.captured,it.binding.zone)}.groupBy{it.binding}.map{(b,rows)->UnifiedKeywordGroup(b,rows.sortedBy{it.key})}
+            val groups=evidence.filter{captureRange.contains(it.binding.captured,it.binding.zone)&&(tag==null||tags.matches(sql,it.binding.source,tag))}.groupBy{it.binding}.map{(b,rows)->UnifiedKeywordGroup(b,rows.sortedBy{it.key})}
                 .sortedWith(compareByDescending<UnifiedKeywordGroup>{it.binding.captured}.thenBy{it.binding.source.sourceId})
-            checkCurrent();Proof(keyword,scope,captureRange,o,a,i,p,m,bindings,groups)
+            checkCurrent();Proof(keyword,scope,captureRange,tag,o,a,i,p,m,bindings,groups)
         }
     }
     override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit)=resolve(snapshot,item,{},admit)
@@ -66,9 +75,10 @@ internal class SqlUnifiedKeywordRepository(private val database:RecordsSqlDataba
         val p=snapshot as? Proof?:return false
         if(p.owner!==this||item!=null&&p.groups.none{g->g.items.any{it===item}})return false
         // Fresh full-set media authentication is completed before the last shared transaction.
-        search(p.keyword,p.scope,p.captureRange,checkCurrent)
+        search(p.keyword,p.scope,p.captureRange,p.tag,checkCurrent)
         return database.transaction {sql->
             checkCurrent()
+            if(p.tag!=null)tags.validate(sql,p.tag,checkCurrent)
             if(p.original!=null&&!originals.keywordCurrentWithin(sql,p.original)||p.audioSet?.current?.invoke(sql)==false||
                 p.imageSet?.current?.invoke(sql)==false||p.preferenceSet?.current?.invoke(sql)==false||
                 p.memorySet?.current(sql,checkCurrent)==false||

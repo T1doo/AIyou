@@ -213,6 +213,40 @@ class UnifiedKeywordPresentationTest {
         assertEquals("",compose.onNodeWithTag("unified-through").performScrollTo().fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         compose.runOnIdle{assertEquals(0,f.writes)}
     }
+    private fun openTags(){compose.onNodeWithTag("unified-results").performScrollToIndex(1);click("unified-tags-open");drain()}
+    @Test fun manualTagDateIntersectionReturnAndClearUseExactOriginalAndNeverSavePrivateFilter(){
+        val restore=StateRestorationTester(compose);content(restore);open()
+        compose.runOnIdle{assertEquals(0,f.tagReads)};openTags()
+        compose.onNodeWithTag("unified-tag-options").performScrollToIndex(1);click("unified-tag-choice:synthetic-tag-0");drain()
+        compose.runOnIdle{assertEquals(0,f.lookups);assertNull(f.local.value.unifiedKeyword!!.snapshot)}
+        date("unified-from","1970-01-01");date("unified-through","1970-01-01");query("淡茶")
+        val old=f.local.value.unifiedKeyword!!;assertEquals("饮食",old.tag!!.name);assertEquals(1,old.snapshot!!.groups.size)
+        result(old.visibleGroups.single().items.filterIsInstance<UnifiedKeywordEvidence.Original>().single())
+        compose.onNodeWithTag("original-text").assertTextEquals(f.records[0].originalText);back()
+        compose.runOnIdle{val returned=f.local.value.unifiedKeyword!!;assertNotSame(old.tag,returned.tag);assertNotSame(old.snapshot,returned.snapshot);assertEquals(old.tag!!.id,returned.tag!!.id)
+            val saved=registry!!.performSave().toString();assertFalse(saved.contains("饮食"));assertFalse(saved.contains("synthetic-tag-0"))}
+        compose.onNodeWithTag("unified-results").performScrollToIndex(1);click("unified-tag-clear")
+        compose.onNodeWithTag("unified-tag-selected").performScrollTo().assertTextEquals("不限标签")
+        openTags();compose.onNodeWithTag("unified-tag-options").performScrollToIndex(2);click("unified-tag-choice:synthetic-tag-1");drain();query("淡茶")
+        compose.onNodeWithTag("unified-empty").assertExists()
+        restore.emulateSavedInstanceStateRestore();compose.waitForIdle();drain();compose.runOnIdle{assertNull(f.local.value.unifiedKeyword);assertEquals(0,f.writes)}
+        open();compose.onNodeWithTag("unified-results").performScrollToIndex(1);compose.onNodeWithTag("unified-tag-selected").performScrollTo().assertTextEquals("不限标签")
+    }
+    @Test @Config(qualifiers="w640dp-h320dp-land")
+    fun manualTagChooserPaginationLongValuesAndKeyboardSourceRemainReachableAtDoubleFont(){
+        content();open();openTags()
+        compose.onNodeWithTag("unified-tag-options").performScrollToIndex(21);click("unified-tags-next");drain()
+        compose.onNodeWithTag("unified-tag-options").performScrollToIndex(3)
+        val choice=compose.onNodeWithTag("unified-tag-choice:synthetic-tag-22").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        choice.assertTextEquals(f.longTag);keyboardEnter(choice)
+        compose.onNodeWithTag("unified-results").performScrollToIndex(1);compose.onNodeWithTag("unified-tag-selected").performScrollTo().assertTextEquals(f.longTag)
+        compose.onNodeWithTag("unified-results").performScrollToIndex(0);compose.onNodeWithTag("unified-query").performScrollTo().performTextReplacement("淡茶")
+        compose.onNodeWithTag("unified-results").performScrollToIndex(2);keyboardEnter(compose.onNodeWithTag("unified-search").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp))
+        val u=f.local.value.unifiedKeyword!!;val item=u.visibleGroups.single().items.filterIsInstance<UnifiedKeywordEvidence.Original>().single()
+        compose.onNodeWithTag("unified-results").performScrollToIndex(3);keyboardEnter(compose.onNodeWithTag("unified-source:"+item.key).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp))
+        compose.onNodeWithTag("original-text").assertTextEquals(f.records[0].originalText)
+        compose.runOnIdle{assertEquals(0,f.writes);assertEquals(0,f.memoryWrites)}
+    }
     private class Fixture {
         private fun id()=UUID.randomUUID().toString()
         val records=listOf("我偏好淡茶🙂","我偏好清水🙂").map{StoredEntry(id(),1,it,55,"UTC",ProcessingPolicy.LOCAL_ONLY)}
@@ -232,10 +266,32 @@ class UnifiedKeywordPresentationTest {
         }
         var writes=0;var mediaReads=0;var tooBroad=false;var lookups=0
         val queue=ArrayDeque<suspend(EntryRepository)->Unit>()
+        val longTag="合成人工标签"+"茶".repeat(34)
+        private class TagChoice(override val id:String,override val name:String):UnifiedTagChoice
+        private class TagSelection(override val id:String,override val name:String):UnifiedTagSelection
+        private class TagPage(override val choices:List<UnifiedTagChoice>,override val hasNext:Boolean,val offset:Int):UnifiedTagPage
+        private val tagValues=(0..22).map{n->TagChoice("synthetic-tag-$n",when(n){0->"饮食";1->"饮水";22->longTag;else->"合成标签$n"})}
+        private val tagPages=Collections.newSetFromMap(IdentityHashMap<UnifiedTagPage,Boolean>())
+        private val selections=Collections.newSetFromMap(IdentityHashMap<UnifiedTagSelection,Boolean>())
+        var tagReads=0
         val repo:UnifiedKeywordRepository=object:UnifiedKeywordRepository {
+            override suspend fun tagChoices(after:UnifiedTagPage?,checkCurrent:()->Unit):UnifiedTagPage {
+                checkCurrent();if(after!=null)check(after in tagPages&&after.hasNext);tagReads++
+                val offset=if(after==null)0 else (after as TagPage).offset+20
+                return TagPage(tagValues.drop(offset).take(20),offset+20<tagValues.size,offset).also{tagPages+=it}
+            }
+            override suspend fun selectTag(page:UnifiedTagPage,choice:UnifiedTagChoice,checkCurrent:()->Unit):UnifiedTagSelection {
+                checkCurrent();check(page in tagPages&&page.choices.any{it===choice});return TagSelection(choice.id,choice.name).also{selections+=it}
+            }
+            override suspend fun refreshTag(selection:UnifiedTagSelection,checkCurrent:()->Unit):UnifiedTagSelection {
+                checkCurrent();check(selection in selections);return TagSelection(selection.id,selection.name).also{selections+=it}
+            }
             override suspend fun search(keyword:String,scope:UnifiedKeywordScope)=search(keyword,scope,UnifiedCaptureRange(),{})
             override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
-                checkCurrent();lookups++
+                return search(keyword,scope,captureRange,null,checkCurrent)
+            }
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+                checkCurrent();if(tag!=null)check(tag in selections);lookups++
                 if(tooBroad)throw UnifiedKeywordTooBroad()
                 val saved=memory;val current=saved?.current
                 val extra=if(saved?.state==SourceMemoryState.ACTIVE&&current?.review==SourceMemoryReview.ACCEPTED){
@@ -244,9 +300,9 @@ class UnifiedKeywordPresentationTest {
                 }else emptyList()
                 val matched=(evidence+extra).filter{e->val text=when(e){is UnifiedKeywordEvidence.Original->e.entry.originalText;is UnifiedKeywordEvidence.Audio->e.value.current.text;is UnifiedKeywordEvidence.Image->e.value.current.text;is UnifiedKeywordEvidence.Preference->e.value.current!!.content.reference.quote;is UnifiedKeywordEvidence.AcceptedMemory->keyword}
                     text.contains(keyword)&&when(scope){UnifiedKeywordScope.ALL->true;UnifiedKeywordScope.ORIGINAL->e is UnifiedKeywordEvidence.Original;UnifiedKeywordScope.AUDIO->e is UnifiedKeywordEvidence.Audio;UnifiedKeywordScope.IMAGE->e is UnifiedKeywordEvidence.Image;UnifiedKeywordScope.PREFERENCE->e is UnifiedKeywordEvidence.Preference;UnifiedKeywordScope.ACCEPTED_MEMORY->e is UnifiedKeywordEvidence.AcceptedMemory}}
-                val dates=captureRange
-                val snapshot=object:UnifiedKeywordSnapshot{override val keyword=keyword;override val scope=scope;override val captureRange=dates;override val bindings=records.map(::bind)
-                    override val groups=matched.filter{dates.contains(it.binding.captured,it.binding.zone)}.groupBy{it.binding}.map{(b,rows)->UnifiedKeywordGroup(b,rows.sortedBy{it.key})}}
+                val dates=captureRange;val selectedTag=tag
+                val snapshot=object:UnifiedKeywordSnapshot{override val keyword=keyword;override val scope=scope;override val captureRange=dates;override val tag=selectedTag;override val bindings=records.map(::bind)
+                    override val groups=matched.filter{dates.contains(it.binding.captured,it.binding.zone)&&(tag==null||it.binding.source.sourceId==records[if(tag.id=="synthetic-tag-1")1 else 0].id)}.groupBy{it.binding}.map{(b,rows)->UnifiedKeywordGroup(b,rows.sortedBy{it.key})}}
                 proofVersions[snapshot]=memory?.version;return snapshot
             }
             override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit):Boolean {if(!proofVersions.containsKey(snapshot)||proofVersions[snapshot]!=memory?.version)return false;if(item!=null&&snapshot.groups.none{it.items.any{row->row===item}})return false;admit();return true}

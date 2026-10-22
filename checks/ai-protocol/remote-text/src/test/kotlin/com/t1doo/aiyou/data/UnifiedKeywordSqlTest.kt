@@ -19,7 +19,7 @@ class UnifiedKeywordSqlTest {
         val originalBytes=h.f.db.read("SELECT * FROM entry_revisions")
         p.groups.flatMap{it.items}.forEach{e->var admitted=false;assertTrue(h.repo.resolve(p,e){admitted=true});assertTrue(admitted)}
         assertEquals(originalBytes,h.f.db.read("SELECT * FROM entry_revisions"))
-        val foreign=SqlUnifiedKeywordRepository(h.f.gateway,h.originals,h.audios,h.images,h.preferences,h.memories)
+        val foreign=SqlUnifiedKeywordRepository(h.f.gateway,h.originals,h.audios,h.images,h.preferences,h.memories,h.f.tags)
         assertFalse(foreign.resolve(p){fail("A foreign owner must not accept this proof")})
     }}
     @Test fun fullMatchedSetIncludesOlderPagesWithBoundedSingleMediaPass():Unit=runBlocking{UnifiedKeywordFixture().use{h->
@@ -102,7 +102,7 @@ internal class UnifiedKeywordFixture(seed:Int=1):AutoCloseable {
     val images=SqlImageTextRepository(f.gateway,f.key,media)
     val preferences=SqlSourcePreferenceRepository(f.gateway,f.key)
     val memories=SqlSourceMemoryRepository(f.gateway,f.key)
-    val repo=SqlUnifiedKeywordRepository(f.gateway,originals,audios,images,preferences,memories)
+    val repo=SqlUnifiedKeywordRepository(f.gateway,originals,audios,images,preferences,memories,f.tags)
     suspend fun audio(id:String,text:String="合成淡茶"):AudioTranscriptSnapshot {
         val bytes=CaptureAudioSqlTest.wave();val i=AttachmentIntent(FullBackupTest.uuid(),id,1,"audio/wav",FullBackupTest.hash(bytes),bytes.size.toLong())
         f.media.save(i){bytes.inputStream()};return audios.write(AudioTranscriptSqlTest.write(audios.preview(i),text=text))

@@ -10,7 +10,7 @@ import com.t1doo.aiyou.model.*
 import com.t1doo.aiyou.records.*
 
 /** Synthetic display data, never a functioning store, inference port, or navigation authority. */
-@Composable private fun UnifiedKeywordSpecimen(firstItem:Int,memoryOnly:Boolean=false,dateRange:Boolean=false){
+@Composable private fun UnifiedKeywordSpecimen(firstItem:Int,memoryOnly:Boolean=false,dateRange:Boolean=false,tags:Boolean=false){
     val entry=StoredEntry("00000000-0000-4000-8000-000000000001",1,"合成：我偏好淡茶，散步后也喜欢清水。",55,"UTC",ProcessingPolicy.LOCAL_ONLY)
     val source=SourceVersion(entry.id,1);val hash=OriginalExports.hash(entry.originalText)
     val binding=UnifiedKeywordBinding(source,hash,0,55,"UTC",entry.policy)
@@ -33,7 +33,8 @@ import com.t1doo.aiyou.records.*
         override suspend fun search(keyword:String,scope:UnifiedKeywordScope):UnifiedKeywordSnapshot=error("Render-only fixture")
         override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit):Boolean=error("Render-only fixture")
     }
-    val ui=UnifiedKeywordUi(1,owner,keyword=word,snapshot=snapshot,from=range.from?.toString().orEmpty(),through=range.through?.toString().orEmpty())
+    val tagPage=object:UnifiedTagPage{override val hasNext=true;override val choices=listOf("合成：饮食与散步","合成人工标签"+"茶".repeat(34)).mapIndexed{n,text->object:UnifiedTagChoice{override val id="synthetic-tag-$n";override val name=text}}}
+    val ui=UnifiedKeywordUi(1,owner,keyword=word,snapshot=snapshot,from=range.from?.toString().orEmpty(),through=range.through?.toString().orEmpty(),tagPicker=tags,tagPage=if(tags)tagPage else null)
     val controller=UnifiedKeywordController({LocalRecordUiState()},{},{false})
     AIyouTheme{UnifiedKeywordContent(ui,controller,{false},{_,_->},rememberLazyListState(initialFirstVisibleItemIndex=firstItem))}
 }
@@ -57,3 +58,8 @@ import com.t1doo.aiyou.records.*
 @Preview(name="portrait200",widthDp=320,heightDp=640,fontScale=2f,locale="zh-rCN")
 @Preview(name="landscape200",widthDp=640,heightDp=320,fontScale=2f,locale="zh-rCN")
 @Composable fun UnifiedKeywordCaptureDateRender(){UnifiedKeywordSpecimen(1,dateRange=true)}
+
+@PreviewTest
+@Preview(name="portrait200",widthDp=320,heightDp=640,fontScale=2f,locale="zh-rCN")
+@Preview(name="landscape200",widthDp=640,heightDp=320,fontScale=2f,locale="zh-rCN")
+@Composable fun UnifiedKeywordManualTagsRender(){UnifiedKeywordSpecimen(0,tags=true)}

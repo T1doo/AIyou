@@ -22,6 +22,7 @@ class ManualTagController internal constructor(
     private val current: () -> LocalRecordUiState,
     private val publish: ((LocalRecordUiState) -> LocalRecordUiState) -> Unit,
     private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
+    private val beforeOpen:()->Unit = {},
 ) {
     private val sessions = AtomicLong()
     @Volatile private var disposed = false
@@ -35,6 +36,7 @@ class ManualTagController internal constructor(
         val local = current()
         if (disposed || !local.ready || local.opening || local.error != null || local.recordPackage != null || local.recycleBin != null || local.sourceMemories != null || local.saving || local.savePending ||
             local.entries.none { it.id == id && it.currentRevision == revision }) return
+        beforeOpen()
         val editor = ManualTagEditor(sessions.incrementAndGet(), id, revision, busy = true)
         publish { latest -> if (!disposed && latest.ready && !latest.opening && latest.error == null &&
             latest.entries.any { it.id == id && it.currentRevision == revision }) latest.copy(manualTagEditor = editor) else latest }

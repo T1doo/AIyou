@@ -8,6 +8,8 @@ import java.util.concurrent.CancellationException
 /** All encryption/decryption runs inside the records owner's counted SQL transaction. */
 internal class SqlManualTagRepository(private val database: RecordsSqlDatabase, databaseKey: ByteArray) : ManualTagRepository {
     private val cipher = ManualTagCipher(databaseKey)
+    private val valueIds = ManualTagValueIds(databaseKey)
+    internal fun valueId(name:String)=valueIds.id(name)
     override fun read(entryId: String): ManualTagSnapshot = safely {
         ManualTags.identifier(entryId)
         database.transaction { sql -> readWithin(sql, entryId) }
@@ -79,5 +81,5 @@ internal class SqlManualTagRepository(private val database: RecordsSqlDatabase, 
         catch (failure: ManualTagUnavailable) { throw failure }
         catch (_: Exception) { throw ManualTagStorageFailure() }
     /** Owner only, after sealing and draining the shared SQL gateway. */
-    fun wipeKey() = cipher.wipe()
+    fun wipeKey() { cipher.wipe();valueIds.wipe() }
 }

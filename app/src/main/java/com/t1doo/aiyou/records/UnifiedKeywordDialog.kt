@@ -75,6 +75,7 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
 /** The exact production body also feeds native render evidence; it has no storage/lifecycle owner. */
 @Composable fun UnifiedKeywordContent(u:UnifiedKeywordUi,c:UnifiedKeywordController,canUse:()->Boolean,
     onLocate:(UnifiedKeywordEvidence,UnifiedKeywordHandoff)->Unit,listState:LazyListState=rememberLazyListState()){
+    if(u.tagPicker){UnifiedTagChooser(u,c,canUse);return}
     var menu by remember{mutableStateOf(false)}
     Surface(Modifier.fillMaxWidth().padding(12.dp).fillMaxHeight(0.94f),shape=MaterialTheme.shapes.large){
             LazyColumn(Modifier.padding(12.dp).testTag("unified-results"),state=listState,verticalArrangement=Arrangement.spacedBy(8.dp)){
@@ -95,11 +96,20 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
                             OutlinedTextField(u.through,{if(canUse())c.through(u.session,it)},singleLine=true,label={Text("结束日期（含）")},
                                 supportingText={Text("YYYY-MM-DD；留空不限")},modifier=Modifier.fillMaxWidth().aiyouFocusOutline().testTag("unified-through"))
                             TextButton({if(canUse())c.unlimitedDates(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-dates-clear")){Text("不限日期")}
+                            HorizontalDivider()
+                            Text("所属原件的人工标签",style=MaterialTheme.typography.titleSmall)
+                            Text("与关键词、捕获日期共同筛选，不改变原件或标签。",style=MaterialTheme.typography.bodySmall)
+                            Text(u.tag?.name?:"不限标签",modifier=Modifier.testTag("unified-tag-selected"))
+                            OutlinedButton({if(canUse())c.openTags(u.session)},enabled=!u.busy&&!u.tagBusy,
+                                modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tags-open")){Text("选择人工标签")}
+                            if(u.tag!=null)TextButton({if(canUse())c.clearTag(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tag-clear")){Text("不限标签")}
+                            if(u.tagBusy)Text("正在重新核对人工标签。",Modifier.testTag("unified-tag-status"))
+                            if(u.tagError!=null)Text(u.tagError,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("unified-tag-error"))
                         }
                     }
                 }
                 item{
-                    FilledTonalButton({if(canUse())c.search(u.session)},enabled=!u.busy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-search")){Text("查找当前内容")}
+                    FilledTonalButton({if(canUse())c.search(u.session)},enabled=!u.busy&&!u.tagBusy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-search")){Text("查找当前内容")}
                     TextButton({if(canUse())c.clear(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-clear")){Text("清空查询和结果")}
                     TextButton({if(canUse())c.close(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-close")){Text("返回回忆时间线")}
                     when{u.busy->Text("正在认证所选内容与原件。",Modifier.testTag("unified-status"))
@@ -125,5 +135,28 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
                     TextButton({if(canUse())c.next(u.session)},enabled=(u.page+1)*20<u.snapshot.groups.size,modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-next")){Text("下一页")}
                 }
             }
+    }
+}
+
+/** Kept inside the same private dialog; the tag list has its own explicit scroll owner. */
+@Composable private fun UnifiedTagChooser(u:UnifiedKeywordUi,c:UnifiedKeywordController,canUse:()->Boolean){
+    Surface(Modifier.fillMaxWidth().padding(12.dp).fillMaxHeight(0.94f),shape=MaterialTheme.shapes.large){
+        LazyColumn(Modifier.padding(12.dp).testTag("unified-tag-options"),verticalArrangement=Arrangement.spacedBy(8.dp)){
+            item {
+                Text("选择人工标签",style=MaterialTheme.typography.titleLarge)
+                Text("来自当前原件的人工标签；同名标签合并显示。选择后仍需主动查找。")
+                if(u.tagBusy)Text("正在完整核对标签与来源。",Modifier.testTag("unified-tag-status"))
+                else if(u.tagError!=null)Text(u.tagError,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("unified-tag-error"))
+                else if(u.tagPage?.choices?.isEmpty()==true)Text("当前没有可选的人工标签。",Modifier.testTag("unified-tags-empty"))
+            }
+            if(!u.tagBusy&&u.tagError==null)items(u.tagPage?.choices.orEmpty(),key={it.id}){choice->
+                OutlinedButton({if(canUse())c.selectTag(u.session,choice)},modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tag-choice:"+choice.id)){Text(choice.name)}
+            }
+            item {
+                TextButton({if(canUse())c.loadTags(u.session)},enabled=!u.tagBusy,modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tags-first")){Text(if(u.tagError!=null)"重新核对标签"else"重新查看第一页")}
+                if(u.tagPage?.hasNext==true)FilledTonalButton({if(canUse())c.loadTags(u.session,true)},enabled=!u.tagBusy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tags-next")){Text("下一页标签")}
+                TextButton({if(canUse())c.closeTags(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tags-cancel")){Text("取消选择，返回查询")}
+            }
+        }
     }
 }

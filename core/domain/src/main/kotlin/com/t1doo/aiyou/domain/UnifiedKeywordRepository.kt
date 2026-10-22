@@ -63,6 +63,7 @@ interface UnifiedKeywordSnapshot {
     val keyword:String
     val scope:UnifiedKeywordScope
     val captureRange:UnifiedCaptureRange get()=UnifiedCaptureRange()
+    val tag:UnifiedTagSelection? get()=null
     val groups:List<UnifiedKeywordGroup>
     /** Includes off-screen and nonmatching sources retained by the authenticated collection proof. */
     val bindings:List<UnifiedKeywordBinding>
@@ -79,6 +80,15 @@ interface UnifiedKeywordRepository {
         if(!captureRange.isUnbounded)throw UnifiedCaptureRangeUnsupported()
         return search(keyword,scope,checkCurrent)
     }
+    /** Owner-private tag capabilities: display properties alone are never proof. */
+    suspend fun tagChoices(after:UnifiedTagPage?=null,checkCurrent:()->Unit):UnifiedTagPage = throw UnifiedTagUnsupported()
+    suspend fun selectTag(page:UnifiedTagPage,choice:UnifiedTagChoice,checkCurrent:()->Unit):UnifiedTagSelection = throw UnifiedTagUnsupported()
+    /** Explicit return requery obtains a new collection proof, never revives the old query proof. */
+    suspend fun refreshTag(selection:UnifiedTagSelection,checkCurrent:()->Unit):UnifiedTagSelection = throw UnifiedTagUnsupported()
+    suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+        if(tag!=null)throw UnifiedTagUnsupported()
+        return search(keyword,scope,captureRange,checkCurrent)
+    }
     /** Reauthenticates media, then jointly verifies all sets. Callback is a PRIVATE admission
      * ticket only: callers must not render or navigate until this method returns true. */
     suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?=null,admit:()->Unit):Boolean
@@ -88,3 +98,8 @@ interface UnifiedKeywordRepository {
 }
 class UnifiedKeywordConflict:IllegalStateException("Unified local lookup changed")
 class UnifiedKeywordTooBroad:IllegalStateException("Accepted memory lookup has too many matches")
+
+interface UnifiedTagChoice { val id:String; val name:String }
+interface UnifiedTagPage { val choices:List<UnifiedTagChoice>; val hasNext:Boolean }
+interface UnifiedTagSelection { val id:String; val name:String }
+class UnifiedTagUnsupported:IllegalStateException("Manual tag filter is unavailable")
