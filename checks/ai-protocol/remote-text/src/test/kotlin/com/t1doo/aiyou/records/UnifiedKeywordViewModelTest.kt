@@ -176,6 +176,51 @@ class UnifiedKeywordViewModelTest {
         h.vm.sourceMemories.close(h.vm.state.value.sourceMemories!!.session);h.vm.unifiedKeywords.resume()
         assertNull(h.vm.state.value.unifiedKeyword)
     }}
+    @Test fun actualPerRowRequestChecksNeverTraverseEntriesOrHashRetainedBindings():Unit=runBlocking{
+        var entryReads=0;var checks=0;var retainedChecks=0
+        fun guard(checkCurrent:()->Unit):()->Unit={
+            val before=entryReads;checkCurrent()
+            assertEquals("A per-row request guard must not read any entry or hash a retained binding",before,entryReads)
+            checks++
+        }
+        HandoffFixture{actual->object:UnifiedKeywordRepository by actual{
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,checkCurrent:()->Unit)=actual.search(keyword,scope,guard(checkCurrent))
+            override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,checkCurrent:()->Unit,admit:()->Unit):Boolean {
+                assertEquals(21,snapshot.bindings.size)
+                return actual.resolve(snapshot,item,{retainedChecks++;guard(checkCurrent)()},admit)
+            }
+        }}.use{h->
+            val body="合成依据"+"x".repeat(99_996)
+            val rows=(0 until 21).map{
+                val id=h.data.f.entry(text=body);AcceptedMemoryKeywordSqlTest.memory(h.data,id,"备注专词",quote="合成依据")
+                StoredEntry(id,1,body,5,"UTC",ProcessingPolicy.LOCAL_ONLY)
+            }
+            val counted=object:AbstractList<StoredEntry>(){
+                override val size:Int get(){entryReads++;return rows.size}
+                override fun get(index:Int):StoredEntry{entryReads++;return rows[index]}
+            }
+            h.state.set(h.state.get().copy(entries=counted))
+            var fullRows=0
+            h.data.f.db.beforeSql={sql->if(sql.startsWith("SELECT id,entryId,sourceRevision,sourceHash,generation,ruleVersion"))fullRows++}
+            try{
+                h.controller.open();var u=h.state.get().unifiedKeyword!!
+                h.controller.scope(u.session,UnifiedKeywordScope.ACCEPTED_MEMORY);h.controller.keyword(u.session,"备注专词")
+                h.controller.search(u.session);h.queue.removeFirst()(h.owner)
+                u=h.state.get().unifiedKeyword!!;assertEquals(21,u.snapshot!!.groups.size)
+                assertTrue(entryReads>0) // Full source validation still occurs outside the row guard.
+                h.controller.next(u.session);h.queue.removeFirst()(h.owner)
+                u=h.state.get().unifiedKeyword!!;assertEquals(1,u.page)
+                val item=u.visibleGroups.single().items.single();var navigations=0
+                h.controller.locate(u.session,item){found,confirm->assertSame(item,found);assertTrue(confirm{navigations++})}
+                h.queue.removeFirst()(h.owner)
+                assertEquals(1,navigations);assertNull(h.state.get().unifiedKeyword)
+                assertEquals(21*8,fullRows) // Search two scans; paging and locate three scans each.
+                assertTrue(checks>=fullRows*4);assertTrue(retainedChecks>0)
+                println("REQUEST_GUARD_COUNT checks=$checks retained=$retainedChecks fullRows=$fullRows entryReadsOutsideGuard=$entryReads guardEntryReads=0")
+                h.controller.resume();assertNotNull(h.state.get().unifiedKeyword)
+            }finally{h.data.f.db.beforeSql=null}
+        }
+    }
     private class Harness(extra:Int=0,withMemory:Boolean=false):AutoCloseable {
         val data=UnifiedKeywordFixture();val id=data.f.entry(text="合成淡茶")
         val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();var block=false
@@ -204,15 +249,16 @@ class UnifiedKeywordViewModelTest {
     }
     /** Real repository/controller, with a publication barrier AFTER the real atomic state CAS.
      * No production-only testing hook, simulated pause is the actual retire/dispose entry. */
-    private class HandoffFixture:AutoCloseable {
+    private class HandoffFixture(decorate:(UnifiedKeywordRepository)->UnifiedKeywordRepository={it}):AutoCloseable {
         val data=UnifiedKeywordFixture();val id=data.f.entry(text="合成淡茶")
+        val port=decorate(data.repo)
         val state=java.util.concurrent.atomic.AtomicReference(LocalRecordUiState(ready=true,opening=false,
-            entries=listOf(com.t1doo.aiyou.model.StoredEntry(id,1,"合成淡茶",5,"UTC",com.t1doo.aiyou.model.ProcessingPolicy.LOCAL_ONLY)),unifiedKeywordOwner=data.repo))
+            entries=listOf(com.t1doo.aiyou.model.StoredEntry(id,1,"合成淡茶",5,"UTC",com.t1doo.aiyou.model.ProcessingPolicy.LOCAL_ONLY)),unifiedKeywordOwner=port))
         val queue=java.util.ArrayDeque<suspend(EntryRepository)->Unit>()
         val cleared=java.util.concurrent.CountDownLatch(1);val release=java.util.concurrent.CountDownLatch(1)
         var block=false;private val blocked=java.util.concurrent.atomic.AtomicBoolean()
         val owner:EntryRepository=object:EntryRepository {
-            override val unifiedKeywords=data.repo
+            override val unifiedKeywords=port
             override suspend fun readDraft():com.t1doo.aiyou.model.TextDraft?=null
             override suspend fun updateDraft(text:String):com.t1doo.aiyou.model.TextDraft=error("Unrelated")
             override suspend fun saveDraft(expected:com.t1doo.aiyou.model.TextDraft,capturedAtMillis:Long,captureTimeZone:String):com.t1doo.aiyou.model.StoredEntry=error("Unrelated")

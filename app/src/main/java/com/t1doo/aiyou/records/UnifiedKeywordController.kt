@@ -11,11 +11,16 @@ data class UnifiedKeywordUi(val session:Long,val owner:UnifiedKeywordRepository,
     val visibleGroups get()=if(busy||error!=null)emptyList()else snapshot?.groups?.drop(page*20)?.take(20).orEmpty()
     override fun toString()="UnifiedKeywordUi(redacted)"
 }
-internal fun LocalRecordUiState.canRetainUnified(u:UnifiedKeywordUi):Boolean {
+/** Constant-time session admission only. Source collections belong to boundary authentication. */
+internal fun LocalRecordUiState.canRetainUnifiedSession(u:UnifiedKeywordUi):Boolean {
     if(!ready||opening||error!=null||unifiedKeywordOwner!==u.owner||saving||savePending||
         originalEdit!=null||originalHistory!=null||recordPackage!=null||recycleBin!=null||
         audioTranscripts!=null||imageTexts!=null||sourcePreferences!=null||sourceMemories!=null||memoryInbox!=null||
         localProcessing!=null||ai!=null||sourceTags!=null||candidates!=null||sourceTask!=null||manualTagEditor!=null||manualPeopleEditor!=null||eventDateEditor!=null)return false
+    return true
+}
+internal fun LocalRecordUiState.canRetainUnified(u:UnifiedKeywordUi):Boolean {
+    if(!canRetainUnifiedSession(u))return false
     val byId=entries.associateBy{it.id}
     if(byId.size!=entries.size)return false
     return u.snapshot?.bindings.orEmpty().all{b->val e=byId[b.source.sourceId]
@@ -55,6 +60,12 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
     private fun owns(session:Long,request:Long?=null):Boolean {
         val l=current();val u=l.unifiedKeyword?:return false
         return !disposed&&u.session==session&&(request==null||u.request==request)&&l.canRetainUnified(u)
+    }
+    /** Used only during bounded SQL reads. Never iterate entries or a retained proof here. */
+    private fun requestCurrent(session:Long,request:Long,epoch:Long,owner:UnifiedKeywordRepository):Boolean=synchronized(handoffLock){
+        val l=current();val u=l.unifiedKeyword
+        !disposed&&lifetime==epoch&&activeRequest?.first==session&&activeRequest?.second==request&&
+            u!=null&&u.session==session&&u.request==request&&u.owner===owner&&l.canRetainUnifiedSession(u)
     }
     private fun update(session:Long,request:Long?=null,change:(UnifiedKeywordUi)->UnifiedKeywordUi)=publish{l->
         val u=l.unifiedKeyword
@@ -114,7 +125,7 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
         if(!enqueue{store->
             if(!owns(before.session,req)||store.unifiedKeywords!==before.owner)return@enqueue
             try {
-                val checkCurrent={if(!owns(before.session,req)||store.unifiedKeywords!==before.owner)throw Retired()}
+                val checkCurrent={if(!requestCurrent(before.session,req,epoch,before.owner)||store.unifiedKeywords!==before.owner)throw Retired()}
                 val result=if(proof==null)before.owner.search(before.keyword,before.scope,checkCurrent)else {
                     var ticket=false
                     if(!before.owner.resolve(proof,item,checkCurrent){ticket=owns(before.session,req)}||!ticket)throw UnifiedKeywordConflict()
