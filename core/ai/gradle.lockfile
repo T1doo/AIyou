@@ -2,9 +2,9 @@
 # Manual edits can break the build and are not advised.
 # This file is expected to be part of source control.
 # To regenerate this file, run: ./gradlew :core:ai:dependencies --write-locks
-com.squareup.okhttp3:mockwebserver3:5.5.0=testCompileClasspath,testRuntimeClasspath
-com.squareup.okhttp3:okhttp-jvm:5.5.0=compileClasspath,testCompileClasspath,testRuntimeClasspath
-com.squareup.okhttp3:okhttp:5.5.0=compileClasspath,testCompileClasspath,testRuntimeClasspath
+com.squareup.okhttp3:mockwebserver3:5.5.1=testCompileClasspath,testRuntimeClasspath
+com.squareup.okhttp3:okhttp-jvm:5.5.1=compileClasspath,testCompileClasspath,testRuntimeClasspath
+com.squareup.okhttp3:okhttp:5.5.1=compileClasspath,testCompileClasspath,testRuntimeClasspath
 com.squareup.okio:okio-jvm:3.18.1=compileClasspath,testCompileClasspath,testRuntimeClasspath
 com.squareup.okio:okio:3.18.1=compileClasspath,testCompileClasspath,testRuntimeClasspath
 junit:junit:4.13.2=testCompileClasspath,testRuntimeClasspath

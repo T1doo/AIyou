@@ -17,7 +17,7 @@ coroutines = "1.9.0"
 # Suppress only newer-release advice for this version; other lint checks remain enabled.
 #noinspection NewerVersionAvailable
 serialization = "1.9.0"
-okhttp = "5.5.0"
+okhttp = "5.5.1"
 #noinspection GradleDependency
 lifecycle = "2.9.4"
 android-test-runner = "1.7.0"

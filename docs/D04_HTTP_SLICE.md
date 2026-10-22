@@ -37,13 +37,13 @@ on top of partition correction
 
 ## Dependency and lint decisions
 
-OkHttp/MockWebServer are fixed at 5.5.0; resolved Okio is fixed at 3.18.1 in the
+OkHttp/MockWebServer are fixed at 5.5.1; resolved Okio is fixed at 3.18.1 in the
 generated lockfile. Their official Maven Central SHA-1 payload checks were
 verified before pinning SHA-256 values. The actual Gradle JARs match the reviewed
 payloads. `checks/ai-protocol/http-dependencies.json` records URLs, sizes and
 hashes; `scripts/verify-ai-http-dependencies.py` verifies resolved JARs read-only.
 Official release source:
-[OkHttp 5.5.0 changelog](https://github.com/square/okhttp/blob/parent-5.5.0/CHANGELOG.md).
+[OkHttp 5.5.1 changelog](https://github.com/square/okhttp/blob/parent-5.5.1/CHANGELOG.md).
 JDK17.0.17+10, Gradle9.8.1, Kotlin2.4.21 and JUnit4.13.2 reuse frozen tools.
 
 The parent task supplied the final outcome of existing CI

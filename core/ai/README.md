@@ -156,7 +156,7 @@ D04/D05 gates. `LOCAL_ONLY` is unchanged; D02 device acceptance is NOT RUN and
 full D04 remains OPEN. Synthetic loopback success is not a provider connection.
 
 Libraries are pinned kotlinx.serialization JSON/core 1.9.0, OkHttp/MockWebServer
-5.5.0 and resolved Okio 3.18.1 (Apache-2.0), from Maven Central with generated
+5.5.1 and resolved Okio 3.18.1 (Apache-2.0), from Maven Central with generated
 dependency locks. The reviewed HTTP JAR hashes and official source addresses
 are in `checks/ai-protocol/http-dependencies.json`; a read-only verifier checks
 the actual Gradle-resolved JARs against those payloads.
