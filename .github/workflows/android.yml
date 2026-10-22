@@ -380,7 +380,7 @@ jobs:
           inventories = [
               ('app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.FullBackupPresentationTest.xml', 3),
               ('checks/ai-protocol/remote-text/build/test-results/test/TEST-com.t1doo.aiyou.data.FullBackupTest.xml', 18),
-              ('checks/ai-protocol/remote-text/build/test-results/test/TEST-com.t1doo.aiyou.records.FullBackupControllerTest.xml', 7),
+              ('checks/ai-protocol/remote-text/build/test-results/test/TEST-com.t1doo.aiyou.records.FullBackupControllerTest.xml', 8),
           ]
           target = Path('app/build/reports/full-offline-backup-targeted')
           target.mkdir(parents=True, exist_ok=True)
