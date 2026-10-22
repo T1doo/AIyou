@@ -12,11 +12,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import com.android.tools.screenshot.PreviewTest
 import com.t1doo.aiyou.designsystem.*
 
 /** Explicit design specimen, never installed into the production navigation or data. */
-@PreviewTest
 @Preview(name = "视觉基础", widthDp = 360, locale = "zh-rCN")
 @Preview(name = "窄屏200%", widthDp = 320, fontScale = 2f, locale = "zh-rCN")
 @Composable

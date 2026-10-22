@@ -35,8 +35,8 @@ jobs:
           git diff --exit-code
       - name: Render ten targeted native Previews (no approved golden claim)
         run: |
-          scripts/gradle.sh :app:updateDebugScreenshotTest --tests '*UiPolishPrimitivesRender*' --tests '*LocalEmptyRender*' --tests '*LocalSaveFailedRender*'
-          scripts/gradle.sh :app:validateDebugScreenshotTest --tests '*UiPolishPrimitivesRender*' --tests '*LocalEmptyRender*' --tests '*LocalSaveFailedRender*'
+          scripts/gradle.sh :app:updateDebugScreenshotTest --tests '*ShellRender*' --tests '*LocalEmptyRender*' --tests '*LocalSaveFailedRender*'
+          scripts/gradle.sh :app:validateDebugScreenshotTest --tests '*ShellRender*' --tests '*LocalEmptyRender*' --tests '*LocalSaveFailedRender*'
           python3 scripts/verify-ui-polish-previews.py
       - name: Preserve actual evidence
         if: always()

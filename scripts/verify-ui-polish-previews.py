@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from png_integrity import verified_dimensions
 
 root = Path(__file__).resolve().parents[1]
-expected = {"UiPolishPrimitivesRender": 2, "LocalEmptyRender": 4, "LocalSaveFailedRender": 4}
+expected = {"ShellRender": 2, "LocalEmptyRender": 4, "LocalSaveFailedRender": 4}
 cases = [case for path in (root / "app/build/test-results/validateDebugScreenshotTest").rglob("*.xml")
          for case in ET.parse(path).getroot().iter("testcase")]
 assert len(cases) == sum(expected.values()), f"Expected ten actual tests, got {len(cases)}"
