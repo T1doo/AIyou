@@ -1,5 +1,9 @@
 package com.t1doo.aiyou
 
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
@@ -74,3 +78,14 @@ import com.t1doo.aiyou.records.*
 @Preview(name="portrait200",widthDp=320,heightDp=640,fontScale=2f,locale="zh-rCN")
 @Preview(name="landscape200",widthDp=640,heightDp=320,fontScale=2f,locale="zh-rCN")
 @Composable fun UnifiedKeywordFavoritesRender(){UnifiedKeywordSpecimen(1,favorites=true)}
+
+@PreviewTest
+@Preview(name="portrait200",widthDp=320,heightDp=640,fontScale=2f,locale="zh-rCN")
+@Preview(name="landscape200",widthDp=640,heightDp=320,fontScale=2f,locale="zh-rCN")
+@Composable fun UnifiedKeywordReadyImagesRender(){
+    AIyouTheme{Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.surface){
+        Surface(Modifier.padding(24.dp),color=MaterialTheme.colorScheme.surfaceContainerLow,shape=MaterialTheme.shapes.medium){
+            Column(Modifier.padding(12.dp)){UnifiedReadyImageFilter(true){}}
+        }
+    }}
+}

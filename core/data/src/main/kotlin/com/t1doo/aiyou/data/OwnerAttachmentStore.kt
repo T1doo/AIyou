@@ -9,6 +9,7 @@ import java.io.InputStream
 internal class OwnerAttachmentStore(private val storage:EncryptedAttachmentStore,private val gate:CaptureDraftGate):AttachmentStore {
     override suspend fun save(intent:AttachmentIntent,source:()->InputStream)=gate.sourceMutation { storage.save(intent,source) }
     override suspend fun recover()=gate.sourceMutation { storage.recover() }
+    override suspend fun recover(beforeImageMutation:()->Unit)=gate.sourceMutation { storage.recover(beforeImageMutation) }
     override suspend fun list(entryId:String,revision:Int)=storage.listReadOnly(entryId,revision)
     override suspend fun read(id:String)=storage.readReadOnly(id)
 }

@@ -30,6 +30,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         override val favorites: Map<String, RecordFavoriteSnapshot>? = null,
         override val eventDates: Map<String, RecordEventDateSnapshot>? = null,
         val imageRequest: LocalSearchRequest? = null,
+        val readyImages:Boolean=false,val includeAliases:Boolean=true,
         override val people: Map<String, ManualPeopleSnapshot>? = null) : LocalSearchSnapshot {
         override val epoch = stamp.epoch
         val owner = this@SqlLocalSearchRepository
@@ -211,7 +212,10 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         require(request.onlyFavorites)
         return candidates(request,request.person==null,guard)
     }
-    private fun candidates(request:LocalSearchRequest,includeAliasCandidates:Boolean,guard:()->Unit={}):LocalSearchSnapshot = safely {
+    internal fun readyImageCandidates(request:LocalSearchRequest,guard:()->Unit):LocalSearchSnapshot {
+        require(request.onlyImages);return candidates(request,request.person==null,guard,true)
+    }
+    private fun candidates(request:LocalSearchRequest,includeAliasCandidates:Boolean,guard:()->Unit={},readyImages:Boolean=false):LocalSearchSnapshot = safely {
         guard()
         val profile = activeProfile()
         if (request.query.length > 100_000) throw LocalSearchInvalid()
@@ -233,7 +237,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             } else null
             val favoriteCondition = if (request.onlyFavorites) " AND e.isFavorite=1" else ""
             val imageCondition = if (request.onlyImages) " AND EXISTS(SELECT 1 FROM attachments p " +
-                "WHERE p.entryId=e.id AND p.revision=e.currentRevision AND p.mediaType IN ('image/png','image/jpeg'))" else ""
+                "WHERE p.entryId=e.id AND p.revision=e.currentRevision AND p.mediaType IN ('image/png','image/jpeg')"+(if(readyImages)" AND p.state='READY'" else "")+")" else ""
             val budget = Budget()
             val aliasIds = if(includeAliasCandidates)aliasCandidates(sql, request, from, through, budget, favoriteCondition, imageCondition,guard)else emptySet()
             val expression = LocalSearchTokenizer.query(request.query, request.exact)
@@ -268,7 +272,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                     if (request.person != null && request.person !in checkNotNull(person).names) continue
                     if(!includeAliasCandidates){tag.names.forEach(budget::add);person?.names?.forEach(budget::add)
                         person?.aliases?.forEach { budget.add(it.alias); budget.add(it.name) }}
-                    val bound = read(sql, id, request.onlyImages) ?: throw LocalSearchStale()
+                    val bound = read(sql, id, request.onlyImages,guard) ?: throw LocalSearchStale()
                     budget.add(bound.entry.originalText)
                     bindings += bound
                     labels[id] = tag
@@ -284,7 +288,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             guard()
             Proof(stamp, profile, Collections.unmodifiableList(bindings.toList()), labels, pending,
                 favoriteValues?.let { Collections.unmodifiableMap(it) },eventValues?.let { Collections.unmodifiableMap(it) },
-                request.takeIf { it.onlyImages }, personValues?.let { Collections.unmodifiableMap(it) })
+                request.takeIf { it.onlyImages },readyImages,includeAliasCandidates, personValues?.let { Collections.unmodifiableMap(it) })
         }
     }
 
@@ -302,20 +306,22 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         }
     }
 
-    internal fun keywordCurrentWithin(sql:RecordsSqlConnection,snapshot:LocalSearchSnapshot):Boolean =
-        verifyWithin(sql,snapshot,null) {}
+    internal fun keywordCurrentWithin(sql:RecordsSqlConnection,snapshot:LocalSearchSnapshot,guard:()->Unit={}):Boolean =
+        verifyWithin(sql,snapshot,null,{},guard)
 
-    private fun verifyWithin(sql:RecordsSqlConnection,snapshot:LocalSearchSnapshot,entryId:String?,publish:(StoredEntry?)->Unit):Boolean {
+    private fun verifyWithin(sql:RecordsSqlConnection,snapshot:LocalSearchSnapshot,entryId:String?,publish:(StoredEntry?)->Unit,guard:()->Unit={}):Boolean {
+        guard()
         val proof=snapshot as? Proof ?: return false
         if(proof.owner!==this || entryId!=null && proof.bindings.none {it.entry.id==entryId} || activeProfile()!=proof.runtime)return false
         if (epochWithin(sql) != proof.stamp) return false
-        // Attachment inserts/changes do not advance the text index epoch. Recompute this bounded
+        // Retain the complete image collection recheck even with the monotonic epoch. Recompute this bounded
         // candidate scope under the same write lease, including empty→nonempty membership.
-        if (proof.imageRequest != null && (candidates(proof.imageRequest) as Proof).bindings != proof.bindings)
+        if (proof.imageRequest != null && (candidates(proof.imageRequest,proof.includeAliases,guard,proof.readyImages) as Proof).bindings != proof.bindings)
             return false
         var selected: StoredEntry? = null
         for (before in proof.bindings) {
-            val current = read(sql, before.entry.id, before.images != null) ?: return false
+            guard()
+            val current = read(sql, before.entry.id, before.images != null,guard) ?: return false
             if (current != before) return false
             val tag = tags.readWithin(sql, before.entry.id)
             val previousTag = proof.tags[before.entry.id] ?: return false
@@ -335,11 +341,11 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             if (entryId == before.entry.id) selected = current.entry
         }
         // The actual owner/CAS callback executes before releasing this counted write transaction.
-        publish(selected)
+        guard();publish(selected)
         return true
     }
 
-    private fun read(sql: RecordsSqlConnection, id: String, onlyImages: Boolean = false): Binding? {
+    private fun read(sql: RecordsSqlConnection, id: String, onlyImages: Boolean = false,guard:()->Unit={}): Binding? {
         val rows = sql.query("SELECT e.id,e.currentRevision,r.originalText,r.contentHash,e.capturedAtMillis," +
             "e.captureTimeZone,e.privacyPolicy,COALESCE(t.version,0),COALESCE(a.generation,0)" + sourceFrom +
             "WHERE e.id=? AND " + live, listOf(id))
@@ -355,6 +361,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             if (rows.isEmpty()) return null
             if (rows.size > 64) throw LocalSearchTooBroad()
             rows.map { image ->
+                guard()
                 val imageId = image[0] as String; ManualTags.identifier(imageId)
                 val imageHash = image[3] as String; val bytes = image[4] as Long
                 require(imageHash.matches(Regex("[0-9a-f]{64}")) && bytes in 1..16_777_216)

@@ -246,7 +246,7 @@ class RecordHistoryMediaTest {
             val oldImage = target.media.list(newId, 1).single().intent
             val path = target.mediaRoot.resolve(oldImage.id + ".aead")
             if (missing) assertTrue(path.delete())
-            else target.db.write("UPDATE attachments SET revision=2 WHERE id=?", oldImage.id)
+            else target.db.injectSyntheticAttachmentCorruption("UPDATE attachments SET revision=2 WHERE id=?", oldImage.id)
             val before = target.db.read("SELECT id,entryId,revision,mediaType,sha256,byteSize,state FROM attachments ORDER BY id")
             assertTrue(before.all { it.last() == "READY" })
             target.reopen(); val cold = repository(target); val retry = cold.open({ bytes.inputStream() }, password())

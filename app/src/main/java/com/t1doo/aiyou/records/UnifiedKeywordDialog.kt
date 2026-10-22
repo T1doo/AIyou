@@ -101,6 +101,8 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
                             Text(if(u.onlyFavorites)"只找回已收藏原件中的所选内容；收藏不代表事实确认。"else"不限收藏状态；此处不改变原件收藏。",
                                 style=MaterialTheme.typography.bodySmall,modifier=Modifier.testTag("unified-favorite-description"))
                             HorizontalDivider()
+                            UnifiedReadyImageFilter(u.onlyReadyImages){if(canUse())c.readyImages(u.session,it)}
+                            HorizontalDivider()
                             Text("捕获日期",style=MaterialTheme.typography.titleSmall)
                             Text("按每条原件保存的时区；不是事件发生日期。",style=MaterialTheme.typography.bodySmall)
                             OutlinedTextField(u.from,{if(canUse())c.from(u.session,it)},singleLine=true,label={Text("起始日期（含）")},
@@ -201,5 +203,18 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
                 TextButton({if(canUse())c.closePeople(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-people-cancel")){Text("取消选择，返回查询")}
             }
         }
+    }
+}
+
+/** Production presentation reused by render evidence, without a fake lifecycle or storage gate. */
+@Composable fun UnifiedReadyImageFilter(checked:Boolean,onChange:(Boolean)->Unit){
+    Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
+        Row(Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().toggleable(value=checked,role=Role.Checkbox,onValueChange=onChange).testTag("unified-only-ready-images"),
+            verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+            Checkbox(checked=checked,onCheckedChange=null)
+            Text("仅看当前有就绪图片的原件",Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge)
+        }
+        Text("按所属原件的当前图片筛选；不识别画面，不要求 OCR。未就绪或历史版本图片不计入。",
+            style=MaterialTheme.typography.bodySmall,modifier=Modifier.testTag("unified-ready-image-description"))
     }
 }

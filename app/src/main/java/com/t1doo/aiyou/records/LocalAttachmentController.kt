@@ -73,6 +73,7 @@ class LocalAttachmentController(
     private val canUsePanel: (AttachmentUiState) -> Boolean = { true },
     private val sourceUi:((()->Unit)->Unit)={it()},
     private val onPanelClose:()->Unit={},
+    private val beforeImageMutation:()->Unit={},
 ) {
     private val mutable = MutableStateFlow<AttachmentUiState?>(null)
     val state = mutable.asStateFlow()
@@ -135,7 +136,7 @@ class LocalAttachmentController(
             try {
                 current(repository, panel)
                 val store = access(repository)
-                store.recover()
+                store.recover(beforeImageMutation)
                 current(repository, panel)
                 val rows = store.list(panel.entryId, panel.revision)
                 verifyRows(panel, rows)
@@ -182,14 +183,21 @@ class LocalAttachmentController(
             "无法打开图片选择器。原文与附件已保留，请重新选择。", requestId)
     }
 
-    fun selected(requestId: Long, source: SelectedImageSource?) { sourceUi { selectedSourceOwned(requestId,source) } }
-    private fun selectedSourceOwned(requestId: Long, source: SelectedImageSource?) {
+    fun selected(requestId: Long, source: SelectedImageSource?) {
+        var accepted:(()->Unit)?=null
+        sourceUi { selectedSourceOwned(requestId,source){accepted=it} }
+        accepted?.invoke() // No capture monitor while acquiring query/navigation lifecycle ownership.
+    }
+    private fun selectedSourceOwned(requestId: Long, source: SelectedImageSource?,afterAdmission:((()->Unit)->Unit)) {
         val panel = mutable.value ?: return
         val selected = panel.selection ?: return
         if (panel.readOnly || panel.focusedIntent!=null) return
         if (selected.requestId != requestId || selected.phase != AttachmentImportPhase.PICKING) return
+        if(!canUseRecord()||!canUsePanel(panel)||!live(panel.sessionId))return
         if (source == null) { cancel(panel.sessionId); return }
         if (!mutable.compareAndSet(panel, panel.copy(selection = selected.copy(phase = AttachmentImportPhase.PREPARING)))) return
+        afterAdmission {
+        beforeImageMutation() // Stable selection CAS accepted, outside the CAS and before queue admission.
         enqueue { repository ->
             if (!owns(panel.sessionId, requestId)) return@enqueue
             var bytes: ByteArray? = null
@@ -220,6 +228,7 @@ class LocalAttachmentController(
                 failed(panel.sessionId, failure, "图片未保存。请重新选择可读取的 JPEG 或 PNG 图片；原文与原文件已保留。", requestId)
             } finally { bytes?.fill(0) }
         }
+        }
     }
 
     fun cancel(sessionId: Long) { sourceUi { cancelSourceOwned(sessionId) } }
@@ -231,11 +240,19 @@ class LocalAttachmentController(
         refresh(sessionId)
     }
 
-    fun retrySave(sessionId: Long) { sourceUi { retrySaveSourceOwned(sessionId) } }
-    private fun retrySaveSourceOwned(sessionId: Long) {
+    fun retrySave(sessionId: Long) {
+        var accepted:(()->Unit)?=null
+        sourceUi { retrySaveSourceOwned(sessionId){accepted=it} }
+        accepted?.invoke()
+    }
+    private fun retrySaveSourceOwned(sessionId: Long,afterAdmission:((()->Unit)->Unit)) {
         val panel = mutable.value ?: return
         val selected = panel.selection ?: return
         if (panel.readOnly || panel.focusedIntent!=null || panel.sessionId != sessionId || selected.phase != AttachmentImportPhase.FAILED || !selected.retryable || panel.unavailable) return
+        if(!canUseRecord()||!canUsePanel(panel)||!live(sessionId))return
+        if(!mutable.compareAndSet(panel,panel.copy(selection=selected.copy(phase=AttachmentImportPhase.PREPARING))))return
+        afterAdmission {
+        beforeImageMutation()
         enqueue { repository ->
             if (!owns(sessionId, selected.requestId)) return@enqueue
             if (prepared?.requestId == selected.requestId) commit(repository, sessionId, selected.requestId)
@@ -243,6 +260,7 @@ class LocalAttachmentController(
                 update(sessionId) { it.copy(selection = null, error = null) }
                 select(sessionId, selected.expected?.id)
             }
+        }
         }
     }
 
@@ -257,7 +275,8 @@ class LocalAttachmentController(
             val store = access(repository)
             // Claim before any durable write: subsequent Cancel/Back cannot promise a rollback.
             if (!mutable.compareAndSet(panel, panel.copy(selection = selected.copy(phase = AttachmentImportPhase.SAVING), error = null))) return
-            store.recover()
+            beforeImageMutation() // Actor revalidated the exact source/request before the real write.
+            store.recover(beforeImageMutation)
             val existing = store.list(panel.entryId, panel.revision).singleOrNull { it.intent.id == input.intent.id }
             if (existing != null && existing.intent != input.intent) throw AttachmentIntegrityFailure()
             val result = existing?.takeIf { it.state == AttachmentState.READY }

@@ -12,7 +12,7 @@ data class UnifiedKeywordUi(val session:Long,val owner:UnifiedKeywordRepository,
     val tag:UnifiedTagSelection?=null,val tagPicker:Boolean=false,val tagPage:UnifiedTagPage?=null,
     val tagBusy:Boolean=false,val tagError:String?=null,
     val person:UnifiedPersonSelection?=null,val personPicker:Boolean=false,val personPage:UnifiedPersonPage?=null,
-    val personBusy:Boolean=false,val personError:String?=null,val onlyFavorites:Boolean=false) {
+    val personBusy:Boolean=false,val personError:String?=null,val onlyFavorites:Boolean=false,val onlyReadyImages:Boolean=false) {
     val visibleGroups get()=if(busy||error!=null||tagPicker||tagBusy||personPicker||personBusy)emptyList()else snapshot?.groups?.drop(page*20)?.take(20).orEmpty()
     override fun toString()="UnifiedKeywordUi(redacted)"
 }
@@ -33,7 +33,7 @@ internal fun LocalRecordUiState.canRetainUnified(u:UnifiedKeywordUi):Boolean {
     if(!canRetainUnifiedSession(u))return false
     val proof=u.snapshot
     if(proof!=null&&u.onlyFavorites&&!unifiedFavoritesReady())return false
-    if(proof!=null&&(proof.keyword!=u.keyword||proof.scope!=u.scope||proof.tag!==u.tag||proof.person!==u.person||proof.onlyFavorites!=u.onlyFavorites||
+    if(proof!=null&&(proof.keyword!=u.keyword||proof.scope!=u.scope||proof.tag!==u.tag||proof.person!==u.person||proof.onlyFavorites!=u.onlyFavorites||proof.onlyReadyImages!=u.onlyReadyImages||
         runCatching{UnifiedCaptureRange.parse(u.from,u.through)}.getOrNull()!=proof.captureRange))return false
     val byId=entries.associateBy{it.id}
     if(byId.size!=entries.size)return false
@@ -46,7 +46,7 @@ internal fun LocalRecordUiState.canRetainUnified(u:UnifiedKeywordUi):Boolean {
 /** Invoke confirmation only while holding the caller's navigation owner. The controller never
  * holds its lifecycle lock while waiting for navigation: lock order is navigation -> lifecycle. */
 typealias UnifiedKeywordHandoff = ((()->Unit)->Boolean)
-internal class UnifiedKeywordRetirement(val session:Long,val request:Long,val lifetime:Long,val completeSources:Boolean,val tags:Boolean=false,val people:Boolean=false,val favorites:Boolean=false)
+internal class UnifiedKeywordRetirement(val session:Long,val request:Long,val lifetime:Long,val completeSources:Boolean,val tags:Boolean=false,val people:Boolean=false,val favorites:Boolean=false,val images:Boolean=false)
 
 class UnifiedKeywordController(private val current:()->LocalRecordUiState,
     private val publish:((LocalRecordUiState)->LocalRecordUiState)->Unit,
@@ -55,13 +55,14 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
     private val handoffLock=Any()
     private var lifetime=0L
     @Volatile private var disposed=false
-    private class ReturnSeed(val keyword:String,val scope:UnifiedKeywordScope,val range:UnifiedCaptureRange,val tag:UnifiedTagSelection?,val person:UnifiedPersonSelection?,val onlyFavorites:Boolean){override fun toString()="UnifiedReturnSeed(redacted)"}
+    private class ReturnSeed(val keyword:String,val scope:UnifiedKeywordScope,val range:UnifiedCaptureRange,val tag:UnifiedTagSelection?,val person:UnifiedPersonSelection?,val onlyFavorites:Boolean,val onlyReadyImages:Boolean){override fun toString()="UnifiedReturnSeed(redacted)"}
     private var returnSeed:ReturnSeed?=null
     private var activeRequest:Pair<Long,Long>?=null
     private var activeScope=UnifiedKeywordScope.ALL
     private var activeCaptureRange=UnifiedCaptureRange()
     private var activeTags=false
     private var activePeople=false
+    private var activeImages=false
     private var activeFavorites=false
     private class Retired:RuntimeException("Unified lookup retired")
     internal fun observeRetirement():UnifiedKeywordRetirement?=synchronized(handoffLock){
@@ -71,12 +72,13 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
         val tags=u?.let{it.tag!=null||it.tagPicker||it.tagBusy}?:activeTags
         val people=u?.let{it.person!=null||it.personPicker||it.personBusy}?:activePeople
         val favorites=u?.onlyFavorites?:activeFavorites
-        UnifiedKeywordRetirement(pair.first,pair.second,lifetime,scope==UnifiedKeywordScope.ALL||scope==UnifiedKeywordScope.ACCEPTED_MEMORY||dates||tags||people||favorites,tags,people,favorites)
+        val images=u?.onlyReadyImages?:activeImages
+        UnifiedKeywordRetirement(pair.first,pair.second,lifetime,scope==UnifiedKeywordScope.ALL||scope==UnifiedKeywordScope.ACCEPTED_MEMORY||dates||tags||people||favorites||images,tags,people,favorites,images)
     }
     internal fun retireObserved(observed:UnifiedKeywordRetirement)=synchronized(handoffLock){
         val u=current().unifiedKeyword;val pair=u?.let{it.session to it.request}?:activeRequest
         if(lifetime==observed.lifetime&&pair==(observed.session to observed.request)){
-            lifetime=Math.addExact(lifetime,1);returnSeed=null;activeRequest=null;activeCaptureRange=UnifiedCaptureRange();activeTags=false;activePeople=false;activeFavorites=false
+            lifetime=Math.addExact(lifetime,1);returnSeed=null;activeRequest=null;activeCaptureRange=UnifiedCaptureRange();activeTags=false;activePeople=false;activeFavorites=false;activeImages=false
             publish{l->if(l.unifiedKeyword?.let{it.session==observed.session&&it.request==observed.request}==true)l.copy(unifiedKeyword=null)else l}
         }
     }
@@ -96,13 +98,13 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
         else l.copy(unifiedKeyword=change(u).takeIf{l.canRetainUnified(it)})
     }
     fun open(){openWith("",UnifiedKeywordScope.ALL)}
-    private fun openWith(keyword:String,scope:UnifiedKeywordScope,range:UnifiedCaptureRange=UnifiedCaptureRange(),tag:UnifiedTagSelection?=null,person:UnifiedPersonSelection?=null,onlyFavorites:Boolean=false)=synchronized(handoffLock) {
+    private fun openWith(keyword:String,scope:UnifiedKeywordScope,range:UnifiedCaptureRange=UnifiedCaptureRange(),tag:UnifiedTagSelection?=null,person:UnifiedPersonSelection?=null,onlyFavorites:Boolean=false,onlyReadyImages:Boolean=false)=synchronized(handoffLock) {
         val l=current();val owner=l.unifiedKeywordOwner?:return@synchronized
         if(disposed||l.unifiedKeyword!=null)return@synchronized
-        val u=UnifiedKeywordUi(tokens.incrementAndGet(),owner,keyword=keyword,scope=scope,from=range.from?.toString().orEmpty(),through=range.through?.toString().orEmpty(),tag=tag,person=person,onlyFavorites=onlyFavorites)
+        val u=UnifiedKeywordUi(tokens.incrementAndGet(),owner,keyword=keyword,scope=scope,from=range.from?.toString().orEmpty(),through=range.through?.toString().orEmpty(),tag=tag,person=person,onlyFavorites=onlyFavorites,onlyReadyImages=onlyReadyImages)
         if(!l.canRetainUnified(u))return@synchronized
         lifetime=Math.addExact(lifetime,1)
-        activeRequest=u.session to u.request;activeScope=scope;activeCaptureRange=range;activeTags=tag!=null;activePeople=person!=null;activeFavorites=onlyFavorites
+        activeRequest=u.session to u.request;activeScope=scope;activeCaptureRange=range;activeTags=tag!=null;activePeople=person!=null;activeFavorites=onlyFavorites;activeImages=onlyReadyImages
         publish{if(it.unifiedKeyword==null&&it.canRetainUnified(u))it.copy(unifiedKeyword=u)else it}
         if(tag!=null||person!=null){
             val refresh:suspend(UnifiedKeywordUi,()->Unit)->Unit={before,guard->
@@ -118,13 +120,13 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
     fun close(session:Long)=synchronized(handoffLock) {
         var closed=false
         publish{if(it.unifiedKeyword?.session==session){closed=true;it.copy(unifiedKeyword=null)}else it}
-        if(closed){lifetime=Math.addExact(lifetime,1);returnSeed=null;activeRequest=null;activeCaptureRange=UnifiedCaptureRange();activeTags=false;activePeople=false;activeFavorites=false}
+        if(closed){lifetime=Math.addExact(lifetime,1);returnSeed=null;activeRequest=null;activeCaptureRange=UnifiedCaptureRange();activeTags=false;activePeople=false;activeFavorites=false;activeImages=false}
     }
     fun retire()=synchronized(handoffLock) {
-        lifetime=Math.addExact(lifetime,1);returnSeed=null;activeRequest=null;activeCaptureRange=UnifiedCaptureRange();activeTags=false;activePeople=false;activeFavorites=false;publish{it.copy(unifiedKeyword=null)}
+        lifetime=Math.addExact(lifetime,1);returnSeed=null;activeRequest=null;activeCaptureRange=UnifiedCaptureRange();activeTags=false;activePeople=false;activeFavorites=false;activeImages=false;publish{it.copy(unifiedKeyword=null)}
     }
     fun resume()=synchronized(handoffLock) {
-        val seed=returnSeed?:return@synchronized;returnSeed=null;openWith(seed.keyword,seed.scope,seed.range,seed.tag,seed.person,seed.onlyFavorites)
+        val seed=returnSeed?:return@synchronized;returnSeed=null;openWith(seed.keyword,seed.scope,seed.range,seed.tag,seed.person,seed.onlyFavorites,seed.onlyReadyImages)
     }
     fun dispose()=synchronized(handoffLock){disposed=true;retire()}
     fun keyword(session:Long,value:String){if(value.length>256)return;update(session){
@@ -140,10 +142,16 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
         if(it.through==value)it else it.copy(through=value,request=tokens.incrementAndGet(),snapshot=null,page=0,busy=false,error=null,tagBusy=false,personBusy=false)
     }}
     fun unlimitedDates(session:Long)=update(session){it.copy(from="",through="",request=tokens.incrementAndGet(),snapshot=null,page=0,busy=false,error=null,tagBusy=false,personBusy=false)}
-    fun clear(session:Long)=update(session){it.copy(keyword="",from="",through="",onlyFavorites=false,tag=null,tagPicker=false,tagPage=null,tagBusy=false,tagError=null,person=null,personPicker=false,personPage=null,personBusy=false,personError=null,request=tokens.incrementAndGet(),snapshot=null,page=0,busy=false,error=null)}
+    fun clear(session:Long)=update(session){it.copy(keyword="",from="",through="",onlyFavorites=false,onlyReadyImages=false,tag=null,tagPicker=false,tagPage=null,tagBusy=false,tagError=null,person=null,personPicker=false,personPage=null,personBusy=false,personError=null,request=tokens.incrementAndGet(),snapshot=null,page=0,busy=false,error=null)}
     fun favorites(session:Long,value:Boolean)=update(session){
         if(it.onlyFavorites==value)it else it.copy(onlyFavorites=value,request=tokens.incrementAndGet(),snapshot=null,page=0,busy=false,
             tagPicker=false,tagPage=null,tagBusy=false,tagError=null,personPicker=false,personPage=null,personBusy=false,personError=null,error=if(value&&!current().unifiedFavoritesReady())"收藏状态尚未确认，请先重试读取或确认未结算的收藏操作。"else null)
+    }
+    /** Mutation was accepted outside state CAS; invalidate even a UI-null handoff/return seed. */
+    fun readyImageMutationAccepted(){val observed=observeRetirement()?:return;if(observed.images)retireObserved(observed)}
+    fun readyImages(session:Long,value:Boolean)=update(session){
+        if(it.onlyReadyImages==value)it else it.copy(onlyReadyImages=value,request=tokens.incrementAndGet(),snapshot=null,page=0,busy=false,error=null,
+            tagPicker=false,tagPage=null,tagBusy=false,tagError=null,personPicker=false,personPage=null,personBusy=false,personError=null)
     }
     fun openTags(session:Long){
         val u=current().unifiedKeyword?:return
@@ -254,12 +262,13 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
         val epoch=synchronized(handoffLock){lifetime}
         val req=tokens.incrementAndGet();update(before.session){it.copy(request=req,busy=true,error=null)}
         if(!owns(before.session,req))return
-        synchronized(handoffLock){if(lifetime!=epoch)return;activeRequest=before.session to req;activeScope=before.scope;activeCaptureRange=range;activeTags=before.tag!=null||before.tagPicker||before.tagBusy;activePeople=before.person!=null||before.personPicker||before.personBusy;activeFavorites=before.onlyFavorites}
+        synchronized(handoffLock){if(lifetime!=epoch)return;activeRequest=before.session to req;activeScope=before.scope;activeCaptureRange=range;activeTags=before.tag!=null||before.tagPicker||before.tagBusy;activePeople=before.person!=null||before.personPicker||before.personBusy;activeFavorites=before.onlyFavorites;activeImages=before.onlyReadyImages}
         if(!enqueue{store->
             if(!owns(before.session,req)||store.unifiedKeywords!==before.owner)return@enqueue
             try {
                 val checkCurrent={if(!requestCurrent(before.session,req,epoch,before.owner)||store.unifiedKeywords!==before.owner||before.onlyFavorites&&!current().unifiedFavoritesReady())throw Retired()}
                 val result=if(proof==null)when {
+                    before.onlyReadyImages->before.owner.search(before.keyword,before.scope,range,before.tag,before.person,before.onlyFavorites,true,checkCurrent)
                     before.onlyFavorites->before.owner.search(before.keyword,before.scope,range,before.tag,before.person,true,checkCurrent)
                     before.person!=null->before.owner.search(before.keyword,before.scope,range,before.tag,before.person,checkCurrent)
                     before.tag!=null->before.owner.search(before.keyword,before.scope,range,before.tag,checkCurrent)
@@ -269,7 +278,7 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
                     if(!before.owner.resolve(proof,item,checkCurrent){ticket=owns(before.session,req)}||!ticket)throw UnifiedKeywordConflict()
                     proof
                 }
-                if(result.keyword!=before.keyword||result.scope!=before.scope||result.captureRange!=range||result.tag!==before.tag||result.person!==before.person||result.onlyFavorites!=before.onlyFavorites)throw UnifiedKeywordConflict()
+                if(result.keyword!=before.keyword||result.scope!=before.scope||result.captureRange!=range||result.tag!==before.tag||result.person!==before.person||result.onlyFavorites!=before.onlyFavorites||result.onlyReadyImages!=before.onlyReadyImages)throw UnifiedKeywordConflict()
                 // No UI content or route is published from the transaction's private ticket.
                 // A thrown/unknown commit acknowledgement reaches only the failure branch.
                 if(!owns(before.session,req))return@enqueue
@@ -284,7 +293,7 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
                             val l=current()
                             if(used||disposed||lifetime!=epoch||l.unifiedKeyword!=null||!l.canRetainUnified(before.copy(snapshot=result)))false
                             else {
-                                used=true;returnSeed=ReturnSeed(before.keyword,before.scope,range,before.tag,before.person,before.onlyFavorites)
+                                used=true;returnSeed=ReturnSeed(before.keyword,before.scope,range,before.tag,before.person,before.onlyFavorites,before.onlyReadyImages)
                                 try{action();true}catch(t:Throwable){returnSeed=null;throw t}
                             }
                         }}
@@ -297,10 +306,14 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
             catch(c:CancellationException){throw c}
             catch(_:UnifiedCaptureRangeUnsupported){update(before.session,req){it.copy(snapshot=null,page=0,busy=false,
                 error="当前查询端口不支持捕获日期范围，未显示未过滤内容。")}}
+            catch(_:UnifiedReadyImagesUnsupported){update(before.session,req){it.copy(snapshot=null,page=0,busy=false,
+                error="当前查询端口不支持就绪图片筛选，未显示未过滤内容。")}}
             catch(_:UnifiedFavoriteUnsupported){update(before.session,req){it.copy(snapshot=null,page=0,busy=false,
                 error="当前查询端口不支持原件收藏筛选，未显示未过滤内容。")}}
             catch(_:UnifiedPersonUnsupported){update(before.session,req){it.copy(snapshot=null,page=0,busy=false,
                 error="当前查询端口不支持人工人物标记，未显示未过滤内容。")}}
+            catch(_:UnifiedReadyImageLimit){update(before.session,req){it.copy(snapshot=null,page=0,busy=false,
+                error="图片关联超出本机核对范围。可关闭就绪图片筛选后找回原件并检查附件；未显示部分结果，原件未改。")}}
             catch(_:UnifiedKeywordTooBroad){update(before.session,req){it.copy(snapshot=null,page=0,busy=false,
                 error="已采纳线索命中过多，请使用更具体的关键词或切换范围；未显示部分结果，原件未改。")}}
             catch(_:Exception){failed(before.session,req)}

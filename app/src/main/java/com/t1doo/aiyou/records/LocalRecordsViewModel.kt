@@ -277,7 +277,7 @@ class LocalRecordsViewModel internal constructor(
         enqueue = { action -> enqueueSource({Command.Attachment(it)},action) }, decodePng = decodePng,
         canUseRecord = { mutableState.value.let { it.ready && !it.opening && it.error == null &&
             !it.saving && !it.savePending && it.captureDiscard == null && it.recycleBin == null } },
-        canUsePanel = { it.hasRecordAccess(mutableState.value) },sourceUi=::sourceUi,onPanelClose=audioPlayback::stop)
+        canUsePanel = { it.hasRecordAccess(mutableState.value) },sourceUi=::sourceUi,onPanelClose=audioPlayback::stop,beforeImageMutation={unifiedObserver?.readyImageMutationAccepted()})
     val tags = ManualTagController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.ManualTags(action)).isSuccess }, beforeOpen={unifiedObserver?.retire()})
     val people = ManualPeopleController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -316,11 +316,11 @@ class LocalRecordsViewModel internal constructor(
     val recordPackages = RecordPackageController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = ::enqueuePackageOperation,
         cipher = com.t1doo.aiyou.data.JcaRecordPackageCipher(), clock = clock,
-        onFullRestored = { store -> reminderRuntime?.afterRestore();mixedCapture.adoptFullRestore(store);tasks.initialize(store);reminders.initialize(store);taskProposals.initialize(store) },sourceUi=::sourceUi)
+        beforeRestore={unifiedObserver?.readyImageMutationAccepted()},onFullRestored = { store -> reminderRuntime?.afterRestore();mixedCapture.adoptFullRestore(store);tasks.initialize(store);reminders.initialize(store);taskProposals.initialize(store) },sourceUi=::sourceUi)
     val recycleBin = RecycleBinController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> enqueueSource({Command.RecycleBin(it)},action) },
         canMove = { attachments.state.value == null },
-        sourceUi=::sourceUi,onCommittedMove = { id ->
+        beforeMutation={unifiedObserver?.readyImageMutationAccepted()},sourceUi=::sourceUi,onCommittedMove = { id ->
             ai.reconcileRecords()
             attachments.state.value?.takeIf { it.entryId == id }?.let { attachments.close(it.sessionId) }
             mutableState.value.originalExport?.takeIf { it.selection.any { source -> source.sourceId == id } }?.let { exports.close(it.session) }
@@ -580,7 +580,8 @@ class LocalRecordsViewModel internal constructor(
                 observed?.favorites==true&&(previous.supportsFavorites!=requested.supportsFavorites||previous.favoritesAvailable!=requested.favoritesAvailable||
                     previous.favoritesLoading!=requested.favoritesLoading||previous.favoritesError!=requested.favoritesError||
                     previous.favoriteControllerRetired!=requested.favoriteControllerRetired||previous.favoriteWrites!=requested.favoriteWrites||
-                    previous.localSearchEpoch!=requested.localSearchEpoch||!sameUnifiedFavorites(previous.favorites,requested.favorites))
+                    previous.localSearchEpoch!=requested.localSearchEpoch||!sameUnifiedFavorites(previous.favorites,requested.favorites))||
+                observed?.images==true&&previous.localSearchEpoch!=requested.localSearchEpoch
             val proposed = if (requested.manualPeople.keys.any { id -> requested.entries.none { it.id == id } }) requested.copy(
                 manualPeople = java.util.Collections.unmodifiableMap(requested.manualPeople.filterKeys { id -> requested.entries.any { it.id == id } })) else requested
             val panel = proposed.localProcessing

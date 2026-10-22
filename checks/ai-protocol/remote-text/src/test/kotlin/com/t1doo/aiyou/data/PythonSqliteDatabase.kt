@@ -16,6 +16,7 @@ internal class PythonSqliteDatabase(
     private val bridgePath: Path,
     initialize: Boolean,
     schemaVersion: Int = 3,
+    schemaFile:Path?=null,
 ) : RecordsSqlDatabase, Closeable {
     private val process: Process
     private val responses = LinkedBlockingQueue<String>()
@@ -31,7 +32,7 @@ internal class PythonSqliteDatabase(
     private var ended = false
 
     init {
-        val schema = repositoryRoot().resolve("core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/$schemaVersion.json")
+        val schema = schemaFile ?: repositoryRoot().resolve("core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/$schemaVersion.json")
         process = ProcessBuilder("python3", "-u", bridgePath.toString(), databasePath.toString(), schema.toString(),
             if (initialize) "initialize" else "open").start()
         writer = process.outputStream.bufferedWriter(Charsets.UTF_8)
@@ -58,6 +59,12 @@ internal class PythonSqliteDatabase(
             pid = hello[1].toLong()
             check(pid == process.pid())
             sqliteVersion = hello[2]
+            // Same guards as production cold-open. No hand-copied REPLACE/epoch rules in fixtures.
+            transaction { sql ->
+                val tables=sql.query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('attachments','local_search_epoch')").map{it.single() as String}.toSet()
+                if("attachments" in tables)AttachmentIntentSqlSchema.guards.forEach{sql.execute(it)}
+                if(tables.containsAll(listOf("attachments","local_search_epoch")))ReadyImageSqlSchema.epochGuards.forEach{sql.execute(it)}
+            }
         } catch (failure: Throwable) {
             try { writer.close() } finally {
                 if (!process.waitFor(1, TimeUnit.SECONDS)) {
@@ -186,3 +193,11 @@ internal class PythonSqliteDatabase(
 }
 
 internal class SqliteBridgeFailure(val code: Int, val category: String) : RuntimeException("SQLite bridge failure: $category")
+
+/** Only owned synthetic corruption tests cross the live immutable UPDATE guard. */
+internal fun PythonSqliteDatabase.injectSyntheticAttachmentCorruption(sql:String,vararg args:Any?) = transaction { connection ->
+    require(sql.startsWith("UPDATE attachments SET "))
+    connection.execute("DROP TRIGGER immutable_attachment_intent")
+    connection.execute(sql,args.toList())
+    AttachmentIntentSqlSchema.guards.forEach{connection.execute(it)}
+}

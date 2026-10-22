@@ -39,6 +39,7 @@ class RecycleBinController internal constructor(
     private val canMove: () -> Boolean = { true },
     private val onCommittedMove: (String) -> Unit = {},
     private val sourceUi:((()->Unit)->Unit)={it()},
+    private val beforeMutation:()->Unit={},
 ) {
     private val sessions = AtomicLong()
     private val confirmations = AtomicLong()
@@ -139,14 +140,20 @@ class RecycleBinController internal constructor(
                 error = "回收站读取失败，加密数据已保留。请重试读取。") } }
         }) update(session) { it.copy(loading = false, error = "本机队列不可用，请重试读取。") }
     }
-    fun confirm(session: Long, id: Long) { sourceUi { confirmSourceOwned(session,id) } }
-    private fun confirmSourceOwned(session: Long, id: Long) {
+    fun confirm(session: Long, id: Long) {
+        var accepted:(()->Unit)?=null
+        sourceUi { confirmSourceOwned(session,id){accepted=it} };accepted?.invoke()
+    }
+    private fun confirmSourceOwned(session: Long, id: Long,afterAdmission:((()->Unit)->Unit)) {
         val ui = current().recycleBin ?: return
         val intent = ui.confirmation ?: return
         if (!owns(session) || ui.loading || intent.id != id || intent.busy || intent.conflict) return
         publish { local -> val latest = local.recycleBin
             if (!owns(session, local) || latest?.confirmation?.id != id || latest.confirmation.busy || latest.confirmation.conflict) local
             else local.copy(recycleBin = latest.copy(confirmation = latest.confirmation.copy(busy = true, error = null))) }
+        afterAdmission {
+        if(!owns(session)||current().recycleBin?.confirmation?.let{it.id==id&&it.busy}!=true)return@afterAdmission
+        beforeMutation()
         if (!enqueue { store ->
             val pending = current().recycleBin?.confirmation
             if (!owns(session) || pending?.id != id || !pending.busy) return@enqueue
@@ -225,6 +232,7 @@ class RecycleBinController internal constructor(
                 if ((intent.permanent || !intent.record.deleted) && entries != null && entries.none { it.id == intent.record.entry.id }) onCommittedMove(intent.record.entry.id)
             }
         }) update(session) { it.copy(confirmation = it.confirmation?.copy(busy = false, error = "本机队列不可用，未执行操作。")) }
+        }
     }
     fun dispose() { disposed = true; publish { it.copy(ready = false, recycleBin = null, recycleControllerRetired = true) } }
 }

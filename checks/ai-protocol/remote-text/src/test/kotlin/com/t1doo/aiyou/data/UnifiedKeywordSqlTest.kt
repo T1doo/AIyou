@@ -97,13 +97,16 @@ class UnifiedKeywordSqlTest {
 internal class UnifiedKeywordFixture(seed:Int=1,withPeople:Boolean=false):AutoCloseable {
     val f=FullFixture(seed);var reads=0;var afterRead:(()->Unit)?=null
     private val media=object:AttachmentStore by f.media{override suspend fun read(id:String)=f.media.read(id).also{reads++;afterRead?.invoke()}}
+    var beforeReadyRead:(suspend(String)->Unit)?=null
+    var lastReadyPlaintext:ByteArray?=null
+    private val readyMedia=object:AttachmentStore by media{override suspend fun read(id:String):ByteArray{beforeReadyRead?.invoke(id);return f.media.readReadOnly(id).also{lastReadyPlaintext=it;reads++;afterRead?.invoke()}}}
     val people=SqlManualPeopleRepository(f.gateway,f.key)
     val originals=SqlLocalSearchRepository(f.gateway,f.tags,people=if(withPeople)people else null)
     val audios=SqlAudioTranscriptRepository(f.gateway,f.key,media)
     val images=SqlImageTextRepository(f.gateway,f.key,media)
     val preferences=SqlSourcePreferenceRepository(f.gateway,f.key)
     val memories=SqlSourceMemoryRepository(f.gateway,f.key)
-    val repo=SqlUnifiedKeywordRepository(f.gateway,originals,audios,images,preferences,memories,f.tags,people)
+    val repo=SqlUnifiedKeywordRepository(f.gateway,originals,audios,images,preferences,memories,f.tags,people,readyMedia)
     suspend fun audio(id:String,text:String="合成淡茶"):AudioTranscriptSnapshot {
         val bytes=CaptureAudioSqlTest.wave();val i=AttachmentIntent(FullBackupTest.uuid(),id,1,"audio/wav",FullBackupTest.hash(bytes),bytes.size.toLong())
         f.media.save(i){bytes.inputStream()};return audios.write(AudioTranscriptSqlTest.write(audios.preview(i),text=text))

@@ -11,6 +11,9 @@ interface AttachmentStore {
     /** No plaintext is returned before the complete AEAD tag, hash and size have been checked. */
     suspend fun read(id: String): ByteArray
     suspend fun recover()
+    /** Recovery may write terminal image states. Notify immediately before an actual mutation.
+     * Legacy ports conservatively notify; production overrides this to preserve no-op reads. */
+    suspend fun recover(beforeImageMutation:()->Unit){beforeImageMutation();recover()}
 }
 
 class AttachmentConflict : IllegalStateException("Attachment intent changed")

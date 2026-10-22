@@ -51,7 +51,7 @@ class RecycleBinSqlTest {
     @Test fun realEncryptedAttachmentFileSurvivesMoveAndColdRestoreByteForByte(): Unit = ManualTaskSqlTest.Fixture().use { f -> runBlocking {
         install(f.db)
         val bytes = "合成原始附件字节🙂PRIVATE_ATTACHMENT".toByteArray()
-        f.db.write("UPDATE attachments SET id=? WHERE id='legacy-attachment'", "e917a576-b1eb-4f85-a2f4-0e180cc0cd00")
+        f.db.injectSyntheticAttachmentCorruption("UPDATE attachments SET id=? WHERE id='legacy-attachment'", "e917a576-b1eb-4f85-a2f4-0e180cc0cd00")
         val fileId = "18c9f111-b8f6-49cc-b78b-60f87bc5820c"
         val mediaRoot = f.directory.resolve("media").toFile()
         var media = EncryptedAttachmentStore(mediaRoot, SqlLedger(f.db), ManualTaskSqlTest.KEY.copyOf())

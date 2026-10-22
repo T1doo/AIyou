@@ -43,7 +43,7 @@ class ImageTextSqlTest {
     @Test fun sourceRevisionTrashPolicyAbaAndWrongExactImageInvalidateReferencesAndBlockLateWrites():Unit=runBlocking{
         for(mode in 0..3)FullFixture().use{f->
             val image=f.image(f.entry());val repo=SqlImageTextRepository(f.gateway,f.key,f.media);val anchor=repo.preview(image);val saved=repo.write(create(anchor,"合成来源文字"))!!;val page=repo.search("")
-            when(mode){0->f.revise(image.entryId,"合成修订原文");1->f.db.write("UPDATE remote_source_access SET generation=generation+1,deleted=1 WHERE entryId=?",image.entryId);2->{f.db.write("UPDATE entries SET privacyPolicy='AI_NONE' WHERE id=?",image.entryId);f.db.write("UPDATE entries SET privacyPolicy='LOCAL_ONLY' WHERE id=?",image.entryId)};3->f.db.write("UPDATE attachments SET sha256=? WHERE id=?","0".repeat(64),image.id)}
+            when(mode){0->f.revise(image.entryId,"合成修订原文");1->f.db.write("UPDATE remote_source_access SET generation=generation+1,deleted=1 WHERE entryId=?",image.entryId);2->{f.db.write("UPDATE entries SET privacyPolicy='AI_NONE' WHERE id=?",image.entryId);f.db.write("UPDATE entries SET privacyPolicy='LOCAL_ONLY' WHERE id=?",image.entryId)};3->f.db.injectSyntheticAttachmentCorruption("UPDATE attachments SET sha256=? WHERE id=?","0".repeat(64),image.id)}
             assertThrows(ImageTextConflict::class.java){runBlocking{repo.write(change(saved,"不得落地迟到纠正"))}}
             assertThrows(ImageTextConflict::class.java){runBlocking{repo.read(anchor)}}
             if(mode!=3){assertEquals(listOf("INVALIDATED",0L),f.db.read("SELECT state,length(payload) FROM local_candidate_batches WHERE ruleVersion=5").single());assertFalse(repo.resolve(page,page.items.single()){fail("Invalidated proof")})}

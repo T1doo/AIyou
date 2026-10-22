@@ -29,6 +29,13 @@ class RecycleBinControllerTest {
         h.runNext(); assertTrue(h.ui().records.isEmpty()); assertEquals(ProcessingPolicy.AI_NONE, h.state.get().entries.single().policy)
         assertEquals(2, h.f.db.read("SELECT id FROM local_jobs WHERE id LIKE 'RECYCLE:%'").size)
     }
+    @Test fun acceptedDeleteNotifiesOutsideSourceGateBeforeQueueWhileReadAndStaleConfirmationDoNot():Unit=Harness().use{h->
+        var accepted=0;h.beforeMutation={accepted++;assertTrue(h.queue.isEmpty());assertFalse(h.bin.read(h.id).deleted)}
+        h.requestMove();assertEquals(0,accepted);val u=h.ui();val id=u.confirmation!!.id
+        h.controller.confirm(u.session,id+1);assertEquals(0,accepted);assertTrue(h.queue.isEmpty())
+        h.controller.confirm(u.session,id);assertEquals(1,accepted);assertEquals(1,h.queue.size)
+        h.controller.confirm(u.session,id);assertEquals(1,accepted);h.runNext();assertTrue(h.bin.read(h.id).deleted)
+    }
     @Test fun closingQueuedConfirmationBeforeTransactionCancelsItsOwnerWithoutTouchingNewTarget(): Unit = Harness().use { h ->
         h.requestMove(); val old = h.ui(); h.controller.confirm(old.session, old.confirmation!!.id)
         h.controller.close(old.session); h.controller.requestMove(h.id, 1)
@@ -210,10 +217,11 @@ class RecycleBinControllerTest {
         val state = AtomicReference(LocalRecordUiState(ready = true, opening = false, supportsRecycleBin = true,
             supportsOriginalExport = true, entries = listOf(bin.read(id).entry), text = "合成草稿"))
         val queue = ArrayDeque<suspend (EntryRepository) -> Unit>()
+        val sourceGate=CaptureDraftGate();var beforeMutation:()->Unit={}
         var beforeCas: ((LocalRecordUiState, LocalRecordUiState) -> Unit)? = null
         val controller = RecycleBinController({ state.get() }, { change ->
             do { val old = state.get(); val next = change(old); beforeCas?.invoke(old, next) } while (!state.compareAndSet(old, next))
-        }, { queue.addLast(it); true }, canMove = { canMove })
+        }, { queue.addLast(it); true }, canMove = { canMove },sourceUi={sourceGate.sourceUi(it)},beforeMutation={assertFalse(Thread.holdsLock(sourceGate));beforeMutation()})
         init { RecycleBinSqlTest.install(f.db) }
         fun ui() = state.get().recycleBin!!
         fun requestMove() { controller.requestMove(id, 1); runNext() }

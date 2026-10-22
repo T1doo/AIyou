@@ -32,9 +32,15 @@ class AttachmentSqlTest(unittest.TestCase):
             self.db.execute("INSERT INTO local_jobs VALUES('synthetic:1:LOCAL_INDEX','synthetic',1,'LOCAL_INDEX','PENDING')")
         self.before = self.snapshot()
         migration = SOURCE.split("internal val recordsMigration2To3 =", 1)[1].split("internal fun installRevisionGuard", 1)[0]
-        guard = SOURCE.split("internal fun installAttachmentGuard", 1)[1].split("/** v1", 1)[0]
+        guard = (ROOT / "core/data/src/main/kotlin/com/t1doo/aiyou/data/AttachmentIntentSqlSchema.kt").read_text()
+        update = re.search(r'val updateGuard = ("(?:[^"\\]|\\.)*")', guard)
+        identity = re.search(r'val identityGuard = """(.*?)""".trimIndent\(\)', guard, re.S)
+        self.assertIsNotNone(update)
+        self.assertIsNotNone(identity)
+        self.assertIn("AttachmentIntentSqlSchema.guards.forEach(db::execSQL)", SOURCE)
+        guards = [json.loads(update.group(1)), identity.group(1).strip()]
         with self.db:
-            for query in statements(migration) + statements(guard):
+            for query in statements(migration) + guards:
                 self.db.execute(query)
         self.intent = ("synthetic-attachment", "synthetic", 1, "image/png", "a" * 64, 100, "WRITING")
 
@@ -76,6 +82,16 @@ class AttachmentSqlTest(unittest.TestCase):
             self.assertEqual(1, self.db.execute(query, {"next": "STAGED", "id": self.intent[0], "expected": "WRITING"}).rowcount)
             self.assertEqual(1, self.db.execute(query, {"next": "READY", "id": self.intent[0], "expected": "STAGED"}).rowcount)
         self.assertEqual(self.intent[:6] + ("READY",), self.db.execute("SELECT * FROM attachments").fetchone())
+
+    def test_replace_cannot_bypass_intent_or_preserve_epoch_by_changing_image_to_audio(self):
+        with self.db:
+            self.db.execute("INSERT INTO attachments VALUES(?,?,?,?,?,?,?)", self.intent)
+        for mime in ("audio/ogg", "image/png"):
+            with self.assertRaises(sqlite3.IntegrityError), self.db:
+                self.db.execute("INSERT OR REPLACE INTO attachments VALUES(?,?,?,?,?,?,?)",
+                                (*self.intent[:3], mime, "b" * 64, 90, "READY"))
+            self.assertEqual([self.intent], self.db.execute("SELECT * FROM attachments").fetchall())
+        self.assertEqual(self.before, self.snapshot())
 
     def test_final_state_transaction_failure_retains_staged_association_and_text(self):
         with self.db:

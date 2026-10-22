@@ -125,6 +125,7 @@ internal class EncryptedAttachmentStore(
     }
 
     override suspend fun recover(): Unit = locked { recoverLocked() }
+    override suspend fun recover(beforeImageMutation:()->Unit):Unit=locked{recoverLocked(beforeImageMutation)}
 
     internal suspend fun <T> stageCapture(intent: AttachmentIntent,bytes: ByteArray,commit: () -> T): T = locked {
         validate(intent); check(ledger.find(intent.id)==null && !erasureHooks.fenced(intent.entryId))
@@ -251,15 +252,16 @@ internal class EncryptedAttachmentStore(
         lease.verify()
     }
 
-    private suspend fun recoverLocked() {
+    private suspend fun recoverLocked(beforeImageMutation:()->Unit={}) {
         for (row in ledger.all()) {
             validate(row.intent)
             if (erasureHooks.fenced(row.intent.entryId)) continue
+            fun changingImage(){if(row.intent.mediaType in setOf("image/png","image/jpeg"))beforeImageMutation()}
             when (row.state) {
                 AttachmentState.WRITING -> {
                     // A file without the durable STAGED marker has no acknowledged complete copy.
                     // Leave bytes for diagnosis; an explicit retry may remove only this row's temp.
-                    ledger.transition(row, AttachmentState.FAILED)
+                    changingImage();ledger.transition(row, AttachmentState.FAILED)
                 }
                 AttachmentState.STAGED -> {
                     val final = file(row.intent, false)
@@ -267,15 +269,15 @@ internal class EncryptedAttachmentStore(
                     try {
                         authenticated(candidate, row.intent).fill(0)
                     } catch (_: AttachmentIntegrityFailure) {
-                        ledger.transition(row, AttachmentState.CORRUPT)
+                        changingImage();ledger.transition(row, AttachmentState.CORRUPT)
                         continue
                     }
                     if (candidate != final) publish(row.intent) else syncDirectory()
-                    ledger.transition(row, AttachmentState.READY)
+                    changingImage();ledger.transition(row, AttachmentState.READY)
                 }
                 AttachmentState.READY -> {
                     try { authenticated(file(row.intent, false), row.intent).fill(0) }
-                    catch (_: AttachmentIntegrityFailure) { ledger.transition(row, AttachmentState.CORRUPT) }
+                    catch (_: AttachmentIntegrityFailure) { changingImage();ledger.transition(row, AttachmentState.CORRUPT) }
                 }
                 else -> Unit // Never enumerate/delete unknown files or replace an acknowledged original.
             }

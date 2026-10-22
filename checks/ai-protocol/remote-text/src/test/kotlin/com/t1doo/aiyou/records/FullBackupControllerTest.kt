@@ -33,6 +33,14 @@ class FullBackupControllerTest {
             assertEquals(RecordPackagePhase.DONE,restore.ui.phase);assertEquals(1,restore.local.entries.size)
         } }
     }
+    @Test fun acceptedRestoreNotifiesOutsideSourceGateBeforeQueueButPreviewAndStaleProofDoNot():Unit=runBlocking{FullFixture().use{source->FullFixture(99).use{target->
+        source.image(source.entry());val gate=CaptureDraftGate();var accepted=0
+        val h=Harness(target,{assertFalse(Thread.holdsLock(gate));accepted++},gate)
+        h.authenticate(document(source));assertEquals(0,accepted);assertTrue(h.queue.isEmpty())
+        h.controller.restoreFull(h.ui.session,h.ui.fullSummary!!.backupId,"0".repeat(64),h.ui.epoch);assertEquals(0,accepted);assertTrue(h.queue.isEmpty())
+        h.confirm();assertEquals(1,accepted);assertEquals(1,h.queue.size);assertTrue(target.db.read("SELECT * FROM attachments").isEmpty())
+        h.confirm();assertEquals(1,accepted);h.drain();assertEquals(RecordPackagePhase.DONE,h.ui.phase)
+    }}}
     @Test fun closingDuringFinalCommitRefreshesActualRecordsWithoutReopeningRetiredPanel():Unit=runBlocking {
         FullFixture().use { source -> FullFixture(99).use { target ->
             val id=source.entry();val restore=Harness(target);restore.authenticate(document(source));restore.confirm()
@@ -182,7 +190,7 @@ class FullBackupControllerTest {
         val snapshot=source.backup.capture(backupId,created);val payload=source.backup.seal(snapshot,password());val out=ByteArrayOutputStream()
         try { payload.writeTo(out) { true };return Document(out.toByteArray()) } finally { payload.release();snapshot.release() }
     }
-    private class Harness(val f:FullFixture) {
+    private class Harness(val f:FullFixture,beforeRestore:()->Unit={},sourceGate:CaptureDraftGate?=null) {
         var local=LocalRecordUiState(ready=true,opening=false,supportsRecordPackages=true,supportsFullBackup=true)
         val queue=ArrayDeque<suspend (EntryRepository)->Unit>()
         val store=object:EntryRepository {
@@ -201,7 +209,7 @@ class FullBackupControllerTest {
             override suspend fun revisions(entryId:String)=emptyList<OriginalRevision>()
             override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry=error("not used")
         }
-        val controller=RecordPackageController({local},{local=it(local)},{queue.add(it);true},JcaRecordPackageCipher(),Clock.systemUTC())
+        val controller=RecordPackageController({local},{local=it(local)},{queue.add(it);true},JcaRecordPackageCipher(),Clock.systemUTC(),sourceUi={if(sourceGate==null)it()else sourceGate.sourceUi(it)},beforeRestore=beforeRestore)
         val ui get()=checkNotNull(local.recordPackage)
         suspend fun drain() { while(queue.isNotEmpty()) queue.removeFirst()(store) }
         fun pick(document:Document) { val key=ui.requestKey!!;assertTrue(controller.claimPicker(ui.session,key));controller.picked(ui.session,key,document) }

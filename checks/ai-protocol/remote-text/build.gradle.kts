@@ -37,6 +37,8 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedAttachmentStore.kt")
+    from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/AttachmentIntentSqlSchema.kt")
+    from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/ReadyImageSqlSchema.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/OwnerAttachmentStore.kt")
     from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/EncryptedOriginalEditStore.kt")
     listOf("ErasureFileProtocol.kt", "PermanentErasureSqlSchema.kt", "SqlPermanentErasureRepository.kt", "DrainingRecordsStorage.kt", "PermanentErasureRecovery.kt").forEach {
@@ -51,7 +53,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     listOf("RecordPackageActivityCodec.kt", "SqlRecordPackageActivities.kt", "RecordPackageBinary.kt", "JcaRecordPackageCipher.kt", "RecordMediaPackageCipher.kt", "SqlRecordMediaPackageRepository.kt", "SqlCaptureRepository.kt", "SqlRecordPackageRepository.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
-    listOf("LocalSearchTokenizer.kt", "LocalSearchSqlSchema.kt", "SqlLocalSearchRepository.kt", "SqlUnifiedKeywordRepository.kt", "UnifiedManualTags.kt", "UnifiedManualPeople.kt", "UnifiedFavorites.kt").forEach {
+    listOf("LocalSearchTokenizer.kt", "LocalSearchSqlSchema.kt", "SqlLocalSearchRepository.kt", "SqlUnifiedKeywordRepository.kt", "UnifiedManualTags.kt", "UnifiedManualPeople.kt", "UnifiedFavorites.kt", "UnifiedReadyImages.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
     listOf("RecordFavoriteSqlSchema.kt", "SqlRecordFavoriteRepository.kt").forEach {

@@ -616,16 +616,91 @@ class UnifiedKeywordViewModelTest {
         h.controller.favorites(session,false);h.controller.search(session);h.queue.removeFirst()(h.owner)
         assertFalse(h.state.get().unifiedKeyword!!.snapshot!!.onlyFavorites);assertEquals(1,h.state.get().unifiedKeyword!!.snapshot!!.groups.size)
     }}
+    private suspend fun loadReady(h:HandoffFixture){
+        h.controller.open();val session=h.state.get().unifiedKeyword!!.session;h.controller.keyword(session,"淡茶");h.controller.readyImages(session,true);h.controller.search(session);h.queue.removeFirst()(h.owner)
+        assertTrue(h.state.get().unifiedKeyword!!.snapshot!!.onlyReadyImages)
+    }
+    @Test fun readyImageModeProofReturnAndMutationInvalidateUiNullHandoffWithoutRevivingSeed():Unit=runBlocking{HandoffFixture().use{h->
+        h.data.f.image(h.id);loadReady(h);var u=h.state.get().unifiedKeyword!!;var offer:UnifiedKeywordHandoff?=null
+        h.controller.locate(u.session,u.visibleGroups.single().items.first()){_,confirm->offer=confirm};h.queue.removeFirst()(h.owner);assertNull(h.state.get().unifiedKeyword)
+        h.controller.readyImageMutationAccepted();assertFalse(offer!!.invoke{fail("Retired image handoff")});h.controller.resume();assertNull(h.state.get().unifiedKeyword)
+        loadReady(h);u=h.state.get().unifiedKeyword!!;val old=u.snapshot
+        h.controller.locate(u.session,u.visibleGroups.single().items.first()){_,confirm->assertTrue(confirm{})};h.queue.removeFirst()(h.owner)
+        h.controller.resume();h.queue.removeFirst()(h.owner);u=h.state.get().unifiedKeyword!!;assertTrue(u.onlyReadyImages);assertNotSame(old,u.snapshot)
+        h.controller.locate(u.session,u.visibleGroups.single().items.first()){_,confirm->assertTrue(confirm{})};h.queue.removeFirst()(h.owner)
+        h.controller.readyImageMutationAccepted();h.controller.resume();assertNull(h.state.get().unifiedKeyword)
+        h.controller.open();u=h.state.get().unifiedKeyword!!;assertFalse(u.onlyReadyImages);h.controller.readyImages(u.session,true);h.controller.clear(u.session);assertFalse(h.state.get().unifiedKeyword!!.onlyReadyImages)
+    }}
+    @Test fun readyImageLegacyPortOrDroppedModeNeverPublishesUnfilteredSnapshot():Unit=runBlocking{
+        for(drop in listOf(false,true))HandoffFixture{actual->
+            val old=object:UnifiedKeywordRepository{override suspend fun search(keyword:String,scope:UnifiedKeywordScope)=actual.search(keyword,scope)
+                override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit)=actual.resolve(snapshot,item,admit)}
+            if(!drop)old else object:UnifiedKeywordRepository by old{
+                override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,onlyFavorites:Boolean,onlyReadyImages:Boolean,checkCurrent:()->Unit)=actual.search(keyword,scope,captureRange,tag,person,onlyFavorites,checkCurrent)
+            }
+        }.use{h->h.data.f.image(h.id);h.controller.open();val s=h.state.get().unifiedKeyword!!.session;h.controller.keyword(s,"淡茶");h.controller.readyImages(s,true);h.controller.search(s);h.queue.removeFirst()(h.owner)
+            assertNull(h.state.get().unifiedKeyword!!.snapshot);assertNotNull(h.state.get().unifiedKeyword!!.error)
+        }
+    }
+    @Test fun readyImagePerRowGuardDoesNotTraverseEntriesAttachmentsOrOldProof():Unit=runBlocking{
+        var reads=0;var checks=0
+        HandoffFixture{actual->object:UnifiedKeywordRepository by actual{
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,onlyFavorites:Boolean,onlyReadyImages:Boolean,checkCurrent:()->Unit)=
+                actual.search(keyword,scope,captureRange,tag,person,onlyFavorites,onlyReadyImages,{val before=reads;checkCurrent();assertEquals(before,reads);checks++})
+        }}.use{h->h.data.f.image(h.id);repeat(22){h.data.f.entry()};val rows=h.state.get().entries
+            h.state.set(h.state.get().copy(entries=object:AbstractList<StoredEntry>(){override val size:Int get(){reads++;return rows.size};override fun get(index:Int):StoredEntry{reads++;return rows[index]}}))
+            loadReady(h);assertTrue(checks>100);assertTrue(reads>0);println("READY_IMAGE_GUARDS checks=$checks guardEntries=0 boundaryEntryReads=$reads")
+        }
+    }
+    @Test fun acceptedImageSelectionRetiresBeforeQueueButNoopReadCancelAndStaleSelectionDoNot():Unit=runBlocking{HandoffFixture().use{h->
+        h.data.f.image(h.id);loadReady(h);var notices=0;val sourceGate=CaptureDraftGate()
+        val media=object:AttachmentStore by h.data.f.media{override suspend fun read(id:String)=h.data.f.media.readReadOnly(id);override suspend fun list(entryId:String,revision:Int)=h.data.f.media.listReadOnly(entryId,revision)}
+        val owner=object:EntryRepository by h.owner{override val attachments=media}
+        val q=java.util.ArrayDeque<suspend(EntryRepository)->Unit>()
+        val attachments=LocalAttachmentController({q.add(it);true},{object:AttachmentPicture{override val width=1;override val height=1}},sourceUi={sourceGate.sourceUi(it)},beforeImageMutation={assertFalse(Thread.holdsLock(sourceGate));notices++;h.controller.readyImageMutationAccepted()})
+        try{
+            attachments.open(h.id,1);q.removeFirst()(owner);assertNotNull(h.state.get().unifiedKeyword);assertEquals(0,notices)
+            val panel=attachments.state.value!!;attachments.select(panel.sessionId);val selection=attachments.state.value!!.selection!!
+            attachments.selected(selection.requestId+1,null);assertEquals(0,notices)
+            attachments.selected(selection.requestId,null);while(q.isNotEmpty())q.removeFirst()(owner);assertEquals(0,notices);assertNotNull(h.state.get().unifiedKeyword)
+            attachments.select(panel.sessionId);val next=attachments.state.value!!.selection!!
+            attachments.selected(next.requestId,object:SelectedImageSource{override fun mediaType()="image/png";override fun open()=FullBackupTest.PNG.inputStream()})
+            assertEquals(1,notices);assertNull(h.state.get().unifiedKeyword);assertEquals(AttachmentImportPhase.PREPARING,attachments.state.value!!.selection!!.phase)
+            assertEquals(1,h.data.f.db.read("SELECT * FROM attachments").size)
+            while(q.isNotEmpty())q.removeFirst()(owner)
+            assertEquals(2,h.data.f.db.read("SELECT * FROM attachments").size);assertNull(attachments.state.value!!.selection)
+            loadReady(h);val fresh=h.state.get().unifiedKeyword;attachments.selected(next.requestId,null);assertSame(fresh,h.state.get().unifiedKeyword)
+        }finally{attachments.markDisposed();attachments.disposeOnIo()}
+    }}
+    @Test fun actualVmReadyImageObservationRetiresEveryScopeOnNonmatchingImageChange():Unit=runBlocking{
+        for(scope in UnifiedKeywordScope.entries)Harness(withImages=true).use{h->
+            h.ready();h.vm.unifiedKeywords.open();val s=h.value().session;h.vm.unifiedKeywords.scope(s,scope);h.vm.unifiedKeywords.keyword(s,"淡茶");h.vm.unifiedKeywords.readyImages(s,true);h.vm.unifiedKeywords.search(s)
+            val u=h.ui{!it.busy&&it.snapshot!=null};assertTrue(u.snapshot!!.onlyReadyImages)
+            val other=h.data.f.entry(text="合成不命中");h.data.f.image(other);h.vm.refreshLocalSearch()
+            withTimeout(4000){h.vm.state.first{it.entries.any{e->e.id==other}}};assertNull(h.vm.state.value.unifiedKeyword)
+            h.vm.unifiedKeywords.resume();assertNull(h.vm.state.value.unifiedKeyword)
+        }
+    }
+    @Test fun actualVmOldReadyModeCannotReturnAfterOffOnAndClearWhileReadWasDelayed():Unit=runBlocking{Harness(withImages=true).use{h->
+        h.ready();h.vm.unifiedKeywords.open();val s=h.value().session;h.vm.unifiedKeywords.keyword(s,"淡茶");h.vm.unifiedKeywords.readyImages(s,true);h.block=true;h.vm.unifiedKeywords.search(s)
+        withTimeout(4000){h.entered.await()};h.vm.unifiedKeywords.readyImages(s,false);h.vm.unifiedKeywords.readyImages(s,true);h.vm.unifiedKeywords.search(s);h.release.complete(Unit)
+        val u=h.ui{!it.busy&&it.snapshot!=null};assertTrue(u.onlyReadyImages);assertNotSame(h.first,u.snapshot);assertEquals(2,h.calls)
+        h.vm.unifiedKeywords.clear(s);assertFalse(h.value().onlyReadyImages);assertNull(h.value().snapshot)
+    }}
     private suspend fun chooseFavorite(h:Harness,id:String,value:Boolean){
         val state=h.vm.state.value;val e=state.entries.single{it.id==id};h.vm.favorites.set(id,e.currentRevision,OriginalExports.hash(e.originalText),state.favorites.getValue(id).version,value)
         withTimeout(4000){h.vm.state.first{it.favoriteWrites[id]==null&&it.favoritesAvailable&&it.favorites[id]?.isFavorite==value}}
     }
-    private class Harness(extra:Int=0,withMemory:Boolean=false,withPeople:Boolean=false,withFavorites:Boolean=false):AutoCloseable {
+    private class Harness(extra:Int=0,withMemory:Boolean=false,withPeople:Boolean=false,withFavorites:Boolean=false,private val withImages:Boolean=false):AutoCloseable {
         val data=UnifiedKeywordFixture(withPeople=withPeople);val id=data.f.entry(text="合成淡茶")
         val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();var block=false
         var first:UnifiedKeywordSnapshot?=null;var calls=0;var loseFavoriteAck=false
-        init{runBlocking{data.audio(id);repeat(extra){data.audio(data.f.entry(text="合成淡茶"))};if(withMemory)AcceptedMemoryKeywordSqlTest.memory(data,id,"备注专词")}}
+        init{runBlocking{data.audio(id);if(withImages)data.f.image(id);repeat(extra){data.audio(data.f.entry(text="合成淡茶"))};if(withMemory)AcceptedMemoryKeywordSqlTest.memory(data,id,"备注专词")}}
         val port:UnifiedKeywordRepository=object:UnifiedKeywordRepository by data.repo{
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,onlyFavorites:Boolean,onlyReadyImages:Boolean,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+                calls++;val result=data.repo.search(keyword,scope,captureRange,tag,person,onlyFavorites,onlyReadyImages,checkCurrent)
+                if(block){block=false;first=result;entered.complete(Unit);release.await()};return result
+            }
             override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,onlyFavorites:Boolean,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
                 calls++;val result=data.repo.search(keyword,scope,captureRange,tag,person,onlyFavorites,checkCurrent)
                 if(block){block=false;first=result;entered.complete(Unit);release.await()};return result
@@ -665,13 +740,21 @@ class UnifiedKeywordViewModelTest {
                     if(loseFavoriteAck){loseFavoriteAck=false;error("Synthetic committed favorite ACK loss")};return saved
                 }
             }else null
-            override val localSearch=if(withFavorites)data.originals else null
+            override val localSearch=if(withFavorites||withImages)data.originals else null
             override val sourceMemories=if(withMemory)data.memories else null
             override suspend fun prepare(){check(data.f.db.read("PRAGMA user_version").single().single()==12L)}
             override fun close()=base.close()
         }
         val vm=LocalRecordsViewModel(Application(),{owner},Clock.systemUTC())
-        suspend fun ready()=withTimeout(4000){vm.state.first{it.ready&&!it.opening&&it.unifiedKeywordOwner===port}}
+        suspend fun ready()=withTimeout(4000){
+            vm.state.first{it.ready&&!it.opening&&it.unifiedKeywordOwner===port}
+            if(withImages){
+                // Initial open publishes before scheduling its index command. Two serial markers
+                // prove that the initial (single-source) batch really finished, with no timing sleeps.
+                repeat(2){val ack=CompletableDeferred<Unit>();check(vm.enqueueTaskOperation{ack.complete(Unit)});ack.await()}
+                vm.state.first{!it.localIndexBusy&&it.localIndexError==null}
+            }
+        }
         fun value()=checkNotNull(vm.state.value.unifiedKeyword)
         fun open(keyword:String,scope:UnifiedKeywordScope=UnifiedKeywordScope.ALL,from:String="",through:String=""){vm.unifiedKeywords.open();val u=value();vm.unifiedKeywords.scope(u.session,scope);vm.unifiedKeywords.keyword(u.session,keyword);vm.unifiedKeywords.from(u.session,from);vm.unifiedKeywords.through(u.session,through);vm.unifiedKeywords.search(u.session)}
         suspend fun ui(predicate:(UnifiedKeywordUi)->Boolean)=withTimeout(8000){vm.state.first{it.unifiedKeyword?.let(predicate)==true}.unifiedKeyword!!}

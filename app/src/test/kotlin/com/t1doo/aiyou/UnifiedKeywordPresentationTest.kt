@@ -317,6 +317,44 @@ class UnifiedKeywordPresentationTest {
         compose.onNodeWithTag("original-text").assertTextEquals(f.records[0].originalText)
         compose.runOnIdle{assertEquals(0,f.writes);assertEquals(listOf("我偏好淡茶🙂","我偏好清水🙂"),f.records.map{it.originalText})}
     }
+    @Test fun currentReadyImageCheckboxFreshReturnRestoreAndClearDoNotWriteAnySource(){
+        f.onlyFirstReadyImage();val restore=StateRestorationTester(compose);content(restore);open()
+        compose.onNodeWithTag("unified-results").performScrollToIndex(1)
+        compose.onNodeWithTag("unified-only-ready-images").performScrollTo().assertIsOff().assertHeightIsAtLeast(48.dp).performClick().assertIsOn()
+        compose.runOnIdle{assertEquals(0,f.lookups);assertNull(f.local.value.unifiedKeyword!!.snapshot)}
+        query("🙂");val before=f.local.value.unifiedKeyword!!.snapshot!!
+        compose.runOnIdle{assertTrue(before.onlyReadyImages);assertEquals(listOf(f.records[0].id),before.groups.map{it.binding.source.sourceId})}
+        result(before.groups.single().items.filterIsInstance<UnifiedKeywordEvidence.Original>().single())
+        compose.onNodeWithTag("original-text").assertTextEquals(f.records[0].originalText);back()
+        compose.runOnIdle{assertTrue(f.local.value.unifiedKeyword!!.onlyReadyImages);assertNotSame(before,f.local.value.unifiedKeyword!!.snapshot);assertFalse(registry!!.performSave().toString().contains("🙂"))}
+        restore.emulateSavedInstanceStateRestore();compose.waitForIdle();drain();open()
+        compose.onNodeWithTag("unified-results").performScrollToIndex(1)
+        compose.onNodeWithTag("unified-only-ready-images").performScrollTo().assertIsOff().performClick().assertIsOn()
+        query("🙂");compose.onNodeWithTag("unified-results").performScrollToIndex(2)
+        compose.onNodeWithTag("unified-clear").performScrollTo().performClick();compose.waitForIdle()
+        compose.onNodeWithTag("unified-results").performScrollToIndex(1)
+        compose.onNodeWithTag("unified-only-ready-images").performScrollTo().assertIsOff()
+        compose.runOnIdle{assertFalse(f.local.value.unifiedKeyword!!.onlyReadyImages);assertNull(f.local.value.unifiedKeyword!!.snapshot)
+            assertEquals(1,f.readyPictureIds.size);assertEquals(0,f.writes)}
+    }
+    @Test @Config(qualifiers="w640dp-h320dp-land")
+    fun currentReadyImageDoubleFontCheckboxKeyboardAndExactOriginalStayReachable(){
+        f.onlyFirstReadyImage();content();open();compose.onNodeWithTag("unified-results").performScrollToIndex(1)
+        val imageFilter=compose.onNodeWithTag("unified-only-ready-images").performScrollTo().assertIsDisplayed().assertIsOff().assertHeightIsAtLeast(48.dp)
+        val dialogView=(imageFilter.fetchSemanticsNode().root as ViewRootForTest).view
+        compose.runOnIdle{assertTrue(dialogView.isAttachedToWindow);assertTrue(dialogView.requestFocusFromTouch())};compose.waitForIdle()
+        compose.runOnIdle{assertFalse(dialogView.isInTouchMode)}
+        imageFilter.performSemanticsAction(SemanticsActions.RequestFocus){assertTrue(it())}
+        imageFilter.assertIsFocused().performKeyInput{pressKey(Key.Enter)};compose.waitForIdle();imageFilter.assertIsOn()
+        compose.runOnIdle{assertEquals(0,f.lookups)};query("🙂")
+        val original=f.local.value.unifiedKeyword!!.snapshot!!.groups.single().items.filterIsInstance<UnifiedKeywordEvidence.Original>().single()
+        compose.onNodeWithTag("unified-results").performScrollToIndex(3)
+        val source=compose.onNodeWithTag("unified-source:"+original.key).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        compose.runOnIdle{assertTrue(dialogView.requestFocusFromTouch())};compose.waitForIdle()
+        source.performSemanticsAction(SemanticsActions.RequestFocus){assertTrue(it())};source.assertIsFocused().performKeyInput{pressKey(Key.Enter)};drain()
+        compose.onNodeWithTag("original-text").assertTextEquals(f.records[0].originalText)
+        compose.runOnIdle{assertEquals(0,f.writes);assertEquals(listOf("我偏好淡茶🙂","我偏好清水🙂"),f.records.map{it.originalText})}
+    }
     private class Fixture {
         private fun id()=UUID.randomUUID().toString()
         val records=listOf("我偏好淡茶🙂","我偏好清水🙂").map{StoredEntry(id(),1,it,55,"UTC",ProcessingPolicy.LOCAL_ONLY)}
@@ -324,6 +362,8 @@ class UnifiedKeywordPresentationTest {
         private val wave=LocalPcmAudio.encode(ShortArray(32){it.toShort()})
         private fun hash(b:ByteArray)=java.security.MessageDigest.getInstance("SHA-256").digest(b).joinToString(""){"%02x".format(it)}
         private val pictures=records.map{AttachmentIntent(id(),it.id,1,"image/png",hash(png),png.size.toLong())}
+        val readyPictureIds=pictures.map{it.id}.toMutableSet()
+        fun onlyFirstReadyImage(){readyPictureIds.retainAll(setOf(pictures[0].id))}
         private val audio=AttachmentIntent(id(),records[0].id,1,"audio/wav",hash(wave),wave.size.toLong())
         private fun bind(e:StoredEntry)=UnifiedKeywordBinding(SourceVersion(e.id,1),OriginalExports.hash(e.originalText),0,55,"UTC",e.policy)
         private val evidence=records.flatMapIndexed{at,e->
@@ -385,6 +425,9 @@ class UnifiedKeywordPresentationTest {
                 return search(keyword,scope,captureRange,tag,person,false,checkCurrent)
             }
             override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,onlyFavorites:Boolean,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+                return search(keyword,scope,captureRange,tag,person,onlyFavorites,false,checkCurrent)
+            }
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,onlyFavorites:Boolean,onlyReadyImages:Boolean,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
                 checkCurrent();if(tag!=null)check(tag in selections);if(person!=null)check(person in personSelections);lookups++
                 if(tooBroad)throw UnifiedKeywordTooBroad()
                 val saved=memory;val current=saved?.current
@@ -394,9 +437,9 @@ class UnifiedKeywordPresentationTest {
                 }else emptyList()
                 val matched=(evidence+extra).filter{e->val text=when(e){is UnifiedKeywordEvidence.Original->e.entry.originalText;is UnifiedKeywordEvidence.Audio->e.value.current.text;is UnifiedKeywordEvidence.Image->e.value.current.text;is UnifiedKeywordEvidence.Preference->e.value.current!!.content.reference.quote;is UnifiedKeywordEvidence.AcceptedMemory->keyword}
                     text.contains(keyword)&&when(scope){UnifiedKeywordScope.ALL->true;UnifiedKeywordScope.ORIGINAL->e is UnifiedKeywordEvidence.Original;UnifiedKeywordScope.AUDIO->e is UnifiedKeywordEvidence.Audio;UnifiedKeywordScope.IMAGE->e is UnifiedKeywordEvidence.Image;UnifiedKeywordScope.PREFERENCE->e is UnifiedKeywordEvidence.Preference;UnifiedKeywordScope.ACCEPTED_MEMORY->e is UnifiedKeywordEvidence.AcceptedMemory}}
-                val dates=captureRange;val selectedTag=tag;val selectedPerson=person;val favorite=onlyFavorites
-                val snapshot=object:UnifiedKeywordSnapshot{override val keyword=keyword;override val scope=scope;override val captureRange=dates;override val tag=selectedTag;override val person=selectedPerson;override val onlyFavorites=favorite;override val bindings=records.map(::bind)
-                    override val groups=matched.filter{dates.contains(it.binding.captured,it.binding.zone)&&(tag==null||it.binding.source.sourceId==records[if(tag.id=="synthetic-tag-1")1 else 0].id)&&(person==null||it.binding.source.sourceId==records[if(person.id=="synthetic-person-1")1 else 0].id)&&(!favorite||local.value.favorites[it.binding.source.sourceId]?.isFavorite==true)}.groupBy{it.binding}.map{(b,rows)->UnifiedKeywordGroup(b,rows.sortedBy{it.key})}}
+                val dates=captureRange;val selectedTag=tag;val selectedPerson=person;val favorite=onlyFavorites;val ready=onlyReadyImages
+                val snapshot=object:UnifiedKeywordSnapshot{override val keyword=keyword;override val scope=scope;override val captureRange=dates;override val tag=selectedTag;override val person=selectedPerson;override val onlyFavorites=favorite;override val onlyReadyImages=ready;override val bindings=records.map(::bind)
+                    override val groups=matched.filter{dates.contains(it.binding.captured,it.binding.zone)&&(tag==null||it.binding.source.sourceId==records[if(tag.id=="synthetic-tag-1")1 else 0].id)&&(person==null||it.binding.source.sourceId==records[if(person.id=="synthetic-person-1")1 else 0].id)&&(!favorite||local.value.favorites[it.binding.source.sourceId]?.isFavorite==true)&&(!ready||pictures.any{p->p.entryId==it.binding.source.sourceId&&p.id in readyPictureIds})}.groupBy{it.binding}.map{(b,rows)->UnifiedKeywordGroup(b,rows.sortedBy{it.key})}}
                 proofVersions[snapshot]=memory?.version;return snapshot
             }
             override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit):Boolean {if(!proofVersions.containsKey(snapshot)||proofVersions[snapshot]!=memory?.version)return false;if(item!=null&&snapshot.groups.none{it.items.any{row->row===item}})return false;admit();return true}
@@ -430,7 +473,7 @@ class UnifiedKeywordPresentationTest {
             override val sourceMemories=memoryPort
             override val attachments=object:AttachmentStore {
                 override suspend fun save(intent:AttachmentIntent,source:()->java.io.InputStream):LocalAttachment{writes++;error("No source writes")}
-                override suspend fun list(entryId:String,revision:Int)=(pictures+audio).filter{it.entryId==entryId&&it.revision==revision}.map{LocalAttachment(it,AttachmentState.READY)}
+                override suspend fun list(entryId:String,revision:Int)=(pictures+audio).filter{it.entryId==entryId&&it.revision==revision}.map{LocalAttachment(it,if(it.mediaType=="image/png"&&it.id !in readyPictureIds)AttachmentState.FAILED else AttachmentState.READY)}
                 override suspend fun read(id:String):ByteArray{mediaReads++;return if(id==audio.id)wave.copyOf()else png.copyOf()}
                 override suspend fun recover()=Unit
             }

@@ -66,6 +66,7 @@ interface UnifiedKeywordSnapshot {
     val tag:UnifiedTagSelection? get()=null
     val person:UnifiedPersonSelection? get()=null
     val onlyFavorites:Boolean get()=false
+    val onlyReadyImages:Boolean get()=false
     val groups:List<UnifiedKeywordGroup>
     /** Includes off-screen and nonmatching sources retained by the authenticated collection proof. */
     val bindings:List<UnifiedKeywordBinding>
@@ -104,6 +105,11 @@ interface UnifiedKeywordRepository {
         if(onlyFavorites)throw UnifiedFavoriteUnsupported()
         return search(keyword,scope,captureRange,tag,person,checkCurrent)
     }
+    /** Explicit READY qualification must never fall back to the old any-state image filter. */
+    suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,onlyFavorites:Boolean,onlyReadyImages:Boolean,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+        if(onlyReadyImages)throw UnifiedReadyImagesUnsupported()
+        return search(keyword,scope,captureRange,tag,person,onlyFavorites,checkCurrent)
+    }
     /** Reauthenticates media, then jointly verifies all sets. Callback is a PRIVATE admission
      * ticket only: callers must not render or navigate until this method returns true. */
     suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?=null,admit:()->Unit):Boolean
@@ -124,3 +130,7 @@ interface UnifiedPersonChoice { val id:String; val name:String }
 interface UnifiedPersonPage { val choices:List<UnifiedPersonChoice>; val hasNext:Boolean }
 interface UnifiedPersonSelection { val id:String; val name:String }
 class UnifiedPersonUnsupported:IllegalStateException("Manual person marker filter is unavailable")
+
+class UnifiedReadyImagesUnsupported:IllegalStateException("Current ready-image filter is unavailable")
+
+class UnifiedReadyImageLimit:IllegalStateException("Current image associations exceed authentication limit")

@@ -26,5 +26,6 @@ internal object LocalSearchSqlSchema {
                     " AFTER " + event + " ON " + table + " BEGIN " + invalidate(id) + " END")
             }
         }
+        addAll(ReadyImageSqlSchema.epochGuards)
     }
 }

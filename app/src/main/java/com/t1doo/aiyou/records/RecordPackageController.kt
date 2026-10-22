@@ -39,7 +39,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
     private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
     private val cipher: RecordPackageCipher, private val clock: Clock,
     private val onFullRestored:suspend (EntryRepository)->Unit = {},
-    private val sourceUi:((()->Unit)->Unit)={it()}) {
+    private val sourceUi:((()->Unit)->Unit)={it()},private val beforeRestore:()->Unit={}) {
     private class Work(val session: Long, val epoch: Long, val key: String = UUID.randomUUID().toString(),
         val snapshot: OriginalExportSnapshot? = null, val mediaPreview: RecordMediaPreview? = null) {
         val cancelled = AtomicBoolean()
@@ -268,12 +268,18 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             }) fail(active, "本机操作暂不可用。")
         } finally { password.fill('\u0000') }
     }
-    fun confirmRestore(session: Long, backupId: String, digest: String, epoch: Long) { sourceUi { confirmRestoreSourceOwned(session,backupId,digest,epoch) } }
-    private fun confirmRestoreSourceOwned(session: Long, backupId: String, digest: String, epoch: Long) {
+    fun confirmRestore(session: Long, backupId: String, digest: String, epoch: Long) {
+        var accepted:(()->Unit)?=null
+        sourceUi { confirmRestoreSourceOwned(session,backupId,digest,epoch){accepted=it} };accepted?.invoke()
+    }
+    private fun confirmRestoreSourceOwned(session: Long, backupId: String, digest: String, epoch: Long,afterAdmission:((()->Unit)->Unit)) {
         val active = work.get() ?: return; val ui = panel(session) ?: return; val verified = active.verified ?: return
         if (!owned(active) || ui.phase !in setOf(RecordPackagePhase.RESTORE_PREVIEW, RecordPackagePhase.UNCERTAIN) ||
             ui.epoch != epoch || verified.manifest.backupId != backupId || verified.digest != digest || ui.verified !== verified) return
         updateOwned(active, ui.phase) { it.copy(phase = RecordPackagePhase.IMPORTING, error = null, notice = "正在提交并核对本机恢复回执；返回不会撤销已提交事务。") }
+        afterAdmission {
+        if(!owned(active,RecordPackagePhase.IMPORTING))return@afterAdmission
+        beforeRestore()
         if (!enqueue { store ->
             try {
                 if (!owned(active, RecordPackagePhase.IMPORTING)) return@enqueue
@@ -322,6 +328,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                     error = "恢复结果尚未确认。请核对同一包的稳定回执；不会另建一批副本。", notice = null) }
             }
         }) { updateOwned(active, RecordPackagePhase.IMPORTING) { it.copy(phase = RecordPackagePhase.UNCERTAIN, error = "恢复结果尚未确认，请保留同一包并重试核对。") } }
+        }
     }
     fun fullHome(session:Long) { sourceUi { fullHomeSourceOwned(session) } }
     private fun fullHomeSourceOwned(session:Long) {
@@ -394,12 +401,18 @@ class RecordPackageController internal constructor(private val current: () -> Lo
             finally { active.endFull() }
         }) fail(active,"本机操作暂不可用。")
     }
-    fun restoreFull(session:Long,id:String,digest:String,epoch:Long) { sourceUi { restoreFullSourceOwned(session,id,digest,epoch) } }
-    private fun restoreFullSourceOwned(session:Long,id:String,digest:String,epoch:Long) {
+    fun restoreFull(session:Long,id:String,digest:String,epoch:Long) {
+        var accepted:(()->Unit)?=null
+        sourceUi { restoreFullSourceOwned(session,id,digest,epoch){accepted=it} };accepted?.invoke()
+    }
+    private fun restoreFullSourceOwned(session:Long,id:String,digest:String,epoch:Long,afterAdmission:((()->Unit)->Unit)) {
         val ui=panel(session) ?: return;val active=work.get() ?: return
         if(!owned(active) || !ui.fullMode || ui.phase !in setOf(RecordPackagePhase.RESTORE_PREVIEW,RecordPackagePhase.UNCERTAIN) ||
             ui.epoch!=epoch || ui.fullSummary?.backupId!=id || ui.fullDigest!=digest) return
         updateOwned(active,ui.phase) { it.copy(phase=RecordPackagePhase.IMPORTING,error=null,notice="先核对同一备份的完成回执；无回执时仅导入空资料库。已开始的事务可能在退出后完成。") }
+        afterAdmission {
+        if(!owned(active,RecordPackagePhase.IMPORTING))return@afterAdmission
+        beforeRestore()
         if(!enqueue { store ->
             if(!owned(active,RecordPackagePhase.IMPORTING) || !active.beginFull()) return@enqueue
             try {
@@ -437,6 +450,7 @@ class RecordPackageController internal constructor(private val current: () -> Lo
                     error="恢复尚未确认：目标可能非空、发生变化或文件发布未完成。资料和失败密文已保留；仅可核对同一备份回执，不会覆盖或删除现有库。",notice=null) }
             } finally { active.endFull() }
         }) updateOwned(active,RecordPackagePhase.IMPORTING) { it.copy(phase=RecordPackagePhase.UNCERTAIN,error="恢复尚未确认，请保留同一备份并重试核对。") }
+        }
     }
     private fun hasFullBackupInput(local:LocalRecordUiState)=local.text.isNotEmpty() || local.mixedCapture?.let {
         it.text.isNotEmpty() || it.pendingEdits>0 || it.busy || it.selection!=null || it.uncertainSave ||

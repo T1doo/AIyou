@@ -74,7 +74,7 @@ internal val recordsMigration3To4 = object : Migration(3, 4) {
 internal fun installRemoteTextGuards(db: SupportSQLiteDatabase) { RemoteTextSqlSchema.guards.forEach(db::execSQL) }
 
 internal fun installAttachmentGuard(db: SupportSQLiteDatabase) {
-    db.execSQL("CREATE TRIGGER IF NOT EXISTS immutable_attachment_intent BEFORE UPDATE ON attachments WHEN OLD.id IS NOT NEW.id OR OLD.entryId IS NOT NEW.entryId OR OLD.revision IS NOT NEW.revision OR OLD.mediaType IS NOT NEW.mediaType OR OLD.sha256 IS NOT NEW.sha256 OR OLD.byteSize IS NOT NEW.byteSize BEGIN SELECT RAISE(ABORT, 'immutable attachment intent'); END")
+    AttachmentIntentSqlSchema.guards.forEach(db::execSQL)
 }
 
 /** v1 is the initial D02 text schema; v2 adds the durable local work ledger. */
@@ -106,6 +106,7 @@ internal fun installManualTaskGuard(db: SupportSQLiteDatabase) { db.execSQL(Manu
 internal val recordsMigration6To7 = object : Migration(6, 7) {
     override fun migrate(db: SupportSQLiteDatabase) {
         LocalSearchSqlSchema.migration6To7.forEach(db::execSQL)
+        installAttachmentGuard(db)
         installLocalSearchGuards(db)
     }
 }

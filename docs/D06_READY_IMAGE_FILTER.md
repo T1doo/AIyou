@@ -1,7 +1,8 @@
-# D06 统一找回：当前修订就绪图片交集（设计候选）
+# D06 统一找回：当前修订就绪图片交集
 
 基线 `5d5e377d41fc9f57470be2737c39902c5fb5f13a`；两份原方案 §5.2。
-本提交只定义合同与候选 SQL，不安装运行触发器、不接通新功能、不重跑已有 CI。
+设计候选 `4fc1b2754491539105e9fada042b9d0c7f8b9bbe` 已独审；后续实施按本文合同接线。
+本片不代表完整 D06、Android/Preview 或设备验收。
 
 ## 资格与用户闭环
 
@@ -35,6 +36,7 @@
   初读→逐批媒体认证→最终共同 SQL 重验保持同一集合回执，不缓存全库 ID/正文/图片 Map。
   同时最多一批轻量 metadata、单源计数和一幅 ≤16MiB 明文；逐批/逐幅检查 O(1) 请求门。
   不借用备份 64MiB 总额，不新增全库图片/保存数量上限；总耗时随合法媒体量线性增长，性能未验。
+- 单源图片关联超限与“已采纳线索 1000 命中预算”使用不同错误，不能误导为收窄关键词即可修复。
 - 原文内部候选必须以 READY EXISTS 在候选预算前筛选，并让私有 proof 保留 READY 与别名模式；
   最后复核不可误调旧 any-state 候选。所有嵌套复核传入同一 guard，不删原图片集合重验。
   profile2 完整验证全部历史/来源，显式计算各条件；仅当前 ACCEPTED、逐字且全部条件满足才
@@ -53,11 +55,19 @@
 - 现有 create/onOpen 安装路径须覆盖旧库冷开及真实主机 fixture；epoch 既有溢出保护不降级。
   full backup 已排除 epoch；所有全备份/选择包/恢复 journal 仍在原事务中自动推进它，
   回滚同时回滚 epoch；旧格式字节与旧表/列保持。需验证恢复/迁移，不以“没有新字段”跳验证。
+- 已排查全备份/选择媒体包/journal/草稿落正式记录均为普通 INSERT；未找到附件 REPLACE 调用。
+  但 UPDATE-only intent guard 无法阻止 SQLite OR REPLACE；其隐式 DELETE 默认不触发删除 trigger，
+  图→音可连图片 epoch 一并绕过。补 [同 ID BEFORE INSERT 拒绝规则](design/D06_ATTACHMENT_IDENTITY.sql)，
+  与原 UPDATE guard 同源安装在新建/迁移/冷开和主机 fixture；不是修改恢复数据或允许重用 ID。
+  普通插入冲突/REPLACE/UPSERT 同 ID 改 intent 必须原子拒绝，原 row/epoch/密文保持；正常重试
+  仍走既有 read/ack，同次恢复 DONE/journal 重读，不以 REPLACE 覆盖。必要真实 SQL 反例单列保全。
 - 新图片/重选在来源与当前 selection 核验、CAS 接收稳定选择请求后，于 CAS 外/入队前
   退休过滤会话及 returnSeed，含 UI-null handoff；文件读取生成完整 intent 后，actor 再核
   owner/来源版本/request，匹配后才写。包恢复/状态变化/原件改版或删除也覆盖真实变更准入。
   不能只禁用按钮；未获准的旧请求不触发退休，旧失败/迟到回调不能伤新会话。
   读图片/列附件/精确回跳不是写入，不应因此清掉正常返回种子；UNKNOWN 不复活旧 proof。
+  图片、选择包/全备份恢复及回收删除的准入通知都在 sourceUi/capture monitor 外、入队前执行，
+  避免与导航持 lifecycle→sourceUi 的顺序反转。恢复读取仅在实际图片状态变更前通知，正常核对不通知。
 - 每个 scope 开启条件后都观察全来源、owner/可用性/epoch 变化，含非命中/屏外来源；逐行门
   不遍历 UI entries/附件集合/旧 bindings。正常生产 READY 原件只读，替换用新 ID/修订，
   不允许同 intent 偷换 hash/字节；外部文件篡改在认证/重开时失败，不承诺实时监控磁盘。

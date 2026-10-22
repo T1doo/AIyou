@@ -15,6 +15,12 @@ class CurrentImageSearchSqlTest {
         revision: Int = 1, state: String = "READY") = UUID.randomUUID().toString().also {
         f.db.write("INSERT INTO attachments VALUES(?,?,?,?,?,9,?)",it,id,revision,type,"a".repeat(64),state)
     }
+    /** Owned corruption fixture deliberately crosses immutable intent protection, then reinstalls it. */
+    private fun corruptIntent(f:RecordEventDateFixture,id:String,change:String){f.db.transaction{sql->
+        sql.execute("DROP TRIGGER immutable_attachment_intent")
+        sql.execute("UPDATE attachments SET "+change+" WHERE id=?",listOf(id))
+        AttachmentIntentSqlSchema.guards.forEach{sql.execute(it)}
+    }}
     private fun request() = LocalSearchRequest("",onlyImages=true)
     private fun ids(f: RecordEventDateFixture) = f.search.candidates(request()).entries.map { it.id }.toSet()
 
@@ -62,12 +68,14 @@ class CurrentImageSearchSqlTest {
         }
     }
 
-    @Test fun attachmentIdentityStateHashSizeAndRemovalInvalidateWithoutTextEpochChange(): Unit = RecordEventDateFixture().use { f ->
+    @Test fun attachmentIdentityStateHashSizeAndRemovalAdvanceEpochWithoutRebuildingTextIndex(): Unit = RecordEventDateFixture().use { f ->
         val id=f.entry();val pic=image(f,id);f.drain()
+        val fts=f.db.read("SELECT * FROM local_search_fts");val docs=f.db.read("SELECT * FROM local_search_documents");val jobs=f.db.read("SELECT * FROM local_jobs")
         for(change in listOf("state='CORRUPT'","sha256='"+"b".repeat(64)+"'","byteSize=10","mediaType='image/jpeg'")) {
             val proof=f.search.candidates(request());val epoch=f.search.epoch()
-            f.db.write("UPDATE attachments SET "+change+" WHERE id=?",pic)
-            assertEquals(epoch,f.search.epoch())
+            corruptIntent(f,pic,change)
+            assertEquals(epoch+1,f.search.epoch())
+            assertEquals(fts,f.db.read("SELECT * FROM local_search_fts"));assertEquals(docs,f.db.read("SELECT * FROM local_search_documents"));assertEquals(jobs,f.db.read("SELECT * FROM local_jobs"))
             assertFalse(f.search.publishCurrent(proof){fail("Old image association published")})
             assertFalse(f.search.resolve(proof,id){fail("Old image association opened")})
         }
@@ -75,13 +83,13 @@ class CurrentImageSearchSqlTest {
         assertTrue(ids(f).isEmpty());assertFalse(f.search.publishCurrent(before){})
     }
 
-    @Test fun newlyQualifyingImageRejectsEvenEmptyProofAndHistoricalChangesDoNotChangeMembership(): Unit = RecordEventDateFixture().use { f ->
+    @Test fun newlyQualifyingAndHistoricalImageChangesRetireProofWithoutChangingHistoricalMembership(): Unit = RecordEventDateFixture().use { f ->
         val id=f.entry();val historic=image(f,id);f.append(id);f.drain()
         val empty=f.search.candidates(request());assertTrue(empty.entries.isEmpty())
         f.db.write("UPDATE attachments SET state='FAILED' WHERE id=?",historic)
-        assertTrue(f.search.publishCurrent(empty){})
-        val epoch=f.search.epoch();image(f,id,revision=2)
-        assertEquals(epoch,f.search.epoch());assertFalse(f.search.publishCurrent(empty){fail("Stale empty result")})
+        assertFalse(f.search.publishCurrent(empty){});assertTrue(ids(f).isEmpty())
+        val refreshed=f.search.candidates(request());val epoch=f.search.epoch();image(f,id,revision=2)
+        assertEquals(epoch+1,f.search.epoch());assertFalse(f.search.publishCurrent(refreshed){fail("Stale empty result")})
         val current=f.search.candidates(request());image(f,id,"image/jpeg",2)
         assertFalse(f.search.resolve(current,id){fail("Added image reused old proof")})
         assertEquals(setOf(id),ids(f))
@@ -113,11 +121,11 @@ class CurrentImageSearchSqlTest {
             val fallback=LocalOriginalSearchMatcher.match(all,input)
             assertEquals(OriginalSearchStage.FAILED,fallback.stage);assertTrue(fallback.hits.isEmpty())
             assertTrue(fallback.message!!.contains("重试本机读取"))
-            f.db.write("UPDATE attachments SET sha256='bad' WHERE id=?",pic)
+            corruptIntent(f,pic,"sha256='bad'")
             val failed=LocalOriginalSearchMatcher.indexed(all,input,f.search)
             assertEquals(OriginalSearchStage.FAILED,failed.stage);assertTrue(failed.hits.isEmpty())
             assertTrue(failed.message!!.contains("原文已保留"))
-            f.db.write("UPDATE attachments SET sha256=? WHERE id=?","a".repeat(64),pic)
+            corruptIntent(f,pic,"sha256='"+"a".repeat(64)+"'")
             val old=f.search.candidates(request());var callback=false
             f.db.beforeSql={if(it.startsWith("SELECT id,revision,mediaType"))error("Synthetic image ledger read failure")}
             assertThrows(LocalSearchFailure::class.java){f.search.publishCurrent(old){callback=true}}
