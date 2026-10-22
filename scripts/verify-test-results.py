@@ -221,6 +221,8 @@ for label, folder, minimum in targets:
             "failedReadAndRestorationHidePrivateResultsAndRetireRetainedPageCallbacks",
             "acceptedMemoriesAreReachableAtDoubleFontAndDisappearOnlyAfterSeparateRevocationConfirmation")
         additional["com.t1doo.aiyou.UnifiedKeywordPresentationTest"] = (
+            "capturedDateErrorCorrectionKeyboardAndClearRangeRemainReachableAtDoubleFont",
+            "capturedDateRangeIsPrivateAndRestorationOrOldClickCannotReviveIt",
             "doubleFontFourTypedResultsOpenExactOriginalAndPreferenceThenRequeryWithoutChangingSources",
             "literalNoResultClearAndRestoreNeverSaveQueryOrRetainOldSession",
             "restoredExactImageProofRetiresAPanelBeforeBLookupAndRejectsRetainedAAction",

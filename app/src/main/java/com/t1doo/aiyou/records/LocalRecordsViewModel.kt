@@ -568,7 +568,7 @@ class LocalRecordsViewModel internal constructor(
         var changedSource=false
         mutableState.update { previous ->
             val requested = transform(previous)
-            changedSource=observed?.memorySelected==true&&(previous.entries!=requested.entries||
+            changedSource=observed?.completeSources==true&&(previous.entries!=requested.entries||
                 previous.localProcessingVersions!=requested.localProcessingVersions||previous.unifiedKeywordOwner!==requested.unifiedKeywordOwner||
                 previous.localProcessingAvailable!=requested.localProcessingAvailable||previous.supportsLocalProcessing!=requested.supportsLocalProcessing||
                 previous.ready!=requested.ready||previous.opening!=requested.opening||previous.error!=requested.error)

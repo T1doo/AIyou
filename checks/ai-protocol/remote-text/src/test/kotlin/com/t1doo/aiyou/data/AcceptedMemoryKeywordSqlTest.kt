@@ -72,8 +72,11 @@ class AcceptedMemoryKeywordSqlTest {
         var source=""
         h.f.gateway.transaction {repeat(1000){n->if(n%20==0)source=h.f.entry();memory(h,source,"共同备注",id="bulk-$n")}}
         assertEquals(1000,h.repo.search("共同备注",UnifiedKeywordScope.ACCEPTED_MEMORY).groups.sumOf{it.items.size})
+        val captured=UnifiedCaptureRange.parse("1970-01-01","1970-01-01")
+        assertEquals(1000,h.repo.search("共同备注",UnifiedKeywordScope.ACCEPTED_MEMORY,captured,{}).groups.sumOf{it.items.size})
         val id=h.f.entry();val last=memory(h,id,"共同备注");val bytes=h.f.db.read("SELECT payload FROM local_candidate_batches WHERE id=?",last.id).single().single() as ByteArray
         assertThrows(UnifiedKeywordTooBroad::class.java){runBlocking{h.repo.search("共同备注",UnifiedKeywordScope.ALL)}}
+        assertThrows(UnifiedKeywordTooBroad::class.java){runBlocking{h.repo.search("共同备注",UnifiedKeywordScope.ACCEPTED_MEMORY,captured,{})}}
         assertArrayEquals(bytes,h.f.db.read("SELECT payload FROM local_candidate_batches WHERE id=?",last.id).single().single() as ByteArray)
         assertEquals(1001L,h.f.db.read("SELECT count(*) FROM local_candidate_batches WHERE ruleVersion=2").single().single())
         assertEquals(1,h.repo.search("合成",UnifiedKeywordScope.ORIGINAL).groups.map{it.binding.source.sourceId}.count{it==id})

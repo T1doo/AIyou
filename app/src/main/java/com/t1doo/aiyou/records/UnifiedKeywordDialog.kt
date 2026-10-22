@@ -84,8 +84,23 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
                     OutlinedTextField(u.keyword,{if(canUse())c.keyword(u.session,it)},label={Text("关键词（最多64字）")},modifier=Modifier.fillMaxWidth().aiyouFocusOutline().testTag("unified-query"))
                     Box{TextButton({if(canUse())menu=true},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-scope")){Text("范围："+unifiedScopeLabel(u.scope))}
                         DropdownMenu(menu,{menu=false}){UnifiedKeywordScope.entries.forEach{s->DropdownMenuItem(text={Text(unifiedScopeLabel(s))},onClick={menu=false;if(canUse())c.scope(u.session,s)},modifier=Modifier.testTag("unified-scope:"+s.name))}}}
+                }
+                item{
+                    Surface(color=MaterialTheme.colorScheme.surfaceContainerLow,shape=MaterialTheme.shapes.medium){
+                        Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                            Text("捕获日期",style=MaterialTheme.typography.titleSmall)
+                            Text("按每条原件保存的时区；不是事件发生日期。",style=MaterialTheme.typography.bodySmall)
+                            OutlinedTextField(u.from,{if(canUse())c.from(u.session,it)},label={Text("起始日期（含）")},
+                                supportingText={Text("YYYY-MM-DD；留空不限")},modifier=Modifier.fillMaxWidth().aiyouFocusOutline().testTag("unified-from"))
+                            OutlinedTextField(u.through,{if(canUse())c.through(u.session,it)},label={Text("结束日期（含）")},
+                                supportingText={Text("YYYY-MM-DD；留空不限")},modifier=Modifier.fillMaxWidth().aiyouFocusOutline().testTag("unified-through"))
+                            TextButton({if(canUse())c.unlimitedDates(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-dates-clear")){Text("不限日期")}
+                        }
+                    }
+                }
+                item{
                     FilledTonalButton({if(canUse())c.search(u.session)},enabled=!u.busy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-search")){Text("查找当前内容")}
-                    TextButton({if(canUse())c.keyword(u.session,"")},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-clear")){Text("清空查询和结果")}
+                    TextButton({if(canUse())c.clear(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-clear")){Text("清空查询和结果")}
                     TextButton({if(canUse())c.close(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-close")){Text("返回回忆时间线")}
                     when{u.busy->Text("正在认证所选内容与原件。",Modifier.testTag("unified-status"))
                         u.error!=null->Text(u.error,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("unified-error"))
@@ -95,7 +110,9 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
                 }
                 items(u.visibleGroups,key={it.key}){g->
                     OutlinedCard(Modifier.fillMaxWidth().testTag("unified-group:"+g.key)){Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
-                        Text("原件版本 ${g.binding.source.revision} · "+java.time.Instant.ofEpochMilli(g.binding.captured).atZone(java.time.ZoneId.of(g.binding.zone)).toLocalDate())
+                        Text("原件版本 ${g.binding.source.revision}",style=MaterialTheme.typography.labelLarge)
+                        Text("捕获日期："+java.time.Instant.ofEpochMilli(g.binding.captured).atZone(java.time.ZoneId.of(g.binding.zone)).toLocalDate()+" · "+g.binding.zone,
+                            modifier=Modifier.testTag("unified-capture-date:"+g.key),style=MaterialTheme.typography.bodySmall)
                         g.items.forEach{e->key(e.key){
                             Text(when(e){is UnifiedKeywordEvidence.Original->"原文命中";is UnifiedKeywordEvidence.Audio->"人工转写 · 非自动识别";is UnifiedKeywordEvidence.Image->if(e.value.engine.synthetic)"合成端口测试结果 · 非真实 OCR"else if(e.value.current.humanCorrection)"图片文字 · 人工纠正"else"图片提取文字";is UnifiedKeywordEvidence.Preference->"已采纳普通偏好 · 人工确认";is UnifiedKeywordEvidence.AcceptedMemory->if(e.value.content.kind==SourceMemoryKind.EVENT)"已采纳事件线索"else"已采纳当次情绪线索"})
                             KeywordExcerpt(e,u.keyword)

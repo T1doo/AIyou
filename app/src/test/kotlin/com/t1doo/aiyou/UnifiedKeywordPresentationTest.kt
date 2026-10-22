@@ -49,7 +49,7 @@ class UnifiedKeywordPresentationTest {
     private fun query(value:String){compose.onNodeWithTag("unified-results").performScrollToIndex(0)
         compose.onNodeWithTag("unified-query").performScrollTo().performTextReplacement(value)
         compose.onNodeWithTag("unified-search").performScrollTo().assertHeightIsAtLeast(48.dp).performClick();drain()}
-    private fun result(e:UnifiedKeywordEvidence){compose.onNodeWithTag("unified-results").performScrollToIndex(1)
+    private fun result(e:UnifiedKeywordEvidence){compose.onNodeWithTag("unified-results").performScrollToIndex(3)
         compose.onNodeWithTag("unified-source:"+e.key).performScrollTo().assertHeightIsAtLeast(48.dp).performClick();drain()}
     private fun back(){compose.onNodeWithText("返回列表").assertIsDisplayed().performClick();drain()}
     @Test fun doubleFontFourTypedResultsOpenExactOriginalAndPreferenceThenRequeryWithoutChangingSources(){
@@ -104,7 +104,7 @@ class UnifiedKeywordPresentationTest {
         search.performSemanticsAction(SemanticsActions.RequestFocus){assertTrue(it())}
         search.assertIsFocused().performKeyInput{pressKey(Key.Enter)};drain()
         val item=f.local.value.unifiedKeyword!!.snapshot!!.groups.single().items.filterIsInstance<UnifiedKeywordEvidence.Original>().single()
-        compose.onNodeWithTag("unified-results").performScrollToIndex(1)
+        compose.onNodeWithTag("unified-results").performScrollToIndex(3)
         val source=compose.onNodeWithTag("unified-source:"+item.key).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
         assertSame(dialogView,(source.fetchSemanticsNode().root as ViewRootForTest).view)
         compose.runOnIdle{assertFalse(dialogView.isInTouchMode)}
@@ -125,7 +125,7 @@ class UnifiedKeywordPresentationTest {
     fun noteOnlyAcceptedEmotionKeepsSeparateHighlightAndKeyboardReturnsExactQuoteInsteadOfNote(){
         f.enableMemory(SourceMemoryKind.OCCASION_EMOTION,"🙂人工备注专词");content();open();query("备注专词")
         val item=f.local.value.unifiedKeyword!!.snapshot!!.groups.single().items.single() as UnifiedKeywordEvidence.AcceptedMemory
-        compose.onNodeWithTag("unified-results").performScrollToIndex(1)
+        compose.onNodeWithTag("unified-results").performScrollToIndex(3)
         compose.onNodeWithTag("unified-memory-note-label:"+item.key).performScrollTo().assertTextEquals("人工备注命中 · 非原文")
         val quote=compose.onNodeWithTag("unified-memory-quote:"+item.key).performScrollTo().fetchSemanticsNode().config[SemanticsProperties.Text].single()
         assertEquals(f.records[0].originalText,quote.text);assertTrue(quote.spanStyles.isEmpty())
@@ -140,7 +140,7 @@ class UnifiedKeywordPresentationTest {
         f.enableMemory(SourceMemoryKind.EVENT,"合成淡茶备注");content();open();query("淡茶")
         val original=f.records[0].originalText
         val item=f.local.value.unifiedKeyword!!.snapshot!!.groups.single().items.filterIsInstance<UnifiedKeywordEvidence.AcceptedMemory>().single()
-        compose.onNodeWithTag("unified-results").performScrollToIndex(1)
+        compose.onNodeWithTag("unified-results").performScrollToIndex(3)
         compose.onNodeWithTag("unified-memory-quote-label:"+item.key).performScrollTo().assertTextEquals("逐字依据命中")
         compose.onNodeWithTag("unified-memory-note-label:"+item.key).performScrollTo().assertTextEquals("人工备注命中 · 非原文")
         result(item);click("original-source-memories");drain();click("source-memory-correct-0")
@@ -176,6 +176,40 @@ class UnifiedKeywordPresentationTest {
         open();assertEquals("",compose.onNodeWithTag("unified-query").fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         compose.runOnIdle{assertEquals(0,f.memoryWrites);assertEquals(0,f.writes)}
     }
+    private fun date(tag:String,value:String){compose.onNodeWithTag("unified-results").performScrollToIndex(1)
+        compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performTextReplacement(value);compose.waitForIdle()}
+    @Test @Config(qualifiers="w640dp-h320dp-land")
+    fun capturedDateErrorCorrectionKeyboardAndClearRangeRemainReachableAtDoubleFont(){
+        content();open();date("unified-from","1970-02-30");query("淡茶")
+        compose.onNodeWithTag("unified-error").performScrollTo().assertTextEquals("起始捕获日期无效，请按 YYYY-MM-DD 输入或留空。")
+        compose.runOnIdle{assertEquals(0,f.lookups);assertNull(f.local.value.unifiedKeyword!!.snapshot)}
+        date("unified-from","1970-01-01");date("unified-through","1970-01-01")
+        val search=compose.onNodeWithTag("unified-search").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        keyboardEnter(search);val u=f.local.value.unifiedKeyword!!
+        assertEquals(UnifiedCaptureRange.parse("1970-01-01","1970-01-01"),u.snapshot!!.captureRange)
+        val item=u.visibleGroups.first().items.filterIsInstance<UnifiedKeywordEvidence.Original>().single()
+        compose.onNodeWithTag("unified-results").performScrollToIndex(3)
+        compose.onNodeWithTag("unified-capture-date:"+u.visibleGroups.first().key).performScrollTo().assertTextEquals("捕获日期：1970-01-01 · UTC")
+        val source=compose.onNodeWithTag("unified-source:"+item.key).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        keyboardEnter(source);compose.onNodeWithTag("original-text").assertTextEquals(item.entry.originalText);back()
+        compose.runOnIdle{assertEquals("1970-01-01",f.local.value.unifiedKeyword!!.from);assertNotSame(u.snapshot,f.local.value.unifiedKeyword!!.snapshot)}
+        date("unified-from","1970-01-02");date("unified-through","1970-01-02");query("淡茶")
+        compose.onNodeWithTag("unified-empty").performScrollTo().assertExists()
+        compose.onNodeWithTag("unified-results").performScrollToIndex(1);click("unified-dates-clear");query("淡茶")
+        compose.runOnIdle{assertEquals("",f.local.value.unifiedKeyword!!.from);assertEquals(1,f.local.value.unifiedKeyword!!.snapshot!!.groups.size);assertEquals(0,f.writes)}
+    }
+    @Test fun capturedDateRangeIsPrivateAndRestorationOrOldClickCannotReviveIt(){
+        val restore=StateRestorationTester(compose);content(restore);open()
+        date("unified-from","1970-01-01");date("unified-through","1970-01-01");query("淡茶")
+        val old=f.local.value.unifiedKeyword!!;val item=old.visibleGroups.first().items.first()
+        compose.runOnIdle{assertFalse(registry!!.performSave().toString().contains("1970-01-01"))}
+        restore.emulateSavedInstanceStateRestore();compose.waitForIdle();drain()
+        compose.runOnIdle{assertNull(f.local.value.unifiedKeyword);f.c.locate(old.session,item){_,_->fail("Old date proof")}}
+        open();compose.onNodeWithTag("unified-results").performScrollToIndex(1)
+        assertEquals("",compose.onNodeWithTag("unified-from").performScrollTo().fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        assertEquals("",compose.onNodeWithTag("unified-through").performScrollTo().fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        compose.runOnIdle{assertEquals(0,f.writes)}
+    }
     private class Fixture {
         private fun id()=UUID.randomUUID().toString()
         val records=listOf("我偏好淡茶🙂","我偏好清水🙂").map{StoredEntry(id(),1,it,55,"UTC",ProcessingPolicy.LOCAL_ONLY)}
@@ -193,10 +227,12 @@ class UnifiedKeywordPresentationTest {
                 val preference=SourcePreferenceSnapshot(id(),b.source,b.hash,0,2,PreferenceAvailability.AVAILABLE,55,55,"UTC",b.policy,id(),"合成口味",listOf(PreferenceContentVersion(1,PreferenceContent(SourceMemoryRules.reference(preview,e.originalText)),55)),listOf(PreferenceCheckpoint(1,PreferenceReview.ACCEPTED,null,55)))
                 rows+=UnifiedKeywordEvidence.Preference(b,preference)};rows
         }
-        var writes=0;var mediaReads=0;var tooBroad=false
+        var writes=0;var mediaReads=0;var tooBroad=false;var lookups=0
         val queue=ArrayDeque<suspend(EntryRepository)->Unit>()
         val repo:UnifiedKeywordRepository=object:UnifiedKeywordRepository {
-            override suspend fun search(keyword:String,scope:UnifiedKeywordScope):UnifiedKeywordSnapshot {
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope)=search(keyword,scope,UnifiedCaptureRange(),{})
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+                checkCurrent();lookups++
                 if(tooBroad)throw UnifiedKeywordTooBroad()
                 val saved=memory;val current=saved?.current
                 val extra=if(saved?.state==SourceMemoryState.ACTIVE&&current?.review==SourceMemoryReview.ACCEPTED){
@@ -205,8 +241,9 @@ class UnifiedKeywordPresentationTest {
                 }else emptyList()
                 val matched=(evidence+extra).filter{e->val text=when(e){is UnifiedKeywordEvidence.Original->e.entry.originalText;is UnifiedKeywordEvidence.Audio->e.value.current.text;is UnifiedKeywordEvidence.Image->e.value.current.text;is UnifiedKeywordEvidence.Preference->e.value.current!!.content.reference.quote;is UnifiedKeywordEvidence.AcceptedMemory->keyword}
                     text.contains(keyword)&&when(scope){UnifiedKeywordScope.ALL->true;UnifiedKeywordScope.ORIGINAL->e is UnifiedKeywordEvidence.Original;UnifiedKeywordScope.AUDIO->e is UnifiedKeywordEvidence.Audio;UnifiedKeywordScope.IMAGE->e is UnifiedKeywordEvidence.Image;UnifiedKeywordScope.PREFERENCE->e is UnifiedKeywordEvidence.Preference;UnifiedKeywordScope.ACCEPTED_MEMORY->e is UnifiedKeywordEvidence.AcceptedMemory}}
-                val snapshot=object:UnifiedKeywordSnapshot{override val keyword=keyword;override val scope=scope;override val bindings=records.map(::bind)
-                    override val groups=matched.groupBy{it.binding}.map{(b,rows)->UnifiedKeywordGroup(b,rows.sortedBy{it.key})}}
+                val dates=captureRange
+                val snapshot=object:UnifiedKeywordSnapshot{override val keyword=keyword;override val scope=scope;override val captureRange=dates;override val bindings=records.map(::bind)
+                    override val groups=matched.filter{dates.contains(it.binding.captured,it.binding.zone)}.groupBy{it.binding}.map{(b,rows)->UnifiedKeywordGroup(b,rows.sortedBy{it.key})}}
                 proofVersions[snapshot]=memory?.version;return snapshot
             }
             override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit):Boolean {if(!proofVersions.containsKey(snapshot)||proofVersions[snapshot]!=memory?.version)return false;if(item!=null&&snapshot.groups.none{it.items.any{row->row===item}})return false;admit();return true}

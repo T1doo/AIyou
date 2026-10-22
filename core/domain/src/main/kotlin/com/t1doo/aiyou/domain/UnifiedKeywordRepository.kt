@@ -1,6 +1,35 @@
 package com.t1doo.aiyou.domain
 
 import com.t1doo.aiyou.model.*
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+
+/** Calendar dates in each original's saved zone, never the device's current zone. */
+data class UnifiedCaptureRange(val from:LocalDate?=null,val through:LocalDate?=null) {
+    init {require(from==null||from.year in 0..9999);require(through==null||through.year in 0..9999);require(from==null||through==null||from<=through)}
+    val isUnbounded get()=from==null&&through==null
+    fun contains(captured:Long,zone:String):Boolean {
+        val date=Instant.ofEpochMilli(captured).atZone(ZoneId.of(zone)).toLocalDate()
+        return (from==null||date>=from)&&(through==null||date<=through)
+    }
+    override fun toString()="UnifiedCaptureRange(redacted)"
+    companion object {
+        fun parse(from:String,through:String):UnifiedCaptureRange {
+            fun date(value:String,problem:UnifiedCaptureRangeProblem):LocalDate? {
+                if(value.isEmpty())return null
+                if(!Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(value))throw UnifiedCaptureRangeInvalid(problem)
+                return try{LocalDate.parse(value)}catch(_:Exception){throw UnifiedCaptureRangeInvalid(problem)}
+            }
+            val a=date(from,UnifiedCaptureRangeProblem.FROM);val b=date(through,UnifiedCaptureRangeProblem.THROUGH)
+            if(a!=null&&b!=null&&a>b)throw UnifiedCaptureRangeInvalid(UnifiedCaptureRangeProblem.ORDER)
+            return UnifiedCaptureRange(a,b)
+        }
+    }
+}
+enum class UnifiedCaptureRangeProblem { FROM, THROUGH, ORDER }
+class UnifiedCaptureRangeInvalid(val problem:UnifiedCaptureRangeProblem):IllegalArgumentException("Invalid capture date range")
+class UnifiedCaptureRangeUnsupported:IllegalStateException("Capture date range is unavailable")
 
 enum class UnifiedKeywordScope { ALL, ORIGINAL, AUDIO, IMAGE, PREFERENCE, ACCEPTED_MEMORY }
 data class UnifiedKeywordBinding(val source:SourceVersion,val hash:String,val generation:Long,
@@ -33,6 +62,7 @@ class UnifiedKeywordGroup(val binding:UnifiedKeywordBinding,items:List<UnifiedKe
 interface UnifiedKeywordSnapshot {
     val keyword:String
     val scope:UnifiedKeywordScope
+    val captureRange:UnifiedCaptureRange get()=UnifiedCaptureRange()
     val groups:List<UnifiedKeywordGroup>
     /** Includes off-screen and nonmatching sources retained by the authenticated collection proof. */
     val bindings:List<UnifiedKeywordBinding>
@@ -43,6 +73,11 @@ interface UnifiedKeywordRepository {
     /** The actual owner checks between bounded reads; callers cannot use cancellation as a SQL ACK. */
     suspend fun search(keyword:String,scope:UnifiedKeywordScope,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
         checkCurrent();return search(keyword,scope).also{checkCurrent()}
+    }
+    /** A legacy port must never silently ignore an explicit date restriction. */
+    suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+        if(!captureRange.isUnbounded)throw UnifiedCaptureRangeUnsupported()
+        return search(keyword,scope,checkCurrent)
     }
     /** Reauthenticates media, then jointly verifies all sets. Callback is a PRIVATE admission
      * ticket only: callers must not render or navigate until this method returns true. */

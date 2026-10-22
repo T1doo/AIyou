@@ -224,14 +224,15 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
     private data class KeywordReceipt(val epoch:Long,val rows:Long,val digest:String)
     private class KeywordScan(val receipt:KeywordReceipt,val items:List<AcceptedMemoryKeywordHit>)
     /** The guard belongs to this invocation, never to the retained proof. No global row limit. */
-    internal fun keywordSet(keyword:String,checkCurrent:()->Unit):KeywordSet<AcceptedMemoryKeywordHit> {
+    internal fun keywordSet(keyword:String,checkCurrent:()->Unit)=keywordSet(keyword,UnifiedCaptureRange(),checkCurrent)
+    internal fun keywordSet(keyword:String,captureRange:UnifiedCaptureRange,checkCurrent:()->Unit):KeywordSet<AcceptedMemoryKeywordHit> {
         PreferenceKeywords.validate(keyword);require(keyword.isNotBlank())
-        val first=database.transaction{keywordScan(it,keyword,true,checkCurrent)}
+        val first=database.transaction{keywordScan(it,keyword,captureRange,true,checkCurrent)}
         return KeywordSet(first.items,first.items.map{it.binding.source}.distinct(),guardedCurrent={sql,guard->
-            keywordScan(sql,keyword,false,guard).receipt==first.receipt
-        }) {sql->keywordScan(sql,keyword,false,{}).receipt==first.receipt}
+            keywordScan(sql,keyword,captureRange,false,guard).receipt==first.receipt
+        }) {sql->keywordScan(sql,keyword,captureRange,false,{}).receipt==first.receipt}
     }
-    private fun keywordScan(sql:RecordsSqlConnection,keyword:String,collect:Boolean,checkCurrent:()->Unit):KeywordScan {
+    private fun keywordScan(sql:RecordsSqlConnection,keyword:String,captureRange:UnifiedCaptureRange,collect:Boolean,checkCurrent:()->Unit):KeywordScan {
         checkCurrent()
         val epoch=sql.query("SELECT epoch FROM local_search_epoch WHERE slot=1").single().single() as Long
         val digest=MessageDigest.getInstance("SHA-256")
@@ -277,7 +278,7 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
                     val latest=saved.versions.last()
                     if(latest.review==SourceMemoryReview.ACCEPTED){
                         val q=latest.content.reference.quote.contains(keyword);val n=latest.content.note.contains(keyword)
-                        if(q||n){
+                        if((q||n)&&captureRange.contains(source.capturedAtMillis,source.captureTimeZone)){
                             if(++matched>1000)throw UnifiedKeywordTooBroad()
                             if(collect)items+=AcceptedMemoryKeywordHit(row.id,UnifiedKeywordBinding(source.source,source.sourceHash,
                                 source.generation,source.capturedAtMillis,source.captureTimeZone,source.policy),row.version,

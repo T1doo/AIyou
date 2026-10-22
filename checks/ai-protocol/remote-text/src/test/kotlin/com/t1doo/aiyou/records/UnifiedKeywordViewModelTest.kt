@@ -185,6 +185,7 @@ class UnifiedKeywordViewModelTest {
         }
         HandoffFixture{actual->object:UnifiedKeywordRepository by actual{
             override suspend fun search(keyword:String,scope:UnifiedKeywordScope,checkCurrent:()->Unit)=actual.search(keyword,scope,guard(checkCurrent))
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,checkCurrent:()->Unit)=actual.search(keyword,scope,captureRange,guard(checkCurrent))
             override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,checkCurrent:()->Unit,admit:()->Unit):Boolean {
                 assertEquals(21,snapshot.bindings.size)
                 return actual.resolve(snapshot,item,{retainedChecks++;guard(checkCurrent)()},admit)
@@ -205,6 +206,7 @@ class UnifiedKeywordViewModelTest {
             try{
                 h.controller.open();var u=h.state.get().unifiedKeyword!!
                 h.controller.scope(u.session,UnifiedKeywordScope.ACCEPTED_MEMORY);h.controller.keyword(u.session,"备注专词")
+                h.controller.from(u.session,"1970-01-01");h.controller.through(u.session,"1970-01-01")
                 h.controller.search(u.session);h.queue.removeFirst()(h.owner)
                 u=h.state.get().unifiedKeyword!!;assertEquals(21,u.snapshot!!.groups.size)
                 assertTrue(entryReads>0) // Full source validation still occurs outside the row guard.
@@ -221,6 +223,75 @@ class UnifiedKeywordViewModelTest {
             }finally{h.data.f.db.beforeSql=null}
         }
     }
+    @Test fun invalidDatesAndLegacyFilteredPortsNeverEnqueueOrSilentlyReadUnfiltered():Unit=runBlocking{
+        var reads=0
+        HandoffFixture{actual->object:UnifiedKeywordRepository{
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope):UnifiedKeywordSnapshot {reads++;return actual.search(keyword,scope)}
+            override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit)=actual.resolve(snapshot,item,admit)
+        }}.use{h->
+            h.controller.open();val session=h.state.get().unifiedKeyword!!.session;h.controller.keyword(session,"淡茶")
+            h.controller.from(session,"1970-02-30");h.controller.search(session)
+            assertTrue(h.queue.isEmpty());assertTrue(h.state.get().unifiedKeyword!!.error!!.contains("起始捕获日期无效"))
+            h.controller.from(session,"1970-01-02");h.controller.through(session,"1970-01-01");h.controller.search(session)
+            assertTrue(h.queue.isEmpty());assertEquals(0,reads)
+            h.controller.through(session,"1970-01-02");h.controller.search(session);h.queue.removeFirst()(h.owner)
+            assertEquals(0,reads);assertNull(h.state.get().unifiedKeyword!!.snapshot)
+            assertEquals("当前查询端口不支持捕获日期范围，未显示未过滤内容。",h.state.get().unifiedKeyword!!.error)
+            h.controller.unlimitedDates(session);h.controller.search(session);h.queue.removeFirst()(h.owner)
+            assertEquals(1,reads);assertNotNull(h.state.get().unifiedKeyword!!.snapshot)
+            h.controller.clear(session);h.controller.search(session);assertTrue(h.queue.isEmpty())
+            assertEquals("",h.state.get().unifiedKeyword!!.from);assertEquals("",h.state.get().unifiedKeyword!!.through)
+        }
+    }
+    @Test fun actualRangeAToBToARejectsFirstLateResultAndOnlyPublishesLastRange():Unit=runBlocking{Harness().use{h->
+        h.ready();h.block=true;h.open("淡茶",UnifiedKeywordScope.ORIGINAL,"1970-01-01","1970-01-01")
+        withTimeout(4000){h.entered.await()};val old=h.value()
+        h.vm.unifiedKeywords.from(old.session,"1970-01-02");h.vm.unifiedKeywords.through(old.session,"1970-01-02");h.vm.unifiedKeywords.search(old.session)
+        h.vm.unifiedKeywords.from(old.session,"1970-01-01");h.vm.unifiedKeywords.through(old.session,"1970-01-01");h.vm.unifiedKeywords.search(old.session)
+        assertNull(h.value().snapshot);h.release.complete(Unit)
+        val found=h.ui{it.snapshot!=null&&!it.busy};assertNotSame(h.first,found.snapshot);assertEquals(2,h.calls)
+        assertEquals(UnifiedCaptureRange.parse("1970-01-01","1970-01-01"),found.snapshot!!.captureRange)
+    }}
+    @Test fun observedNonmatchingSourceChangeRetiresBoundedEmptyOrNonemptyQueryInEveryScope():Unit=runBlocking{
+        for(scope in UnifiedKeywordScope.entries)Harness(withMemory=true).use{h->
+            h.ready();val other=h.data.f.entry(text="合成完全不命中来源");h.vm.refreshLocalSearch()
+            withTimeout(4000){h.vm.state.first{it.entries.any{e->e.id==other}}}
+            h.open("淡茶",scope,"1970-01-01","1970-01-01");val old=h.ui{it.snapshot!=null&&!it.busy}
+            h.data.f.revise(other,"合成不匹配来源新版本");h.vm.refreshLocalSearch()
+            withTimeout(4000){h.vm.state.first{it.entries.any{e->e.id==other&&e.currentRevision==2}}}
+            assertNull("Every bounded scope must retire, even an empty set: $scope",h.vm.state.value.unifiedKeyword)
+            h.vm.unifiedKeywords.close(old.session);assertNull(h.vm.state.value.unifiedKeyword)
+        }
+    }
+    @Test fun confirmedReturnKeepsDateRangeButReauthenticatesInsteadOfRestoringOldProof():Unit=runBlocking{Harness().use{h->
+        h.ready();h.open("淡茶",UnifiedKeywordScope.ORIGINAL,"1970-01-01","1970-01-01");val old=h.ui{it.snapshot!=null&&!it.busy}
+        val item=old.visibleGroups.single().items.single();val done=CompletableDeferred<Unit>()
+        h.vm.unifiedKeywords.locate(old.session,item){_,confirm->assertTrue(confirm{done.complete(Unit)})};withTimeout(4000){done.await()}
+        h.vm.unifiedKeywords.close(old.session);h.vm.unifiedKeywords.resume()
+        val fresh=h.ui{it.snapshot!=null&&!it.busy};assertEquals(old.from,fresh.from);assertEquals(old.through,fresh.through)
+        assertEquals(old.snapshot!!.captureRange,fresh.snapshot!!.captureRange);assertNotSame(old.snapshot,fresh.snapshot);assertEquals(0,fresh.page)
+        h.vm.unifiedKeywords.retire();h.vm.unifiedKeywords.resume();assertNull(h.vm.state.value.unifiedKeyword)
+    }}
+    @Test fun ownerReturningAnUnfilteredProofForRestrictedRequestCannotPublish():Unit=runBlocking{
+        HandoffFixture{actual->object:UnifiedKeywordRepository by actual{
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,checkCurrent:()->Unit)=actual.search(keyword,scope,checkCurrent)
+        }}.use{h->
+            h.controller.open();val session=h.state.get().unifiedKeyword!!.session
+            h.controller.keyword(session,"淡茶");h.controller.from(session,"1970-01-01");h.controller.search(session);h.queue.removeFirst()(h.owner)
+            assertNotNull(h.state.get().unifiedKeyword!!.error);assertNull(h.state.get().unifiedKeyword!!.snapshot)
+        }
+    }
+    @Test fun boundedOriginalHandoffRetainsCompleteSourceRetirementEvenAfterUiCasClearsSession():Unit=runBlocking{HandoffFixture().use{h->
+        h.controller.open();val session=h.state.get().unifiedKeyword!!.session
+        h.controller.keyword(session,"淡茶");h.controller.scope(session,UnifiedKeywordScope.ORIGINAL);h.controller.from(session,"1970-01-01")
+        h.controller.search(session);h.queue.removeFirst()(h.owner);val u=h.state.get().unifiedKeyword!!
+        var navigations=0;h.block=true;h.controller.locate(session,u.visibleGroups.single().items.single()){_,confirm->confirm{navigations++}}
+        val work=async(Dispatchers.IO){h.queue.removeFirst()(h.owner)}
+        try{assertTrue(h.cleared.await(4,TimeUnit.SECONDS));val observed=h.controller.observeRetirement()!!
+            assertTrue(observed.completeSources);h.controller.retireObserved(observed)
+        }finally{h.release.countDown()}
+        work.await();assertEquals(0,navigations);h.controller.resume();assertNull(h.state.get().unifiedKeyword)
+    }}
     private class Harness(extra:Int=0,withMemory:Boolean=false):AutoCloseable {
         val data=UnifiedKeywordFixture();val id=data.f.entry(text="合成淡茶")
         val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();var block=false
@@ -228,8 +299,9 @@ class UnifiedKeywordViewModelTest {
         init{runBlocking{data.audio(id);repeat(extra){data.audio(data.f.entry(text="合成淡茶"))};if(withMemory)AcceptedMemoryKeywordSqlTest.memory(data,id,"备注专词")}}
         val port:UnifiedKeywordRepository=object:UnifiedKeywordRepository by data.repo{
             override suspend fun search(keyword:String,scope:UnifiedKeywordScope)=search(keyword,scope,{})
-            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
-                calls++;val result=data.repo.search(keyword,scope,checkCurrent)
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,checkCurrent:()->Unit)=search(keyword,scope,UnifiedCaptureRange(),checkCurrent)
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+                calls++;val result=data.repo.search(keyword,scope,captureRange,checkCurrent)
                 if(block){block=false;first=result;entered.complete(Unit);release.await()};return result
             }
         }
@@ -243,7 +315,7 @@ class UnifiedKeywordViewModelTest {
         val vm=LocalRecordsViewModel(Application(),{owner},Clock.systemUTC())
         suspend fun ready()=withTimeout(4000){vm.state.first{it.ready&&!it.opening&&it.unifiedKeywordOwner===port}}
         fun value()=checkNotNull(vm.state.value.unifiedKeyword)
-        fun open(keyword:String,scope:UnifiedKeywordScope=UnifiedKeywordScope.ALL){vm.unifiedKeywords.open();val u=value();vm.unifiedKeywords.scope(u.session,scope);vm.unifiedKeywords.keyword(u.session,keyword);vm.unifiedKeywords.search(u.session)}
+        fun open(keyword:String,scope:UnifiedKeywordScope=UnifiedKeywordScope.ALL,from:String="",through:String=""){vm.unifiedKeywords.open();val u=value();vm.unifiedKeywords.scope(u.session,scope);vm.unifiedKeywords.keyword(u.session,keyword);vm.unifiedKeywords.from(u.session,from);vm.unifiedKeywords.through(u.session,through);vm.unifiedKeywords.search(u.session)}
         suspend fun ui(predicate:(UnifiedKeywordUi)->Boolean)=withTimeout(8000){vm.state.first{it.unifiedKeyword?.let(predicate)==true}.unifiedKeyword!!}
         override fun close(){release.complete(Unit);vm.clearForHostTest();assertTrue(base.closed.await(4,TimeUnit.SECONDS));base.closeFailure.get()?.let{throw it};data.close()}
     }
