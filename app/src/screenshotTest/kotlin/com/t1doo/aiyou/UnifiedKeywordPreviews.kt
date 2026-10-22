@@ -10,7 +10,7 @@ import com.t1doo.aiyou.model.*
 import com.t1doo.aiyou.records.*
 
 /** Synthetic display data, never a functioning store, inference port, or navigation authority. */
-@Composable private fun UnifiedKeywordSpecimen(firstItem:Int){
+@Composable private fun UnifiedKeywordSpecimen(firstItem:Int,memoryOnly:Boolean=false){
     val entry=StoredEntry("00000000-0000-4000-8000-000000000001",1,"合成：我偏好淡茶，散步后也喜欢清水。",55,"UTC",ProcessingPolicy.LOCAL_ONLY)
     val source=SourceVersion(entry.id,1);val hash=OriginalExports.hash(entry.originalText)
     val binding=UnifiedKeywordBinding(source,hash,0,55,"UTC",entry.policy)
@@ -23,13 +23,16 @@ import com.t1doo.aiyou.records.*
         UnifiedKeywordEvidence.Audio(binding,AudioTranscriptSnapshot("00000000-0000-4000-8000-000000000006",AudioTranscriptSource(audio,hash,0,55,"UTC",entry.policy,32),1,false,listOf(AudioTranscriptVersion(1,"合成人工转写：散步后喝淡茶。",55)))),
         UnifiedKeywordEvidence.Image(binding,ImageTextSnapshot("00000000-0000-4000-8000-000000000007",ImageTextSource(image,hash,0,55,"UTC",entry.policy),ImageTextEngine("preview-synthetic","1",true),listOf(ImageTextVersion(1,"合成端口展示：淡茶",false,55)))),
         UnifiedKeywordEvidence.Preference(binding,preference))
-    val snapshot=object:UnifiedKeywordSnapshot{override val keyword="淡茶";override val scope=UnifiedKeywordScope.ALL
-        override val bindings=listOf(binding);override val groups=listOf(UnifiedKeywordGroup(binding,evidence.sortedBy{it.key}))}
+    val shown=if(memoryOnly)listOf(UnifiedKeywordEvidence.AcceptedMemory(AcceptedMemoryKeywordHit("00000000-0000-4000-8000-000000000008",binding,2,1,
+        SourceMemoryContent(SourceMemoryRules.reference(preview,"我偏好淡茶"),SourceMemoryKind.OCCASION_EMOTION,SourceMemoryAssertion.UNCERTAIN,"合成人工备注：散步后更清醒。"),false,true)))else evidence
+    val word=if(memoryOnly)"散步"else"淡茶"
+    val snapshot=object:UnifiedKeywordSnapshot{override val keyword=word;override val scope=UnifiedKeywordScope.ALL
+        override val bindings=listOf(binding);override val groups=listOf(UnifiedKeywordGroup(binding,shown.sortedBy{it.key}))}
     val owner=object:UnifiedKeywordRepository{
         override suspend fun search(keyword:String,scope:UnifiedKeywordScope):UnifiedKeywordSnapshot=error("Render-only fixture")
         override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit):Boolean=error("Render-only fixture")
     }
-    val ui=UnifiedKeywordUi(1,owner,keyword="淡茶",snapshot=snapshot)
+    val ui=UnifiedKeywordUi(1,owner,keyword=word,snapshot=snapshot)
     val controller=UnifiedKeywordController({LocalRecordUiState()},{},{false})
     AIyouTheme{UnifiedKeywordContent(ui,controller,{false},{_,_->},rememberLazyListState(initialFirstVisibleItemIndex=firstItem))}
 }
@@ -43,3 +46,8 @@ import com.t1doo.aiyou.records.*
 @Preview(name="portrait200",widthDp=320,heightDp=640,fontScale=2f,locale="zh-rCN")
 @Preview(name="landscape200",widthDp=640,heightDp=320,fontScale=2f,locale="zh-rCN")
 @Composable fun UnifiedKeywordResultsRender(){UnifiedKeywordSpecimen(1)}
+
+@PreviewTest
+@Preview(name="portrait200",widthDp=320,heightDp=640,fontScale=2f,locale="zh-rCN")
+@Preview(name="landscape200",widthDp=640,heightDp=320,fontScale=2f,locale="zh-rCN")
+@Composable fun UnifiedKeywordAcceptedMemoryRender(){UnifiedKeywordSpecimen(1,true)}

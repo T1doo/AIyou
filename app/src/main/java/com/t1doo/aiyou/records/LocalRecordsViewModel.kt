@@ -159,6 +159,7 @@ class LocalRecordsViewModel internal constructor(
 ) : AndroidViewModel(application) {
     constructor(application: Application) : this(application, { throw IllegalStateException("Records require an admitted foreground owner") })
     private val mutableState = MutableStateFlow(LocalRecordUiState())
+    private var unifiedObserver:UnifiedKeywordController?=null
     val state = mutableState.asStateFlow()
     private val commands = Channel<Command>(Channel.UNLIMITED)
     private val appAccessGuard = Any()
@@ -298,11 +299,11 @@ class LocalRecordsViewModel internal constructor(
         scope = viewModelScope, clock = clock, extract = extractLocalCandidates)
     val sourceTags = SourceTagController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock = clock)
+    val unifiedKeywords=UnifiedKeywordController({mutableState.value},{change->update(change)},{action->submit(Command.LocalCandidates(action)).isSuccess}).also{unifiedObserver=it}
     val memoryInbox = SourceMemoryInboxController({ mutableState.value }, { change -> update(change) },
-        { action -> submit(Command.MemoryInbox(action)).isSuccess })
+        { action -> submit(Command.MemoryInbox(action)).isSuccess },beforeOpen={unifiedKeywords.retire()})
     val sourceMemories = SourceMemoryController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock = clock)
-    val unifiedKeywords=UnifiedKeywordController({mutableState.value},{change->update(change)},{action->submit(Command.LocalCandidates(action)).isSuccess})
+        enqueue = { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock = clock,beforeOpen={unifiedKeywords.retire()})
     val audioTranscripts=AudioTranscriptController({mutableState.value},{change->update(change)},{action->submit(Command.LocalCandidates(action)).isSuccess},clock,::sourceUi)
     val imageTexts=ImageTextController({mutableState.value},{change->update(change)},{action->submit(Command.LocalCandidates(action)).isSuccess},clock,imageTextRecognizer,::sourceUi,canOpen={intent->
         val panel=attachments.state.value
@@ -563,8 +564,14 @@ class LocalRecordsViewModel internal constructor(
 
     /** Local and AI writers validate the selected source in the same state CAS. */
     private inline fun update(transform: (LocalRecordUiState) -> LocalRecordUiState) {
+        val observed=unifiedObserver?.observeRetirement()
+        var changedSource=false
         mutableState.update { previous ->
             val requested = transform(previous)
+            changedSource=observed?.memorySelected==true&&(previous.entries!=requested.entries||
+                previous.localProcessingVersions!=requested.localProcessingVersions||previous.unifiedKeywordOwner!==requested.unifiedKeywordOwner||
+                previous.localProcessingAvailable!=requested.localProcessingAvailable||previous.supportsLocalProcessing!=requested.supportsLocalProcessing||
+                previous.ready!=requested.ready||previous.opening!=requested.opening||previous.error!=requested.error)
             val proposed = if (requested.manualPeople.keys.any { id -> requested.entries.none { it.id == id } }) requested.copy(
                 manualPeople = java.util.Collections.unmodifiableMap(requested.manualPeople.filterKeys { id -> requested.entries.any { it.id == id } })) else requested
             val panel = proposed.localProcessing
@@ -582,7 +589,8 @@ class LocalRecordsViewModel internal constructor(
             val pictureText=candidate.imageTexts
             val imageCandidate=if(pictureText!=null&&(editsDisposed||!candidate.canRetainImageTexts(pictureText)))candidate.copy(imageTexts=null)else candidate
             val unified=imageCandidate.unifiedKeyword
-            val unifiedCandidate=if(unified!=null&&(editsDisposed||!imageCandidate.canRetainUnified(unified)))imageCandidate.copy(unifiedKeyword=null)else imageCandidate
+            val observedQuery=observed?.let{o->unified?.session==o.session&&unified.request==o.request}==true
+            val unifiedCandidate=if(unified!=null&&(editsDisposed||changedSource&&observedQuery||!imageCandidate.canRetainUnified(unified)))imageCandidate.copy(unifiedKeyword=null)else imageCandidate
             val transformed = if (unifiedCandidate.supportsFavorites && unifiedCandidate.favoritesAvailable &&
                 unifiedCandidate.entries.any { !unifiedCandidate.favorites.containsKey(it.id) }) unifiedCandidate.copy(
                     favoritesAvailable = false, favoritesError = "记录列表已变化，请重新读取收藏状态。") else unifiedCandidate
@@ -630,6 +638,7 @@ class LocalRecordsViewModel internal constructor(
                     selected.phase == RecordAiPhase.BLOCKED && selected.preview.isEmpty() && selected.annotation == null)) reviewed
             else reviewed.copy(ai = null)
         }
+        if(changedSource&&observed!=null)unifiedObserver?.retireObserved(observed)
     }
 
     private fun reconcilePreferences(local: LocalRecordUiState): LocalRecordUiState {

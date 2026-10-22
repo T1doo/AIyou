@@ -225,6 +225,10 @@ for label, folder, minimum in targets:
             "literalNoResultClearAndRestoreNeverSaveQueryOrRetainOldSession",
             "restoredExactImageProofRetiresAPanelBeforeBLookupAndRejectsRetainedAAction",
             "landscapeDoubleFontScrollsToFocusedQuerySearchAndExactSourceWithoutHiddenActions",
+            "noteOnlyAcceptedEmotionKeepsSeparateHighlightAndKeyboardReturnsExactQuoteInsteadOfNote",
+            "quoteAndNoteCorrectionNeedsSeparateReacceptanceThenWithdrawalRemovesOnlyMemoryHit",
+            "restoredAcceptedNoteQueryAndRetainedClickCannotRecoverPrivateProof",
+            "memoryScopeOverflowShowsNoPartialResultsThenNarrowQueryRemainsUsable",
         )
         additional["com.t1doo.aiyou.ImageTextPresentationTest"] = (
             "unavailableModelAndAiNoneNeverInferCreateManualReplacementOrChangeOriginal",

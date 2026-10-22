@@ -3,6 +3,7 @@ package com.t1doo.aiyou.records
 import android.app.Application
 import com.t1doo.aiyou.data.*
 import com.t1doo.aiyou.domain.*
+import com.t1doo.aiyou.model.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import org.junit.Assert.*
@@ -59,7 +60,7 @@ class UnifiedKeywordViewModelTest {
         assertEquals("淡茶",result.keyword);assertNotSame(h.first,result.snapshot);assertEquals(2,h.calls)
         assertEquals(h.id,result.visibleGroups.single().binding.source.sourceId)
     }}
-    @Test fun actualFinalCommitFailureAndLostCommitAckNeverPublishContentOrEmptySuccess():Unit=runBlocking{Harness().use{h->
+    @Test fun actualFinalCommitFailureAndLostCommitAckNeverPublishContentOrEmptySuccess():Unit=runBlocking{Harness(withMemory=true).use{h->
         h.ready()
         for(lost in listOf(false,true)){
             var joint=false;var tripped=false
@@ -120,27 +121,84 @@ class UnifiedKeywordViewModelTest {
         h.vm.unifiedKeywords.keyword(returned.session,"");assertNull(h.value().snapshot)
         h.vm.unifiedKeywords.search(returned.session);assertNull(h.value().snapshot)
     }}
-    private class Harness(extra:Int=0):AutoCloseable {
+    @Test fun noteOnlyLocationUsesVerifiedQuoteAndQuoteHitUsesUnicodeCodePoints():Unit=runBlocking{UnifiedKeywordFixture().use{h->
+        val body="🙂合成原文：我并不开心。";val id=h.f.entry(text=body)
+        val row=AcceptedMemoryKeywordSqlTest.memory(h,id,"人工备注专词",quote="我并不开心")
+        val p=h.repo.search("备注专词",UnifiedKeywordScope.ACCEPTED_MEMORY)
+        val note=p.groups.single().items.single();val n=unifiedOriginalLocation(note,"备注专词")!!
+        assertFalse(body.contains("备注专词"));assertEquals(row.current!!.content.reference.start,n.startCodePoint)
+        assertEquals(row.current!!.content.reference.end,n.endCodePoint)
+        val q=unifiedOriginalLocation(h.repo.search("开心",UnifiedKeywordScope.ACCEPTED_MEMORY).groups.single().items.single(),"开心")!!
+        assertEquals(body.codePointCount(0,body.indexOf("开心")),q.startCodePoint)
+        assertEquals(q.startCodePoint+2,q.endCodePoint);assertEquals(id,q.entryId)
+    }}
+    @Test fun observedRetirementAfterCasCancelsSameOfferButCannotEraseANewerSession():Unit=runBlocking{HandoffFixture().use{h->
+        h.load();val old=h.state.get().unifiedKeyword!!;val item=old.visibleGroups.single().items.first();var navigated=0
+        h.block=true;h.controller.locate(old.session,item){_,confirm->if(confirm{navigated++})fail("Retired offer")}
+        val action=h.queue.removeFirst();val job=async(Dispatchers.IO){action(h.owner)}
+        assertTrue(h.cleared.await(4,TimeUnit.SECONDS));val observation=h.controller.observeRetirement()!!
+        assertNull(h.state.get().unifiedKeyword);h.controller.retireObserved(observation);h.release.countDown();job.await()
+        assertEquals(0,navigated);h.controller.resume();assertNull(h.state.get().unifiedKeyword)
+        h.load();val fresh=h.state.get().unifiedKeyword!!
+        h.controller.retireObserved(observation);assertSame(fresh,h.state.get().unifiedKeyword)
+    }}
+    @Test fun actualNonmatchingSourceObservationRetiresCompleteMemoryProofAndRejectsOldClick():Unit=runBlocking{Harness(withMemory=true).use{h->
+        h.ready();val other=h.data.f.entry(text="合成不匹配来源");AcceptedMemoryKeywordSqlTest.memory(h.data,other,"无关备注")
+        h.vm.refreshLocalSearch();withTimeout(4000){h.vm.state.first{it.entries.any{e->e.id==other}}}
+        h.open("备注专词",UnifiedKeywordScope.ACCEPTED_MEMORY);val u=h.ui{it.snapshot!=null&&!it.busy}
+        assertTrue(u.snapshot!!.bindings.none{it.source.sourceId==other});val item=u.visibleGroups.single().items.single()
+        h.data.f.revise(other,"合成来源已修订");h.vm.refreshLocalSearch()
+        withTimeout(4000){h.vm.state.first{it.entries.any{e->e.id==other&&e.currentRevision==2}}}
+        assertNull(h.vm.state.value.unifiedKeyword)
+        h.vm.unifiedKeywords.locate(u.session,item){_,_->fail("Nonmatching source changed")}
+    }}
+    @Test fun actualScanRetirementUnwindsLeaseAndLeavesSharedActorAliveForNextQuery():Unit=runBlocking{Harness(withMemory=true).use{h->
+        h.ready();val entered=java.util.concurrent.CountDownLatch(1);val release=java.util.concurrent.CountDownLatch(1)
+        val once=java.util.concurrent.atomic.AtomicBoolean();var rolledBack=false
+        h.data.f.db.afterSql={sql->if(sql.startsWith("SELECT c.id,c.entryId,c.sourceRevision,length(c.payload)")&&once.compareAndSet(false,true)){
+            entered.countDown();check(release.await(4,TimeUnit.SECONDS))
+        };if(sql=="ROLLBACK")rolledBack=true}
+        val pool=java.util.concurrent.Executors.newSingleThreadExecutor()
+        try{
+            h.open("备注专词");assertTrue(entered.await(4,TimeUnit.SECONDS));val old=h.value()
+            val waiting=java.util.concurrent.CountDownLatch(1)
+            val wait=pool.submit{waiting.countDown();h.data.f.gateway.awaitIdle()};assertTrue(waiting.await(4,TimeUnit.SECONDS));assertThrows(java.util.concurrent.TimeoutException::class.java){wait.get(50,TimeUnit.MILLISECONDS)}
+            h.vm.unifiedKeywords.keyword(old.session,"合成");h.vm.unifiedKeywords.search(old.session);release.countDown()
+            wait.get(4,TimeUnit.SECONDS);val fresh=h.ui{it.snapshot!=null&&!it.busy&&it.keyword=="合成"}
+            assertTrue(rolledBack);assertNull(h.vm.state.value.error);assertTrue(fresh.visibleGroups.isNotEmpty())
+        }finally{release.countDown();h.data.f.db.afterSql=null;pool.shutdown();assertTrue(pool.awaitTermination(4,TimeUnit.SECONDS))}
+    }}
+    @Test fun actualReviewOpenRetiresConfirmedQuerySeedBeforeAnyCorrection():Unit=runBlocking{Harness(withMemory=true).use{h->
+        h.ready();h.open("备注专词");val u=h.ui{it.snapshot!=null&&!it.busy}
+        val item=u.visibleGroups.single().items.single();val done=CompletableDeferred<Unit>()
+        h.vm.unifiedKeywords.locate(u.session,item){_,confirm->assertTrue(confirm{done.complete(Unit)})};withTimeout(4000){done.await()}
+        h.vm.sourceMemories.open(h.id,1);withTimeout(4000){h.vm.state.first{it.sourceMemories?.preview!=null}}
+        h.vm.sourceMemories.close(h.vm.state.value.sourceMemories!!.session);h.vm.unifiedKeywords.resume()
+        assertNull(h.vm.state.value.unifiedKeyword)
+    }}
+    private class Harness(extra:Int=0,withMemory:Boolean=false):AutoCloseable {
         val data=UnifiedKeywordFixture();val id=data.f.entry(text="合成淡茶")
         val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();var block=false
         var first:UnifiedKeywordSnapshot?=null;var calls=0
-        init{runBlocking{data.audio(id);repeat(extra){data.audio(data.f.entry(text="合成淡茶"))}}}
+        init{runBlocking{data.audio(id);repeat(extra){data.audio(data.f.entry(text="合成淡茶"))};if(withMemory)AcceptedMemoryKeywordSqlTest.memory(data,id,"备注专词")}}
         val port:UnifiedKeywordRepository=object:UnifiedKeywordRepository by data.repo{
-            override suspend fun search(keyword:String,scope:UnifiedKeywordScope):UnifiedKeywordSnapshot {
-                calls++;val result=data.repo.search(keyword,scope)
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope)=search(keyword,scope,{})
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+                calls++;val result=data.repo.search(keyword,scope,checkCurrent)
                 if(block){block=false;first=result;entered.complete(Unit);release.await()};return result
             }
         }
         private val base=SqliteVmEntryRepository(data.f.db,data.f.gateway,RemoteTextTransactions(data.f.gateway)){data.f.media.close();data.f.media.awaitIdle();data.f.gateway.stopAndAwaitIdle()}
         val owner:EntryRepository=object:EntryRepository by base,AutoCloseable{
             override val unifiedKeywords=port
+            override val sourceMemories=if(withMemory)data.memories else null
             override suspend fun prepare(){check(data.f.db.read("PRAGMA user_version").single().single()==12L)}
             override fun close()=base.close()
         }
         val vm=LocalRecordsViewModel(Application(),{owner},Clock.systemUTC())
         suspend fun ready()=withTimeout(4000){vm.state.first{it.ready&&!it.opening&&it.unifiedKeywordOwner===port}}
         fun value()=checkNotNull(vm.state.value.unifiedKeyword)
-        fun open(keyword:String){vm.unifiedKeywords.open();val u=value();vm.unifiedKeywords.keyword(u.session,keyword);vm.unifiedKeywords.search(u.session)}
+        fun open(keyword:String,scope:UnifiedKeywordScope=UnifiedKeywordScope.ALL){vm.unifiedKeywords.open();val u=value();vm.unifiedKeywords.scope(u.session,scope);vm.unifiedKeywords.keyword(u.session,keyword);vm.unifiedKeywords.search(u.session)}
         suspend fun ui(predicate:(UnifiedKeywordUi)->Boolean)=withTimeout(8000){vm.state.first{it.unifiedKeyword?.let(predicate)==true}.unifiedKeyword!!}
         override fun close(){release.complete(Unit);vm.clearForHostTest();assertTrue(base.closed.await(4,TimeUnit.SECONDS));base.closeFailure.get()?.let{throw it};data.close()}
     }

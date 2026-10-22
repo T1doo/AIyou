@@ -17,17 +17,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.t1doo.aiyou.domain.*
+import com.t1doo.aiyou.model.SourceMemoryAssertion
+import com.t1doo.aiyou.model.SourceMemoryKind
 import com.t1doo.aiyou.designsystem.aiyouFocusOutline
 
 internal fun unifiedScopeLabel(s:UnifiedKeywordScope)=when(s){
     UnifiedKeywordScope.ALL->"全部内容";UnifiedKeywordScope.ORIGINAL->"原文";UnifiedKeywordScope.AUDIO->"人工转写"
     UnifiedKeywordScope.IMAGE->"图片文字";UnifiedKeywordScope.PREFERENCE->"已采纳普通偏好"
+    UnifiedKeywordScope.ACCEPTED_MEMORY->"已采纳事件与当次情绪"
 }
 private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
     is UnifiedKeywordEvidence.Original->e.entry.originalText
     is UnifiedKeywordEvidence.Audio->e.value.current.text
     is UnifiedKeywordEvidence.Image->e.value.current.text
     is UnifiedKeywordEvidence.Preference->e.value.topicLabel.orEmpty()+"\n"+e.value.current?.content?.reference?.quote.orEmpty()
+    is UnifiedKeywordEvidence.AcceptedMemory->e.value.content.reference.quote
 }
 @Composable private fun KeywordExcerpt(e:UnifiedKeywordEvidence,keyword:String){
     if(e is UnifiedKeywordEvidence.Original){
@@ -36,14 +40,30 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
         val spans=if(preview.highlightEnd>preview.highlightStart)listOf(AnnotatedString.Range(SpanStyle(fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary),preview.highlightStart,preview.highlightEnd))else emptyList()
         Text(AnnotatedString(preview.text,spans),Modifier.testTag("unified-excerpt:"+e.key));return
     }
-    val text=evidenceText(e);val at=text.indexOf(keyword)
+    if(e is UnifiedKeywordEvidence.AcceptedMemory){
+        val m=e.value
+        Text("人工分类 · "+when(m.content.assertion){SourceMemoryAssertion.SELF_REPORT->"明确自述";SourceMemoryAssertion.CONTEXT->"上下文";SourceMemoryAssertion.UNCERTAIN->"含义未确认"})
+        Text("采纳是人工审阅决定，不证明事件发生或人格特征。")
+        Text(if(m.quoteMatch)"逐字依据命中"else"逐字依据（用于回原文）",Modifier.testTag("unified-memory-quote-label:"+e.key))
+        KeywordText(m.content.reference.quote,if(m.quoteMatch)keyword else"","unified-memory-quote:"+e.key)
+        if(m.noteMatch){
+            Text("人工备注命中 · 非原文",Modifier.testTag("unified-memory-note-label:"+e.key))
+            KeywordText(m.content.note,keyword,"unified-memory-note:"+e.key)
+            if(!m.quoteMatch)Text("原文定位的是依据，不是备注文字。",Modifier.testTag("unified-memory-location:"+e.key))
+        }
+        return
+    }
+    KeywordText(evidenceText(e),keyword,"unified-excerpt:"+e.key)
+}
+@Composable private fun KeywordText(text:String,keyword:String,tag:String){
+    val at=if(keyword.isEmpty())-1 else text.indexOf(keyword)
     val point=if(at<0)0 else text.codePointCount(0,at)
     val start=text.offsetByCodePoints(0,(point-24).coerceAtLeast(0))
     val end=text.offsetByCodePoints(start,minOf(240,text.codePointCount(start,text.length)))
     val prefix=if(start>0)"…"else"";val shown=prefix+text.substring(start,end)+(if(end<text.length)"…"else"")
     val hit=at-start+prefix.length
     val spans=if(at>=start&&at+keyword.length<=end&&keyword.isNotEmpty())listOf(AnnotatedString.Range(SpanStyle(fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary),hit,hit+keyword.length))else emptyList()
-    Text(AnnotatedString(shown,spans),Modifier.testTag("unified-excerpt:"+e.key))
+    Text(AnnotatedString(shown,spans),Modifier.testTag(tag))
 }
 @Composable internal fun UnifiedKeywordDialog(u:UnifiedKeywordUi,c:UnifiedKeywordController,canUse:()->Boolean,onLocate:(UnifiedKeywordEvidence,UnifiedKeywordHandoff)->Unit){
     DisposableEffect(c,u.session){onDispose{c.close(u.session)}}
@@ -77,7 +97,7 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
                     OutlinedCard(Modifier.fillMaxWidth().testTag("unified-group:"+g.key)){Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
                         Text("原件版本 ${g.binding.source.revision} · "+java.time.Instant.ofEpochMilli(g.binding.captured).atZone(java.time.ZoneId.of(g.binding.zone)).toLocalDate())
                         g.items.forEach{e->key(e.key){
-                            Text(when(e){is UnifiedKeywordEvidence.Original->"原文命中";is UnifiedKeywordEvidence.Audio->"人工转写 · 非自动识别";is UnifiedKeywordEvidence.Image->if(e.value.engine.synthetic)"合成端口测试结果 · 非真实 OCR"else if(e.value.current.humanCorrection)"图片文字 · 人工纠正"else"图片提取文字";is UnifiedKeywordEvidence.Preference->"已采纳普通偏好 · 人工确认"})
+                            Text(when(e){is UnifiedKeywordEvidence.Original->"原文命中";is UnifiedKeywordEvidence.Audio->"人工转写 · 非自动识别";is UnifiedKeywordEvidence.Image->if(e.value.engine.synthetic)"合成端口测试结果 · 非真实 OCR"else if(e.value.current.humanCorrection)"图片文字 · 人工纠正"else"图片提取文字";is UnifiedKeywordEvidence.Preference->"已采纳普通偏好 · 人工确认";is UnifiedKeywordEvidence.AcceptedMemory->if(e.value.content.kind==SourceMemoryKind.EVENT)"已采纳事件线索"else"已采纳当次情绪线索"})
                             KeywordExcerpt(e,u.keyword)
                             TextButton({if(canUse())c.locate(u.session,e,onLocate)},enabled=!u.busy,modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-source:"+e.key)){Text(when(e){is UnifiedKeywordEvidence.Audio->"查看精确原音";is UnifiedKeywordEvidence.Image->"查看精确原图";else->"查看逐字原文出处"})}
                         }}

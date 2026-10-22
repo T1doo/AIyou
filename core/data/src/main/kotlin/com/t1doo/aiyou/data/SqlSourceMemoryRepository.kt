@@ -52,6 +52,7 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
         selected.forEach { cells ->
             val id=cells[0] as String;val row=checkNotNull(row(sql,id))
             val source=sources.getOrPut(row.source) { readSource(sql,row.source) }
+            validateSourceCapacity(sql,row.source)
             val saved=snapshot(row,payload(row,source)) // Authenticate every selected row, including non-pending rows.
             signatures+=receipt { w ->
                 w.string(row.id,512);w.string(row.hash,64);w.i64(row.generation);w.i64(row.version);w.i64(row.created)
@@ -66,6 +67,7 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
     override fun preview(source:SourceVersion):SourceMemoryPreview = safe { database.transaction { readSource(it,source) } }
     override fun memories(source:SourceVersion):List<SourceMemorySnapshot> = safe { database.transaction { sql ->
         val current=readSource(sql,source)
+        validateSourceCapacity(sql,source)
         sql.query("SELECT "+COLUMNS+" FROM local_candidate_batches WHERE entryId=? AND sourceRevision=? AND ruleVersion=2 ORDER BY CASE WHEN state='READY' THEN 0 ELSE 1 END,createdAtMillis DESC,id LIMIT 20",
             listOf(source.sourceId,source.revision)).map { cells ->
             val row=decode(cells)
@@ -87,8 +89,7 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
             return@transaction snapshot(old,saved)
         }
         if(source.epoch!=p.epoch) throw SourceMemoryConflict()
-        if((sql.query("SELECT COUNT(*) FROM local_candidate_batches WHERE entryId=? AND sourceRevision=? AND ruleVersion=2 AND state='READY'",
-                listOf(source.source.sourceId,source.source.revision)).single().single() as Long)>=SourceMemoryRules.MAX_MEMORIES) throw SourceMemoryLimit()
+        if(readyCount(sql,source.source).also(SourceMemoryCapacity::count)>=SourceMemoryRules.MAX_MEMORIES) throw SourceMemoryLimit()
         val version=SourceMemoryVersion(1,request.content,SourceMemoryReview.PROPOSED,null,null,request.requestedAtMillis,request.requestedAtMillis)
         val initial=Row(request.id,source.source,source.sourceHash,source.generation,PROFILE_VERSION,1,"READY",receipt,request.requestedAtMillis,byteArrayOf())
         val data=SourceMemoryCipher.Payload(source.capturedAtMillis,source.captureTimeZone,source.policy,p.epoch,listOf(version),"CREATE",0,0,null,request.requestedAtMillis)
@@ -98,6 +99,7 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
     } }
     override fun mutate(request:SourceMemoryMutation):SourceMemorySnapshot = safe { database.transaction { sql ->
         val source=readSource(sql,request.source);val old=row(sql,request.id) ?: throw SourceMemoryConflict();bind(old,source)
+        validateSourceCapacity(sql,source.source)
         if(request.sourceHash!=old.hash || request.generation!=old.generation) throw SourceMemoryConflict()
         val before=payload(old,source);val latest=before.versions.last();val receipt=mutationReceipt(request)
         val nextReview=try { SourceMemoryRules.decision(request.previousReview,request.action) } catch(_:IllegalArgumentException) { throw SourceMemoryConflict() }
@@ -133,6 +135,10 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
         return SourceMemoryPreview(expected,r[2] as String,r[6] as Long,r[1] as String,r[3] as Long,r[4] as String,ProcessingPolicy.valueOf(r[5] as String),epoch)
     }
     private fun matches(row:Row,source:SourceMemoryPreview)=row.source==source.source && row.hash==source.sourceHash && row.generation==source.generation && row.profile==PROFILE_VERSION
+    private fun readyCount(sql:RecordsSqlConnection,source:SourceVersion)=sql.query(
+        "SELECT COUNT(*) FROM local_candidate_batches WHERE entryId=? AND sourceRevision=? AND ruleVersion=2 AND state='READY'",
+        listOf(source.sourceId,source.revision)).single().single() as Long
+    private fun validateSourceCapacity(sql:RecordsSqlConnection,source:SourceVersion)=SourceMemoryCapacity.count(readyCount(sql,source))
     private fun bind(row:Row,source:SourceMemoryPreview) { if(row.state!="READY" || !matches(row,source)) throw SourceMemoryConflict() }
     private fun validate(content:SourceMemoryContent,source:SourceMemoryPreview) {
         try { SourceMemoryRules.validate(content,source.source,source.original) } catch(_:IllegalArgumentException) { throw InvalidSourceMemory() }
@@ -207,10 +213,84 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
     internal fun validateFullWithin(sql:RecordsSqlConnection) {
         val rows=sql.query("SELECT "+COLUMNS+" FROM local_candidate_batches WHERE ruleVersion=2 ORDER BY id LIMIT 4097")
         require(rows.size<=4096)
+        sql.query("SELECT COUNT(*) FROM local_candidate_batches WHERE ruleVersion=2 AND state='READY' GROUP BY entryId,sourceRevision").forEach {
+            SourceMemoryCapacity.count(it.single() as Long)
+        }
         rows.map(::decode).forEach { row ->
             if(row.state=="INVALIDATED") require(row.bytes.isEmpty())
             else payload(row,readSource(sql,row.source))
         }
+    }
+    private data class KeywordReceipt(val epoch:Long,val rows:Long,val digest:String)
+    private class KeywordScan(val receipt:KeywordReceipt,val items:List<AcceptedMemoryKeywordHit>)
+    /** The guard belongs to this invocation, never to the retained proof. No global row limit. */
+    internal fun keywordSet(keyword:String,checkCurrent:()->Unit):KeywordSet<AcceptedMemoryKeywordHit> {
+        PreferenceKeywords.validate(keyword);require(keyword.isNotBlank())
+        val first=database.transaction{keywordScan(it,keyword,true,checkCurrent)}
+        return KeywordSet(first.items,first.items.map{it.binding.source}.distinct(),guardedCurrent={sql,guard->
+            keywordScan(sql,keyword,false,guard).receipt==first.receipt
+        }) {sql->keywordScan(sql,keyword,false,{}).receipt==first.receipt}
+    }
+    private fun keywordScan(sql:RecordsSqlConnection,keyword:String,collect:Boolean,checkCurrent:()->Unit):KeywordScan {
+        checkCurrent()
+        val epoch=sql.query("SELECT epoch FROM local_search_epoch WHERE slot=1").single().single() as Long
+        val digest=MessageDigest.getInstance("SHA-256")
+        require(epoch>=0)
+        fun append(write:(PackageWriter)->Unit) {
+            val bytes=PackageWriter(8192).use {w->write(w);w.bytes()}
+            try{digest.update(bytes)}finally{bytes.fill(0)}
+        }
+        append{it.string("AIyou/unified/profile2-keywords/1",64);it.i64(epoch)}
+        val items=ArrayList<AcceptedMemoryKeywordHit>();var cursor:String?=null;var count=0L;var matched=0
+        do {
+            checkCurrent()
+            // The same BINARY order is used by both the cursor and ORDER BY, including Unicode IDs.
+            val page=sql.query("SELECT c.id,c.entryId,c.sourceRevision,length(c.payload),length(CAST(r.originalText AS BLOB)) "+
+                "FROM local_candidate_batches c JOIN entries e ON e.id=c.entryId "+
+                "JOIN entry_revisions r ON r.entryId=e.id AND r.revision=e.currentRevision "+
+                "LEFT JOIN remote_source_access a ON a.entryId=e.id "+
+                "WHERE c.ruleVersion=2 AND c.state='READY' AND c.sourceRevision=e.currentRevision "+
+                "AND e.privacyPolicy IN ('LOCAL_ONLY','REMOTE_ALLOWED') AND COALESCE(a.deleted,0)=0 "+
+                "AND NOT EXISTS(SELECT 1 FROM permanent_erasure_receipts p WHERE p.entryId=e.id)"+
+                (if(cursor==null) "" else " AND c.id COLLATE BINARY > ? COLLATE BINARY")+
+                " ORDER BY c.id COLLATE BINARY LIMIT 20",if(cursor==null) emptyList() else listOf(cursor))
+            page.forEach {meta->
+                checkCurrent();require((meta[3] as Long) in 29..32797 && (meta[4] as Long) in 1..400000)
+                val sourceVersion=SourceVersion(meta[1] as String,meta[2] as Long)
+                validateSourceCapacity(sql,sourceVersion)
+                // Fetch BLOB/body only after bounded SQL lengths. Both passes authenticate every row,
+                // including nonmatching and non-accepted rows; no full-set plaintext/history cache.
+                val row=checkNotNull(row(sql,meta[0] as String))
+                try {
+                    require(row.bytes.size.toLong()==meta[3]);checkCurrent()
+                    val source=readSource(sql,sourceVersion) // Preview recomputes the real original hash.
+                    checkCurrent();val saved=payload(row,source);checkCurrent()
+                    append {w->
+                        w.string(row.id,512);w.i32(row.profile);w.string(row.state,16)
+                        sourceReceipt(w,row.source,row.hash,row.generation);w.i64(row.version)
+                        w.string(row.mutation,512);w.i64(row.created)
+                        w.string(MessageDigest.getInstance("SHA-256").digest(row.bytes).joinToString(""){"%02x".format(it.toInt() and 255)},64)
+                        w.string(source.sourceHash,64);w.i64(source.generation);w.i64(source.capturedAtMillis)
+                        w.string(source.captureTimeZone,128);w.string(source.policy.name,32)
+                    }
+                    count=Math.addExact(count,1)
+                    val latest=saved.versions.last()
+                    if(latest.review==SourceMemoryReview.ACCEPTED){
+                        val q=latest.content.reference.quote.contains(keyword);val n=latest.content.note.contains(keyword)
+                        if(q||n){
+                            if(++matched>1000)throw UnifiedKeywordTooBroad()
+                            if(collect)items+=AcceptedMemoryKeywordHit(row.id,UnifiedKeywordBinding(source.source,source.sourceHash,
+                                source.generation,source.capturedAtMillis,source.captureTimeZone,source.policy),row.version,
+                                latest.revision,latest.content,q,n)
+                        }
+                    }
+                    checkCurrent()
+                } finally {row.bytes.fill(0)}
+            }
+            cursor=page.lastOrNull()?.get(0) as? String
+        }while(page.size==20)
+        append{it.i64(count)};checkCurrent()
+        return KeywordScan(KeywordReceipt(epoch,count,digest.digest().joinToString(""){"%02x".format(it.toInt() and 255)}),items)
     }
     internal fun portable(cells:List<Any?>,restoring:Boolean):ByteArray {
         val row=decode(cells)
@@ -222,5 +302,17 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
     companion object {
         const val PROFILE_VERSION=2
         private const val COLUMNS="id,entryId,sourceRevision,sourceHash,generation,ruleVersion,version,state,lastMutationId,createdAtMillis,payload"
+    }
+}
+
+/** Existing per-source write contract, shared by all portable/SQL readers. No global scan cap. */
+internal object SourceMemoryCapacity {
+    fun count(value:Long){if(value !in 0..SourceMemoryRules.MAX_MEMORIES.toLong())throw SourceMemoryLimit()}
+    fun portable(rows:List<List<Any?>>){
+        val counts=HashMap<SourceVersion,Long>()
+        rows.forEach {r->if(r[5]==2L&&r[7]=="READY"){
+            val source=SourceVersion(r[1] as String,r[2] as Long)
+            val next=Math.addExact(counts[source]?:0L,1);count(next);counts[source]=next
+        }}
     }
 }

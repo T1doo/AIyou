@@ -27,6 +27,7 @@ internal fun LocalRecordUiState.canRetainUnified(u:UnifiedKeywordUi):Boolean {
 /** Invoke confirmation only while holding the caller's navigation owner. The controller never
  * holds its lifecycle lock while waiting for navigation: lock order is navigation -> lifecycle. */
 typealias UnifiedKeywordHandoff = ((()->Unit)->Boolean)
+internal class UnifiedKeywordRetirement(val session:Long,val request:Long,val lifetime:Long,val memorySelected:Boolean)
 
 class UnifiedKeywordController(private val current:()->LocalRecordUiState,
     private val publish:((LocalRecordUiState)->LocalRecordUiState)->Unit,
@@ -36,6 +37,21 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
     private var lifetime=0L
     @Volatile private var disposed=false
     private var returnSeed:Pair<String,UnifiedKeywordScope>?=null
+    private var activeRequest:Pair<Long,Long>?=null
+    private var activeScope=UnifiedKeywordScope.ALL
+    private class Retired:RuntimeException("Unified lookup retired")
+    internal fun observeRetirement():UnifiedKeywordRetirement?=synchronized(handoffLock){
+        val u=current().unifiedKeyword;val pair=u?.let{it.session to it.request}?:activeRequest?:return@synchronized null
+        val scope=u?.scope?:activeScope
+        UnifiedKeywordRetirement(pair.first,pair.second,lifetime,scope==UnifiedKeywordScope.ALL||scope==UnifiedKeywordScope.ACCEPTED_MEMORY)
+    }
+    internal fun retireObserved(observed:UnifiedKeywordRetirement)=synchronized(handoffLock){
+        val u=current().unifiedKeyword;val pair=u?.let{it.session to it.request}?:activeRequest
+        if(lifetime==observed.lifetime&&pair==(observed.session to observed.request)){
+            lifetime=Math.addExact(lifetime,1);returnSeed=null;activeRequest=null
+            publish{l->if(l.unifiedKeyword?.let{it.session==observed.session&&it.request==observed.request}==true)l.copy(unifiedKeyword=null)else l}
+        }
+    }
     private fun owns(session:Long,request:Long?=null):Boolean {
         val l=current();val u=l.unifiedKeyword?:return false
         return !disposed&&u.session==session&&(request==null||u.request==request)&&l.canRetainUnified(u)
@@ -52,16 +68,17 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
         val u=UnifiedKeywordUi(tokens.incrementAndGet(),owner,keyword=keyword,scope=scope)
         if(!l.canRetainUnified(u))return@synchronized
         lifetime=Math.addExact(lifetime,1)
+        activeRequest=u.session to u.request;activeScope=scope
         publish{if(it.unifiedKeyword==null&&it.canRetainUnified(u))it.copy(unifiedKeyword=u)else it}
         if(keyword.isNotBlank())search(u.session)
     }
     fun close(session:Long)=synchronized(handoffLock) {
         var closed=false
         publish{if(it.unifiedKeyword?.session==session){closed=true;it.copy(unifiedKeyword=null)}else it}
-        if(closed){lifetime=Math.addExact(lifetime,1);returnSeed=null}
+        if(closed){lifetime=Math.addExact(lifetime,1);returnSeed=null;activeRequest=null}
     }
     fun retire()=synchronized(handoffLock) {
-        lifetime=Math.addExact(lifetime,1);returnSeed=null;publish{it.copy(unifiedKeyword=null)}
+        lifetime=Math.addExact(lifetime,1);returnSeed=null;activeRequest=null;publish{it.copy(unifiedKeyword=null)}
     }
     fun resume()=synchronized(handoffLock) {
         val seed=returnSeed?:return@synchronized;returnSeed=null;openWith(seed.first,seed.second)
@@ -93,12 +110,14 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
         val epoch=synchronized(handoffLock){lifetime}
         val req=tokens.incrementAndGet();update(before.session){it.copy(request=req,busy=true,error=null)}
         if(!owns(before.session,req))return
+        synchronized(handoffLock){if(lifetime!=epoch)return;activeRequest=before.session to req;activeScope=before.scope}
         if(!enqueue{store->
             if(!owns(before.session,req)||store.unifiedKeywords!==before.owner)return@enqueue
             try {
-                val result=if(proof==null)before.owner.search(before.keyword,before.scope)else {
+                val checkCurrent={if(!owns(before.session,req)||store.unifiedKeywords!==before.owner)throw Retired()}
+                val result=if(proof==null)before.owner.search(before.keyword,before.scope,checkCurrent)else {
                     var ticket=false
-                    if(!before.owner.resolve(proof,item){ticket=owns(before.session,req)}||!ticket)throw UnifiedKeywordConflict()
+                    if(!before.owner.resolve(proof,item,checkCurrent){ticket=owns(before.session,req)}||!ticket)throw UnifiedKeywordConflict()
                     proof
                 }
                 // No UI content or route is published from the transaction's private ticket.
@@ -124,7 +143,11 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
                         if(synchronized(handoffLock){!disposed&&lifetime==epoch})onLocate?.invoke(item,confirm)
                     }
                 }
-            }catch(c:CancellationException){throw c}catch(_:Exception){failed(before.session,req)}
+            }catch(_:Retired){ /* The real transaction has unwound; do not cancel the shared actor. */ }
+            catch(c:CancellationException){throw c}
+            catch(_:UnifiedKeywordTooBroad){update(before.session,req){it.copy(snapshot=null,page=0,busy=false,
+                error="已采纳线索命中过多，请使用更具体的关键词或切换范围；未显示部分结果，原件未改。")}}
+            catch(_:Exception){failed(before.session,req)}
         })failed(before.session,req)
     }
     private fun failed(session:Long,request:Long)=update(session,request){it.copy(snapshot=null,page=0,busy=false,
@@ -148,6 +171,10 @@ internal fun unifiedOriginalLocation(item:UnifiedKeywordEvidence,keyword:String)
             if(originalSearchPreview(item.entry,hit)==null)return null
             hit.matchStartCodePoint to hit.matchEndCodePoint}
         is UnifiedKeywordEvidence.Preference->item.value.current?.content?.reference?.let{it.start to it.end}?:return null
+        is UnifiedKeywordEvidence.AcceptedMemory->{val m=item.value;val ref=m.content.reference
+            if(m.quoteMatch){val at=ref.quote.indexOf(keyword);if(at<0||keyword.isEmpty())return null
+                val start=ref.start+ref.quote.codePointCount(0,at);start to start+keyword.codePointCount(0,keyword.length)
+            }else ref.start to ref.end}
         else->return null
     }
     return OriginalReadingLocation(b.source.sourceId,b.source.revision.toInt(),b.hash,range.first,range.second)

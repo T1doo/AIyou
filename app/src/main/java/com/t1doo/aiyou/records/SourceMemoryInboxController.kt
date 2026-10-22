@@ -16,7 +16,8 @@ data class SourceMemoryInboxUiState(val session: Long, val request: SourceMemory
 /** Private read-only pages on the existing IO actor. Every rendered action owns its request. */
 class SourceMemoryInboxController internal constructor(private val current: () -> LocalRecordUiState,
     private val publish: ((LocalRecordUiState) -> LocalRecordUiState) -> Unit,
-    private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean) {
+    private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
+    private val beforeOpen:()->Unit={}) {
     private val tokens = AtomicLong()
     private val gate = Any()
     private val cursors = mutableListOf<SourceMemoryInboxCursor?>()
@@ -32,6 +33,7 @@ class SourceMemoryInboxController internal constructor(private val current: () -
     fun open(section: SourceMemoryInboxSection = SourceMemoryInboxSection.PENDING): Unit = synchronized(gate) {
         val local = current()
         if (!available(local) || local.saving || local.savePending) return
+        beforeOpen()
         val session = tokens.incrementAndGet(); cursors.clear(); cursors.add(null)
         publish { if (available(it)) it.copy(memoryInbox = SourceMemoryInboxUiState(session, section = section)) else it }
         current().memoryInbox?.takeIf { it.session == session }?.let { read(it) }

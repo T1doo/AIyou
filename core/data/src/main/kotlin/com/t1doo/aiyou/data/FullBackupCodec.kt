@@ -215,6 +215,7 @@ internal object FullBackupCodec {
         }
         for(index in listOf(4,5,6,8)) require(d.tables[index].all { it[if(index==8) 1 else 0] in entries })
         d.tables[8].forEach { require(it[5] in (if(d.version==12) setOf(1L,2L,3L,4L,5L) else if(d.version==11) setOf(1L,2L,3L,4L) else if(d.version==10) setOf(1L,2L,3L) else setOf(1L,2L)) && it[7] in setOf("READY","CANCELLED","INVALIDATED")) }
+        SourceMemoryCapacity.portable(d.tables[8])
     }
     fun sameCapture(a:CaptureDraft?,b:CaptureDraft?):Boolean = if(a==null || b==null) a==null && b==null else
         a.sameSnapshot(b)

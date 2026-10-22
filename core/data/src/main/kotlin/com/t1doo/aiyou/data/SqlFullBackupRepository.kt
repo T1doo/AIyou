@@ -277,6 +277,7 @@ private class FullBackupCells(database:RecordsSqlDatabase,key:ByteArray):AutoClo
     private val imageTexts=SqlImageTextRepository(database,key)
     /** Parse and bind portable cells entirely in memory before exposing a restore preview or writing an intent. */
     fun validatePortable(data:FullBackupData) {
+        SourceMemoryCapacity.portable(data.tables[8])
         val retained=mutableListOf<Pair<List<Any?>,FullBackupSourceProof?>>()
         try { data.tables.forEachIndexed { index,rows ->
             val spec=FullBackupTables.specs[index]

@@ -24,7 +24,8 @@ data class SourceMemoryUiState(val session:Long,val source:SourceVersion,val sou
 /** All form and confirmation authority is memory-only; stored review is authenticated IO. */
 class SourceMemoryController(private val current:()->LocalRecordUiState,
     private val publish:((LocalRecordUiState)->LocalRecordUiState)->Unit,
-    private val enqueue:(suspend(EntryRepository)->Unit)->Boolean,private val clock:Clock) {
+    private val enqueue:(suspend(EntryRepository)->Unit)->Boolean,private val clock:Clock,
+    private val beforeOpen:()->Unit={}) {
     private val sessions=AtomicLong();private val tokens=AtomicLong()
     @Volatile private var disposed=false
     private fun owns(session:Long,request:Long?=null):Boolean {
@@ -41,6 +42,7 @@ class SourceMemoryController(private val current:()->LocalRecordUiState,
             local.sourceMemories!=null || local.sourceTags!=null || local.candidates!=null || local.manualTagEditor!=null || local.recordPackage!=null || local.recycleBin!=null) return
         if(!local.hasLocalProcessingProof(SourceVersion(id,revision.toLong())) || local.localProcessing!=null) return
         val entry=local.entries.singleOrNull { it.id==id && it.currentRevision==revision && it.policy!=ProcessingPolicy.AI_NONE } ?: return
+        beforeOpen()
         val ui=SourceMemoryUiState(sessions.incrementAndGet(),SourceVersion(id,revision.toLong()),OriginalExports.hash(entry.originalText))
         publish { it.copy(sourceMemories=ui) };execute(ui,null)
     }

@@ -40,7 +40,7 @@ class UnifiedKeywordPresentationTest {
     private fun content(restore:StateRestorationTester?=null){
         val body:@Composable ()->Unit={registry=LocalSaveableStateRegistry.current;val d=LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(d.density,2f)){AIyouTheme{
-                AIyouApp(previewDestination=Destination.MEMORIES,local=f.local.value,currentRecords={f.local.value},unifiedKeywords=f.c,attachments=f.attachments)
+                AIyouApp(previewDestination=Destination.MEMORIES,local=f.local.value,currentRecords={f.local.value},unifiedKeywords=f.c,attachments=f.attachments,sourceMemories=f.memoryController)
             }}}
         if(restore==null)compose.setContent(body)else restore.setContent(body)
     }
@@ -113,6 +113,69 @@ class UnifiedKeywordPresentationTest {
         compose.onNodeWithTag("original-text").assertTextEquals(item.entry.originalText)
         compose.runOnIdle{assertEquals(0,f.writes)}
     }
+    private fun click(tag:String){compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick();compose.waitForIdle()}
+    private fun keyboardEnter(node:SemanticsNodeInteraction){
+        val view=(node.fetchSemanticsNode().root as ViewRootForTest).view
+        compose.runOnIdle{assertTrue(view.isAttachedToWindow);assertTrue(view.requestFocusFromTouch())};compose.waitForIdle()
+        compose.runOnIdle{assertFalse(view.isInTouchMode)}
+        node.performSemanticsAction(SemanticsActions.RequestFocus){assertTrue(it())}
+        node.assertIsFocused().performKeyInput{pressKey(Key.Enter)};drain()
+    }
+    @Test @Config(qualifiers="w640dp-h320dp-land")
+    fun noteOnlyAcceptedEmotionKeepsSeparateHighlightAndKeyboardReturnsExactQuoteInsteadOfNote(){
+        f.enableMemory(SourceMemoryKind.OCCASION_EMOTION,"🙂人工备注专词");content();open();query("备注专词")
+        val item=f.local.value.unifiedKeyword!!.snapshot!!.groups.single().items.single() as UnifiedKeywordEvidence.AcceptedMemory
+        compose.onNodeWithTag("unified-results").performScrollToIndex(1)
+        compose.onNodeWithTag("unified-memory-note-label:"+item.key).performScrollTo().assertTextEquals("人工备注命中 · 非原文")
+        val quote=compose.onNodeWithTag("unified-memory-quote:"+item.key).performScrollTo().fetchSemanticsNode().config[SemanticsProperties.Text].single()
+        assertEquals(f.records[0].originalText,quote.text);assertTrue(quote.spanStyles.isEmpty())
+        val note=compose.onNodeWithTag("unified-memory-note:"+item.key).performScrollTo().fetchSemanticsNode().config[SemanticsProperties.Text].single()
+        assertTrue(note.spanStyles.any{note.text.substring(it.start,it.end)=="备注专词"})
+        compose.onNodeWithTag("unified-memory-location:"+item.key).performScrollTo().assertTextEquals("原文定位的是依据，不是备注文字。")
+        val source=compose.onNodeWithTag("unified-source:"+item.key).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        keyboardEnter(source);compose.onNodeWithTag("original-text").assertTextEquals(f.records[0].originalText)
+        compose.runOnIdle{assertFalse(f.records[0].originalText.contains("备注专词"));assertEquals(0,f.memoryWrites);assertEquals(0,f.writes)}
+    }
+    @Test fun quoteAndNoteCorrectionNeedsSeparateReacceptanceThenWithdrawalRemovesOnlyMemoryHit(){
+        f.enableMemory(SourceMemoryKind.EVENT,"合成淡茶备注");content();open();query("淡茶")
+        val original=f.records[0].originalText
+        val item=f.local.value.unifiedKeyword!!.snapshot!!.groups.single().items.filterIsInstance<UnifiedKeywordEvidence.AcceptedMemory>().single()
+        compose.onNodeWithTag("unified-results").performScrollToIndex(1)
+        compose.onNodeWithTag("unified-memory-quote-label:"+item.key).performScrollTo().assertTextEquals("逐字依据命中")
+        compose.onNodeWithTag("unified-memory-note-label:"+item.key).performScrollTo().assertTextEquals("人工备注命中 · 非原文")
+        result(item);click("original-source-memories");drain();click("source-memory-correct-0")
+        compose.onNodeWithTag("source-memory-note").performScrollTo().performTextReplacement("纠正备注专词")
+        click("source-memory-save");click("source-memory-confirm");assertEquals(0,f.memoryWrites);drain()
+        compose.onNodeWithTag("source-memory-review-0").performScrollTo().assertTextEquals("待审候选")
+        click("source-memories-close");back();open();query("纠正备注专词")
+        compose.onNodeWithTag("unified-empty").assertExists()
+        query("淡茶");val raw=f.local.value.unifiedKeyword!!.snapshot!!.groups.single().items.filterIsInstance<UnifiedKeywordEvidence.Original>().single()
+        result(raw);click("original-source-memories");drain();click("source-memory-ACCEPT-0");click("source-memory-confirm");drain()
+        click("source-memories-close");back();open();query("纠正备注专词")
+        val accepted=f.local.value.unifiedKeyword!!.snapshot!!.groups.single().items.single() as UnifiedKeywordEvidence.AcceptedMemory
+        result(accepted);click("original-source-memories");drain();click("source-memory-REVOKE-0");click("source-memory-confirm");drain()
+        click("source-memories-close");back();open();query("纠正备注专词");compose.onNodeWithTag("unified-empty").assertExists()
+        compose.runOnIdle{assertEquals(3,f.memoryWrites);assertEquals(0,f.writes);assertEquals(original,f.records[0].originalText)}
+    }
+    @Test fun memoryScopeOverflowShowsNoPartialResultsThenNarrowQueryRemainsUsable(){
+        f.enableMemory(SourceMemoryKind.EVENT,"备注专词");content();open();click("unified-scope")
+        click("unified-scope:ACCEPTED_MEMORY");f.tooBroad=true;query("备注")
+        compose.onNodeWithTag("unified-error").performScrollTo().assertTextEquals("已采纳线索命中过多，请使用更具体的关键词或切换范围；未显示部分结果，原件未改。")
+        compose.onNodeWithTag("unified-empty").assertDoesNotExist()
+        compose.runOnIdle{assertNull(f.local.value.unifiedKeyword!!.snapshot);assertEquals(0,f.memoryWrites);assertEquals(0,f.writes)}
+        f.tooBroad=false;query("备注专词")
+        compose.runOnIdle{assertEquals(UnifiedKeywordScope.ACCEPTED_MEMORY,f.local.value.unifiedKeyword!!.scope)
+            assertEquals(1,f.local.value.unifiedKeyword!!.snapshot!!.groups.single().items.size)}
+    }
+    @Test fun restoredAcceptedNoteQueryAndRetainedClickCannotRecoverPrivateProof(){
+        f.enableMemory(SourceMemoryKind.EVENT,"私有备注专词");val restore=StateRestorationTester(compose);content(restore);open();query("备注专词")
+        val old=f.local.value.unifiedKeyword!!;val item=old.visibleGroups.single().items.single()
+        compose.runOnIdle{assertFalse(registry!!.performSave().toString().contains("备注专词"))}
+        restore.emulateSavedInstanceStateRestore();compose.waitForIdle();drain()
+        compose.runOnIdle{assertNull(f.local.value.unifiedKeyword);f.c.locate(old.session,item){_,_->fail("Old note proof")}}
+        open();assertEquals("",compose.onNodeWithTag("unified-query").fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        compose.runOnIdle{assertEquals(0,f.memoryWrites);assertEquals(0,f.writes)}
+    }
     private class Fixture {
         private fun id()=UUID.randomUUID().toString()
         val records=listOf("我偏好淡茶🙂","我偏好清水🙂").map{StoredEntry(id(),1,it,55,"UTC",ProcessingPolicy.LOCAL_ONLY)}
@@ -130,19 +193,49 @@ class UnifiedKeywordPresentationTest {
                 val preference=SourcePreferenceSnapshot(id(),b.source,b.hash,0,2,PreferenceAvailability.AVAILABLE,55,55,"UTC",b.policy,id(),"合成口味",listOf(PreferenceContentVersion(1,PreferenceContent(SourceMemoryRules.reference(preview,e.originalText)),55)),listOf(PreferenceCheckpoint(1,PreferenceReview.ACCEPTED,null,55)))
                 rows+=UnifiedKeywordEvidence.Preference(b,preference)};rows
         }
-        var writes=0;var mediaReads=0
+        var writes=0;var mediaReads=0;var tooBroad=false
         val queue=ArrayDeque<suspend(EntryRepository)->Unit>()
         val repo:UnifiedKeywordRepository=object:UnifiedKeywordRepository {
             override suspend fun search(keyword:String,scope:UnifiedKeywordScope):UnifiedKeywordSnapshot {
-                val matched=evidence.filter{e->records.single{it.id==e.binding.source.sourceId}.originalText.contains(keyword)&&when(scope){UnifiedKeywordScope.ALL->true;UnifiedKeywordScope.ORIGINAL->e is UnifiedKeywordEvidence.Original;UnifiedKeywordScope.AUDIO->e is UnifiedKeywordEvidence.Audio;UnifiedKeywordScope.IMAGE->e is UnifiedKeywordEvidence.Image;UnifiedKeywordScope.PREFERENCE->e is UnifiedKeywordEvidence.Preference}}
-                return object:UnifiedKeywordSnapshot{override val keyword=keyword;override val scope=scope;override val bindings=records.map(::bind)
+                if(tooBroad)throw UnifiedKeywordTooBroad()
+                val saved=memory;val current=saved?.current
+                val extra=if(saved?.state==SourceMemoryState.ACTIVE&&current?.review==SourceMemoryReview.ACCEPTED){
+                    val q=current.content.reference.quote.contains(keyword);val n=current.content.note.contains(keyword)
+                    if(q||n)listOf(UnifiedKeywordEvidence.AcceptedMemory(AcceptedMemoryKeywordHit(saved.id,bind(records[0]),saved.version,current.revision,current.content,q,n)))else emptyList()
+                }else emptyList()
+                val matched=(evidence+extra).filter{e->val text=when(e){is UnifiedKeywordEvidence.Original->e.entry.originalText;is UnifiedKeywordEvidence.Audio->e.value.current.text;is UnifiedKeywordEvidence.Image->e.value.current.text;is UnifiedKeywordEvidence.Preference->e.value.current!!.content.reference.quote;is UnifiedKeywordEvidence.AcceptedMemory->keyword}
+                    text.contains(keyword)&&when(scope){UnifiedKeywordScope.ALL->true;UnifiedKeywordScope.ORIGINAL->e is UnifiedKeywordEvidence.Original;UnifiedKeywordScope.AUDIO->e is UnifiedKeywordEvidence.Audio;UnifiedKeywordScope.IMAGE->e is UnifiedKeywordEvidence.Image;UnifiedKeywordScope.PREFERENCE->e is UnifiedKeywordEvidence.Preference;UnifiedKeywordScope.ACCEPTED_MEMORY->e is UnifiedKeywordEvidence.AcceptedMemory}}
+                val snapshot=object:UnifiedKeywordSnapshot{override val keyword=keyword;override val scope=scope;override val bindings=records.map(::bind)
                     override val groups=matched.groupBy{it.binding}.map{(b,rows)->UnifiedKeywordGroup(b,rows.sortedBy{it.key})}}
+                proofVersions[snapshot]=memory?.version;return snapshot
             }
-            override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit):Boolean {if(item!=null&&snapshot.groups.none{it.items.any{row->row===item}})return false;admit();return true}
+            override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit):Boolean {if(!proofVersions.containsKey(snapshot)||proofVersions[snapshot]!=memory?.version)return false;if(item!=null&&snapshot.groups.none{it.items.any{row->row===item}})return false;admit();return true}
+        }
+        var memory:SourceMemorySnapshot?=null;var memoryWrites=0
+        private val proofVersions=IdentityHashMap<UnifiedKeywordSnapshot,Long?>()
+        val memoryPort=object:SourceMemoryRepository {
+            override fun preview(source:SourceVersion):SourceMemoryPreview {val e=records.single{it.id==source.sourceId};return SourceMemoryPreview(source,OriginalExports.hash(e.originalText),0,e.originalText,55,"UTC",e.policy,0)}
+            override fun memories(source:SourceVersion)=listOfNotNull(memory?.takeIf{it.source==source})
+            override fun create(request:SourceMemoryCreate):SourceMemorySnapshot=error("No creation in this UI case")
+            override fun mutate(request:SourceMemoryMutation):SourceMemorySnapshot {
+                val old=checkNotNull(memory);val v=checkNotNull(old.current)
+                check(old.id==request.id&&old.version==request.expectedVersion&&v.revision==request.expectedContentRevision&&v.review==request.previousReview)
+                val review=SourceMemoryRules.decision(v.review,request.action)
+                val history=if(request.action==SourceMemoryAction.CORRECT){val content=checkNotNull(request.content);SourceMemoryRules.validate(content,old.source,records[0].originalText)
+                    old.versions.dropLast(1)+v.copy(review=SourceMemoryReview.SUPERSEDED,priorReview=v.review)+SourceMemoryVersion(v.revision+1,content,SourceMemoryReview.PROPOSED,null,v.revision,request.requestedAtMillis,request.requestedAtMillis)
+                }else old.versions.dropLast(1)+v.copy(review=review,reviewedAtMillis=request.requestedAtMillis)
+                memoryWrites++;return SourceMemorySnapshot(old.id,old.source,old.sourceHash,old.generation,old.version+1,old.state,old.createdAtMillis,old.capturedAtMillis,old.captureTimeZone,history).also{memory=it}
+            }
+        }
+        fun enableMemory(kind:SourceMemoryKind,note:String){
+            val e=records[0];val p=memoryPort.preview(SourceVersion(e.id,1));val content=SourceMemoryContent(SourceMemoryRules.reference(p,e.originalText),kind,SourceMemoryAssertion.UNCERTAIN,note)
+            memory=SourceMemorySnapshot(id(),p.source,p.sourceHash,0,2,SourceMemoryState.ACTIVE,55,55,"UTC",listOf(SourceMemoryVersion(1,content,SourceMemoryReview.ACCEPTED,null,null,55,60)))
+            local.value=local.value.copy(supportsSourceMemories=true)
         }
         val local=mutableStateOf(LocalRecordUiState(ready=true,opening=false,entries=records,unifiedKeywordOwner=repo))
         val store:EntryRepository=object:EntryRepository {
             override val unifiedKeywords=repo
+            override val sourceMemories=memoryPort
             override val attachments=object:AttachmentStore {
                 override suspend fun save(intent:AttachmentIntent,source:()->java.io.InputStream):LocalAttachment{writes++;error("No source writes")}
                 override suspend fun list(entryId:String,revision:Int)=(pictures+audio).filter{it.entryId==entryId&&it.revision==revision}.map{LocalAttachment(it,AttachmentState.READY)}
@@ -157,6 +250,7 @@ class UnifiedKeywordPresentationTest {
             override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry=error("Unrelated")
         }
         val c=UnifiedKeywordController({local.value},{change->val next=change(local.value);local.value=if(next.unifiedKeyword?.let{!next.canRetainUnified(it)}==true)next.copy(unifiedKeyword=null)else next},{queue.add(it);true})
+        val memoryController=SourceMemoryController({local.value},{change->local.value=change(local.value)},{queue.add(it);true},java.time.Clock.fixed(java.time.Instant.ofEpochMilli(100),java.time.ZoneOffset.UTC),beforeOpen={c.retire()})
         val attachments=LocalAttachmentController({queue.add(it);true},PlatformImageDecoder::decode,canUseRecord={local.value.ready},canUsePanel={it.hasRecordAccess(local.value)})
     }
 }

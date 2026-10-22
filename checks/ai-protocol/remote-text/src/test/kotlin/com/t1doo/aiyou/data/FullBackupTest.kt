@@ -446,23 +446,27 @@ class FullBackupTest {
         } finally { reordered.release();base.release() }
     }
     /** Adversarial authenticated document generator intentionally bypasses the product semantic encoder. */
-    private fun uncheckedAuthenticatedNoImages(d:FullBackupData):ByteArray {
+    internal fun uncheckedAuthenticatedNoImages(d:FullBackupData,version:Int=8):ByteArray {
+        require(version in 8..12 && d.media.isEmpty())
+        val marker=uuid()
+        val tables=d.tables.mapIndexed { i,rows -> if(i==12 && version>=9 && d.version!=version)rows+listOf(listOf("FULL_BACKUP:"+marker,marker,version.toLong(),"FULL_BACKUP_IMPORT_V"+version,"DONE:"+"0".repeat(64)))else rows }
         val metadata=PackageWriter(FullBackupCodec.MAX_METADATA).use { w ->
             fun text(value:String) { w.i32(value.length);val bytes=ByteArray(value.length*2);value.forEachIndexed { i,c ->bytes[2*i]=(c.code ushr 8).toByte();bytes[2*i+1]=c.code.toByte() };w.raw(bytes);bytes.fill(0) }
-            w.string("AIyou-logical-full-v8",32);w.i32(8);w.i32(1);w.string(d.id,36);w.i64(d.created);w.i32(d.tables.size)
+            w.string("AIyou-logical-full-v"+version,32);w.i32(version);w.i32(1);w.string(d.id,36);w.i64(d.created);w.i32(tables.size)
             FullBackupTables.specs.forEachIndexed { index,spec ->
-                w.string(spec.name,64);w.string(spec.columns,512);w.i32(d.tables[index].size)
-                d.tables[index].forEach { row ->row.forEach { cell ->when(cell) {
+                w.string(spec.name,64);w.string(spec.columns,512);w.i32(tables[index].size)
+                tables[index].forEach { row ->row.forEach { cell ->when(cell) {
                     null->w.i32(0)
                     is Long->{w.i32(1);w.i64(cell)}
                     is String->{w.i32(2);text(cell)}
                     is ByteArray->{w.i32(3);w.i32(cell.size);w.raw(cell)}
                 } } }
             }
-            w.i32(0);w.i32(d.edits.size);d.edits.forEach { RecordEditDraftPackageCodec.write(w,it) };w.bytes()
+            w.i32(0);if(version>=9)w.i32(0);w.i32(d.edits.size);d.edits.forEach { RecordEditDraftPackageCodec.write(w,it) };w.bytes()
         }
         val salt=ByteArray(16) { it.toByte() };val prefix=ByteArray(8) { (it+30).toByte() }
-        val header=java.nio.ByteBuffer.allocate(40).put("AIYOUPK8".toByteArray()).putInt(8).putInt(RecordPackages.ITERATIONS).put(salt).put(prefix).array()
+        val magic=when(version){8->"AIYOUPK8";9->"AIYOUFB9";else->"AIYOUF"+version}
+        val header=java.nio.ByteBuffer.allocate(40).put(magic.toByteArray()).putInt(version).putInt(RecordPackages.ITERATIONS).put(salt).put(prefix).array()
         val password=password();val key=RecordPackageCrypto.derive(password,salt);password.fill('\u0000')
         val out=ByteArrayOutputStream();out.write(header)
         fun frame(index:Int,binding:ByteArray,plain:ByteArray) {
