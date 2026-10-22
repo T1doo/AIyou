@@ -24,7 +24,7 @@ reports = list((root / "app/build/test-results/validateDebugScreenshotTest").rgl
 cases = []
 for report in reports:
     cases.extend(ET.parse(report).getroot().iter("testcase"))
-expected = 4 * len(target_methods) if targeted else 404  # Existing394 plus10 exact unified-lookup body renders.
+expected = 4 * len(target_methods) if targeted else 406  # Existing394 plus12 exact unified-lookup body renders.
 if len(cases) != expected:
     raise SystemExit(f"FAIL: expected {expected} actual Preview smoke tests, found {len(cases)}")
 if any(any(case.find(tag) is not None for tag in ("failure", "error", "skipped")) for case in cases):
@@ -67,7 +67,7 @@ for method in (target_methods if targeted else local_methods + attachment_method
     if len(production) != 4:
         raise SystemExit(f"FAIL: require all four actual production sizes for {method}, found {len(production)}")
 if not targeted:
-    for method in ("UnifiedKeywordHeaderRender", "UnifiedKeywordResultsRender", "UnifiedKeywordAcceptedMemoryRender", "UnifiedKeywordCaptureDateRender", "UnifiedKeywordManualTagsRender"):
+    for method in ("UnifiedKeywordHeaderRender", "UnifiedKeywordResultsRender", "UnifiedKeywordAcceptedMemoryRender", "UnifiedKeywordCaptureDateRender", "UnifiedKeywordManualTagsRender", "UnifiedKeywordManualPeopleRender"):
         actual = [case for case in cases if case.get("name", "").startswith(method + "_")]
         images = [item for item in manifest if "/" + method + "_" in item["file"]]
         if len(actual) != 2 or len(images) != 2:

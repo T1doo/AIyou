@@ -247,6 +247,38 @@ class UnifiedKeywordPresentationTest {
         compose.onNodeWithTag("original-text").assertTextEquals(f.records[0].originalText)
         compose.runOnIdle{assertEquals(0,f.writes);assertEquals(0,f.memoryWrites)}
     }
+    private fun openPeople(){compose.onNodeWithTag("unified-results").performScrollToIndex(1);click("unified-people-open");drain()}
+    @Test fun manualPersonTagDateIntersectionFreshReturnAndRestorationKeepOriginalAndPrivateIdentity(){
+        val restore=StateRestorationTester(compose);content(restore);open();openTags()
+        compose.onNodeWithTag("unified-tag-options").performScrollToIndex(1);click("unified-tag-choice:synthetic-tag-0");drain()
+        openPeople();compose.onNodeWithTag("unified-person-options").performScrollToIndex(1);click("unified-person-choice:synthetic-person-0");drain()
+        compose.runOnIdle{assertEquals(0,f.lookups);assertNull(f.local.value.unifiedKeyword!!.snapshot)}
+        date("unified-from","1970-01-01");date("unified-through","1970-01-01");query("淡茶")
+        val old=f.local.value.unifiedKeyword!!;assertEquals("合成阿岚",old.person!!.name);assertEquals("饮食",old.tag!!.name)
+        assertEquals(f.records[0].id,old.visibleGroups.single().binding.source.sourceId)
+        result(old.visibleGroups.single().items.filterIsInstance<UnifiedKeywordEvidence.Original>().single())
+        compose.onNodeWithTag("original-text").assertTextEquals(f.records[0].originalText);back()
+        compose.runOnIdle{val fresh=f.local.value.unifiedKeyword!!;assertNotSame(old.person,fresh.person);assertNotSame(old.tag,fresh.tag);assertNotSame(old.snapshot,fresh.snapshot)
+            val saved=registry!!.performSave().toString();assertFalse(saved.contains("合成阿岚"));assertFalse(saved.contains("synthetic-person-0"))}
+        openPeople();compose.onNodeWithTag("unified-person-options").performScrollToIndex(2);click("unified-person-choice:synthetic-person-1");drain();query("淡茶")
+        compose.onNodeWithTag("unified-empty").assertExists()
+        compose.onNodeWithTag("unified-results").performScrollToIndex(1);click("unified-person-clear");query("淡茶")
+        assertNull(f.local.value.unifiedKeyword!!.person);assertEquals("饮食",f.local.value.unifiedKeyword!!.tag!!.name)
+        restore.emulateSavedInstanceStateRestore();compose.waitForIdle();drain();compose.runOnIdle{assertNull(f.local.value.unifiedKeyword);assertEquals(0,f.writes)}
+    }
+    @Test @Config(qualifiers="w640dp-h320dp-land")
+    fun manualPersonPagedLongMarkerKeyboardIntersectionAndExactOriginalStayReachableAtDoubleFont(){
+        content();open();openPeople();compose.onNodeWithTag("unified-person-options").performScrollToIndex(21);click("unified-people-next");drain()
+        compose.onNodeWithTag("unified-person-options").performScrollToIndex(3)
+        val choice=compose.onNodeWithTag("unified-person-choice:synthetic-person-22").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        choice.assertTextEquals(f.longPerson);keyboardEnter(choice)
+        compose.onNodeWithTag("unified-results").performScrollToIndex(1);compose.onNodeWithTag("unified-person-selected").performScrollTo().assertTextEquals(f.longPerson)
+        compose.onNodeWithTag("unified-results").performScrollToIndex(0);compose.onNodeWithTag("unified-query").performScrollTo().performTextReplacement("淡茶")
+        compose.onNodeWithTag("unified-results").performScrollToIndex(2);keyboardEnter(compose.onNodeWithTag("unified-search").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp))
+        val item=f.local.value.unifiedKeyword!!.visibleGroups.single().items.filterIsInstance<UnifiedKeywordEvidence.Original>().single()
+        compose.onNodeWithTag("unified-results").performScrollToIndex(3);keyboardEnter(compose.onNodeWithTag("unified-source:"+item.key).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp))
+        compose.onNodeWithTag("original-text").assertTextEquals(f.records[0].originalText);compose.runOnIdle{assertEquals(0,f.writes);assertEquals(0,f.memoryWrites)}
+    }
     private class Fixture {
         private fun id()=UUID.randomUUID().toString()
         val records=listOf("我偏好淡茶🙂","我偏好清水🙂").map{StoredEntry(id(),1,it,55,"UTC",ProcessingPolicy.LOCAL_ONLY)}
@@ -274,7 +306,25 @@ class UnifiedKeywordPresentationTest {
         private val tagPages=Collections.newSetFromMap(IdentityHashMap<UnifiedTagPage,Boolean>())
         private val selections=Collections.newSetFromMap(IdentityHashMap<UnifiedTagSelection,Boolean>())
         var tagReads=0
+        val longPerson="合成人物标记"+"人".repeat(34)
+        private class PersonChoice(override val id:String,override val name:String):UnifiedPersonChoice
+        private class PersonSelection(override val id:String,override val name:String):UnifiedPersonSelection
+        private class PersonPage(override val choices:List<UnifiedPersonChoice>,override val hasNext:Boolean,val offset:Int):UnifiedPersonPage
+        private val personValues=(0..22).map{n->PersonChoice("synthetic-person-$n",when(n){0->"合成阿岚";1->"合成另位";22->longPerson;else->"合成人物$n"})}
+        private val personPages=Collections.newSetFromMap(IdentityHashMap<UnifiedPersonPage,Boolean>())
+        private val personSelections=Collections.newSetFromMap(IdentityHashMap<UnifiedPersonSelection,Boolean>())
         val repo:UnifiedKeywordRepository=object:UnifiedKeywordRepository {
+            override suspend fun personChoices(after:UnifiedPersonPage?,checkCurrent:()->Unit):UnifiedPersonPage {
+                checkCurrent();if(after!=null)check(after in personPages&&after.hasNext)
+                val offset=if(after==null)0 else (after as PersonPage).offset+20
+                return PersonPage(personValues.drop(offset).take(20),offset+20<personValues.size,offset).also{personPages+=it}
+            }
+            override suspend fun selectPerson(page:UnifiedPersonPage,choice:UnifiedPersonChoice,checkCurrent:()->Unit):UnifiedPersonSelection {
+                checkCurrent();check(page in personPages&&page.choices.any{it===choice});return PersonSelection(choice.id,choice.name).also{personSelections+=it}
+            }
+            override suspend fun refreshPerson(selection:UnifiedPersonSelection,checkCurrent:()->Unit):UnifiedPersonSelection {
+                checkCurrent();check(selection in personSelections);return PersonSelection(selection.id,selection.name).also{personSelections+=it}
+            }
             override suspend fun tagChoices(after:UnifiedTagPage?,checkCurrent:()->Unit):UnifiedTagPage {
                 checkCurrent();if(after!=null)check(after in tagPages&&after.hasNext);tagReads++
                 val offset=if(after==null)0 else (after as TagPage).offset+20
@@ -291,7 +341,10 @@ class UnifiedKeywordPresentationTest {
                 return search(keyword,scope,captureRange,null,checkCurrent)
             }
             override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
-                checkCurrent();if(tag!=null)check(tag in selections);lookups++
+                return search(keyword,scope,captureRange,tag,null,checkCurrent)
+            }
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+                checkCurrent();if(tag!=null)check(tag in selections);if(person!=null)check(person in personSelections);lookups++
                 if(tooBroad)throw UnifiedKeywordTooBroad()
                 val saved=memory;val current=saved?.current
                 val extra=if(saved?.state==SourceMemoryState.ACTIVE&&current?.review==SourceMemoryReview.ACCEPTED){
@@ -300,9 +353,9 @@ class UnifiedKeywordPresentationTest {
                 }else emptyList()
                 val matched=(evidence+extra).filter{e->val text=when(e){is UnifiedKeywordEvidence.Original->e.entry.originalText;is UnifiedKeywordEvidence.Audio->e.value.current.text;is UnifiedKeywordEvidence.Image->e.value.current.text;is UnifiedKeywordEvidence.Preference->e.value.current!!.content.reference.quote;is UnifiedKeywordEvidence.AcceptedMemory->keyword}
                     text.contains(keyword)&&when(scope){UnifiedKeywordScope.ALL->true;UnifiedKeywordScope.ORIGINAL->e is UnifiedKeywordEvidence.Original;UnifiedKeywordScope.AUDIO->e is UnifiedKeywordEvidence.Audio;UnifiedKeywordScope.IMAGE->e is UnifiedKeywordEvidence.Image;UnifiedKeywordScope.PREFERENCE->e is UnifiedKeywordEvidence.Preference;UnifiedKeywordScope.ACCEPTED_MEMORY->e is UnifiedKeywordEvidence.AcceptedMemory}}
-                val dates=captureRange;val selectedTag=tag
-                val snapshot=object:UnifiedKeywordSnapshot{override val keyword=keyword;override val scope=scope;override val captureRange=dates;override val tag=selectedTag;override val bindings=records.map(::bind)
-                    override val groups=matched.filter{dates.contains(it.binding.captured,it.binding.zone)&&(tag==null||it.binding.source.sourceId==records[if(tag.id=="synthetic-tag-1")1 else 0].id)}.groupBy{it.binding}.map{(b,rows)->UnifiedKeywordGroup(b,rows.sortedBy{it.key})}}
+                val dates=captureRange;val selectedTag=tag;val selectedPerson=person
+                val snapshot=object:UnifiedKeywordSnapshot{override val keyword=keyword;override val scope=scope;override val captureRange=dates;override val tag=selectedTag;override val person=selectedPerson;override val bindings=records.map(::bind)
+                    override val groups=matched.filter{dates.contains(it.binding.captured,it.binding.zone)&&(tag==null||it.binding.source.sourceId==records[if(tag.id=="synthetic-tag-1")1 else 0].id)&&(person==null||it.binding.source.sourceId==records[if(person.id=="synthetic-person-1")1 else 0].id)}.groupBy{it.binding}.map{(b,rows)->UnifiedKeywordGroup(b,rows.sortedBy{it.key})}}
                 proofVersions[snapshot]=memory?.version;return snapshot
             }
             override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit):Boolean {if(!proofVersions.containsKey(snapshot)||proofVersions[snapshot]!=memory?.version)return false;if(item!=null&&snapshot.groups.none{it.items.any{row->row===item}})return false;admit();return true}

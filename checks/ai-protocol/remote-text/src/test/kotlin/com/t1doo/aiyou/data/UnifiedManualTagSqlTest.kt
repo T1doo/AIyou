@@ -14,7 +14,7 @@ class UnifiedManualTagSqlTest {
         assertEquals("52454bc7abc9c2c770f7e9dd58105501d5cefe295208fbdc67d64b64e1de82d6",page.choices.single{it.name=="淡茶"}.id)
         assertEquals(page.choices.size,page.choices.map{it.id}.distinct().size)
         assertEquals(listOf("A","a","é","é","淡茶","\uE000","𠀀"),page.choices.map{it.name})
-        val cold=SqlUnifiedKeywordRepository(h.f.gateway,h.originals,h.audios,h.images,h.preferences,h.memories,h.f.tags)
+        val cold=SqlUnifiedKeywordRepository(h.f.gateway,h.originals,h.audios,h.images,h.preferences,h.memories,h.f.tags,h.people)
         assertEquals(page.choices.map{it.id},cold.tagChoices(null,{}).choices.map{it.id})
         assertThrows(UnifiedKeywordConflict::class.java){runBlocking{cold.selectTag(page,page.choices.first(),{})}}
         val ids=ManualTagValueIds(h.f.key);val other=ManualTagValueIds(ByteArray(32){(it+2).toByte()})

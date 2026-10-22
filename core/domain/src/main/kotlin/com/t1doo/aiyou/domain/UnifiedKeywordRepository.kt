@@ -64,6 +64,7 @@ interface UnifiedKeywordSnapshot {
     val scope:UnifiedKeywordScope
     val captureRange:UnifiedCaptureRange get()=UnifiedCaptureRange()
     val tag:UnifiedTagSelection? get()=null
+    val person:UnifiedPersonSelection? get()=null
     val groups:List<UnifiedKeywordGroup>
     /** Includes off-screen and nonmatching sources retained by the authenticated collection proof. */
     val bindings:List<UnifiedKeywordBinding>
@@ -89,6 +90,14 @@ interface UnifiedKeywordRepository {
         if(tag!=null)throw UnifiedTagUnsupported()
         return search(keyword,scope,captureRange,checkCurrent)
     }
+    /** A record-local manual name marker, never a globally resolved person identity. */
+    suspend fun personChoices(after:UnifiedPersonPage?=null,checkCurrent:()->Unit):UnifiedPersonPage = throw UnifiedPersonUnsupported()
+    suspend fun selectPerson(page:UnifiedPersonPage,choice:UnifiedPersonChoice,checkCurrent:()->Unit):UnifiedPersonSelection = throw UnifiedPersonUnsupported()
+    suspend fun refreshPerson(selection:UnifiedPersonSelection,checkCurrent:()->Unit):UnifiedPersonSelection = throw UnifiedPersonUnsupported()
+    suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+        if(person!=null)throw UnifiedPersonUnsupported()
+        return search(keyword,scope,captureRange,tag,checkCurrent)
+    }
     /** Reauthenticates media, then jointly verifies all sets. Callback is a PRIVATE admission
      * ticket only: callers must not render or navigate until this method returns true. */
     suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?=null,admit:()->Unit):Boolean
@@ -103,3 +112,8 @@ interface UnifiedTagChoice { val id:String; val name:String }
 interface UnifiedTagPage { val choices:List<UnifiedTagChoice>; val hasNext:Boolean }
 interface UnifiedTagSelection { val id:String; val name:String }
 class UnifiedTagUnsupported:IllegalStateException("Manual tag filter is unavailable")
+
+interface UnifiedPersonChoice { val id:String; val name:String }
+interface UnifiedPersonPage { val choices:List<UnifiedPersonChoice>; val hasNext:Boolean }
+interface UnifiedPersonSelection { val id:String; val name:String }
+class UnifiedPersonUnsupported:IllegalStateException("Manual person marker filter is unavailable")

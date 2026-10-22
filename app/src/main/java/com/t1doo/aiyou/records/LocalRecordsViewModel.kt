@@ -281,7 +281,7 @@ class LocalRecordsViewModel internal constructor(
     val tags = ManualTagController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.ManualTags(action)).isSuccess }, beforeOpen={unifiedObserver?.retire()})
     val people = ManualPeopleController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> submit(Command.ManualPeople(action)).isSuccess })
+        enqueue = { action -> submit(Command.ManualPeople(action)).isSuccess }, beforeOpen={unifiedObserver?.retire()})
     val modelConnections = ModelConnectionsController(current = { mutableState.value },
         enqueue = { action -> submit(Command.ModelConnections(action)).isSuccess },capabilityProbe=capabilityProbe)
     val favorites = RecordFavoriteController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -573,7 +573,10 @@ class LocalRecordsViewModel internal constructor(
                 previous.localProcessingAvailable!=requested.localProcessingAvailable||previous.supportsLocalProcessing!=requested.supportsLocalProcessing||
                 previous.ready!=requested.ready||previous.opening!=requested.opening||previous.error!=requested.error)||
                 observed?.tags==true&&(previous.manualTagsAvailable!=requested.manualTagsAvailable||previous.manualTagsError!=requested.manualTagsError||
-                    previous.localSearchEpoch!=requested.localSearchEpoch||!sameUnifiedManualTags(previous.manualTags,requested.manualTags))
+                    previous.localSearchEpoch!=requested.localSearchEpoch||!sameUnifiedManualTags(previous.manualTags,requested.manualTags))||
+                observed?.people==true&&(previous.manualPeopleAvailable!=requested.manualPeopleAvailable||previous.manualPeopleError!=requested.manualPeopleError||
+                    previous.manualPeopleOwner!==requested.manualPeopleOwner||previous.localSearchEpoch!=requested.localSearchEpoch||
+                    !sameUnifiedManualPeople(previous.manualPeople,requested.manualPeople))
             val proposed = if (requested.manualPeople.keys.any { id -> requested.entries.none { it.id == id } }) requested.copy(
                 manualPeople = java.util.Collections.unmodifiableMap(requested.manualPeople.filterKeys { id -> requested.entries.any { it.id == id } })) else requested
             val panel = proposed.localProcessing
@@ -1607,3 +1610,7 @@ class LocalRecordsViewModel internal constructor(
 /** ManualTagSnapshot deliberately redacts and has reference equality; compare authenticated meaning. */
 internal fun sameUnifiedManualTags(a:Map<String,com.t1doo.aiyou.model.ManualTagSnapshot>,b:Map<String,com.t1doo.aiyou.model.ManualTagSnapshot>):Boolean =
     a.size==b.size&&a.all{(id,v)->b[id]?.let{it.entryId==v.entryId&&it.version==v.version&&it.names==v.names}==true}
+
+internal fun sameUnifiedManualPeople(a:Map<String,com.t1doo.aiyou.model.ManualPeopleSnapshot>,b:Map<String,com.t1doo.aiyou.model.ManualPeopleSnapshot>):Boolean =
+    a===b||a.size==b.size&&a.all{(id,v)->b[id]?.let{it.entryId==v.entryId&&it.version==v.version&&it.names==v.names&&it.aliases==v.aliases&&
+        it.sourceRevision==v.sourceRevision&&it.sourceHash==v.sourceHash&&it.generation==v.generation}==true}

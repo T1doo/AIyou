@@ -51,7 +51,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     listOf("RecordPackageActivityCodec.kt", "SqlRecordPackageActivities.kt", "RecordPackageBinary.kt", "JcaRecordPackageCipher.kt", "RecordMediaPackageCipher.kt", "SqlRecordMediaPackageRepository.kt", "SqlCaptureRepository.kt", "SqlRecordPackageRepository.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
-    listOf("LocalSearchTokenizer.kt", "LocalSearchSqlSchema.kt", "SqlLocalSearchRepository.kt", "SqlUnifiedKeywordRepository.kt", "UnifiedManualTags.kt").forEach {
+    listOf("LocalSearchTokenizer.kt", "LocalSearchSqlSchema.kt", "SqlLocalSearchRepository.kt", "SqlUnifiedKeywordRepository.kt", "UnifiedManualTags.kt", "UnifiedManualPeople.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
     listOf("RecordFavoriteSqlSchema.kt", "SqlRecordFavoriteRepository.kt").forEach {

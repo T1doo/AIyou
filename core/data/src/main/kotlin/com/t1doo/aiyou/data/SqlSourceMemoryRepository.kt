@@ -225,14 +225,14 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
     private class KeywordScan(val receipt:KeywordReceipt,val items:List<AcceptedMemoryKeywordHit>)
     /** The guard belongs to this invocation, never to the retained proof. No global row limit. */
     internal fun keywordSet(keyword:String,checkCurrent:()->Unit)=keywordSet(keyword,UnifiedCaptureRange(),checkCurrent)
-    internal fun keywordSet(keyword:String,captureRange:UnifiedCaptureRange,checkCurrent:()->Unit,tagMatch:((RecordsSqlConnection,SourceVersion)->Boolean)?=null):KeywordSet<AcceptedMemoryKeywordHit> {
+    internal fun keywordSet(keyword:String,captureRange:UnifiedCaptureRange,checkCurrent:()->Unit,sourceMatch:((RecordsSqlConnection,SourceVersion)->Boolean)?=null):KeywordSet<AcceptedMemoryKeywordHit> {
         PreferenceKeywords.validate(keyword);require(keyword.isNotBlank())
-        val first=database.transaction{keywordScan(it,keyword,captureRange,true,checkCurrent,tagMatch)}
+        val first=database.transaction{keywordScan(it,keyword,captureRange,true,checkCurrent,sourceMatch)}
         return KeywordSet(first.items,first.items.map{it.binding.source}.distinct(),guardedCurrent={sql,guard->
-            keywordScan(sql,keyword,captureRange,false,guard,tagMatch).receipt==first.receipt
-        }) {sql->keywordScan(sql,keyword,captureRange,false,{},tagMatch).receipt==first.receipt}
+            keywordScan(sql,keyword,captureRange,false,guard,sourceMatch).receipt==first.receipt
+        }) {sql->keywordScan(sql,keyword,captureRange,false,{},sourceMatch).receipt==first.receipt}
     }
-    private fun keywordScan(sql:RecordsSqlConnection,keyword:String,captureRange:UnifiedCaptureRange,collect:Boolean,checkCurrent:()->Unit,tagMatch:((RecordsSqlConnection,SourceVersion)->Boolean)?):KeywordScan {
+    private fun keywordScan(sql:RecordsSqlConnection,keyword:String,captureRange:UnifiedCaptureRange,collect:Boolean,checkCurrent:()->Unit,sourceMatch:((RecordsSqlConnection,SourceVersion)->Boolean)?):KeywordScan {
         checkCurrent()
         val epoch=sql.query("SELECT epoch FROM local_search_epoch WHERE slot=1").single().single() as Long
         val digest=MessageDigest.getInstance("SHA-256")
@@ -275,11 +275,11 @@ internal class SqlSourceMemoryRepository(private val database: RecordsSqlDatabas
                         w.string(source.captureTimeZone,128);w.string(source.policy.name,32)
                     }
                     count=Math.addExact(count,1)
-                    val tagFits=tagMatch?.invoke(sql,sourceVersion)?:true
+                    val sourceFits=sourceMatch?.invoke(sql,sourceVersion)?:true
                     val latest=saved.versions.last()
                     if(latest.review==SourceMemoryReview.ACCEPTED){
                         val q=latest.content.reference.quote.contains(keyword);val n=latest.content.note.contains(keyword)
-                        if(tagFits&&(q||n)&&captureRange.contains(source.capturedAtMillis,source.captureTimeZone)){
+                        if(sourceFits&&(q||n)&&captureRange.contains(source.capturedAtMillis,source.captureTimeZone)){
                             if(++matched>1000)throw UnifiedKeywordTooBroad()
                             if(collect)items+=AcceptedMemoryKeywordHit(row.id,UnifiedKeywordBinding(source.source,source.sourceHash,
                                 source.generation,source.capturedAtMillis,source.captureTimeZone,source.policy),row.version,

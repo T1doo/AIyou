@@ -393,12 +393,131 @@ class UnifiedKeywordViewModelTest {
         val fresh=h.ui{it.snapshot!=null&&!it.busy};assertNotSame(h.first,fresh.snapshot);assertNull(fresh.snapshot!!.tag)
         assertEquals("淡茶",fresh.keyword);assertEquals(2,h.calls)
     }}
-    private class Harness(extra:Int=0,withMemory:Boolean=false):AutoCloseable {
-        val data=UnifiedKeywordFixture();val id=data.f.entry(text="合成淡茶")
+    @Test fun unselectedPersonChooserObservesAliasAndSourceChangesInEveryScope():Unit=runBlocking{
+        for(sourceChange in listOf(false,true))for(scope in UnifiedKeywordScope.entries)Harness(withPeople=true).use{h->
+            h.ready();val other=h.data.f.entry(text="合成不命中来源");UnifiedManualPersonSqlTest.set(h.data,other,listOf("合成他名"),listOf(ManualPersonAlias("合成别称","合成他名")))
+            h.vm.refreshLocalSearch();withTimeout(4000){h.vm.state.first{it.manualPeople[other]?.version==1L}}
+            h.vm.unifiedKeywords.open();val session=h.value().session;h.vm.unifiedKeywords.scope(session,scope);h.vm.unifiedKeywords.openPeople(session)
+            h.ui{it.personPicker&&!it.personBusy&&it.personPage!=null};assertNull(h.value().person)
+            if(sourceChange)h.data.f.revise(other,"合成新版不命中")else UnifiedManualPersonSqlTest.set(h.data,other,listOf("合成他名"),listOf(ManualPersonAlias("合成新别称","合成他名")))
+            h.vm.refreshLocalSearch();withTimeout(4000){h.vm.state.first{if(sourceChange)it.entries.any{e->e.id==other&&e.currentRevision==2}else it.manualPeople[other]?.version==2L}}
+            assertNull("Unselected person chooser must retire: $scope source=$sourceChange",h.vm.state.value.unifiedKeyword)
+            h.vm.unifiedKeywords.resume();assertNull(h.vm.state.value.unifiedKeyword)
+        }
+    }
+    @Test fun personSnapshotSemanticEqualityKeepsProofAndAliasOnlyChangeRetiresEvenEmptyResult():Unit=runBlocking{Harness(withPeople=true).use{h->
+        h.ready();UnifiedManualPersonSqlTest.set(h.data,h.id,listOf("合成甲"));h.vm.refreshLocalSearch();withTimeout(4000){h.vm.state.first{it.manualPeople[h.id]!=null}}
+        choosePerson(h,"合成甲");val session=h.value().session;h.vm.unifiedKeywords.scope(session,UnifiedKeywordScope.PREFERENCE)
+        h.vm.unifiedKeywords.keyword(session,"不存在");h.vm.unifiedKeywords.search(session);val old=h.ui{it.snapshot!=null&&!it.busy};assertTrue(old.snapshot!!.groups.isEmpty())
+        val labels=h.vm.state.value.manualPeople[h.id];h.vm.refreshLocalSearch();withTimeout(4000){h.vm.state.first{it.manualPeople[h.id]!==labels}}
+        assertSame(old.snapshot,h.value().snapshot)
+        UnifiedManualPersonSqlTest.set(h.data,h.id,listOf("合成甲"),listOf(ManualPersonAlias("合成别称","合成甲")));h.vm.refreshLocalSearch()
+        withTimeout(4000){h.vm.state.first{it.manualPeople[h.id]?.version==2L}};assertNull(h.vm.state.value.unifiedKeyword)
+    }}
+    @Test fun latePersonPageAfterRetirementCannotPopulateNewSessionOrSelectOldChoice():Unit=runBlocking{Harness(withPeople=true).use{h->
+        h.ready();UnifiedManualPersonSqlTest.set(h.data,h.id,listOf("合成甲"));h.vm.unifiedKeywords.open();val old=h.value();h.block=true;h.vm.unifiedKeywords.openPeople(old.session)
+        withTimeout(4000){h.entered.await()};assertTrue(h.value().personBusy);h.vm.unifiedKeywords.retire();h.vm.unifiedKeywords.open();val fresh=h.value();h.release.complete(Unit)
+        h.vm.unifiedKeywords.openPeople(fresh.session);val page=h.ui{it.personPage!=null&&!it.personBusy}.personPage!!
+        assertNotEquals(old.session,h.value().session);h.vm.unifiedKeywords.selectPerson(old.session,page.choices.single());assertNull(h.value().person)
+        h.vm.unifiedKeywords.closePeople(fresh.session);assertFalse(h.value().personPicker);assertNull(h.value().personPage)
+    }}
+    @Test fun confirmedReturnReauthenticatesBothFiltersAndRealPeopleEditorAdmissionRetiresSeed():Unit=runBlocking{Harness(withPeople=true).use{h->
+        h.ready();UnifiedManualPersonSqlTest.set(h.data,h.id,listOf("合成甲"));UnifiedManualTagSqlTest.set(h.data,h.id,listOf("合成标签"));h.vm.refreshLocalSearch()
+        withTimeout(4000){h.vm.state.first{it.manualPeople[h.id]!=null&&it.manualTags[h.id]!=null}}
+        choosePerson(h,"合成甲");var u=h.value();h.vm.unifiedKeywords.openTags(u.session)
+        h.vm.unifiedKeywords.selectTag(u.session,h.ui{it.tagPage!=null&&!it.tagBusy}.tagPage!!.choices.single());h.ui{it.tag!=null&&!it.tagBusy}
+        h.vm.unifiedKeywords.keyword(u.session,"淡茶");h.vm.unifiedKeywords.search(u.session);u=h.ui{it.snapshot!=null&&!it.busy}
+        val first=CompletableDeferred<Unit>();h.vm.unifiedKeywords.locate(u.session,u.visibleGroups.single().items.first()){_,confirm->assertTrue(confirm{first.complete(Unit)})};withTimeout(4000){first.await()}
+        h.vm.unifiedKeywords.close(u.session);h.vm.unifiedKeywords.resume();val fresh=h.ui{it.snapshot!=null&&!it.busy}
+        assertNotSame(u.person,fresh.person);assertNotSame(u.tag,fresh.tag);assertNotSame(u.snapshot,fresh.snapshot);assertEquals(u.person!!.id,fresh.person!!.id);assertEquals(u.tag!!.id,fresh.tag!!.id)
+        val next=CompletableDeferred<Unit>();h.vm.unifiedKeywords.locate(fresh.session,fresh.visibleGroups.single().items.first()){_,confirm->assertTrue(confirm{next.complete(Unit)})};withTimeout(4000){next.await()}
+        val source=h.vm.state.value.manualPeopleReadingSource(h.id,1);assertNotNull(source);h.vm.people.open(source!!)
+        withTimeout(4000){h.vm.state.first{it.manualPeopleEditor?.snapshot!=null&&!it.manualPeopleEditor.busy}}
+        h.vm.people.close(h.vm.state.value.manualPeopleEditor!!.session);h.vm.unifiedKeywords.resume();assertNull(h.vm.state.value.unifiedKeyword)
+    }}
+    @Test fun clearingEitherFilterDuringPendingPersonQueryKeepsRemainingConditionUsable():Unit=runBlocking{
+        for(clearPerson in listOf(false,true))Harness(withPeople=true).use{h->
+            h.ready();UnifiedManualPersonSqlTest.set(h.data,h.id,listOf("合成甲"));UnifiedManualTagSqlTest.set(h.data,h.id,listOf("合成标签"));choosePerson(h,"合成甲")
+            var u=h.value();h.vm.unifiedKeywords.openTags(u.session);h.vm.unifiedKeywords.selectTag(u.session,h.ui{it.tagPage!=null&&!it.tagBusy}.tagPage!!.choices.single());h.ui{it.tag!=null&&!it.tagBusy}
+            h.vm.unifiedKeywords.keyword(u.session,"淡茶");h.block=true;h.vm.unifiedKeywords.search(u.session);withTimeout(4000){h.entered.await()}
+            if(clearPerson)h.vm.unifiedKeywords.clearPerson(u.session)else h.vm.unifiedKeywords.clearTag(u.session)
+            assertFalse(h.value().busy);assertFalse(h.value().personBusy);assertFalse(h.value().tagBusy);assertNull(h.value().snapshot)
+            h.vm.unifiedKeywords.search(u.session);h.release.complete(Unit);u=h.ui{it.snapshot!=null&&!it.busy}
+            assertNotSame(h.first,u.snapshot);if(clearPerson){assertNull(u.person);assertNotNull(u.tag)}else{assertNotNull(u.person);assertNull(u.tag)}
+        }
+    }
+    @Test fun personUiNullHandoffStillRetiresOnObservedMetadataChange():Unit=runBlocking{HandoffFixture(withPeople=true).use{h->
+        UnifiedManualPersonSqlTest.set(h.data,h.id,listOf("合成甲"));h.controller.open();val session=h.state.get().unifiedKeyword!!.session
+        h.controller.openPeople(session);h.queue.removeFirst()(h.owner);h.controller.selectPerson(session,h.state.get().unifiedKeyword!!.personPage!!.choices.single());h.queue.removeFirst()(h.owner)
+        h.controller.scope(session,UnifiedKeywordScope.ORIGINAL);h.controller.keyword(session,"淡茶");h.controller.search(session);h.queue.removeFirst()(h.owner)
+        val u=h.state.get().unifiedKeyword!!;var navigations=0;h.block=true;h.controller.locate(session,u.visibleGroups.single().items.single()){_,confirm->confirm{navigations++}}
+        val work=async(Dispatchers.IO){h.queue.removeFirst()(h.owner)}
+        try{assertTrue(h.cleared.await(4,TimeUnit.SECONDS));val observed=h.controller.observeRetirement()!!;assertTrue(observed.people);assertTrue(observed.completeSources);h.controller.retireObserved(observed)}finally{h.release.countDown()}
+        work.await();assertEquals(0,navigations);h.controller.resume();assertNull(h.state.get().unifiedKeyword)
+    }}
+    @Test fun personGuardsKeepEntriesTagsAndPeopleMapsOutsideEveryRowCheck():Unit=runBlocking{
+        var entryReads=0;var tagReads=0;var personReads=0;var checks=0
+        fun guard(check:()->Unit):()->Unit={val a=entryReads;val b=tagReads;val c=personReads;check();assertEquals(a,entryReads);assertEquals(b,tagReads);assertEquals(c,personReads);checks++}
+        HandoffFixture(withPeople=true){actual->object:UnifiedKeywordRepository by actual{
+            override suspend fun personChoices(after:UnifiedPersonPage?,checkCurrent:()->Unit)=actual.personChoices(after,guard(checkCurrent))
+            override suspend fun selectPerson(page:UnifiedPersonPage,choice:UnifiedPersonChoice,checkCurrent:()->Unit)=actual.selectPerson(page,choice,guard(checkCurrent))
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,checkCurrent:()->Unit)=actual.search(keyword,scope,captureRange,tag,person,guard(checkCurrent))
+            override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,checkCurrent:()->Unit,admit:()->Unit)=actual.resolve(snapshot,item,guard(checkCurrent),admit)
+        }}.use{h->
+            UnifiedManualPersonSqlTest.set(h.data,h.id,listOf("合成甲"));val rows=h.state.get().entries
+            val entries=object:AbstractList<StoredEntry>(){override val size:Int get(){entryReads++;return rows.size};override fun get(index:Int):StoredEntry{entryReads++;return rows[index]}}
+            val tags=object:AbstractMap<String,ManualTagSnapshot>(){override val entries:Set<Map.Entry<String,ManualTagSnapshot>> get(){tagReads++;return emptySet()}}
+            val people=object:AbstractMap<String,ManualPeopleSnapshot>(){override val entries:Set<Map.Entry<String,ManualPeopleSnapshot>> get(){personReads++;return emptySet()}}
+            h.state.set(h.state.get().copy(entries=entries,manualTags=tags,manualPeople=people));h.controller.open();val session=h.state.get().unifiedKeyword!!.session
+            h.controller.openPeople(session);h.queue.removeFirst()(h.owner);h.controller.selectPerson(session,h.state.get().unifiedKeyword!!.personPage!!.choices.single());h.queue.removeFirst()(h.owner)
+            h.controller.keyword(session,"淡茶");h.controller.search(session);h.queue.removeFirst()(h.owner);val u=h.state.get().unifiedKeyword!!;assertNotNull(u.snapshot)
+            h.controller.locate(session,u.visibleGroups.single().items.single()){_,confirm->assertTrue(confirm{})};h.queue.removeFirst()(h.owner)
+            assertTrue(checks>20);assertTrue(entryReads>0);assertEquals(0,tagReads);assertEquals(0,personReads)
+            println("PERSON_REQUEST_GUARDS checks=$checks guardEntries=0 guardTags=0 guardPeople=0 fullBoundaryEntryReads=$entryReads")
+        }
+    }
+    @Test fun unsupportedOrConditionDroppingPersonPortNeverPublishesUnfilteredContent():Unit=runBlocking{
+        for(drop in listOf(false,true)){
+            var reads=0
+            HandoffFixture(withPeople=true){actual->
+                val legacy=object:UnifiedKeywordRepository {
+                    override suspend fun search(keyword:String,scope:UnifiedKeywordScope):UnifiedKeywordSnapshot {reads++;return actual.search(keyword,scope)}
+                    override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit)=actual.resolve(snapshot,item,admit)
+                    override suspend fun personChoices(after:UnifiedPersonPage?,checkCurrent:()->Unit)=actual.personChoices(after,checkCurrent)
+                    override suspend fun selectPerson(page:UnifiedPersonPage,choice:UnifiedPersonChoice,checkCurrent:()->Unit)=actual.selectPerson(page,choice,checkCurrent)
+                }
+                if(!drop)legacy else object:UnifiedKeywordRepository by legacy {
+                    override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,checkCurrent:()->Unit):UnifiedKeywordSnapshot {reads++;return actual.search(keyword,scope,captureRange,tag,checkCurrent)}
+                }
+            }.use{h->
+                UnifiedManualPersonSqlTest.set(h.data,h.id,listOf("合成甲"));h.controller.open();val session=h.state.get().unifiedKeyword!!.session
+                h.controller.openPeople(session);h.queue.removeFirst()(h.owner);h.controller.selectPerson(session,h.state.get().unifiedKeyword!!.personPage!!.choices.single());h.queue.removeFirst()(h.owner)
+                h.controller.keyword(session,"淡茶");h.controller.search(session);h.queue.removeFirst()(h.owner)
+                val u=h.state.get().unifiedKeyword!!;assertNull(u.snapshot);assertTrue(u.visibleGroups.isEmpty());assertNotNull(u.error)
+                assertEquals(if(drop)1 else 0,reads)
+                if(!drop)assertEquals("当前查询端口不支持人工人物标记，未显示未过滤内容。",u.error)
+            }
+        }
+    }
+    private suspend fun choosePerson(h:Harness,name:String){
+        if(h.vm.state.value.unifiedKeyword==null)h.vm.unifiedKeywords.open()
+        val session=h.value().session;h.vm.unifiedKeywords.openPeople(session)
+        val page=h.ui{it.personPage!=null&&!it.personBusy}.personPage!!;h.vm.unifiedKeywords.selectPerson(session,page.choices.single{it.name==name});h.ui{it.person!=null&&!it.personBusy}
+    }
+    private class Harness(extra:Int=0,withMemory:Boolean=false,withPeople:Boolean=false):AutoCloseable {
+        val data=UnifiedKeywordFixture(withPeople=withPeople);val id=data.f.entry(text="合成淡茶")
         val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();var block=false
         var first:UnifiedKeywordSnapshot?=null;var calls=0
         init{runBlocking{data.audio(id);repeat(extra){data.audio(data.f.entry(text="合成淡茶"))};if(withMemory)AcceptedMemoryKeywordSqlTest.memory(data,id,"备注专词")}}
         val port:UnifiedKeywordRepository=object:UnifiedKeywordRepository by data.repo{
+            override suspend fun personChoices(after:UnifiedPersonPage?,checkCurrent:()->Unit):UnifiedPersonPage {
+                val result=data.repo.personChoices(after,checkCurrent)
+                if(block){block=false;entered.complete(Unit);release.await()};return result
+            }
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+                calls++;val result=data.repo.search(keyword,scope,captureRange,tag,person,checkCurrent)
+                if(block){block=false;first=result;entered.complete(Unit);release.await()};return result
+            }
             override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
                 calls++;val result=data.repo.search(keyword,scope,captureRange,tag,checkCurrent)
                 if(block){block=false;first=result;entered.complete(Unit);release.await()};return result
@@ -418,6 +537,8 @@ class UnifiedKeywordViewModelTest {
         val owner:EntryRepository=object:EntryRepository by base,AutoCloseable{
             override val unifiedKeywords=port
             override val manualTags=data.f.tags
+            override val manualPeople=if(withPeople)data.people else null
+            override val localProcessing=if(withPeople)SqlLocalProcessingRepository(data.f.gateway)else null
             override val sourceMemories=if(withMemory)data.memories else null
             override suspend fun prepare(){check(data.f.db.read("PRAGMA user_version").single().single()==12L)}
             override fun close()=base.close()
@@ -431,8 +552,8 @@ class UnifiedKeywordViewModelTest {
     }
     /** Real repository/controller, with a publication barrier AFTER the real atomic state CAS.
      * No production-only testing hook, simulated pause is the actual retire/dispose entry. */
-    private class HandoffFixture(decorate:(UnifiedKeywordRepository)->UnifiedKeywordRepository={it}):AutoCloseable {
-        val data=UnifiedKeywordFixture();val id=data.f.entry(text="合成淡茶")
+    private class HandoffFixture(withPeople:Boolean=false,decorate:(UnifiedKeywordRepository)->UnifiedKeywordRepository={it}):AutoCloseable {
+        val data=UnifiedKeywordFixture(withPeople=withPeople);val id=data.f.entry(text="合成淡茶")
         val port=decorate(data.repo)
         val state=java.util.concurrent.atomic.AtomicReference(LocalRecordUiState(ready=true,opening=false,
             entries=listOf(com.t1doo.aiyou.model.StoredEntry(id,1,"合成淡茶",5,"UTC",com.t1doo.aiyou.model.ProcessingPolicy.LOCAL_ONLY)),unifiedKeywordOwner=port))

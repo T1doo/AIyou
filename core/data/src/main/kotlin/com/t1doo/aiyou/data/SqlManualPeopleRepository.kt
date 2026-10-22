@@ -8,6 +8,8 @@ import java.util.concurrent.CancellationException
 /** Borrowed records transaction and existing AEAD primitive, with a separate key/AAD purpose. */
 internal class SqlManualPeopleRepository(private val database: RecordsSqlDatabase, key: ByteArray) : ManualPeopleRepository {
     private val cipher = ManualTagCipher(key, ManualLabelPurpose.PEOPLE)
+    private val valueIds=ManualPersonValueIds(key)
+    internal fun valueId(name:String)=valueIds.id(name)
     override fun read(entryId: String): ManualPeopleSnapshot = safe { database.transaction { readWithin(it, entryId) } }
     internal fun readWithin(sql: RecordsSqlConnection, id: String): ManualPeopleSnapshot {
         ManualTags.identifier(id)
@@ -55,7 +57,7 @@ internal class SqlManualPeopleRepository(private val database: RecordsSqlDatabas
             listOf(id, mutation, cipher.sealPeople(id, 1, mutation, names, aliases)))
         check(readWithin(sql, id).let { it.names == names && it.aliases == aliases })
     }
-    fun wipeKey() = cipher.wipe()
+    fun wipeKey() {cipher.wipe();valueIds.wipe()}
     private inline fun <T> safe(block: () -> T): T = try { block() }
         catch (e: CancellationException) { throw e }
         catch (e: ManualPeopleConflict) { throw e }

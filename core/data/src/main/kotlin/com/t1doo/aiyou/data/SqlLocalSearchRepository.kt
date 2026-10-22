@@ -197,7 +197,14 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         return ids
     }
 
-    override fun candidates(request: LocalSearchRequest): LocalSearchSnapshot = safely {
+    override fun candidates(request: LocalSearchRequest): LocalSearchSnapshot = candidates(request,true)
+    /** Unified lookup retains only body-literal hits. Its authenticated person corpus is checked
+     * by the same owner before/after this read; unrelated alias recall is not a match budget. */
+    internal fun literalPersonCandidates(request:LocalSearchRequest):LocalSearchSnapshot {
+        require(request.person!=null)
+        return candidates(request,false)
+    }
+    private fun candidates(request:LocalSearchRequest,includeAliasCandidates:Boolean):LocalSearchSnapshot = safely {
         val profile = activeProfile()
         if (request.query.length > 100_000) throw LocalSearchInvalid()
         val from = date(request.from); val through = date(request.through)
@@ -220,7 +227,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             val imageCondition = if (request.onlyImages) " AND EXISTS(SELECT 1 FROM attachments p " +
                 "WHERE p.entryId=e.id AND p.revision=e.currentRevision AND p.mediaType IN ('image/png','image/jpeg'))" else ""
             val budget = Budget()
-            val aliasIds = aliasCandidates(sql, request, from, through, budget, favoriteCondition, imageCondition)
+            val aliasIds = if(includeAliasCandidates)aliasCandidates(sql, request, from, through, budget, favoriteCondition, imageCondition)else emptySet()
             val expression = LocalSearchTokenizer.query(request.query, request.exact)
             val condition = if (expression == null || stamp.version != 1 || stamp.profile != profile) "" else
                 " AND (" + valid(stamp.epoch, profile) + "=0 OR e.id IN (SELECT entryId FROM local_search_fts WHERE local_search_fts MATCH ?)" +
@@ -243,12 +250,14 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                     if ((from != null && selectedDate < from) || (through != null && selectedDate > through)) continue
                     // Authenticate real tags even for body-only queries; corrupted rows are never skipped as misses.
                     val tag = tags.readWithin(sql, id)
-                    tag.names.forEach(budget::add)
+                    if(includeAliasCandidates)tag.names.forEach(budget::add)
                     if (request.tag != null && request.tag !in tag.names) continue
                     val person = if (personValues != null) checkNotNull(people).readWithin(sql, id) else null
-                    person?.names?.forEach(budget::add)
-                    person?.aliases?.forEach { budget.add(it.alias); budget.add(it.name) }
+                    if(includeAliasCandidates){person?.names?.forEach(budget::add)
+                        person?.aliases?.forEach { budget.add(it.alias); budget.add(it.name) }}
                     if (request.person != null && request.person !in checkNotNull(person).names) continue
+                    if(!includeAliasCandidates){tag.names.forEach(budget::add);person?.names?.forEach(budget::add)
+                        person?.aliases?.forEach { budget.add(it.alias); budget.add(it.name) }}
                     val bound = read(sql, id, request.onlyImages) ?: throw LocalSearchStale()
                     budget.add(bound.entry.originalText)
                     bindings += bound

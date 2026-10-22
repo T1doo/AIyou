@@ -75,6 +75,7 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
 /** The exact production body also feeds native render evidence; it has no storage/lifecycle owner. */
 @Composable fun UnifiedKeywordContent(u:UnifiedKeywordUi,c:UnifiedKeywordController,canUse:()->Boolean,
     onLocate:(UnifiedKeywordEvidence,UnifiedKeywordHandoff)->Unit,listState:LazyListState=rememberLazyListState()){
+    if(u.personPicker){UnifiedPersonChooser(u,c,canUse);return}
     if(u.tagPicker){UnifiedTagChooser(u,c,canUse);return}
     var menu by remember{mutableStateOf(false)}
     Surface(Modifier.fillMaxWidth().padding(12.dp).fillMaxHeight(0.94f),shape=MaterialTheme.shapes.large){
@@ -100,16 +101,25 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
                             Text("所属原件的人工标签",style=MaterialTheme.typography.titleSmall)
                             Text("与关键词、捕获日期共同筛选，不改变原件或标签。",style=MaterialTheme.typography.bodySmall)
                             Text(u.tag?.name?:"不限标签",modifier=Modifier.testTag("unified-tag-selected"))
-                            OutlinedButton({if(canUse())c.openTags(u.session)},enabled=!u.busy&&!u.tagBusy,
+                            OutlinedButton({if(canUse())c.openTags(u.session)},enabled=!u.busy&&!u.tagBusy&&!u.personBusy,
                                 modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tags-open")){Text("选择人工标签")}
                             if(u.tag!=null)TextButton({if(canUse())c.clearTag(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tag-clear")){Text("不限标签")}
                             if(u.tagBusy)Text("正在重新核对人工标签。",Modifier.testTag("unified-tag-status"))
                             if(u.tagError!=null)Text(u.tagError,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("unified-tag-error"))
+                            HorizontalDivider()
+                            Text("所属原件的人工人物标记",style=MaterialTheme.typography.titleSmall)
+                            Text("按人工标记名筛选；同名不代表同一人。别名仅在原件内有效。",style=MaterialTheme.typography.bodySmall)
+                            Text(u.person?.name?:"不限人物标记",modifier=Modifier.testTag("unified-person-selected"))
+                            OutlinedButton({if(canUse())c.openPeople(u.session)},enabled=!u.busy&&!u.tagBusy&&!u.personBusy,
+                                modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-people-open")){Text("选择人工人物标记")}
+                            if(u.person!=null)TextButton({if(canUse())c.clearPerson(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-person-clear")){Text("不限人物标记")}
+                            if(u.personBusy)Text("正在重新核对人工人物标记。",Modifier.testTag("unified-person-status"))
+                            if(u.personError!=null)Text(u.personError,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("unified-person-error"))
                         }
                     }
                 }
                 item{
-                    FilledTonalButton({if(canUse())c.search(u.session)},enabled=!u.busy&&!u.tagBusy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-search")){Text("查找当前内容")}
+                    FilledTonalButton({if(canUse())c.search(u.session)},enabled=!u.busy&&!u.tagBusy&&!u.personBusy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-search")){Text("查找当前内容")}
                     TextButton({if(canUse())c.clear(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-clear")){Text("清空查询和结果")}
                     TextButton({if(canUse())c.close(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-close")){Text("返回回忆时间线")}
                     when{u.busy->Text("正在认证所选内容与原件。",Modifier.testTag("unified-status"))
@@ -156,6 +166,28 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
                 TextButton({if(canUse())c.loadTags(u.session)},enabled=!u.tagBusy,modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tags-first")){Text(if(u.tagError!=null)"重新核对标签"else"重新查看第一页")}
                 if(u.tagPage?.hasNext==true)FilledTonalButton({if(canUse())c.loadTags(u.session,true)},enabled=!u.tagBusy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tags-next")){Text("下一页标签")}
                 TextButton({if(canUse())c.closeTags(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tags-cancel")){Text("取消选择，返回查询")}
+            }
+        }
+    }
+}
+
+@Composable private fun UnifiedPersonChooser(u:UnifiedKeywordUi,c:UnifiedKeywordController,canUse:()->Boolean){
+    Surface(Modifier.fillMaxWidth().padding(12.dp).fillMaxHeight(0.94f),shape=MaterialTheme.shapes.large){
+        LazyColumn(Modifier.padding(12.dp).testTag("unified-person-options"),verticalArrangement=Arrangement.spacedBy(8.dp)){
+            item {
+                Text("选择人工人物标记",style=MaterialTheme.typography.titleLarge)
+                Text("按所属原件的人工人物标记筛选。同名不代表同一人，别名只在原件内有效。选择后仍需主动查找。")
+                if(u.personBusy)Text("正在完整核对人物标记与来源。",Modifier.testTag("unified-person-status"))
+                else if(u.personError!=null)Text(u.personError,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("unified-person-error"))
+                else if(u.personPage?.choices?.isEmpty()==true)Text("当前没有可选的人工人物标记。",Modifier.testTag("unified-people-empty"))
+            }
+            if(!u.personBusy&&u.personError==null)items(u.personPage?.choices.orEmpty(),key={it.id}){choice->
+                OutlinedButton({if(canUse())c.selectPerson(u.session,choice)},shape=MaterialTheme.shapes.medium,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-person-choice:"+choice.id)){Text(choice.name)}
+            }
+            item {
+                TextButton({if(canUse())c.loadPeople(u.session)},enabled=!u.personBusy,modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-people-first")){Text(if(u.personError!=null)"重新核对人物标记"else"重新查看第一页")}
+                if(u.personPage?.hasNext==true)FilledTonalButton({if(canUse())c.loadPeople(u.session,true)},enabled=!u.personBusy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-people-next")){Text("下一页人物标记")}
+                TextButton({if(canUse())c.closePeople(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-people-cancel")){Text("取消选择，返回查询")}
             }
         }
     }

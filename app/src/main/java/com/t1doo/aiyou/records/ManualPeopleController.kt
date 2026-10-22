@@ -47,6 +47,7 @@ class ManualPeopleController internal constructor(
     private val current: () -> LocalRecordUiState,
     private val publish: ((LocalRecordUiState) -> LocalRecordUiState) -> Unit,
     private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
+    private val beforeOpen:()->Unit = {},
 ) {
     private val sessions = AtomicLong()
     @Volatile private var disposed = false
@@ -63,6 +64,7 @@ class ManualPeopleController internal constructor(
         val local = current()
         if (disposed || !source.same(local.manualPeopleReadingSource(id, revision)) || local.recordPackage != null ||
             local.recycleBin != null || local.sourceMemories != null || local.saving || local.savePending) return
+        beforeOpen()
         val editor = ManualPeopleEditor(sessions.incrementAndGet(), id, revision, busy = true, owner = source.owner,
             sourceHash = source.contentHash, sourceGeneration = source.generation)
         publish { latest -> if (!disposed && source.same(latest.manualPeopleReadingSource(id, revision)))
