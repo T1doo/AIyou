@@ -78,6 +78,8 @@ data class LocalRecordUiState(
     val supportsCandidates: Boolean = false,
     val supportsSourceTags: Boolean = false,
     val sourceTags: SourceTagUiState? = null,
+    val unifiedKeywordOwner:com.t1doo.aiyou.domain.UnifiedKeywordRepository?=null,
+    val unifiedKeyword:UnifiedKeywordUi?=null,
     val supportsAudioTranscripts:Boolean=false,
     val audioTranscripts:AudioTranscriptUi?=null,
     val supportsImageTexts:Boolean=false,
@@ -300,6 +302,7 @@ class LocalRecordsViewModel internal constructor(
         { action -> submit(Command.MemoryInbox(action)).isSuccess })
     val sourceMemories = SourceMemoryController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock = clock)
+    val unifiedKeywords=UnifiedKeywordController({mutableState.value},{change->update(change)},{action->submit(Command.LocalCandidates(action)).isSuccess})
     val audioTranscripts=AudioTranscriptController({mutableState.value},{change->update(change)},{action->submit(Command.LocalCandidates(action)).isSuccess},clock,::sourceUi)
     val imageTexts=ImageTextController({mutableState.value},{change->update(change)},{action->submit(Command.LocalCandidates(action)).isSuccess},clock,imageTextRecognizer,::sourceUi,canOpen={intent->
         val panel=attachments.state.value
@@ -522,7 +525,7 @@ class LocalRecordsViewModel internal constructor(
                 reminders.dispose()
                 candidates.dispose()
                 sourceTags.dispose()
-                sourceMemories.dispose(); memoryInbox.dispose(); sourcePreferences.dispose();audioTranscripts.dispose();imageTexts.dispose()
+                unifiedKeywords.dispose(); sourceMemories.dispose(); memoryInbox.dispose(); sourcePreferences.dispose();audioTranscripts.dispose();imageTexts.dispose()
                 exports.dispose()
                 recordPackages.dispose()
                 recycleBin.dispose()
@@ -578,9 +581,11 @@ class LocalRecordsViewModel internal constructor(
             val candidate=if(transcript!=null&&(editsDisposed||!preference.canRetainTranscripts(transcript)))preference.copy(audioTranscripts=null)else preference
             val pictureText=candidate.imageTexts
             val imageCandidate=if(pictureText!=null&&(editsDisposed||!candidate.canRetainImageTexts(pictureText)))candidate.copy(imageTexts=null)else candidate
-            val transformed = if (imageCandidate.supportsFavorites && imageCandidate.favoritesAvailable &&
-                imageCandidate.entries.any { !imageCandidate.favorites.containsKey(it.id) }) imageCandidate.copy(
-                    favoritesAvailable = false, favoritesError = "记录列表已变化，请重新读取收藏状态。") else imageCandidate
+            val unified=imageCandidate.unifiedKeyword
+            val unifiedCandidate=if(unified!=null&&(editsDisposed||!imageCandidate.canRetainUnified(unified)))imageCandidate.copy(unifiedKeyword=null)else imageCandidate
+            val transformed = if (unifiedCandidate.supportsFavorites && unifiedCandidate.favoritesAvailable &&
+                unifiedCandidate.entries.any { !unifiedCandidate.favorites.containsKey(it.id) }) unifiedCandidate.copy(
+                    favoritesAvailable = false, favoritesError = "记录列表已变化，请重新读取收藏状态。") else unifiedCandidate
             val eventSource = if (transformed.supportsEventDates && transformed.eventDatesAvailable &&
                 transformed.entries.any { !transformed.eventDates.containsKey(it.id) }) transformed.copy(
                     eventDatesAvailable = false, eventDatesError = "记录列表已变化，请重新读取事件日期。") else transformed
@@ -1353,6 +1358,7 @@ class LocalRecordsViewModel internal constructor(
                 supportsMixedCapture = store.captureRecords != null,
                 supportsCandidates = store.localCandidates != null,
                 supportsSourceTags = store.sourceTags != null,
+                unifiedKeywordOwner=store.unifiedKeywords,
                 supportsAudioTranscripts=store.audioTranscripts!=null,
                 supportsImageTexts=store.imageTexts!=null,
                 supportsSourcePreferences = store.sourcePreferences != null,
@@ -1534,7 +1540,7 @@ class LocalRecordsViewModel internal constructor(
         reminders.dispose()
         candidates.dispose()
         sourceTags.dispose()
-        sourceMemories.dispose(); memoryInbox.dispose(); sourcePreferences.dispose()
+        unifiedKeywords.dispose(); sourceMemories.dispose(); memoryInbox.dispose(); sourcePreferences.dispose()
         exports.dispose()
         recordPackages.dispose()
         recycleBin.dispose()

@@ -79,6 +79,18 @@ internal class SqlAudioTranscriptRepository(private val database:RecordsSqlDatab
         val all=live(sql);val matched=all.filter{!it.second.withdrawn&&it.second.history.last().text.contains(keyword)}.filter{cursor==null||it.first.created<cursor.createdAtMillis||it.first.created==cursor.createdAtMillis&&it.first.id>cursor.id};val selected=matched.take(20)
         return Page(keyword,cursor,if(matched.size>20)selected.last().first.let{PreferenceCursor(it.created,it.id)}else null,selected.map{snapshot(it.first,it.second)},all.map{it.first.id+":"+it.first.version+":"+hash(it.first.bytes)})
     }
+    internal suspend fun keywordSet(keyword:String):KeywordSet<AudioTranscriptSnapshot> {
+        val initial=search(keyword,null) as Page
+        return database.transaction { sql ->
+            val all=live(sql)
+            if(all.map{it.first.id+":"+it.first.version+":"+hash(it.first.bytes)}!=initial.signatures)throw AudioTranscriptConflict()
+            val items=ArrayList<AudioTranscriptSnapshot>();var cursor:PreferenceCursor?=null
+            do {val p=page(sql,keyword,cursor);items.addAll(p.items);cursor=p.next}while(cursor!=null)
+            KeywordSet(items,all.map{it.second.anchor.source}) { current ->
+                page(current,keyword,null).signatures==initial.signatures
+            }
+        }
+    }
     override suspend fun resolve(page:AudioTranscriptPage,item:AudioTranscriptSnapshot?,publish:()->Unit):Boolean = safe {
         val p=page as? Page?:return@safe false;if(p.owner!==this||item!=null&&p.items.none{it===item})return@safe false
         val fresh=search(p.keyword,p.cursor) as Page

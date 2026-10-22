@@ -105,6 +105,7 @@ fun LocalRecordsScreen(
     onOpenRecycleBin: (() -> Unit)? = null,
     onBeginRecordPackage: (() -> Unit)? = null,
     onOpenFactRecap: (() -> Unit)? = null,
+    onOpenUnified:(()->Unit)?=null,
     onOpenTranscripts:(()->Unit)?=null,
     onOpenPreferences: (() -> Unit)? = null,
     onOpenMemoryInbox: (() -> Unit)? = null,
@@ -281,11 +282,13 @@ fun LocalRecordsScreen(
                         (onOpenRecycleBin != null && local.supportsRecycleBin) ||
                         (onBeginRecordPackage != null && local.supportsRecordPackages) ||
                         (onOpenFactRecap != null && local.supportsFactRecaps) ||
+                        (onOpenUnified != null && local.unifiedKeywordOwner!=null) ||
                         (onOpenTranscripts != null && local.supportsAudioTranscripts) ||
                         (onOpenImageTexts != null && local.supportsImageTexts) ||
                         (onOpenPreferences != null && local.supportsSourcePreferences) ||
                         ((onOpenMemoryInbox != null || onOpenAcceptedMemories != null) && local.supportsMemoryInbox))) {
                         Column(Modifier.fillMaxWidth()) {
+                            if(onOpenUnified!=null && local.unifiedKeywordOwner!=null)OutlinedButton(onOpenUnified,enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("unified-open")){Text("统一关键词找回")}
                             if(onOpenImageTexts!=null && local.supportsImageTexts)OutlinedButton(onOpenImageTexts,enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("image-texts-open")){Text("找回图片文字与原图")}
                             if(imageTextBusy)Text("上一图片提取仍在结束，文字入口等待资源释放。")
                             if(onOpenTranscripts!=null && local.supportsAudioTranscripts)OutlinedButton(onOpenTranscripts,enabled=local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("transcripts-open")){Text("找回人工转写与原音")}

@@ -220,6 +220,11 @@ for label, folder, minimum in targets:
             "narrowInboxReachesExactOriginalAndRequiresSeparateExistingAcceptanceAtDoubleFont",
             "failedReadAndRestorationHidePrivateResultsAndRetireRetainedPageCallbacks",
             "acceptedMemoriesAreReachableAtDoubleFontAndDisappearOnlyAfterSeparateRevocationConfirmation")
+        additional["com.t1doo.aiyou.UnifiedKeywordPresentationTest"] = (
+            "doubleFontFourTypedResultsOpenExactOriginalAndPreferenceThenRequeryWithoutChangingSources",
+            "literalNoResultClearAndRestoreNeverSaveQueryOrRetainOldSession",
+            "restoredExactImageProofRetiresAPanelBeforeBLookupAndRejectsRetainedAAction",
+        )
         additional["com.t1doo.aiyou.ImageTextPresentationTest"] = (
             "unavailableModelAndAiNoneNeverInferCreateManualReplacementOrChangeOriginal",
             "doubleFontControlledExtractionCorrectionKeywordJumpAndConfirmedDeletionReachExactOriginal",

@@ -274,41 +274,49 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         verify(snapshot, entryId) { publish(checkNotNull(it)) }
 
     private fun verify(snapshot: LocalSearchSnapshot, entryId: String?, publish: (StoredEntry?) -> Unit): Boolean {
-        val proof = snapshot as? Proof ?: return false
-        if (proof.owner !== this || (entryId != null && proof.bindings.none { it.entry.id == entryId })) return false
+        val proof=snapshot as? Proof ?: return false
+        if(proof.owner!==this || entryId!=null && proof.bindings.none{it.entry.id==entryId})return false
         return safely {
-            if (activeProfile() != proof.runtime) return@safely false
-            database.transaction { sql ->
-            if (epochWithin(sql) != proof.stamp) return@transaction false
-            // Attachment inserts/changes do not advance the text index epoch. Recompute this bounded
-            // candidate scope under the same write lease, including empty→nonempty membership.
-            if (proof.imageRequest != null && (candidates(proof.imageRequest) as Proof).bindings != proof.bindings)
-                return@transaction false
-            var selected: StoredEntry? = null
-            for (before in proof.bindings) {
-                val current = read(sql, before.entry.id, before.images != null) ?: return@transaction false
-                if (current != before) return@transaction false
-                val tag = tags.readWithin(sql, before.entry.id)
-                val previousTag = proof.tags[before.entry.id] ?: return@transaction false
-                if (tag.entryId != previousTag.entryId || tag.version != previousTag.version ||
-                    tag.names != previousTag.names) return@transaction false
-                proof.eventDates?.let { values ->
-                    val previous = values[before.entry.id] ?: return@transaction false
-                    val currentEvent = eventDateStorage.readWithin(sql,before.entry.id)
-                    if (previous.version != currentEvent.version || previous.date != currentEvent.date) return@transaction false
-                }
-                proof.people?.let { values ->
-                    val old = checkNotNull(values[before.entry.id])
-                    val now = checkNotNull(people).readWithin(sql, before.entry.id)
-                    if (old.version != now.version || old.names != now.names || old.aliases != now.aliases || old.sourceRevision != now.sourceRevision ||
-                        old.sourceHash != now.sourceHash || old.generation != now.generation) return@transaction false
-                }
-                if (entryId == before.entry.id) selected = current.entry
+            if(activeProfile()!=proof.runtime)return@safely false
+            database.transaction { verifyWithin(it,snapshot,entryId,publish) }
+        }
+    }
+
+    internal fun keywordCurrentWithin(sql:RecordsSqlConnection,snapshot:LocalSearchSnapshot):Boolean =
+        verifyWithin(sql,snapshot,null) {}
+
+    private fun verifyWithin(sql:RecordsSqlConnection,snapshot:LocalSearchSnapshot,entryId:String?,publish:(StoredEntry?)->Unit):Boolean {
+        val proof=snapshot as? Proof ?: return false
+        if(proof.owner!==this || entryId!=null && proof.bindings.none {it.entry.id==entryId} || activeProfile()!=proof.runtime)return false
+        if (epochWithin(sql) != proof.stamp) return false
+        // Attachment inserts/changes do not advance the text index epoch. Recompute this bounded
+        // candidate scope under the same write lease, including empty→nonempty membership.
+        if (proof.imageRequest != null && (candidates(proof.imageRequest) as Proof).bindings != proof.bindings)
+            return false
+        var selected: StoredEntry? = null
+        for (before in proof.bindings) {
+            val current = read(sql, before.entry.id, before.images != null) ?: return false
+            if (current != before) return false
+            val tag = tags.readWithin(sql, before.entry.id)
+            val previousTag = proof.tags[before.entry.id] ?: return false
+            if (tag.entryId != previousTag.entryId || tag.version != previousTag.version ||
+                tag.names != previousTag.names) return false
+            proof.eventDates?.let { values ->
+                val previous = values[before.entry.id] ?: return false
+                val currentEvent = eventDateStorage.readWithin(sql,before.entry.id)
+                if (previous.version != currentEvent.version || previous.date != currentEvent.date) return false
             }
-            // The actual owner/CAS callback executes before releasing this counted write transaction.
-            publish(selected)
-            true
-        } }
+            proof.people?.let { values ->
+                val old = checkNotNull(values[before.entry.id])
+                val now = checkNotNull(people).readWithin(sql, before.entry.id)
+                if (old.version != now.version || old.names != now.names || old.aliases != now.aliases || old.sourceRevision != now.sourceRevision ||
+                    old.sourceHash != now.sourceHash || old.generation != now.generation) return false
+            }
+            if (entryId == before.entry.id) selected = current.entry
+        }
+        // The actual owner/CAS callback executes before releasing this counted write transaction.
+        publish(selected)
+        return true
     }
 
     private fun read(sql: RecordsSqlConnection, id: String, onlyImages: Boolean = false): Binding? {

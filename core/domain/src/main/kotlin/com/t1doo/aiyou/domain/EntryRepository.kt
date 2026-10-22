@@ -31,6 +31,7 @@ interface EntryRepository {
     val favorites: RecordFavoriteRepository? get() = null
     val eventDates: RecordEventDateRepository? get() = null
     val permanentErasure: PermanentErasureRepository? get() = null
+    val unifiedKeywords: UnifiedKeywordRepository? get() = null
     val localSearch: LocalSearchRepository? get() = null
     val fullBackups: FullBackupRepository? get() = null
     val mediaPackages: RecordMediaPackageRepository? get() = null

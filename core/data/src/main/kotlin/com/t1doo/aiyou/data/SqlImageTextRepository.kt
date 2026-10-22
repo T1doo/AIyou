@@ -114,6 +114,18 @@ internal class SqlImageTextRepository(private val database:RecordsSqlDatabase,ke
         val all=live(sql);val matched=all.filter{it.second.history.last().text.contains(keyword)}.filter{cursor==null||it.first.created<cursor.createdAtMillis||it.first.created==cursor.createdAtMillis&&it.first.id>cursor.id};val selected=matched.take(20)
         return Page(keyword,cursor,if(matched.size>20)selected.last().first.let{PreferenceCursor(it.created,it.id)}else null,selected.map{snapshot(it.first,it.second)},signatures(all))
     }
+    internal suspend fun keywordSet(keyword:String):KeywordSet<ImageTextSnapshot> {
+        val initial=search(keyword,null) as Page
+        return database.transaction { sql ->
+            val all=live(sql)
+            if(signatures(all)!=initial.signatures)throw ImageTextConflict()
+            val items=ArrayList<ImageTextSnapshot>();var cursor:PreferenceCursor?=null
+            do {val p=page(sql,keyword,cursor);items.addAll(p.items);cursor=p.next}while(cursor!=null)
+            KeywordSet(items,all.map{it.second.anchor.source}) { current ->
+                page(current,keyword,null).signatures==initial.signatures
+            }
+        }
+    }
     override suspend fun resolve(page:ImageTextPage,item:ImageTextSnapshot?,publish:()->Unit):Boolean = safe {
         val p=page as? Page?:return@safe false;if(p.owner!==this||item!=null&&p.items.none{it===item})return@safe false
         val fresh=search(p.keyword,p.cursor) as Page;if(p.signatures!=fresh.signatures||p.next!=fresh.next)return@safe false

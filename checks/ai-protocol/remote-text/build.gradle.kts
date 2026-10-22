@@ -50,7 +50,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     listOf("RecordPackageActivityCodec.kt", "SqlRecordPackageActivities.kt", "RecordPackageBinary.kt", "JcaRecordPackageCipher.kt", "RecordMediaPackageCipher.kt", "SqlRecordMediaPackageRepository.kt", "SqlCaptureRepository.kt", "SqlRecordPackageRepository.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
-    listOf("LocalSearchTokenizer.kt", "LocalSearchSqlSchema.kt", "SqlLocalSearchRepository.kt").forEach {
+    listOf("LocalSearchTokenizer.kt", "LocalSearchSqlSchema.kt", "SqlLocalSearchRepository.kt", "SqlUnifiedKeywordRepository.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
     listOf("RecordFavoriteSqlSchema.kt", "SqlRecordFavoriteRepository.kt").forEach {
@@ -94,7 +94,7 @@ val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
     from("../../../app/src/main/java/com/t1doo/aiyou/records/OriginalAudioOutput.kt")
     listOf("ControlledCaptureAudio.kt", "MixedCaptureController.kt", "LocalOriginalSearchController.kt", "LocalOriginalSearchMatcher.kt", "RecordPackageController.kt", "RecordPackageIo.kt", "RecycleBinController.kt", "OriginalExportController.kt", "OriginalExportIo.kt", "ManualTaskController.kt", "ManualTagController.kt", "RecordFavoriteController.kt", "LocalRecordsViewModel.kt", "OriginalEditUiState.kt", "OriginalHistoryUiState.kt",
         "LocalAttachmentController.kt", "PngPayloadValidator.kt", "JpegPayloadValidator.kt",
-        "LocalRecordAiController.kt", "RecordAiCapability.kt", "RecordAiUiState.kt", "LocalCandidateController.kt", "SourceTagController.kt", "SourceMemoryController.kt", "SourceMemoryInboxController.kt", "SourcePreferenceController.kt", "AudioTranscriptController.kt", "ImageTextController.kt").forEach { name ->
+        "LocalRecordAiController.kt", "RecordAiCapability.kt", "RecordAiUiState.kt", "LocalCandidateController.kt", "SourceTagController.kt", "SourceMemoryController.kt", "SourceMemoryInboxController.kt", "SourcePreferenceController.kt", "UnifiedKeywordController.kt", "OriginalSearchPreview.kt", "AudioTranscriptController.kt", "ImageTextController.kt").forEach { name ->
         from("../../../app/src/main/java/com/t1doo/aiyou/records/$name")
     }
     into(vmProduction)

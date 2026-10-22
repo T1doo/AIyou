@@ -165,6 +165,16 @@ internal class SqlSourcePreferenceRepository(private val database: RecordsSqlDat
         return Page(PreferenceReview.ACCEPTED,cursor,if(matches.size>20)selected.last().row.let {PreferenceCursor(it.created,it.id)} else null,
             selected.map {snapshot(it.row,it.payload)},all.map {it.row.id+":"+it.row.version+":"+hash(it.row.bytes)},keyword)
     }
+    internal fun keywordSet(keyword:String):KeywordSet<SourcePreferenceSnapshot> {
+        PreferenceKeywords.validate(keyword)
+        return database.transaction { sql ->
+            val first=searchAccepted(sql,keyword,null)
+            val all=live(sql);validateGraph(all)
+            val items=ArrayList<SourcePreferenceSnapshot>();var cursor:PreferenceCursor?=null
+            do {val p=searchAccepted(sql,keyword,cursor);items.addAll(p.items);cursor=p.next}while(cursor!=null)
+            KeywordSet(items,all.map{it.row.source}) { current -> searchAccepted(current,keyword,null).signatures==first.signatures }
+        }
+    }
     override fun resolve(page:PreferencePage,item:SourcePreferenceSnapshot?,publish:()->Unit):Boolean = safe {
         val p=page as? Page ?: return@safe false
         if(p.owner!==this || item!=null && p.items.none { it===item })return@safe false

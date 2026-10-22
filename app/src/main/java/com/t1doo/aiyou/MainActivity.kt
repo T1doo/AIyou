@@ -195,7 +195,7 @@ class MainActivity : ComponentActivity() {
                 favorites = records.favorites, eventDates = records.eventDates,
                 candidates = records.candidates,
                 sourceTags = records.sourceTags, people = records.people, modelConnections = records.modelConnections,
-                sourceMemories = records.sourceMemories, memoryInbox = records.memoryInbox, sourcePreferences = records.sourcePreferences, audioTranscripts=records.audioTranscripts, imageTexts=records.imageTexts,
+                sourceMemories = records.sourceMemories, memoryInbox = records.memoryInbox, sourcePreferences = records.sourcePreferences, audioTranscripts=records.audioTranscripts, imageTexts=records.imageTexts, unifiedKeywords=records.unifiedKeywords,
                 sourceTasks = records.sourceTasks,
                 taskProposals = records.taskProposals,
                 reminders = records.reminders,
@@ -213,7 +213,7 @@ class MainActivity : ComponentActivity() {
                     accessIdle && access.retirementReady(id)) })
     }
     override fun onResume() { super.onResume(); packageRecords?.audioForeground(true);packagePicker?.resumed() }
-    override fun onPause() { packageRecords?.audioForeground(false);packageRecords?.state?.value?.sourcePreferences?.let { packageRecords?.sourcePreferences?.close(it.session) };packageRecords?.state?.value?.memoryInbox?.let { packageRecords?.memoryInbox?.close(it.session) }; packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); packageRecords?.state?.value?.audioTranscripts?.let{packageRecords?.audioTranscripts?.close(it.session)};packageRecords?.state?.value?.imageTexts?.let{packageRecords?.imageTexts?.close(it.session)}; super.onPause() }
+    override fun onPause() { packageRecords?.unifiedKeywords?.retire(); packageRecords?.audioForeground(false);packageRecords?.state?.value?.sourcePreferences?.let { packageRecords?.sourcePreferences?.close(it.session) };packageRecords?.state?.value?.memoryInbox?.let { packageRecords?.memoryInbox?.close(it.session) }; packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); packageRecords?.state?.value?.audioTranscripts?.let{packageRecords?.audioTranscripts?.close(it.session)};packageRecords?.state?.value?.imageTexts?.let{packageRecords?.imageTexts?.close(it.session)}; super.onPause() }
     override fun onSaveInstanceState(outState: Bundle) { packagePicker?.save(outState); super.onSaveInstanceState(outState) }
     override fun onDestroy() {
         reminderClicks.clear()
@@ -342,8 +342,11 @@ fun AIyouApp(
     appAccessSettings: (@Composable () -> Unit)? = null,
     reminderNavigation:Long=0,
     onNavigationGenerationChanged:(Long?)->Unit={},
+    unifiedKeywords:com.t1doo.aiyou.records.UnifiedKeywordController?=null,
     imageTexts:com.t1doo.aiyou.records.ImageTextController?=null,
 ) {
+    val currentUnifiedController by rememberUpdatedState(unifiedKeywords)
+    val currentUnifiedState by rememberUpdatedState(local?.unifiedKeyword)
     val currentNavigationCallback by rememberUpdatedState(onNavigationGenerationChanged)
     val currentAudioRouteCallback by rememberUpdatedState(onAudioRouteChanged)
     val currentAttachments by rememberUpdatedState(attachments)
@@ -351,7 +354,8 @@ fun AIyouApp(
     val currentImageTextSnapshot by rememberUpdatedState(local?.imageTexts)
     val currentImageTextRecords by rememberUpdatedState(currentRecords)
     val imageTextBusy=imageTexts?.inFlight?.collectAsState()?.value==true
-    val navigation = remember { NavigationOwner{(currentImageTextRecords?.invoke()?.imageTexts?:currentImageTextSnapshot)?.let{currentImageTextController?.close(it.session)};currentAudioRouteCallback();currentAttachments?.state?.value?.takeIf{panel->panel.focusedIntent!=null}?.let{panel->currentAttachments?.retireFocusedSource(panel.sessionId)};currentNavigationCallback(it)} }
+    val navigation = remember { NavigationOwner{currentUnifiedState?.let{currentUnifiedController?.close(it.session)};(currentImageTextRecords?.invoke()?.imageTexts?:currentImageTextSnapshot)?.let{currentImageTextController?.close(it.session)};currentAudioRouteCallback();currentAttachments?.state?.value?.takeIf{panel->panel.focusedIntent!=null}?.let{panel->currentAttachments?.retireFocusedSource(panel.sessionId)};currentNavigationCallback(it)} }
+    DisposableEffect(unifiedKeywords){onDispose{unifiedKeywords?.retire()}}
     DisposableEffect(audioPlayback) { onDispose { audioPlayback?.stop() } }
     DisposableEffect(navigation) { onDispose { navigation.active = false;currentNavigationCallback(null) } }
     SideEffect {currentNavigationCallback(navigation.generation)}
@@ -376,6 +380,7 @@ fun AIyouApp(
     var taskSourceRoute by remember { mutableStateOf(false) }
     // This bit only makes a restored private source route fail closed; no source proof enters Bundle.
     var inboxSourceRoute by rememberSaveable { mutableStateOf(false) }
+    var unifiedSourceRoute by remember { mutableStateOf(false) }
     DisposableEffect(sourcePreferences) { onDispose { currentRecords?.invoke()?.sourcePreferences?.let { sourcePreferences?.close(it.session) } } }
     DisposableEffect(memoryInbox) { onDispose { currentRecords?.invoke()?.memoryInbox?.let { memoryInbox?.close(it.session) } } }
     DisposableEffect(factRecaps) { onDispose { factRecaps?.close() } }
@@ -437,6 +442,7 @@ fun AIyouApp(
     var readerFromSearch by remember { mutableStateOf(false) }
     var searchLocation by remember { mutableStateOf<com.t1doo.aiyou.records.OriginalReadingLocation?>(null) }
     fun clearSearch() {
+        unifiedSourceRoute=false;unifiedKeywords?.retire()
         taskSourceRoute=false
         search.clear()
         evidence.clear()
@@ -484,6 +490,7 @@ fun AIyouApp(
             (currentRecordsProvider?.invoke() ?: currentLocal)?.sourcePreferences?.let { sourcePreferences?.close(it.session) }
             (currentRecordsProvider?.invoke() ?: currentLocal)?.sourceMemories?.let { sourceMemories?.close(it.session) }
             detailEntryId = null; inboxSourceRoute = false
+            unifiedSourceRoute=false;unifiedKeywords?.retire()
         }
     }
     val reading = detailEntryId != null && !showSettings && !demo && local != null && selected != Destination.TASKS && !browsingRecycle && !lostInboxSource
@@ -661,12 +668,38 @@ fun AIyouApp(
                 tailReturnRequest = if (!readerFromSearch && latest?.ready == true && !latest.opening && latest.error == null && last?.id == readerId)
                     TailReturnRequest(origin, checkNotNull(readerId), navigation.generation) else null
                 detailEntryId = null
+                if(unifiedSourceRoute){unifiedSourceRoute=false;tailReturnRequest=null;unifiedKeywords?.resume()}
                 inboxSourceRoute = false
                 searchLocation = null
                 if(recapRoute) { tailReturnRequest=null;factRecaps?.validate() }
                 if (readerFromSearch && origin == Destination.MEMORIES) {
                     search.sync(true)
                     searchReturnSource = search.state.value.entries
+                }
+            }
+        }
+    }
+    val unifiedUi=local?.unifiedKeyword
+    val unifiedRoute=!demo&&!showSettings&&!recapRoute&&!reading&&selected==Destination.MEMORIES&&unifiedUi!=null
+    LaunchedEffect(unifiedRoute,unifiedUi?.session){if(!unifiedRoute)unifiedUi?.let{unifiedKeywords?.close(it.session)}}
+    if(unifiedRoute&&unifiedUi!=null&&unifiedKeywords!=null){
+        fun ownsUnified()=ownsNavigation()&&!showSettings&&!demo&&!recapRoute&&detailEntryId==null&&
+            (currentRecordsProvider?.invoke()?:currentLocal)?.unifiedKeyword?.session==unifiedUi.session
+        com.t1doo.aiyou.records.UnifiedKeywordDialog(unifiedUi,unifiedKeywords,::ownsUnified){item->
+            navigation.publish(generation){
+                val latest=currentRecordsProvider?.invoke()?:currentLocal
+                val b=item.binding
+                val entry=latest?.entries?.singleOrNull{it.id==b.source.sourceId&&it.currentRevision.toLong()==b.source.revision&&com.t1doo.aiyou.model.OriginalExports.hash(it.originalText)==b.hash&&it.policy==b.policy}
+                if(ownsNavigation()&&!showSettings&&!demo&&entry!=null&&latest?.let{!it.supportsLocalProcessing||it.localProcessingAvailable&&it.localProcessingVersions[b.source.sourceId]?.generation==b.generation}==true){
+                    navigation.advance();search.pause();readerFromSearch=false;tailReturnRequest=null
+                    audioSourceAnchor=null;imageSourceAnchor=null
+                    searchLocation=com.t1doo.aiyou.records.unifiedOriginalLocation(item,unifiedUi.keyword)
+                    when(item){
+                        is com.t1doo.aiyou.domain.UnifiedKeywordEvidence.Audio->{audioSourceAnchor=item.value.anchor;attachments?.openAudio(item.value.anchor.intent)}
+                        is com.t1doo.aiyou.domain.UnifiedKeywordEvidence.Image->{imageSourceAnchor=item.value.anchor;attachments?.openImage(item.value.anchor.intent)}
+                        else->Unit
+                    }
+                    unifiedSourceRoute=true;inboxSourceRoute=true;detailEntryId=entry.id
                 }
             }
         }
@@ -1073,8 +1106,8 @@ fun AIyouApp(
                 onOpenPeople = people?.let { controller -> { source -> if (canCopy(source.version.sourceId, source.version.revision.toInt())) controller.open(source) } },
                 location = searchLocation,
                 requiredSource = if(recapRoute||taskSourceRoute||inboxSourceRoute) searchLocation else null,
-                requiredSourceTitle = if(inboxSourceRoute) "候选来源版本已变化" else if(taskSourceRoute) "待办来源版本已变化" else "回顾来源版本已变化",
-                requiredSourceMessage = if(inboxSourceRoute) "请返回回忆刷新待审线索，再核对原文。" else if(taskSourceRoute) "请返回待办重新核对来源，没有将新版本冒充旧摘录。" else "请返回回顾并重新生成，没有将新版本冒充旧摘录。",
+                requiredSourceTitle = if(unifiedSourceRoute) "统一找回来源版本已变化" else if(inboxSourceRoute) "候选来源版本已变化" else if(taskSourceRoute) "待办来源版本已变化" else "回顾来源版本已变化",
+                requiredSourceMessage = if(unifiedSourceRoute) "请返回统一关键词找回重新查找，未将新版本冒充旧出处。" else if(inboxSourceRoute) "请返回回忆刷新待审线索，再核对原文。" else if(taskSourceRoute) "请返回待办重新核对来源，没有将新版本冒充旧摘录。" else "请返回回顾并重新生成，没有将新版本冒充旧摘录。",
                 eventDateController = eventDates, canUseEventDate = canCopy,
                 candidateController = candidates,
                 sourceTagController = sourceTags,
@@ -1176,6 +1209,7 @@ fun AIyouApp(
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
                 imageTextBusy=imageTextBusy,
+                onOpenUnified=unifiedKeywords?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
                 onOpenImageTexts=imageTexts?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
                 onOpenTranscripts=audioTranscripts?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
                 onOpenPreferences = sourcePreferences?.let { controller -> { if (ownsNavigation() && selected == Destination.MEMORIES &&
