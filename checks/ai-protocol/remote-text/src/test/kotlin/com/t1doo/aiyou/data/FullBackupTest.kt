@@ -214,15 +214,29 @@ class FullBackupTest {
         } }
     }
     @Test fun corruptionTruncationSubstitutionAndTrailingDataCannotProduceImportPreview():Unit=runBlocking {
+        fun corruptTerminal(bytes:ByteArray) {bytes[bytes.lastIndex]=(bytes.last().toInt() xor 1).toByte()}
+        // Exercise every possible original byte, including zero; changing only the terminal is required.
+        for(value in 0..255) {
+            val probe=byteArrayOf(0x5a,value.toByte());corruptTerminal(probe)
+            assertEquals(2,probe.size);assertEquals(0x5a,probe[0].toInt())
+            assertTrue("Terminal corruption must change every byte value",probe.last()!=value.toByte())
+        }
         FullFixture().use { source -> FullFixture(99).use { target ->
             source.image(source.entry());val bytes=export(source)
             for(bad in listOf(bytes.copyOf(bytes.size-1),bytes+byteArrayOf(0),bytes.copyOf().also { it[it.lastIndex-40]=(it[it.lastIndex-40].toInt() xor 1).toByte() })) {
+                assertFalse("A corruption fixture must change the original document",bytes.contentEquals(bad))
                 fails { target.backup.open({bad.inputStream()},password()) }
                 assertTrue(target.db.read("SELECT * FROM entries").isEmpty());assertTrue(target.db.read("SELECT * FROM record_package_receipts").isEmpty())
             }
-            val pack=target.backup.open({bytes.inputStream()},password());bytes[bytes.lastIndex]=0
-            fails { target.backup.restore(pack) { true } }
-            assertTrue(target.db.read("SELECT * FROM entries").isEmpty());pack.release()
+            val pack=target.backup.open({bytes.inputStream()},password())
+            try {
+                val originalTail=bytes.last();corruptTerminal(bytes)
+                assertTrue("Selected document must change after preview",originalTail!=bytes.last())
+                fails { target.backup.restore(pack) { true } }
+                assertTrue(target.db.read("SELECT * FROM entries").isEmpty())
+                // A retryable PENDING intent is allowed; an authenticated import must never be acknowledged.
+                assertTrue(target.db.read("SELECT state FROM record_package_receipts WHERE state LIKE 'DONE:%'").isEmpty())
+            } finally {pack.release()}
         } }
     }
     @Test fun publicEnvelopeBoundsRejectBeforeKdfAndWipePasswords():Unit=runBlocking {
