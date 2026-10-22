@@ -33,10 +33,16 @@ class RecapAudioSourceTest {
     }
     @Test fun corruptEncryptedOriginalRetiresRecapWithoutPublishingOrReplacingBytes():Unit=runBlocking {
         Harness().use { h->
-            h.generate();val card=h.ui.snapshot!!.cards.single();val file=h.f.mediaRoot.walkTopDown().first{it.isFile}
+            h.generate();val card=h.ui.snapshot!!.cards.single()
+            // Directory enumeration also includes the empty store lock; bind corruption to this exact original.
+            val lock=h.f.mediaRoot.resolve(".store.lock");assertTrue(lock.isFile);val lockBefore=lock.readBytes()
+            val file=h.f.mediaRoot.resolve(h.intent.id+".aead");assertTrue("Exact original ciphertext must exist",file.isFile)
+            assertTrue("Original ciphertext must be nonempty",file.length()>0)
             val corrupt=file.readBytes().also{it[it.lastIndex]=(it.last().toInt() xor 1).toByte()};file.writeBytes(corrupt)
             var opens=0;h.c.audioSource(card,card.audios.single()){opens++};h.drain()
-            assertEquals(0,opens);assertNull(h.ui.snapshot);assertNotNull(h.ui.error);assertArrayEquals(corrupt,file.readBytes())
+            assertEquals(1,h.reads);assertEquals(0,opens);assertNull(h.ui.snapshot);assertNotNull(h.ui.error)
+            assertEquals("CORRUPT",h.f.db.read("SELECT state FROM attachments WHERE id=?",h.intent.id).single().single())
+            assertArrayEquals(corrupt,file.readBytes());assertArrayEquals(lockBefore,lock.readBytes())
         }
     }
     @Test fun finalRecapProofRejectsSourceAndOtherRangeMutationsAfterMediaAuthentication():Unit=runBlocking {
