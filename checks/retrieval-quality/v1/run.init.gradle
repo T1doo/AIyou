@@ -1,0 +1,14 @@
+// Opt-in host evaluation. Normal test source sets, CI gates and product sources are unchanged.
+gradle.projectsEvaluated {
+    def taskRoot = new File(System.getenv('AIYOU_QUALITY_ROOT'))
+    def output = new File(System.getenv('AIYOU_QUALITY_OUTPUT'))
+    def target = gradle.rootProject.project(':remote-text')
+    target.extensions.getByName('kotlin').sourceSets.getByName('test').kotlin.srcDir(new File(taskRoot, 'checks/retrieval-quality/v1/src'))
+    target.tasks.named('test') {
+        systemProperty 'aiyou.quality.root', taskRoot.absolutePath
+        systemProperty 'aiyou.quality.output', output.absolutePath
+        reports.junitXml.outputLocation = new File(output, 'xml')
+        reports.html.outputLocation = new File(output, 'html')
+        binaryResultsDirectory = new File(output, 'binary')
+    }
+}

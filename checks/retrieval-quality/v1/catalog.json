@@ -1,0 +1,1128 @@
+{
+  "version": 1,
+  "authorship": "single agent authored, synthetic, provisionally labeled before first execution; no independent human relevance adjudication yet",
+  "population": "curated challenge examples, not a random user sample; no generalization or production quality claim",
+  "reference_instant": "2026-10-22T12:00:00Z",
+  "reference_zone": "UTC",
+  "annotation_rules": {
+    "unit": "current original source group, stable source ID + current revision; never count multiple typed children as multiple Recall hits",
+    "relevant": "retrieval relevance, including negated, quoted and conflicting text; not entailment/occurrence/personality correctness",
+    "roadmap": "report separately and in all-case aggregate; unsupported natural-language failure is not a violated literal search promise",
+    "empty_gold": "exclude from Recall denominator; separately report any-result false positives and returned identities",
+    "ceiling": "min(5,number of gold sources)/number of gold sources; broad cases not silently dropped",
+    "frozen": "no edits to records/gold after looking at baseline; revisions require new version and report both"
+  },
+  "records": [
+    {
+      "id": "sunset",
+      "text": "落日照在江面上。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "audio",
+      "text": "这条合成记录附有原音。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "manual_transcript_not_asr",
+      "audio": "口述清单：纸笔和水。"
+    },
+    {
+      "id": "image",
+      "text": "这条合成记录附有图片。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "synthetic_port_not_ocr",
+      "image": "灯塔文字：请沿小路向前。"
+    },
+    {
+      "id": "preference",
+      "text": "我偏好淡茶🙂",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "explicit_accepted_self_report",
+      "preference": true
+    },
+    {
+      "id": "memory",
+      "text": "今天看海。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "manual_note_not_original",
+      "note": "旅行备注：准备带水。"
+    },
+    {
+      "id": "phrase",
+      "text": "咖啡 散步是这条记录的标题。",
+      "captured": "2026-09-01T12:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "scattered-1",
+      "text": "散步回来整理关于咖啡的笔记，合成编号1。",
+      "captured": "2026-10-11T12:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "scattered-2",
+      "text": "散步回来整理关于咖啡的笔记，合成编号2。",
+      "captured": "2026-10-12T12:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "scattered-3",
+      "text": "散步回来整理关于咖啡的笔记，合成编号3。",
+      "captured": "2026-10-13T12:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "scattered-4",
+      "text": "散步回来整理关于咖啡的笔记，合成编号4。",
+      "captured": "2026-10-14T12:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "scattered-5",
+      "text": "散步回来整理关于咖啡的笔记，合成编号5。",
+      "captured": "2026-10-15T12:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "scattered-6",
+      "text": "散步回来整理关于咖啡的笔记，合成编号6。",
+      "captured": "2026-10-16T12:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "case",
+      "text": "Coffee ABC12，午后备忘。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "broad-1",
+      "text": "宽词集合的合成记录1。",
+      "captured": "2026-10-11T13:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "broad-2",
+      "text": "宽词集合的合成记录2。",
+      "captured": "2026-10-12T13:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "broad-3",
+      "text": "宽词集合的合成记录3。",
+      "captured": "2026-10-13T13:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "broad-4",
+      "text": "宽词集合的合成记录4。",
+      "captured": "2026-10-14T13:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "broad-5",
+      "text": "宽词集合的合成记录5。",
+      "captured": "2026-10-15T13:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "broad-6",
+      "text": "宽词集合的合成记录6。",
+      "captured": "2026-10-16T13:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "broad-7",
+      "text": "宽词集合的合成记录7。",
+      "captured": "2026-10-17T13:00:00Z",
+      "zone": "UTC",
+      "support": "literal_record"
+    },
+    {
+      "id": "negative",
+      "text": "我没有喝过可可。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "negated_self_report"
+    },
+    {
+      "id": "conditional",
+      "text": "如果下雨，我才会去山路。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "conditional_not_occurred"
+    },
+    {
+      "id": "quote",
+      "text": "小雨说：“我在海边跑步。”这不是我的经历。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "other_person_quote_not_self"
+    },
+    {
+      "id": "capture-shanghai",
+      "text": "10月1日记下：9月30日看展览。",
+      "captured": "2026-09-30T16:15:00Z",
+      "zone": "Asia/Shanghai",
+      "support": "captured_oct1_event_sep30"
+    },
+    {
+      "id": "capture-utc",
+      "text": "9月30日记下：10月1日计划展览。",
+      "captured": "2026-09-30T16:15:00Z",
+      "zone": "UTC",
+      "support": "captured_sep30_planned_event_oct1"
+    },
+    {
+      "id": "alias",
+      "text": "合成同伴一起整理画册。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "manual_record_local_alias_not_identity_inference",
+      "names": [
+        "小林"
+      ],
+      "aliases": [
+        {
+          "alias": "阿林",
+          "name": "小林"
+        }
+      ]
+    },
+    {
+      "id": "alias-space",
+      "text": "合成同伴一起整理地图。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "manual_record_local_alias_not_identity_inference",
+      "names": [
+        "林同学"
+      ],
+      "aliases": [
+        {
+          "alias": "Lin Example",
+          "name": "林同学"
+        }
+      ]
+    },
+    {
+      "id": "conflict-old",
+      "text": "以前我偏好浓茶。",
+      "captured": "2026-09-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "historical_self_report_not_current_truth"
+    },
+    {
+      "id": "conflict-new",
+      "text": "现在我偏好淡茶。",
+      "captured": "2026-10-20T12:00:00Z",
+      "zone": "UTC",
+      "support": "later_self_report_not_automatic_supersession"
+    },
+    {
+      "id": "deleted",
+      "text": "已删除的蓝伞。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "deleted_ineligible",
+      "deleted": true
+    },
+    {
+      "id": "revised",
+      "text": "旧版红伞。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "old_revision_ineligible_current_revision_valid",
+      "revision2": "修订为银伞。"
+    },
+    {
+      "id": "revoked",
+      "text": "合成撤回来源。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "revoked_derived_not_eligible",
+      "note": "退订备注。",
+      "revoke": true
+    },
+    {
+      "id": "private",
+      "text": "合成私密来源。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "support": "ai_none_excludes_derived_not_original_manual_browsing",
+      "note": "隐私候选。",
+      "ai_none": true
+    }
+  ],
+  "queries": [
+    {
+      "id": "control-original",
+      "category": "control",
+      "lane": "contract",
+      "query": "落日",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "sunset"
+        ],
+        "unified": [
+          "sunset"
+        ],
+        "evidence": [
+          "sunset"
+        ]
+      },
+      "rationale": "逐字相关的当前有效原件；相关不表示事实已发生。",
+      "grades": {
+        "original": {
+          "sunset": 1
+        },
+        "unified": {
+          "sunset": 1
+        },
+        "evidence": {
+          "sunset": 1
+        }
+      }
+    },
+    {
+      "id": "control-audio",
+      "category": "control",
+      "lane": "contract",
+      "query": "口述清单",
+      "scope": "AUDIO",
+      "from": "",
+      "through": "",
+      "gold": {
+        "unified": [
+          "audio"
+        ]
+      },
+      "rationale": "人工转写词只存在于独立派生文字；不称ASR。",
+      "grades": {
+        "unified": {
+          "audio": 1
+        }
+      }
+    },
+    {
+      "id": "control-image",
+      "category": "control",
+      "lane": "contract",
+      "query": "灯塔文字",
+      "scope": "IMAGE",
+      "from": "",
+      "through": "",
+      "gold": {
+        "unified": [
+          "image"
+        ]
+      },
+      "rationale": "受控合成端口文字；不称真实OCR。",
+      "grades": {
+        "unified": {
+          "image": 1
+        }
+      }
+    },
+    {
+      "id": "control-preference",
+      "category": "control",
+      "lane": "contract",
+      "query": "合成口味",
+      "scope": "PREFERENCE",
+      "from": "",
+      "through": "",
+      "gold": {
+        "unified": [
+          "preference"
+        ]
+      },
+      "rationale": "当前已采纳人工主题命中。",
+      "grades": {
+        "unified": {
+          "preference": 1
+        }
+      }
+    },
+    {
+      "id": "control-note",
+      "category": "control",
+      "lane": "contract",
+      "query": "旅行备注",
+      "scope": "ACCEPTED_MEMORY",
+      "from": "",
+      "through": "",
+      "gold": {
+        "unified": [
+          "memory"
+        ]
+      },
+      "rationale": "人工备注命中，不能伪造正文位置。",
+      "grades": {
+        "unified": {
+          "memory": 1
+        }
+      }
+    },
+    {
+      "id": "phrase-vs-scattered",
+      "category": "lexical",
+      "lane": "contract",
+      "query": "咖啡 散步",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "phrase",
+          "scattered-1",
+          "scattered-2",
+          "scattered-3",
+          "scattered-4",
+          "scattered-5",
+          "scattered-6"
+        ],
+        "unified": [
+          "phrase"
+        ],
+        "evidence": [
+          "phrase",
+          "scattered-1",
+          "scattered-2",
+          "scattered-3",
+          "scattered-4",
+          "scattered-5",
+          "scattered-6"
+        ]
+      },
+      "rationale": "原文关键词模式按空白AND词；统一入口按含空格完整逐字串，分别预标，不混淆合同。完整短语的graded相关性为2，其余为1。",
+      "grades": {
+        "original": {
+          "phrase": 2,
+          "scattered-1": 1,
+          "scattered-2": 1,
+          "scattered-3": 1,
+          "scattered-4": 1,
+          "scattered-5": 1,
+          "scattered-6": 1
+        },
+        "unified": {
+          "phrase": 2
+        },
+        "evidence": {
+          "phrase": 2,
+          "scattered-1": 1,
+          "scattered-2": 1,
+          "scattered-3": 1,
+          "scattered-4": 1,
+          "scattered-5": 1,
+          "scattered-6": 1
+        }
+      }
+    },
+    {
+      "id": "unicode-case",
+      "category": "lexical",
+      "lane": "contract",
+      "query": "coffee",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "case"
+        ],
+        "unified": [],
+        "evidence": [
+          "case"
+        ]
+      },
+      "rationale": "原文关键词模式Unicode简单折叠；统一入口明确区分大小写。",
+      "grades": {
+        "original": {
+          "case": 1
+        },
+        "unified": {},
+        "evidence": {
+          "case": 1
+        }
+      }
+    },
+    {
+      "id": "single-character",
+      "category": "lexical",
+      "lane": "contract",
+      "query": "伞",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "revised"
+        ],
+        "unified": [
+          "revised"
+        ],
+        "evidence": [
+          "revised"
+        ]
+      },
+      "rationale": "当前银伞可见；删除蓝伞与历史红伞不准复活。",
+      "grades": {
+        "original": {
+          "revised": 1
+        },
+        "unified": {
+          "revised": 1
+        },
+        "evidence": {
+          "revised": 1
+        }
+      }
+    },
+    {
+      "id": "broad-seven",
+      "category": "lexical",
+      "lane": "contract",
+      "query": "宽词",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "broad-1",
+          "broad-2",
+          "broad-3",
+          "broad-4",
+          "broad-5",
+          "broad-6",
+          "broad-7"
+        ],
+        "unified": [
+          "broad-1",
+          "broad-2",
+          "broad-3",
+          "broad-4",
+          "broad-5",
+          "broad-6",
+          "broad-7"
+        ],
+        "evidence": [
+          "broad-1",
+          "broad-2",
+          "broad-3",
+          "broad-4",
+          "broad-5",
+          "broad-6",
+          "broad-7"
+        ]
+      },
+      "rationale": "全部7条都相关，Recall@5理论上限5/7；不得把此截断当排序缺陷。",
+      "grades": {
+        "original": {
+          "broad-1": 1,
+          "broad-2": 1,
+          "broad-3": 1,
+          "broad-4": 1,
+          "broad-5": 1,
+          "broad-6": 1,
+          "broad-7": 1
+        },
+        "unified": {
+          "broad-1": 1,
+          "broad-2": 1,
+          "broad-3": 1,
+          "broad-4": 1,
+          "broad-5": 1,
+          "broad-6": 1,
+          "broad-7": 1
+        },
+        "evidence": {
+          "broad-1": 1,
+          "broad-2": 1,
+          "broad-3": 1,
+          "broad-4": 1,
+          "broad-5": 1,
+          "broad-6": 1,
+          "broad-7": 1
+        }
+      }
+    },
+    {
+      "id": "negative-literal",
+      "category": "negation",
+      "lane": "contract",
+      "query": "没有喝过可可",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "negative"
+        ],
+        "unified": [
+          "negative"
+        ],
+        "evidence": [
+          "negative"
+        ]
+      },
+      "rationale": "检索到否定自述是正确结果；不能转为饮用已发生。",
+      "grades": {
+        "original": {
+          "negative": 1
+        },
+        "unified": {
+          "negative": 1
+        },
+        "evidence": {
+          "negative": 1
+        }
+      }
+    },
+    {
+      "id": "negative-question",
+      "category": "negation",
+      "lane": "roadmap",
+      "query": "我喝过可可吗",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "negative"
+        ],
+        "unified": [
+          "negative"
+        ],
+        "evidence": [
+          "negative"
+        ]
+      },
+      "rationale": "自然语言是主方案后续质量探针，现有逐字入口未承诺分解该问句；否定原文仍是回答是否的重要证据。",
+      "grades": {
+        "original": {
+          "negative": 1
+        },
+        "unified": {
+          "negative": 1
+        },
+        "evidence": {
+          "negative": 1
+        }
+      }
+    },
+    {
+      "id": "conditional-literal",
+      "category": "negation",
+      "lane": "contract",
+      "query": "如果下雨",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "conditional"
+        ],
+        "unified": [
+          "conditional"
+        ],
+        "evidence": [
+          "conditional"
+        ]
+      },
+      "rationale": "条件句是相关素材，不是已经出行。",
+      "grades": {
+        "original": {
+          "conditional": 1
+        },
+        "unified": {
+          "conditional": 1
+        },
+        "evidence": {
+          "conditional": 1
+        }
+      }
+    },
+    {
+      "id": "quote-literal",
+      "category": "quotation",
+      "lane": "contract",
+      "query": "小雨说",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "quote"
+        ],
+        "unified": [
+          "quote"
+        ],
+        "evidence": [
+          "quote"
+        ]
+      },
+      "rationale": "引述是相关记录，主体仍是合成人物小雨。",
+      "grades": {
+        "original": {
+          "quote": 1
+        },
+        "unified": {
+          "quote": 1
+        },
+        "evidence": {
+          "quote": 1
+        }
+      }
+    },
+    {
+      "id": "quote-question",
+      "category": "quotation",
+      "lane": "roadmap",
+      "query": "谁说在海边跑步",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "quote"
+        ],
+        "unified": [
+          "quote"
+        ],
+        "evidence": [
+          "quote"
+        ]
+      },
+      "rationale": "需问句分解；引用来源应保留主体，不作为自己的跑步经历。",
+      "grades": {
+        "original": {
+          "quote": 1
+        },
+        "unified": {
+          "quote": 1
+        },
+        "evidence": {
+          "quote": 1
+        }
+      }
+    },
+    {
+      "id": "capture-oct1",
+      "category": "time",
+      "lane": "contract",
+      "query": "展览",
+      "scope": "ALL",
+      "from": "2026-10-01",
+      "through": "2026-10-01",
+      "gold": {
+        "original": [
+          "capture-shanghai"
+        ],
+        "unified": [
+          "capture-shanghai"
+        ],
+        "evidence": [
+          "capture-shanghai"
+        ]
+      },
+      "rationale": "两端包含，按每原件存储时区；同一UTC时刻在上海属于10月1日。",
+      "grades": {
+        "original": {
+          "capture-shanghai": 1
+        },
+        "unified": {
+          "capture-shanghai": 1
+        },
+        "evidence": {
+          "capture-shanghai": 1
+        }
+      }
+    },
+    {
+      "id": "capture-sep30",
+      "category": "time",
+      "lane": "contract",
+      "query": "展览",
+      "scope": "ALL",
+      "from": "2026-09-30",
+      "through": "2026-09-30",
+      "gold": {
+        "original": [
+          "capture-utc"
+        ],
+        "unified": [
+          "capture-utc"
+        ],
+        "evidence": [
+          "capture-utc"
+        ]
+      },
+      "rationale": "UTC原件捕获9月30日；正文事件日期不能覆盖捕获条件。",
+      "grades": {
+        "original": {
+          "capture-utc": 1
+        },
+        "unified": {
+          "capture-utc": 1
+        },
+        "evidence": {
+          "capture-utc": 1
+        }
+      }
+    },
+    {
+      "id": "relative-month",
+      "category": "time",
+      "lane": "roadmap",
+      "query": "上个月的展览",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "capture-utc"
+        ],
+        "unified": [
+          "capture-utc"
+        ],
+        "evidence": [
+          "capture-utc"
+        ]
+      },
+      "rationale": "固定参考2026-10-22T12:00Z，参考时区UTC；问的是捕获上个月，非事件发生时间；当前入口无自然日期解析。",
+      "grades": {
+        "original": {
+          "capture-utc": 1
+        },
+        "unified": {
+          "capture-utc": 1
+        },
+        "evidence": {
+          "capture-utc": 1
+        }
+      }
+    },
+    {
+      "id": "date-in-body",
+      "category": "time",
+      "lane": "contract",
+      "query": "9月30日",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "capture-shanghai",
+          "capture-utc"
+        ],
+        "unified": [
+          "capture-shanghai",
+          "capture-utc"
+        ],
+        "evidence": [
+          "capture-shanghai",
+          "capture-utc"
+        ]
+      },
+      "rationale": "没有日期过滤；正文逐字日期均相关，不推断它是发生时间。",
+      "grades": {
+        "original": {
+          "capture-shanghai": 1,
+          "capture-utc": 1
+        },
+        "unified": {
+          "capture-shanghai": 1,
+          "capture-utc": 1
+        },
+        "evidence": {
+          "capture-shanghai": 1,
+          "capture-utc": 1
+        }
+      }
+    },
+    {
+      "id": "manual-alias",
+      "category": "alias",
+      "lane": "contract",
+      "query": "阿林",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "alias"
+        ],
+        "unified": [],
+        "evidence": []
+      },
+      "rationale": "记录级手工别名仅原文查找支持；统一入口只逐字，证据包不将纯别名匹配当原文引用。",
+      "grades": {
+        "original": {
+          "alias": 1
+        },
+        "unified": {},
+        "evidence": {}
+      }
+    },
+    {
+      "id": "manual-space-alias",
+      "category": "alias",
+      "lane": "contract",
+      "query": "Lin Example",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "alias-space"
+        ],
+        "unified": [],
+        "evidence": []
+      },
+      "rationale": "带空格完整人工别名同样按已实现原文入口合同；不是跨记录身份归一。",
+      "grades": {
+        "original": {
+          "alias-space": 1
+        },
+        "unified": {},
+        "evidence": {}
+      }
+    },
+    {
+      "id": "unknown-alias",
+      "category": "alias",
+      "lane": "contract",
+      "query": "阿林同学",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [],
+        "unified": [],
+        "evidence": []
+      },
+      "rationale": "未声明的扩展称呼不能猜成阿林。",
+      "grades": {
+        "original": {},
+        "unified": {},
+        "evidence": {}
+      }
+    },
+    {
+      "id": "conflict-coexist",
+      "category": "conflict",
+      "lane": "contract",
+      "query": "偏好",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "preference",
+          "conflict-old",
+          "conflict-new"
+        ],
+        "unified": [
+          "preference",
+          "conflict-old",
+          "conflict-new"
+        ],
+        "evidence": [
+          "preference",
+          "conflict-old",
+          "conflict-new"
+        ]
+      },
+      "rationale": "三份当前原件都相关；捕获新旧不是自动取代真实事实的授权。",
+      "grades": {
+        "original": {
+          "preference": 1,
+          "conflict-old": 1,
+          "conflict-new": 1
+        },
+        "unified": {
+          "preference": 1,
+          "conflict-old": 1,
+          "conflict-new": 1
+        },
+        "evidence": {
+          "preference": 1,
+          "conflict-old": 1,
+          "conflict-new": 1
+        }
+      }
+    },
+    {
+      "id": "conflict-question",
+      "category": "conflict",
+      "lane": "roadmap",
+      "query": "现在我喜欢什么饮品",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "preference",
+          "conflict-old",
+          "conflict-new"
+        ],
+        "unified": [
+          "preference",
+          "conflict-old",
+          "conflict-new"
+        ],
+        "evidence": [
+          "preference",
+          "conflict-old",
+          "conflict-new"
+        ]
+      },
+      "rationale": "自然语言/喜欢与偏好关系未由当前逐字入口支持；保留冲突证据，不自动决定唯一真值。",
+      "grades": {
+        "original": {
+          "preference": 1,
+          "conflict-old": 1,
+          "conflict-new": 1
+        },
+        "unified": {
+          "preference": 1,
+          "conflict-old": 1,
+          "conflict-new": 1
+        },
+        "evidence": {
+          "preference": 1,
+          "conflict-old": 1,
+          "conflict-new": 1
+        }
+      }
+    },
+    {
+      "id": "deleted-record",
+      "category": "retirement",
+      "lane": "contract",
+      "query": "蓝伞",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [],
+        "unified": [],
+        "evidence": []
+      },
+      "rationale": "删除来源不能进入候选或前五。",
+      "grades": {
+        "original": {},
+        "unified": {},
+        "evidence": {}
+      }
+    },
+    {
+      "id": "old-revision",
+      "category": "retirement",
+      "lane": "contract",
+      "query": "红伞",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [],
+        "unified": [],
+        "evidence": []
+      },
+      "rationale": "历史正文不属于当前版本检索。",
+      "grades": {
+        "original": {},
+        "unified": {},
+        "evidence": {}
+      }
+    },
+    {
+      "id": "current-revision",
+      "category": "retirement",
+      "lane": "contract",
+      "query": "银伞",
+      "scope": "ALL",
+      "from": "",
+      "through": "",
+      "gold": {
+        "original": [
+          "revised"
+        ],
+        "unified": [
+          "revised"
+        ],
+        "evidence": [
+          "revised"
+        ]
+      },
+      "rationale": "必须是修订2的当前原文。",
+      "grades": {
+        "original": {
+          "revised": 1
+        },
+        "unified": {
+          "revised": 1
+        },
+        "evidence": {
+          "revised": 1
+        }
+      }
+    },
+    {
+      "id": "withdrawn-note",
+      "category": "retirement",
+      "lane": "contract",
+      "query": "退订备注",
+      "scope": "ACCEPTED_MEMORY",
+      "from": "",
+      "through": "",
+      "gold": {
+        "unified": []
+      },
+      "rationale": "撤回人工备注不再是当前ACCEPTED投影。",
+      "grades": {
+        "unified": {}
+      }
+    },
+    {
+      "id": "ai-none-note",
+      "category": "retirement",
+      "lane": "contract",
+      "query": "隐私候选",
+      "scope": "ACCEPTED_MEMORY",
+      "from": "",
+      "through": "",
+      "gold": {
+        "unified": []
+      },
+      "rationale": "AI_NONE禁止派生投影；不把它误说成原文不能手工浏览。",
+      "grades": {
+        "unified": {}
+      }
+    }
+  ]
+}

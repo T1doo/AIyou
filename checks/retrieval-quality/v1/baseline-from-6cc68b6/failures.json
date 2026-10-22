@@ -1,0 +1,1010 @@
+[
+  {
+    "query_id": "phrase-vs-scattered",
+    "route": "original",
+    "category": "lexical",
+    "lane": "contract",
+    "gold_count": 7,
+    "candidate_count": 7,
+    "returned_count": 7,
+    "recall_at_5": 0.7142857142857143,
+    "full_candidate_recall": 1.0,
+    "oracle_top5_ceiling": 0.7142857142857143,
+    "ndcg_at_5": 1.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "top5_capacity_not_ranking_defect"
+    ],
+    "top5": [
+      "phrase",
+      "scattered-6",
+      "scattered-5",
+      "scattered-4",
+      "scattered-3"
+    ],
+    "missing_from_candidates": [],
+    "missing_from_top5": [
+      "scattered-1",
+      "scattered-2"
+    ],
+    "query": "咖啡 散步",
+    "from": "",
+    "through": "",
+    "rationale": "原文关键词模式按空白AND词；统一入口按含空格完整逐字串，分别预标，不混淆合同。完整短语的graded相关性为2，其余为1。",
+    "gold": [
+      "phrase",
+      "scattered-1",
+      "scattered-2",
+      "scattered-3",
+      "scattered-4",
+      "scattered-5",
+      "scattered-6"
+    ],
+    "records": {
+      "phrase": {
+        "id": "phrase",
+        "text": "咖啡 散步是这条记录的标题。",
+        "captured": "2026-09-01T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "scattered-1": {
+        "id": "scattered-1",
+        "text": "散步回来整理关于咖啡的笔记，合成编号1。",
+        "captured": "2026-10-11T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "scattered-2": {
+        "id": "scattered-2",
+        "text": "散步回来整理关于咖啡的笔记，合成编号2。",
+        "captured": "2026-10-12T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "scattered-3": {
+        "id": "scattered-3",
+        "text": "散步回来整理关于咖啡的笔记，合成编号3。",
+        "captured": "2026-10-13T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "scattered-4": {
+        "id": "scattered-4",
+        "text": "散步回来整理关于咖啡的笔记，合成编号4。",
+        "captured": "2026-10-14T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "scattered-5": {
+        "id": "scattered-5",
+        "text": "散步回来整理关于咖啡的笔记，合成编号5。",
+        "captured": "2026-10-15T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "scattered-6": {
+        "id": "scattered-6",
+        "text": "散步回来整理关于咖啡的笔记，合成编号6。",
+        "captured": "2026-10-16T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      }
+    }
+  },
+  {
+    "query_id": "phrase-vs-scattered",
+    "route": "evidence",
+    "category": "lexical",
+    "lane": "contract",
+    "gold_count": 7,
+    "candidate_count": 7,
+    "returned_count": 5,
+    "recall_at_5": 0.7142857142857143,
+    "full_candidate_recall": 1.0,
+    "oracle_top5_ceiling": 0.7142857142857143,
+    "ndcg_at_5": 1.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "top5_capacity_not_ranking_defect"
+    ],
+    "top5": [
+      "phrase",
+      "scattered-6",
+      "scattered-5",
+      "scattered-4",
+      "scattered-3"
+    ],
+    "missing_from_candidates": [],
+    "missing_from_top5": [
+      "scattered-1",
+      "scattered-2"
+    ],
+    "query": "咖啡 散步",
+    "from": "",
+    "through": "",
+    "rationale": "原文关键词模式按空白AND词；统一入口按含空格完整逐字串，分别预标，不混淆合同。完整短语的graded相关性为2，其余为1。",
+    "gold": [
+      "phrase",
+      "scattered-1",
+      "scattered-2",
+      "scattered-3",
+      "scattered-4",
+      "scattered-5",
+      "scattered-6"
+    ],
+    "records": {
+      "phrase": {
+        "id": "phrase",
+        "text": "咖啡 散步是这条记录的标题。",
+        "captured": "2026-09-01T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "scattered-1": {
+        "id": "scattered-1",
+        "text": "散步回来整理关于咖啡的笔记，合成编号1。",
+        "captured": "2026-10-11T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "scattered-2": {
+        "id": "scattered-2",
+        "text": "散步回来整理关于咖啡的笔记，合成编号2。",
+        "captured": "2026-10-12T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "scattered-3": {
+        "id": "scattered-3",
+        "text": "散步回来整理关于咖啡的笔记，合成编号3。",
+        "captured": "2026-10-13T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "scattered-4": {
+        "id": "scattered-4",
+        "text": "散步回来整理关于咖啡的笔记，合成编号4。",
+        "captured": "2026-10-14T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "scattered-5": {
+        "id": "scattered-5",
+        "text": "散步回来整理关于咖啡的笔记，合成编号5。",
+        "captured": "2026-10-15T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "scattered-6": {
+        "id": "scattered-6",
+        "text": "散步回来整理关于咖啡的笔记，合成编号6。",
+        "captured": "2026-10-16T12:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      }
+    }
+  },
+  {
+    "query_id": "broad-seven",
+    "route": "unified",
+    "category": "lexical",
+    "lane": "contract",
+    "gold_count": 7,
+    "candidate_count": 7,
+    "returned_count": 7,
+    "recall_at_5": 0.7142857142857143,
+    "full_candidate_recall": 1.0,
+    "oracle_top5_ceiling": 0.7142857142857143,
+    "ndcg_at_5": 1.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "top5_capacity_not_ranking_defect"
+    ],
+    "top5": [
+      "broad-7",
+      "broad-6",
+      "broad-5",
+      "broad-4",
+      "broad-3"
+    ],
+    "missing_from_candidates": [],
+    "missing_from_top5": [
+      "broad-1",
+      "broad-2"
+    ],
+    "query": "宽词",
+    "from": "",
+    "through": "",
+    "rationale": "全部7条都相关，Recall@5理论上限5/7；不得把此截断当排序缺陷。",
+    "gold": [
+      "broad-1",
+      "broad-2",
+      "broad-3",
+      "broad-4",
+      "broad-5",
+      "broad-6",
+      "broad-7"
+    ],
+    "records": {
+      "broad-1": {
+        "id": "broad-1",
+        "text": "宽词集合的合成记录1。",
+        "captured": "2026-10-11T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-2": {
+        "id": "broad-2",
+        "text": "宽词集合的合成记录2。",
+        "captured": "2026-10-12T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-3": {
+        "id": "broad-3",
+        "text": "宽词集合的合成记录3。",
+        "captured": "2026-10-13T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-4": {
+        "id": "broad-4",
+        "text": "宽词集合的合成记录4。",
+        "captured": "2026-10-14T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-5": {
+        "id": "broad-5",
+        "text": "宽词集合的合成记录5。",
+        "captured": "2026-10-15T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-6": {
+        "id": "broad-6",
+        "text": "宽词集合的合成记录6。",
+        "captured": "2026-10-16T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-7": {
+        "id": "broad-7",
+        "text": "宽词集合的合成记录7。",
+        "captured": "2026-10-17T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      }
+    }
+  },
+  {
+    "query_id": "broad-seven",
+    "route": "original",
+    "category": "lexical",
+    "lane": "contract",
+    "gold_count": 7,
+    "candidate_count": 7,
+    "returned_count": 7,
+    "recall_at_5": 0.7142857142857143,
+    "full_candidate_recall": 1.0,
+    "oracle_top5_ceiling": 0.7142857142857143,
+    "ndcg_at_5": 1.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "top5_capacity_not_ranking_defect"
+    ],
+    "top5": [
+      "broad-7",
+      "broad-6",
+      "broad-5",
+      "broad-4",
+      "broad-3"
+    ],
+    "missing_from_candidates": [],
+    "missing_from_top5": [
+      "broad-1",
+      "broad-2"
+    ],
+    "query": "宽词",
+    "from": "",
+    "through": "",
+    "rationale": "全部7条都相关，Recall@5理论上限5/7；不得把此截断当排序缺陷。",
+    "gold": [
+      "broad-1",
+      "broad-2",
+      "broad-3",
+      "broad-4",
+      "broad-5",
+      "broad-6",
+      "broad-7"
+    ],
+    "records": {
+      "broad-1": {
+        "id": "broad-1",
+        "text": "宽词集合的合成记录1。",
+        "captured": "2026-10-11T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-2": {
+        "id": "broad-2",
+        "text": "宽词集合的合成记录2。",
+        "captured": "2026-10-12T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-3": {
+        "id": "broad-3",
+        "text": "宽词集合的合成记录3。",
+        "captured": "2026-10-13T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-4": {
+        "id": "broad-4",
+        "text": "宽词集合的合成记录4。",
+        "captured": "2026-10-14T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-5": {
+        "id": "broad-5",
+        "text": "宽词集合的合成记录5。",
+        "captured": "2026-10-15T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-6": {
+        "id": "broad-6",
+        "text": "宽词集合的合成记录6。",
+        "captured": "2026-10-16T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-7": {
+        "id": "broad-7",
+        "text": "宽词集合的合成记录7。",
+        "captured": "2026-10-17T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      }
+    }
+  },
+  {
+    "query_id": "broad-seven",
+    "route": "evidence",
+    "category": "lexical",
+    "lane": "contract",
+    "gold_count": 7,
+    "candidate_count": 7,
+    "returned_count": 5,
+    "recall_at_5": 0.7142857142857143,
+    "full_candidate_recall": 1.0,
+    "oracle_top5_ceiling": 0.7142857142857143,
+    "ndcg_at_5": 1.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "top5_capacity_not_ranking_defect"
+    ],
+    "top5": [
+      "broad-7",
+      "broad-6",
+      "broad-5",
+      "broad-4",
+      "broad-3"
+    ],
+    "missing_from_candidates": [],
+    "missing_from_top5": [
+      "broad-1",
+      "broad-2"
+    ],
+    "query": "宽词",
+    "from": "",
+    "through": "",
+    "rationale": "全部7条都相关，Recall@5理论上限5/7；不得把此截断当排序缺陷。",
+    "gold": [
+      "broad-1",
+      "broad-2",
+      "broad-3",
+      "broad-4",
+      "broad-5",
+      "broad-6",
+      "broad-7"
+    ],
+    "records": {
+      "broad-1": {
+        "id": "broad-1",
+        "text": "宽词集合的合成记录1。",
+        "captured": "2026-10-11T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-2": {
+        "id": "broad-2",
+        "text": "宽词集合的合成记录2。",
+        "captured": "2026-10-12T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-3": {
+        "id": "broad-3",
+        "text": "宽词集合的合成记录3。",
+        "captured": "2026-10-13T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-4": {
+        "id": "broad-4",
+        "text": "宽词集合的合成记录4。",
+        "captured": "2026-10-14T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-5": {
+        "id": "broad-5",
+        "text": "宽词集合的合成记录5。",
+        "captured": "2026-10-15T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-6": {
+        "id": "broad-6",
+        "text": "宽词集合的合成记录6。",
+        "captured": "2026-10-16T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      },
+      "broad-7": {
+        "id": "broad-7",
+        "text": "宽词集合的合成记录7。",
+        "captured": "2026-10-17T13:00:00Z",
+        "zone": "UTC",
+        "support": "literal_record"
+      }
+    }
+  },
+  {
+    "query_id": "negative-question",
+    "route": "unified",
+    "category": "negation",
+    "lane": "roadmap",
+    "gold_count": 1,
+    "candidate_count": 0,
+    "returned_count": 0,
+    "recall_at_5": 0.0,
+    "full_candidate_recall": 0.0,
+    "oracle_top5_ceiling": 1.0,
+    "ndcg_at_5": 0.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "candidate_absent"
+    ],
+    "top5": [],
+    "missing_from_candidates": [
+      "negative"
+    ],
+    "missing_from_top5": [
+      "negative"
+    ],
+    "query": "我喝过可可吗",
+    "from": "",
+    "through": "",
+    "rationale": "自然语言是主方案后续质量探针，现有逐字入口未承诺分解该问句；否定原文仍是回答是否的重要证据。",
+    "gold": [
+      "negative"
+    ],
+    "records": {
+      "negative": {
+        "id": "negative",
+        "text": "我没有喝过可可。",
+        "captured": "2026-10-10T12:00:00Z",
+        "zone": "UTC",
+        "support": "negated_self_report"
+      }
+    }
+  },
+  {
+    "query_id": "negative-question",
+    "route": "original",
+    "category": "negation",
+    "lane": "roadmap",
+    "gold_count": 1,
+    "candidate_count": 0,
+    "returned_count": 0,
+    "recall_at_5": 0.0,
+    "full_candidate_recall": 0.0,
+    "oracle_top5_ceiling": 1.0,
+    "ndcg_at_5": 0.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "candidate_absent"
+    ],
+    "top5": [],
+    "missing_from_candidates": [
+      "negative"
+    ],
+    "missing_from_top5": [
+      "negative"
+    ],
+    "query": "我喝过可可吗",
+    "from": "",
+    "through": "",
+    "rationale": "自然语言是主方案后续质量探针，现有逐字入口未承诺分解该问句；否定原文仍是回答是否的重要证据。",
+    "gold": [
+      "negative"
+    ],
+    "records": {
+      "negative": {
+        "id": "negative",
+        "text": "我没有喝过可可。",
+        "captured": "2026-10-10T12:00:00Z",
+        "zone": "UTC",
+        "support": "negated_self_report"
+      }
+    }
+  },
+  {
+    "query_id": "negative-question",
+    "route": "evidence",
+    "category": "negation",
+    "lane": "roadmap",
+    "gold_count": 1,
+    "candidate_count": 0,
+    "returned_count": 0,
+    "recall_at_5": 0.0,
+    "full_candidate_recall": 0.0,
+    "oracle_top5_ceiling": 1.0,
+    "ndcg_at_5": 0.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "candidate_absent"
+    ],
+    "top5": [],
+    "missing_from_candidates": [
+      "negative"
+    ],
+    "missing_from_top5": [
+      "negative"
+    ],
+    "query": "我喝过可可吗",
+    "from": "",
+    "through": "",
+    "rationale": "自然语言是主方案后续质量探针，现有逐字入口未承诺分解该问句；否定原文仍是回答是否的重要证据。",
+    "gold": [
+      "negative"
+    ],
+    "records": {
+      "negative": {
+        "id": "negative",
+        "text": "我没有喝过可可。",
+        "captured": "2026-10-10T12:00:00Z",
+        "zone": "UTC",
+        "support": "negated_self_report"
+      }
+    }
+  },
+  {
+    "query_id": "quote-question",
+    "route": "unified",
+    "category": "quotation",
+    "lane": "roadmap",
+    "gold_count": 1,
+    "candidate_count": 0,
+    "returned_count": 0,
+    "recall_at_5": 0.0,
+    "full_candidate_recall": 0.0,
+    "oracle_top5_ceiling": 1.0,
+    "ndcg_at_5": 0.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "candidate_absent"
+    ],
+    "top5": [],
+    "missing_from_candidates": [
+      "quote"
+    ],
+    "missing_from_top5": [
+      "quote"
+    ],
+    "query": "谁说在海边跑步",
+    "from": "",
+    "through": "",
+    "rationale": "需问句分解；引用来源应保留主体，不作为自己的跑步经历。",
+    "gold": [
+      "quote"
+    ],
+    "records": {
+      "quote": {
+        "id": "quote",
+        "text": "小雨说：“我在海边跑步。”这不是我的经历。",
+        "captured": "2026-10-10T12:00:00Z",
+        "zone": "UTC",
+        "support": "other_person_quote_not_self"
+      }
+    }
+  },
+  {
+    "query_id": "quote-question",
+    "route": "original",
+    "category": "quotation",
+    "lane": "roadmap",
+    "gold_count": 1,
+    "candidate_count": 0,
+    "returned_count": 0,
+    "recall_at_5": 0.0,
+    "full_candidate_recall": 0.0,
+    "oracle_top5_ceiling": 1.0,
+    "ndcg_at_5": 0.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "candidate_absent"
+    ],
+    "top5": [],
+    "missing_from_candidates": [
+      "quote"
+    ],
+    "missing_from_top5": [
+      "quote"
+    ],
+    "query": "谁说在海边跑步",
+    "from": "",
+    "through": "",
+    "rationale": "需问句分解；引用来源应保留主体，不作为自己的跑步经历。",
+    "gold": [
+      "quote"
+    ],
+    "records": {
+      "quote": {
+        "id": "quote",
+        "text": "小雨说：“我在海边跑步。”这不是我的经历。",
+        "captured": "2026-10-10T12:00:00Z",
+        "zone": "UTC",
+        "support": "other_person_quote_not_self"
+      }
+    }
+  },
+  {
+    "query_id": "quote-question",
+    "route": "evidence",
+    "category": "quotation",
+    "lane": "roadmap",
+    "gold_count": 1,
+    "candidate_count": 0,
+    "returned_count": 0,
+    "recall_at_5": 0.0,
+    "full_candidate_recall": 0.0,
+    "oracle_top5_ceiling": 1.0,
+    "ndcg_at_5": 0.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "candidate_absent"
+    ],
+    "top5": [],
+    "missing_from_candidates": [
+      "quote"
+    ],
+    "missing_from_top5": [
+      "quote"
+    ],
+    "query": "谁说在海边跑步",
+    "from": "",
+    "through": "",
+    "rationale": "需问句分解；引用来源应保留主体，不作为自己的跑步经历。",
+    "gold": [
+      "quote"
+    ],
+    "records": {
+      "quote": {
+        "id": "quote",
+        "text": "小雨说：“我在海边跑步。”这不是我的经历。",
+        "captured": "2026-10-10T12:00:00Z",
+        "zone": "UTC",
+        "support": "other_person_quote_not_self"
+      }
+    }
+  },
+  {
+    "query_id": "relative-month",
+    "route": "unified",
+    "category": "time",
+    "lane": "roadmap",
+    "gold_count": 1,
+    "candidate_count": 0,
+    "returned_count": 0,
+    "recall_at_5": 0.0,
+    "full_candidate_recall": 0.0,
+    "oracle_top5_ceiling": 1.0,
+    "ndcg_at_5": 0.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "candidate_absent"
+    ],
+    "top5": [],
+    "missing_from_candidates": [
+      "capture-utc"
+    ],
+    "missing_from_top5": [
+      "capture-utc"
+    ],
+    "query": "上个月的展览",
+    "from": "",
+    "through": "",
+    "rationale": "固定参考2026-10-22T12:00Z，参考时区UTC；问的是捕获上个月，非事件发生时间；当前入口无自然日期解析。",
+    "gold": [
+      "capture-utc"
+    ],
+    "records": {
+      "capture-utc": {
+        "id": "capture-utc",
+        "text": "9月30日记下：10月1日计划展览。",
+        "captured": "2026-09-30T16:15:00Z",
+        "zone": "UTC",
+        "support": "captured_sep30_planned_event_oct1"
+      }
+    }
+  },
+  {
+    "query_id": "relative-month",
+    "route": "original",
+    "category": "time",
+    "lane": "roadmap",
+    "gold_count": 1,
+    "candidate_count": 0,
+    "returned_count": 0,
+    "recall_at_5": 0.0,
+    "full_candidate_recall": 0.0,
+    "oracle_top5_ceiling": 1.0,
+    "ndcg_at_5": 0.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "candidate_absent"
+    ],
+    "top5": [],
+    "missing_from_candidates": [
+      "capture-utc"
+    ],
+    "missing_from_top5": [
+      "capture-utc"
+    ],
+    "query": "上个月的展览",
+    "from": "",
+    "through": "",
+    "rationale": "固定参考2026-10-22T12:00Z，参考时区UTC；问的是捕获上个月，非事件发生时间；当前入口无自然日期解析。",
+    "gold": [
+      "capture-utc"
+    ],
+    "records": {
+      "capture-utc": {
+        "id": "capture-utc",
+        "text": "9月30日记下：10月1日计划展览。",
+        "captured": "2026-09-30T16:15:00Z",
+        "zone": "UTC",
+        "support": "captured_sep30_planned_event_oct1"
+      }
+    }
+  },
+  {
+    "query_id": "relative-month",
+    "route": "evidence",
+    "category": "time",
+    "lane": "roadmap",
+    "gold_count": 1,
+    "candidate_count": 0,
+    "returned_count": 0,
+    "recall_at_5": 0.0,
+    "full_candidate_recall": 0.0,
+    "oracle_top5_ceiling": 1.0,
+    "ndcg_at_5": 0.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "candidate_absent"
+    ],
+    "top5": [],
+    "missing_from_candidates": [
+      "capture-utc"
+    ],
+    "missing_from_top5": [
+      "capture-utc"
+    ],
+    "query": "上个月的展览",
+    "from": "",
+    "through": "",
+    "rationale": "固定参考2026-10-22T12:00Z，参考时区UTC；问的是捕获上个月，非事件发生时间；当前入口无自然日期解析。",
+    "gold": [
+      "capture-utc"
+    ],
+    "records": {
+      "capture-utc": {
+        "id": "capture-utc",
+        "text": "9月30日记下：10月1日计划展览。",
+        "captured": "2026-09-30T16:15:00Z",
+        "zone": "UTC",
+        "support": "captured_sep30_planned_event_oct1"
+      }
+    }
+  },
+  {
+    "query_id": "conflict-question",
+    "route": "unified",
+    "category": "conflict",
+    "lane": "roadmap",
+    "gold_count": 3,
+    "candidate_count": 0,
+    "returned_count": 0,
+    "recall_at_5": 0.0,
+    "full_candidate_recall": 0.0,
+    "oracle_top5_ceiling": 1.0,
+    "ndcg_at_5": 0.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "candidate_absent"
+    ],
+    "top5": [],
+    "missing_from_candidates": [
+      "conflict-new",
+      "conflict-old",
+      "preference"
+    ],
+    "missing_from_top5": [
+      "conflict-new",
+      "conflict-old",
+      "preference"
+    ],
+    "query": "现在我喜欢什么饮品",
+    "from": "",
+    "through": "",
+    "rationale": "自然语言/喜欢与偏好关系未由当前逐字入口支持；保留冲突证据，不自动决定唯一真值。",
+    "gold": [
+      "conflict-new",
+      "conflict-old",
+      "preference"
+    ],
+    "records": {
+      "conflict-new": {
+        "id": "conflict-new",
+        "text": "现在我偏好淡茶。",
+        "captured": "2026-10-20T12:00:00Z",
+        "zone": "UTC",
+        "support": "later_self_report_not_automatic_supersession"
+      },
+      "conflict-old": {
+        "id": "conflict-old",
+        "text": "以前我偏好浓茶。",
+        "captured": "2026-09-10T12:00:00Z",
+        "zone": "UTC",
+        "support": "historical_self_report_not_current_truth"
+      },
+      "preference": {
+        "id": "preference",
+        "text": "我偏好淡茶🙂",
+        "captured": "2026-10-10T12:00:00Z",
+        "zone": "UTC",
+        "support": "explicit_accepted_self_report",
+        "preference": true
+      }
+    }
+  },
+  {
+    "query_id": "conflict-question",
+    "route": "original",
+    "category": "conflict",
+    "lane": "roadmap",
+    "gold_count": 3,
+    "candidate_count": 0,
+    "returned_count": 0,
+    "recall_at_5": 0.0,
+    "full_candidate_recall": 0.0,
+    "oracle_top5_ceiling": 1.0,
+    "ndcg_at_5": 0.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "candidate_absent"
+    ],
+    "top5": [],
+    "missing_from_candidates": [
+      "conflict-new",
+      "conflict-old",
+      "preference"
+    ],
+    "missing_from_top5": [
+      "conflict-new",
+      "conflict-old",
+      "preference"
+    ],
+    "query": "现在我喜欢什么饮品",
+    "from": "",
+    "through": "",
+    "rationale": "自然语言/喜欢与偏好关系未由当前逐字入口支持；保留冲突证据，不自动决定唯一真值。",
+    "gold": [
+      "conflict-new",
+      "conflict-old",
+      "preference"
+    ],
+    "records": {
+      "conflict-new": {
+        "id": "conflict-new",
+        "text": "现在我偏好淡茶。",
+        "captured": "2026-10-20T12:00:00Z",
+        "zone": "UTC",
+        "support": "later_self_report_not_automatic_supersession"
+      },
+      "conflict-old": {
+        "id": "conflict-old",
+        "text": "以前我偏好浓茶。",
+        "captured": "2026-09-10T12:00:00Z",
+        "zone": "UTC",
+        "support": "historical_self_report_not_current_truth"
+      },
+      "preference": {
+        "id": "preference",
+        "text": "我偏好淡茶🙂",
+        "captured": "2026-10-10T12:00:00Z",
+        "zone": "UTC",
+        "support": "explicit_accepted_self_report",
+        "preference": true
+      }
+    }
+  },
+  {
+    "query_id": "conflict-question",
+    "route": "evidence",
+    "category": "conflict",
+    "lane": "roadmap",
+    "gold_count": 3,
+    "candidate_count": 0,
+    "returned_count": 0,
+    "recall_at_5": 0.0,
+    "full_candidate_recall": 0.0,
+    "oracle_top5_ceiling": 1.0,
+    "ndcg_at_5": 0.0,
+    "no_answer_false_positive": false,
+    "failure_kinds": [
+      "candidate_absent"
+    ],
+    "top5": [],
+    "missing_from_candidates": [
+      "conflict-new",
+      "conflict-old",
+      "preference"
+    ],
+    "missing_from_top5": [
+      "conflict-new",
+      "conflict-old",
+      "preference"
+    ],
+    "query": "现在我喜欢什么饮品",
+    "from": "",
+    "through": "",
+    "rationale": "自然语言/喜欢与偏好关系未由当前逐字入口支持；保留冲突证据，不自动决定唯一真值。",
+    "gold": [
+      "conflict-new",
+      "conflict-old",
+      "preference"
+    ],
+    "records": {
+      "conflict-new": {
+        "id": "conflict-new",
+        "text": "现在我偏好淡茶。",
+        "captured": "2026-10-20T12:00:00Z",
+        "zone": "UTC",
+        "support": "later_self_report_not_automatic_supersession"
+      },
+      "conflict-old": {
+        "id": "conflict-old",
+        "text": "以前我偏好浓茶。",
+        "captured": "2026-09-10T12:00:00Z",
+        "zone": "UTC",
+        "support": "historical_self_report_not_current_truth"
+      },
+      "preference": {
+        "id": "preference",
+        "text": "我偏好淡茶🙂",
+        "captured": "2026-10-10T12:00:00Z",
+        "zone": "UTC",
+        "support": "explicit_accepted_self_report",
+        "preference": true
+      }
+    }
+  }
+]

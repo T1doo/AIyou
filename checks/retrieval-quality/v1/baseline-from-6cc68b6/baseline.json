@@ -1,0 +1,2114 @@
+{
+  "catalog_sha256": "b37ce3766060e1fccf6a73b58208fd616e9290af71311a53fbccba722627abdb",
+  "production_base_sha": "6cc68b6a3fbdab4f92d20cb30f5553363b300cef",
+  "records": 33,
+  "labeled_queries": 28,
+  "population": "curated challenge examples, not a random user sample; no generalization or production quality claim",
+  "authorship": "single agent authored, synthetic, provisionally labeled before first execution; no independent human relevance adjudication yet",
+  "metrics": "Macro Recall@5 over nonempty independently listed source-group gold; no-answer cases separate. No pooling routes.",
+  "routes": {
+    "evidence": {
+      "all": {
+        "queries": 22,
+        "positive_queries": 17,
+        "empty_gold_queries": 5,
+        "macro_recall_at_5": 0.73109243697479,
+        "macro_full_candidate_recall": 0.7647058823529411,
+        "macro_oracle_top5_ceiling": 0.9663865546218486,
+        "macro_ndcg_at_5": 0.7647058823529411,
+        "empty_gold_false_positive_count": 0,
+        "failure_query_counts": {
+          "candidate_absent": 4,
+          "ranking_or_evidence_budget": 0,
+          "top5_capacity_not_ranking_defect": 2,
+          "graded_order_loss": 0,
+          "no_answer_false_positive": 0
+        }
+      },
+      "lanes": {
+        "contract": {
+          "queries": 18,
+          "positive_queries": 13,
+          "empty_gold_queries": 5,
+          "macro_recall_at_5": 0.9560439560439561,
+          "macro_full_candidate_recall": 1.0,
+          "macro_oracle_top5_ceiling": 0.9560439560439561,
+          "macro_ndcg_at_5": 1.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 2,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "roadmap": {
+          "queries": 4,
+          "positive_queries": 4,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.0,
+          "macro_full_candidate_recall": 0.0,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 4,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        }
+      },
+      "categories": {
+        "alias": {
+          "queries": 3,
+          "positive_queries": 0,
+          "empty_gold_queries": 3,
+          "macro_recall_at_5": null,
+          "macro_full_candidate_recall": null,
+          "macro_oracle_top5_ceiling": null,
+          "macro_ndcg_at_5": null,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "conflict": {
+          "queries": 2,
+          "positive_queries": 2,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.5,
+          "macro_full_candidate_recall": 0.5,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.5,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 1,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "control": {
+          "queries": 1,
+          "positive_queries": 1,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 1.0,
+          "macro_full_candidate_recall": 1.0,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 1.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "lexical": {
+          "queries": 4,
+          "positive_queries": 4,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.8571428571428572,
+          "macro_full_candidate_recall": 1.0,
+          "macro_oracle_top5_ceiling": 0.8571428571428572,
+          "macro_ndcg_at_5": 1.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 2,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "negation": {
+          "queries": 3,
+          "positive_queries": 3,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.6666666666666666,
+          "macro_full_candidate_recall": 0.6666666666666666,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.6666666666666666,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 1,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "quotation": {
+          "queries": 2,
+          "positive_queries": 2,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.5,
+          "macro_full_candidate_recall": 0.5,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.5,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 1,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "retirement": {
+          "queries": 3,
+          "positive_queries": 1,
+          "empty_gold_queries": 2,
+          "macro_recall_at_5": 1.0,
+          "macro_full_candidate_recall": 1.0,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 1.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "time": {
+          "queries": 4,
+          "positive_queries": 4,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.75,
+          "macro_full_candidate_recall": 0.75,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.75,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 1,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        }
+      }
+    },
+    "original": {
+      "all": {
+        "queries": 22,
+        "positive_queries": 19,
+        "empty_gold_queries": 3,
+        "macro_recall_at_5": 0.7593984962406015,
+        "macro_full_candidate_recall": 0.7894736842105263,
+        "macro_oracle_top5_ceiling": 0.9699248120300751,
+        "macro_ndcg_at_5": 0.7894736842105263,
+        "empty_gold_false_positive_count": 0,
+        "failure_query_counts": {
+          "candidate_absent": 4,
+          "ranking_or_evidence_budget": 0,
+          "top5_capacity_not_ranking_defect": 2,
+          "graded_order_loss": 0,
+          "no_answer_false_positive": 0
+        }
+      },
+      "lanes": {
+        "contract": {
+          "queries": 18,
+          "positive_queries": 15,
+          "empty_gold_queries": 3,
+          "macro_recall_at_5": 0.9619047619047619,
+          "macro_full_candidate_recall": 1.0,
+          "macro_oracle_top5_ceiling": 0.9619047619047619,
+          "macro_ndcg_at_5": 1.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 2,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "roadmap": {
+          "queries": 4,
+          "positive_queries": 4,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.0,
+          "macro_full_candidate_recall": 0.0,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 4,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        }
+      },
+      "categories": {
+        "alias": {
+          "queries": 3,
+          "positive_queries": 2,
+          "empty_gold_queries": 1,
+          "macro_recall_at_5": 1.0,
+          "macro_full_candidate_recall": 1.0,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 1.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "conflict": {
+          "queries": 2,
+          "positive_queries": 2,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.5,
+          "macro_full_candidate_recall": 0.5,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.5,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 1,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "control": {
+          "queries": 1,
+          "positive_queries": 1,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 1.0,
+          "macro_full_candidate_recall": 1.0,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 1.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "lexical": {
+          "queries": 4,
+          "positive_queries": 4,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.8571428571428572,
+          "macro_full_candidate_recall": 1.0,
+          "macro_oracle_top5_ceiling": 0.8571428571428572,
+          "macro_ndcg_at_5": 1.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 2,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "negation": {
+          "queries": 3,
+          "positive_queries": 3,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.6666666666666666,
+          "macro_full_candidate_recall": 0.6666666666666666,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.6666666666666666,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 1,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "quotation": {
+          "queries": 2,
+          "positive_queries": 2,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.5,
+          "macro_full_candidate_recall": 0.5,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.5,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 1,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "retirement": {
+          "queries": 3,
+          "positive_queries": 1,
+          "empty_gold_queries": 2,
+          "macro_recall_at_5": 1.0,
+          "macro_full_candidate_recall": 1.0,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 1.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "time": {
+          "queries": 4,
+          "positive_queries": 4,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.75,
+          "macro_full_candidate_recall": 0.75,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.75,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 1,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        }
+      }
+    },
+    "unified": {
+      "all": {
+        "queries": 28,
+        "positive_queries": 20,
+        "empty_gold_queries": 8,
+        "macro_recall_at_5": 0.7857142857142857,
+        "macro_full_candidate_recall": 0.8,
+        "macro_oracle_top5_ceiling": 0.9857142857142858,
+        "macro_ndcg_at_5": 0.8,
+        "empty_gold_false_positive_count": 0,
+        "failure_query_counts": {
+          "candidate_absent": 4,
+          "ranking_or_evidence_budget": 0,
+          "top5_capacity_not_ranking_defect": 1,
+          "graded_order_loss": 0,
+          "no_answer_false_positive": 0
+        }
+      },
+      "lanes": {
+        "contract": {
+          "queries": 24,
+          "positive_queries": 16,
+          "empty_gold_queries": 8,
+          "macro_recall_at_5": 0.9821428571428571,
+          "macro_full_candidate_recall": 1.0,
+          "macro_oracle_top5_ceiling": 0.9821428571428571,
+          "macro_ndcg_at_5": 1.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 1,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "roadmap": {
+          "queries": 4,
+          "positive_queries": 4,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.0,
+          "macro_full_candidate_recall": 0.0,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 4,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        }
+      },
+      "categories": {
+        "alias": {
+          "queries": 3,
+          "positive_queries": 0,
+          "empty_gold_queries": 3,
+          "macro_recall_at_5": null,
+          "macro_full_candidate_recall": null,
+          "macro_oracle_top5_ceiling": null,
+          "macro_ndcg_at_5": null,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "conflict": {
+          "queries": 2,
+          "positive_queries": 2,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.5,
+          "macro_full_candidate_recall": 0.5,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.5,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 1,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "control": {
+          "queries": 5,
+          "positive_queries": 5,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 1.0,
+          "macro_full_candidate_recall": 1.0,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 1.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "lexical": {
+          "queries": 4,
+          "positive_queries": 3,
+          "empty_gold_queries": 1,
+          "macro_recall_at_5": 0.9047619047619048,
+          "macro_full_candidate_recall": 1.0,
+          "macro_oracle_top5_ceiling": 0.9047619047619048,
+          "macro_ndcg_at_5": 1.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 1,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "negation": {
+          "queries": 3,
+          "positive_queries": 3,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.6666666666666666,
+          "macro_full_candidate_recall": 0.6666666666666666,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.6666666666666666,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 1,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "quotation": {
+          "queries": 2,
+          "positive_queries": 2,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.5,
+          "macro_full_candidate_recall": 0.5,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.5,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 1,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "retirement": {
+          "queries": 5,
+          "positive_queries": 1,
+          "empty_gold_queries": 4,
+          "macro_recall_at_5": 1.0,
+          "macro_full_candidate_recall": 1.0,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 1.0,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 0,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        },
+        "time": {
+          "queries": 4,
+          "positive_queries": 4,
+          "empty_gold_queries": 0,
+          "macro_recall_at_5": 0.75,
+          "macro_full_candidate_recall": 0.75,
+          "macro_oracle_top5_ceiling": 1.0,
+          "macro_ndcg_at_5": 0.75,
+          "empty_gold_false_positive_count": 0,
+          "failure_query_counts": {
+            "candidate_absent": 1,
+            "ranking_or_evidence_budget": 0,
+            "top5_capacity_not_ranking_defect": 0,
+            "graded_order_loss": 0,
+            "no_answer_false_positive": 0
+          }
+        }
+      }
+    }
+  },
+  "cases": [
+    {
+      "query_id": "control-original",
+      "route": "unified",
+      "category": "control",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "sunset"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "control-original",
+      "route": "original",
+      "category": "control",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "sunset"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "control-original",
+      "route": "evidence",
+      "category": "control",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "sunset"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "control-audio",
+      "route": "unified",
+      "category": "control",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "audio"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "control-image",
+      "route": "unified",
+      "category": "control",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "image"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "control-preference",
+      "route": "unified",
+      "category": "control",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "preference"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "control-note",
+      "route": "unified",
+      "category": "control",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "memory"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "phrase-vs-scattered",
+      "route": "unified",
+      "category": "lexical",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "phrase"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "phrase-vs-scattered",
+      "route": "original",
+      "category": "lexical",
+      "lane": "contract",
+      "gold_count": 7,
+      "candidate_count": 7,
+      "returned_count": 7,
+      "recall_at_5": 0.7142857142857143,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 0.7142857142857143,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "top5_capacity_not_ranking_defect"
+      ],
+      "top5": [
+        "phrase",
+        "scattered-6",
+        "scattered-5",
+        "scattered-4",
+        "scattered-3"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": [
+        "scattered-1",
+        "scattered-2"
+      ]
+    },
+    {
+      "query_id": "phrase-vs-scattered",
+      "route": "evidence",
+      "category": "lexical",
+      "lane": "contract",
+      "gold_count": 7,
+      "candidate_count": 7,
+      "returned_count": 5,
+      "recall_at_5": 0.7142857142857143,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 0.7142857142857143,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "top5_capacity_not_ranking_defect"
+      ],
+      "top5": [
+        "phrase",
+        "scattered-6",
+        "scattered-5",
+        "scattered-4",
+        "scattered-3"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": [
+        "scattered-1",
+        "scattered-2"
+      ]
+    },
+    {
+      "query_id": "unicode-case",
+      "route": "unified",
+      "category": "lexical",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "unicode-case",
+      "route": "original",
+      "category": "lexical",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "case"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "unicode-case",
+      "route": "evidence",
+      "category": "lexical",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "case"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "single-character",
+      "route": "unified",
+      "category": "lexical",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "revised"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "single-character",
+      "route": "original",
+      "category": "lexical",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "revised"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "single-character",
+      "route": "evidence",
+      "category": "lexical",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "revised"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "broad-seven",
+      "route": "unified",
+      "category": "lexical",
+      "lane": "contract",
+      "gold_count": 7,
+      "candidate_count": 7,
+      "returned_count": 7,
+      "recall_at_5": 0.7142857142857143,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 0.7142857142857143,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "top5_capacity_not_ranking_defect"
+      ],
+      "top5": [
+        "broad-7",
+        "broad-6",
+        "broad-5",
+        "broad-4",
+        "broad-3"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": [
+        "broad-1",
+        "broad-2"
+      ]
+    },
+    {
+      "query_id": "broad-seven",
+      "route": "original",
+      "category": "lexical",
+      "lane": "contract",
+      "gold_count": 7,
+      "candidate_count": 7,
+      "returned_count": 7,
+      "recall_at_5": 0.7142857142857143,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 0.7142857142857143,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "top5_capacity_not_ranking_defect"
+      ],
+      "top5": [
+        "broad-7",
+        "broad-6",
+        "broad-5",
+        "broad-4",
+        "broad-3"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": [
+        "broad-1",
+        "broad-2"
+      ]
+    },
+    {
+      "query_id": "broad-seven",
+      "route": "evidence",
+      "category": "lexical",
+      "lane": "contract",
+      "gold_count": 7,
+      "candidate_count": 7,
+      "returned_count": 5,
+      "recall_at_5": 0.7142857142857143,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 0.7142857142857143,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "top5_capacity_not_ranking_defect"
+      ],
+      "top5": [
+        "broad-7",
+        "broad-6",
+        "broad-5",
+        "broad-4",
+        "broad-3"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": [
+        "broad-1",
+        "broad-2"
+      ]
+    },
+    {
+      "query_id": "negative-literal",
+      "route": "unified",
+      "category": "negation",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "negative"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "negative-literal",
+      "route": "original",
+      "category": "negation",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "negative"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "negative-literal",
+      "route": "evidence",
+      "category": "negation",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "negative"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "negative-question",
+      "route": "unified",
+      "category": "negation",
+      "lane": "roadmap",
+      "gold_count": 1,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": 0.0,
+      "full_candidate_recall": 0.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 0.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "candidate_absent"
+      ],
+      "top5": [],
+      "missing_from_candidates": [
+        "negative"
+      ],
+      "missing_from_top5": [
+        "negative"
+      ]
+    },
+    {
+      "query_id": "negative-question",
+      "route": "original",
+      "category": "negation",
+      "lane": "roadmap",
+      "gold_count": 1,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": 0.0,
+      "full_candidate_recall": 0.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 0.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "candidate_absent"
+      ],
+      "top5": [],
+      "missing_from_candidates": [
+        "negative"
+      ],
+      "missing_from_top5": [
+        "negative"
+      ]
+    },
+    {
+      "query_id": "negative-question",
+      "route": "evidence",
+      "category": "negation",
+      "lane": "roadmap",
+      "gold_count": 1,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": 0.0,
+      "full_candidate_recall": 0.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 0.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "candidate_absent"
+      ],
+      "top5": [],
+      "missing_from_candidates": [
+        "negative"
+      ],
+      "missing_from_top5": [
+        "negative"
+      ]
+    },
+    {
+      "query_id": "conditional-literal",
+      "route": "unified",
+      "category": "negation",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "conditional"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "conditional-literal",
+      "route": "original",
+      "category": "negation",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "conditional"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "conditional-literal",
+      "route": "evidence",
+      "category": "negation",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "conditional"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "quote-literal",
+      "route": "unified",
+      "category": "quotation",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "quote"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "quote-literal",
+      "route": "original",
+      "category": "quotation",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "quote"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "quote-literal",
+      "route": "evidence",
+      "category": "quotation",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "quote"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "quote-question",
+      "route": "unified",
+      "category": "quotation",
+      "lane": "roadmap",
+      "gold_count": 1,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": 0.0,
+      "full_candidate_recall": 0.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 0.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "candidate_absent"
+      ],
+      "top5": [],
+      "missing_from_candidates": [
+        "quote"
+      ],
+      "missing_from_top5": [
+        "quote"
+      ]
+    },
+    {
+      "query_id": "quote-question",
+      "route": "original",
+      "category": "quotation",
+      "lane": "roadmap",
+      "gold_count": 1,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": 0.0,
+      "full_candidate_recall": 0.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 0.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "candidate_absent"
+      ],
+      "top5": [],
+      "missing_from_candidates": [
+        "quote"
+      ],
+      "missing_from_top5": [
+        "quote"
+      ]
+    },
+    {
+      "query_id": "quote-question",
+      "route": "evidence",
+      "category": "quotation",
+      "lane": "roadmap",
+      "gold_count": 1,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": 0.0,
+      "full_candidate_recall": 0.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 0.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "candidate_absent"
+      ],
+      "top5": [],
+      "missing_from_candidates": [
+        "quote"
+      ],
+      "missing_from_top5": [
+        "quote"
+      ]
+    },
+    {
+      "query_id": "capture-oct1",
+      "route": "unified",
+      "category": "time",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "capture-shanghai"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "capture-oct1",
+      "route": "original",
+      "category": "time",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "capture-shanghai"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "capture-oct1",
+      "route": "evidence",
+      "category": "time",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "capture-shanghai"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "capture-sep30",
+      "route": "unified",
+      "category": "time",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "capture-utc"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "capture-sep30",
+      "route": "original",
+      "category": "time",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "capture-utc"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "capture-sep30",
+      "route": "evidence",
+      "category": "time",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "capture-utc"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "relative-month",
+      "route": "unified",
+      "category": "time",
+      "lane": "roadmap",
+      "gold_count": 1,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": 0.0,
+      "full_candidate_recall": 0.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 0.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "candidate_absent"
+      ],
+      "top5": [],
+      "missing_from_candidates": [
+        "capture-utc"
+      ],
+      "missing_from_top5": [
+        "capture-utc"
+      ]
+    },
+    {
+      "query_id": "relative-month",
+      "route": "original",
+      "category": "time",
+      "lane": "roadmap",
+      "gold_count": 1,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": 0.0,
+      "full_candidate_recall": 0.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 0.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "candidate_absent"
+      ],
+      "top5": [],
+      "missing_from_candidates": [
+        "capture-utc"
+      ],
+      "missing_from_top5": [
+        "capture-utc"
+      ]
+    },
+    {
+      "query_id": "relative-month",
+      "route": "evidence",
+      "category": "time",
+      "lane": "roadmap",
+      "gold_count": 1,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": 0.0,
+      "full_candidate_recall": 0.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 0.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "candidate_absent"
+      ],
+      "top5": [],
+      "missing_from_candidates": [
+        "capture-utc"
+      ],
+      "missing_from_top5": [
+        "capture-utc"
+      ]
+    },
+    {
+      "query_id": "date-in-body",
+      "route": "unified",
+      "category": "time",
+      "lane": "contract",
+      "gold_count": 2,
+      "candidate_count": 2,
+      "returned_count": 2,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "capture-utc",
+        "capture-shanghai"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "date-in-body",
+      "route": "original",
+      "category": "time",
+      "lane": "contract",
+      "gold_count": 2,
+      "candidate_count": 2,
+      "returned_count": 2,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "capture-utc",
+        "capture-shanghai"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "date-in-body",
+      "route": "evidence",
+      "category": "time",
+      "lane": "contract",
+      "gold_count": 2,
+      "candidate_count": 2,
+      "returned_count": 2,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "capture-utc",
+        "capture-shanghai"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "manual-alias",
+      "route": "unified",
+      "category": "alias",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "manual-alias",
+      "route": "original",
+      "category": "alias",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "alias"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "manual-alias",
+      "route": "evidence",
+      "category": "alias",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "manual-space-alias",
+      "route": "unified",
+      "category": "alias",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "manual-space-alias",
+      "route": "original",
+      "category": "alias",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "alias-space"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "manual-space-alias",
+      "route": "evidence",
+      "category": "alias",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "unknown-alias",
+      "route": "unified",
+      "category": "alias",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "unknown-alias",
+      "route": "original",
+      "category": "alias",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "unknown-alias",
+      "route": "evidence",
+      "category": "alias",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "conflict-coexist",
+      "route": "unified",
+      "category": "conflict",
+      "lane": "contract",
+      "gold_count": 3,
+      "candidate_count": 3,
+      "returned_count": 3,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "conflict-new",
+        "preference",
+        "conflict-old"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "conflict-coexist",
+      "route": "original",
+      "category": "conflict",
+      "lane": "contract",
+      "gold_count": 3,
+      "candidate_count": 3,
+      "returned_count": 3,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "conflict-new",
+        "preference",
+        "conflict-old"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "conflict-coexist",
+      "route": "evidence",
+      "category": "conflict",
+      "lane": "contract",
+      "gold_count": 3,
+      "candidate_count": 3,
+      "returned_count": 3,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "conflict-new",
+        "preference",
+        "conflict-old"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "conflict-question",
+      "route": "unified",
+      "category": "conflict",
+      "lane": "roadmap",
+      "gold_count": 3,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": 0.0,
+      "full_candidate_recall": 0.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 0.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "candidate_absent"
+      ],
+      "top5": [],
+      "missing_from_candidates": [
+        "conflict-new",
+        "conflict-old",
+        "preference"
+      ],
+      "missing_from_top5": [
+        "conflict-new",
+        "conflict-old",
+        "preference"
+      ]
+    },
+    {
+      "query_id": "conflict-question",
+      "route": "original",
+      "category": "conflict",
+      "lane": "roadmap",
+      "gold_count": 3,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": 0.0,
+      "full_candidate_recall": 0.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 0.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "candidate_absent"
+      ],
+      "top5": [],
+      "missing_from_candidates": [
+        "conflict-new",
+        "conflict-old",
+        "preference"
+      ],
+      "missing_from_top5": [
+        "conflict-new",
+        "conflict-old",
+        "preference"
+      ]
+    },
+    {
+      "query_id": "conflict-question",
+      "route": "evidence",
+      "category": "conflict",
+      "lane": "roadmap",
+      "gold_count": 3,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": 0.0,
+      "full_candidate_recall": 0.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 0.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [
+        "candidate_absent"
+      ],
+      "top5": [],
+      "missing_from_candidates": [
+        "conflict-new",
+        "conflict-old",
+        "preference"
+      ],
+      "missing_from_top5": [
+        "conflict-new",
+        "conflict-old",
+        "preference"
+      ]
+    },
+    {
+      "query_id": "deleted-record",
+      "route": "unified",
+      "category": "retirement",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "deleted-record",
+      "route": "original",
+      "category": "retirement",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "deleted-record",
+      "route": "evidence",
+      "category": "retirement",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "old-revision",
+      "route": "unified",
+      "category": "retirement",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "old-revision",
+      "route": "original",
+      "category": "retirement",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "old-revision",
+      "route": "evidence",
+      "category": "retirement",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "current-revision",
+      "route": "unified",
+      "category": "retirement",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "revised"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "current-revision",
+      "route": "original",
+      "category": "retirement",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "revised"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "current-revision",
+      "route": "evidence",
+      "category": "retirement",
+      "lane": "contract",
+      "gold_count": 1,
+      "candidate_count": 1,
+      "returned_count": 1,
+      "recall_at_5": 1.0,
+      "full_candidate_recall": 1.0,
+      "oracle_top5_ceiling": 1.0,
+      "ndcg_at_5": 1.0,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [
+        "revised"
+      ],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "withdrawn-note",
+      "route": "unified",
+      "category": "retirement",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    },
+    {
+      "query_id": "ai-none-note",
+      "route": "unified",
+      "category": "retirement",
+      "lane": "contract",
+      "gold_count": 0,
+      "candidate_count": 0,
+      "returned_count": 0,
+      "recall_at_5": null,
+      "full_candidate_recall": null,
+      "oracle_top5_ceiling": null,
+      "ndcg_at_5": null,
+      "no_answer_false_positive": false,
+      "failure_kinds": [],
+      "top5": [],
+      "missing_from_candidates": [],
+      "missing_from_top5": []
+    }
+  ]
+}

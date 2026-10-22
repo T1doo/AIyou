@@ -1,0 +1,1029 @@
+{
+    "catalog_sha256": "b37ce3766060e1fccf6a73b58208fd616e9290af71311a53fbccba722627abdb",
+    "production_base_sha": "6cc68b6a3fbdab4f92d20cb30f5553363b300cef",
+    "scope": "actual production SQL/AEAD search and original matcher/evidence projection; host SQLite adapter, not device SQLCipher",
+    "results": [
+        {
+            "query_id": "control-original",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "sunset",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "control-original",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "sunset",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                }
+            ]
+        },
+        {
+            "query_id": "control-original",
+            "route": "evidence",
+            "stage": "READY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": [
+                {
+                    "id": "sunset",
+                    "revision": 1
+                }
+            ]
+        },
+        {
+            "query_id": "control-audio",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "audio",
+                    "revision": 1,
+                    "kinds": [
+                        "A"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "control-image",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "image",
+                    "revision": 1,
+                    "kinds": [
+                        "I"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "control-preference",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "preference",
+                    "revision": 1,
+                    "kinds": [
+                        "P"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "control-note",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "memory",
+                    "revision": 1,
+                    "kinds": [
+                        "M"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "phrase-vs-scattered",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "phrase",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "phrase-vs-scattered",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "phrase",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "scattered-6",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "scattered-5",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "scattered-4",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "scattered-3",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "scattered-2",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "scattered-1",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                }
+            ]
+        },
+        {
+            "query_id": "phrase-vs-scattered",
+            "route": "evidence",
+            "stage": "READY",
+            "proof_current": true,
+            "limited": true,
+            "ranked": [
+                {
+                    "id": "phrase",
+                    "revision": 1
+                },
+                {
+                    "id": "scattered-6",
+                    "revision": 1
+                },
+                {
+                    "id": "scattered-5",
+                    "revision": 1
+                },
+                {
+                    "id": "scattered-4",
+                    "revision": 1
+                },
+                {
+                    "id": "scattered-3",
+                    "revision": 1
+                }
+            ]
+        },
+        {
+            "query_id": "unicode-case",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "unicode-case",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "case",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                }
+            ]
+        },
+        {
+            "query_id": "unicode-case",
+            "route": "evidence",
+            "stage": "READY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": [
+                {
+                    "id": "case",
+                    "revision": 1
+                }
+            ]
+        },
+        {
+            "query_id": "single-character",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "revised",
+                    "revision": 2,
+                    "kinds": [
+                        "O"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "single-character",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "revised",
+                    "revision": 2,
+                    "original_match": true,
+                    "alias_match": false
+                }
+            ]
+        },
+        {
+            "query_id": "single-character",
+            "route": "evidence",
+            "stage": "READY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": [
+                {
+                    "id": "revised",
+                    "revision": 2
+                }
+            ]
+        },
+        {
+            "query_id": "broad-seven",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "broad-7",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                },
+                {
+                    "id": "broad-6",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                },
+                {
+                    "id": "broad-5",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                },
+                {
+                    "id": "broad-4",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                },
+                {
+                    "id": "broad-3",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                },
+                {
+                    "id": "broad-2",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                },
+                {
+                    "id": "broad-1",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "broad-seven",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "broad-7",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "broad-6",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "broad-5",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "broad-4",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "broad-3",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "broad-2",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "broad-1",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                }
+            ]
+        },
+        {
+            "query_id": "broad-seven",
+            "route": "evidence",
+            "stage": "READY",
+            "proof_current": true,
+            "limited": true,
+            "ranked": [
+                {
+                    "id": "broad-7",
+                    "revision": 1
+                },
+                {
+                    "id": "broad-6",
+                    "revision": 1
+                },
+                {
+                    "id": "broad-5",
+                    "revision": 1
+                },
+                {
+                    "id": "broad-4",
+                    "revision": 1
+                },
+                {
+                    "id": "broad-3",
+                    "revision": 1
+                }
+            ]
+        },
+        {
+            "query_id": "negative-literal",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "negative",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "negative-literal",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "negative",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                }
+            ]
+        },
+        {
+            "query_id": "negative-literal",
+            "route": "evidence",
+            "stage": "READY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": [
+                {
+                    "id": "negative",
+                    "revision": 1
+                }
+            ]
+        },
+        {
+            "query_id": "negative-question",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "negative-question",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "negative-question",
+            "route": "evidence",
+            "stage": "EMPTY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": []
+        },
+        {
+            "query_id": "conditional-literal",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "conditional",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "conditional-literal",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "conditional",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                }
+            ]
+        },
+        {
+            "query_id": "conditional-literal",
+            "route": "evidence",
+            "stage": "READY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": [
+                {
+                    "id": "conditional",
+                    "revision": 1
+                }
+            ]
+        },
+        {
+            "query_id": "quote-literal",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "quote",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "quote-literal",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "quote",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                }
+            ]
+        },
+        {
+            "query_id": "quote-literal",
+            "route": "evidence",
+            "stage": "READY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": [
+                {
+                    "id": "quote",
+                    "revision": 1
+                }
+            ]
+        },
+        {
+            "query_id": "quote-question",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "quote-question",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "quote-question",
+            "route": "evidence",
+            "stage": "EMPTY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": []
+        },
+        {
+            "query_id": "capture-oct1",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "capture-shanghai",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "capture-oct1",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "capture-shanghai",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                }
+            ]
+        },
+        {
+            "query_id": "capture-oct1",
+            "route": "evidence",
+            "stage": "READY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": [
+                {
+                    "id": "capture-shanghai",
+                    "revision": 1
+                }
+            ]
+        },
+        {
+            "query_id": "capture-sep30",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "capture-utc",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "capture-sep30",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "capture-utc",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                }
+            ]
+        },
+        {
+            "query_id": "capture-sep30",
+            "route": "evidence",
+            "stage": "READY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": [
+                {
+                    "id": "capture-utc",
+                    "revision": 1
+                }
+            ]
+        },
+        {
+            "query_id": "relative-month",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "relative-month",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "relative-month",
+            "route": "evidence",
+            "stage": "EMPTY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": []
+        },
+        {
+            "query_id": "date-in-body",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "capture-utc",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                },
+                {
+                    "id": "capture-shanghai",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "date-in-body",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "capture-utc",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "capture-shanghai",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                }
+            ]
+        },
+        {
+            "query_id": "date-in-body",
+            "route": "evidence",
+            "stage": "READY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": [
+                {
+                    "id": "capture-utc",
+                    "revision": 1
+                },
+                {
+                    "id": "capture-shanghai",
+                    "revision": 1
+                }
+            ]
+        },
+        {
+            "query_id": "manual-alias",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "manual-alias",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "alias",
+                    "revision": 1,
+                    "original_match": false,
+                    "alias_match": true
+                }
+            ]
+        },
+        {
+            "query_id": "manual-alias",
+            "route": "evidence",
+            "stage": "EMPTY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": []
+        },
+        {
+            "query_id": "manual-space-alias",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "manual-space-alias",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "alias-space",
+                    "revision": 1,
+                    "original_match": false,
+                    "alias_match": true
+                }
+            ]
+        },
+        {
+            "query_id": "manual-space-alias",
+            "route": "evidence",
+            "stage": "EMPTY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": []
+        },
+        {
+            "query_id": "unknown-alias",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "unknown-alias",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "unknown-alias",
+            "route": "evidence",
+            "stage": "EMPTY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": []
+        },
+        {
+            "query_id": "conflict-coexist",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "conflict-new",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                },
+                {
+                    "id": "preference",
+                    "revision": 1,
+                    "kinds": [
+                        "O",
+                        "P"
+                    ]
+                },
+                {
+                    "id": "conflict-old",
+                    "revision": 1,
+                    "kinds": [
+                        "O"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "conflict-coexist",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "conflict-new",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "preference",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                },
+                {
+                    "id": "conflict-old",
+                    "revision": 1,
+                    "original_match": true,
+                    "alias_match": false
+                }
+            ]
+        },
+        {
+            "query_id": "conflict-coexist",
+            "route": "evidence",
+            "stage": "READY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": [
+                {
+                    "id": "conflict-new",
+                    "revision": 1
+                },
+                {
+                    "id": "preference",
+                    "revision": 1
+                },
+                {
+                    "id": "conflict-old",
+                    "revision": 1
+                }
+            ]
+        },
+        {
+            "query_id": "conflict-question",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "conflict-question",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "conflict-question",
+            "route": "evidence",
+            "stage": "EMPTY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": []
+        },
+        {
+            "query_id": "deleted-record",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "deleted-record",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "deleted-record",
+            "route": "evidence",
+            "stage": "EMPTY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": []
+        },
+        {
+            "query_id": "old-revision",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "old-revision",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "old-revision",
+            "route": "evidence",
+            "stage": "EMPTY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": []
+        },
+        {
+            "query_id": "current-revision",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "revised",
+                    "revision": 2,
+                    "kinds": [
+                        "O"
+                    ]
+                }
+            ]
+        },
+        {
+            "query_id": "current-revision",
+            "route": "original",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": [
+                {
+                    "id": "revised",
+                    "revision": 2,
+                    "original_match": true,
+                    "alias_match": false
+                }
+            ]
+        },
+        {
+            "query_id": "current-revision",
+            "route": "evidence",
+            "stage": "READY",
+            "proof_current": true,
+            "limited": false,
+            "ranked": [
+                {
+                    "id": "revised",
+                    "revision": 2
+                }
+            ]
+        },
+        {
+            "query_id": "withdrawn-note",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        },
+        {
+            "query_id": "ai-none-note",
+            "route": "unified",
+            "stage": "READY",
+            "proof_current": true,
+            "ranked": []
+        }
+    ]
+}
