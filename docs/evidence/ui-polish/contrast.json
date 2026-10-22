@@ -1,0 +1,14 @@
+{
+  "base": "4f547c09b1b5c6674060a9fff6527768fee11b27",
+  "implementation": "d4b44f5374c8dc49e47fb2f8c434435581d7235d",
+  "kind": "static sRGB token contrast; no device claim",
+  "text_minimums": {
+    "textPrimary": 11.068293583490945,
+    "textSecondary": 5.163815073481776,
+    "primary": 5.717583046200463,
+    "success": 5.283543804430762,
+    "error": 5.152110724467829
+  },
+  "functional_outline_minimum": 3.6374885455615615,
+  "tested_code_commit": "fcf9553c971e72014cf6b44b6c4ac2ec6e1f9c99"
+}

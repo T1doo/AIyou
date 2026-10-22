@@ -1,0 +1,66 @@
+{
+  "kind": "targeted Layoutlib smoke; no device or approved golden claim",
+  "tests": 10,
+  "pngs": [
+    {
+      "file": "com/t1doo/aiyou/D01ScreenshotPreviewsKt/ShellRender_\u4e3b\u5bfc\u822a_5fbca5dc_0.png",
+      "width": 945,
+      "height": 2100,
+      "sha256": "41515663210d855c03530c436b933d4448c5ccbf1e07e097995bbd5740f62b80"
+    },
+    {
+      "file": "com/t1doo/aiyou/D01ScreenshotPreviewsKt/ShellRender_\u4e3b\u5bfc\u822a\u7a84\u5c4f\u5927\u5b57\u4f53_5529f59d_0.png",
+      "width": 840,
+      "height": 2100,
+      "sha256": "51f574ae9d2cb4ff1ae23a306e9244c25a170af89c59d08fa1dc350f4b46d255"
+    },
+    {
+      "file": "com/t1doo/aiyou/D01ScreenshotPreviewsKt/LocalEmptyRender_\u672c\u673a\u5927\u5c4f_438ada43_0.png",
+      "width": 2205,
+      "height": 2625,
+      "sha256": "ebb92d9ad7b50b5b8e6f2ae1d8264b89232f094eaa80db30aa405c4c54d0e47c"
+    },
+    {
+      "file": "com/t1doo/aiyou/D01ScreenshotPreviewsKt/LocalEmptyRender_\u672c\u673a\u5e38\u89c4_994efbf4_0.png",
+      "width": 945,
+      "height": 2100,
+      "sha256": "d547f2ccbf36fbd339e1ab5cd091897cae0462a36c2c3ec5447a456bb4e4a469"
+    },
+    {
+      "file": "com/t1doo/aiyou/D01ScreenshotPreviewsKt/LocalEmptyRender_\u672c\u673a\u6a2a\u5c4f_01211591_0.png",
+      "width": 2100,
+      "height": 945,
+      "sha256": "17472a92e07a988a8a461eae2347eeac1bde3878a951540a5f517853451058b1"
+    },
+    {
+      "file": "com/t1doo/aiyou/D01ScreenshotPreviewsKt/LocalEmptyRender_\u672c\u673a\u7a84\u5c4f\u5927\u5b57\u4f53_60cab41b_0.png",
+      "width": 840,
+      "height": 2625,
+      "sha256": "26a110a9d7f65f9d0fa43bb5cccb5bb90bd61a8baf87b6a70521db9f0863d934"
+    },
+    {
+      "file": "com/t1doo/aiyou/D01ScreenshotPreviewsKt/LocalSaveFailedRender_\u672c\u673a\u5927\u5c4f_438ada43_0.png",
+      "width": 2205,
+      "height": 2625,
+      "sha256": "48269d2928dff8fa939e7a7d6a4a36d85477396827a38f1df26bc083fb78cbb8"
+    },
+    {
+      "file": "com/t1doo/aiyou/D01ScreenshotPreviewsKt/LocalSaveFailedRender_\u672c\u673a\u5e38\u89c4_994efbf4_0.png",
+      "width": 945,
+      "height": 2100,
+      "sha256": "41fce4781d5f665299d7f2753c689774d7a8b69fa4733394e543f10ac7ba3a43"
+    },
+    {
+      "file": "com/t1doo/aiyou/D01ScreenshotPreviewsKt/LocalSaveFailedRender_\u672c\u673a\u6a2a\u5c4f_01211591_0.png",
+      "width": 2100,
+      "height": 945,
+      "sha256": "c826ae57e8d0ed02f9580ddb480fa1a615b7c42d3b8940f4d2a4b0f6d6feb8c5"
+    },
+    {
+      "file": "com/t1doo/aiyou/D01ScreenshotPreviewsKt/LocalSaveFailedRender_\u672c\u673a\u7a84\u5c4f\u5927\u5b57\u4f53_60cab41b_0.png",
+      "width": 840,
+      "height": 2625,
+      "sha256": "39782570088487e68128e613cd6b582dcedc9447b856e56221b4fd0f4b1a7ad2"
+    }
+  ]
+}
