@@ -150,7 +150,7 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
                 else if(u.tagPage?.choices?.isEmpty()==true)Text("当前没有可选的人工标签。",Modifier.testTag("unified-tags-empty"))
             }
             if(!u.tagBusy&&u.tagError==null)items(u.tagPage?.choices.orEmpty(),key={it.id}){choice->
-                OutlinedButton({if(canUse())c.selectTag(u.session,choice)},modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tag-choice:"+choice.id)){Text(choice.name)}
+                OutlinedButton({if(canUse())c.selectTag(u.session,choice)},shape=MaterialTheme.shapes.medium,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tag-choice:"+choice.id)){Text(choice.name)}
             }
             item {
                 TextButton({if(canUse())c.loadTags(u.session)},enabled=!u.tagBusy,modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-tags-first")){Text(if(u.tagError!=null)"重新核对标签"else"重新查看第一页")}
