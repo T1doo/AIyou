@@ -1,0 +1,1539 @@
+{
+    "corpus_sha256": "3a178b53261fbadda64ccde12051e268a7d6d91c419817e286cbdaeb75960c0b",
+    "production_base_sha": "6cc68b6a3fbdab4f92d20cb30f5553363b300cef",
+    "prototype_revision": 2,
+    "resource_revision": "whole-run candidate <=16 codepoints; same frozen corpus/labels; no content-specific rule",
+    "scope": "nonshipping fragment prototype and actual original recall after prewritten synthetic user choices; no automatic query selection, UI or user study",
+    "results": [
+        {
+            "id": "heldout-star",
+            "question": "我去观星台拍照了吗？",
+            "status": "confirmed_script",
+            "truncated": false,
+            "proposals": [
+                {
+                    "text": "我去观星台拍照了吗",
+                    "start": 0,
+                    "end": 9
+                },
+                {
+                    "text": "我去观星",
+                    "start": 0,
+                    "end": 4
+                },
+                {
+                    "text": "我去观",
+                    "start": 0,
+                    "end": 3
+                },
+                {
+                    "text": "我去",
+                    "start": 0,
+                    "end": 2
+                },
+                {
+                    "text": "我",
+                    "start": 0,
+                    "end": 1
+                },
+                {
+                    "text": "去观星台",
+                    "start": 1,
+                    "end": 5
+                },
+                {
+                    "text": "去观星",
+                    "start": 1,
+                    "end": 4
+                },
+                {
+                    "text": "去观",
+                    "start": 1,
+                    "end": 3
+                },
+                {
+                    "text": "去",
+                    "start": 1,
+                    "end": 2
+                },
+                {
+                    "text": "观星台拍",
+                    "start": 2,
+                    "end": 6
+                },
+                {
+                    "text": "观星台",
+                    "start": 2,
+                    "end": 5
+                },
+                {
+                    "text": "观星",
+                    "start": 2,
+                    "end": 4
+                },
+                {
+                    "text": "观",
+                    "start": 2,
+                    "end": 3
+                },
+                {
+                    "text": "星台拍照",
+                    "start": 3,
+                    "end": 7
+                },
+                {
+                    "text": "星台拍",
+                    "start": 3,
+                    "end": 6
+                },
+                {
+                    "text": "星台",
+                    "start": 3,
+                    "end": 5
+                },
+                {
+                    "text": "星",
+                    "start": 3,
+                    "end": 4
+                },
+                {
+                    "text": "台拍照了",
+                    "start": 4,
+                    "end": 8
+                },
+                {
+                    "text": "台拍照",
+                    "start": 4,
+                    "end": 7
+                },
+                {
+                    "text": "台拍",
+                    "start": 4,
+                    "end": 6
+                },
+                {
+                    "text": "台",
+                    "start": 4,
+                    "end": 5
+                },
+                {
+                    "text": "拍照了吗",
+                    "start": 5,
+                    "end": 9
+                },
+                {
+                    "text": "拍照了",
+                    "start": 5,
+                    "end": 8
+                },
+                {
+                    "text": "拍照",
+                    "start": 5,
+                    "end": 7
+                },
+                {
+                    "text": "拍",
+                    "start": 5,
+                    "end": 6
+                },
+                {
+                    "text": "照了吗",
+                    "start": 6,
+                    "end": 9
+                },
+                {
+                    "text": "照了",
+                    "start": 6,
+                    "end": 8
+                },
+                {
+                    "text": "照",
+                    "start": 6,
+                    "end": 7
+                },
+                {
+                    "text": "了吗",
+                    "start": 7,
+                    "end": 9
+                },
+                {
+                    "text": "了",
+                    "start": 7,
+                    "end": 8
+                },
+                {
+                    "text": "吗",
+                    "start": 8,
+                    "end": 9
+                }
+            ],
+            "query_executed": true,
+            "confirmed_query": "观星台 拍照",
+            "all_terms_offered": true,
+            "raw_question": {
+                "query": "我去观星台拍照了吗？",
+                "ranked": []
+            },
+            "after_scripted_confirmation": {
+                "query": "观星台 拍照",
+                "ranked": [
+                    {
+                        "id": "star-negative",
+                        "revision": 1,
+                        "original": "我没有在观星台拍照。",
+                        "original_match": true
+                    },
+                    {
+                        "id": "star-self",
+                        "revision": 1,
+                        "original": "昨晚我在观星台拍照。",
+                        "original_match": true
+                    },
+                    {
+                        "id": "star-quote",
+                        "revision": 1,
+                        "original": "小舟说：“我在观星台拍照。”这不是我的经历。",
+                        "original_match": true
+                    }
+                ]
+            }
+        },
+        {
+            "id": "heldout-book",
+            "question": "哪次在图书馆借绘本？",
+            "status": "confirmed_script",
+            "truncated": false,
+            "proposals": [
+                {
+                    "text": "哪次在图书馆借绘本",
+                    "start": 0,
+                    "end": 9
+                },
+                {
+                    "text": "哪次在图",
+                    "start": 0,
+                    "end": 4
+                },
+                {
+                    "text": "哪次在",
+                    "start": 0,
+                    "end": 3
+                },
+                {
+                    "text": "哪次",
+                    "start": 0,
+                    "end": 2
+                },
+                {
+                    "text": "哪",
+                    "start": 0,
+                    "end": 1
+                },
+                {
+                    "text": "次在图书",
+                    "start": 1,
+                    "end": 5
+                },
+                {
+                    "text": "次在图",
+                    "start": 1,
+                    "end": 4
+                },
+                {
+                    "text": "次在",
+                    "start": 1,
+                    "end": 3
+                },
+                {
+                    "text": "次",
+                    "start": 1,
+                    "end": 2
+                },
+                {
+                    "text": "在图书馆",
+                    "start": 2,
+                    "end": 6
+                },
+                {
+                    "text": "在图书",
+                    "start": 2,
+                    "end": 5
+                },
+                {
+                    "text": "在图",
+                    "start": 2,
+                    "end": 4
+                },
+                {
+                    "text": "在",
+                    "start": 2,
+                    "end": 3
+                },
+                {
+                    "text": "图书馆借",
+                    "start": 3,
+                    "end": 7
+                },
+                {
+                    "text": "图书馆",
+                    "start": 3,
+                    "end": 6
+                },
+                {
+                    "text": "图书",
+                    "start": 3,
+                    "end": 5
+                },
+                {
+                    "text": "图",
+                    "start": 3,
+                    "end": 4
+                },
+                {
+                    "text": "书馆借绘",
+                    "start": 4,
+                    "end": 8
+                },
+                {
+                    "text": "书馆借",
+                    "start": 4,
+                    "end": 7
+                },
+                {
+                    "text": "书馆",
+                    "start": 4,
+                    "end": 6
+                },
+                {
+                    "text": "书",
+                    "start": 4,
+                    "end": 5
+                },
+                {
+                    "text": "馆借绘本",
+                    "start": 5,
+                    "end": 9
+                },
+                {
+                    "text": "馆借绘",
+                    "start": 5,
+                    "end": 8
+                },
+                {
+                    "text": "馆借",
+                    "start": 5,
+                    "end": 7
+                },
+                {
+                    "text": "馆",
+                    "start": 5,
+                    "end": 6
+                },
+                {
+                    "text": "借绘本",
+                    "start": 6,
+                    "end": 9
+                },
+                {
+                    "text": "借绘",
+                    "start": 6,
+                    "end": 8
+                },
+                {
+                    "text": "借",
+                    "start": 6,
+                    "end": 7
+                },
+                {
+                    "text": "绘本",
+                    "start": 7,
+                    "end": 9
+                },
+                {
+                    "text": "绘",
+                    "start": 7,
+                    "end": 8
+                },
+                {
+                    "text": "本",
+                    "start": 8,
+                    "end": 9
+                }
+            ],
+            "query_executed": true,
+            "confirmed_query": "图书馆 借 绘本",
+            "all_terms_offered": true,
+            "raw_question": {
+                "query": "哪次在图书馆借绘本？",
+                "ranked": []
+            },
+            "after_scripted_confirmation": {
+                "query": "图书馆 借 绘本",
+                "ranked": [
+                    {
+                        "id": "book-borrow",
+                        "revision": 1,
+                        "original": "今天在图书馆借绘本。",
+                        "original_match": true
+                    }
+                ]
+            }
+        },
+        {
+            "id": "heldout-negation",
+            "question": "我没种薄荷吗？",
+            "status": "confirmed_script",
+            "truncated": false,
+            "proposals": [
+                {
+                    "text": "我没种薄荷吗",
+                    "start": 0,
+                    "end": 6
+                },
+                {
+                    "text": "我没种薄",
+                    "start": 0,
+                    "end": 4
+                },
+                {
+                    "text": "我没种",
+                    "start": 0,
+                    "end": 3
+                },
+                {
+                    "text": "我没",
+                    "start": 0,
+                    "end": 2
+                },
+                {
+                    "text": "我",
+                    "start": 0,
+                    "end": 1
+                },
+                {
+                    "text": "没种薄荷",
+                    "start": 1,
+                    "end": 5
+                },
+                {
+                    "text": "没种薄",
+                    "start": 1,
+                    "end": 4
+                },
+                {
+                    "text": "没种",
+                    "start": 1,
+                    "end": 3
+                },
+                {
+                    "text": "没",
+                    "start": 1,
+                    "end": 2
+                },
+                {
+                    "text": "种薄荷吗",
+                    "start": 2,
+                    "end": 6
+                },
+                {
+                    "text": "种薄荷",
+                    "start": 2,
+                    "end": 5
+                },
+                {
+                    "text": "种薄",
+                    "start": 2,
+                    "end": 4
+                },
+                {
+                    "text": "种",
+                    "start": 2,
+                    "end": 3
+                },
+                {
+                    "text": "薄荷吗",
+                    "start": 3,
+                    "end": 6
+                },
+                {
+                    "text": "薄荷",
+                    "start": 3,
+                    "end": 5
+                },
+                {
+                    "text": "薄",
+                    "start": 3,
+                    "end": 4
+                },
+                {
+                    "text": "荷吗",
+                    "start": 4,
+                    "end": 6
+                },
+                {
+                    "text": "荷",
+                    "start": 4,
+                    "end": 5
+                },
+                {
+                    "text": "吗",
+                    "start": 5,
+                    "end": 6
+                }
+            ],
+            "query_executed": true,
+            "confirmed_query": "没 种 薄荷",
+            "all_terms_offered": true,
+            "raw_question": {
+                "query": "我没种薄荷吗？",
+                "ranked": []
+            },
+            "after_scripted_confirmation": {
+                "query": "没 种 薄荷",
+                "ranked": [
+                    {
+                        "id": "mint-self",
+                        "revision": 1,
+                        "original": "我没种薄荷。",
+                        "original_match": true
+                    },
+                    {
+                        "id": "mint-quote",
+                        "revision": 1,
+                        "original": "小舟说他没种薄荷。",
+                        "original_match": true
+                    }
+                ]
+            }
+        },
+        {
+            "id": "heldout-usb",
+            "question": "我的USB转接头放在哪里？",
+            "status": "confirmed_script",
+            "truncated": false,
+            "proposals": [
+                {
+                    "text": "我的",
+                    "start": 0,
+                    "end": 2
+                },
+                {
+                    "text": "我",
+                    "start": 0,
+                    "end": 1
+                },
+                {
+                    "text": "的",
+                    "start": 1,
+                    "end": 2
+                },
+                {
+                    "text": "USB",
+                    "start": 2,
+                    "end": 5
+                },
+                {
+                    "text": "转接头放在哪里",
+                    "start": 5,
+                    "end": 12
+                },
+                {
+                    "text": "转接头放",
+                    "start": 5,
+                    "end": 9
+                },
+                {
+                    "text": "转接头",
+                    "start": 5,
+                    "end": 8
+                },
+                {
+                    "text": "转接",
+                    "start": 5,
+                    "end": 7
+                },
+                {
+                    "text": "转",
+                    "start": 5,
+                    "end": 6
+                },
+                {
+                    "text": "接头放在",
+                    "start": 6,
+                    "end": 10
+                },
+                {
+                    "text": "接头放",
+                    "start": 6,
+                    "end": 9
+                },
+                {
+                    "text": "接头",
+                    "start": 6,
+                    "end": 8
+                },
+                {
+                    "text": "接",
+                    "start": 6,
+                    "end": 7
+                },
+                {
+                    "text": "头放在哪",
+                    "start": 7,
+                    "end": 11
+                },
+                {
+                    "text": "头放在",
+                    "start": 7,
+                    "end": 10
+                },
+                {
+                    "text": "头放",
+                    "start": 7,
+                    "end": 9
+                },
+                {
+                    "text": "头",
+                    "start": 7,
+                    "end": 8
+                },
+                {
+                    "text": "放在哪里",
+                    "start": 8,
+                    "end": 12
+                },
+                {
+                    "text": "放在哪",
+                    "start": 8,
+                    "end": 11
+                },
+                {
+                    "text": "放在",
+                    "start": 8,
+                    "end": 10
+                },
+                {
+                    "text": "放",
+                    "start": 8,
+                    "end": 9
+                },
+                {
+                    "text": "在哪里",
+                    "start": 9,
+                    "end": 12
+                },
+                {
+                    "text": "在哪",
+                    "start": 9,
+                    "end": 11
+                },
+                {
+                    "text": "在",
+                    "start": 9,
+                    "end": 10
+                },
+                {
+                    "text": "哪里",
+                    "start": 10,
+                    "end": 12
+                },
+                {
+                    "text": "哪",
+                    "start": 10,
+                    "end": 11
+                },
+                {
+                    "text": "里",
+                    "start": 11,
+                    "end": 12
+                }
+            ],
+            "query_executed": true,
+            "confirmed_query": "USB 转接头",
+            "all_terms_offered": true,
+            "raw_question": {
+                "query": "我的USB转接头放在哪里？",
+                "ranked": []
+            },
+            "after_scripted_confirmation": {
+                "query": "USB 转接头",
+                "ranked": [
+                    {
+                        "id": "usb-box",
+                        "revision": 1,
+                        "original": "USB转接头放在收纳盒。",
+                        "original_match": true
+                    }
+                ]
+            }
+        },
+        {
+            "id": "heldout-unicode",
+            "question": "我在𠀀园看流星了吗？",
+            "status": "confirmed_script",
+            "truncated": false,
+            "proposals": [
+                {
+                    "text": "我在𠀀园看流星了吗",
+                    "start": 0,
+                    "end": 9
+                },
+                {
+                    "text": "我在𠀀园",
+                    "start": 0,
+                    "end": 4
+                },
+                {
+                    "text": "我在𠀀",
+                    "start": 0,
+                    "end": 3
+                },
+                {
+                    "text": "我在",
+                    "start": 0,
+                    "end": 2
+                },
+                {
+                    "text": "我",
+                    "start": 0,
+                    "end": 1
+                },
+                {
+                    "text": "在𠀀园看",
+                    "start": 1,
+                    "end": 5
+                },
+                {
+                    "text": "在𠀀园",
+                    "start": 1,
+                    "end": 4
+                },
+                {
+                    "text": "在𠀀",
+                    "start": 1,
+                    "end": 3
+                },
+                {
+                    "text": "在",
+                    "start": 1,
+                    "end": 2
+                },
+                {
+                    "text": "𠀀园看流",
+                    "start": 2,
+                    "end": 6
+                },
+                {
+                    "text": "𠀀园看",
+                    "start": 2,
+                    "end": 5
+                },
+                {
+                    "text": "𠀀园",
+                    "start": 2,
+                    "end": 4
+                },
+                {
+                    "text": "𠀀",
+                    "start": 2,
+                    "end": 3
+                },
+                {
+                    "text": "园看流星",
+                    "start": 3,
+                    "end": 7
+                },
+                {
+                    "text": "园看流",
+                    "start": 3,
+                    "end": 6
+                },
+                {
+                    "text": "园看",
+                    "start": 3,
+                    "end": 5
+                },
+                {
+                    "text": "园",
+                    "start": 3,
+                    "end": 4
+                },
+                {
+                    "text": "看流星了",
+                    "start": 4,
+                    "end": 8
+                },
+                {
+                    "text": "看流星",
+                    "start": 4,
+                    "end": 7
+                },
+                {
+                    "text": "看流",
+                    "start": 4,
+                    "end": 6
+                },
+                {
+                    "text": "看",
+                    "start": 4,
+                    "end": 5
+                },
+                {
+                    "text": "流星了吗",
+                    "start": 5,
+                    "end": 9
+                },
+                {
+                    "text": "流星了",
+                    "start": 5,
+                    "end": 8
+                },
+                {
+                    "text": "流星",
+                    "start": 5,
+                    "end": 7
+                },
+                {
+                    "text": "流",
+                    "start": 5,
+                    "end": 6
+                },
+                {
+                    "text": "星了吗",
+                    "start": 6,
+                    "end": 9
+                },
+                {
+                    "text": "星了",
+                    "start": 6,
+                    "end": 8
+                },
+                {
+                    "text": "星",
+                    "start": 6,
+                    "end": 7
+                },
+                {
+                    "text": "了吗",
+                    "start": 7,
+                    "end": 9
+                },
+                {
+                    "text": "了",
+                    "start": 7,
+                    "end": 8
+                },
+                {
+                    "text": "吗",
+                    "start": 8,
+                    "end": 9
+                }
+            ],
+            "query_executed": true,
+            "confirmed_query": "𠀀园 流星",
+            "all_terms_offered": true,
+            "raw_question": {
+                "query": "我在𠀀园看流星了吗？",
+                "ranked": []
+            },
+            "after_scripted_confirmation": {
+                "query": "𠀀园 流星",
+                "ranked": [
+                    {
+                        "id": "unicode-garden",
+                        "revision": 1,
+                        "original": "在𠀀园看流星。",
+                        "original_match": true
+                    }
+                ]
+            }
+        },
+        {
+            "id": "heldout-case",
+            "question": "coffee豆存在哪里？",
+            "status": "confirmed_script",
+            "truncated": false,
+            "proposals": [
+                {
+                    "text": "coffee",
+                    "start": 0,
+                    "end": 6
+                },
+                {
+                    "text": "豆存在哪里",
+                    "start": 6,
+                    "end": 11
+                },
+                {
+                    "text": "豆存在哪",
+                    "start": 6,
+                    "end": 10
+                },
+                {
+                    "text": "豆存在",
+                    "start": 6,
+                    "end": 9
+                },
+                {
+                    "text": "豆存",
+                    "start": 6,
+                    "end": 8
+                },
+                {
+                    "text": "豆",
+                    "start": 6,
+                    "end": 7
+                },
+                {
+                    "text": "存在哪里",
+                    "start": 7,
+                    "end": 11
+                },
+                {
+                    "text": "存在哪",
+                    "start": 7,
+                    "end": 10
+                },
+                {
+                    "text": "存在",
+                    "start": 7,
+                    "end": 9
+                },
+                {
+                    "text": "存",
+                    "start": 7,
+                    "end": 8
+                },
+                {
+                    "text": "在哪里",
+                    "start": 8,
+                    "end": 11
+                },
+                {
+                    "text": "在哪",
+                    "start": 8,
+                    "end": 10
+                },
+                {
+                    "text": "在",
+                    "start": 8,
+                    "end": 9
+                },
+                {
+                    "text": "哪里",
+                    "start": 9,
+                    "end": 11
+                },
+                {
+                    "text": "哪",
+                    "start": 9,
+                    "end": 10
+                },
+                {
+                    "text": "里",
+                    "start": 10,
+                    "end": 11
+                }
+            ],
+            "query_executed": true,
+            "confirmed_query": "coffee 豆",
+            "all_terms_offered": true,
+            "raw_question": {
+                "query": "coffee豆存在哪里？",
+                "ranked": []
+            },
+            "after_scripted_confirmation": {
+                "query": "coffee 豆",
+                "ranked": [
+                    {
+                        "id": "coffee-jar",
+                        "revision": 1,
+                        "original": "Coffee豆装在蓝罐里。",
+                        "original_match": true
+                    }
+                ]
+            }
+        },
+        {
+            "id": "heldout-conflict",
+            "question": "我偏好哪种茶？",
+            "status": "confirmed_script",
+            "truncated": false,
+            "proposals": [
+                {
+                    "text": "我偏好哪种茶",
+                    "start": 0,
+                    "end": 6
+                },
+                {
+                    "text": "我偏好哪",
+                    "start": 0,
+                    "end": 4
+                },
+                {
+                    "text": "我偏好",
+                    "start": 0,
+                    "end": 3
+                },
+                {
+                    "text": "我偏",
+                    "start": 0,
+                    "end": 2
+                },
+                {
+                    "text": "我",
+                    "start": 0,
+                    "end": 1
+                },
+                {
+                    "text": "偏好哪种",
+                    "start": 1,
+                    "end": 5
+                },
+                {
+                    "text": "偏好哪",
+                    "start": 1,
+                    "end": 4
+                },
+                {
+                    "text": "偏好",
+                    "start": 1,
+                    "end": 3
+                },
+                {
+                    "text": "偏",
+                    "start": 1,
+                    "end": 2
+                },
+                {
+                    "text": "好哪种茶",
+                    "start": 2,
+                    "end": 6
+                },
+                {
+                    "text": "好哪种",
+                    "start": 2,
+                    "end": 5
+                },
+                {
+                    "text": "好哪",
+                    "start": 2,
+                    "end": 4
+                },
+                {
+                    "text": "好",
+                    "start": 2,
+                    "end": 3
+                },
+                {
+                    "text": "哪种茶",
+                    "start": 3,
+                    "end": 6
+                },
+                {
+                    "text": "哪种",
+                    "start": 3,
+                    "end": 5
+                },
+                {
+                    "text": "哪",
+                    "start": 3,
+                    "end": 4
+                },
+                {
+                    "text": "种茶",
+                    "start": 4,
+                    "end": 6
+                },
+                {
+                    "text": "种",
+                    "start": 4,
+                    "end": 5
+                },
+                {
+                    "text": "茶",
+                    "start": 5,
+                    "end": 6
+                }
+            ],
+            "query_executed": true,
+            "confirmed_query": "偏好 茶",
+            "all_terms_offered": true,
+            "raw_question": {
+                "query": "我偏好哪种茶？",
+                "ranked": []
+            },
+            "after_scripted_confirmation": {
+                "query": "偏好 茶",
+                "ranked": [
+                    {
+                        "id": "tea-new",
+                        "revision": 1,
+                        "original": "现在我偏好淡茶。",
+                        "original_match": true
+                    },
+                    {
+                        "id": "tea-old",
+                        "revision": 1,
+                        "original": "以前我偏好浓茶。",
+                        "original_match": true
+                    }
+                ]
+            }
+        },
+        {
+            "id": "heldout-no-synonym",
+            "question": "我喜欢哪种茶？",
+            "status": "confirmed_script",
+            "truncated": false,
+            "proposals": [
+                {
+                    "text": "我喜欢哪种茶",
+                    "start": 0,
+                    "end": 6
+                },
+                {
+                    "text": "我喜欢哪",
+                    "start": 0,
+                    "end": 4
+                },
+                {
+                    "text": "我喜欢",
+                    "start": 0,
+                    "end": 3
+                },
+                {
+                    "text": "我喜",
+                    "start": 0,
+                    "end": 2
+                },
+                {
+                    "text": "我",
+                    "start": 0,
+                    "end": 1
+                },
+                {
+                    "text": "喜欢哪种",
+                    "start": 1,
+                    "end": 5
+                },
+                {
+                    "text": "喜欢哪",
+                    "start": 1,
+                    "end": 4
+                },
+                {
+                    "text": "喜欢",
+                    "start": 1,
+                    "end": 3
+                },
+                {
+                    "text": "喜",
+                    "start": 1,
+                    "end": 2
+                },
+                {
+                    "text": "欢哪种茶",
+                    "start": 2,
+                    "end": 6
+                },
+                {
+                    "text": "欢哪种",
+                    "start": 2,
+                    "end": 5
+                },
+                {
+                    "text": "欢哪",
+                    "start": 2,
+                    "end": 4
+                },
+                {
+                    "text": "欢",
+                    "start": 2,
+                    "end": 3
+                },
+                {
+                    "text": "哪种茶",
+                    "start": 3,
+                    "end": 6
+                },
+                {
+                    "text": "哪种",
+                    "start": 3,
+                    "end": 5
+                },
+                {
+                    "text": "哪",
+                    "start": 3,
+                    "end": 4
+                },
+                {
+                    "text": "种茶",
+                    "start": 4,
+                    "end": 6
+                },
+                {
+                    "text": "种",
+                    "start": 4,
+                    "end": 5
+                },
+                {
+                    "text": "茶",
+                    "start": 5,
+                    "end": 6
+                }
+            ],
+            "query_executed": true,
+            "confirmed_query": "喜欢 茶",
+            "all_terms_offered": true,
+            "raw_question": {
+                "query": "我喜欢哪种茶？",
+                "ranked": []
+            },
+            "after_scripted_confirmation": {
+                "query": "喜欢 茶",
+                "ranked": []
+            }
+        },
+        {
+            "id": "heldout-explicit-date",
+            "question": "10月1日捕获的书店记录？",
+            "status": "confirmed_script",
+            "truncated": false,
+            "proposals": [
+                {
+                    "text": "10",
+                    "start": 0,
+                    "end": 2
+                },
+                {
+                    "text": "月",
+                    "start": 2,
+                    "end": 3
+                },
+                {
+                    "text": "1",
+                    "start": 3,
+                    "end": 4
+                },
+                {
+                    "text": "日捕获的书店记录",
+                    "start": 4,
+                    "end": 12
+                },
+                {
+                    "text": "日捕获的",
+                    "start": 4,
+                    "end": 8
+                },
+                {
+                    "text": "日捕获",
+                    "start": 4,
+                    "end": 7
+                },
+                {
+                    "text": "日捕",
+                    "start": 4,
+                    "end": 6
+                },
+                {
+                    "text": "日",
+                    "start": 4,
+                    "end": 5
+                },
+                {
+                    "text": "捕获的书",
+                    "start": 5,
+                    "end": 9
+                },
+                {
+                    "text": "捕获的",
+                    "start": 5,
+                    "end": 8
+                },
+                {
+                    "text": "捕获",
+                    "start": 5,
+                    "end": 7
+                },
+                {
+                    "text": "捕",
+                    "start": 5,
+                    "end": 6
+                },
+                {
+                    "text": "获的书店",
+                    "start": 6,
+                    "end": 10
+                },
+                {
+                    "text": "获的书",
+                    "start": 6,
+                    "end": 9
+                },
+                {
+                    "text": "获的",
+                    "start": 6,
+                    "end": 8
+                },
+                {
+                    "text": "获",
+                    "start": 6,
+                    "end": 7
+                },
+                {
+                    "text": "的书店记",
+                    "start": 7,
+                    "end": 11
+                },
+                {
+                    "text": "的书店",
+                    "start": 7,
+                    "end": 10
+                },
+                {
+                    "text": "的书",
+                    "start": 7,
+                    "end": 9
+                },
+                {
+                    "text": "的",
+                    "start": 7,
+                    "end": 8
+                },
+                {
+                    "text": "书店记录",
+                    "start": 8,
+                    "end": 12
+                },
+                {
+                    "text": "书店记",
+                    "start": 8,
+                    "end": 11
+                },
+                {
+                    "text": "书店",
+                    "start": 8,
+                    "end": 10
+                },
+                {
+                    "text": "书",
+                    "start": 8,
+                    "end": 9
+                },
+                {
+                    "text": "店记录",
+                    "start": 9,
+                    "end": 12
+                },
+                {
+                    "text": "店记",
+                    "start": 9,
+                    "end": 11
+                },
+                {
+                    "text": "店",
+                    "start": 9,
+                    "end": 10
+                },
+                {
+                    "text": "记录",
+                    "start": 10,
+                    "end": 12
+                },
+                {
+                    "text": "记",
+                    "start": 10,
+                    "end": 11
+                },
+                {
+                    "text": "录",
+                    "start": 11,
+                    "end": 12
+                }
+            ],
+            "query_executed": true,
+            "confirmed_query": "书店",
+            "all_terms_offered": true,
+            "raw_question": {
+                "query": "10月1日捕获的书店记录？",
+                "ranked": []
+            },
+            "after_scripted_confirmation": {
+                "query": "书店",
+                "ranked": [
+                    {
+                        "id": "book-shanghai",
+                        "revision": 1,
+                        "original": "10月1日记下：9月30日逛书店。",
+                        "original_match": true
+                    }
+                ]
+            }
+        },
+        {
+            "id": "heldout-ambiguous-date",
+            "question": "上个月逛书店的记录？",
+            "status": "clarification_required",
+            "truncated": false,
+            "proposals": [
+                {
+                    "text": "上个月逛书店的记录",
+                    "start": 0,
+                    "end": 9
+                },
+                {
+                    "text": "上个月逛",
+                    "start": 0,
+                    "end": 4
+                },
+                {
+                    "text": "上个月",
+                    "start": 0,
+                    "end": 3
+                },
+                {
+                    "text": "上个",
+                    "start": 0,
+                    "end": 2
+                },
+                {
+                    "text": "上",
+                    "start": 0,
+                    "end": 1
+                },
+                {
+                    "text": "个月逛书",
+                    "start": 1,
+                    "end": 5
+                },
+                {
+                    "text": "个月逛",
+                    "start": 1,
+                    "end": 4
+                },
+                {
+                    "text": "个月",
+                    "start": 1,
+                    "end": 3
+                },
+                {
+                    "text": "个",
+                    "start": 1,
+                    "end": 2
+                },
+                {
+                    "text": "月逛书店",
+                    "start": 2,
+                    "end": 6
+                },
+                {
+                    "text": "月逛书",
+                    "start": 2,
+                    "end": 5
+                },
+                {
+                    "text": "月逛",
+                    "start": 2,
+                    "end": 4
+                },
+                {
+                    "text": "月",
+                    "start": 2,
+                    "end": 3
+                },
+                {
+                    "text": "逛书店的",
+                    "start": 3,
+                    "end": 7
+                },
+                {
+                    "text": "逛书店",
+                    "start": 3,
+                    "end": 6
+                },
+                {
+                    "text": "逛书",
+                    "start": 3,
+                    "end": 5
+                },
+                {
+                    "text": "逛",
+                    "start": 3,
+                    "end": 4
+                },
+                {
+                    "text": "书店的记",
+                    "start": 4,
+                    "end": 8
+                },
+                {
+                    "text": "书店的",
+                    "start": 4,
+                    "end": 7
+                },
+                {
+                    "text": "书店",
+                    "start": 4,
+                    "end": 6
+                },
+                {
+                    "text": "书",
+                    "start": 4,
+                    "end": 5
+                },
+                {
+                    "text": "店的记录",
+                    "start": 5,
+                    "end": 9
+                },
+                {
+                    "text": "店的记",
+                    "start": 5,
+                    "end": 8
+                },
+                {
+                    "text": "店的",
+                    "start": 5,
+                    "end": 7
+                },
+                {
+                    "text": "店",
+                    "start": 5,
+                    "end": 6
+                },
+                {
+                    "text": "的记录",
+                    "start": 6,
+                    "end": 9
+                },
+                {
+                    "text": "的记",
+                    "start": 6,
+                    "end": 8
+                },
+                {
+                    "text": "的",
+                    "start": 6,
+                    "end": 7
+                },
+                {
+                    "text": "记录",
+                    "start": 7,
+                    "end": 9
+                },
+                {
+                    "text": "记",
+                    "start": 7,
+                    "end": 8
+                },
+                {
+                    "text": "录",
+                    "start": 8,
+                    "end": 9
+                }
+            ],
+            "query_executed": false
+        }
+    ]
+}

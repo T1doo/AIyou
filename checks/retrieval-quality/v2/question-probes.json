@@ -1,0 +1,360 @@
+{
+  "version": 2,
+  "rules_fixed_before_stimuli": "script-runs and exact contiguous Han spans widths4,3,2,1; no content dictionary, stopword stripping, synonym or sample-ID branches; source span provenance; max64 unique proposals, question<=512 codepoints",
+  "authorship": "new synthetic vocabulary and distractors; one agent authored, not independent humans/random sample/automatic query accuracy",
+  "records": [
+    {
+      "id": "star-self",
+      "text": "昨晚我在观星台拍照。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "self_report_not_verified_occurrence"
+    },
+    {
+      "id": "star-negative",
+      "text": "我没有在观星台拍照。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "negated_self_report"
+    },
+    {
+      "id": "star-quote",
+      "text": "小舟说：“我在观星台拍照。”这不是我的经历。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "other_person_quote_not_self"
+    },
+    {
+      "id": "star-place-distractor",
+      "text": "在观星台整理镜头。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "synthetic_original"
+    },
+    {
+      "id": "star-action-distractor",
+      "text": "在湖边拍照。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "synthetic_original"
+    },
+    {
+      "id": "book-borrow",
+      "text": "今天在图书馆借绘本。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "synthetic_original"
+    },
+    {
+      "id": "book-return-distractor",
+      "text": "今天在图书馆归还绘本。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "synthetic_original"
+    },
+    {
+      "id": "book-place-distractor",
+      "text": "今天在书店借绘本。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "synthetic_original"
+    },
+    {
+      "id": "mint-self",
+      "text": "我没种薄荷。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "negated_self_report"
+    },
+    {
+      "id": "mint-quote",
+      "text": "小舟说他没种薄荷。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "third_party_negation"
+    },
+    {
+      "id": "mint-conditional-distractor",
+      "text": "如果晴天，就种薄荷。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "hypothetical_not_occurrence"
+    },
+    {
+      "id": "usb-box",
+      "text": "USB转接头放在收纳盒。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "synthetic_original"
+    },
+    {
+      "id": "usb-word-distractor",
+      "text": "USB线放在桌上。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "synthetic_original"
+    },
+    {
+      "id": "usb-place-distractor",
+      "text": "转接头借给同伴。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "synthetic_original"
+    },
+    {
+      "id": "unicode-garden",
+      "text": "在𠀀园看流星。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "synthetic_original"
+    },
+    {
+      "id": "unicode-place-distractor",
+      "text": "在公园看月亮。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "synthetic_original"
+    },
+    {
+      "id": "coffee-jar",
+      "text": "Coffee豆装在蓝罐里。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "synthetic_original"
+    },
+    {
+      "id": "tea-old",
+      "text": "以前我偏好浓茶。",
+      "captured": "2026-09-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "older_conflicting_self_report"
+    },
+    {
+      "id": "tea-new",
+      "text": "现在我偏好淡茶。",
+      "captured": "2026-10-20T12:00:00Z",
+      "zone": "UTC",
+      "role": "newer_conflicting_self_report_not_auto_truth"
+    },
+    {
+      "id": "book-shanghai",
+      "text": "10月1日记下：9月30日逛书店。",
+      "captured": "2026-09-30T16:15:00Z",
+      "zone": "Asia/Shanghai",
+      "role": "synthetic_original"
+    },
+    {
+      "id": "book-utc",
+      "text": "9月30日记下：10月1日打算逛书店。",
+      "captured": "2026-09-30T16:15:00Z",
+      "zone": "UTC",
+      "role": "plan_not_actual_occurrence"
+    },
+    {
+      "id": "deleted-star",
+      "text": "已经删除：在观星台拍照。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "synthetic_original",
+      "deleted": true
+    },
+    {
+      "id": "revised-book",
+      "text": "以前在图书馆借绘本。",
+      "captured": "2026-10-10T12:00:00Z",
+      "zone": "UTC",
+      "role": "synthetic_original",
+      "revision2": "现在的记录只剩归还明信片。"
+    }
+  ],
+  "queries": [
+    {
+      "id": "heldout-star",
+      "question": "我去观星台拍照了吗？",
+      "confirmed_terms": [
+        "观星台",
+        "拍照"
+      ],
+      "relevance_gold": [
+        "star-self",
+        "star-negative",
+        "star-quote"
+      ],
+      "status": "confirmed_script",
+      "from": "",
+      "through": "",
+      "date_basis": "CAPTURED",
+      "date_choice": "explicit_unlimited",
+      "user_action_provenance": "prewritten synthetic user-confirmation script, not automatically selected or a user study",
+      "note": "返回肯定/否定/引述原文，不能生成自己拍照的肯定答案。"
+    },
+    {
+      "id": "heldout-book",
+      "question": "哪次在图书馆借绘本？",
+      "confirmed_terms": [
+        "图书馆",
+        "借",
+        "绘本"
+      ],
+      "relevance_gold": [
+        "book-borrow"
+      ],
+      "status": "confirmed_script",
+      "from": "",
+      "through": "",
+      "date_basis": "CAPTURED",
+      "date_choice": "explicit_unlimited",
+      "user_action_provenance": "prewritten synthetic user-confirmation script, not automatically selected or a user study",
+      "note": "选单字借，排除归还与书店干扰；只用问题已有字，不做借/还同义归并。"
+    },
+    {
+      "id": "heldout-negation",
+      "question": "我没种薄荷吗？",
+      "confirmed_terms": [
+        "没",
+        "种",
+        "薄荷"
+      ],
+      "relevance_gold": [
+        "mint-self",
+        "mint-quote"
+      ],
+      "status": "confirmed_script",
+      "from": "",
+      "through": "",
+      "date_basis": "CAPTURED",
+      "date_choice": "explicit_unlimited",
+      "user_action_provenance": "prewritten synthetic user-confirmation script, not automatically selected or a user study",
+      "note": "否定字保留在用户确认词中；其他人的否定不等于自己经历。"
+    },
+    {
+      "id": "heldout-usb",
+      "question": "我的USB转接头放在哪里？",
+      "confirmed_terms": [
+        "USB",
+        "转接头"
+      ],
+      "relevance_gold": [
+        "usb-box"
+      ],
+      "status": "confirmed_script",
+      "from": "",
+      "through": "",
+      "date_basis": "CAPTURED",
+      "date_choice": "explicit_unlimited",
+      "user_action_provenance": "prewritten synthetic user-confirmation script, not automatically selected or a user study"
+    },
+    {
+      "id": "heldout-unicode",
+      "question": "我在𠀀园看流星了吗？",
+      "confirmed_terms": [
+        "𠀀园",
+        "流星"
+      ],
+      "relevance_gold": [
+        "unicode-garden"
+      ],
+      "status": "confirmed_script",
+      "from": "",
+      "through": "",
+      "date_basis": "CAPTURED",
+      "date_choice": "explicit_unlimited",
+      "user_action_provenance": "prewritten synthetic user-confirmation script, not automatically selected or a user study"
+    },
+    {
+      "id": "heldout-case",
+      "question": "coffee豆存在哪里？",
+      "confirmed_terms": [
+        "coffee",
+        "豆"
+      ],
+      "relevance_gold": [
+        "coffee-jar"
+      ],
+      "status": "confirmed_script",
+      "from": "",
+      "through": "",
+      "date_basis": "CAPTURED",
+      "date_choice": "explicit_unlimited",
+      "user_action_provenance": "prewritten synthetic user-confirmation script, not automatically selected or a user study",
+      "note": "相关性gold不随入口大小写能力变化；实际原文关键词路径已有简单折叠。"
+    },
+    {
+      "id": "heldout-conflict",
+      "question": "我偏好哪种茶？",
+      "confirmed_terms": [
+        "偏好",
+        "茶"
+      ],
+      "relevance_gold": [
+        "tea-old",
+        "tea-new"
+      ],
+      "status": "confirmed_script",
+      "from": "",
+      "through": "",
+      "date_basis": "CAPTURED",
+      "date_choice": "explicit_unlimited",
+      "user_action_provenance": "prewritten synthetic user-confirmation script, not automatically selected or a user study",
+      "note": "两份相冲突原文都要保留；不自动选最新当真值。"
+    },
+    {
+      "id": "heldout-no-synonym",
+      "question": "我喜欢哪种茶？",
+      "confirmed_terms": [
+        "喜欢",
+        "茶"
+      ],
+      "relevance_gold": [
+        "tea-old",
+        "tea-new"
+      ],
+      "status": "confirmed_script",
+      "from": "",
+      "through": "",
+      "date_basis": "CAPTURED",
+      "date_choice": "explicit_unlimited",
+      "user_action_provenance": "prewritten synthetic user-confirmation script, not automatically selected or a user study",
+      "note": "信息需要相关，但原文只有偏好；助手不得改写喜欢→偏好。保留预期能力缺口。"
+    },
+    {
+      "id": "heldout-explicit-date",
+      "question": "10月1日捕获的书店记录？",
+      "confirmed_terms": [
+        "书店"
+      ],
+      "relevance_gold": [
+        "book-shanghai"
+      ],
+      "status": "confirmed_script",
+      "from": "2026-10-01",
+      "through": "2026-10-01",
+      "date_basis": "CAPTURED",
+      "date_choice": "explicit_range_chosen_by_user_not_parsed",
+      "user_action_provenance": "prewritten synthetic user-confirmation script, not automatically selected or a user study"
+    },
+    {
+      "id": "heldout-ambiguous-date",
+      "question": "上个月逛书店的记录？",
+      "confirmed_terms": [],
+      "relevance_gold": null,
+      "status": "clarification_required",
+      "date_choice": "not_yet_chosen",
+      "alternatives": [
+        {
+          "basis": "CAPTURED",
+          "gold": [
+            "book-utc"
+          ]
+        },
+        {
+          "basis": "EVENT_ACTUAL",
+          "gold": [
+            "book-shanghai"
+          ]
+        }
+      ],
+      "user_action_provenance": "no query until explicit date decision"
+    }
+  ]
+}

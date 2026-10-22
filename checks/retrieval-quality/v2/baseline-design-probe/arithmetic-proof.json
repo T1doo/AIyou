@@ -1,0 +1,17 @@
+[
+  {
+    "route": "original",
+    "exact_fraction": "101/126",
+    "positive_queries": 18
+  },
+  {
+    "route": "unified",
+    "exact_fraction": "52/77",
+    "positive_queries": 22
+  },
+  {
+    "route": "evidence",
+    "exact_fraction": "29/42",
+    "positive_queries": 18
+  }
+]

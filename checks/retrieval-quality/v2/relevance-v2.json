@@ -1,0 +1,606 @@
+{
+  "version": 2,
+  "scope": "Common information-need relevance across routes; capability and quote eligibility are separate diagnostics. Not comparable as improvement over v1. Single-agent labels pending independent adjudication.",
+  "v1_catalog_sha256": "b37ce3766060e1fccf6a73b58208fd616e9290af71311a53fbccba722627abdb",
+  "v1_observations_sha256": "efc22f873792da0d2c228f54fb113d6992446ee843519c7ad67e975059bdfa00",
+  "queries": [
+    {
+      "id": "control-original",
+      "query": "落日",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "sunset"
+      ],
+      "intent": "逐字相关的当前有效原件；相关不表示事实已发生。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "control-audio",
+      "query": "口述清单",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "audio"
+      ],
+      "intent": "人工转写词只存在于独立派生文字；不称ASR。",
+      "alternatives": [],
+      "observed_routes": [
+        "unified"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "control-image",
+      "query": "灯塔文字",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "image"
+      ],
+      "intent": "受控合成端口文字；不称真实OCR。",
+      "alternatives": [],
+      "observed_routes": [
+        "unified"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "control-preference",
+      "query": "合成口味",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "preference"
+      ],
+      "intent": "当前已采纳人工主题命中。",
+      "alternatives": [],
+      "observed_routes": [
+        "unified"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "control-note",
+      "query": "旅行备注",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "memory"
+      ],
+      "intent": "人工备注命中，不能伪造正文位置。",
+      "alternatives": [],
+      "observed_routes": [
+        "unified"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "phrase-vs-scattered",
+      "query": "咖啡 散步",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "phrase",
+        "scattered-1",
+        "scattered-2",
+        "scattered-3",
+        "scattered-4",
+        "scattered-5",
+        "scattered-6"
+      ],
+      "intent": "找回同时提及咖啡与散步的记录，完整短语是更强相关项，逐字入口能力不改变相关性gold。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "unicode-case",
+      "query": "coffee",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "case"
+      ],
+      "intent": "找回提及coffee的记录，用户没有要求区分大小写；相关性不因入口大小写能力改变。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "single-character",
+      "query": "伞",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "revised"
+      ],
+      "intent": "当前银伞可见；删除蓝伞与历史红伞不准复活。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "broad-seven",
+      "query": "宽词",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "broad-1",
+        "broad-2",
+        "broad-3",
+        "broad-4",
+        "broad-5",
+        "broad-6",
+        "broad-7"
+      ],
+      "intent": "全部7条都相关，Recall@5理论上限5/7；不得把此截断当排序缺陷。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "negative-literal",
+      "query": "没有喝过可可",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "negative"
+      ],
+      "intent": "检索到否定自述是正确结果；不能转为饮用已发生。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "negative-question",
+      "query": "我喝过可可吗",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "negative"
+      ],
+      "intent": "自然语言是主方案后续质量探针，现有逐字入口未承诺分解该问句；否定原文仍是回答是否的重要证据。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "conditional-literal",
+      "query": "如果下雨",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "conditional"
+      ],
+      "intent": "条件句是相关素材，不是已经出行。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "quote-literal",
+      "query": "小雨说",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "quote"
+      ],
+      "intent": "引述是相关记录，主体仍是合成人物小雨。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "quote-question",
+      "query": "谁说在海边跑步",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "quote"
+      ],
+      "intent": "需问句分解；引用来源应保留主体，不作为自己的跑步经历。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "capture-oct1",
+      "query": "展览",
+      "from": "2026-10-01",
+      "through": "2026-10-01",
+      "status": "labeled",
+      "relevance_gold": [
+        "capture-shanghai"
+      ],
+      "intent": "两端包含，按每原件存储时区；同一UTC时刻在上海属于10月1日。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "capture-sep30",
+      "query": "展览",
+      "from": "2026-09-30",
+      "through": "2026-09-30",
+      "status": "labeled",
+      "relevance_gold": [
+        "capture-utc"
+      ],
+      "intent": "UTC原件捕获9月30日；正文事件日期不能覆盖捕获条件。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "relative-month",
+      "query": "上个月的展览",
+      "from": "",
+      "through": "",
+      "status": "clarification_required",
+      "relevance_gold": null,
+      "intent": "上个月的展览：未说明捕获记录时间还是实际事件时间，不选一个解释当唯一gold。",
+      "alternatives": [
+        {
+          "date_basis": "CAPTURED",
+          "gold": [
+            "capture-utc"
+          ]
+        },
+        {
+          "date_basis": "EVENT_ACTUAL",
+          "gold": [
+            "capture-shanghai"
+          ]
+        }
+      ],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "date-in-body",
+      "query": "9月30日",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "capture-shanghai",
+        "capture-utc"
+      ],
+      "intent": "没有日期过滤；正文逐字日期均相关，不推断它是发生时间。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "manual-alias",
+      "query": "阿林",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "alias"
+      ],
+      "intent": "找回手工声明阿林别名的记录；纯元数据相关不等于可作为正文引文。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": [
+          "alias"
+        ]
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "manual-space-alias",
+      "query": "Lin Example",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "alias-space"
+      ],
+      "intent": "找回手工声明Lin Example别名的记录；纯元数据相关不等于可作为正文引文。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": [
+          "alias-space"
+        ]
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "unknown-alias",
+      "query": "阿林同学",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [],
+      "intent": "未声明的扩展称呼不能猜成阿林。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "conflict-coexist",
+      "query": "偏好",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "preference",
+        "conflict-old",
+        "conflict-new"
+      ],
+      "intent": "三份当前原件都相关；捕获新旧不是自动取代真实事实的授权。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "conflict-question",
+      "query": "现在我喜欢什么饮品",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "preference",
+        "conflict-old",
+        "conflict-new"
+      ],
+      "intent": "自然语言/喜欢与偏好关系未由当前逐字入口支持；保留冲突证据，不自动决定唯一真值。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "deleted-record",
+      "query": "蓝伞",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [],
+      "intent": "删除来源不能进入候选或前五。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "old-revision",
+      "query": "红伞",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [],
+      "intent": "历史正文不属于当前版本检索。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "current-revision",
+      "query": "银伞",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [
+        "revised"
+      ],
+      "intent": "必须是修订2的当前原文。",
+      "alternatives": [],
+      "observed_routes": [
+        "original",
+        "unified",
+        "evidence"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "withdrawn-note",
+      "query": "退订备注",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [],
+      "intent": "撤回人工备注不再是当前ACCEPTED投影。",
+      "alternatives": [],
+      "observed_routes": [
+        "unified"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    },
+    {
+      "id": "ai-none-note",
+      "query": "隐私候选",
+      "from": "",
+      "through": "",
+      "status": "labeled",
+      "relevance_gold": [],
+      "intent": "AI_NONE禁止派生投影；不把它误说成原文不能手工浏览。",
+      "alternatives": [],
+      "observed_routes": [
+        "unified"
+      ],
+      "quote_admissibility": {
+        "metadata_only_gold": []
+      },
+      "source": "v1 unchanged observations; labels re-reviewed in new version, not new runtime execution"
+    }
+  ]
+}
