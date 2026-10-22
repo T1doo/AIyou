@@ -110,7 +110,7 @@ summary = {'catalog_sha256': observed['catalog_sha256'], 'production_base_sha': 
 with (output / 'case-metrics.csv').open('w', newline='') as f:
     fields = ['query_id', 'route', 'category', 'lane', 'gold_count', 'candidate_count', 'returned_count',
               'recall_at_5', 'full_candidate_recall', 'oracle_top5_ceiling', 'ndcg_at_5', 'no_answer_false_positive']
-    writer = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore'); writer.writeheader(); writer.writerows(rows)
+    writer = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore', lineterminator='\n'); writer.writeheader(); writer.writerows(rows)
 print(json.dumps({'records': len(records), 'queries': len(queries), 'routes': {
     route: {lane: value for lane, value in group.items() if lane != 'categories'}
     for route, group in summary['routes'].items()}}, ensure_ascii=False))
