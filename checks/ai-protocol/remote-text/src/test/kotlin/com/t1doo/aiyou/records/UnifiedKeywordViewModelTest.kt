@@ -11,6 +11,31 @@ import java.time.Clock
 import java.util.concurrent.TimeUnit
 
 class UnifiedKeywordViewModelTest {
+    @Test fun postCasRetirementOrDisposalCannotNavigateOrResurrectReturnSeed():Unit=runBlocking{
+        for(dispose in listOf(false,true))HandoffFixture().use{h->
+            h.load();val u=h.state.get().unifiedKeyword!!;val item=u.visibleGroups.single().items.first()
+            var navigations=0;h.block=true;h.controller.locate(u.session,item){_,confirm->confirm{navigations++}}
+            val work=async(Dispatchers.IO){h.queue.removeFirst()(h.owner)}
+            try {
+                assertTrue("Actual UI CAS must finish before retirement",h.cleared.await(4,TimeUnit.SECONDS))
+                assertNull(h.state.get().unifiedKeyword)
+                if(dispose)h.controller.dispose()else h.controller.retire()
+            }finally{h.release.countDown()}
+            work.await();assertEquals("Retirement must win the post-CAS window",0,navigations)
+            h.controller.resume();assertNull(h.state.get().unifiedKeyword);assertTrue(h.queue.isEmpty())
+        }
+    }
+    @Test fun retainedHandoffOfferCannotConfirmAfterRetirementOrDisposal():Unit=runBlocking{
+        for(dispose in listOf(false,true))HandoffFixture().use{h->
+            h.load();val u=h.state.get().unifiedKeyword!!;val item=u.visibleGroups.single().items.first()
+            var offer:UnifiedKeywordHandoff?=null
+            h.controller.locate(u.session,item){_,confirm->offer=confirm}
+            h.queue.removeFirst()(h.owner);assertNotNull(offer);assertNull(h.state.get().unifiedKeyword)
+            if(dispose)h.controller.dispose()else h.controller.retire()
+            assertFalse(offer!!.invoke{fail("Retained offer must not navigate")})
+            h.controller.resume();assertNull(h.state.get().unifiedKeyword);assertTrue(h.queue.isEmpty())
+        }
+    }
     @Test fun originalLocationUsesCodePointsAndTopicMatchLocatesActualQuoteInsteadOfTopicText():Unit=runBlocking{UnifiedKeywordFixture().use{h->
         val id=h.f.entry(text="🙂合成 我偏好淡茶🙂");h.preference(id)
         val original=h.repo.search("淡茶",UnifiedKeywordScope.ORIGINAL).groups.single().items.single()
@@ -50,7 +75,7 @@ class UnifiedKeywordViewModelTest {
         h.ready();h.block=true;h.open("淡茶");withTimeout(4000){h.entered.await()};val old=h.value()
         h.vm.unifiedKeywords.retire();h.release.complete(Unit)
         h.open("淡茶");val next=h.ui{it.snapshot!=null&&!it.busy};assertNotEquals(old.session,next.session)
-        h.vm.unifiedKeywords.locate(old.session,next.visibleGroups.single().items.first()){fail("Retired session")}
+        h.vm.unifiedKeywords.locate(old.session,next.visibleGroups.single().items.first()){_,_->fail("Retired session")}
         assertEquals(next.session,h.value().session)
     }}
     @Test fun lostFinalResolveCommitAckCannotNavigateFromItsPrivateAdmissionTicket():Unit=runBlocking{Harness().use{h->
@@ -62,7 +87,7 @@ class UnifiedKeywordViewModelTest {
         h.data.f.db.beforeSql={if(it.startsWith("SELECT e.currentRevision,r.contentHash,COALESCE(a.generation,0),e.capturedAtMillis")){aggregateReads++;if(aggregateReads==2)resolveCommit=true}}
         h.data.f.db.afterSql={if(it=="COMMIT"&&resolveCommit&&!observed){observed=true;error("Synthetic final resolve committed ACK loss")}}
         try{
-            h.vm.unifiedKeywords.locate(u.session,item){fail("Unconfirmed private ticket cannot navigate")}
+            h.vm.unifiedKeywords.locate(u.session,item){_,_->fail("Unconfirmed private ticket cannot navigate")}
             val failed=h.ui{it.error!=null&&!it.busy};assertTrue(observed);assertNull(failed.snapshot)
         }finally{h.data.f.db.beforeSql=null;h.data.f.db.afterSql=null}
     }}
@@ -72,7 +97,7 @@ class UnifiedKeywordViewModelTest {
         val visible=first.visibleGroups.first().items.first();h.data.f.revise(offPage,"合成新版本")
         h.vm.refreshLocalSearch();withTimeout(4000){h.vm.state.first{it.entries.any{e->e.id==offPage&&e.currentRevision==2}}}
         assertNull(h.vm.state.value.unifiedKeyword)
-        h.vm.unifiedKeywords.locate(first.session,visible){fail("Off-screen source invalidation")}
+        h.vm.unifiedKeywords.locate(first.session,visible){_,_->fail("Off-screen source invalidation")}
     }}
     @Test fun actualPagingRevalidatesWholeSetAndWithdrawalOutsideCurrentPageClearsIt():Unit=runBlocking{Harness(extra=22).use{h->
         h.ready();h.vm.unifiedKeywords.open();var u=h.value();h.vm.unifiedKeywords.scope(u.session,UnifiedKeywordScope.AUDIO)
@@ -87,7 +112,7 @@ class UnifiedKeywordViewModelTest {
     @Test fun confirmedTypedLocationAndReturnRequeryNeverReuseOldProof():Unit=runBlocking{Harness().use{h->
         h.ready();h.open("淡茶");val u=h.ui{it.snapshot!=null&&!it.busy}
         val item=u.visibleGroups.single().items.filterIsInstance<UnifiedKeywordEvidence.Audio>().single()
-        val located=CompletableDeferred<UnifiedKeywordEvidence>();h.vm.unifiedKeywords.locate(u.session,item){located.complete(it)}
+        val located=CompletableDeferred<UnifiedKeywordEvidence>();h.vm.unifiedKeywords.locate(u.session,item){found,confirm->assertTrue(confirm{located.complete(found)});assertFalse(confirm{fail("One-shot source handoff")})}
         assertSame(item,withTimeout(4000){located.await()});assertNull(h.vm.state.value.unifiedKeyword)
         // An old composition's disposal cannot erase the query seed of confirmed navigation.
         h.vm.unifiedKeywords.close(u.session);h.vm.unifiedKeywords.resume()
@@ -118,5 +143,32 @@ class UnifiedKeywordViewModelTest {
         fun open(keyword:String){vm.unifiedKeywords.open();val u=value();vm.unifiedKeywords.keyword(u.session,keyword);vm.unifiedKeywords.search(u.session)}
         suspend fun ui(predicate:(UnifiedKeywordUi)->Boolean)=withTimeout(8000){vm.state.first{it.unifiedKeyword?.let(predicate)==true}.unifiedKeyword!!}
         override fun close(){release.complete(Unit);vm.clearForHostTest();assertTrue(base.closed.await(4,TimeUnit.SECONDS));base.closeFailure.get()?.let{throw it};data.close()}
+    }
+    /** Real repository/controller, with a publication barrier AFTER the real atomic state CAS.
+     * No production-only testing hook, simulated pause is the actual retire/dispose entry. */
+    private class HandoffFixture:AutoCloseable {
+        val data=UnifiedKeywordFixture();val id=data.f.entry(text="合成淡茶")
+        val state=java.util.concurrent.atomic.AtomicReference(LocalRecordUiState(ready=true,opening=false,
+            entries=listOf(com.t1doo.aiyou.model.StoredEntry(id,1,"合成淡茶",5,"UTC",com.t1doo.aiyou.model.ProcessingPolicy.LOCAL_ONLY)),unifiedKeywordOwner=data.repo))
+        val queue=java.util.ArrayDeque<suspend(EntryRepository)->Unit>()
+        val cleared=java.util.concurrent.CountDownLatch(1);val release=java.util.concurrent.CountDownLatch(1)
+        var block=false;private val blocked=java.util.concurrent.atomic.AtomicBoolean()
+        val owner:EntryRepository=object:EntryRepository {
+            override val unifiedKeywords=data.repo
+            override suspend fun readDraft():com.t1doo.aiyou.model.TextDraft?=null
+            override suspend fun updateDraft(text:String):com.t1doo.aiyou.model.TextDraft=error("Unrelated")
+            override suspend fun saveDraft(expected:com.t1doo.aiyou.model.TextDraft,capturedAtMillis:Long,captureTimeZone:String):com.t1doo.aiyou.model.StoredEntry=error("Unrelated")
+            override suspend fun entries()=state.get().entries
+            override suspend fun revisions(entryId:String):List<com.t1doo.aiyou.model.OriginalRevision> = error("Unrelated")
+            override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):com.t1doo.aiyou.model.StoredEntry=error("Unrelated")
+        }
+        val controller=UnifiedKeywordController({state.get()},{change->
+            val before=state.get();val after=state.updateAndGet(change)
+            if(block&&before.unifiedKeyword!=null&&after.unifiedKeyword==null&&blocked.compareAndSet(false,true)){
+                cleared.countDown();check(release.await(4,TimeUnit.SECONDS))
+            }
+        },{queue.add(it);true})
+        suspend fun load(){controller.open();val u=state.get().unifiedKeyword!!;controller.keyword(u.session,"淡茶");controller.search(u.session);queue.removeFirst()(owner)}
+        override fun close(){release.countDown();controller.dispose();data.close()}
     }
 }

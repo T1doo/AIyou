@@ -42,7 +42,7 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
     val spans=if(at>=start&&at+keyword.length<=end&&keyword.isNotEmpty())listOf(AnnotatedString.Range(SpanStyle(fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary),hit,hit+keyword.length))else emptyList()
     Text(AnnotatedString(shown,spans),Modifier.testTag("unified-excerpt:"+e.key))
 }
-@Composable internal fun UnifiedKeywordDialog(u:UnifiedKeywordUi,c:UnifiedKeywordController,canUse:()->Boolean,onLocate:(UnifiedKeywordEvidence)->Unit){
+@Composable internal fun UnifiedKeywordDialog(u:UnifiedKeywordUi,c:UnifiedKeywordController,canUse:()->Boolean,onLocate:(UnifiedKeywordEvidence,UnifiedKeywordHandoff)->Unit){
     DisposableEffect(c,u.session){onDispose{c.close(u.session)}}
     var menu by remember{mutableStateOf(false)}
     Dialog(onDismissRequest={if(canUse())c.close(u.session)},properties=DialogProperties(usePlatformDefaultWidth=false)){

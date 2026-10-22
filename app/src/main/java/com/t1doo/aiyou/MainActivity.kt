@@ -685,21 +685,23 @@ fun AIyouApp(
     if(unifiedRoute&&unifiedUi!=null&&unifiedKeywords!=null){
         fun ownsUnified()=ownsNavigation()&&!showSettings&&!demo&&!recapRoute&&detailEntryId==null&&
             (currentRecordsProvider?.invoke()?:currentLocal)?.unifiedKeyword?.session==unifiedUi.session
-        com.t1doo.aiyou.records.UnifiedKeywordDialog(unifiedUi,unifiedKeywords,::ownsUnified){item->
+        com.t1doo.aiyou.records.UnifiedKeywordDialog(unifiedUi,unifiedKeywords,::ownsUnified){item,confirm->
             navigation.publish(generation){
                 val latest=currentRecordsProvider?.invoke()?:currentLocal
                 val b=item.binding
                 val entry=latest?.entries?.singleOrNull{it.id==b.source.sourceId&&it.currentRevision.toLong()==b.source.revision&&com.t1doo.aiyou.model.OriginalExports.hash(it.originalText)==b.hash&&it.policy==b.policy}
                 if(ownsNavigation()&&!showSettings&&!demo&&entry!=null&&latest?.let{!it.supportsLocalProcessing||it.localProcessingAvailable&&it.localProcessingVersions[b.source.sourceId]?.generation==b.generation}==true){
-                    navigation.advance();search.pause();readerFromSearch=false;tailReturnRequest=null
-                    audioSourceAnchor=null;imageSourceAnchor=null
-                    searchLocation=com.t1doo.aiyou.records.unifiedOriginalLocation(item,unifiedUi.keyword)
-                    when(item){
-                        is com.t1doo.aiyou.domain.UnifiedKeywordEvidence.Audio->{audioSourceAnchor=item.value.anchor;attachments?.openAudio(item.value.anchor.intent)}
-                        is com.t1doo.aiyou.domain.UnifiedKeywordEvidence.Image->{imageSourceAnchor=item.value.anchor;attachments?.openImage(item.value.anchor.intent)}
-                        else->Unit
+                    confirm {
+                        navigation.advance();search.pause();readerFromSearch=false;tailReturnRequest=null
+                        audioSourceAnchor=null;imageSourceAnchor=null
+                        searchLocation=com.t1doo.aiyou.records.unifiedOriginalLocation(item,unifiedUi.keyword)
+                        when(item){
+                            is com.t1doo.aiyou.domain.UnifiedKeywordEvidence.Audio->{audioSourceAnchor=item.value.anchor;attachments?.openAudio(item.value.anchor.intent)}
+                            is com.t1doo.aiyou.domain.UnifiedKeywordEvidence.Image->{imageSourceAnchor=item.value.anchor;attachments?.openImage(item.value.anchor.intent)}
+                            else->Unit
+                        }
+                        unifiedSourceRoute=true;inboxSourceRoute=true;detailEntryId=entry.id
                     }
-                    unifiedSourceRoute=true;inboxSourceRoute=true;detailEntryId=entry.id
                 }
             }
         }

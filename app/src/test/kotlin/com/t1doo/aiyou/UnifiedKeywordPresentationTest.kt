@@ -72,7 +72,7 @@ class UnifiedKeywordPresentationTest {
         compose.onNodeWithTag("unified-empty").assertDoesNotExist();query("淡茶")
         val old=f.local.value.unifiedKeyword!!;val item=old.snapshot!!.groups.single().items.first()
         restore.emulateSavedInstanceStateRestore();compose.waitForIdle();drain()
-        compose.runOnIdle{assertNull(f.local.value.unifiedKeyword);f.c.locate(old.session,item){fail("Old query restored")}}
+        compose.runOnIdle{assertNull(f.local.value.unifiedKeyword);f.c.locate(old.session,item){_,_->fail("Old query restored")}}
         open();assertEquals("",compose.onNodeWithTag("unified-query").fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         compose.onNodeWithTag("unified-empty").assertDoesNotExist()
     }
@@ -82,7 +82,7 @@ class UnifiedKeywordPresentationTest {
         result(a);compose.onNodeWithTag("attachment-picture").assertIsDisplayed()
         compose.runOnIdle{assertEquals(a.value.anchor.intent,f.attachments.state.value!!.focusImage)}
         val panel=f.attachments.state.value!!;restore.emulateSavedInstanceStateRestore();compose.waitForIdle();drain()
-        compose.runOnIdle{assertNull(f.attachments.state.value);f.attachments.refresh(panel.sessionId);f.c.locate(old.session,a){fail("Old image route")}};drain()
+        compose.runOnIdle{assertNull(f.attachments.state.value);f.attachments.refresh(panel.sessionId);f.c.locate(old.session,a){_,_->fail("Old image route")}};drain()
         open();query("清水");val b=f.local.value.unifiedKeyword!!.snapshot!!.groups.single().items.filterIsInstance<UnifiedKeywordEvidence.Image>().single()
         result(b);compose.onNodeWithTag("attachment-picture").assertIsDisplayed()
         compose.runOnIdle{assertEquals(b.value.anchor.intent,f.attachments.state.value!!.focusImage);assertNotEquals(a.value.anchor.intent,b.value.anchor.intent);assertEquals(0,f.writes)}

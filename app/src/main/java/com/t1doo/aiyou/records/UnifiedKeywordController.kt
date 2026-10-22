@@ -24,10 +24,16 @@ internal fun LocalRecordUiState.canRetainUnified(u:UnifiedKeywordUi):Boolean {
         (!supportsLocalProcessing||localProcessingAvailable&&localProcessingVersions[b.source.sourceId]?.generation==b.generation)}
 }
 
+/** Invoke confirmation only while holding the caller's navigation owner. The controller never
+ * holds its lifecycle lock while waiting for navigation: lock order is navigation -> lifecycle. */
+typealias UnifiedKeywordHandoff = ((()->Unit)->Boolean)
+
 class UnifiedKeywordController(private val current:()->LocalRecordUiState,
     private val publish:((LocalRecordUiState)->LocalRecordUiState)->Unit,
     private val enqueue:(suspend(EntryRepository)->Unit)->Boolean) {
     private val tokens=AtomicLong()
+    private val handoffLock=Any()
+    private var lifetime=0L
     @Volatile private var disposed=false
     private var returnSeed:Pair<String,UnifiedKeywordScope>?=null
     private fun owns(session:Long,request:Long?=null):Boolean {
@@ -40,18 +46,27 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
         else l.copy(unifiedKeyword=change(u).takeIf{l.canRetainUnified(it)})
     }
     fun open(){openWith("",UnifiedKeywordScope.ALL)}
-    private fun openWith(keyword:String,scope:UnifiedKeywordScope) {
-        val l=current();val owner=l.unifiedKeywordOwner?:return
-        if(disposed||l.unifiedKeyword!=null)return
+    private fun openWith(keyword:String,scope:UnifiedKeywordScope)=synchronized(handoffLock) {
+        val l=current();val owner=l.unifiedKeywordOwner?:return@synchronized
+        if(disposed||l.unifiedKeyword!=null)return@synchronized
         val u=UnifiedKeywordUi(tokens.incrementAndGet(),owner,keyword=keyword,scope=scope)
-        if(!l.canRetainUnified(u))return
+        if(!l.canRetainUnified(u))return@synchronized
+        lifetime=Math.addExact(lifetime,1)
         publish{if(it.unifiedKeyword==null&&it.canRetainUnified(u))it.copy(unifiedKeyword=u)else it}
         if(keyword.isNotBlank())search(u.session)
     }
-    fun close(session:Long){var closed=false;publish{if(it.unifiedKeyword?.session==session){closed=true;it.copy(unifiedKeyword=null)}else it};if(closed)returnSeed=null}
-    fun retire(){publish{it.copy(unifiedKeyword=null)};returnSeed=null}
-    fun resume(){val seed=returnSeed?:return;returnSeed=null;openWith(seed.first,seed.second)}
-    fun dispose(){disposed=true;retire()}
+    fun close(session:Long)=synchronized(handoffLock) {
+        var closed=false
+        publish{if(it.unifiedKeyword?.session==session){closed=true;it.copy(unifiedKeyword=null)}else it}
+        if(closed){lifetime=Math.addExact(lifetime,1);returnSeed=null}
+    }
+    fun retire()=synchronized(handoffLock) {
+        lifetime=Math.addExact(lifetime,1);returnSeed=null;publish{it.copy(unifiedKeyword=null)}
+    }
+    fun resume()=synchronized(handoffLock) {
+        val seed=returnSeed?:return@synchronized;returnSeed=null;openWith(seed.first,seed.second)
+    }
+    fun dispose()=synchronized(handoffLock){disposed=true;retire()}
     fun keyword(session:Long,value:String){if(value.length>256)return;update(session){
         if(it.keyword==value)it else it.copy(keyword=value,request=tokens.incrementAndGet(),snapshot=null,page=0,busy=false,error=null)
     }}
@@ -69,12 +84,13 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
         if(page<0||page*20>=proof.groups.size)return
         execute(u,proof,page,null,null)
     }
-    fun locate(session:Long,item:UnifiedKeywordEvidence,onLocate:(UnifiedKeywordEvidence)->Unit){
+    fun locate(session:Long,item:UnifiedKeywordEvidence,onLocate:(UnifiedKeywordEvidence,UnifiedKeywordHandoff)->Unit){
         val u=current().unifiedKeyword?:return;val proof=u.snapshot?:return
         if(!owns(session)||u.busy||u.visibleGroups.none{g->g.items.any{it===item}})return
         execute(u,proof,u.page,item,onLocate)
     }
-    private fun execute(before:UnifiedKeywordUi,proof:UnifiedKeywordSnapshot?,page:Int,item:UnifiedKeywordEvidence?,onLocate:((UnifiedKeywordEvidence)->Unit)?) {
+    private fun execute(before:UnifiedKeywordUi,proof:UnifiedKeywordSnapshot?,page:Int,item:UnifiedKeywordEvidence?,onLocate:((UnifiedKeywordEvidence,UnifiedKeywordHandoff)->Unit)?) {
+        val epoch=synchronized(handoffLock){lifetime}
         val req=tokens.incrementAndGet();update(before.session){it.copy(request=req,busy=true,error=null)}
         if(!owns(before.session,req))return
         if(!enqueue{store->
@@ -93,7 +109,20 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
                     var admitted=false
                     publish{l->val u=l.unifiedKeyword;admitted=!disposed&&u?.session==before.session&&u.request==req&&l.canRetainUnified(u)
                         if(admitted)l.copy(unifiedKeyword=null)else l}
-                    if(admitted){returnSeed=before.keyword to before.scope;onLocate?.invoke(item)}
+                    if(admitted){
+                        var used=false
+                        val confirm:UnifiedKeywordHandoff={action->synchronized(handoffLock){
+                            val l=current()
+                            if(used||disposed||lifetime!=epoch||l.unifiedKeyword!=null||!l.canRetainUnified(before.copy(snapshot=result)))false
+                            else {
+                                used=true;returnSeed=before.keyword to before.scope
+                                try{action();true}catch(t:Throwable){returnSeed=null;throw t}
+                            }
+                        }}
+                        // UI is already null here. Retirement must still invalidate this offer.
+                        // Never hold handoffLock while a caller obtains its navigation lock.
+                        if(synchronized(handoffLock){!disposed&&lifetime==epoch})onLocate?.invoke(item,confirm)
+                    }
                 }
             }catch(c:CancellationException){throw c}catch(_:Exception){failed(before.session,req)}
         })failed(before.session,req)
