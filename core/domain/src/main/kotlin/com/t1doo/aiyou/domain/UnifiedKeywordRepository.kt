@@ -65,6 +65,7 @@ interface UnifiedKeywordSnapshot {
     val captureRange:UnifiedCaptureRange get()=UnifiedCaptureRange()
     val tag:UnifiedTagSelection? get()=null
     val person:UnifiedPersonSelection? get()=null
+    val onlyFavorites:Boolean get()=false
     val groups:List<UnifiedKeywordGroup>
     /** Includes off-screen and nonmatching sources retained by the authenticated collection proof. */
     val bindings:List<UnifiedKeywordBinding>
@@ -98,6 +99,11 @@ interface UnifiedKeywordRepository {
         if(person!=null)throw UnifiedPersonUnsupported()
         return search(keyword,scope,captureRange,tag,checkCurrent)
     }
+    /** An old port must never silently drop an explicit original-favorite intersection. */
+    suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,onlyFavorites:Boolean,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+        if(onlyFavorites)throw UnifiedFavoriteUnsupported()
+        return search(keyword,scope,captureRange,tag,person,checkCurrent)
+    }
     /** Reauthenticates media, then jointly verifies all sets. Callback is a PRIVATE admission
      * ticket only: callers must not render or navigate until this method returns true. */
     suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?=null,admit:()->Unit):Boolean
@@ -106,6 +112,7 @@ interface UnifiedKeywordRepository {
     }
 }
 class UnifiedKeywordConflict:IllegalStateException("Unified local lookup changed")
+class UnifiedFavoriteUnsupported:IllegalStateException("Original favorite filter is unavailable")
 class UnifiedKeywordTooBroad:IllegalStateException("Accepted memory lookup has too many matches")
 
 interface UnifiedTagChoice { val id:String; val name:String }

@@ -10,7 +10,7 @@ import com.t1doo.aiyou.model.*
 import com.t1doo.aiyou.records.*
 
 /** Synthetic display data, never a functioning store, inference port, or navigation authority. */
-@Composable private fun UnifiedKeywordSpecimen(firstItem:Int,memoryOnly:Boolean=false,dateRange:Boolean=false,tags:Boolean=false,people:Boolean=false){
+@Composable private fun UnifiedKeywordSpecimen(firstItem:Int,memoryOnly:Boolean=false,dateRange:Boolean=false,tags:Boolean=false,people:Boolean=false,favorites:Boolean=false){
     val entry=StoredEntry("00000000-0000-4000-8000-000000000001",1,"合成：我偏好淡茶，散步后也喜欢清水。",55,"UTC",ProcessingPolicy.LOCAL_ONLY)
     val source=SourceVersion(entry.id,1);val hash=OriginalExports.hash(entry.originalText)
     val binding=UnifiedKeywordBinding(source,hash,0,55,"UTC",entry.policy)
@@ -27,7 +27,7 @@ import com.t1doo.aiyou.records.*
         SourceMemoryContent(SourceMemoryRules.reference(preview,"我偏好淡茶"),SourceMemoryKind.OCCASION_EMOTION,SourceMemoryAssertion.UNCERTAIN,"合成人工备注：散步后更清醒。"),false,true)))else evidence
     val word=if(memoryOnly)"散步"else"淡茶"
     val range=if(dateRange)UnifiedCaptureRange.parse("1970-01-01","1970-01-01")else UnifiedCaptureRange()
-    val snapshot=object:UnifiedKeywordSnapshot{override val keyword=word;override val scope=UnifiedKeywordScope.ALL;override val captureRange=range
+    val snapshot=object:UnifiedKeywordSnapshot{override val keyword=word;override val scope=UnifiedKeywordScope.ALL;override val captureRange=range;override val onlyFavorites=favorites
         override val bindings=listOf(binding);override val groups=listOf(UnifiedKeywordGroup(binding,shown.sortedBy{it.key}))}
     val owner=object:UnifiedKeywordRepository{
         override suspend fun search(keyword:String,scope:UnifiedKeywordScope):UnifiedKeywordSnapshot=error("Render-only fixture")
@@ -35,7 +35,7 @@ import com.t1doo.aiyou.records.*
     }
     val tagPage=object:UnifiedTagPage{override val hasNext=true;override val choices=listOf("合成：饮食与散步","合成人工标签"+"茶".repeat(34)).mapIndexed{n,text->object:UnifiedTagChoice{override val id="synthetic-tag-$n";override val name=text}}}
     val peoplePage=object:UnifiedPersonPage{override val hasNext=true;override val choices=listOf("合成人物标记：阿岚","合成人物标记"+"人".repeat(34)).mapIndexed{n,text->object:UnifiedPersonChoice{override val id="synthetic-person-$n";override val name=text}}}
-    val ui=UnifiedKeywordUi(1,owner,keyword=word,snapshot=snapshot,from=range.from?.toString().orEmpty(),through=range.through?.toString().orEmpty(),tagPicker=tags,tagPage=if(tags)tagPage else null,personPicker=people,personPage=if(people)peoplePage else null)
+    val ui=UnifiedKeywordUi(1,owner,keyword=word,snapshot=snapshot,from=range.from?.toString().orEmpty(),through=range.through?.toString().orEmpty(),tagPicker=tags,tagPage=if(tags)tagPage else null,personPicker=people,personPage=if(people)peoplePage else null,onlyFavorites=favorites)
     val controller=UnifiedKeywordController({LocalRecordUiState()},{},{false})
     AIyouTheme{UnifiedKeywordContent(ui,controller,{false},{_,_->},rememberLazyListState(initialFirstVisibleItemIndex=firstItem))}
 }
@@ -69,3 +69,8 @@ import com.t1doo.aiyou.records.*
 @Preview(name="portrait200",widthDp=320,heightDp=640,fontScale=2f,locale="zh-rCN")
 @Preview(name="landscape200",widthDp=640,heightDp=320,fontScale=2f,locale="zh-rCN")
 @Composable fun UnifiedKeywordManualPeopleRender(){UnifiedKeywordSpecimen(0,people=true)}
+
+@PreviewTest
+@Preview(name="portrait200",widthDp=320,heightDp=640,fontScale=2f,locale="zh-rCN")
+@Preview(name="landscape200",widthDp=640,heightDp=320,fontScale=2f,locale="zh-rCN")
+@Composable fun UnifiedKeywordFavoritesRender(){UnifiedKeywordSpecimen(1,favorites=true)}

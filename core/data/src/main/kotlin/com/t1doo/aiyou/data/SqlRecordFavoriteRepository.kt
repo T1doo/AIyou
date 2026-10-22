@@ -29,18 +29,25 @@ internal class SqlRecordFavoriteRepository(private val database: RecordsSqlDatab
     internal fun validateWithin(sql: RecordsSqlConnection) { forEachWithin(sql) {} }
     internal fun readWithin(sql: RecordsSqlConnection, id: String) = row(sql,id).snapshot()
 
+    /** Complete metadata, including receipt fields: public flag/version alone are not proof. */
+    internal fun visitWithin(sql:RecordsSqlConnection,checkCurrent:()->Unit,consume:(Row)->Unit) =
+        forEachWithin(sql,checkCurrent,20,consume)
+    internal fun metadataWithin(sql:RecordsSqlConnection,id:String)=row(sql,id)
+
     /** Bounded keyset pages validate every metadata row; no truncated READY/EMPTY result. */
-    private fun forEachWithin(sql: RecordsSqlConnection, consume: (Row) -> Unit) {
+    private fun forEachWithin(sql: RecordsSqlConnection, checkCurrent:()->Unit={}, batch:Int=256, consume: (Row) -> Unit) {
         var last: String? = null; var seen = 0
         while (true) {
-            val pageSize = minOf(256, metadataLimit-seen+1)
+            checkCurrent()
+            val pageSize = minOf(batch, metadataLimit-seen+1)
             val page = sql.query("SELECT " + columns + " FROM entries e WHERE " + live +
                 (if(last == null) "" else " AND e.id>?") + " ORDER BY e.id LIMIT ?",
                 if(last == null) listOf(pageSize) else listOf(last,pageSize))
             if(page.isEmpty()) return
             for(cells in page) {
+                checkCurrent()
                 if(++seen>metadataLimit) throw RecordFavoriteTooBroad()
-                val value=decode(cells);consume(value);last=value.id
+                val value=decode(cells);consume(value);last=value.id;checkCurrent()
             }
             if(page.size<pageSize) return
         }
@@ -102,7 +109,7 @@ internal class SqlRecordFavoriteRepository(private val database: RecordsSqlDatab
         return Row(id, current, flag == 1L, version, mutation, source)
     }
 
-    private class Row(val id: String, val currentRevision: Int, val favorite: Boolean,
+    internal class Row(val id: String, val currentRevision: Int, val favorite: Boolean,
         val version: Long, val mutation: String?, val sourceRevision: Int) {
         fun snapshot() = RecordFavoriteSnapshot(id, version, favorite)
     }

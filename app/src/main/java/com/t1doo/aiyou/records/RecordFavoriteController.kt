@@ -31,6 +31,7 @@ class RecordFavoriteController internal constructor(
     private val current: () -> LocalRecordUiState,
     private val publish: ((LocalRecordUiState) -> LocalRecordUiState) -> Unit,
     private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
+    private val beforeWrite:()->Unit={},
 ) {
     private val tokens = AtomicLong()
     private val reads = AtomicLong()
@@ -63,7 +64,7 @@ class RecordFavoriteController internal constructor(
                 latest.favorites[id]?.let { it.version == version && it.isFavorite == snapshot.isFavorite } != true) latest
             else latest.copy(favoriteWrites = latest.favoriteWrites + (id to write), favoriteNotice = null, favoriteNoticeEntryId = null, favoriteNoticeReceipt = null)
         }
-        if (owns(write)) submit(write)
+        if (owns(write)) { beforeWrite(); if(owns(write)) submit(write) }
     }
 
     fun retry(id: String) {
@@ -71,7 +72,7 @@ class RecordFavoriteController internal constructor(
         if (write.conflict) { refresh(); return }
         publish { local -> if (!owns(write, local)) local else local.copy(
             favoriteWrites = local.favoriteWrites + (id to write.copy(busy = true, error = null))) }
-        if (owns(write)) submit(write)
+        if (owns(write)) { beforeWrite(); if(owns(write)) submit(write) }
     }
 
     private fun submit(write: RecordFavoriteWrite) {

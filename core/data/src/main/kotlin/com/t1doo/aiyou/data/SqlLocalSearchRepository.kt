@@ -156,7 +156,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
 
     /** Authenticated record-local lookup, never a global replacement in the FTS expression. */
     private fun aliasCandidates(sql: RecordsSqlConnection, request: LocalSearchRequest,
-        from: LocalDate?, through: LocalDate?, budget: Budget, favoriteCondition: String, imageCondition: String): Set<String> {
+        from: LocalDate?, through: LocalDate?, budget: Budget, favoriteCondition: String, imageCondition: String, guard:()->Unit={}): Set<String> {
         val owner = people ?: return emptySet()
         if (request.exact || request.query.isBlank()) return emptySet()
         val whole = ManualPeopleAliases.fold(request.query.trim())
@@ -166,11 +166,13 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         var scanned = 0
         var authenticated = 0
         while (true) {
+            guard()
             val rows = sql.query("SELECT e.id,e.capturedAtMillis,e.captureTimeZone FROM entry_manual_people p " +
                 "JOIN entries e ON e.id=p.entryId LEFT JOIN remote_source_access a ON a.entryId=e.id WHERE " +
                 live + favoriteCondition + imageCondition + " ORDER BY e.id LIMIT 100 OFFSET " + scanned)
             if (rows.isEmpty()) break
             for (row in rows) {
+                guard()
                 if (++scanned > 10_000) throw LocalSearchTooBroad()
                 val id = row[0] as String
                 val selectedDate = if (request.dateBasis == RecordDateBasis.EVENT)
@@ -204,7 +206,13 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         require(request.person!=null)
         return candidates(request,false)
     }
-    private fun candidates(request:LocalSearchRequest,includeAliasCandidates:Boolean):LocalSearchSnapshot = safely {
+    /** Unified only-favorites reads share the real owner's bounded cancellation admission. */
+    internal fun favoriteCandidates(request:LocalSearchRequest,guard:()->Unit):LocalSearchSnapshot {
+        require(request.onlyFavorites)
+        return candidates(request,request.person==null,guard)
+    }
+    private fun candidates(request:LocalSearchRequest,includeAliasCandidates:Boolean,guard:()->Unit={}):LocalSearchSnapshot = safely {
+        guard()
         val profile = activeProfile()
         if (request.query.length > 100_000) throw LocalSearchInvalid()
         val from = date(request.from); val through = date(request.through)
@@ -214,7 +222,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         database.transaction { sql ->
             val stamp = epochWithin(sql)
             // Never interpret missing or malformed favorite metadata as an empty collection.
-            if (request.onlyFavorites) try { favorites.validateWithin(sql) }
+            if (request.onlyFavorites) try { favorites.visitWithin(sql,guard) {} }
                 catch (_: RecordFavoriteTooBroad) { throw LocalSearchFavoriteLimit() }
             val favoriteValues = if (request.onlyFavorites) HashMap<String,RecordFavoriteSnapshot>() else null
             // Unknown event dates are excluded, never replaced with the captured calendar day.
@@ -227,7 +235,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             val imageCondition = if (request.onlyImages) " AND EXISTS(SELECT 1 FROM attachments p " +
                 "WHERE p.entryId=e.id AND p.revision=e.currentRevision AND p.mediaType IN ('image/png','image/jpeg'))" else ""
             val budget = Budget()
-            val aliasIds = if(includeAliasCandidates)aliasCandidates(sql, request, from, through, budget, favoriteCondition, imageCondition)else emptySet()
+            val aliasIds = if(includeAliasCandidates)aliasCandidates(sql, request, from, through, budget, favoriteCondition, imageCondition,guard)else emptySet()
             val expression = LocalSearchTokenizer.query(request.query, request.exact)
             val condition = if (expression == null || stamp.version != 1 || stamp.profile != profile) "" else
                 " AND (" + valid(stamp.epoch, profile) + "=0 OR e.id IN (SELECT entryId FROM local_search_fts WHERE local_search_fts MATCH ?)" +
@@ -238,10 +246,12 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             val labels = HashMap<String, ManualTagSnapshot>()
             var scanned = 0
             while (true) {
+                guard()
                 val page = sql.query("SELECT e.id,e.capturedAtMillis,e.captureTimeZone" + sourceFrom +
                     "WHERE " + live + favoriteCondition + imageCondition + condition + " ORDER BY e.id LIMIT 100 OFFSET " + scanned, args)
                 if (page.isEmpty()) break
                 for (row in page) {
+                    guard()
                     if (++scanned > 10_000) throw LocalSearchTooBroad()
                     val id = row[0] as String
                     val event = if (eventValues != null) eventDateStorage.readWithin(sql,id) else null
@@ -271,6 +281,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             }
             val pending = sql.query("SELECT e.id" + sourceFrom + "WHERE " + live + " AND " + dirty(stamp.epoch, profile) +
                 " LIMIT 1").isNotEmpty() || stamp.version != 1 || stamp.profile != profile
+            guard()
             Proof(stamp, profile, Collections.unmodifiableList(bindings.toList()), labels, pending,
                 favoriteValues?.let { Collections.unmodifiableMap(it) },eventValues?.let { Collections.unmodifiableMap(it) },
                 request.takeIf { it.onlyImages }, personValues?.let { Collections.unmodifiableMap(it) })

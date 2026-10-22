@@ -1,6 +1,8 @@
 package com.t1doo.aiyou.records
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -90,6 +92,15 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
                 item{
                     Surface(color=MaterialTheme.colorScheme.surfaceContainerLow,shape=MaterialTheme.shapes.medium){
                         Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                            Row(Modifier.fillMaxWidth().heightIn(min=48.dp).aiyouFocusOutline().toggleable(value=u.onlyFavorites,role=Role.Checkbox,
+                                onValueChange={if(canUse())c.favorites(u.session,it)}).testTag("unified-only-favorites"),
+                                verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+                                Checkbox(checked=u.onlyFavorites,onCheckedChange=null)
+                                Text("仅看所属原件已收藏",Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge)
+                            }
+                            Text(if(u.onlyFavorites)"只找回已收藏原件中的所选内容；收藏不代表事实确认。"else"不限收藏状态；此处不改变原件收藏。",
+                                style=MaterialTheme.typography.bodySmall,modifier=Modifier.testTag("unified-favorite-description"))
+                            HorizontalDivider()
                             Text("捕获日期",style=MaterialTheme.typography.titleSmall)
                             Text("按每条原件保存的时区；不是事件发生日期。",style=MaterialTheme.typography.bodySmall)
                             OutlinedTextField(u.from,{if(canUse())c.from(u.session,it)},singleLine=true,label={Text("起始日期（含）")},

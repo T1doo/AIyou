@@ -285,7 +285,7 @@ class LocalRecordsViewModel internal constructor(
     val modelConnections = ModelConnectionsController(current = { mutableState.value },
         enqueue = { action -> submit(Command.ModelConnections(action)).isSuccess },capabilityProbe=capabilityProbe)
     val favorites = RecordFavoriteController(current = { mutableState.value }, publish = { change -> update(change) },
-        enqueue = { action -> submit(Command.Favorites(action)).isSuccess })
+        enqueue = { action -> submit(Command.Favorites(action)).isSuccess }, beforeWrite={unifiedObserver?.retire()})
     val eventDates = RecordEventDateController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.EventDates(action)).isSuccess })
     val tasks = ManualTaskController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -576,7 +576,11 @@ class LocalRecordsViewModel internal constructor(
                     previous.localSearchEpoch!=requested.localSearchEpoch||!sameUnifiedManualTags(previous.manualTags,requested.manualTags))||
                 observed?.people==true&&(previous.manualPeopleAvailable!=requested.manualPeopleAvailable||previous.manualPeopleError!=requested.manualPeopleError||
                     previous.manualPeopleOwner!==requested.manualPeopleOwner||previous.localSearchEpoch!=requested.localSearchEpoch||
-                    !sameUnifiedManualPeople(previous.manualPeople,requested.manualPeople))
+                    !sameUnifiedManualPeople(previous.manualPeople,requested.manualPeople))||
+                observed?.favorites==true&&(previous.supportsFavorites!=requested.supportsFavorites||previous.favoritesAvailable!=requested.favoritesAvailable||
+                    previous.favoritesLoading!=requested.favoritesLoading||previous.favoritesError!=requested.favoritesError||
+                    previous.favoriteControllerRetired!=requested.favoriteControllerRetired||previous.favoriteWrites!=requested.favoriteWrites||
+                    previous.localSearchEpoch!=requested.localSearchEpoch||!sameUnifiedFavorites(previous.favorites,requested.favorites))
             val proposed = if (requested.manualPeople.keys.any { id -> requested.entries.none { it.id == id } }) requested.copy(
                 manualPeople = java.util.Collections.unmodifiableMap(requested.manualPeople.filterKeys { id -> requested.entries.any { it.id == id } })) else requested
             val panel = proposed.localProcessing

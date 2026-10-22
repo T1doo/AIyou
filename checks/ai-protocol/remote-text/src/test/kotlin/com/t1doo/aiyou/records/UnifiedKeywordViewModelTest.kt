@@ -504,12 +504,132 @@ class UnifiedKeywordViewModelTest {
         val session=h.value().session;h.vm.unifiedKeywords.openPeople(session)
         val page=h.ui{it.personPage!=null&&!it.personBusy}.personPage!!;h.vm.unifiedKeywords.selectPerson(session,page.choices.single{it.name==name});h.ui{it.person!=null&&!it.personBusy}
     }
-    private class Harness(extra:Int=0,withMemory:Boolean=false,withPeople:Boolean=false):AutoCloseable {
+    @Test fun actualFavoriteQueryReturnsFreshProofThenAcceptedWriteRetiresPrivateReturnSeed():Unit=runBlocking{Harness(withFavorites=true).use{h->
+        h.ready();chooseFavorite(h,h.id,true)
+        h.open("淡茶");h.ui{!it.busy&&it.snapshot!=null};var u=h.value()
+        h.vm.unifiedKeywords.favorites(u.session,true);h.vm.unifiedKeywords.search(u.session)
+        u=h.ui{!it.busy&&it.snapshot?.onlyFavorites==true};val proof=u.snapshot!!
+        var nav=0;val firstNavigation=CompletableDeferred<Unit>();val secondNavigation=CompletableDeferred<Unit>()
+        h.vm.unifiedKeywords.locate(u.session,u.visibleGroups.single().items.first()){_,confirm->assertTrue(confirm{nav++;firstNavigation.complete(Unit)})}
+        withTimeout(4000){firstNavigation.await()};assertEquals(1,nav);assertNull(h.vm.state.value.unifiedKeyword)
+        h.vm.unifiedKeywords.resume();u=h.ui{!it.busy&&it.snapshot!=null};assertTrue(u.onlyFavorites);assertNotSame(proof,u.snapshot)
+        h.vm.unifiedKeywords.locate(u.session,u.visibleGroups.single().items.first()){_,confirm->assertTrue(confirm{nav++;secondNavigation.complete(Unit)})}
+        withTimeout(4000){secondNavigation.await()};assertEquals(2,nav);assertNull(h.vm.state.value.unifiedKeyword)
+        chooseFavorite(h,h.id,false);h.vm.unifiedKeywords.resume();assertNull(h.vm.state.value.unifiedKeyword)
+        assertEquals(2L,SqlRecordFavoriteRepository(h.data.f.gateway).read(h.id).version)
+    }}
+    @Test fun allScopesAndEmptyResultRetireForUnmatchedSourceFavoriteChanges():Unit=runBlocking{
+        for(scope in UnifiedKeywordScope.entries)Harness(withMemory=true,withFavorites=true).use{h->
+            h.ready();val hidden=h.data.f.entry(text="合成未命中");h.vm.favorites.refresh()
+            withTimeout(4000){h.vm.state.first{!it.favoritesLoading&&it.favorites.containsKey(hidden)}}
+            chooseFavorite(h,h.id,true)
+            h.open("淡茶",scope);h.ui{!it.busy&&it.snapshot!=null};val session=h.value().session
+            h.vm.unifiedKeywords.favorites(session,true);h.vm.unifiedKeywords.search(session);val old=h.ui{!it.busy&&it.snapshot!=null}
+            chooseFavorite(h,hidden,true)
+            assertNull(h.vm.state.value.unifiedKeyword)
+            old.snapshot!!.groups.firstOrNull()?.items?.firstOrNull()?.let{item->h.vm.unifiedKeywords.locate(old.session,item){_,_->fail("Retired source")}}
+            h.vm.unifiedKeywords.resume();assertNull(h.vm.state.value.unifiedKeyword)
+        }
+    }
+    @Test fun unknownFavoriteAckAndRefreshCannotPublishUntilSameIntentSettles():Unit=runBlocking{Harness(withFavorites=true).use{h->
+        h.ready();h.loseFavoriteAck=true
+        val e=h.vm.state.value.entries.single();h.vm.favorites.set(h.id,1,OriginalExports.hash(e.originalText),0,true)
+        withTimeout(4000){h.vm.state.first{it.favoriteWrites[h.id]?.busy==false}}
+        assertFalse(h.vm.state.value.favoritesAvailable);val intent=h.vm.state.value.favoriteWrites.getValue(h.id).intent
+        h.vm.unifiedKeywords.open();var u=h.value();h.vm.unifiedKeywords.keyword(u.session,"淡茶");h.vm.unifiedKeywords.favorites(u.session,true)
+        val before=h.calls;h.vm.unifiedKeywords.search(u.session);assertEquals(before,h.calls);assertNull(h.value().snapshot);assertNotNull(h.value().error)
+        h.vm.favorites.refresh();withTimeout(4000){h.vm.state.first{!it.favoritesLoading&&it.favoritesAvailable}}
+        assertSame(intent,h.vm.state.value.favoriteWrites.getValue(h.id).intent);assertNull(h.vm.state.value.unifiedKeyword)
+        h.vm.unifiedKeywords.open();u=h.value();h.vm.unifiedKeywords.keyword(u.session,"淡茶");h.vm.unifiedKeywords.favorites(u.session,true)
+        h.vm.unifiedKeywords.search(u.session);assertEquals(before,h.calls);assertNull(h.value().snapshot)
+        h.vm.favorites.retry(h.id);withTimeout(4000){h.vm.state.first{it.favoriteWrites.isEmpty()&&it.favoritesAvailable}}
+        assertEquals(1L,SqlRecordFavoriteRepository(h.data.f.gateway).read(h.id).version);assertNull(h.vm.state.value.unifiedKeyword)
+        h.open("淡茶");h.ui{!it.busy&&it.snapshot!=null};u=h.value();h.vm.unifiedKeywords.favorites(u.session,true);h.vm.unifiedKeywords.search(u.session)
+        assertTrue(h.ui{!it.busy&&it.snapshot!=null}.snapshot!!.onlyFavorites)
+    }}
+    @Test fun oldFavoriteTrueFalseTrueResultCannotReplaceNewRequest():Unit=runBlocking{Harness(withFavorites=true).use{h->
+        h.ready();chooseFavorite(h,h.id,true);h.vm.unifiedKeywords.open();var u=h.value();h.vm.unifiedKeywords.keyword(u.session,"淡茶");h.vm.unifiedKeywords.favorites(u.session,true)
+        h.block=true;h.vm.unifiedKeywords.search(u.session);withTimeout(4000){h.entered.await()}
+        val oldRequest=h.value().request;h.vm.unifiedKeywords.favorites(u.session,false);h.vm.unifiedKeywords.favorites(u.session,true);h.vm.unifiedKeywords.search(u.session)
+        assertTrue(h.value().request>oldRequest);assertNull(h.value().snapshot);h.release.complete(Unit)
+        u=h.ui{!it.busy&&it.snapshot!=null};assertTrue(u.onlyFavorites);assertNotSame(h.first,u.snapshot)
+        h.vm.unifiedKeywords.clear(u.session);assertFalse(h.value().onlyFavorites);assertNull(h.value().snapshot)
+    }}
+    @Test fun favoriteOldPortAndDroppingConditionNeverPublishUnfilteredResults():Unit=runBlocking{
+        for(drop in listOf(false,true))HandoffFixture{actual->
+            val legacy=object:UnifiedKeywordRepository {
+                override suspend fun search(keyword:String,scope:UnifiedKeywordScope)=actual.search(keyword,scope)
+                override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit)=actual.resolve(snapshot,item,admit)
+            }
+            if(!drop)legacy else object:UnifiedKeywordRepository by legacy {
+                override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,onlyFavorites:Boolean,checkCurrent:()->Unit)=actual.search(keyword,scope,captureRange,tag,person,checkCurrent)
+            }
+        }.use{h->
+            UnifiedFavoriteSqlTest.favorite(h.data,h.id,true)
+            h.state.set(h.state.get().copy(supportsFavorites=true,favoritesAvailable=true,favorites=SqlRecordFavoriteRepository(h.data.f.gateway).snapshots()))
+            h.controller.open();val s=h.state.get().unifiedKeyword!!.session;h.controller.keyword(s,"淡茶");h.controller.favorites(s,true);h.controller.search(s);h.queue.removeFirst()(h.owner)
+            assertNull(h.state.get().unifiedKeyword!!.snapshot);assertNotNull(h.state.get().unifiedKeyword!!.error)
+        }
+    }
+    @Test fun favoriteSqlPerRowGuardsDoNotReadUiEntriesFavoritesOrRetainedProof():Unit=runBlocking{
+        var entryReads=0;var favoriteReads=0;var checks=0
+        fun counted(guard:()->Unit):()->Unit={val e=entryReads;val f=favoriteReads;guard();assertEquals(e,entryReads);assertEquals(f,favoriteReads);checks++}
+        HandoffFixture{actual->object:UnifiedKeywordRepository by actual {
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,onlyFavorites:Boolean,checkCurrent:()->Unit)=actual.search(keyword,scope,captureRange,tag,person,onlyFavorites,counted(checkCurrent))
+            override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,checkCurrent:()->Unit,admit:()->Unit)=actual.resolve(snapshot,item,counted(checkCurrent),admit)
+        }}.use{h->
+            UnifiedFavoriteSqlTest.favorite(h.data,h.id,true);repeat(3){h.data.f.entry(text="合成其他")}
+            val rows=h.state.get().entries;val values=SqlRecordFavoriteRepository(h.data.f.gateway).snapshots()
+            val entries=object:AbstractList<StoredEntry>(){override val size:Int get(){entryReads++;return rows.size};override fun get(index:Int):StoredEntry{entryReads++;return rows[index]}}
+            val favorites=object:AbstractMap<String,RecordFavoriteSnapshot>(){override val entries:Set<Map.Entry<String,RecordFavoriteSnapshot>> get(){favoriteReads++;return values.entries}}
+            h.state.set(h.state.get().copy(entries=entries,supportsFavorites=true,favoritesAvailable=true,favorites=favorites))
+            h.controller.open();val session=h.state.get().unifiedKeyword!!.session;h.controller.keyword(session,"淡茶");h.controller.favorites(session,true);h.controller.search(session);h.queue.removeFirst()(h.owner)
+            val u=h.state.get().unifiedKeyword!!;assertTrue(u.snapshot!!.onlyFavorites);var nav=0
+            h.controller.locate(session,u.visibleGroups.single().items.first()){_,confirm->assertTrue(confirm{nav++})};h.queue.removeFirst()(h.owner)
+            assertEquals(1,nav);assertTrue(checks>20);assertTrue(entryReads>0);assertEquals(0,favoriteReads)
+            println("FAVORITE_REQUEST_GUARDS checks=$checks guardEntries=0 guardFavorites=0 fullBoundaryEntryReads=$entryReads")
+        }
+    }
+    @Test fun favoriteIntentRetiresAfterAcceptedCasBeforeEnqueueAndNeverForRejectedChoice():Unit=runBlocking{HandoffFixture().use{h->
+        val actual=SqlRecordFavoriteRepository(h.data.f.gateway);h.state.set(h.state.get().copy(supportsFavorites=true,favoritesAvailable=true,favorites=actual.snapshots(),
+            localProcessingAvailable=true,localProcessingVersions=SqlLocalProcessingRepository(h.data.f.gateway).versions()))
+        h.load();val old=h.state.get().unifiedKeyword!!;var retired=0
+        val writes=RecordFavoriteController({h.state.get()},{change->change(h.state.get());h.state.updateAndGet(change)},
+            {action->assertEquals(1,retired);assertNull(h.state.get().unifiedKeyword);h.queue.add(action);true},
+            {retired++;h.controller.retire()})
+        val e=h.state.get().entries.single();val hash=OriginalExports.hash(e.originalText)
+        writes.set(h.id,1,hash,8,true);assertEquals(0,retired);assertTrue(h.queue.isEmpty());assertSame(old,h.state.get().unifiedKeyword)
+        writes.set(h.id,1,hash,0,true);assertEquals(1,retired);assertEquals(1,h.queue.size);assertFalse(actual.read(h.id).isFavorite)
+        val store=object:EntryRepository by h.owner{override val favorites=actual}
+        h.queue.removeFirst()(store);assertTrue(actual.read(h.id).isFavorite);assertTrue(h.state.get().favoriteWrites.isEmpty())
+        h.controller.resume();assertNull(h.state.get().unifiedKeyword)
+    }}
+    @Test fun unconfirmedFavoriteConditionCannotStrandTagPickerOrPublishUnfilteredResults():Unit=runBlocking{HandoffFixture().use{h->
+        h.data.f.tags.replace(ManualTagMutation(h.id,0,listOf("合成标签"),FullBackupTest.uuid()))
+        h.state.set(h.state.get().copy(supportsFavorites=true,favoritesAvailable=false))
+        h.controller.open();val session=h.state.get().unifiedKeyword!!.session;h.controller.keyword(session,"淡茶");h.controller.favorites(session,true)
+        h.controller.openTags(session);assertTrue(h.state.get().unifiedKeyword!!.tagBusy);h.queue.removeFirst()(h.owner)
+        var u=h.state.get().unifiedKeyword!!;assertFalse(u.tagBusy);assertEquals(listOf("合成标签"),u.tagPage!!.choices.map{it.name})
+        h.controller.selectTag(session,u.tagPage!!.choices.single());h.queue.removeFirst()(h.owner);u=h.state.get().unifiedKeyword!!
+        assertFalse(u.tagBusy);assertNotNull(u.tag);h.controller.search(session)
+        assertTrue(h.queue.isEmpty());assertNull(h.state.get().unifiedKeyword!!.snapshot);assertNotNull(h.state.get().unifiedKeyword!!.error)
+        h.controller.favorites(session,false);h.controller.search(session);h.queue.removeFirst()(h.owner)
+        assertFalse(h.state.get().unifiedKeyword!!.snapshot!!.onlyFavorites);assertEquals(1,h.state.get().unifiedKeyword!!.snapshot!!.groups.size)
+    }}
+    private suspend fun chooseFavorite(h:Harness,id:String,value:Boolean){
+        val state=h.vm.state.value;val e=state.entries.single{it.id==id};h.vm.favorites.set(id,e.currentRevision,OriginalExports.hash(e.originalText),state.favorites.getValue(id).version,value)
+        withTimeout(4000){h.vm.state.first{it.favoriteWrites[id]==null&&it.favoritesAvailable&&it.favorites[id]?.isFavorite==value}}
+    }
+    private class Harness(extra:Int=0,withMemory:Boolean=false,withPeople:Boolean=false,withFavorites:Boolean=false):AutoCloseable {
         val data=UnifiedKeywordFixture(withPeople=withPeople);val id=data.f.entry(text="合成淡茶")
         val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();var block=false
-        var first:UnifiedKeywordSnapshot?=null;var calls=0
+        var first:UnifiedKeywordSnapshot?=null;var calls=0;var loseFavoriteAck=false
         init{runBlocking{data.audio(id);repeat(extra){data.audio(data.f.entry(text="合成淡茶"))};if(withMemory)AcceptedMemoryKeywordSqlTest.memory(data,id,"备注专词")}}
         val port:UnifiedKeywordRepository=object:UnifiedKeywordRepository by data.repo{
+            override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,onlyFavorites:Boolean,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
+                calls++;val result=data.repo.search(keyword,scope,captureRange,tag,person,onlyFavorites,checkCurrent)
+                if(block){block=false;first=result;entered.complete(Unit);release.await()};return result
+            }
             override suspend fun personChoices(after:UnifiedPersonPage?,checkCurrent:()->Unit):UnifiedPersonPage {
                 val result=data.repo.personChoices(after,checkCurrent)
                 if(block){block=false;entered.complete(Unit);release.await()};return result
@@ -538,7 +658,14 @@ class UnifiedKeywordViewModelTest {
             override val unifiedKeywords=port
             override val manualTags=data.f.tags
             override val manualPeople=if(withPeople)data.people else null
-            override val localProcessing=if(withPeople)SqlLocalProcessingRepository(data.f.gateway)else null
+            override val localProcessing=if(withPeople||withFavorites)SqlLocalProcessingRepository(data.f.gateway)else null
+            override val favorites=if(withFavorites)object:RecordFavoriteRepository by SqlRecordFavoriteRepository(data.f.gateway){
+                override fun set(mutation:RecordFavoriteMutation):RecordFavoriteSnapshot {
+                    val saved=SqlRecordFavoriteRepository(data.f.gateway).set(mutation)
+                    if(loseFavoriteAck){loseFavoriteAck=false;error("Synthetic committed favorite ACK loss")};return saved
+                }
+            }else null
+            override val localSearch=if(withFavorites)data.originals else null
             override val sourceMemories=if(withMemory)data.memories else null
             override suspend fun prepare(){check(data.f.db.read("PRAGMA user_version").single().single()==12L)}
             override fun close()=base.close()
