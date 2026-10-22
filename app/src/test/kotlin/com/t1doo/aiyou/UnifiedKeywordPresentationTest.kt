@@ -48,6 +48,7 @@ class UnifiedKeywordPresentationTest {
     private fun open(){compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.onNodeWithTag("unified-open").performScrollTo().performClick();compose.waitForIdle()}
     private fun query(value:String){compose.onNodeWithTag("unified-results").performScrollToIndex(0)
         compose.onNodeWithTag("unified-query").performScrollTo().performTextReplacement(value)
+        compose.onNodeWithTag("unified-results").performScrollToIndex(2)
         compose.onNodeWithTag("unified-search").performScrollTo().assertHeightIsAtLeast(48.dp).performClick();drain()}
     private fun result(e:UnifiedKeywordEvidence){compose.onNodeWithTag("unified-results").performScrollToIndex(3)
         compose.onNodeWithTag("unified-source:"+e.key).performScrollTo().assertHeightIsAtLeast(48.dp).performClick();drain()}
@@ -70,7 +71,7 @@ class UnifiedKeywordPresentationTest {
         val restore=StateRestorationTester(compose);content(restore);open();query("不存在的合成词")
         compose.onNodeWithTag("unified-empty").assertTextEquals("当前所选内容没有找到逐字匹配。可修改关键词或范围。")
         compose.runOnIdle{assertFalse(registry!!.performSave().toString().contains("不存在的合成词"))}
-        compose.onNodeWithTag("unified-results").performScrollToIndex(0)
+        compose.onNodeWithTag("unified-results").performScrollToIndex(2)
         compose.onNodeWithTag("unified-clear").performScrollTo().performClick();compose.waitForIdle()
         compose.onNodeWithTag("unified-empty").assertDoesNotExist();query("淡茶")
         val old=f.local.value.unifiedKeyword!!;val item=old.snapshot!!.groups.single().items.first()
@@ -94,6 +95,7 @@ class UnifiedKeywordPresentationTest {
     fun landscapeDoubleFontScrollsToFocusedQuerySearchAndExactSourceWithoutHiddenActions(){
         content();open()
         compose.onNodeWithTag("unified-query").performScrollTo().performClick().assertIsFocused().performTextInput("淡茶")
+        compose.onNodeWithTag("unified-results").performScrollToIndex(2)
         val search=compose.onNodeWithTag("unified-search").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
         // Touch input leaves Material buttons in system-defined, non-keyboard focus mode.
         // Switch the actual Dialog owner, rather than the Activity's separate Compose root.
@@ -184,6 +186,7 @@ class UnifiedKeywordPresentationTest {
         compose.onNodeWithTag("unified-error").performScrollTo().assertTextEquals("起始捕获日期无效，请按 YYYY-MM-DD 输入或留空。")
         compose.runOnIdle{assertEquals(0,f.lookups);assertNull(f.local.value.unifiedKeyword!!.snapshot)}
         date("unified-from","1970-01-01");date("unified-through","1970-01-01")
+        compose.onNodeWithTag("unified-results").performScrollToIndex(2)
         val search=compose.onNodeWithTag("unified-search").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
         keyboardEnter(search);val u=f.local.value.unifiedKeyword!!
         assertEquals(UnifiedCaptureRange.parse("1970-01-01","1970-01-01"),u.snapshot!!.captureRange)
