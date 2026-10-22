@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -51,17 +49,7 @@ import com.t1doo.aiyou.model.ProcessingPolicy
 
 @Composable
 private fun ComponentCard(modifier: Modifier = Modifier, padding: Dp = AIyouDimensions.spaceLg, content: @Composable () -> Unit) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = AIyouColors.surface),
-        border = BorderStroke(AIyouDimensions.spaceXs / 4, AIyouColors.outlineDecorative),
-    ) {
-        Column(
-            Modifier.padding(padding),
-            verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm),
-        ) { content() }
-    }
+    AIyouPanel(modifier, contentPadding = padding) { content() }
 }
 
 @Composable

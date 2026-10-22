@@ -14,15 +14,15 @@ private val palette = lightColorScheme(
     primary = AIyouColors.primary,
     onPrimary = AIyouColors.onPrimary,
     primaryContainer = AIyouColors.primaryContainer,
-    onPrimaryContainer = AIyouColors.textPrimary,
+    onPrimaryContainer = AIyouColors.primary,
     secondary = AIyouColors.primary,
     onSecondary = AIyouColors.onPrimary,
     secondaryContainer = AIyouColors.surfaceMuted,
     onSecondaryContainer = AIyouColors.textPrimary,
     tertiary = AIyouColors.success,
     onTertiary = AIyouColors.onPrimary,
-    tertiaryContainer = AIyouColors.surfaceMuted,
-    onTertiaryContainer = AIyouColors.textPrimary,
+    tertiaryContainer = AIyouColors.successContainer,
+    onTertiaryContainer = AIyouColors.success,
     background = AIyouColors.background,
     onBackground = AIyouColors.textPrimary,
     surface = AIyouColors.surface,
@@ -44,7 +44,7 @@ private val palette = lightColorScheme(
     outlineVariant = AIyouColors.outlineDecorative,
     error = AIyouColors.error,
     onError = AIyouColors.onPrimary,
-    errorContainer = AIyouColors.surfaceMuted,
+    errorContainer = AIyouColors.errorContainer,
     onErrorContainer = AIyouColors.error,
     scrim = AIyouColors.textPrimary,
 )
@@ -72,7 +72,7 @@ private val supporting = TextStyle(
     lineHeight = AIyouTypeScale.supportingLineHeight,
 )
 
-/** Fixed light hand-journal palette; device dark mode does not change D01 tokens. */
+/** Fixed light notebook palette; system fonts and sp retain user font scaling. */
 @Composable
 fun AIyouTheme(content: @Composable () -> Unit) {
     MaterialTheme(
@@ -80,9 +80,11 @@ fun AIyouTheme(content: @Composable () -> Unit) {
         typography = Typography(
             displayLarge = title, displayMedium = title, displaySmall = title,
             headlineLarge = title, headlineMedium = title, headlineSmall = section,
-            titleLarge = section, titleMedium = body, titleSmall = body,
+            titleLarge = section, titleMedium = body.copy(fontWeight = FontWeight.SemiBold),
+            titleSmall = supporting.copy(fontWeight = FontWeight.SemiBold),
             bodyLarge = body, bodyMedium = body, bodySmall = supporting,
-            labelLarge = supporting.copy(fontWeight = FontWeight.Medium), labelMedium = supporting, labelSmall = supporting,
+            labelLarge = supporting.copy(fontWeight = FontWeight.SemiBold),
+            labelMedium = supporting.copy(fontWeight = FontWeight.Medium), labelSmall = supporting,
         ),
         shapes = Shapes(
             small = RoundedCornerShape(AIyouDimensions.spaceSm),
