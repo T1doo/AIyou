@@ -1,0 +1,57 @@
+name: Native UI polish bounded review
+
+'on':
+  push:
+    branches: ['dev/ui-polish']
+    paths: ['core/designsystem/**', 'design/**', 'app/src/screenshotTest/**', '.github/workflows/ui-polish.yml', 'scripts/verify-ui-polish-previews.py']
+
+permissions:
+  contents: read
+
+jobs:
+  native-visual-review:
+    if: github.repository == 'T1doo/AIyou' && github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      AIYOU_CI_ANDROID_DAEMON: 'true'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Verify existing SDK and visual contracts
+        run: |
+          python3 scripts/check-sdk.py
+          python3 scripts/generate-tokens.py --check
+          python3 -m unittest scripts.tests.test_design_tokens -v
+      - name: Build and check actual native code
+        run: |
+          scripts/gradle.sh :app:checkDebugAarMetadata :app:assembleDebug :core:domain:test :core:designsystem:testDebugUnitTest :app:lintDebug :core:designsystem:lintDebug
+          git diff --exit-code
+      - name: Render ten targeted native Previews (no approved golden claim)
+        run: |
+          scripts/gradle.sh :app:updateDebugScreenshotTest --tests '*ShellRender*' --tests '*LocalEmptyRender*' --tests '*LocalSaveFailedRender*'
+          scripts/gradle.sh :app:validateDebugScreenshotTest --tests '*ShellRender*' --tests '*LocalEmptyRender*' --tests '*LocalSaveFailedRender*'
+          python3 scripts/verify-ui-polish-previews.py
+      - name: Preserve actual evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-ui-polish-evidence
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            app/src/screenshotTestDebug/reference/
+            app/build/reports/ui-polish-previews.json
+            app/build/reports/screenshotTest/
+            app/build/test-results/validateDebugScreenshotTest/
+            app/build/reports/lint-results-debug.*
+            core/designsystem/build/reports/lint-results-debug.*
+            core/designsystem/build/test-results/
+            core/domain/build/test-results/
+            app/build/outputs/apk/debug/app-debug.apk

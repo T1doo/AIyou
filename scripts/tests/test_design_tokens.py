@@ -27,7 +27,7 @@ class DesignTokenContracts(unittest.TestCase):
     def test_small_text_is_readable_on_all_used_light_surfaces(self):
         colors = TOKENS["colors"]
         for foreground in ("textPrimary", "textSecondary", "primary", "success", "error"):
-            for background in ("background", "surface", "surfaceMuted", "primaryContainer"):
+            for background in ("background", "surface", "surfaceMuted", "primaryContainer", "errorContainer", "successContainer"):
                 with self.subTest(foreground=foreground, background=background):
                     self.assertGreaterEqual(contrast(colors[foreground], colors[background]), 4.5)
 

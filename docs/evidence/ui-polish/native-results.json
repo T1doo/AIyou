@@ -1,0 +1,103 @@
+{
+  "run": "https://github.com/T1doo/AIyou/actions/runs/39747398671",
+  "tested_commit": "fcf9553c971e72014cf6b44b6c4ac2ec6e1f9c99",
+  "designsystem_tree": "60b2779dcb78fe25ad7de07688b658591b13d534",
+  "artifact_id": 12412466574,
+  "artifact_sha256": "61fcc44b116866ca1925b19b7446c23bcd7d3c88a30d328df9977d32bb2b1a1a",
+  "apk_path": "app/build/outputs/apk/debug/app-debug.apk",
+  "apk_sha256": "18845b4025a8cb7f9966409b26021e0fd1eae56cf94342a9a798da0860210dcd",
+  "suites": [
+    {
+      "file": "core/domain/build/test-results/test/TEST-com.t1doo.aiyou.domain.TaskRemindersTest.xml",
+      "tests": 22,
+      "sha256": "1d45b150a9024ce8d881cfa5a6a66786c9735c2a83da70486d3483b544602c9d"
+    },
+    {
+      "file": "core/domain/build/test-results/test/TEST-com.t1doo.aiyou.domain.TaskProposalsTest.xml",
+      "tests": 2,
+      "sha256": "983d5c5114fe90937916d6a125b2b1753851667bdd5813013e82563abb52d981"
+    },
+    {
+      "file": "core/domain/build/test-results/test/TEST-com.t1doo.aiyou.domain.SourceTasksTest.xml",
+      "tests": 2,
+      "sha256": "459669da1ba648ce7769d31a9e0e70a8b0fb1f7afb639523779d2d0c97bcf03b"
+    },
+    {
+      "file": "core/domain/build/test-results/test/TEST-com.t1doo.aiyou.domain.SourceTagRulesTest.xml",
+      "tests": 4,
+      "sha256": "6f0452df6d135bf9c57cd3f12fbfbe4ffb9fd709ebea397b0b1994fb163dac7d"
+    },
+    {
+      "file": "core/domain/build/test-results/test/TEST-com.t1doo.aiyou.domain.SourceMemoryRulesTest.xml",
+      "tests": 4,
+      "sha256": "e206a0582e192773f0567fbea303b063e6843e6798b848b7fd0944ac1f9e96ee"
+    },
+    {
+      "file": "core/domain/build/test-results/test/TEST-com.t1doo.aiyou.domain.RemoteProcessingRuleTest.xml",
+      "tests": 3,
+      "sha256": "1f4dc1b8e51696ff77199a74f2f28df5e0812f2b831ae414a9a2066d42182991"
+    },
+    {
+      "file": "core/domain/build/test-results/test/TEST-com.t1doo.aiyou.domain.RecordEventDatesTest.xml",
+      "tests": 3,
+      "sha256": "b1299c6023458d1e35ed2a4e25eb2504f2ba2dd6c0def426450a3f2b376a2de5"
+    },
+    {
+      "file": "core/domain/build/test-results/test/TEST-com.t1doo.aiyou.domain.FactRecapRangeTest.xml",
+      "tests": 6,
+      "sha256": "448516b3889e9678aef7797805887f36f78e28c8a9bb44009192b24f752e6735"
+    },
+    {
+      "file": "core/domain/build/test-results/test/TEST-com.t1doo.aiyou.domain.ExcerptResponseParserTest.xml",
+      "tests": 15,
+      "sha256": "183d2fd1d5a4a8dabd01cbb8a9907d3e1722979365c2793c50e61d696775575c"
+    },
+    {
+      "file": "core/domain/build/test-results/test/TEST-com.t1doo.aiyou.domain.CurrentSendAuthorityTest.xml",
+      "tests": 10,
+      "sha256": "982354a276523afd2b7fadfe3199c8923c51342d2e7a0ab5102556333ac47ed8"
+    },
+    {
+      "file": "core/designsystem/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.designsystem.ComponentPresentationTest.xml",
+      "tests": 7,
+      "sha256": "f471d63b380f5f883985b4ec85a388c2319c8bcea0bfb3df8280383789e16768"
+    },
+    {
+      "file": "app/build/test-results/validateDebugScreenshotTest/TEST-preview-screenshot-test-engine.xml",
+      "tests": 10,
+      "sha256": "90ef0a02d959e1cfc3c2380858d88be1701d7fc54a61f691cd0b5aa2c2911988"
+    }
+  ],
+  "images": [
+    {
+      "file": "after-empty-200.png",
+      "sha256": "26a110a9d7f65f9d0fa43bb5cccb5bb90bd61a8baf87b6a70521db9f0863d934"
+    },
+    {
+      "file": "after-empty-landscape.png",
+      "sha256": "17472a92e07a988a8a461eae2347eeac1bde3878a951540a5f517853451058b1"
+    },
+    {
+      "file": "after-empty-normal.png",
+      "sha256": "d547f2ccbf36fbd339e1ab5cd091897cae0462a36c2c3ec5447a456bb4e4a469"
+    },
+    {
+      "file": "after-failure-200.png",
+      "sha256": "39782570088487e68128e613cd6b582dcedc9447b856e56221b4fd0f4b1a7ad2"
+    },
+    {
+      "file": "after-failure-normal.png",
+      "sha256": "41fce4781d5f665299d7f2753c689774d7a8b69fa4733394e543f10ac7ba3a43"
+    },
+    {
+      "file": "before-empty-200.png",
+      "sha256": "efc5958e851e52aa060db0e82650db59115236735b9becd37d44b89feb6a21f6"
+    },
+    {
+      "file": "before-empty-normal.png",
+      "sha256": "039af0cf2af8e402550972db8e4b9a12542ea3f386278911265a81c6c88a492e"
+    }
+  ],
+  "visual_review": "Viewed all ten unchanged PNGs with view_image. Static viewport inspection only; full scrolling, focus navigation, TalkBack and device NOT RUN.",
+  "lint": "designsystem: zero issues; app: zero errors/warnings, one existing Hint AutoboxingStateCreation in unchanged MainActivity.kt:238"
+}

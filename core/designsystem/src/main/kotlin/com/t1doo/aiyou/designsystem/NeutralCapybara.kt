@@ -15,6 +15,10 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 fun NeutralCapybara(state: MascotState, modifier: Modifier = Modifier) {
     Canvas(modifier.clearAndSetSemantics { }) {
         withTransform({ scale(size.width / 100f, size.height / 100f, pivot = Offset.Zero) }) {
+            // Static pale-blue halo; no ongoing animation or state/success implication.
+            drawCircle(AIyouColors.surfaceMuted, 42f, Offset(50f, 48f))
+            drawCircle(AIyouColors.primaryContainer, 5f, Offset(88f, 27f))
+            drawCircle(AIyouColors.accentDecorative, 2.5f, Offset(15f, 26f))
             drawOval(AIyouColors.companionShade.copy(alpha = .15f), Offset(18f, 86f), Size(67f, 8f))
             drawRoundRect(AIyouColors.companionBody, Offset(31f, 42f), Size(48f, 45f), CornerRadius(20f))
             drawRoundRect(AIyouColors.companionShade, Offset(29f, 78f), Size(17f, 12f), CornerRadius(5f))
