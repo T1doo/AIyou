@@ -90,9 +90,9 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
                         Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
                             Text("捕获日期",style=MaterialTheme.typography.titleSmall)
                             Text("按每条原件保存的时区；不是事件发生日期。",style=MaterialTheme.typography.bodySmall)
-                            OutlinedTextField(u.from,{if(canUse())c.from(u.session,it)},label={Text("起始日期（含）")},
+                            OutlinedTextField(u.from,{if(canUse())c.from(u.session,it)},singleLine=true,label={Text("起始日期（含）")},
                                 supportingText={Text("YYYY-MM-DD；留空不限")},modifier=Modifier.fillMaxWidth().aiyouFocusOutline().testTag("unified-from"))
-                            OutlinedTextField(u.through,{if(canUse())c.through(u.session,it)},label={Text("结束日期（含）")},
+                            OutlinedTextField(u.through,{if(canUse())c.through(u.session,it)},singleLine=true,label={Text("结束日期（含）")},
                                 supportingText={Text("YYYY-MM-DD；留空不限")},modifier=Modifier.fillMaxWidth().aiyouFocusOutline().testTag("unified-through"))
                             TextButton({if(canUse())c.unlimitedDates(u.session)},modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-dates-clear")){Text("不限日期")}
                         }

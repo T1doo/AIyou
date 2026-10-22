@@ -239,6 +239,12 @@ class UnifiedKeywordViewModelTest {
             assertEquals("当前查询端口不支持捕获日期范围，未显示未过滤内容。",h.state.get().unifiedKeyword!!.error)
             h.controller.unlimitedDates(session);h.controller.search(session);h.queue.removeFirst()(h.owner)
             assertEquals(1,reads);assertNotNull(h.state.get().unifiedKeyword!!.snapshot)
+            val longDate="1970-01-01"+"x".repeat(100)
+            h.controller.from(session,longDate)
+            assertNull("Even an invalid paste must retire the old proof",h.state.get().unifiedKeyword!!.snapshot)
+            assertEquals(longDate,h.state.get().unifiedKeyword!!.from)
+            h.controller.search(session);assertTrue(h.queue.isEmpty());assertEquals(1,reads)
+            assertNotNull(h.state.get().unifiedKeyword!!.error)
             h.controller.clear(session);h.controller.search(session);assertTrue(h.queue.isEmpty())
             assertEquals("",h.state.get().unifiedKeyword!!.from);assertEquals("",h.state.get().unifiedKeyword!!.through)
         }

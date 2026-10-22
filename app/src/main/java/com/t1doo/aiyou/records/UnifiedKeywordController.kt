@@ -108,10 +108,10 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
     fun scope(session:Long,value:UnifiedKeywordScope){update(session){
         if(it.scope==value)it else it.copy(scope=value,request=tokens.incrementAndGet(),snapshot=null,page=0,busy=false,error=null)
     }}
-    fun from(session:Long,value:String){if(value.length>64)return;update(session){
+    fun from(session:Long,value:String){update(session){
         if(it.from==value)it else it.copy(from=value,request=tokens.incrementAndGet(),snapshot=null,page=0,busy=false,error=null)
     }}
-    fun through(session:Long,value:String){if(value.length>64)return;update(session){
+    fun through(session:Long,value:String){update(session){
         if(it.through==value)it else it.copy(through=value,request=tokens.incrementAndGet(),snapshot=null,page=0,busy=false,error=null)
     }}
     fun unlimitedDates(session:Long)=update(session){it.copy(from="",through="",request=tokens.incrementAndGet(),snapshot=null,page=0,busy=false,error=null)}
