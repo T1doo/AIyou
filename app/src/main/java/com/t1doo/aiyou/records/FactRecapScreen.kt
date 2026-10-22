@@ -14,7 +14,8 @@ import java.time.ZoneId
 
 @Composable
 fun FactRecapScreen(local: LocalRecordUiState,controller: FactRecapController,list: LazyListState,
-    onSource: (FactRecapCard,Boolean)->Unit,modifier: Modifier=Modifier,onRetryRecords: ()->Unit={}) {
+    onSource: (FactRecapCard,Boolean)->Unit,modifier: Modifier=Modifier,onRetryRecords: ()->Unit={},
+    onAudioSource: ((FactRecapCard,FactRecapAudio)->Unit)?=null) {
     val u=local.factRecap ?: return
     val ready=local.ready && !local.opening && local.error==null
     val range=runCatching { u.requestedRange() }.getOrNull()
@@ -71,8 +72,13 @@ fun FactRecapScreen(local: LocalRecordUiState,controller: FactRecapController,li
                             Text("手工标签："+card.tags.names.takeIf { it.isNotEmpty() }?.joinToString("、").orEmpty().ifEmpty { "无" })
                             card.images.forEach { image -> Text("图片来源 ${image.intent.id} · ${image.intent.mediaType} · ${image.intent.byteSize} 字节 · "+
                                 if(image.state==AttachmentState.READY) "清单已保存，文件打开时核验" else "尚未完整可读，请在原记录处理") }
-                            card.audios.forEach { audio -> Text("原音来源 ${audio.intent.id} · ${audio.intent.byteSize} 字节 · "+
-                                if(audio.state==AttachmentState.READY) "清单已保存；当前尚未接入播放" else "尚未完整可读，请在原记录处理") }
+                            card.audios.forEach { audio ->
+                                Text("原音来源 ${audio.intent.id} · ${audio.intent.byteSize} 字节 · "+
+                                    if(audio.state==AttachmentState.READY) "清单已保存，打开时核验原音文件" else "尚未完整可读，请在原记录处理")
+                                if(onAudioSource!=null && local.supportsAudioTranscripts) TextButton(
+                                    onClick={onAudioSource(card,audio)},enabled=!u.loading && audio.state==AttachmentState.READY,
+                                    modifier=Modifier.heightIn(min=48.dp).testTag("recap-audio:"+audio.intent.id)) { Text("查看这段原音／人工补转写") }
+                            }
                             OutlinedButton({onSource(card,false)},enabled=!u.loading,
                                 modifier=Modifier.heightIn(min=48.dp).testTag("recap-source:"+card.source.sourceId)){Text("打开准确原文／全文")}
                             if(card.images.isNotEmpty()) TextButton({onSource(card,true)},

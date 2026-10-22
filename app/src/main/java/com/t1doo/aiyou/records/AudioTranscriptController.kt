@@ -13,6 +13,12 @@ data class AudioTranscriptUi(val session:Long,val selected:AttachmentIntent?,val
 internal fun LocalRecordUiState.currentTranscriptSource(a:AudioTranscriptSource):Boolean = ready&&!opening&&error==null&&
     entries.any{it.id==a.intent.entryId&&it.currentRevision==a.intent.revision&&OriginalExports.hash(it.originalText)==a.sourceHash&&it.policy==a.policy&&it.capturedAtMillis==a.capturedAtMillis&&it.captureTimeZone==a.zone}&&
     (!supportsLocalProcessing||localProcessingAvailable&&localProcessingVersions[a.intent.entryId]?.generation==a.generation)
+/** A recap may edit human text only from its still-live, exact original-audio reader. */
+internal fun LocalRecordUiState.canUseRecapTranscript(selected:AttachmentIntent?,panel:AttachmentUiState?,anchor:AudioTranscriptSource?):Boolean =
+    selected!=null && anchor!=null && anchor.intent==selected && currentTranscriptSource(anchor) &&
+        panel?.let { it.focusAudio==selected && it.entryId==selected.entryId && it.revision==selected.revision &&
+            !it.busy && !it.readOnly && !it.unavailable && it.error==null && it.hasRecordAccess(this) &&
+            it.items.any { row->row.intent==selected && row.state==AttachmentState.READY } }==true
 internal fun LocalRecordUiState.canRetainTranscripts(u:AudioTranscriptUi):Boolean {
     if(!ready||opening||error!=null||!supportsAudioTranscripts)return false
     fun source(i:AttachmentIntent,hash:String,generation:Long?=null,policy:ProcessingPolicy?=null,captured:Long?=null,zone:String?=null)=entries.any{it.id==i.entryId&&it.currentRevision==i.revision&&OriginalExports.hash(it.originalText)==hash&&(policy==null||it.policy==policy)&&(captured==null||it.capturedAtMillis==captured)&&(zone==null||it.captureTimeZone==zone)} && (generation==null||!supportsLocalProcessing||localProcessingAvailable&&localProcessingVersions[i.entryId]?.generation==generation)

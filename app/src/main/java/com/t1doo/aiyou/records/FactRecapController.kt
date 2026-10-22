@@ -85,6 +85,29 @@ class FactRecapController internal constructor(private val current: ()->LocalRec
             catch(e:CancellationException){throw e} catch(_:Exception){retireOwned(token,snapshot)}
         }) retireOwned(token,snapshot)
     }
+    /** Authenticate this exact original audio, then recheck the complete recap after the
+     * suspending media read. Opening a source never starts playback or creates a transcript. */
+    fun audioSource(card: FactRecapCard,audio: FactRecapAudio,onOpen: (AudioTranscriptSource)->Unit) {
+        val (token,snapshot)=synchronized(ownershipGate) {
+            val s=ui()?.snapshot ?: return
+            if(!available() || s.cards.none { it===card } || card.audios.none { it===audio } ||
+                audio.state!=AttachmentState.READY) return
+            generation.get() to s
+        }
+        if(!enqueue { store ->
+            if(!owns(token) || ui()?.snapshot!==snapshot) return@enqueue
+            try {
+                val anchor=checkNotNull(store.audioTranscripts).preview(audio.intent)
+                require(anchor.intent==audio.intent && anchor.source==card.source && anchor.sourceHash==card.contentHash &&
+                    anchor.generation==card.sourceGeneration && anchor.capturedAtMillis==card.capturedAtMillis &&
+                    anchor.zone==card.captureZone && anchor.policy==card.policy)
+                if(!owns(token) || ui()?.snapshot!==snapshot) return@enqueue
+                if(!checkNotNull(store.factRecaps).resolve(snapshot,card.source) {
+                    synchronized(ownershipGate) { if(owns(token) && ui()?.snapshot===snapshot) onOpen(anchor) }
+                }) retireOwned(token,snapshot)
+            } catch(e:CancellationException){throw e} catch(_:Exception){retireOwned(token,snapshot)}
+        }) retireOwned(token,snapshot)
+    }
     /** Recheck on reader return without replacing the list or its scroll position. */
     fun validate() {
         val (token,snapshot)=synchronized(ownershipGate) { generation.get() to (ui()?.snapshot ?: return) }

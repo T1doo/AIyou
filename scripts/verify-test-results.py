@@ -267,6 +267,8 @@ for label, folder, minimum in targets:
             "lostClearAckHasReachableSameClearRetryAndCannotPromiseContinuedEditingBeforeVerification",
         )
         additional["com.t1doo.aiyou.FactRecapPresentationTest"] = (
+            "recapExactAudioOpensManualEditorAndReturnsToSameWeekWithoutChangingOriginal",
+            "restoredRecapAudioProofRetiresRealFocusedPanelAndOldEditorBeforeAnotherSource",
             "actualSettingsPersistWeekAndOpenedRangeKeepsItsOwnChoiceBeforeExplicitGeneration",
             "latePreferenceReadDoesNotRewriteOpenDayAndRetainedOpenUsesLatestConfirmedDefault",
             "actualNarrowDoubleFontRouteShowsOriginalExcerptThenFullTextAndReturnsToSameCard",

@@ -1,6 +1,7 @@
 package com.t1doo.aiyou
 
 import com.t1doo.aiyou.records.currentTranscriptSource
+import com.t1doo.aiyou.records.canUseRecapTranscript
 import com.t1doo.aiyou.records.currentImageTextSource
 import com.t1doo.aiyou.records.canRetainImageTexts
 
@@ -671,12 +672,17 @@ fun AIyouApp(
         }
     }
     val transcriptUi=local?.audioTranscripts
-    val transcriptRoute=!demo&&!showSettings&&!recapRoute&&transcriptUi!=null&&local?.let{it.ready&&!it.opening&&it.error==null}==true&&
+    val transcriptRoute=!demo&&!showSettings&&transcriptUi!=null&&local?.let{it.ready&&!it.opening&&it.error==null}==true&&
+        (!recapRoute || local?.canUseRecapTranscript(transcriptUi.selected,attachmentPanel,audioSourceAnchor)==true)&&
         (if(transcriptUi.selected==null)!reading&&selected==Destination.MEMORIES else reading&&detailEntryId==transcriptUi.selected.entryId&&attachmentPanel?.entryId==transcriptUi.selected.entryId&&attachmentPanel?.revision==transcriptUi.selected.revision)
     LaunchedEffect(transcriptRoute,transcriptUi?.session){if(!transcriptRoute)transcriptUi?.let{audioTranscripts?.close(it.session)}}
     DisposableEffect(audioTranscripts){onDispose{currentRecords?.invoke()?.audioTranscripts?.let{audioTranscripts?.close(it.session)}}}
     if(transcriptUi!=null&&audioTranscripts!=null&&transcriptRoute){
-        fun ownsTranscript()=ownsNavigation()&&!showSettings&&!demo&&!recapRoute&&currentLocal?.audioTranscripts?.session==transcriptUi.session
+        fun ownsTranscript():Boolean {
+            val source=currentRecordsProvider?.invoke() ?: currentLocal
+            return ownsNavigation()&&!showSettings&&!demo&&source?.audioTranscripts?.session==transcriptUi.session&&
+                (!recapRoute || source?.canUseRecapTranscript(transcriptUi.selected,attachments?.state?.value,audioSourceAnchor)==true)
+        }
         com.t1doo.aiyou.records.AudioTranscriptDialog(transcriptUi,audioTranscripts,::ownsTranscript){anchor->
             val intent=anchor.intent
             navigation.publish(generation){val entry=currentLocal?.entries?.singleOrNull{it.id==intent.entryId&&it.currentRevision==intent.revision}
@@ -1112,7 +1118,22 @@ fun AIyouApp(
                         }
                     }
                 }
-            },modifier,onRetryRecords={if(ownsNavigation() && recapRoute && !reading) onRetry()})
+            },modifier,onRetryRecords={if(ownsNavigation() && recapRoute && !reading) onRetry()},
+                onAudioSource=if(attachments==null || audioTranscripts==null) null else {card,audio ->
+                    if(ownsNavigation() && detailEntryId==null && recapRoute && !showSettings && !demo) {
+                        val routeGeneration=generation
+                        factRecaps.audioSource(card,audio) { anchor ->
+                            navigation.publish(routeGeneration) {
+                                if(ownsNavigation() && recapRoute && selectedName==Destination.MEMORIES.name && detailEntryId==null && !showSettings && !demo &&
+                                    currentLocal?.factRecap?.snapshot?.cards?.any { it===card }==true && currentLocal?.currentTranscriptSource(anchor)==true) {
+                                    navigation.advance();search.pause();readerFromSearch=false;tailReturnRequest=null;searchLocation=null
+                                    imageSourceAnchor=null;audioSourceAnchor=anchor;inboxSourceRoute=true;detailEntryId=anchor.intent.entryId
+                                    attachments.openAudio(anchor.intent)
+                                }
+                            }
+                        }
+                    }
+                })
         } else if (!demo && local != null && selected == Destination.TASKS &&
             (local.tasks.supported || local.opening || local.error != null)) {
             fun ownsTasks() = ownsNavigation() && selectedName == Destination.TASKS.name && !showSettings && !demo

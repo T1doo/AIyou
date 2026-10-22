@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.t1doo.aiyou.model.*
@@ -42,13 +43,14 @@ class FactRecapPresentationTest {
     @get:Rule val temporary=TemporaryFolder()
     private val f=Fixture();private var registry:SaveableStateRegistry?=null
     private val display=mutableStateOf(UiPreferencesState(UiPreferences(showCompanion=false,reduceMotion=true),ready=true))
+    @org.junit.After fun closeAudio(){f.closeFails=false;f.player.stop();runBlocking {f.player.closeAndJoin()};f.transcripts.dispose();f.attachments.markDisposed();runBlocking{f.attachments.disposeOnIo()}}
     private fun content(preferences: UiPreferencesViewModel?=null,
         observeDefault: ((FactRecapPeriod, () -> Unit) -> Unit)?=null) {compose.setContent {
         registry=LocalSaveableStateRegistry.current;val d=LocalDensity.current
         val confirmed=preferences?.state?.collectAsState()?.value ?: display.value
         CompositionLocalProvider(LocalDensity provides Density(d.density,2f),LocalRecapPreferenceActionObserver provides observeDefault) {
             AIyouTheme {AIyouApp(previewDestination=Destination.MEMORIES,local=f.local.value,factRecaps=f.c,attachments=f.attachments,
-                display=confirmed,onDisplayChange={preferences?.change(it)},onRetryDisplay={preferences?.retry()},
+                audioTranscripts=f.transcripts,audioPlayback=f.player,onAudioRouteChanged=f.player::routeChanged,currentRecords={f.local.value},display=confirmed,onDisplayChange={preferences?.change(it)},onRetryDisplay={preferences?.retry()},
                 onOpenTags=f.tags::open,onTagClose=f.tags::close)}
         }
     }}
@@ -150,9 +152,57 @@ class FactRecapPresentationTest {
         compose.onNodeWithText("返回回忆").performClick();compose.onNodeWithText("设置").performClick()
         compose.onNodeWithText("可在回忆中制作选定记录与原图的加密包并恢复",substring=true).performScrollTo().assertIsDisplayed()
     }
+    @Test fun recapExactAudioOpensManualEditorAndReturnsToSameWeekWithoutChangingOriginal() {
+        f.enableAudio();content();open();click("recap-week");generate()
+        val snapshot=f.local.value.factRecap!!.snapshot!!;val source=f.audioIntent
+        click("recap-audio:"+source.id);drain()
+        compose.runOnIdle {assertEquals(source,f.attachments.state.value!!.focusAudio);assertEquals(0,f.transcriptWrites);assertNull(f.local.value.audioTranscripts);assertEquals(0,f.nativeOpens.get())}
+        compose.onNodeWithTag("attachment-audio-play:"+source.id).performScrollTo().assertIsEnabled().performClick();drain()
+        compose.waitUntil(5000){f.player.state.value.phase==OriginalAudioPhase.PLAYING}
+        compose.onNodeWithTag("attachment-transcript:"+source.id).performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle {f.transcripts.open(source);assertNull(f.local.value.audioTranscripts);f.closeFails=true}
+        compose.onNodeWithTag("audio-playback-stop").assertIsDisplayed().performClick()
+        compose.waitUntil(5000){f.player.state.value.phase==OriginalAudioPhase.CLOSING_UNKNOWN}
+        compose.runOnIdle {f.transcripts.open(source);assertNull(f.local.value.audioTranscripts);f.closeFails=false}
+        compose.onNodeWithTag("audio-playback-stop").assertIsDisplayed().performClick()
+        compose.waitUntil(5000){f.player.state.value.phase==OriginalAudioPhase.IDLE}
+        compose.runOnIdle {assertEquals(1,f.nativeOpens.get());assertEquals(2,f.nativeCloses.get())}
+        compose.onNodeWithTag("attachment-transcript:"+source.id).performScrollTo().performClick();drain()
+        compose.onNodeWithTag("transcript-text").performScrollTo().performTextReplacement("合成回顾中的人工转写")
+        compose.onNodeWithTag("transcript-save").performScrollTo().assertHeightIsAtLeast(48.dp).performClick();drain()
+        compose.runOnIdle {assertEquals(1,f.transcriptWrites);assertEquals("合成回顾中的人工转写",f.savedTranscript!!.current.text)}
+        compose.onNodeWithTag("transcript-close").performScrollTo().performClick();compose.waitForIdle()
+        compose.onNodeWithText("返回原文").assertIsDisplayed().performClick();compose.waitForIdle()
+        compose.onNodeWithText("返回回顾").assertIsDisplayed().performClick();drain()
+        compose.onNodeWithTag("recap-audio:"+source.id).assertIsDisplayed()
+        compose.runOnIdle {assertSame(snapshot,f.local.value.factRecap!!.snapshot);assertEquals(FactRecapPeriod.WEEK,snapshot.range.period)
+            assertEquals(f.records.first().originalText,f.local.value.entries.first().originalText);assertArrayEquals(f.wave,runBlocking{f.store.attachments!!.read(source.id)})}
+    }
+    @Test fun restoredRecapAudioProofRetiresRealFocusedPanelAndOldEditorBeforeAnotherSource() {
+        f.enableAudio();val restore=StateRestorationTester(compose)
+        restore.setContent {registry=LocalSaveableStateRegistry.current;AIyouTheme {AIyouApp(previewDestination=Destination.MEMORIES,local=f.local.value,currentRecords={f.local.value},factRecaps=f.c,attachments=f.attachments,audioTranscripts=f.transcripts)}}
+        open();generate();val source=f.audioIntent;click("recap-audio:"+source.id);drain()
+        val oldPanel=f.attachments.state.value!!
+        compose.onNodeWithTag("attachment-transcript:"+source.id).performScrollTo().performClick();drain()
+        compose.onNodeWithTag("transcript-text").performScrollTo().performTextReplacement("合成尚未保存的人工输入")
+        val oldSession=f.local.value.audioTranscripts!!.session
+        compose.runOnIdle {assertFalse(registry!!.performSave().toString().contains("合成尚未保存的人工输入"))}
+        restore.emulateSavedInstanceStateRestore();compose.waitForIdle();drain()
+        compose.runOnIdle {assertNull(f.attachments.state.value);assertNull(f.local.value.audioTranscripts);f.transcripts.save(oldSession);f.attachments.refresh(oldPanel.sessionId)};drain()
+        compose.onNodeWithTag("attachment-"+source.id).assertDoesNotExist()
+        open();generate();val other=f.records[1];click("recap-source:"+other.id);drain()
+        compose.onNodeWithTag("original-text").assertTextEquals(other.originalText)
+        compose.runOnIdle {assertNull(f.attachments.state.value);assertEquals(0,f.transcriptWrites)}
+    }
     private class Fixture {
         val clock:Clock=Clock.fixed(Instant.parse("2026-10-15T08:00:00Z"),ZoneId.of("UTC"))
         var records=(0..19).map {StoredEntry(UUID.randomUUID().toString(),1,"合成原文$it："+"文".repeat(300)+"合成全文尾部$it",clock.millis()+it,"UTC",ProcessingPolicy.AI_NONE)}
+        var audioEnabled=false;val wave=LocalPcmAudio.encode(ShortArray(441){(it%7).toShort()})
+        private val audioId=UUID.randomUUID().toString()
+        val audioIntent get()=AttachmentIntent(audioId,records.first().id,1,"audio/wav",java.security.MessageDigest.getInstance("SHA-256").digest(wave).joinToString(""){"%02x".format(it.toInt() and 255)},wave.size.toLong())
+        fun enableAudio(){audioEnabled=true;local.value=local.value.copy(supportsAudioTranscripts=true,supportsLocalProcessing=true,localProcessingAvailable=true,localProcessingVersions=records.associate{it.id to LocalProcessingVersion(SourceVersion(it.id,it.currentRevision.toLong()),0)});player.foreground(true)}
+        val gate=CaptureDraftGate();val nativeOpens=java.util.concurrent.atomic.AtomicInteger();val nativeCloses=java.util.concurrent.atomic.AtomicInteger();@Volatile var closeFails=false
+        var savedTranscript:AudioTranscriptSnapshot?=null;var transcriptWrites=0
         private val imageId=UUID.randomUUID().toString();private val imageEntry=records.first().id
         private val bytes=Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNQCp35HwADvQIQaYgMTgAAAABJRU5ErkJggg==")
         private fun picture()=LocalAttachment(AttachmentIntent(imageId,imageEntry,1,"image/png",java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString(""){"%02x".format(it)},bytes.size.toLong()),AttachmentState.READY)
@@ -161,6 +211,21 @@ class FactRecapPresentationTest {
         val queue=ArrayDeque<suspend(EntryRepository)->Unit>();var fail=false
         fun refresh(){local.value=reconcileFactRecap(local.value,local.value.copy(entries=records))}
         val store=object:EntryRepository {
+            override val localProcessing=object:LocalProcessingRepository {
+                override fun versions()=local.value.localProcessingVersions
+                override fun read(source:SourceVersion):LocalProcessingSnapshot {val e=records.single{it.id==source.sourceId&&it.currentRevision.toLong()==source.revision};return LocalProcessingSnapshot(source,OriginalExports.hash(e.originalText),0,e.policy)}
+                override fun change(request:LocalProcessingChange):LocalProcessingSnapshot=error("No range change")
+            }
+            override val audioTranscripts=object:AudioTranscriptRepository {
+                override suspend fun preview(intent:AttachmentIntent):AudioTranscriptSource {check(audioEnabled && intent==audioIntent);val e=records.first();return AudioTranscriptSource(intent,OriginalExports.hash(e.originalText),0,e.capturedAtMillis,e.captureTimeZone,e.policy,441)}
+                override suspend fun read(anchor:AudioTranscriptSource)=savedTranscript
+                override suspend fun write(request:AudioTranscriptWrite):AudioTranscriptSnapshot {
+                    check(request.anchor==preview(audioIntent));check(request.expected?.version==savedTranscript?.version);transcriptWrites++
+                    return AudioTranscriptSnapshot(request.id,request.anchor,(savedTranscript?.version?:0)+1,false,savedTranscript?.history.orEmpty()+AudioTranscriptVersion((savedTranscript?.history?.size?:0)+1,request.text!!,request.at)).also{savedTranscript=it}
+                }
+                override suspend fun search(keyword:String,cursor:PreferenceCursor?):AudioTranscriptPage=error("Not used in recap")
+                override suspend fun resolve(page:AudioTranscriptPage,item:AudioTranscriptSnapshot?,publish:()->Unit)=error("Not used in recap")
+            }
             override val manualTags=object:ManualTagRepository {
                 override fun read(entryId:String)=labels[entryId] ?: ManualTagSnapshot(entryId,0,emptyList())
                 override fun snapshots()=labels.toMap()
@@ -176,7 +241,7 @@ class FactRecapPresentationTest {
                         override val range=range
                         override val cards=records.filter {it.capturedAtMillis>=range.startMillis&&it.capturedAtMillis<range.endMillis}.map {
                             FactRecapCard(SourceVersion(it.id,it.currentRevision.toLong()),it.capturedAtMillis,it.captureTimeZone,OriginalExports.hash(it.originalText),0,it.originalText.take(240),it.originalText.length>240,
-                                manualTags.read(it.id),if(it.id==imageEntry && it.currentRevision==1)listOf(FactRecapImage(picture().intent,AttachmentState.READY))else emptyList(),it.policy)
+                                manualTags.read(it.id),if(it.id==imageEntry && it.currentRevision==1)listOf(FactRecapImage(picture().intent,AttachmentState.READY))else emptyList(),it.policy,if(audioEnabled&&it.id==audioIntent.entryId)listOf(FactRecapAudio(audioIntent,AttachmentState.READY))else emptyList())
                         }
                     }
                 }
@@ -185,20 +250,29 @@ class FactRecapPresentationTest {
             }
             override val attachments=object:AttachmentStore {
                 override suspend fun save(intent:AttachmentIntent,source:()->java.io.InputStream):LocalAttachment=error("Unrelated")
-                override suspend fun list(entryId:String,revision:Int)=listOf(picture()).filter{it.intent.entryId==entryId&&it.intent.revision==revision}
-                override suspend fun read(id:String)=bytes.copyOf()
+                override suspend fun list(entryId:String,revision:Int)=(listOf(picture())+if(audioEnabled)listOf(LocalAttachment(audioIntent,AttachmentState.READY))else emptyList()).filter{it.intent.entryId==entryId&&it.intent.revision==revision}
+                override suspend fun read(id:String)=if(audioEnabled&&id==audioIntent.id)wave.copyOf()else bytes.copyOf()
                 override suspend fun recover()=Unit
             }
             override suspend fun entries()=records
             override suspend fun readDraft():TextDraft?=null
             override suspend fun updateDraft(text:String):TextDraft=error("Unrelated")
             override suspend fun saveDraft(expected:TextDraft,capturedAtMillis:Long,captureTimeZone:String):StoredEntry=error("Unrelated")
-            override suspend fun revisions(entryId:String)=emptyList<OriginalRevision>()
+            override suspend fun revisions(entryId:String)=records.filter{it.id==entryId}.map{OriginalRevision(it.id,it.currentRevision,it.originalText,OriginalExports.hash(it.originalText),it.capturedAtMillis)}
             override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry=error("Unrelated")
         }
         val c=FactRecapController({local.value},{change->local.value=reconcileFactRecap(local.value,change(local.value))},{queue.add(it);true},clock)
+        val transcripts=AudioTranscriptController({local.value},{local.value=it(local.value)},{queue.add(it);true},clock,{gate.sourceUi(it)})
         val tags=ManualTagController({local.value},{change->local.value=reconcileFactRecap(local.value,change(local.value))},{queue.add(it);true})
-        val attachments=LocalAttachmentController({queue.add(it);true},PlatformImageDecoder::decode,
-            canUseRecord={local.value.ready},canUsePanel={it.hasRecordAccess(local.value)})
+        val attachments:LocalAttachmentController=LocalAttachmentController({queue.add(it);true},PlatformImageDecoder::decode,
+            canUseRecord={local.value.ready},canUsePanel={it.hasRecordAccess(local.value)},sourceUi={gate.sourceUi(it)},onPanelClose={player.stop()})
+        val player:OriginalAudioController=OriginalAudioController({local.value},{attachments.state.value},{gate},{queue.add(it);true},{object:OriginalAudioOutput {
+            override fun focus()=true
+            override fun open(){nativeOpens.incrementAndGet()}
+            override fun play(){}
+            override fun write(samples:ShortArray,count:Int)=count
+            override fun playedFrames()=0L
+            override fun close(){nativeCloses.incrementAndGet();check(!closeFails){"Synthetic close ACK failure"}}
+        }},{true})
     }
 }
