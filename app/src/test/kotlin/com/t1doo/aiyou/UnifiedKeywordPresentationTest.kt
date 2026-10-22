@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.input.key.Key
@@ -94,11 +95,19 @@ class UnifiedKeywordPresentationTest {
         content();open()
         compose.onNodeWithTag("unified-query").performScrollTo().performClick().assertIsFocused().performTextInput("淡茶")
         val search=compose.onNodeWithTag("unified-search").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        // Touch input leaves Material buttons in system-defined, non-keyboard focus mode.
+        // Switch the actual Dialog owner, rather than the Activity's separate Compose root.
+        val dialogView=(search.fetchSemanticsNode().root as ViewRootForTest).view
+        compose.runOnIdle{assertTrue(dialogView.isAttachedToWindow);assertTrue(dialogView.requestFocusFromTouch())}
+        compose.waitForIdle()
+        compose.runOnIdle{assertFalse(dialogView.isInTouchMode)}
         search.performSemanticsAction(SemanticsActions.RequestFocus){assertTrue(it())}
         search.assertIsFocused().performKeyInput{pressKey(Key.Enter)};drain()
         val item=f.local.value.unifiedKeyword!!.snapshot!!.groups.single().items.filterIsInstance<UnifiedKeywordEvidence.Original>().single()
         compose.onNodeWithTag("unified-results").performScrollToIndex(1)
         val source=compose.onNodeWithTag("unified-source:"+item.key).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        assertSame(dialogView,(source.fetchSemanticsNode().root as ViewRootForTest).view)
+        compose.runOnIdle{assertFalse(dialogView.isInTouchMode)}
         source.performSemanticsAction(SemanticsActions.RequestFocus){assertTrue(it())}
         source.assertIsFocused().performKeyInput{pressKey(Key.Enter)};drain()
         compose.onNodeWithTag("original-text").assertTextEquals(item.entry.originalText)
