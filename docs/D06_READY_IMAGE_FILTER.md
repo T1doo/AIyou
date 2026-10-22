@@ -22,7 +22,12 @@
 ## 完整认证、有界读取和提交
 
 - 同一加密 records owner 注入只读 `OwnerAttachmentStore`；不用会 recover/标 CORRUPT 的读取路径。
-  SQL 每批 20 个 live 来源，当前附件也按 ID keyset 每批至多 20 项；
+  SQL 每批 20 个 live 来源；两次完整元数据扫描各自保持同一 SQL 写租约，当前附件沿既有
+  (entryId,revision) 索引的 rowid 顺序每批至多 20 项。rowid 仅是单次事务内游标，不入 proof、
+  receipt 或 IO ticket，首批无下界也验证负 rowid；事务间不可沿用它。实际 EXPLAIN 证明原 ID
+  分页对全部附件反复建临时排序树，故用同事务有序读取；不新建索引，不改变身份。
+  IO 阶段只对已证最多64张的图片按稳定 ID keyset；逐幅核对用精确主键查询，VACUUM 不能跳幅。
+  SQL 对 ID/MIME/hash/state/时区等畸形超长字段先投影为失败值，不把坏行 WHERE 掉或先搬出巨串；
   单源当前图片最多 64、以第 65 张判超限，不新增“图片+音频”总数上限；先检正文 byte length，
   再验真实正文 hash/revision/generation/捕获时间/合法保存时区/策略，以及所有当前图片的
   ID/entryId/revision/MIME/hash/byteSize/state。当前非图片附件也验证既有合法 metadata，

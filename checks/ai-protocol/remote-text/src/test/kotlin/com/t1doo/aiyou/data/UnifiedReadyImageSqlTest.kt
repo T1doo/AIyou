@@ -133,6 +133,34 @@ class UnifiedReadyImageSqlTest {
             assertThrows(Exception::class.java){runBlocking{search(h,UnifiedKeywordScope.AUDIO)}}
         }
     }
+    @Test fun fullMetadataUsesBoundedExistingOrderedIndexWithinOneLeaseIncludingNegativeRowid():Unit=runBlocking{UnifiedKeywordFixture().use{h->
+        val id=h.f.entry(text="合成淡茶");h.f.image(id);h.f.image(id)
+        repeat(101){h.f.db.write("INSERT INTO attachments VALUES(?,?,1,'audio/ogg',?,68,'FAILED')",FullBackupTest.uuid(),id,"0".repeat(64))}
+        h.f.db.write("INSERT INTO attachments(rowid,id,entryId,revision,mediaType,sha256,byteSize,state) VALUES(?,?,?,1,'audio/ogg',?,68,'FAILED')",Long.MIN_VALUE,FullBackupTest.uuid(),id,"0".repeat(64))
+        val indices=h.f.db.read("SELECT name,sql FROM sqlite_master WHERE type='index' ORDER BY name");val queries=mutableListOf<Pair<String,List<Any?>>>();var first:Long?=null;var max=0;var begins=0;var commits=0
+        h.f.db.afterSql={if(it=="BEGIN IMMEDIATE")begins++;if(it=="COMMIT")commits++}
+        val scanner=UnifiedReadyImages(h.f.gateway,null)
+        val proof=try{h.f.gateway.transaction{raw->scanner.scan(object:RecordsSqlConnection by raw{
+            override fun query(sql:String,args:List<Any?>):List<List<Any?>> = raw.query(sql,args).also{rows->if(sql.startsWith("SELECT rowid,")){queries+=sql to args.toList();max=maxOf(max,rows.size);if(first==null&&rows.isNotEmpty())first=rows.first()[0] as Long}}
+        },{})}}finally{h.f.db.afterSql=null}
+        assertEquals(1,begins);assertEquals(1,commits);assertEquals(Long.MIN_VALUE,first!!);assertEquals(104L,proof.attachments);assertEquals(6,queries.size);assertEquals(20,max)
+        for((q,args)in queries){val plan=h.f.db.read("EXPLAIN QUERY PLAN "+q,*args.toTypedArray()).joinToString();assertFalse(plan.contains("TEMP B-TREE"));assertTrue(plan.contains("index_attachments_entryId_revision"));if(args.size==3)assertTrue(plan.contains("rowid>?"))}
+        assertEquals(indices,h.f.db.read("SELECT name,sql FROM sqlite_master WHERE type='index' ORDER BY name"))
+    }}
+    @Test fun physicalRowidRekeyAndVacuumBetweenIoNeverSkipStableImageIds():Unit=runBlocking{UnifiedKeywordFixture().use{h->
+        val id=h.f.entry(text="合成淡茶");repeat(3){h.f.image(id)};val epoch=h.originals.epoch();var moved=false
+        h.beforeReadyRead={if(!moved){moved=true;h.f.db.write("UPDATE attachments SET rowid=rowid+1000");h.f.db.vacuumForSyntheticTest()}}
+        h.reads=0;assertEquals(1,search(h,UnifiedKeywordScope.ORIGINAL).groups.size);assertTrue(moved);assertEquals(3,h.reads);assertEquals(epoch,h.originals.epoch());assertTrue(h.lastReadyPlaintext!!.all{it==0.toByte()})
+    }}
+    @Test fun oversizedBadMetadataIsRejectedBeforeMovingItsTextOutOfSql():Unit=runBlocking{UnifiedKeywordFixture().use{h->
+        val id=h.f.entry(text="合成淡茶");val image=h.f.image(id)
+        h.f.db.injectSyntheticAttachmentCorruption("UPDATE attachments SET sha256=? WHERE id=?","f".repeat(1024*1024),image.id)
+        var largest=0;var sawNull=false;val scanner=UnifiedReadyImages(h.f.gateway,null)
+        assertThrows(Exception::class.java){h.f.gateway.transaction{raw->scanner.scan(object:RecordsSqlConnection by raw{
+            override fun query(sql:String,args:List<Any?>):List<List<Any?>> = raw.query(sql,args).also{rows->rows.flatten().filterIsInstance<String>().forEach{largest=maxOf(largest,it.length)};if(sql.startsWith("SELECT rowid,"))sawNull=rows.any{it[5]==null}}
+        },{})}}
+        assertTrue(sawNull);assertTrue(largest<=512);assertEquals("READY",h.f.db.read("SELECT state FROM attachments WHERE id=?",image.id).single().single())
+    }}
     @Test fun disabledFilterDoesNotAddCorpusScanOrReadyMediaRead():Unit=runBlocking{UnifiedKeywordFixture().use{h->
         val id=h.f.entry(text="合成淡茶");h.f.image(id);val bad=h.f.entry(text="合成无关");h.f.db.write("UPDATE entries SET captureTimeZone='invalid/synthetic' WHERE id=?",bad)
         h.reads=0;assertTrue(h.repo.search("淡茶",UnifiedKeywordScope.AUDIO).groups.isEmpty());assertEquals(0,h.reads)

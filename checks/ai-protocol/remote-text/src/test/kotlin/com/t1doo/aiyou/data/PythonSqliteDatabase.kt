@@ -140,6 +140,9 @@ internal class PythonSqliteDatabase(
     private fun takeLine(): String = responses.poll(2, TimeUnit.SECONDS)
         ?: throw IllegalStateException("Owned SQLite process exceeded response deadline")
 
+    /** Test owner only: exercise physical rekeying between product SQL leases, never during one. */
+    fun vacuumForSyntheticTest()=synchronized(monitor){check(!ended&&transactionDepth==0);Connection().execute("VACUUM");Unit}
+
     override fun close() = synchronized(monitor) {
         if (ended) return@synchronized
         ended = true
