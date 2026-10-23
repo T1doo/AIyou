@@ -101,6 +101,7 @@ class CompanionSettingsPresentationTest {
         val output = java.io.File("build/reports/companion-motion/interactions").apply { mkdirs() }
         val observations = org.json.JSONArray()
         val runs = java.util.IdentityHashMap<CompanionInteraction.Run, Int>()
+        val owners = java.util.IdentityHashMap<androidx.lifecycle.LifecycleOwner, Int>()
         var phase = "setup"
         var button = org.json.JSONObject()
         var lastObservation = org.json.JSONObject()
@@ -111,6 +112,7 @@ class CompanionSettingsPresentationTest {
             lastObservation = org.json.JSONObject().put("point", point).put("phase", phase)
                 .put("virtual_time_ms", compose.mainClock.currentTime)
                 .put("owner", visibleOwner.value.lifecycle.currentState.name).put("allowed", allowed.value)
+                .put("owner_id", owners.getOrPut(visibleOwner.value) { owners.size + 1 })
                 .put("run", runId ?: org.json.JSONObject.NULL).put("pose", observed.pose.name)
                 .put("feedback", observed.feedback.name).put("foreground", observed.foreground)
                 .put("retired", observed.retired).put("motion", motion).put("button", button)
@@ -120,6 +122,31 @@ class CompanionSettingsPresentationTest {
                 .put("method", "finiteInteractionMotionStopsOnReductionAndBackgroundWithoutAutomaticReplay")
                 .put("kind", "Read-only controlled-clock state observations; not device evidence")
                 .put("observations", observations).toString(2))
+        }
+        fun clickAndCheckFirstFrame(label: String, tag: String, expected: CompanionPose) {
+            compose.runOnIdle { phase = label; button = org.json.JSONObject().put("tag", tag); observe("request") }
+            val target = compose.onNodeWithTag(tag).performScrollTo()
+            compose.mainClock.advanceTimeByFrame(); compose.waitForIdle()
+            compose.runOnIdle { observe("scrollStable") } // Layout frame before input, not the action's first frame.
+            target.assertIsDisplayed().assertIsEnabled()
+            val node = target.fetchSemanticsNode()
+            compose.runOnIdle {
+                val bounds = node.boundsInRoot
+                button = org.json.JSONObject().put("tag", tag).put("displayed_assertion", true)
+                    .put("enabled", !node.config.contains(SemanticsProperties.Disabled))
+                    .put("left", bounds.left).put("top", bounds.top).put("right", bounds.right).put("bottom", bounds.bottom)
+                observe("before")
+            }
+            target.performClick()
+            compose.runOnIdle { observe("afterClick") }
+            compose.mainClock.advanceTimeByFrame()
+            compose.runOnIdle {
+                observe("firstFrame")
+                assertEquals("First frame feedback: $lastObservation", expected, observed.feedback)
+                assertEquals("First frame pose: $lastObservation", expected, observed.pose)
+                if (expected == CompanionPose.Idle) assertNull("First frame cancelled run: $lastObservation", observed.run)
+                else assertNotNull("First frame active run: $lastObservation", observed.run)
+            }
         }
         fun pixels(name: String? = null): IntArray {
             fun requireRequestedPose() {
@@ -162,8 +189,9 @@ class CompanionSettingsPresentationTest {
         }
         compose.mainClock.advanceTimeByFrame()
         val idlePixels = pixels("00-idle")
-        compose.onNodeWithTag("companion-greet").performScrollTo().performClick()
-        compose.mainClock.advanceTimeByFrame(); compose.mainClock.advanceTimeBy(64)
+        clickAndCheckFirstFrame("greeting-before-reduction", "companion-greet", CompanionPose.Greeting)
+        compose.mainClock.advanceTimeBy(64)
+        compose.runOnIdle { observe("64ms") }
         compose.onNodeWithTag("companion-artwork-fallback").assertDoesNotExist()
         val greetingPixels = pixels("01-greeting")
         assertFalse("Explicit greeting renders a distinct actual pose", idlePixels.contentEquals(greetingPixels))
@@ -172,32 +200,13 @@ class CompanionSettingsPresentationTest {
         compose.runOnIdle { assertEquals(0f, motion, 0f); allowed.value = true }
         repeat(4) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
         compose.runOnIdle { assertEquals(0f, motion, 0f); assertNull(observed.run) }
-        val encourage = compose.onNodeWithTag("companion-encourage").performScrollTo().assertIsDisplayed().assertIsEnabled()
-        val node = encourage.fetchSemanticsNode()
-        compose.runOnIdle {
-            phase = "encouragement"
-            val bounds = node.boundsInRoot
-            button = org.json.JSONObject().put("displayed_assertion", true)
-                .put("enabled", !node.config.contains(SemanticsProperties.Disabled))
-                .put("left", bounds.left).put("top", bounds.top).put("right", bounds.right).put("bottom", bounds.bottom)
-            observe("before")
-        }
-        encourage.performClick()
-        compose.runOnIdle { observe("afterClick") }
-        compose.mainClock.advanceTimeByFrame()
-        compose.runOnIdle {
-            observe("firstFrame")
-            assertEquals("First frame feedback: $lastObservation", CompanionPose.Encouraging, observed.feedback)
-            assertEquals("First frame pose: $lastObservation", CompanionPose.Encouraging, observed.pose)
-            assertNotNull("First frame active run: $lastObservation", observed.run)
-        }
+        clickAndCheckFirstFrame("encouragement-before-quiet", "companion-encourage", CompanionPose.Encouraging)
         compose.mainClock.advanceTimeBy(96)
         compose.runOnIdle { observe("96ms") }
         compose.onNodeWithTag("companion-artwork-fallback").assertDoesNotExist()
         assertFalse("Encouragement renders its own actual pose", greetingPixels.contentEquals(pixels("02-encouraging")))
         compose.runOnIdle { assertTrue("Active encouragement before quiet: $lastObservation", motion > 0f); watchQuiet = true }
-        compose.onNodeWithTag("companion-quiet").performScrollTo().assertIsDisplayed().performClick()
-        compose.mainClock.advanceTimeByFrame()
+        clickAndCheckFirstFrame("quiet-cancel", "companion-quiet", CompanionPose.Idle)
         compose.runOnIdle {
             assertNull(observed.run); assertEquals(CompanionPose.Idle, observed.pose)
             assertTrue("Observe the first quiet composition before relying on a later animation reset", quietMotion.isNotEmpty())
@@ -205,38 +214,56 @@ class CompanionSettingsPresentationTest {
             assertEquals(0f, motion, 0f); watchQuiet = false
         }
         assertArrayEquals("Quiet cancellation must restore the unshifted, unscaled idle raster", idlePixels, pixels("02b-quiet-still"))
-        compose.onNodeWithTag("companion-encourage").performScrollTo().performClick()
-        compose.mainClock.advanceTimeByFrame(); compose.mainClock.advanceTimeBy(96)
-        compose.runOnIdle { assertTrue(motion > 0f); owner.registry.currentState = androidx.lifecycle.Lifecycle.State.STARTED }
+        clickAndCheckFirstFrame("encouragement-before-background", "companion-encourage", CompanionPose.Encouraging)
+        compose.mainClock.advanceTimeBy(96)
+        compose.runOnIdle {
+            observe("96ms"); assertTrue("Active encouragement before background: $lastObservation", motion > 0f)
+            phase = "background"; button = org.json.JSONObject(); observe("beforePause")
+            owner.registry.currentState = androidx.lifecycle.Lifecycle.State.STARTED
+        }
         compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle { observe("firstFrame") }
         assertArrayEquals("Background cancels back to the quiet raster", idlePixels, pixels("03-background-still"))
         compose.onNodeWithTag("companion-greet").assertIsNotEnabled()
-        compose.runOnIdle { checkNotNull(callbacks).encourage(); assertEquals(CompanionPose.Idle, observed.pose); assertEquals(0f, motion, 0f) }
-        compose.runOnIdle { owner.registry.currentState = androidx.lifecycle.Lifecycle.State.RESUMED }
+        compose.runOnIdle {
+            phase = "background-rejected-callback"; observe("before")
+            checkNotNull(callbacks).encourage(); observe("afterCallback")
+            assertEquals(CompanionPose.Idle, observed.pose); assertEquals(0f, motion, 0f)
+        }
+        compose.runOnIdle { phase = "foreground-return"; owner.registry.currentState = androidx.lifecycle.Lifecycle.State.RESUMED }
         repeat(4) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
-        compose.runOnIdle { assertNull(observed.run); assertEquals(0f, motion, 0f) }
-        compose.onNodeWithTag("companion-encourage").performScrollTo().performClick()
-        repeat(40) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
-        compose.runOnIdle { assertNull(observed.run); assertEquals(CompanionPose.Idle, observed.pose); assertEquals(0f, motion, .001f) }
+        compose.runOnIdle { observe("settled"); assertNull(observed.run); assertEquals(0f, motion, 0f) }
+        clickAndCheckFirstFrame("encouragement-natural-finish", "companion-encourage", CompanionPose.Encouraging)
+        // The helper consumed the first frame: retain the original total of 40 frames, not 41.
+        repeat(39) { frame ->
+            compose.mainClock.advanceTimeByFrame(); compose.waitForIdle()
+            if (frame == 5) compose.runOnIdle { observe("96ms"); assertTrue("Natural action is moving: $lastObservation", motion > 0f) }
+        }
+        compose.runOnIdle { observe("settled"); assertNull(observed.run); assertEquals(CompanionPose.Idle, observed.pose); assertEquals(0f, motion, .001f) }
         val oldOwnerCallbacks = checkNotNull(callbacks)
         val replacement = object : androidx.lifecycle.LifecycleOwner {
             val registry = androidx.lifecycle.LifecycleRegistry(this)
             override val lifecycle: androidx.lifecycle.Lifecycle get() = registry
         }
-        compose.runOnIdle { replacement.registry.currentState = androidx.lifecycle.Lifecycle.State.RESUMED; visibleOwner.value = replacement }
+        compose.runOnIdle {
+            phase = "owner-replacement"; button = org.json.JSONObject(); observe("before")
+            replacement.registry.currentState = androidx.lifecycle.Lifecycle.State.RESUMED; visibleOwner.value = replacement
+        }
         repeat(4) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
         compose.runOnIdle {
+            observe("settled"); phase = "retired-owner-callbacks"; observe("before")
             oldOwnerCallbacks.greet(); oldOwnerCallbacks.encourage(); oldOwnerCallbacks.close()
+            observe("afterCallbacks")
             assertEquals(CompanionPose.Idle, observed.pose); assertEquals(0, closes)
         }
         compose.onNodeWithTag("companion-greet").assertIsEnabled()
-        compose.runOnIdle { artwork.value = NeutralMascotAssets }
+        compose.runOnIdle { phase = "fallback-asset"; artwork.value = NeutralMascotAssets }
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithTag("companion-artwork-fallback").performScrollTo().assertIsDisplayed()
         val staticFallback = pixels()
-        compose.runOnIdle { checkNotNull(callbacks).greet() }
-        compose.mainClock.advanceTimeByFrame(); compose.mainClock.advanceTimeBy(64)
-        compose.runOnIdle { assertTrue(kotlin.math.abs(motion) > .01f) }
+        clickAndCheckFirstFrame("fallback-greeting", "companion-greet", CompanionPose.Greeting)
+        compose.mainClock.advanceTimeBy(64)
+        compose.runOnIdle { observe("64ms"); assertTrue(kotlin.math.abs(motion) > .01f) }
         assertArrayEquals("Unavailable pose must keep the actual fallback pixels static", staticFallback, pixels())
     }
 
