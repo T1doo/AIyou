@@ -91,6 +91,8 @@ class CompanionSettingsPresentationTest {
         val visibleOwner = mutableStateOf<androidx.lifecycle.LifecycleOwner>(owner)
         val artwork = mutableStateOf<MascotAssetProvider>(LuluMascotAssets)
         val allowed = mutableStateOf(true)
+        var watchQuiet = false
+        val quietMotion = mutableListOf<Float>()
         var closes = 0
         var observed = CompanionInteraction.Snapshot()
         var motion = 0f
@@ -117,7 +119,10 @@ class CompanionSettingsPresentationTest {
         compose.runOnIdle { owner.registry.currentState = androidx.lifecycle.Lifecycle.State.RESUMED }
         compose.setContent {
             CompositionLocalProvider(androidx.lifecycle.compose.LocalLifecycleOwner provides visibleOwner.value,
-                LocalCompanionInteractionObserver provides { state, value, actions -> observed = state; motion = value; callbacks = actions }) {
+                LocalCompanionInteractionObserver provides { state, value, actions ->
+                    observed = state; motion = value; callbacks = actions
+                    if (watchQuiet && state.run == null) quietMotion += value
+                }) {
                 AIyouTheme { CompanionDialog(onClose = { closes++ }, motionAllowed = allowed.value, assets = artwork.value) }
             }
         }
@@ -137,6 +142,18 @@ class CompanionSettingsPresentationTest {
         compose.mainClock.advanceTimeByFrame(); compose.mainClock.advanceTimeBy(96)
         compose.onNodeWithTag("companion-artwork-fallback").assertDoesNotExist()
         assertFalse("Encouragement renders its own actual pose", greetingPixels.contentEquals(pixels("02-encouraging")))
+        compose.runOnIdle { assertTrue(motion > 0f); watchQuiet = true }
+        compose.onNodeWithTag("companion-quiet").performScrollTo().assertIsDisplayed().performClick()
+        compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle {
+            assertNull(observed.run); assertEquals(CompanionPose.Idle, observed.pose)
+            assertTrue("Observe the first quiet composition before relying on a later animation reset", quietMotion.isNotEmpty())
+            assertTrue("Every quiet composition must suppress retained translation/scale input", quietMotion.all { it == 0f })
+            assertEquals(0f, motion, 0f); watchQuiet = false
+        }
+        assertArrayEquals("Quiet cancellation must restore the unshifted, unscaled idle raster", idlePixels, pixels("02b-quiet-still"))
+        compose.onNodeWithTag("companion-encourage").performScrollTo().performClick()
+        compose.mainClock.advanceTimeByFrame(); compose.mainClock.advanceTimeBy(96)
         compose.runOnIdle { assertTrue(motion > 0f); owner.registry.currentState = androidx.lifecycle.Lifecycle.State.STARTED }
         compose.mainClock.advanceTimeByFrame()
         assertArrayEquals("Background cancels back to the quiet raster", idlePixels, pixels("03-background-still"))

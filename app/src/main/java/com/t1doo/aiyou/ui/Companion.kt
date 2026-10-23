@@ -172,7 +172,7 @@ fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotA
             ui = interaction.finish(run) // A cancelled/retired run cannot finish a later action.
         }
     }
-    val motion = if (motionAllowed && ui.foreground) movement.value else 0f
+    val motion = if (motionAllowed && ui.foreground && ui.run != null) movement.value else 0f
     LocalCompanionInteractionObserver.current?.let { observer -> SideEffect { observer(ui, motion, actions) } }
     AlertDialog(onDismissRequest = actions.close, containerColor = AIyouColors.surface,
         title = { Text("安静陪你一会儿") },
