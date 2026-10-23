@@ -74,7 +74,7 @@ class OriginalActivityExportPresentationTest {
         }
     }}
     private fun node(tag:String)=compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
-    private fun click(tag:String) {node(tag).assertIsEnabled().performClick()}
+    private fun click(tag:String) {compose.showNotebookToolsFor(tag);node(tag).assertIsEnabled().performClick()}
     private fun pump() {compose.runOnIdle {runBlocking {while(queue.isNotEmpty()) queue.removeFirst()(store)}}}
     private fun ui()=checkNotNull(state.value.originalExport)
     private fun preview() {click("export-open");click("export-include-activities");click("export-prepare");pump()}

@@ -60,7 +60,7 @@ class RecycleBinPresentationTest {
     private fun browse() {
         // After deleting the visible row, the remembered timeline can keep its
         // header offscreen. Compose that lazy item before looking up its node.
-        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("recycle-open"))
+        compose.showNotebookToolsFor("recycle-open");compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("recycle-open"))
         compose.onNodeWithTag("recycle-open").assertIsDisplayed().performClick(); pump()
     }
     @Test fun actualMoveAndExplicitRestoreKeepFullOriginalTagsAndRequireEachConfirmation() {
@@ -87,7 +87,7 @@ class RecycleBinPresentationTest {
         assertEquals(listOf("合成私密标签"), f.state.value.manualTags.getValue("one").names)
     }
     @Test fun loadingEmptyAndFailedReadsAreDistinctAndNeverExposeStaleTrashBody() {
-        content(); compose.onNodeWithTag("recycle-open").performScrollTo().performClick()
+        content(); compose.showNotebookToolsFor("recycle-open");compose.onNodeWithTag("recycle-open").performScrollTo().performClick()
         compose.onNodeWithText("正在读取回收站").assertExists(); pump()
         compose.onNodeWithText("回收站为空").assertExists(); compose.onNodeWithTag("recycle-original").assertDoesNotExist()
         compose.runOnIdle { f.failRead = true }

@@ -102,7 +102,7 @@ class ManualTagPresentationTest {
     @Test fun tagSearchReturnKeepsExactPositionWithExportControlVisible() = assertTagSearchReturn(true)
     private fun assertTagSearchReturn(exportVisible: Boolean) {
         content(exportVisible = exportVisible)
-        if (exportVisible) compose.onNodeWithTag("export-open").assertIsEnabled()
+        if (exportVisible) { compose.showNotebookToolsFor("export-open");compose.onNodeWithTag("export-open").assertIsEnabled() }
         chooseTag(); val only = result { it.stage == OriginalSearchStage.READY && it.input.tag == TAG }
         assertEquals(listOf("one", "two"), only.state.hits.map { it.entry.id })
         field("original-search-query", "咖啡"); field("original-search-from", "2026-10-14"); field("original-search-through", "2026-10-14")

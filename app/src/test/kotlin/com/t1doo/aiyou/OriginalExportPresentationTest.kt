@@ -67,7 +67,7 @@ class OriginalExportPresentationTest {
     }
     private fun pump() { compose.runOnIdle { fixture.drain() } }
     private fun preview() {
-        compose.onNodeWithTag("export-open").performScrollTo().performClick()
+        compose.showNotebookToolsFor("export-open");compose.onNodeWithTag("export-open").performScrollTo().performClick()
         compose.onNodeWithTag("export-select-one").performScrollTo().performClick()
         compose.onNodeWithTag("export-prepare").performScrollTo().performClick(); pump()
     }
@@ -75,7 +75,7 @@ class OriginalExportPresentationTest {
         fixture.includeImage = true; fixture.original = fixture.original.copy(originalText = "")
         fixture.state.value = fixture.state.value.copy(entries = listOf(fixture.original))
         content(true)
-        compose.onNodeWithTag("export-open").performScrollTo().performClick()
+        compose.showNotebookToolsFor("export-open");compose.onNodeWithTag("export-open").performScrollTo().performClick()
         compose.onNodeWithTag("export-select-one").performScrollTo().performClick()
         compose.onNodeWithTag("export-format-MEDIA_ZIP").performScrollTo().performClick()
         compose.onNodeWithTag("export-prepare").performScrollTo().performClick(); pump()
@@ -109,7 +109,7 @@ class OriginalExportPresentationTest {
         fixture.includeImage = true
         fixture.imageBytes = Fixture.PNG.copyOf().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
         content()
-        compose.onNodeWithTag("export-open").performScrollTo().performClick()
+        compose.showNotebookToolsFor("export-open");compose.onNodeWithTag("export-open").performScrollTo().performClick()
         compose.onNodeWithTag("export-select-one").performScrollTo().performClick()
         compose.onNodeWithTag("export-format-MEDIA_ZIP").performScrollTo().performClick()
         compose.onNodeWithTag("export-prepare").performScrollTo().performClick(); pump()
@@ -118,7 +118,7 @@ class OriginalExportPresentationTest {
         compose.runOnIdle { assertEquals(OriginalExportPhase.FAILED, fixture.ui().phase); assertNull(fixture.ui().snapshot); assertTrue(registry.intents.isEmpty()) }
     }
     @Test fun actualDialogRequiresSelectionPreviewAndFreshPlaintextConsentBeforeSystemDocumentIntent() {
-        content(); compose.onNodeWithTag("export-open").performScrollTo().performClick()
+        content(); compose.showNotebookToolsFor("export-open");compose.onNodeWithTag("export-open").performScrollTo().performClick()
         compose.onNodeWithTag("export-prepare").assertIsNotEnabled(); assertTrue(fixture.ui().selection.isEmpty())
         compose.onNodeWithTag("export-select-one").performScrollTo().performClick()
         compose.onNodeWithTag("export-format-JSONL").performScrollTo().performClick()
@@ -163,7 +163,7 @@ class OriginalExportPresentationTest {
     @Test @Config(sdk = [35], qualifiers = "w320dp-h1000dp")
     fun narrowDoubleFontKeepsRiskDestinationAndCloseReachableAndHidesPreviewOnReadFailure() {
         content(true)
-        compose.onNodeWithTag("export-open").performScrollTo().performClick()
+        compose.showNotebookToolsFor("export-open");compose.onNodeWithTag("export-open").performScrollTo().performClick()
         compose.onNodeWithTag("export-select-one").performScrollTo().performClick()
         compose.runOnIdle { fixture.state.value = fixture.state.value.copy(ready = false) }
         compose.onAllNodesWithTag("export-select-one").assertCountEquals(0)

@@ -119,7 +119,7 @@ class RecordPackageActivityPresentationTest {
     }
     private fun click(tag:String) {node(tag).assertIsEnabled().performClick()}
     private fun pump() {compose.runOnIdle {runBlocking {while(queue.isNotEmpty()) queue.removeFirst()(owner)}}}
-    private fun open() {compose.onNodeWithTag("package-open").performScrollTo().performClick()}
+    private fun open() {compose.showNotebookToolsFor("package-open");compose.onNodeWithTag("package-open").performScrollTo().performClick()}
     @Test fun taskOnlySelectionAtDoubleFontPreviewsEveryKindAndKeepsExplicitScopeGateAndPrivateState() {
         content();open();click("package-export")
         node("package-preview").assertIsNotEnabled();click("package-include-activities");click("package-preview");pump()

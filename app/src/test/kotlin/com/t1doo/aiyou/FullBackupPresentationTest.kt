@@ -52,7 +52,7 @@ class FullBackupPresentationTest {
         }
     }
     private fun open() {
-        compose.onNodeWithTag("package-open").performScrollTo().performClick()
+        compose.showNotebookToolsFor("package-open");compose.onNodeWithTag("package-open").performScrollTo().performClick()
         compose.onNodeWithTag("package-list").performScrollToNode(hasTestTag("package-full-backup"))
         compose.onNodeWithTag("package-full-backup").performClick()
     }
@@ -65,7 +65,16 @@ class FullBackupPresentationTest {
     }
     private fun pump() { compose.runOnIdle { runBlocking { f.drain() } } }
     @Test fun actualRootFullScopeRequiresExplicitAcceptanceAndMatchingIndependentPasswords() {
-        compose.setContent { Content() };open();click("full-backup-preview");pump()
+        compose.setContent { Content() };open()
+        compose.onNodeWithText("内容范围").assertDoesNotExist()
+        compose.onNodeWithText("恢复条件").assertExists();compose.onNodeWithText("恢复口令").assertExists()
+        click("full-backup-details")
+        for(title in listOf("内容范围","不随备份恢复","容量上限")) compose.onNodeWithText(title).assertExists()
+        compose.runOnIdle {assertTrue(f.queue.isEmpty());assertEquals(0,f.seals);assertEquals(0,f.imports);assertEquals(0,f.picker.launches)}
+        click("full-backup-details");compose.onNodeWithText("内容范围").assertDoesNotExist()
+        click("full-backup-preview");pump()
+        for(title in listOf("内容范围","不随备份恢复","容量上限","恢复条件","恢复口令")) compose.onNodeWithText(title).assertExists()
+        compose.onNodeWithTag("full-backup-details").assertDoesNotExist()
         compose.onNodeWithTag("full-backup").performScrollToNode(hasTestTag("full-backup-summary"))
         compose.onNodeWithTag("full-backup-summary").assertTextEquals("记录 26 条（回收站 1 条）；修订 27 个；原图 2 张／24 字节。")
         compose.onNodeWithTag("full-backup").performScrollToNode(hasTestTag("full-backup-save"))

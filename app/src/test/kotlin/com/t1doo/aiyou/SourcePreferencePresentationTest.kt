@@ -129,7 +129,7 @@ class SourcePreferencePresentationTest {
         click("preference-revoke:"+saved!!.id);drain();confirm();assertEquals(PreferenceReview.REVOKED,saved!!.review!!.review)
         click("preference-close");compose.onNodeWithText("返回列表").assertIsDisplayed().performClick();compose.waitForIdle()
         compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
-        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("preferences-open"));compose.onNodeWithTag("preferences-open").performClick();drain()
+        compose.showNotebookToolsFor("preferences-open");compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("preferences-open"));compose.onNodeWithTag("preferences-open").performClick();drain()
         click("preference-section-ACCEPTED");drain();assertTrue(state.value.sourcePreferences!!.items.isEmpty())
         assertEquals(listOf(entry),state.value.entries);assertTrue(state.value.tasks.items.isEmpty())
     }
@@ -137,7 +137,7 @@ class SourcePreferencePresentationTest {
         compose.setContent {Screen()};reader();open();form();click("preference-save");confirm();accept();click("preference-close")
         compose.onNodeWithText("返回列表").assertIsDisplayed().performClick();compose.waitForIdle()
         compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
-        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("preferences-open"));compose.onNodeWithTag("preferences-open").performClick();drain()
+        compose.showNotebookToolsFor("preferences-open");compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("preferences-open"));compose.onNodeWithTag("preferences-open").performClick();drain()
         click("preference-section-ACCEPTED");drain()
         val keyword=compose.onNodeWithTag("preference-keyword").performScrollTo().assertIsDisplayed()
         keyword.performTextReplacement("合成口味");compose.onNodeWithTag("preferences-count").assertDoesNotExist()
@@ -156,7 +156,7 @@ class SourcePreferencePresentationTest {
     }
     @Test fun failedGlobalReadHidesCountAndNeverPresentsAnUnverifiedEmptyPage() {
         compose.setContent {Screen()}
-        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("preferences-open"));compose.onNodeWithTag("preferences-open").performClick();drain()
+        compose.showNotebookToolsFor("preferences-open");compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("preferences-open"));compose.onNodeWithTag("preferences-open").performClick();drain()
         compose.onNodeWithTag("preferences-count").performScrollTo().assertIsDisplayed()
         compose.runOnIdle {failRead=true}
         compose.onNodeWithText("仅刷新实际状态，不重复原请求").performScrollTo().performClick();drain()

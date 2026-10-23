@@ -55,7 +55,7 @@ class FactRecapPresentationTest {
         }
     }}
     private fun click(tag:String) {compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag(tag));compose.onNodeWithTag(tag).assertIsDisplayed().assertIsEnabled().performClick()}
-    private fun open(){compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("recap-open"));compose.onNodeWithTag("recap-open").performClick()}
+    private fun open(){compose.showNotebookToolsFor("recap-open");compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("recap-open"));compose.onNodeWithTag("recap-open").performClick()}
     private fun drain(){compose.runOnIdle {runBlocking {while(f.queue.isNotEmpty())f.queue.removeFirst()(f.store)}}}
     private fun generate(){click("recap-generate");drain()}
     @Test fun actualSettingsPersistWeekAndOpenedRangeKeepsItsOwnChoiceBeforeExplicitGeneration() {
@@ -96,7 +96,7 @@ class FactRecapPresentationTest {
         compose.runOnIdle {display.value=UiPreferencesState(UiPreferences(false,true,FactRecapPeriod.WEEK),ready=true)}
         compose.runOnIdle {assertEquals(FactRecapPeriod.DAY,f.local.value.factRecap!!.period);assertNull(f.local.value.factRecap!!.snapshot);assertTrue(f.queue.isEmpty())}
         compose.onNodeWithText("返回回忆").performClick()
-        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("recap-open"))
+        compose.showNotebookToolsFor("recap-open");compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("recap-open"))
         val retained=compose.onNodeWithTag("recap-open").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!!
         compose.runOnIdle {display.value=display.value.copy(preferences=display.value.preferences.copy(defaultRecapPeriod=FactRecapPeriod.DAY))}
         compose.runOnIdle {retained()}

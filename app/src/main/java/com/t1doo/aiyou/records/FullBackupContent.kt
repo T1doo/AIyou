@@ -4,13 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import com.t1doo.aiyou.designsystem.AIyouColors
+import com.t1doo.aiyou.designsystem.aiyouFocusOutline
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.input.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -20,6 +22,8 @@ import androidx.compose.ui.unit.dp
 internal fun FullBackupContent(ui:RecordPackageUiState,controller:RecordPackageController,
     available:Boolean,pickerAvailable:Boolean,ownsRoute:()->Boolean,password:TextFieldState,again:TextFieldState,
     clearPasswords:()->Unit,modifier:Modifier) {
+    var detailsExpanded by remember(controller,ui.session,ui.phase) { mutableStateOf(false) }
+    val isHome=ui.phase==RecordPackagePhase.HOME
     LazyColumn(modifier.fillMaxSize().background(AIyouColors.surface).padding(16.dp).testTag("full-backup"),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item { Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Text("完整资料库备份",Modifier.semantics { heading() },style=MaterialTheme.typography.headlineSmall)
@@ -28,6 +32,23 @@ internal fun FullBackupContent(ui:RecordPackageUiState,controller:RecordPackageC
                 OutlinedButton(onClick={if(ownsRoute()) controller.chooseRestore(ui.session)},enabled=pickerAvailable,shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("full-backup-open")) { Text("选择完整备份恢复") }
                 HorizontalDivider(color=AIyouColors.outlineDecorative)
             }
+            Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                Text("恢复条件",Modifier.semantics { heading() },style=MaterialTheme.typography.titleMedium)
+                Text("仅恢复到严格空资料库，保留原身份、版本和回收站状态。已有资料、删除证明或未保存输入会阻止导入；请先保全现有内容。本入口不提供覆盖和清库。")
+            }
+            Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                Text("恢复口令",Modifier.semantics { heading() },style=MaterialTheme.typography.titleMedium)
+                Text("请保存独立恢复口令，丢失后无法解密。失败文件会保留；同一备份完成后的重试只核对回执，不会复活后来的删除。")
+            }
+            if(isHome) {
+                Text("加密保存本机资料；密钥、联网授权与设备锁不随备份恢复。",style=MaterialTheme.typography.bodyMedium)
+                TextButton(onClick={detailsExpanded=!detailsExpanded},modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)
+                    .aiyouFocusOutline().testTag("full-backup-details")
+                    .semantics { stateDescription=if(detailsExpanded) "已展开" else "已收起" }) {
+                    Text(if(detailsExpanded) "收起完整范围、排除项与上限" else "查看完整范围、排除项与上限")
+                }
+            }
+            if(!isHome || detailsExpanded) {
             Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
                 Text("内容范围",Modifier.semantics { heading() },style=MaterialTheme.typography.titleMedium)
                 Text("包含全部记录与回收站、完整修订和原图、收藏、手工人物／标签／事件日期、正式待办及提案、手工记忆及候选确认历史、原音及人工转写版本、图片提取与人工纠正版本、捕获草稿和已保留编辑草稿、完成回执与删除证明。未保存的表单输入不在资料库中。")
@@ -40,13 +61,6 @@ internal fun FullBackupContent(ui:RecordPackageUiState,controller:RecordPackageC
                 Text("容量上限",Modifier.semantics { heading() },style=MaterialTheme.typography.titleMedium)
                 Text("上限：256 条记录、4096 个修订、256 张 JPEG/PNG 原图；单图16 MiB、原图共64 MiB、资料清单16 MiB，任务／提案与记忆／确认各4096行。超限、损坏或未完成操作会整体拒绝。")
             }
-            Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                Text("恢复条件",Modifier.semantics { heading() },style=MaterialTheme.typography.titleMedium)
-                Text("仅恢复到严格空资料库，保留原身份、版本和回收站状态。已有资料、删除证明或未保存输入会阻止导入；请先保全现有内容。本入口不提供覆盖和清库。")
-            }
-            Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                Text("恢复口令",Modifier.semantics { heading() },style=MaterialTheme.typography.titleMedium)
-                Text("请保存独立恢复口令，丢失后无法解密。失败文件会保留；同一备份完成后的重试只核对回执，不会复活后来的删除。")
             }
         } }
         ui.fullSummary?.let { summary -> item {

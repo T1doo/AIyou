@@ -64,7 +64,7 @@ class RecordPackagePresentationTest {
         compose.onNodeWithTag(tag).performTextInput(value)
     }
     private fun pump() { compose.runOnIdle { fixture.drain() } }
-    private fun open() { compose.onNodeWithTag("package-open").performScrollTo().performClick() }
+    private fun open() { compose.showNotebookToolsFor("package-open");compose.onNodeWithTag("package-open").performScrollTo().performClick() }
     private fun preview() { open(); click("package-export"); click("package-select:one"); click("package-preview"); pump() }
     @Test fun actualFullPreviewRequiresScopeAndTwoMatchingSecretInputsBeforeExportPicker() {
         content(); preview()

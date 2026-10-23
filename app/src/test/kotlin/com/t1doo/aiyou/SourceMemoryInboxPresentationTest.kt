@@ -104,7 +104,7 @@ class SourceMemoryInboxPresentationTest {
             } }
         }
     }
-    private fun click(tag: String) { compose.onNodeWithTag(tag).performScrollTo().performClick() }
+    private fun click(tag: String) { compose.showNotebookToolsFor(tag);compose.onNodeWithTag(tag).performScrollTo().performClick() }
     private fun drain() { compose.runOnIdle { runBlocking { while (true) (queue.poll() ?: break)(owner) } }; compose.waitForIdle() }
     private fun open() { click("memory-inbox-open"); drain() }
 

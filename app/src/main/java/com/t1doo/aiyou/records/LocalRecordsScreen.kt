@@ -51,6 +51,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
 import com.t1doo.aiyou.designsystem.AIyouColors
@@ -60,6 +61,7 @@ import com.t1doo.aiyou.designsystem.ComponentState
 import com.t1doo.aiyou.designsystem.MemoryCard
 import com.t1doo.aiyou.designsystem.StatusNotice
 import com.t1doo.aiyou.designsystem.SourceCitationCard
+import com.t1doo.aiyou.designsystem.aiyouFocusOutline
 import com.t1doo.aiyou.data.EncryptedEntryRepository
 import com.t1doo.aiyou.ui.Destination
 import com.t1doo.aiyou.ui.SearchSection
@@ -143,6 +145,11 @@ fun LocalRecordsScreen(
     onQuestionKeywords:(()->Unit)?=null,
     onReduceSearchKeywords:((OriginalSearchState)->Boolean)?=null,
 ) {
+    // Presentation only. Never retain a source, query proof or controller in disclosure state.
+    var reviewToolsExpanded by remember(destination, local.localSearch, local.unifiedKeywordOwner,
+        local.recordAuthorizationOwner, local.ready) { mutableStateOf(false) }
+    var manageToolsExpanded by remember(destination, local.localSearch, local.unifiedKeywordOwner,
+        local.recordAuthorizationOwner, local.ready) { mutableStateOf(false) }
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
             onDismissRequest = { if (!discard.busy) onCancelCaptureDiscard(discard.requestId) },
@@ -299,11 +306,23 @@ fun LocalRecordsScreen(
                             val hasManageTools = (onBeginRecordPackage != null && local.supportsRecordPackages) ||
                                 (onBeginExport != null && local.supportsOriginalExport) ||
                                 (onOpenRecycleBin != null && local.supportsRecycleBin)
-                            if (hasReviewTools) {
-                            Text("找回与审阅", style=MaterialTheme.typography.titleMedium)
+                            FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                                if (hasReviewTools) OutlinedButton(onClick={ reviewToolsExpanded=!reviewToolsExpanded },
+                                    shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget)
+                                        .aiyouFocusOutline().testTag("notebook-review-tools")
+                                        .semantics { stateDescription=if(reviewToolsExpanded) "已展开" else "已收起" }) {
+                                    Text(if(reviewToolsExpanded) "找回与审阅 · 收起" else "找回与审阅 · 展开")
+                                }
+                                if (hasManageTools) OutlinedButton(onClick={ manageToolsExpanded=!manageToolsExpanded },
+                                    shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget)
+                                        .aiyouFocusOutline().testTag("notebook-manage-tools")
+                                        .semantics { stateDescription=if(manageToolsExpanded) "已展开" else "已收起" }) {
+                                    Text(if(manageToolsExpanded) "资料管理 · 收起" else "资料管理 · 展开")
+                                }
+                            }
+                            if (hasReviewTools && reviewToolsExpanded) {
                             FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                             if(onOpenImageTexts!=null && local.supportsImageTexts)TextButton(onOpenImageTexts,enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("image-texts-open")){Text("找回图片文字与原图")}
-                            if(imageTextBusy)Text("上一图片提取仍在结束，文字入口等待资源释放。")
                             if(onOpenTranscripts!=null && local.supportsAudioTranscripts)TextButton(onOpenTranscripts,enabled=local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("transcripts-open")){Text("找回人工转写与原音")}
                             if (onOpenPreferences != null && local.supportsSourcePreferences) TextButton(onOpenPreferences,
                                 enabled = local.ready && !local.opening && local.error == null,
@@ -319,9 +338,9 @@ fun LocalRecordsScreen(
                                 modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("recap-open")){Text("生成本机日／周回顾")}
                             }
                             }
-                            if (hasManageTools) {
+                            if(imageTextBusy)Text("上一图片提取仍在结束，文字入口等待资源释放。")
+                            if (hasManageTools && manageToolsExpanded) {
                             HorizontalDivider(color=AIyouColors.outlineDecorative)
-                            Text("资料管理", style=MaterialTheme.typography.titleMedium)
                             FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                             if (onBeginRecordPackage != null && local.supportsRecordPackages) TextButton(
                                 onClick = onBeginRecordPackage,
