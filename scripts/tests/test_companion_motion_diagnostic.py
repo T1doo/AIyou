@@ -9,15 +9,15 @@ from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location('notebook_probe', ROOT / 'scripts/diagnose-notebook-overflow.py')
+spec = importlib.util.spec_from_file_location('companion_probe', ROOT / 'scripts/diagnose-companion-motion.py')
 probe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)
 
 
-class NotebookDiagnosticTests(unittest.TestCase):
+class CompanionDiagnosticTests(unittest.TestCase):
     def formal_workflow(self):
         workflow = (ROOT / '.github/workflows/android.yml').read_text()
-        formal = workflow.split('\n  notebook-overflow-diagnostic:\n')[0]
+        formal = workflow.split('\n  companion-motion-diagnostic:\n')[0]
         lines = formal.splitlines(keepends=True)
         lines = [line for line in lines if not line.startswith('run-name:') and not line.startswith('    if: ${{ !(')]
         formal = ''.join(lines)
@@ -45,6 +45,16 @@ class NotebookDiagnosticTests(unittest.TestCase):
         target = folder / 'TEST-synthetic.xml'
         target.write_bytes(ET.tostring(suite))
         return target
+
+    def trace(self, root):
+        path = root / probe.TRACE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        data = {'source_sha': '1' * 40, 'method': probe.METHOD,
+                'observations': [{'point': point} for point in ('before', 'afterClick', 'firstFrame', '96ms')]}
+        path.write_text(json.dumps(data))
+        for name in probe.FRAMES:
+            (path.parent / name).write_bytes(b'synthetic fixture; not actual PNG or Android evidence')
+        return path, data
 
     def test_only_the_exact_public_push_request_is_admitted(self):
         probe.request(self.env(), self.event())
@@ -80,11 +90,31 @@ class NotebookDiagnosticTests(unittest.TestCase):
                 (folder / 'admission.json').write_text(json.dumps({'source_sha': '1' * 40, 'run_id': 123, 'run_attempt': 1, 'started_ns': 0}))
                 if not missing:
                     self.xml(root / 'app/build/test-results/testDebugUnitTest', failure=failure)
+                self.trace(root)
                 with patch.object(probe, 'git', return_value='1' * 40):
                     result = probe.collect(root, {**self.env(), 'TARGET_OUTCOME': outcome, 'SCHEMA_OUTCOME': schema})
                 expected = 'PASS' if not failure and outcome == schema == 'success' and not missing else 'FAIL'
                 self.assertEqual(expected, result['status'])
                 self.assertIn('not D01', result['kind'])
+
+    def test_trace_identity_empty_duplicate_and_incomplete_checkpoints_cannot_pass(self):
+        for kind in ('source', 'method', 'empty', 'duplicate', 'incomplete', 'unbounded', 'missing', 'capture'):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp); folder = root / probe.OUTPUT; folder.mkdir(parents=True)
+                (folder / 'admission.json').write_text(json.dumps({'source_sha': '1' * 40, 'run_id': 123, 'run_attempt': 1, 'started_ns': 0}))
+                self.xml(root / 'app/build/test-results/testDebugUnitTest')
+                trace, data = self.trace(root)
+                if kind == 'source': data['source_sha'] = '2' * 40
+                elif kind == 'method': data['method'] = 'other'
+                elif kind == 'empty': data['observations'] = []
+                elif kind == 'duplicate': data['observations'].append({'point': 'before'})
+                elif kind == 'incomplete': data['observations'].pop()
+                elif kind == 'unbounded': data['observations'] *= 129
+                elif kind == 'capture': (trace.parent / probe.FRAMES[-1]).unlink()
+                trace.write_text(json.dumps(data))
+                if kind == 'missing': trace.unlink()
+                with patch.object(probe, 'git', return_value='1' * 40):
+                    self.assertEqual('FAIL', probe.collect(root, self.env())['status'])
 
     def test_formal_workflow_bodies_and_budgets_remain_byte_identical(self):
         workflow = (ROOT / '.github/workflows/android.yml').read_text()
@@ -93,7 +123,7 @@ class NotebookDiagnosticTests(unittest.TestCase):
                          hashlib.sha256((self.formal_workflow().rstrip('\n') + '\n').encode()).hexdigest())
         selector = ("github.event_name == 'push' && github.repository == 'T1doo/AIyou' && "
                     "github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && "
-                    "github.event.head_commit.message == '[ui-overflow-probe] fixed Notebook measurement'")
+                    "github.event.head_commit.message == '[ui-companion-probe] b438 finite motion admission'")
         self.assertEqual(5, workflow.count(selector))
         self.assertEqual(3, workflow.count('    if: ${{ !(' + selector + ') }}'))
         self.assertEqual(1, workflow.count('    if: ${{ ' + selector + ' }}'))
@@ -103,7 +133,7 @@ class NotebookDiagnosticTests(unittest.TestCase):
 
     def test_diagnostic_keeps_all_current_schema_guards_and_fixed_target(self):
         workflow = (ROOT / '.github/workflows/android.yml').read_text()
-        diagnostic = workflow.split('\n  notebook-overflow-diagnostic:\n', 1)[1]
+        diagnostic = workflow.split('\n  companion-motion-diagnostic:\n', 1)[1]
         import re
         expected = set(re.findall(r'python3 scripts/verify-([a-z-]+)-schema.py --capture', self.formal_workflow()))
         loops = re.findall(r'for kind in ([a-z -]+); do', diagnostic)
@@ -113,5 +143,7 @@ class NotebookDiagnosticTests(unittest.TestCase):
         self.assertEqual(1, diagnostic.count(':app:testDebugUnitTest --tests'))
         self.assertIn("--tests '" + probe.CLASS + '.' + probe.METHOD + "'", diagnostic)
         self.assertIn('timeout-minutes: 12', diagnostic)
+        self.assertIn('540s scripts/gradle.sh', diagnostic)
+        self.assertIn('app/build/reports/companion-motion/', diagnostic)
         self.assertNotIn('needs:', diagnostic)
         self.assertNotIn('ScreenshotTest', diagnostic)

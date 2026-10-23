@@ -1,5 +1,5 @@
 name: D01 Android and Preview checks
-run-name: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-overflow-probe] fixed Notebook measurement' && 'DIAGNOSTIC ONLY - Notebook overflow (not D01 acceptance)' || '' }}
+run-name: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 finite motion admission' && 'DIAGNOSTIC ONLY - Lulu motion admission (not D01 acceptance)' || '' }}
 
 'on':
   push:
@@ -18,7 +18,7 @@ permissions:
 # Every other push retains all three formal jobs; runtime admission also requires attempt1.
 jobs:
   contracts:
-    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-overflow-probe] fixed Notebook measurement') }}
+    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 finite motion admission') }}
     name: Host contracts and generated Room evidence
     runs-on: ubuntu-24.04
     timeout-minutes: 23
@@ -227,7 +227,7 @@ jobs:
       - name: Require host sources to remain unchanged
         run: git diff --exit-code
   d01:
-    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-overflow-probe] fixed Notebook measurement') }}
+    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 finite motion admission') }}
     name: Android APK Compose lint and compiled native evidence
     needs: [contracts]
     runs-on: ubuntu-24.04
@@ -690,7 +690,7 @@ jobs:
             core/data/build/reports/lint-results-debug.*
             core/designsystem/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
   preview:
-    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-overflow-probe] fixed Notebook measurement') }}
+    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 finite motion admission') }}
     name: Complete 430 Preview validation and original PNG evidence
     needs: [contracts]
     runs-on: ubuntu-24.04
@@ -789,13 +789,13 @@ jobs:
         if: always() && steps.visual_packs.outcome == 'success' && steps.visual_index.outcome == 'success'
         uses: ./.github/actions/upload-visual-packs
 
-  notebook-overflow-diagnostic:
-    name: DIAGNOSTIC ONLY - one Notebook method; not D01 acceptance
-    if: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-overflow-probe] fixed Notebook measurement' }}
+  companion-motion-diagnostic:
+    name: DIAGNOSTIC ONLY - one Lulu method; not D01 acceptance
+    if: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 finite motion admission' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     concurrency:
-      group: aiyou-fixed-notebook-overflow-diagnostic
+      group: aiyou-fixed-companion-motion-diagnostic
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -809,7 +809,7 @@ jobs:
           java-version: '17.0.17+10'
           check-latest: false
       - name: Require the fixed request and exact reviewed source
-        run: python3 scripts/diagnose-notebook-overflow.py --admit
+        run: python3 scripts/diagnose-companion-motion.py --admit
       - name: Verify unchanged wrapper and existing accepted SDK; no installation
         run: |
           printf '%s  %s\n' 3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
@@ -820,13 +820,13 @@ jobs:
           for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime; do
             python3 "scripts/verify-$kind-schema.py" --capture
           done
-      - name: Run only the fixed actual Notebook method
+      - name: Run only the fixed actual companion method
         id: method
         env:
           AIYOU_CI_ANDROID_DAEMON: 'true'
         run: |
           set -o pipefail
-          timeout --signal=TERM --kill-after=10s 540s scripts/gradle.sh :app:testDebugUnitTest --tests 'com.t1doo.aiyou.MixedNotebookPresentationTest.realNotebookUsesBundledLuluOnlyWhenPreferenceIsReadyAndVisibleWithoutWritingRecords' 2>&1 | tee build/notebook-overflow/gradle.log
+          timeout --signal=TERM --kill-after=10s 540s scripts/gradle.sh :app:testDebugUnitTest --tests 'com.t1doo.aiyou.CompanionSettingsPresentationTest.finiteInteractionMotionStopsOnReductionAndBackgroundWithoutAutomaticReplay' 2>&1 | tee build/companion-motion-diagnostic/gradle.log
       - name: Verify schema and tracked source even when the method fails
         id: schema_verify
         if: always() && steps.schema_capture.outcome == 'success' && steps.method.outcome != 'skipped'
@@ -840,14 +840,15 @@ jobs:
         env:
           TARGET_OUTCOME: ${{ steps.method.outcome }}
           SCHEMA_OUTCOME: ${{ steps.schema_verify.outcome }}
-        run: python3 scripts/diagnose-notebook-overflow.py --collect
+        run: python3 scripts/diagnose-companion-motion.py --collect
       - name: Preserve raw diagnostic XML and log, not acceptance evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: notebook-overflow-DIAGNOSTIC-ONLY
+          name: companion-motion-DIAGNOSTIC-ONLY
           path: |
-            build/notebook-overflow/
+            build/companion-motion-diagnostic/
             app/build/test-results/testDebugUnitTest/
+            app/build/reports/companion-motion/
           if-no-files-found: error
           retention-days: 14

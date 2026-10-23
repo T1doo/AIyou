@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One fixed Compose measurement, never the formal D01 or device acceptance gate."""
+"""One fixed Lulu motion admission trace, never formal D01 or device acceptance."""
 import argparse
 import hashlib
 import json
@@ -11,17 +11,20 @@ import time
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
-PRODUCTION = '20f581f465b42853ee3648519cc379cd0cdd0a76'
-TEST_OWNER = 'aa7c5967453f1251798ec695e2e018aad9a94559'
-SOURCE = 'app/src/test/kotlin/com/t1doo/aiyou/MixedNotebookPresentationTest.kt'
-TEST_SHA256 = 'e789bbaff59a759b7c076146abb665d598abeabd322404838f61d60377b92285'
-MESSAGE = '[ui-overflow-probe] fixed Notebook measurement'
+PRODUCTION = 'b4380bdb17e52681609a552c8542de1b705f199d'
+TEST_OWNER = 'dae7d9705149fa96ff64f36703eced4d313f724c'
+SOURCE = 'app/src/test/kotlin/com/t1doo/aiyou/CompanionSettingsPresentationTest.kt'
+TEST_SHA256 = '6aa1e8a8466bf806ebf4c6dd105fa0b263fb88efd3f09a3e05242afe359defb7'
+MESSAGE = '[ui-companion-probe] b438 finite motion admission'
 REF = 'refs/heads/codex/d03-short-audio-design-20261020'
-CLASS = 'com.t1doo.aiyou.MixedNotebookPresentationTest'
-METHOD = 'realNotebookUsesBundledLuluOnlyWhenPreferenceIsReadyAndVisibleWithoutWritingRecords'
-ALLOWED = {SOURCE, '.github/workflows/android.yml', 'scripts/diagnose-notebook-overflow.py',
-           'scripts/tests/test_notebook_overflow_diagnostic.py'}
-OUTPUT = 'build/notebook-overflow'
+CLASS = 'com.t1doo.aiyou.CompanionSettingsPresentationTest'
+METHOD = 'finiteInteractionMotionStopsOnReductionAndBackgroundWithoutAutomaticReplay'
+ALLOWED = {SOURCE, '.github/workflows/android.yml', 'scripts/diagnose-companion-motion.py',
+           'scripts/tests/test_companion_motion_diagnostic.py',
+           'scripts/diagnose-notebook-overflow.py', 'scripts/tests/test_notebook_overflow_diagnostic.py'}
+OUTPUT = 'build/companion-motion-diagnostic'
+TRACE = 'app/build/reports/companion-motion/interactions/motion-probe.json'
+FRAMES = ('00-idle.png', '01-greeting.png', '02-encouraging.png', '02b-quiet-still.png', '03-background-still.png')
 
 
 def require(value, message):
@@ -49,13 +52,13 @@ def admit(root, env):
     subprocess.run(['git', 'merge-base', '--is-ancestor', TEST_OWNER, 'HEAD'], cwd=root, timeout=10, check=True)
     require(set(git(root, 'diff', '--name-only', PRODUCTION, 'HEAD').splitlines()) <= ALLOWED, 'Unreviewed source difference')
     test_blob = git(root, 'rev-parse', TEST_OWNER + ':' + SOURCE)
-    require(git(root, 'rev-parse', 'HEAD:' + SOURCE) == test_blob and hashlib.sha256((root / SOURCE).read_bytes()).hexdigest() == TEST_SHA256, 'Test differs from aa7c596')
+    require(git(root, 'rev-parse', 'HEAD:' + SOURCE) == test_blob and hashlib.sha256((root / SOURCE).read_bytes()).hexdigest() == TEST_SHA256, 'Test differs from the fixed trace owner')
     trees = {}
     for path in ('app/src/main', 'core'):
         expected = git(root, 'rev-parse', PRODUCTION + ':' + path)
-        require(git(root, 'rev-parse', 'HEAD:' + path) == expected, 'Production differs from20f581f')
+        require(git(root, 'rev-parse', 'HEAD:' + path) == expected, 'Production differs from b4380bd')
         trees[path] = expected
-    receipt = {'kind': 'DIAGNOSTIC ONLY; formal348/Preview/lint/native/device NOT RUN',
+    receipt = {'kind': 'DIAGNOSTIC ONLY; formal354/Preview/lint/native/device NOT RUN',
                'source_sha': env['GITHUB_SHA'], 'run_id': int(env['GITHUB_RUN_ID']), 'run_attempt': int(env['GITHUB_RUN_ATTEMPT']),
                'production_owner': PRODUCTION, 'production_trees': trees, 'test_owner': TEST_OWNER,
                'test_blob': test_blob, 'test_sha256': TEST_SHA256, 'class': CLASS, 'method': METHOD, 'started_ns': time.time_ns()}
@@ -94,7 +97,30 @@ def collect(root, env):
                 receipt['run_id'] == int(env['GITHUB_RUN_ID']) and receipt['run_attempt'] == int(env['GITHUB_RUN_ATTEMPT']), 'Foreign admission')
         result['admission_authenticated'] = True
         result['actual'] = single_case(root / 'app/build/test-results/testDebugUnitTest', receipt['started_ns'])
+        result['captures'] = []
+        for name in FRAMES:
+            path = (root / TRACE).parent / name
+            if path.exists():
+                require(not path.is_symlink() and path.stat().st_mtime_ns >= receipt['started_ns'] and
+                        0 < path.stat().st_size <= 2 * 1024 * 1024, 'Stale/unsafe capture')
+                raw = path.read_bytes()
+                result['captures'].append({'file': name, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+        trace = root / TRACE
+        require(not trace.is_symlink() and trace.stat().st_mtime_ns >= receipt['started_ns'] and
+                0 < trace.stat().st_size <= 2 * 1024 * 1024, 'Missing/stale/unsafe trace')
+        raw = trace.read_bytes()
+        data = json.loads(raw)
+        require(data['source_sha'] == env['GITHUB_SHA'] and data['method'] == METHOD, 'Foreign trace')
+        observations = data['observations']
+        require(isinstance(observations, list) and 0 < len(observations) <= 512, 'Empty/unbounded trace')
+        points = [row['point'] for row in observations]
+        result['trace'] = {'path': TRACE, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+                           'observations': len(observations),
+                           'checkpoints': [point for point in ('before', 'afterClick', 'firstFrame', '96ms') if point in points]}
+        require(all(points.count(point) == 1 for point in ('before', 'afterClick', 'firstFrame', '96ms')),
+                'Incomplete/duplicate checkpoint trace remains FAIL')
         require(env.get('TARGET_OUTCOME') == env.get('SCHEMA_OUTCOME') == 'success' and result['actual']['failures'] == 0, 'Original method/schema failure remains FAIL')
+        require(len(result['captures']) == len(FRAMES), 'A successful complete method must produce all five captures')
         result['status'] = 'PASS'
     except (OSError, ValueError, KeyError, ET.ParseError, subprocess.SubprocessError) as error:
         result['reason'] = str(error)
