@@ -51,7 +51,7 @@ import com.t1doo.aiyou.designsystem.AIyouColors
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.MascotAssetProvider
 import com.t1doo.aiyou.designsystem.MascotState
-import com.t1doo.aiyou.designsystem.NeutralMascotAssets
+import com.t1doo.aiyou.designsystem.LuluMascotAssets
 
 /** Read-only test observation; absent in production and carries no record content. */
 internal val LocalCompanionObserver = staticCompositionLocalOf<((MascotState, Float) -> Unit)?> { null }
@@ -91,7 +91,7 @@ fun CompanionEntry(
     pulse: Long,
     motionAllowed: Boolean,
     onOpen: () -> Unit,
-    assets: MascotAssetProvider = NeutralMascotAssets,
+    assets: MascotAssetProvider = LuluMascotAssets,
 ) {
     val nod = remember { Animatable(0f) }
     var handled by remember { mutableLongStateOf(pulse) }
@@ -115,7 +115,7 @@ fun CompanionEntry(
 }
 
 @Composable
-fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotAssetProvider = NeutralMascotAssets) {
+fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotAssetProvider = LuluMascotAssets) {
     var greeting by remember { mutableStateOf(false) }
     var pulse by remember { mutableLongStateOf(0L) }
     val nod = remember { Animatable(0f) }
@@ -126,7 +126,8 @@ fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotA
         nod.snapTo(0f)
         if (fresh && motionAllowed) { nod.animateTo(1f, tween(100)); nod.animateTo(0f, tween(140)) }
     }
-    AlertDialog(onDismissRequest = onClose, title = { Text("安静陪你一会儿") },
+    AlertDialog(onDismissRequest = onClose, containerColor = AIyouColors.surface,
+        title = { Text("安静陪你一会儿") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {

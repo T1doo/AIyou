@@ -683,7 +683,7 @@ jobs:
             core/data/build/reports/lint-results-debug.*
             core/designsystem/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
   preview:
-    name: Complete 418 Preview validation and original PNG evidence
+    name: Complete 426 Preview validation and original PNG evidence
     needs: [contracts]
     runs-on: ubuntu-24.04
     timeout-minutes: 17

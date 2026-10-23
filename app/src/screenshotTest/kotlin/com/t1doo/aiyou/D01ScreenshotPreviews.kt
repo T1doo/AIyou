@@ -1,6 +1,7 @@
 package com.t1doo.aiyou
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -114,6 +115,31 @@ private val syntheticEntries = listOf(StoredEntry("synthetic-ui-1", 1,
     "合成记录：散步时看见一片新叶子，把这个小小的发现记下来。", 1_791_647_400_000, "Asia/Shanghai", ProcessingPolicy.LOCAL_ONLY))
 private val restoredLocal = LocalRecordUiState(ready = true, opening = false,
     text = "合成恢复的草稿：把沿途的树叶颜色记下来。", draftNotice = "已恢复本机草稿", entries = syntheticEntries)
+
+// Actual mixed-capture route with synthetic state. The render never opens a database,
+// accepts media, or reports a successful write from its non-executing actor port.
+@Composable
+private fun MixedNotebookPreview(withRecent:Boolean) {
+    val clock=remember { java.time.Clock.fixed(java.time.Instant.parse("2026-10-23T12:00:00Z"),java.time.ZoneOffset.UTC) }
+    val local=remember(withRecent) {
+        LocalRecordUiState(ready=true,opening=false,supportsMixedCapture=true,
+            entries=if(withRecent) listOf(StoredEntry("31a33c5b-b173-4688-a430-3597d59ebd20",1,
+                "合成记录：散步回来，记下路边那棵树。",clock.millis(),"UTC",ProcessingPolicy.LOCAL_ONLY)) else emptyList(),
+            mixedCapture=com.t1doo.aiyou.records.MixedCaptureUiState(
+                draft=com.t1doo.aiyou.model.CaptureDraft("68a2a5f4-4be7-4dc0-9b85-6b26e4518821",1,"",emptyList()),
+                supportsProcessingChoice=true))
+    }
+    val controller=remember(local) { com.t1doo.aiyou.records.MixedCaptureController(
+        {local},{},{false},{error("Preview does not import media")},clock) }
+    AIyouTheme { AIyouApp(local=local,mixedCapture=controller,
+        display=UiPreferencesState(UiPreferences(reduceMotion=true),ready=true)) }
+}
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun MixedNotebookEmptyRender() { MixedNotebookPreview(withRecent=false) }
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun MixedNotebookRecentRender() { MixedNotebookPreview(withRecent=true) }
 
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalEmptyRender() { AIyouTheme { AIyouApp(display = UiPreferencesState(UiPreferences(), ready = true), local = LocalRecordUiState(ready = true, opening = false, draftNotice = "没有未保存的草稿")) } }

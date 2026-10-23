@@ -162,7 +162,7 @@ fun SettingsScreen(
                 }
                 SettingsGroup("关于") {
                     Text("爱忆 AIyou · 本机记录伙伴", style = MaterialTheme.typography.bodyMedium)
-                    Text("陪伴形象为原创中性水豚占位，尚未使用正式 IP 素材。", style = MaterialTheme.typography.bodySmall,
+                    Text("陪伴插画按噜噜参考形象生成；只用于本机展示，不读取你的记录。", style = MaterialTheme.typography.bodySmall,
                         color = AIyouColors.textSecondary)
                     TextButton(onClick = onLicenses, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("开源许可与声明") }
                 }

@@ -1243,7 +1243,7 @@ fun AIyouApp(
             com.t1doo.aiyou.records.MixedCapturePicker(mixedCapture,local.mixedCapture?.selection)
             com.t1doo.aiyou.records.MixedCaptureScreen(local,mixedCapture,modifier,
                 listState=nowList,onOpenEntry=openEntry,selectedEntryId=selectedNowId,
-                defaultPolicyUnavailable=!display.ready && display.error!=null,audio=audioPlayback,
+                defaultPolicyUnavailable=!display.ready && display.error!=null,audio=audioPlayback,companion=companion,
                 canImportAudio={ownsNavigation() && selectedName==Destination.NOW.name && !showSettings && !demo && !reading})
         } else if (!demo && local != null && selected != Destination.TASKS) {
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
