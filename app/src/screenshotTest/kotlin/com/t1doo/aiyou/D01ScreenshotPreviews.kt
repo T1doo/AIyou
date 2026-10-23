@@ -424,7 +424,7 @@ private fun NotebookLibraryPreview(fullBackup:Boolean) {
         unifiedKeywordOwner=owner,recordPackage=if(fullBackup)com.t1doo.aiyou.records.RecordPackageUiState(1,fullMode=true)else null) }
     val current=remember(local) { {local} }
     val publish:((LocalRecordUiState)->LocalRecordUiState)->Unit=remember { {} }
-    val enqueue:(suspend(com.t1doo.aiyou.records.EntryRepository)->Unit)->Boolean=remember { {false} }
+    val enqueue:(suspend(com.t1doo.aiyou.domain.EntryRepository)->Unit)->Boolean=remember { {false} }
     val unified=remember(local) { com.t1doo.aiyou.records.UnifiedKeywordController(current,publish,enqueue) }
     val images=remember(local) { com.t1doo.aiyou.records.ImageTextController(current,publish,enqueue,clock) }
     val audio=remember(local) { com.t1doo.aiyou.records.AudioTranscriptController(current,publish,enqueue,clock) }
