@@ -12,10 +12,10 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 PRODUCTION = 'b4380bdb17e52681609a552c8542de1b705f199d'
-TEST_OWNER = 'd72d2766c5aa289fd1ef1e4bb044f457e3e39eaa'
+TEST_OWNER = 'c5e7360cd10cb79bc4024e4b16d84949d94e946d'
 SOURCE = 'app/src/test/kotlin/com/t1doo/aiyou/CompanionSettingsPresentationTest.kt'
-TEST_SHA256 = 'efbf8336dbb462e5f584a92830753f8b3929e339c3eaac12d5b120777e646046'
-MESSAGE = '[ui-companion-probe] b438 all action admissions'
+TEST_SHA256 = '1ed8d96531f0197f797cce34c2c721dde5b414da02a30bb39c4dcac2994e920e'
+MESSAGE = '[ui-companion-probe] b438 host state publication'
 REF = 'refs/heads/codex/d03-short-audio-design-20261020'
 CLASS = 'com.t1doo.aiyou.CompanionSettingsPresentationTest'
 METHOD = 'finiteInteractionMotionStopsOnReductionAndBackgroundWithoutAutomaticReplay'
@@ -25,6 +25,8 @@ ALLOWED = {SOURCE, '.github/workflows/android.yml', 'scripts/diagnose-companion-
 OUTPUT = 'build/companion-motion-diagnostic'
 TRACE = 'app/build/reports/companion-motion/interactions/motion-probe.json'
 FRAMES = ('00-idle.png', '01-greeting.png', '02-encouraging.png', '02b-quiet-still.png', '03-background-still.png')
+HOST_PHASES = ('initial-owner', 'motion-disabled', 'motion-enabled', 'background',
+               'foreground-return', 'owner-replacement', 'fallback-asset')
 CHECKPOINTS = {
     'greeting-before-reduction': ('scrollStable', 'before', 'afterClick', 'firstFrame', '64ms'),
     'encouragement-before-quiet': ('scrollStable', 'before', 'afterClick', 'firstFrame', '96ms'),
@@ -32,6 +34,7 @@ CHECKPOINTS = {
     'encouragement-before-background': ('scrollStable', 'before', 'afterClick', 'firstFrame', '96ms'),
     'encouragement-natural-finish': ('scrollStable', 'before', 'afterClick', 'firstFrame', '96ms', 'settled'),
     'fallback-greeting': ('scrollStable', 'before', 'afterClick', 'firstFrame', '64ms'),
+    **{phase: ('before', 'consumed', 'settled') for phase in HOST_PHASES},
 }
 
 
@@ -122,12 +125,24 @@ def collect(root, env):
         observations = data['observations']
         require(isinstance(observations, list) and 0 < len(observations) <= 512, 'Empty/unbounded trace')
         points = [(row['phase'], row['point']) for row in observations]
+        publication_frames = {phase: [point for current, point in points
+                                     if current == phase and point.startswith('publicationFrame-')]
+                              for phase in HOST_PHASES}
+        unconsumed = [phase for phase, point in points if point == 'unconsumed']
         result['trace'] = {'path': TRACE, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
                            'observations': len(observations),
+                           'publication_frames_by_phase': publication_frames, 'unconsumed_phases': unconsumed,
                            'checkpoints_by_phase': {phase: [point for point in expected if (phase, point) in points]
                                                     for phase, expected in CHECKPOINTS.items()}}
         require(all(points.count((phase, point)) == 1 for phase, expected in CHECKPOINTS.items() for point in expected),
                 'Incomplete/duplicate phase-and-point trace remains FAIL')
+        require(not unconsumed, 'An unconsumed host publication remains FAIL')
+        for phase, frames in publication_frames.items():
+            require(1 <= len(frames) <= 4 and frames == [f'publicationFrame-{i}' for i in range(1, len(frames) + 1)],
+                    'Host publication must have one to four consecutive frames: ' + phase)
+            ordered = [point for current, point in points if current == phase and
+                       (point in CHECKPOINTS[phase] or point.startswith('publicationFrame-'))]
+            require(ordered == ['before', *frames, 'consumed', 'settled'], 'Host publication checkpoint order differs: ' + phase)
         require(env.get('TARGET_OUTCOME') == env.get('SCHEMA_OUTCOME') == 'success' and result['actual']['failures'] == 0, 'Original method/schema failure remains FAIL')
         require(len(result['captures']) == len(FRAMES), 'A successful complete method must produce all five captures')
         result['status'] = 'PASS'

@@ -1,5 +1,5 @@
 name: D01 Android and Preview checks
-run-name: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 all action admissions' && 'DIAGNOSTIC ONLY - Lulu motion admission (not D01 acceptance)' || '' }}
+run-name: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 host state publication' && 'DIAGNOSTIC ONLY - Lulu motion admission (not D01 acceptance)' || '' }}
 
 'on':
   push:
@@ -18,7 +18,7 @@ permissions:
 # Every other push retains all three formal jobs; runtime admission also requires attempt1.
 jobs:
   contracts:
-    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 all action admissions') }}
+    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 host state publication') }}
     name: Host contracts and generated Room evidence
     runs-on: ubuntu-24.04
     timeout-minutes: 23
@@ -227,7 +227,7 @@ jobs:
       - name: Require host sources to remain unchanged
         run: git diff --exit-code
   d01:
-    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 all action admissions') }}
+    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 host state publication') }}
     name: Android APK Compose lint and compiled native evidence
     needs: [contracts]
     runs-on: ubuntu-24.04
@@ -690,7 +690,7 @@ jobs:
             core/data/build/reports/lint-results-debug.*
             core/designsystem/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
   preview:
-    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 all action admissions') }}
+    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 host state publication') }}
     name: Complete 430 Preview validation and original PNG evidence
     needs: [contracts]
     runs-on: ubuntu-24.04
@@ -791,7 +791,7 @@ jobs:
 
   companion-motion-diagnostic:
     name: DIAGNOSTIC ONLY - one Lulu method; not D01 acceptance
-    if: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 all action admissions' }}
+    if: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 host state publication' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     concurrency:
