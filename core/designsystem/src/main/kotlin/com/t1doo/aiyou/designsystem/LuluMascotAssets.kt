@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalConfiguration
@@ -17,17 +18,38 @@ object LuluMascotAssets : MascotAssetProvider {
     override fun labelFor(state: MascotState): String = state.description
 
     @Composable
-    override fun Artwork(state: MascotState, modifier: Modifier) {
+    override fun Artwork(state: MascotState, modifier: Modifier) { DrawLulu(CompanionPose.Idle, state, modifier) }
+
+    @Composable
+    override fun InteractionArtwork(pose: CompanionPose, modifier: Modifier, actionModifier: Modifier) =
+        DrawLulu(pose, MascotState.Idle, modifier, actionModifier)
+
+    @Composable
+    private fun DrawLulu(pose: CompanionPose, fallback: MascotState, modifier: Modifier,
+                         actionModifier: Modifier = Modifier): Boolean {
         val resources = LocalResources.current
         val configuration = LocalConfiguration.current
-        // Bundled 1254px source; decode at about 627px for the 56dp/112dp placements.
-        // No network, full-resolution decode, mutable user data or image-loading dependency.
-        val bitmap = remember(resources, configuration) {
-            BitmapFactory.decodeResource(resources, R.drawable.lulu_hello,
-                BitmapFactory.Options().apply { inSampleSize = 2; inScaled = false })?.asImageBitmap()
+        // Three fixed 1254px sources, decoded lazily at627px: at most about4.5MiB
+        // per mounted consumer. No network or repeated decode on each animation frame.
+        val decoded = remember(resources, configuration) { mutableMapOf<CompanionPose, ImageBitmap?>() }
+        fun bitmapFor(requested: CompanionPose): ImageBitmap? {
+            if (!decoded.containsKey(requested)) {
+                val resource = when (requested) {
+                    CompanionPose.Idle -> R.drawable.lulu_hello
+                    CompanionPose.Greeting -> R.drawable.lulu_wave
+                    CompanionPose.Encouraging -> R.drawable.lulu_encourage
+                }
+                decoded[requested] = BitmapFactory.decodeResource(resources, resource,
+                    BitmapFactory.Options().apply { inSampleSize = 2; inScaled = false })?.asImageBitmap()
+            }
+            return decoded[requested]
         }
-        if (bitmap != null) Image(bitmap, contentDescription = null, modifier = modifier,
+        val requested = bitmapFor(pose)
+        val bitmap = requested ?: bitmapFor(CompanionPose.Idle)
+        if (bitmap != null) Image(bitmap, contentDescription = null,
+            modifier = if (requested != null) modifier.then(actionModifier) else modifier,
             contentScale = ContentScale.Fit)
-        else NeutralCapybara(state, modifier)
+        else NeutralCapybara(fallback, modifier)
+        return requested != null
     }
 }

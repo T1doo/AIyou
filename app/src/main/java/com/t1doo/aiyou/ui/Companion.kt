@@ -14,11 +14,15 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
@@ -54,9 +59,17 @@ import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.MascotAssetProvider
 import com.t1doo.aiyou.designsystem.MascotState
 import com.t1doo.aiyou.designsystem.LuluMascotAssets
+import com.t1doo.aiyou.designsystem.CompanionPose
+import com.t1doo.aiyou.designsystem.aiyouFocusOutline
+import kotlinx.coroutines.delay
 
 /** Read-only test observation; absent in production and carries no record content. */
 internal val LocalCompanionObserver = staticCompositionLocalOf<((MascotState, Float) -> Unit)?> { null }
+
+internal data class CompanionDialogActions(val greet: () -> Unit, val encourage: () -> Unit,
+                                         val quiet: () -> Unit, val close: () -> Unit)
+internal val LocalCompanionInteractionObserver = staticCompositionLocalOf<
+    ((CompanionInteraction.Snapshot, Float, CompanionDialogActions) -> Unit)?> { null }
 
 @Composable
 internal fun companionMotionAllowed(reduceMotion: Boolean): Boolean {
@@ -120,27 +133,72 @@ fun CompanionEntry(
 
 @Composable
 fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotAssetProvider = LuluMascotAssets) {
-    var greeting by remember { mutableStateOf(false) }
-    var pulse by remember { mutableLongStateOf(0L) }
-    val nod = remember { Animatable(0f) }
-    var handled by remember { mutableLongStateOf(pulse) }
-    LaunchedEffect(pulse, motionAllowed) {
-        val fresh = handled != pulse
-        handled = pulse
-        nod.snapTo(0f)
-        if (fresh && motionAllowed) { nod.animateTo(1f, tween(100)); nod.animateTo(0f, tween(140)) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val interaction = remember(lifecycle) { CompanionInteraction() }
+    var ui by remember(interaction) { mutableStateOf(interaction.snapshot) }
+    val currentClose by rememberUpdatedState(onClose)
+    val movement = remember(interaction) { Animatable(0f) }
+    var handled by remember(interaction) { mutableStateOf<CompanionInteraction.Run?>(null) }
+    val actions = remember(interaction, lifecycle) {
+        fun act(pose: CompanionPose) {
+            interaction.foreground(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+            ui = interaction.start(pose)
+        }
+        CompanionDialogActions({ act(CompanionPose.Greeting) }, { act(CompanionPose.Encouraging) }, {
+            interaction.foreground(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+            ui = interaction.quiet()
+        }, { if (interaction.retire()) currentClose() })
     }
-    AlertDialog(onDismissRequest = onClose, containerColor = AIyouColors.surface,
+    DisposableEffect(interaction, lifecycle) {
+        fun update() { ui = interaction.foreground(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
+        val listener = LifecycleEventObserver { _, _ -> update() }
+        lifecycle.addObserver(listener)
+        update()
+        onDispose { interaction.retire(); lifecycle.removeObserver(listener) }
+    }
+    val run = ui.run
+    LaunchedEffect(run, motionAllowed) {
+        val fresh = run != null && handled !== run
+        handled = run // Consume before suspending, including reduced-motion requests.
+        movement.snapTo(0f)
+        if (run != null) {
+            if (fresh && motionAllowed) {
+                if (run.pose == CompanionPose.Greeting) {
+                    for (value in listOf(-1f, 1f, -.55f, .55f, 0f)) movement.animateTo(value, tween(90))
+                } else {
+                    movement.animateTo(1f, tween(180)); movement.animateTo(0f, tween(220))
+                }
+            } else if (fresh) delay(700) // Brief static pose, never a reduced-motion animation.
+            ui = interaction.finish(run) // A cancelled/retired run cannot finish a later action.
+        }
+    }
+    val motion = if (motionAllowed && ui.foreground) movement.value else 0f
+    LocalCompanionInteractionObserver.current?.let { observer -> SideEffect { observer(ui, motion, actions) } }
+    AlertDialog(onDismissRequest = actions.close, containerColor = AIyouColors.surface,
         title = { Text("安静陪你一会儿") },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally,
+            Column(Modifier.testTag("companion-scroll").verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
-                assets.Artwork(MascotState.Idle, Modifier.size(112.dp).graphicsLayer { rotationZ = nod.value * 3f })
-                Text(if (greeting) "你好，慢慢记录就好。" else "想记就记，停一会儿也很好。",
-                    Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyLarge)
+                val poseAvailable = assets.InteractionArtwork(ui.pose, Modifier.size(112.dp).testTag("companion-interaction-artwork"), Modifier.graphicsLayer {
+                    if (ui.pose == CompanionPose.Greeting) rotationZ = motion * 6f
+                    else { translationY = -motion * 4.dp.toPx(); scaleX = 1f + motion * .04f; scaleY = scaleX }
+                })
+                Text(when (ui.feedback) {
+                    CompanionPose.Greeting -> "你好，慢慢记录就好。"
+                    CompanionPose.Encouraging -> "按自己的节奏来，小小一步也很好。"
+                    CompanionPose.Idle -> "想记就记，停一会儿也很好。"
+                }, Modifier.testTag("companion-feedback").semantics { liveRegion = LiveRegionMode.Polite },
+                    style = MaterialTheme.typography.bodyLarge)
                 Text("本地小互动，不读取或修改你的记录。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-                TextButton(onClick = { greeting = true; pulse++ }) { Text("打个招呼") }
-                TextButton(onClick = { greeting = false }) { Text("安静陪伴") }
+                if (!poseAvailable)
+                    Text("当前动作插画暂不可用，正在显示静态占位。", Modifier.testTag("companion-artwork-fallback"),
+                        style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                FilledTonalButton(onClick = actions.greet, enabled = ui.foreground && ui.run == null && !ui.retired,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-greet")) { Text("打个招呼") }
+                OutlinedButton(onClick = actions.encourage, enabled = ui.foreground && ui.run == null && !ui.retired,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-encourage")) { Text("给我一点鼓励") }
+                TextButton(onClick = actions.quiet, enabled = ui.foreground && !ui.retired,
+                    modifier = Modifier.heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-quiet")) { Text("安静陪伴") }
             }
-        }, confirmButton = { TextButton(onClick = onClose) { Text("关闭陪伴面板") } })
+        }, confirmButton = { TextButton(onClick = actions.close, modifier = Modifier.heightIn(min = 48.dp).aiyouFocusOutline()) { Text("关闭陪伴面板") } })
 }

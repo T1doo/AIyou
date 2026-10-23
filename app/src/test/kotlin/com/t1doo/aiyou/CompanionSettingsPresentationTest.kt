@@ -16,6 +16,10 @@ import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.designsystem.MascotState
+import com.t1doo.aiyou.designsystem.CompanionPose
+import com.t1doo.aiyou.designsystem.MascotAssetProvider
+import com.t1doo.aiyou.designsystem.LuluMascotAssets
+import com.t1doo.aiyou.designsystem.NeutralMascotAssets
 import com.t1doo.aiyou.ui.*
 import com.t1doo.aiyou.records.LocalRecordUiState
 import com.t1doo.aiyou.model.ProcessingPolicy
@@ -34,6 +38,137 @@ class CompanionSettingsPresentationTest {
     @get:Rule val compose = createComposeRule(effectContext = object : androidx.compose.ui.MotionDurationScale {
         override val scaleFactor = 1f
     })
+
+    @Test @Config(qualifiers = "w320dp-h640dp")
+    fun explicitDoubleFontInteractionsCancelAndRetireWithoutWritingOrReopeningThePanel() {
+        val display = mutableStateOf(UiPreferencesState(UiPreferences(reduceMotion = true), ready = true))
+        val local = LocalRecordUiState(ready = true, opening = false, text = "合成互动前草稿")
+        var writes = 0
+        var observed = CompanionInteraction.Snapshot()
+        var motion = 0f
+        var callbacks: CompanionDialogActions? = null
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f),
+                LocalCompanionInteractionObserver provides { state, value, actions -> observed = state; motion = value; callbacks = actions }) {
+                AIyouTheme { AIyouApp(local = local, display = display.value, onSave = { writes++ }) }
+            }
+        }
+        compose.onNodeWithContentDescription("打开陪伴伙伴").performClick()
+        compose.onNodeWithTag("companion-artwork-fallback").assertDoesNotExist()
+        compose.onNodeWithTag("companion-greet").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithText("你好，慢慢记录就好。").performScrollTo().assertIsDisplayed()
+        compose.runOnIdle { assertEquals(0f, motion, 0f) }
+        compose.onNodeWithTag("companion-quiet").performScrollTo().assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(CompanionPose.Idle, observed.pose); assertEquals(CompanionPose.Idle, observed.feedback) }
+        compose.onNodeWithTag("companion-encourage").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithText("按自己的节奏来，小小一步也很好。").performScrollTo().assertIsDisplayed()
+        val retired = checkNotNull(callbacks)
+        compose.onNodeWithText("关闭陪伴面板").assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithContentDescription("打开陪伴伙伴").performClick()
+        compose.runOnIdle {
+            retired.greet(); retired.encourage(); retired.quiet(); retired.close()
+            assertEquals(CompanionPose.Idle, observed.feedback); assertEquals(0, writes)
+        }
+        compose.onNodeWithText("关闭陪伴面板").assertIsDisplayed()
+        val hidden = checkNotNull(callbacks)
+        compose.runOnIdle { display.value = display.value.copy(preferences = display.value.preferences.copy(showCompanion = false)) }
+        compose.onNodeWithText("关闭陪伴面板").assertDoesNotExist()
+        compose.runOnIdle { hidden.greet(); hidden.encourage(); hidden.close() }
+        compose.onNodeWithContentDescription("打开陪伴伙伴").assertDoesNotExist()
+        compose.runOnIdle { display.value = display.value.copy(preferences = display.value.preferences.copy(showCompanion = true)) }
+        compose.onNodeWithText("关闭陪伴面板").assertDoesNotExist()
+        compose.onNodeWithContentDescription("此刻，想记下什么").assertTextEquals(local.text)
+        compose.runOnIdle { assertEquals(0, writes) }
+    }
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun finiteInteractionMotionStopsOnReductionAndBackgroundWithoutAutomaticReplay() {
+        val owner = object : androidx.lifecycle.LifecycleOwner {
+            val registry = androidx.lifecycle.LifecycleRegistry(this)
+            override val lifecycle: androidx.lifecycle.Lifecycle get() = registry
+        }
+        val visibleOwner = mutableStateOf<androidx.lifecycle.LifecycleOwner>(owner)
+        val artwork = mutableStateOf<MascotAssetProvider>(LuluMascotAssets)
+        val allowed = mutableStateOf(true)
+        var closes = 0
+        var observed = CompanionInteraction.Snapshot()
+        var motion = 0f
+        var callbacks: CompanionDialogActions? = null
+        val frames = org.json.JSONArray()
+        val output = java.io.File("build/reports/companion-motion/interactions").apply { mkdirs() }
+        fun pixels(name: String? = null): IntArray {
+            val bitmap = compose.onNodeWithTag("companion-interaction-artwork").performScrollTo().assertIsDisplayed()
+                .captureToImage().asAndroidBitmap()
+            if (name != null) {
+                java.io.File(output, "$name.png").outputStream().use {
+                    assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+                }
+                frames.put(org.json.JSONObject().put("file", "$name.png").put("pose", observed.pose.name)
+                    .put("requested_motion", motion).put("virtual_time_ms", compose.mainClock.currentTime))
+                java.io.File(output, "frames.json").writeText(org.json.JSONObject()
+                    .put("source_sha", System.getenv("GITHUB_SHA") ?: "local-unbound")
+                    .put("kind", "Actual controlled-clock native Compose captures; independent poses, not continuous animation or device performance")
+                    .put("frames", frames).toString(2))
+            }
+            return IntArray(bitmap.width * bitmap.height).also { bitmap.getPixels(it, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height) }
+        }
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { owner.registry.currentState = androidx.lifecycle.Lifecycle.State.RESUMED }
+        compose.setContent {
+            CompositionLocalProvider(androidx.lifecycle.compose.LocalLifecycleOwner provides visibleOwner.value,
+                LocalCompanionInteractionObserver provides { state, value, actions -> observed = state; motion = value; callbacks = actions }) {
+                AIyouTheme { CompanionDialog(onClose = { closes++ }, motionAllowed = allowed.value, assets = artwork.value) }
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        val idlePixels = pixels("00-idle")
+        compose.onNodeWithTag("companion-greet").performScrollTo().performClick()
+        compose.mainClock.advanceTimeByFrame(); compose.mainClock.advanceTimeBy(64)
+        compose.onNodeWithTag("companion-artwork-fallback").assertDoesNotExist()
+        val greetingPixels = pixels("01-greeting")
+        assertFalse("Explicit greeting renders a distinct actual pose", idlePixels.contentEquals(greetingPixels))
+        compose.runOnIdle { assertTrue(kotlin.math.abs(motion) > .01f); allowed.value = false }
+        compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle { assertEquals(0f, motion, 0f); allowed.value = true }
+        repeat(4) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
+        compose.runOnIdle { assertEquals(0f, motion, 0f); assertNull(observed.run) }
+        compose.onNodeWithTag("companion-encourage").performScrollTo().performClick()
+        compose.mainClock.advanceTimeByFrame(); compose.mainClock.advanceTimeBy(96)
+        compose.onNodeWithTag("companion-artwork-fallback").assertDoesNotExist()
+        assertFalse("Encouragement renders its own actual pose", greetingPixels.contentEquals(pixels("02-encouraging")))
+        compose.runOnIdle { assertTrue(motion > 0f); owner.registry.currentState = androidx.lifecycle.Lifecycle.State.STARTED }
+        compose.mainClock.advanceTimeByFrame()
+        assertArrayEquals("Background cancels back to the quiet raster", idlePixels, pixels("03-background-still"))
+        compose.onNodeWithTag("companion-greet").assertIsNotEnabled()
+        compose.runOnIdle { checkNotNull(callbacks).encourage(); assertEquals(CompanionPose.Idle, observed.pose); assertEquals(0f, motion, 0f) }
+        compose.runOnIdle { owner.registry.currentState = androidx.lifecycle.Lifecycle.State.RESUMED }
+        repeat(4) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
+        compose.runOnIdle { assertNull(observed.run); assertEquals(0f, motion, 0f) }
+        compose.onNodeWithTag("companion-encourage").performScrollTo().performClick()
+        repeat(40) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
+        compose.runOnIdle { assertNull(observed.run); assertEquals(CompanionPose.Idle, observed.pose); assertEquals(0f, motion, .001f) }
+        val oldOwnerCallbacks = checkNotNull(callbacks)
+        val replacement = object : androidx.lifecycle.LifecycleOwner {
+            val registry = androidx.lifecycle.LifecycleRegistry(this)
+            override val lifecycle: androidx.lifecycle.Lifecycle get() = registry
+        }
+        compose.runOnIdle { replacement.registry.currentState = androidx.lifecycle.Lifecycle.State.RESUMED; visibleOwner.value = replacement }
+        repeat(4) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
+        compose.runOnIdle {
+            oldOwnerCallbacks.greet(); oldOwnerCallbacks.encourage(); oldOwnerCallbacks.close()
+            assertEquals(CompanionPose.Idle, observed.pose); assertEquals(0, closes)
+        }
+        compose.onNodeWithTag("companion-greet").assertIsEnabled()
+        compose.runOnIdle { artwork.value = NeutralMascotAssets }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("companion-artwork-fallback").performScrollTo().assertIsDisplayed()
+        val staticFallback = pixels()
+        compose.runOnIdle { checkNotNull(callbacks).greet() }
+        compose.mainClock.advanceTimeByFrame(); compose.mainClock.advanceTimeBy(64)
+        compose.runOnIdle { assertTrue(kotlin.math.abs(motion) > .01f) }
+        assertArrayEquals("Unavailable pose must keep the actual fallback pixels static", staticFallback, pixels())
+    }
 
     @Test @Config(sdk = [35], qualifiers = "w320dp-h640dp")
     fun captureDefaultHasExplicitLocalChoicesAndRetiredOrUnconfirmedActionsCannotChangeIt() {

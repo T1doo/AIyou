@@ -437,6 +437,8 @@ for label, folder, minimum in targets:
             "failedWriteKeepsConfirmedValuesAndRetryPersistsTheRequestedChoice",
             "corruptPreferencesArePreservedAndNeverFlashTheCompanion")
         additional["com.t1doo.aiyou.CompanionSettingsPresentationTest"] = (
+            "explicitDoubleFontInteractionsCancelAndRetireWithoutWritingOrReopeningThePanel",
+            "finiteInteractionMotionStopsOnReductionAndBackgroundWithoutAutomaticReplay",
             "captureDefaultHasExplicitLocalChoicesAndRetiredOrUnconfirmedActionsCannotChangeIt",
             "companionIsLocalOptionalAndSettingsReturnPreservesCapture",
             "narrowDoubleFontSettingsHaveOneSwitchTargetAndReachableLicenseAndRetry",
@@ -446,6 +448,11 @@ for label, folder, minimum in targets:
             "oneNodEndsAndReducedMotionOrRemountCannotReplayIt",
             "successfulReadbackAcknowledgementDoesNotReplayOnSettingsReturn",
             "actualMotionGateTracksLifecycleSystemScalePowerSaverAndUserPreference")
+        additional["com.t1doo.aiyou.ui.CompanionInteractionTest"] = (
+            "onlyExplicitForegroundActionsStartAndBusyDoubleClicksCannotReplaceTheirRun",
+            "quietCancelsAndOldCompletionCannotFinishTheNextExplicitAction",
+            "backgroundCancelsAndForegroundReturnDoesNotReplayAnOldAction",
+            "retirementFencesBlockedCompletionAndAllOldCallbacksWithoutAffectingNewPanel")
         additional["com.t1doo.aiyou.PlatformJpegPipelineTest"] = (
             "gridJpegUsesSmallerAllocationAndKeepsExifOrientationAndOriginalBytes",
             "nativeDecoderAppliesAllEightExifDirectionsOnceWithCorrectPixelsAndBothEndianHeaders",

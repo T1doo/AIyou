@@ -24,6 +24,28 @@ reference material are excluded from the repository and APK.
 - SHA-256: `34ee4a54e3a778c5ef31e030f9f3ee65c3eb6f7a5004fcd25b10a51c70b409bf`
 - Pose: seated greeting; expression does not assert any record-processing result
 
+## Explicit local interactions
+
+Two additional reference-faithful poses were generated with Codex's image tool
+and visually reviewed on 2026-10-23 under the same project authorization:
+
+| Bundled PNG | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `lulu_wave.png` | 903871 | `bb8c267d0d312d93a120c11fd4a5a1f7243fd7ed1d1ada6ebf4b23d4ac1c6232` |
+| `lulu_encourage.png` | 883239 | `9cc2e5483f1d4f1d9abe9a4a76937d3d243ef981204ec437a75907a1e0371f6d` |
+
+Both are unchanged 1254 × 1254 RGBA originals in the same drawable-nodpi folder.
+These are distinct still poses, not consecutive animation frames. Their full
+canvas and alpha remain unchanged; very-low-alpha edge noise is present in the
+originals. User-triggered motion is a finite Compose transform, not proof of
+anatomically continuous animation or device smoothness. Thinking and sleepy
+reference poses are not bundled or connected in this development slice.
+
+`CompanionPose` is separate from record-processing `MascotState`. The interaction
+panel can only greet, encourage, return to quiet, or close; it receives no record,
+task, model, permission, or storage ports. Reduced-motion mode shows a static pose
+briefly; backgrounding or closing retires the current action without replay.
+
 ## Runtime boundary
 
 `MascotAssetProvider.Artwork` receives presentation state only. The illustration
