@@ -99,10 +99,43 @@ class CompanionSettingsPresentationTest {
         var callbacks: CompanionDialogActions? = null
         val frames = org.json.JSONArray()
         val output = java.io.File("build/reports/companion-motion/interactions").apply { mkdirs() }
+        val observations = org.json.JSONArray()
+        val runs = java.util.IdentityHashMap<CompanionInteraction.Run, Int>()
+        var phase = "setup"
+        var button = org.json.JSONObject()
+        var lastObservation = org.json.JSONObject()
+        fun observe(point: String) {
+            check(observations.length() < 512) { "Bounded interaction trace exceeded" }
+            val run = observed.run
+            val runId = run?.let { runs.getOrPut(it) { runs.size + 1 } }
+            lastObservation = org.json.JSONObject().put("point", point).put("phase", phase)
+                .put("virtual_time_ms", compose.mainClock.currentTime)
+                .put("owner", visibleOwner.value.lifecycle.currentState.name).put("allowed", allowed.value)
+                .put("run", runId ?: org.json.JSONObject.NULL).put("pose", observed.pose.name)
+                .put("feedback", observed.feedback.name).put("foreground", observed.foreground)
+                .put("retired", observed.retired).put("motion", motion).put("button", button)
+            observations.put(lastObservation)
+            java.io.File(output, "motion-probe.json").writeText(org.json.JSONObject()
+                .put("source_sha", System.getenv("GITHUB_SHA") ?: "local-unbound")
+                .put("method", "finiteInteractionMotionStopsOnReductionAndBackgroundWithoutAutomaticReplay")
+                .put("kind", "Read-only controlled-clock state observations; not device evidence")
+                .put("observations", observations).toString(2))
+        }
         fun pixels(name: String? = null): IntArray {
+            fun requireRequestedPose() {
+                val expected = when (name) {
+                    "01-greeting" -> CompanionPose.Greeting
+                    "02-encouraging" -> CompanionPose.Encouraging
+                    else -> CompanionPose.Idle
+                }
+                assertEquals("Requested capture $name: $lastObservation", expected, observed.pose)
+                if (expected != CompanionPose.Idle) assertNotNull("Requested capture $name must have an active run: $lastObservation", observed.run)
+            }
+            if (name != null) compose.runOnIdle { observe("capture-before:$name"); requireRequestedPose() }
             val bitmap = compose.onNodeWithTag("companion-interaction-artwork").performScrollTo().assertIsDisplayed()
                 .captureToImage().asAndroidBitmap()
             if (name != null) {
+                compose.runOnIdle { observe("capture-after:$name"); requireRequestedPose() }
                 java.io.File(output, "$name.png").outputStream().use {
                     assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
                 }
@@ -121,6 +154,7 @@ class CompanionSettingsPresentationTest {
             CompositionLocalProvider(androidx.lifecycle.compose.LocalLifecycleOwner provides visibleOwner.value,
                 LocalCompanionInteractionObserver provides { state, value, actions ->
                     observed = state; motion = value; callbacks = actions
+                    observe("composition")
                     if (watchQuiet && state.run == null) quietMotion += value
                 }) {
                 AIyouTheme { CompanionDialog(onClose = { closes++ }, motionAllowed = allowed.value, assets = artwork.value) }
@@ -138,11 +172,30 @@ class CompanionSettingsPresentationTest {
         compose.runOnIdle { assertEquals(0f, motion, 0f); allowed.value = true }
         repeat(4) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
         compose.runOnIdle { assertEquals(0f, motion, 0f); assertNull(observed.run) }
-        compose.onNodeWithTag("companion-encourage").performScrollTo().performClick()
-        compose.mainClock.advanceTimeByFrame(); compose.mainClock.advanceTimeBy(96)
+        val encourage = compose.onNodeWithTag("companion-encourage").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        val node = encourage.fetchSemanticsNode()
+        compose.runOnIdle {
+            phase = "encouragement"
+            val bounds = node.boundsInRoot
+            button = org.json.JSONObject().put("displayed_assertion", true)
+                .put("enabled", !node.config.contains(SemanticsProperties.Disabled))
+                .put("left", bounds.left).put("top", bounds.top).put("right", bounds.right).put("bottom", bounds.bottom)
+            observe("before")
+        }
+        encourage.performClick()
+        compose.runOnIdle { observe("afterClick") }
+        compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle {
+            observe("firstFrame")
+            assertEquals("First frame feedback: $lastObservation", CompanionPose.Encouraging, observed.feedback)
+            assertEquals("First frame pose: $lastObservation", CompanionPose.Encouraging, observed.pose)
+            assertNotNull("First frame active run: $lastObservation", observed.run)
+        }
+        compose.mainClock.advanceTimeBy(96)
+        compose.runOnIdle { observe("96ms") }
         compose.onNodeWithTag("companion-artwork-fallback").assertDoesNotExist()
         assertFalse("Encouragement renders its own actual pose", greetingPixels.contentEquals(pixels("02-encouraging")))
-        compose.runOnIdle { assertTrue(motion > 0f); watchQuiet = true }
+        compose.runOnIdle { assertTrue("Active encouragement before quiet: $lastObservation", motion > 0f); watchQuiet = true }
         compose.onNodeWithTag("companion-quiet").performScrollTo().assertIsDisplayed().performClick()
         compose.mainClock.advanceTimeByFrame()
         compose.runOnIdle {
