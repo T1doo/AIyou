@@ -7,7 +7,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalConfiguration
 
 /** Static AI-generated artwork, reviewed against the user's character references.
  * State labels still come from the application; the illustration never claims a save succeeded.
@@ -17,10 +18,11 @@ object LuluMascotAssets : MascotAssetProvider {
 
     @Composable
     override fun Artwork(state: MascotState, modifier: Modifier) {
-        val resources = LocalContext.current.resources
+        val resources = LocalResources.current
+        val configuration = LocalConfiguration.current
         // Bundled 1254px source; decode at about 627px for the 56dp/112dp placements.
         // No network, full-resolution decode, mutable user data or image-loading dependency.
-        val bitmap = remember(resources) {
+        val bitmap = remember(resources, configuration) {
             BitmapFactory.decodeResource(resources, R.drawable.lulu_hello,
                 BitmapFactory.Options().apply { inSampleSize = 2; inScaled = false })?.asImageBitmap()
         }
