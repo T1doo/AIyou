@@ -166,7 +166,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                                 horizontalArrangement=Arrangement.SpaceBetween,verticalArrangement=Arrangement.spacedBy(4.dp)) {
                                 Text(if(ui.policyChange!=null) "处理范围待核对" else if(ui.draft!!.policy==com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE)
                                     "不参与 AI · 仅作手账" else "仅本机处理 · 不发远端",
-                                    Modifier.align(Alignment.CenterVertically),style=MaterialTheme.typography.bodySmall.copy(lineBreak=LineBreak.Heading),
+                                    Modifier.width(IntrinsicSize.Max).align(Alignment.CenterVertically),style=MaterialTheme.typography.bodySmall.copy(lineBreak=LineBreak.Heading),
                                     color=if(ui.policyChange!=null) AIyouColors.error else AIyouColors.primary)
                                 TextButton(onClick={reveal("processing-policy")},modifier=Modifier.heightIn(min=48.dp).testTag("mixed-policy-details")){Text("范围详情")}
                             }
