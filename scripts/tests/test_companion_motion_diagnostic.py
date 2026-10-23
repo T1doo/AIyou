@@ -52,9 +52,12 @@ class CompanionDiagnosticTests(unittest.TestCase):
         observations = []
         for phase, points in probe.CHECKPOINTS.items():
             for point in points:
-                observations.append({'phase': phase, 'point': point})
+                semantics = {tag: {'count': 1, 'nodes': [{'disabled': phase == 'background',
+                              'left': 24, 'top': 20, 'right': 336, 'bottom': 68}]} for tag in probe.BUTTON_TAGS}
+                row = {'phase': phase, 'point': point, 'button': {'semantics': semantics}}
+                observations.append(row)
                 if phase in probe.HOST_PHASES and point == 'before':
-                    observations.append({'phase': phase, 'point': 'publicationFrame-1'})
+                    observations.append({**row, 'point': 'publicationFrame-1'})
         data = {'source_sha': '1' * 40, 'method': probe.METHOD, 'observations': observations}
         path.write_text(json.dumps(data))
         for name in probe.FRAMES:
@@ -71,7 +74,8 @@ class CompanionDiagnosticTests(unittest.TestCase):
         for event in [{'repository': {'private': True}, 'head_commit': {'message': probe.MESSAGE}},
                       {'repository': {'private': False}, 'head_commit': {'message': probe.MESSAGE + ' extra'}},
                       {'repository': {'private': False}, 'head_commit': {'message': '[ui-companion-probe] b438 finite motion admission'}},
-                      {'repository': {'private': False}, 'head_commit': {'message': '[ui-companion-probe] b438 all action admissions'}}]:
+                      {'repository': {'private': False}, 'head_commit': {'message': '[ui-companion-probe] b438 all action admissions'}},
+                      {'repository': {'private': False}, 'head_commit': {'message': '[ui-companion-probe] b438 host state publication'}}]:
             with self.assertRaises(ValueError):
                 probe.request(self.env(), event)
 
@@ -126,7 +130,9 @@ class CompanionDiagnosticTests(unittest.TestCase):
 
     def test_host_publication_requires_ordered_bounded_frames_and_actual_consumption(self):
         for kind in ('one', 'four', 'missing-frame', 'duplicate-frame', 'reversed-frames', 'five',
-                     'missing-consumed', 'duplicate-consumed', 'late-before', 'unconsumed'):
+                     'missing-consumed', 'duplicate-consumed', 'late-before', 'unconsumed',
+                     'disabled-consumed', 'encourage-disabled', 'quiet-disabled', 'duplicate-button', 'missing-button', 'missing-buttons', 'enabled-background',
+                     'retired-disabled', 'pending-disabled', 'pending-missing-button', 'missing-frame-semantics'):
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp); folder = root / probe.OUTPUT; folder.mkdir(parents=True)
                 (folder / 'admission.json').write_text(json.dumps({'source_sha': '1' * 40, 'run_id': 123, 'run_attempt': 1, 'started_ns': 0}))
@@ -134,23 +140,37 @@ class CompanionDiagnosticTests(unittest.TestCase):
                 trace, data = self.trace(root)
                 phase = 'fallback-asset'
                 rows = data['observations']
-                frame_index = next(i for i, row in enumerate(rows) if row == {'phase': phase, 'point': 'publicationFrame-1'})
+                frame_index = next(i for i, row in enumerate(rows) if (row['phase'], row['point']) == (phase, 'publicationFrame-1'))
                 if kind in ('four', 'five'):
                     count = 4 if kind == 'four' else 5
-                    rows[frame_index:frame_index + 1] = [{'phase': phase, 'point': f'publicationFrame-{i}'} for i in range(1, count + 1)]
+                    rows[frame_index:frame_index + 1] = [{**rows[frame_index], 'point': f'publicationFrame-{i}'} for i in range(1, count + 1)]
                 elif kind == 'missing-frame': rows.pop(frame_index)
                 elif kind == 'duplicate-frame': rows.insert(frame_index, dict(rows[frame_index]))
                 elif kind == 'reversed-frames': rows[frame_index:frame_index + 1] = [
-                    {'phase': phase, 'point': 'publicationFrame-2'}, {'phase': phase, 'point': 'publicationFrame-1'}]
-                elif kind == 'missing-consumed': rows.remove({'phase': phase, 'point': 'consumed'})
+                     {**rows[frame_index], 'point': 'publicationFrame-2'}, {**rows[frame_index], 'point': 'publicationFrame-1'}]
+                elif kind == 'missing-consumed': rows.remove(next(row for row in rows if (row['phase'], row['point']) == (phase, 'consumed')))
                 elif kind == 'duplicate-consumed': rows.append({'phase': phase, 'point': 'consumed'})
                 elif kind == 'late-before':
-                    row = {'phase': phase, 'point': 'before'}; rows.remove(row); rows.append(row)
+                    row = next(row for row in rows if (row['phase'], row['point']) == (phase, 'before')); rows.remove(row); rows.append(row)
                 elif kind == 'unconsumed': rows.append({'phase': phase, 'point': 'unconsumed'})
+                elif kind in ('disabled-consumed', 'encourage-disabled', 'quiet-disabled', 'duplicate-button', 'missing-button', 'missing-buttons', 'enabled-background', 'retired-disabled', 'pending-disabled', 'pending-missing-button', 'missing-frame-semantics'):
+                    target_phase, target_point = (phase, 'consumed')
+                    if kind == 'enabled-background': target_phase = 'background'
+                    elif kind == 'retired-disabled': target_phase, target_point = 'retired-owner-callbacks', 'afterCallbacks'
+                    elif kind in ('pending-disabled', 'pending-missing-button', 'missing-frame-semantics'): target_point = 'publicationFrame-1'
+                    row = next(row for row in rows if (row['phase'], row['point']) == (target_phase, target_point))
+                    # Independent JSON values: changing an in-progress sample must not alter a later confirmed sample.
+                    row['button'] = json.loads(json.dumps(row['button']))
+                    tag = {'encourage-disabled': 'companion-encourage', 'quiet-disabled': 'companion-quiet'}.get(kind, 'companion-greet')
+                    sample = row['button']['semantics'][tag]
+                    if kind in ('missing-buttons', 'missing-frame-semantics'): row['button'] = {}
+                    elif kind == 'duplicate-button': sample['count'] = 2; sample['nodes'] *= 2
+                    elif kind in ('missing-button', 'pending-missing-button'): sample['count'] = 0; sample['nodes'] = []
+                    else: sample['nodes'][0]['disabled'] = kind != 'enabled-background'
                 trace.write_text(json.dumps(data))
                 with patch.object(probe, 'git', return_value='1' * 40):
                     result = probe.collect(root, self.env())
-                self.assertEqual('PASS' if kind in ('one', 'four') else 'FAIL', result['status'])
+                self.assertEqual('PASS' if kind in ('one', 'four', 'pending-disabled', 'pending-missing-button') else 'FAIL', result['status'])
                 self.assertEqual(['fallback-asset'] if kind == 'unconsumed' else [], result['trace']['unconsumed_phases'])
                 self.assertEqual([row['point'] for row in rows if row['phase'] == phase and row['point'].startswith('publicationFrame-')],
                                  result['trace']['publication_frames_by_phase'][phase])
@@ -162,7 +182,7 @@ class CompanionDiagnosticTests(unittest.TestCase):
                          hashlib.sha256((self.formal_workflow().rstrip('\n') + '\n').encode()).hexdigest())
         selector = ("github.event_name == 'push' && github.repository == 'T1doo/AIyou' && "
                     "github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && "
-                    "github.event.head_commit.message == '[ui-companion-probe] b438 host state publication'")
+                    "github.event.head_commit.message == '[ui-companion-probe] b438 actual button publication'")
         self.assertEqual(5, workflow.count(selector))
         self.assertEqual(3, workflow.count('    if: ${{ !(' + selector + ') }}'))
         self.assertEqual(1, workflow.count('    if: ${{ ' + selector + ' }}'))

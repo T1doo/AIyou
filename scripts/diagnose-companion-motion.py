@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -12,10 +13,10 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 PRODUCTION = 'b4380bdb17e52681609a552c8542de1b705f199d'
-TEST_OWNER = 'c5e7360cd10cb79bc4024e4b16d84949d94e946d'
+TEST_OWNER = 'e0db9e90c10a8e4f61490f5c2fbb1b5d845755c8'
 SOURCE = 'app/src/test/kotlin/com/t1doo/aiyou/CompanionSettingsPresentationTest.kt'
-TEST_SHA256 = '1ed8d96531f0197f797cce34c2c721dde5b414da02a30bb39c4dcac2994e920e'
-MESSAGE = '[ui-companion-probe] b438 host state publication'
+TEST_SHA256 = '2337c497f0f03737ba562155f539ead955b36459047c3c3dacbdc83fc7457c39'
+MESSAGE = '[ui-companion-probe] b438 actual button publication'
 REF = 'refs/heads/codex/d03-short-audio-design-20261020'
 CLASS = 'com.t1doo.aiyou.CompanionSettingsPresentationTest'
 METHOD = 'finiteInteractionMotionStopsOnReductionAndBackgroundWithoutAutomaticReplay'
@@ -27,6 +28,7 @@ TRACE = 'app/build/reports/companion-motion/interactions/motion-probe.json'
 FRAMES = ('00-idle.png', '01-greeting.png', '02-encouraging.png', '02b-quiet-still.png', '03-background-still.png')
 HOST_PHASES = ('initial-owner', 'motion-disabled', 'motion-enabled', 'background',
                'foreground-return', 'owner-replacement', 'fallback-asset')
+BUTTON_TAGS = ('companion-greet', 'companion-encourage', 'companion-quiet')
 CHECKPOINTS = {
     'greeting-before-reduction': ('scrollStable', 'before', 'afterClick', 'firstFrame', '64ms'),
     'encouragement-before-quiet': ('scrollStable', 'before', 'afterClick', 'firstFrame', '96ms'),
@@ -34,6 +36,7 @@ CHECKPOINTS = {
     'encouragement-before-background': ('scrollStable', 'before', 'afterClick', 'firstFrame', '96ms'),
     'encouragement-natural-finish': ('scrollStable', 'before', 'afterClick', 'firstFrame', '96ms', 'settled'),
     'fallback-greeting': ('scrollStable', 'before', 'afterClick', 'firstFrame', '64ms'),
+    'retired-owner-callbacks': ('before', 'afterCallbacks'),
     **{phase: ('before', 'consumed', 'settled') for phase in HOST_PHASES},
 }
 
@@ -45,6 +48,27 @@ def require(value, message):
 
 def git(root, *args):
     return subprocess.check_output(['git', *args], cwd=root, timeout=10).decode().strip()
+
+
+def buttons_match(row, enabled=None):
+    samples = row.get('button', {}).get('semantics', {})
+    if not isinstance(samples, dict):
+        return False
+    for tag in BUTTON_TAGS:
+        sample = samples.get(tag, {})
+        if not isinstance(sample, dict):
+            return False
+        nodes = sample.get('nodes', [])
+        count = sample.get('count')
+        if type(count) is not int or count < 0 or not isinstance(nodes, list) or count != len(nodes):
+            return False
+        if any(not isinstance(node, dict) or type(node.get('disabled')) is not bool or
+               any(type(node.get(key)) not in (int, float) or not math.isfinite(node[key])
+                   for key in ('left', 'top', 'right', 'bottom')) for node in nodes):
+            return False
+        if enabled is not None and (count != 1 or nodes[0]['disabled'] is not (not enabled)):
+            return False
+    return True
 
 
 def request(env, event):
@@ -129,14 +153,27 @@ def collect(root, env):
                                      if current == phase and point.startswith('publicationFrame-')]
                               for phase in HOST_PHASES}
         unconsumed = [phase for phase, point in points if point == 'unconsumed']
+        semantics_mismatches = []
+        for row in observations:
+            phase, point = row['phase'], row['point']
+            if phase in HOST_PHASES and (point in CHECKPOINTS[phase] or point.startswith('publicationFrame-')):
+                enabled = phase != 'background' if point in ('consumed', 'settled') else None
+            elif phase == 'retired-owner-callbacks' and point in CHECKPOINTS[phase]:
+                enabled = True
+            else:
+                continue
+            if not buttons_match(row, enabled):
+                semantics_mismatches.append((phase, point))
         result['trace'] = {'path': TRACE, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
                            'observations': len(observations),
                            'publication_frames_by_phase': publication_frames, 'unconsumed_phases': unconsumed,
+                           'button_semantics_mismatches': semantics_mismatches,
                            'checkpoints_by_phase': {phase: [point for point in expected if (phase, point) in points]
                                                     for phase, expected in CHECKPOINTS.items()}}
         require(all(points.count((phase, point)) == 1 for phase, expected in CHECKPOINTS.items() for point in expected),
                 'Incomplete/duplicate phase-and-point trace remains FAIL')
         require(not unconsumed, 'An unconsumed host publication remains FAIL')
+        require(not semantics_mismatches, 'Published/retired-owner actual button semantics differ; remains FAIL')
         for phase, frames in publication_frames.items():
             require(1 <= len(frames) <= 4 and frames == [f'publicationFrame-{i}' for i in range(1, len(frames) + 1)],
                     'Host publication must have one to four consecutive frames: ' + phase)
