@@ -59,6 +59,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
     val recentIds=recent.map { it.id }
     var seenIds by remember(controller) { mutableStateOf(recentIds) }
     val scope=rememberCoroutineScope()
+    val showReturnToInput by remember(listState) { derivedStateOf { listState.firstVisibleItemIndex>1 } }
     var inputFocused by remember(controller) { mutableStateOf(false) }
     val paperOutline by animateColorAsState(if(inputFocused) AIyouColors.primary else AIyouColors.outlineDecorative,
         animationSpec=tween(if(motionAllowed) 160 else 0),label="notebook-input-outline")
@@ -277,7 +278,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                     modifier=Modifier.heightIn(min=48.dp).testTag("mixed-refresh")){Text("重新核对加密草稿")}
             }
         }
-        if(enabled && listState.firstVisibleItemIndex>1) FilledTonalButton(onClick={reveal("composer")},
+        if(enabled && showReturnToInput) FilledTonalButton(onClick={reveal("composer")},
             shape=RoundedCornerShape(16.dp),modifier=Modifier.padding(horizontal=16.dp,vertical=8.dp).fillMaxWidth().heightIn(min=48.dp)
                 .testTag("mixed-jump-composer")) { Text(if(ui.discardPending) "回到清空核对" else "回到输入") }
     }
