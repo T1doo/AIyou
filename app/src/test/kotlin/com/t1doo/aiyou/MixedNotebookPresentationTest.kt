@@ -2,6 +2,10 @@ package com.t1doo.aiyou
 
 import android.graphics.BitmapFactory
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.dp
@@ -55,6 +59,28 @@ class MixedNotebookPresentationTest {
         compose.onNodeWithTag("companion-entry").assertIsDisplayed()
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
         compose.onNodeWithTag("mixed-text").assertIsDisplayed().assertIsEnabled()
+        compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
+    }
+
+    @Test @Config(qualifiers="w640dp-h320dp")
+    fun emptyLandscapeDoubleFontHasReachableStartAndFocusedComposerWithoutWriting() {
+        val draft=CaptureDraft("00c696bf-c102-4c63-aea2-246fd3be015c",1,"",emptyList())
+        val local=LocalRecordUiState(ready=true,opening=false,supportsMixedCapture=true,
+            mixedCapture=MixedCaptureUiState(draft=draft,supportsProcessingChoice=true))
+        var writes=0
+        val controller=MixedCaptureController({local},{},{writes++;false},{error("No media input")},Clock.systemUTC())
+        compose.setContent {
+            val density=LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density,2f)) {
+                AIyouTheme { AIyouApp(local=local,mixedCapture=controller,
+                    display=UiPreferencesState(UiPreferences(reduceMotion=true),ready=true)) }
+            }
+        }
+        compose.onNodeWithTag("mixed-jump-composer").assertIsDisplayed().assertIsEnabled()
+            .assertHeightIsAtLeast(48.dp).assertTextEquals("开始记录").performClick()
+        compose.onNodeWithTag("mixed-text").assertIsDisplayed().assertIsEnabled()
+            .performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
+        compose.onNodeWithTag("mixed-text").assertIsFocused()
         compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
     }
 }

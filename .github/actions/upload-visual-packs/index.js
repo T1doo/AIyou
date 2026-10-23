@@ -8,7 +8,7 @@ const {spawnSync} = require('node:child_process');
 const SHA = 'ea165f8d65b6e75b540449e92b4886f43607fa02';
 const MAX_BYTES = 17000000;
 const GROUPS = {now: 28, memories: 28, tasks: 28, components: 112, shell: 2,
-  complete: 14, review: 150, attachments: 60, drafts: 4};
+  complete: 14, review: 154, attachments: 60, drafts: 4};
 const fail = message => { throw new Error(message); };
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const positive = value => Number.isSafeInteger(value) && value > 0;
@@ -35,14 +35,14 @@ function upload(workspace) {
   workspace = fs.realpathSync(workspace);
   const directory = path.join(workspace, 'app/build/outputs/d01-visual-packs');
   const index = JSON.parse(fs.readFileSync(path.join(directory, 'INDEX.json'), 'utf8'));
-  if (index.count !== 426 || index.max_inner_zip_bytes !== MAX_BYTES ||
-      !Array.isArray(index.pngs) || index.pngs.length !== 426 ||
-      !Array.isArray(index.packs) || index.packs.length < 9 || index.packs.length > 426)
-    fail('Require the complete bounded 426-PNG delivery index');
+  if (index.count !== 430 || index.max_inner_zip_bytes !== MAX_BYTES ||
+      !Array.isArray(index.pngs) || index.pngs.length !== 430 ||
+      !Array.isArray(index.packs) || index.packs.length < 9 || index.packs.length > 430)
+    fail('Require the complete bounded 430-PNG delivery index');
   const sourceBytes = fs.readFileSync(path.join(workspace, 'app/build/reports/d01-preview-manifest.json'));
   if (digest(sourceBytes) !== index.source_manifest_sha256) fail('Render source manifest changed before upload');
   const source = JSON.parse(sourceBytes);
-  if (source.count !== 426 || !Array.isArray(source.pngs) || source.pngs.length !== 426)
+  if (source.count !== 430 || !Array.isArray(source.pngs) || source.pngs.length !== 430)
     fail('Require the complete render source manifest');
   const originals = new Map();
   for (const item of index.pngs) {
@@ -75,7 +75,7 @@ function upload(workspace) {
     }
     checkFile(directory, pack);
   }
-  if (seen.size !== 426 || Object.keys(GROUPS).some(group =>
+  if (seen.size !== 430 || Object.keys(GROUPS).some(group =>
       counts[group] !== GROUPS[group] || parts[group] !== totals[group])) fail('Missing original PNG group or part');
   // The preceding pinned upload-artifact step makes its runner action available.
   // This cache layout is checked, never repaired by downloading code or artifacts.

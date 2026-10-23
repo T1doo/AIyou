@@ -6,6 +6,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.os.PersistableBundle
+import androidx.compose.foundation.background
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -157,7 +159,7 @@ fun OriginalReadingScreen(
     // Resolve the current local source on every update; navigation never carries plaintext.
     val entry = local.entries.firstOrNull { it.id == entryId }
     var copyDenied by remember(entry?.id, entry?.currentRevision) { mutableStateOf(false) }
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+    Box(modifier.fillMaxSize().background(AIyouColors.surface), contentAlignment = Alignment.TopCenter) {
         Column(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize()
             .padding(AIyouDimensions.pageNarrow), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
             when {
@@ -311,6 +313,7 @@ fun OriginalReadingScreen(
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-memories")) { Text("事件与当次情绪") }
                         }
                     }
+                    HorizontalDivider(color = AIyouColors.outlineDecorative)
                     local.localProcessing?.takeIf { it.source.sourceId == entry.id && it.source.revision == entry.currentRevision.toLong() }?.let { ui ->
                         localProcessingController?.let { controller ->
                             LocalProcessingDialog(ui, entry, controller) { canUseCandidates(entry.id, entry.currentRevision) }

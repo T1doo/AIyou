@@ -1,5 +1,7 @@
 package com.t1doo.aiyou.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,7 +21,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -73,7 +74,7 @@ fun SettingsScreen(
         val confirmed = currentDisplay
         if (owner.get() && confirmed.ready && !confirmed.busy && !confirmed.saveUnconfirmed) currentChange(update(confirmed.preferences))
     }
-    BoxWithConstraints(modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.surface)) {
         val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize()
@@ -184,9 +185,8 @@ fun SettingsScreen(
 private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
-        Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = AIyouColors.surface) {
-            Column(Modifier.padding(AIyouDimensions.spaceLg), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) { content() }
-        }
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) { content() }
+        HorizontalDivider(Modifier.padding(top = AIyouDimensions.spaceLg), color = AIyouColors.outlineDecorative)
     }
 }
 

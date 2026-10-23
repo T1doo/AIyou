@@ -150,7 +150,8 @@ for label, folder, minimum in targets:
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
         additional["com.t1doo.aiyou.MixedNotebookPresentationTest"] = (
-            "realNotebookUsesBundledLuluOnlyWhenPreferenceIsReadyAndVisibleWithoutWritingRecords",)
+            "realNotebookUsesBundledLuluOnlyWhenPreferenceIsReadyAndVisibleWithoutWritingRecords",
+            "emptyLandscapeDoubleFontHasReachableStartAndFocusedComposerWithoutWriting")
         additional["com.t1doo.aiyou.QuestionKeywordPresentationTest"] = (
             "realAppRequiresExplicitDateAndQueriesOnceThenOpensUnchangedNegativeOriginal",
             "restorationAndActualActivityPauseRetireQuestionWithoutSavingOrQuerying",

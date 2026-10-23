@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
 fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureController,modifier: Modifier=Modifier,
     listState: LazyListState = rememberLazyListState(), onOpenEntry: (String) -> Unit = {}, selectedEntryId: String? = null,
     defaultPolicyUnavailable: Boolean = false,audio:OriginalAudioController?=null,canImportAudio:()->Boolean={true},
-    companion: (@Composable () -> Unit)? = null) {
+    companion: (@Composable () -> Unit)? = null,motionAllowed:Boolean=false) {
     val ui=local.mixedCapture ?: MixedCaptureUiState()
     val playback=audio?.state?.collectAsState()?.value ?: OriginalAudioUi()
     val foreground=audio?.foregroundState?.collectAsState()?.value==true
@@ -55,7 +55,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
         confirmButton={TextButton(onClick=controller::confirmDiscard,enabled=!ui.busy,modifier=Modifier.heightIn(min=48.dp).testTag("mixed-discard-confirm")){Text(if(ui.discardPending) "核对同一次清空" else "确认清空草稿")}},
         dismissButton={TextButton(onClick=controller::cancelDiscard,enabled=!ui.busy){Text(if(ui.discardPending) "稍后核对" else "继续编辑")}})
     Column(modifier.fillMaxSize().background(AIyouColors.surface),horizontalAlignment=Alignment.CenterHorizontally) {
-        if(recentIds.any { it !in seenIds }) TextButton(onClick={scope.launch { listState.animateScrollToItem(0) }},
+        if(recentIds.any { it !in seenIds }) TextButton(onClick={scope.launch { if(motionAllowed) listState.animateScrollToItem(0) else listState.scrollToItem(0) }},
             modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("mixed-new-records")) { Text("有新内容 · 查看今天最近记录") }
         LazyColumn(Modifier.weight(1f).widthIn(max=AIyouDimensions.contentMaxWidth).fillMaxWidth()
             .padding(horizontal=AIyouDimensions.pageWide).testTag("mixed-list"),state=listState,
@@ -68,14 +68,14 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                     }
                     companion?.invoke()
                 }
-                Text("用文字、图片或原音文件记下来。不会发送到远端；本次范围以草稿中的选择为准。",
+                Text("文字、图片、原音都留在本机；处理范围由你逐稿选择。",
                     Modifier.padding(top=12.dp),style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
                 if(defaultPolicyUnavailable) Text("设置暂不可读取；以后新建的草稿暂用不参与 AI。当前草稿范围保持不变，仍可逐稿选择。",
                     modifier=Modifier.padding(top=8.dp).testTag("mixed-default-policy-unavailable"),color=AIyouColors.error) }
             item("recent") {
                 HorizontalDivider(Modifier.padding(top=8.dp,bottom=20.dp),color=AIyouColors.outlineDecorative)
                 Text("今天最近记录",style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
-                Text("按记录时间显示最近 5 条；更多记录可到回忆查看。",Modifier.padding(top=4.dp),
+                if(recent.isNotEmpty()) Text("按记录时间显示最近 5 条；更多记录可到回忆查看。",Modifier.padding(top=4.dp),
                     style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary) }
             if(local.ready && !local.opening && local.error==null && recent.isEmpty()) item("recent-empty") {
                 Text("今天还没有记录，从下面记下此刻。",Modifier.padding(vertical=8.dp),
@@ -193,8 +193,11 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                     modifier=Modifier.heightIn(min=48.dp).testTag("mixed-refresh")){Text("重新核对加密草稿")}
             }
         }
-        if(enabled && recent.isNotEmpty()) TextButton(onClick={scope.launch { listState.animateScrollToItem(2+recent.size) }},
-            modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("mixed-jump-composer")) { Text(if(ui.discardPending) "查看清空核对" else "继续记录") }
+        if(enabled) TextButton(onClick={scope.launch {
+            val target=if(recent.isEmpty()) 3 else 2+recent.size
+            if(motionAllowed) listState.animateScrollToItem(target) else listState.scrollToItem(target)
+        }},
+            modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("mixed-jump-composer")) { Text(if(ui.discardPending) "查看清空核对" else if(recent.isEmpty()) "开始记录" else "继续记录") }
     }
 }
 

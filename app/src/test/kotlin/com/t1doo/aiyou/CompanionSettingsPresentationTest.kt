@@ -3,6 +3,7 @@ package com.t1doo.aiyou
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
@@ -24,6 +25,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Production routes with synthetic record state, actual Compose semantics; not TalkBack/device proof. */
 @RunWith(RobolectricTestRunner::class)
@@ -166,7 +168,8 @@ class CompanionSettingsPresentationTest {
         compose.onNodeWithText("合成保存失败").assertExists()
     }
 
-    @Test fun oneNodEndsAndReducedMotionOrRemountCannotReplayIt() {
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun oneNodEndsAndReducedMotionOrRemountCannotReplayIt() {
         val pulse = mutableStateOf(0L)
         val allowed = mutableStateOf(true)
         val visible = mutableStateOf(true)
@@ -178,14 +181,38 @@ class CompanionSettingsPresentationTest {
             }
         }
         compose.mainClock.advanceTimeByFrame()
+        val frames = org.json.JSONArray()
+        val output = java.io.File("build/reports/companion-motion").apply { mkdirs() }
+        fun frame(name: String): IntArray {
+            val bitmap = compose.onNodeWithTag("companion-entry").captureToImage().asAndroidBitmap()
+            val pixels = IntArray(bitmap.width * bitmap.height)
+            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+            assertTrue("Actual native artwork must render, not an empty surface", pixels.toSet().size > 16)
+            java.io.File(output, "$name.png").outputStream().use {
+                assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+            }
+            frames.put(org.json.JSONObject().put("file", "$name.png")
+                .put("virtual_time_ms", compose.mainClock.currentTime).put("observed_nod", observed)
+                .put("width", bitmap.width).put("height", bitmap.height))
+            java.io.File(output, "frames.json").writeText(org.json.JSONObject()
+                .put("source_sha", System.getenv("GITHUB_SHA") ?: "local-unbound")
+                .put("kind", "Actual Robolectric native graphics captures at controlled Compose clock times; not device video or performance")
+                .put("frames", frames).toString(2))
+            return pixels
+        }
+        val still = frame("00-still")
         compose.runOnIdle { pulse.value++ }
         compose.mainClock.advanceTimeByFrame()
         compose.waitForIdle()
         compose.mainClock.advanceTimeBy(64)
         compose.runOnIdle { assertTrue("One finite nod begins", observed > 0f) }
+        val moving = frame("01-moving")
+        assertFalse("Rendered movement must differ from still artwork", still.contentEquals(moving))
         repeat(30) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
+        assertArrayEquals(still, frame("02-settled"))
         compose.runOnIdle { assertEquals(0f, observed, .001f); allowed.value = false; pulse.value++ }
         repeat(8) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
+        assertArrayEquals(still, frame("03-reduced-motion"))
         compose.runOnIdle { assertEquals(0f, observed, .001f); allowed.value = true }
         repeat(8) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
         compose.runOnIdle { assertEquals(0f, observed, .001f); visible.value = false }

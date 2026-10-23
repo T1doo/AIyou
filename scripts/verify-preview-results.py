@@ -24,7 +24,7 @@ reports = list((root / "app/build/test-results/validateDebugScreenshotTest").rgl
 cases = []
 for report in reports:
     cases.extend(ET.parse(report).getroot().iter("testcase"))
-expected = 4 * len(target_methods) if targeted else 426  # Existing418 plus8 actual mixed-capture notebook renders.
+expected = 4 * len(target_methods) if targeted else 430  # Existing426 plus4 actual full-backup HOME renders.
 if len(cases) != expected:
     raise SystemExit(f"FAIL: expected {expected} actual Preview smoke tests, found {len(cases)}")
 if any(any(case.find(tag) is not None for tag in ("failure", "error", "skipped")) for case in cases):
@@ -52,7 +52,7 @@ if not targeted and (len(complete) != 14 or any(item["height"] <= 2400 for item 
 review = [item for item in manifest if "/ReviewNowRender_" in item["file"] or "/ReviewMemoriesRender_" in item["file"]]
 if not targeted and (len(review) != 4 or any(item["height"] < 2000 for item in review)):
     raise SystemExit("FAIL: require four actual whole-phone-page renders")
-local_methods = ("MixedNotebookEmptyRender", "MixedNotebookRecentRender", "LocalCaptureDiscardRender", "LocalTasksRender", "LocalSettingsRender", "LocalEmptyRender", "LocalRestoredRender", "LocalSavingRender", "LocalSaveFailedRender",
+local_methods = ("FullBackupHomeRender", "MixedNotebookEmptyRender", "MixedNotebookRecentRender", "LocalCaptureDiscardRender", "LocalTasksRender", "LocalSettingsRender", "LocalEmptyRender", "LocalRestoredRender", "LocalSavingRender", "LocalSaveFailedRender",
                  "LocalReadFailedRender", "LocalSavedRender", "LocalRejectedInputRender", "LocalMemoriesRender",
                  "LocalLongListRender", "LocalOriginalReadRender", "LocalMissingOriginalRender", "LocalOriginalReadFailureRender",
                  "LocalOriginalEditRender", "LocalOriginalEditSavingRender", "LocalOriginalEditFailedRender", "LocalOriginalEditConflictRender", "LocalOriginalEditStorageFailedRender", "LocalOriginalHistoryRender", "LocalOriginalHistoryReadRender", "LocalOriginalHistoryLoadingRender", "LocalOriginalHistoryFailedRender", "LocalOriginalHistoryUnavailableRender", "LocalHistoryEditorRender", "LocalHistoryEditorFailedRender", "LocalHistoryEditorUnchangedRender", "LocalHistoryReplacementRender")

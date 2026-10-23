@@ -172,7 +172,7 @@ fun LocalRejectedInputRender() { AIyouTheme { AIyouApp(local = restoredLocal.cop
     inputNotice = "合成超限输入。输入长度上限为 100000，本次输入未替换原草稿，请缩短后重试。")) } }
 
 @PreviewTest @LocalRecordPreviews @Composable
-fun LocalMemoriesRender() { AIyouTheme { AIyouApp(display = UiPreferencesState(UiPreferences(), ready = true), previewDestination = Destination.MEMORIES, local = restoredLocal) } }
+fun LocalMemoriesRender() { NotebookLibraryPreview(fullBackup=false) }
 
 // Whole production task route, including navigation/settings and the optional companion.
 // Local records are synthetic; no task creation/completion or demo proposal is fabricated.
@@ -408,3 +408,42 @@ fun LocalSettingsRender() { AIyouTheme { AIyouApp(previewSettings = true,
 @Preview(name = "陪伴面板大字", widthDp = 320, heightDp = 1000, fontScale = 2f, locale = "zh-rCN")
 @Composable
 fun LocalCompanionRender() { AIyouTheme { CompanionDialog(onClose = {}, motionAllowed = false) } }
+
+// Full production entry points, synthetic local state, and explicitly non-executing
+// actor/SAF ports. This is a layout render, not a storage/navigation execution test.
+@Composable
+private fun NotebookLibraryPreview(fullBackup:Boolean) {
+    val clock=remember { java.time.Clock.fixed(java.time.Instant.parse("2026-10-23T12:00:00Z"),java.time.ZoneOffset.UTC) }
+    val owner=remember { object:com.t1doo.aiyou.domain.UnifiedKeywordRepository {
+        override suspend fun search(keyword:String,scope:com.t1doo.aiyou.domain.UnifiedKeywordScope):com.t1doo.aiyou.domain.UnifiedKeywordSnapshot = error("Preview does not query")
+        override suspend fun resolve(snapshot:com.t1doo.aiyou.domain.UnifiedKeywordSnapshot,item:com.t1doo.aiyou.domain.UnifiedKeywordEvidence?,admit:()->Unit):Boolean = error("Preview does not resolve")
+    } }
+    val local=remember(fullBackup) { restoredLocal.copy(supportsImageTexts=true,supportsAudioTranscripts=true,
+        supportsSourcePreferences=true,supportsMemoryInbox=true,supportsFactRecaps=true,
+        supportsRecordPackages=true,supportsFullBackup=true,supportsOriginalExport=true,supportsRecycleBin=true,
+        unifiedKeywordOwner=owner,recordPackage=if(fullBackup)com.t1doo.aiyou.records.RecordPackageUiState(1,fullMode=true)else null) }
+    val current=remember(local) { {local} }
+    val publish:((LocalRecordUiState)->LocalRecordUiState)->Unit=remember { {} }
+    val enqueue:(suspend(com.t1doo.aiyou.records.EntryRepository)->Unit)->Boolean=remember { {false} }
+    val unified=remember(local) { com.t1doo.aiyou.records.UnifiedKeywordController(current,publish,enqueue) }
+    val images=remember(local) { com.t1doo.aiyou.records.ImageTextController(current,publish,enqueue,clock) }
+    val audio=remember(local) { com.t1doo.aiyou.records.AudioTranscriptController(current,publish,enqueue,clock) }
+    val preferences=remember(local) { com.t1doo.aiyou.records.SourcePreferenceController(current,publish,enqueue,clock) }
+    val memories=remember(local) { com.t1doo.aiyou.records.SourceMemoryInboxController(current,publish,enqueue) }
+    val recaps=remember(local) { com.t1doo.aiyou.records.FactRecapController(current,publish,enqueue,clock) }
+    val exports=remember(local) { com.t1doo.aiyou.records.OriginalExportController(current,publish,enqueue,clock) }
+    val recycle=remember(local) { com.t1doo.aiyou.records.RecycleBinController(current,publish,enqueue) }
+    val packages=remember(local) { com.t1doo.aiyou.records.RecordPackageController(current,publish,enqueue,
+        com.t1doo.aiyou.data.JcaRecordPackageCipher(),clock) }
+    val picker=remember { object:com.t1doo.aiyou.records.RecordPackagePicker {
+        override fun launch(export:Boolean,requestKey:String,callback:(com.t1doo.aiyou.records.SelectedRecordPackageDocument?)->Unit)=false
+        override fun cancel(requestKey:String)=Unit
+    } }
+    AIyouTheme { AIyouApp(previewDestination=Destination.MEMORIES,local=local,currentRecords=current,
+        display=UiPreferencesState(UiPreferences(reduceMotion=true),ready=true),unifiedKeywords=unified,
+        imageTexts=images,audioTranscripts=audio,sourcePreferences=preferences,memoryInbox=memories,
+        factRecaps=recaps,exports=exports,recycleBin=recycle,recordPackages=packages,recordPackagePicker=picker) }
+}
+
+@PreviewTest @LocalRecordPreviews @Composable
+fun FullBackupHomeRender() { NotebookLibraryPreview(fullBackup=true) }
