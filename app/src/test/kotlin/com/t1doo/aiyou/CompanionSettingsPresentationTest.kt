@@ -137,18 +137,42 @@ class CompanionSettingsPresentationTest {
                 .put("kind", "Read-only controlled-clock state observations; not device evidence")
                 .put("observations", observations).toString(2))
         }
-        fun publishHostState(label: String, change: () -> Unit, tag: String? = null, consumed: () -> Boolean) {
-            compose.runOnIdle { phase = label; button = org.json.JSONObject(); observe("before"); change() }
+        val actionTags = listOf("companion-greet", "companion-encourage", "companion-quiet")
+        fun sampleButtons(): org.json.JSONObject {
+            val result = org.json.JSONObject()
+            for (tag in actionTags) {
+                val nodes = compose.onAllNodesWithTag(tag).fetchSemanticsNodes()
+                val samples = org.json.JSONArray()
+                for (node in nodes) {
+                    val bounds = node.boundsInRoot
+                    samples.put(org.json.JSONObject().put("disabled", node.config.contains(SemanticsProperties.Disabled))
+                        .put("left", bounds.left).put("top", bounds.top).put("right", bounds.right).put("bottom", bounds.bottom))
+                }
+                result.put(tag, org.json.JSONObject().put("count", nodes.size).put("nodes", samples))
+            }
+            return result
+        }
+        fun buttonsMatch(samples: org.json.JSONObject, enabled: Boolean): Boolean = actionTags.all { tag ->
+            val sample = samples.getJSONObject(tag)
+            sample.getInt("count") == 1 && sample.getJSONArray("nodes").getJSONObject(0).getBoolean("disabled") != enabled
+        }
+        fun publishHostState(label: String, change: () -> Unit, tag: String? = null,
+                             buttonsEnabled: Boolean = true, consumed: () -> Boolean) {
+            val before = sampleButtons()
+            compose.runOnIdle { phase = label; button = org.json.JSONObject().put("semantics", before); observe("before"); change() }
             var published = false
             var count = 0
             while (!published && count < 4) {
                 compose.waitForIdle() // Deliver host snapshot/lifecycle notifications before advancing Compose.
                 compose.mainClock.advanceTimeByFrame(); compose.waitForIdle(); count++
+                val samples = sampleButtons()
                 val matches = if (tag == null) -1 else compose.onAllNodesWithTag(tag).fetchSemanticsNodes().size
                 compose.runOnIdle {
-                    button = org.json.JSONObject().put("publication_tag", tag ?: org.json.JSONObject.NULL).put("matches", matches)
+                    button = org.json.JSONObject().put("semantics", samples).put("expected_enabled", buttonsEnabled)
+                        .put("publication_tag", tag ?: org.json.JSONObject.NULL).put("matches", matches)
                     observe("publicationFrame-$count")
-                    if (consumed() && (tag == null || matches == 1)) {
+                    // Outer SideEffect consumption alone does not prove AlertDialog button semantics were published.
+                    if (consumed() && buttonsMatch(samples, buttonsEnabled) && (tag == null || matches == 1)) {
                         observe("consumed"); published = true; observe("settled")
                     }
                 }
@@ -266,7 +290,7 @@ class CompanionSettingsPresentationTest {
         compose.runOnIdle {
             observe("96ms"); assertTrue("Active encouragement before background: $lastObservation", motion > 0f)
         }
-        publishHostState("background", { owner.registry.currentState = androidx.lifecycle.Lifecycle.State.STARTED }) {
+        publishHostState("background", { owner.registry.currentState = androidx.lifecycle.Lifecycle.State.STARTED }, buttonsEnabled = false) {
             consumedOwner === owner && consumedOwnerState == androidx.lifecycle.Lifecycle.State.STARTED &&
                 !observed.foreground && observed.run == null && motion == 0f
         }
@@ -300,11 +324,21 @@ class CompanionSettingsPresentationTest {
             consumedOwner === replacement && consumedOwnerState == androidx.lifecycle.Lifecycle.State.RESUMED &&
                 observed.foreground && observed.run == null && observed.feedback == CompanionPose.Idle && motion == 0f
         }
+        val beforeOldCallbacks = sampleButtons()
+        val callbackTime = compose.mainClock.currentTime
         compose.runOnIdle {
-            phase = "retired-owner-callbacks"; observe("before")
+            phase = "retired-owner-callbacks"; button = org.json.JSONObject().put("semantics", beforeOldCallbacks); observe("before")
+            assertTrue("New owner's buttons must already be enabled before old callbacks: $lastObservation", buttonsMatch(beforeOldCallbacks, true))
             oldOwnerCallbacks.greet(); oldOwnerCallbacks.encourage(); oldOwnerCallbacks.close()
+        }
+        // Read actual semantics immediately, with no frame advance or recovery polling after the retired callbacks.
+        val afterOldCallbacks = sampleButtons()
+        compose.runOnIdle {
+            button = org.json.JSONObject().put("semantics", afterOldCallbacks)
             observe("afterCallbacks")
+            assertEquals("Do not wait for recovery after old callbacks", callbackTime, compose.mainClock.currentTime)
             assertEquals(CompanionPose.Idle, observed.pose); assertEquals(0, closes)
+            assertTrue("Old callbacks must not disable the new owner's actual buttons: $lastObservation", buttonsMatch(afterOldCallbacks, true))
         }
         compose.onNodeWithTag("companion-greet").assertIsEnabled()
         compose.runOnIdle { assertNull(observed.run); assertEquals(CompanionPose.Idle, observed.pose) }
