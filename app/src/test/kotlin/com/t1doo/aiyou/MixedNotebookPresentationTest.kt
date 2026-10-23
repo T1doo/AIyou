@@ -86,7 +86,11 @@ class MixedNotebookPresentationTest {
         assertTrue("At200% the full range summary precedes its wrapped action",rangeSummary.bottom<=rangeAction.top)
         val layouts=mutableListOf<TextLayoutResult>()
         summaryNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { assertTrue(it(layouts)) }
-        val layout=layouts.single();assertFalse(layout.hasVisualOverflow)
+        val layout=layouts.single()
+        assertFalse("Range summary overflow: size=${layout.size}, paragraph=${layout.multiParagraph.width}x${layout.multiParagraph.height}, " +
+            "width=${layout.didOverflowWidth}, height=${layout.didOverflowHeight}, exceededMaxLines=${layout.multiParagraph.didExceedMaxLines}, " +
+            "lines=${layout.lineCount}, density=${layout.layoutInput.density}, constraints=${layout.layoutInput.constraints}, " +
+            "summary=$rangeSummary, action=$rangeAction",layout.hasVisualOverflow)
         val lastLine=layout.layoutInput.text.text.substring(layout.getLineStart(layout.lineCount-1),layout.getLineEnd(layout.lineCount-1,visibleEnd=true)).trim()
         assertTrue("The narrow200% summary must not leave one character alone",lastLine.codePointCount(0,lastLine.length)>1)
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
