@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.dp
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.AIyouColors
@@ -161,10 +162,11 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                                         .testTag("mixed-audio-status")) {Text("查看本次原音处理")}
                                 }
                             }
-                            if(ui.supportsProcessingChoice) Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                            if(ui.supportsProcessingChoice) FlowRow(Modifier.fillMaxWidth(),
+                                horizontalArrangement=Arrangement.SpaceBetween,verticalArrangement=Arrangement.spacedBy(4.dp)) {
                                 Text(if(ui.policyChange!=null) "处理范围待核对" else if(ui.draft!!.policy==com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE)
                                     "不参与 AI · 仅作手账" else "仅本机处理 · 不发远端",
-                                    Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,
+                                    Modifier.align(Alignment.CenterVertically),style=MaterialTheme.typography.bodySmall.copy(lineBreak=LineBreak.Heading),
                                     color=if(ui.policyChange!=null) AIyouColors.error else AIyouColors.primary)
                                 TextButton(onClick={reveal("processing-policy")},modifier=Modifier.heightIn(min=48.dp).testTag("mixed-policy-details")){Text("范围详情")}
                             }

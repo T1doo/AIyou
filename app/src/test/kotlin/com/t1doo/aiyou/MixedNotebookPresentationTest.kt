@@ -6,6 +6,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.dp
@@ -33,7 +34,8 @@ import org.robolectric.annotation.GraphicsMode
 class MixedNotebookPresentationTest {
     @get:Rule val compose=createComposeRule()
 
-    @Test fun realNotebookUsesBundledLuluOnlyWhenPreferenceIsReadyAndVisibleWithoutWritingRecords() {
+    @Test @Config(qualifiers="w320dp-h1000dp")
+    fun realNotebookUsesBundledLuluOnlyWhenPreferenceIsReadyAndVisibleWithoutWritingRecords() {
         val draft=CaptureDraft("f71b097d-6b88-4bde-bae4-637230066ea2",1,"",emptyList())
         val local=LocalRecordUiState(ready=true,opening=false,supportsMixedCapture=true,
             mixedCapture=MixedCaptureUiState(draft=draft,supportsProcessingChoice=true))
@@ -76,6 +78,17 @@ class MixedNotebookPresentationTest {
         assertCompanionSize(56f)
         compose.onNodeWithTag("companion-entry").assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
         compose.onNodeWithText("关闭陪伴面板").performClick()
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-policy-details"))
+        val rangeAction=compose.onNodeWithTag("mixed-policy-details").performScrollTo().assertIsDisplayed()
+            .assertIsEnabled().assertHeightIsAtLeast(48.dp).getUnclippedBoundsInRoot()
+        val summaryNode=compose.onNodeWithText("仅本机处理 · 不发远端").assertIsDisplayed()
+        val rangeSummary=summaryNode.getUnclippedBoundsInRoot()
+        assertTrue("At200% the full range summary precedes its wrapped action",rangeSummary.bottom<=rangeAction.top)
+        val layouts=mutableListOf<TextLayoutResult>()
+        summaryNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { assertTrue(it(layouts)) }
+        val layout=layouts.single();assertFalse(layout.hasVisualOverflow)
+        val lastLine=layout.layoutInput.text.text.substring(layout.getLineStart(layout.lineCount-1),layout.getLineEnd(layout.lineCount-1,visibleEnd=true)).trim()
+        assertTrue("The narrow200% summary must not leave one character alone",lastLine.codePointCount(0,lastLine.length)>1)
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
         compose.onNodeWithTag("mixed-text").assertIsDisplayed().assertIsEnabled()
         compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
