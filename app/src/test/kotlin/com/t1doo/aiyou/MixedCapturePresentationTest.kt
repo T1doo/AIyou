@@ -1,13 +1,18 @@
 package com.t1doo.aiyou
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
@@ -32,15 +37,19 @@ import org.robolectric.annotation.GraphicsMode
 class MixedCapturePresentationTest {
     @get:Rule val compose=createComposeRule()
     private val f=Fixture();private var registry:SaveableStateRegistry?=null
+    private var focusManager:FocusManager?=null
     private val policyActions=mutableMapOf<String,()->Unit>()
-    private fun content() {
+    private fun content(viewport:State<DpSize>?=null,fontScale:State<Float>?=null) {
         runBlocking { f.c.initialize(f.store) }
         compose.setContent {
             registry=LocalSaveableStateRegistry.current
+            focusManager=LocalFocusManager.current
             val d=LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(d.density,2f),
+            CompositionLocalProvider(LocalDensity provides Density(d.density,fontScale?.value?:2f),
                 LocalCapturePolicyActionObserver provides { name,action -> policyActions[name]=action }) {
-                AIyouTheme { AIyouApp(local=f.local.value,mixedCapture=f.c) }
+                val app: @Composable () -> Unit = { AIyouTheme { AIyouApp(local=f.local.value,mixedCapture=f.c) } }
+                val size=viewport?.value
+                if(size==null) app() else Box(androidx.compose.ui.Modifier.requiredSize(size.width,size.height)) { app() }
             }
         }
     }
@@ -193,6 +202,42 @@ class MixedCapturePresentationTest {
         compose.onNodeWithTag("mixed-text").assertIsEnabled().performTextInput("合成核对后新输入");drain()
         click("mixed-save");drain()
         compose.runOnIdle { assertEquals("合成核对后新输入",f.local.value.entries.single().originalText) }
+    }
+    @Test @Config(qualifiers="w840dp-h1000dp")
+    fun viewportAndFontChangesPreserveDraftAndRangeThenSaveOnlyOnExplicitAction() {
+        val viewport=mutableStateOf(DpSize(800.dp,360.dp))
+        val fontScale=mutableStateOf(1f)
+        content(viewport,fontScale)
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").performTextInput("合成尺寸切换仍保留图文草稿");drain();add()
+        val expected=f.ui.draft!!
+        fun checkLayout(width:Int,height:Int,scale:Float,compact:Boolean) {
+            compose.runOnIdle { checkNotNull(focusManager).clearFocus(force=true)
+                viewport.value=DpSize(width.dp,height.dp);fontScale.value=scale }
+            compose.onNodeWithTag("mixed-list").performScrollToIndex(0)
+            if(compact) {
+                compose.onNodeWithText("生活的小片刻").assertDoesNotExist()
+                val heading=compose.onNodeWithTag("mixed-notebook-heading").assertIsDisplayed().getUnclippedBoundsInRoot()
+                assertTrue(heading.bottom-heading.top<=88.dp)
+            } else compose.onNodeWithText("生活的小片刻").assertIsDisplayed()
+            compose.runOnIdle { assertSame(expected,f.ui.draft);assertEquals(0,f.saves);assertTrue(f.queue.isEmpty()) }
+        }
+        checkLayout(360,800,1f,false)
+        // Whole Scaffold is 600dp; content after its bars is shorter than 480dp.
+        checkLayout(360,600,1f,false)
+        checkLayout(800,480,1f,true)
+        checkLayout(800,481,1f,false)
+        checkLayout(360,800,2f,true)
+        checkLayout(800,360,1f,true)
+        policyNode("mixed-policy-AI_NONE").performClick();drain()
+        compose.runOnIdle { assertEquals(expected.id,f.ui.draft!!.id);assertEquals(expected.text,f.ui.text)
+            assertEquals(expected.images.map{it.intent.id},f.ui.draft!!.images.map{it.intent.id})
+            assertEquals(ProcessingPolicy.AI_NONE,f.ui.draft!!.policy);assertEquals(0,f.saves) }
+        compose.runOnIdle { viewport.value=DpSize(360.dp,800.dp);fontScale.value=2f }
+        click("mixed-save");drain()
+        compose.runOnIdle { assertEquals(1,f.saves)
+            assertEquals(expected.text,f.local.value.entries.single().originalText)
+            assertEquals(ProcessingPolicy.AI_NONE,f.local.value.entries.single().policy) }
     }
     private class Fixture {
         private var draft=CaptureDraft(uuid(),1,"",emptyList());private val bytes=mutableMapOf<String,ByteArray>()

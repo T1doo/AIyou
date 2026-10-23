@@ -54,6 +54,7 @@ class MixedNotebookPresentationTest {
         }
         compose.onNodeWithTag("mixed-list").assertExists()
         compose.onNodeWithText("生活的小片刻").assertIsDisplayed()
+        assertCompanionSize(96f)
         compose.onNodeWithTag("companion-entry").assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
         compose.onNodeWithText("打个招呼").performClick()
         compose.onNodeWithText("你好，慢慢记录就好。").assertIsDisplayed()
@@ -72,6 +73,7 @@ class MixedNotebookPresentationTest {
         compose.onNodeWithText("生活的小片刻").assertDoesNotExist()
         val compactHeading=compose.onNodeWithTag("mixed-notebook-heading").assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue(compactHeading.bottom-compactHeading.top<=88.dp)
+        assertCompanionSize(56f)
         compose.onNodeWithTag("companion-entry").assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
         compose.onNodeWithText("关闭陪伴面板").performClick()
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
@@ -113,5 +115,45 @@ class MixedNotebookPresentationTest {
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
         compose.onNodeWithTag("mixed-text").assertIsDisplayed().assertIsEnabled()
         compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
+    }
+
+    @Test @Config(qualifiers="w800dp-h360dp")
+    fun coldRegularFontLandscapeStartsCompactAndRetainsDraftAcrossReadOnlyActions() {
+        val text="合成横屏冷启动草稿"
+        val draft=CaptureDraft("c5883362-094d-483a-bc55-472076c0c387",1,text,emptyList())
+        val local=LocalRecordUiState(ready=true,opening=false,supportsMixedCapture=true,
+            mixedCapture=MixedCaptureUiState(draft=draft,supportsProcessingChoice=true))
+        var writes=0
+        val controller=MixedCaptureController({local},{},{writes++;false},{error("No media input")},Clock.systemUTC())
+        compose.setContent {
+            val density=LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density,1f)) {
+                AIyouTheme { AIyouApp(local=local,mixedCapture=controller,
+                    display=UiPreferencesState(UiPreferences(reduceMotion=true),ready=true)) }
+            }
+        }
+        compose.onNodeWithText("生活的小片刻").assertDoesNotExist()
+        val heading=compose.onNodeWithTag("mixed-notebook-heading").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue(heading.bottom-heading.top<=88.dp)
+        assertCompanionSize(56f)
+        compose.onNodeWithTag("companion-entry").performClick()
+        compose.onNodeWithText("关闭陪伴面板").performClick()
+        compose.onNodeWithText("设置").performClick()
+        compose.onNodeWithText("返回").performClick()
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-policy-details"))
+        compose.onNodeWithTag("mixed-policy-details").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("mixed-jump-composer").assertIsDisplayed().assertIsEnabled().performClick()
+        compose.onNodeWithTag("mixed-text").performScrollTo().assertIsDisplayed().assertTextEquals(text)
+            .performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
+        compose.onNodeWithTag("mixed-text").assertIsFocused()
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-save"))
+        compose.onNodeWithTag("mixed-save").assertIsDisplayed().assertIsEnabled().assertHeightIsAtLeast(48.dp)
+        compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
+    }
+
+    private fun assertCompanionSize(expectedDp:Float) {
+        val bounds=compose.onNodeWithTag("companion-entry").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertEquals(expectedDp,(bounds.bottom-bounds.top).value,.5f)
+        assertEquals(expectedDp,(bounds.right-bounds.left).value,.5f)
     }
 }

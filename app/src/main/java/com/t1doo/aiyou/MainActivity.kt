@@ -12,6 +12,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -615,16 +617,6 @@ fun AIyouApp(
         }
         if (!companionVisible) companionPanel = false
     }
-    val notebookWindowHeight = with(LocalDensity.current) { scaffoldHeightPx.toDp() }
-    val compactNotebookHeader = LocalDensity.current.fontScale >= 1.5f ||
-        (notebookWindowHeight>0.dp && notebookWindowHeight<=480.dp)
-    val companion: (@Composable () -> Unit)? = if (companionVisible) ({
-        CompanionEntry(if (companionSaved) MascotState.Saved else MascotState.Idle,
-            companionPulse, motionAllowed, onOpen = { companionPanel = true },
-            artworkSize = if(selected==Destination.NOW && local?.supportsMixedCapture==true && !compactNotebookHeader) 96.dp else 56.dp,
-            containerColor = if(selected==Destination.NOW && local?.supportsMixedCapture==true)
-                androidx.compose.ui.graphics.Color.Transparent else com.t1doo.aiyou.designsystem.AIyouColors.surface)
-    }) else null
     val density = LocalDensity.current
     val imeBottomPx = WindowInsets.ime.getBottom(density)
     val imeVisible = imeBottomPx > 0
@@ -1071,8 +1063,20 @@ fun AIyouApp(
 
     val notebookHome=selected==Destination.NOW && local?.supportsMixedCapture==true && !showSettings && !showLicenses &&
         !reading && !recapRoute && !browsingPackage && !browsingRecycle && history==null && editing==null && attachmentPanel==null
+    // maxHeight is the IME-padded whole Scaffold allocation, including its top/bottom bars.
+    // Decide during this first constrained composition; reader measurement remains separate.
+    BoxWithConstraints(Modifier.imePadding().fillMaxSize(),propagateMinConstraints=true) {
+        val compactNotebookHeader = LocalDensity.current.fontScale >= 1.5f ||
+            (maxHeight>0.dp && maxHeight<=480.dp)
+        val companion: (@Composable () -> Unit)? = if (companionVisible) ({
+            CompanionEntry(if (companionSaved) MascotState.Saved else MascotState.Idle,
+                companionPulse, motionAllowed, onOpen = { companionPanel = true },
+                artworkSize = if(selected==Destination.NOW && local?.supportsMixedCapture==true && !compactNotebookHeader) 96.dp else 56.dp,
+                containerColor = if(selected==Destination.NOW && local?.supportsMixedCapture==true)
+                    androidx.compose.ui.graphics.Color.Transparent else com.t1doo.aiyou.designsystem.AIyouColors.surface)
+        }) else null
     Scaffold(
-        modifier = Modifier.imePadding().onSizeChanged { scaffoldHeightPx = it.height },
+        modifier = Modifier.onSizeChanged { scaffoldHeightPx = it.height },
         topBar = {
           Column {
             NotebookAppBar(
@@ -1390,6 +1394,7 @@ fun AIyouApp(
                 state = if (demo) ComponentState.valueOf(stateName) else ComponentState.NORMAL,
             )
         }
+    }
     }
     if(!demo&&!showSettings&&local?.taskProposals?.editor!=null&&taskProposals!=null) {
         key(generation,local.taskProposals.editor.session) {
