@@ -175,10 +175,9 @@ fun LocalRejectedInputRender() { AIyouTheme { AIyouApp(local = restoredLocal.cop
 fun LocalMemoriesRender() { NotebookLibraryPreview(fullBackup=false) }
 
 // Whole production task route, including navigation/settings and the optional companion.
-// Local records are synthetic; no task creation/completion or demo proposal is fabricated.
+// Explicit synthetic task/reminder snapshots; no creation/completion, dispatch or permission action.
 @PreviewTest @LocalRecordPreviews @Composable
-fun LocalTasksRender() { AIyouTheme { AIyouApp(display = UiPreferencesState(UiPreferences(), ready = true),
-    previewDestination = Destination.TASKS, local = restoredLocal) } }
+fun LocalTasksRender() { TaskDashboardPreview() }
 
 private val longOriginal = syntheticEntries.single().copy(id = "synthetic-long-original",
     originalText = "合成长原文：" + "散步时记录叶片的纹理与颜色。\n".repeat(90) + "合成全文末端。")

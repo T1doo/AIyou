@@ -206,7 +206,8 @@ for label, folder, minimum in targets:
         additional["com.t1doo.aiyou.TaskReminderPresentationTest"] = (
             "explicitReminderAndRevocationRequireRealConfirmationWithoutSavingPrivatePlan",
             "dateOnlyAndGlobalReadFailureDisableReminderWithoutChangingOriginalInput",
-            "staleDialogAndRouteCallbacksCannotWriteAnotherTaskWithTheSameTitle")
+            "staleDialogAndRouteCallbacksCannotWriteAnotherTaskWithTheSameTitle",
+            "dashboardShowsActualDeniedUnknownAndScheduledStatesWithoutPromisingDelivery")
         additional["com.t1doo.aiyou.OriginalActivityExportPresentationTest"] = (
             "taskOnlyDoubleFontPreviewSeparatesKindsAndRequiresPlaintextConsentBeforeSafWithoutSavingPrivateState",
             "formatScopeChangesRetireConsentAndChangedActivitiesNeverLaunchDestinationOrPromoteDraft",
@@ -378,7 +379,9 @@ for label, folder, minimum in targets:
             "lostDateReadbackKeepsStableRequestAfterCloseAndNeverShowsFalseEmpty",
             "dateGroupsUseChosenZoneAndTerminalStateRetainsItsPlan",
             "narrowDoubleFontDateActionsAndOldBusinessCallbacksRespectCloseAndNavigation",
-            "rawSavedStateExcludesPlanFieldsAndRecreationRetiresOldBusinessCallbacks")
+            "rawSavedStateExcludesPlanFieldsAndRecreationRetiresOldBusinessCallbacks",
+            "dashboardSeparatesDraftCountAndCreatingTaskNeverAddsAReminder",
+            "landscapeDashboardKeepsCreateCancelAndConfirmedCompletionReachable")
         additional["com.t1doo.aiyou.ManualTagPresentationTest"] = (
             "tagSearchReturnKeepsExactPositionWithExportControlVisible",
             "actualTagEditorWaitsForAcknowledgementKeepsFailedInputAndRemovesOnlyAfterConfirmation",

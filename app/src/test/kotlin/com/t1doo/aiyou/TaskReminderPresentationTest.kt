@@ -223,6 +223,33 @@ class TaskReminderPresentationTest {
         compose.onNodeWithContentDescription("此刻，想记下什么").assertTextEquals(capture)
     }
 
+    @Test fun dashboardShowsActualDeniedUnknownAndScheduledStatesWithoutPromisingDelivery() {
+        val expected = listOf(
+            TaskReminderPhase.NOTIFICATION_DENIED to "大约提醒计划 · 提醒未安排 · 通知授权已拒绝",
+            TaskReminderPhase.POST_UNKNOWN to "大约提醒计划 · 通知发布结果未核实 · 不会自动重发",
+            TaskReminderPhase.SCHEDULED to "大约提醒计划 · 调度适配器已确认安排 · 通知送达未验证")
+        for ((phase, _) in expected) {
+            val id = "synthetic-" + phase.name.lowercase()
+            val base = task(id, "合成提醒状态 " + phase.name)
+            persisted[id] = base.copy(reminder = TaskReminders.confirm(base, TaskReminderMode.APPROXIMATE)
+                .copy(phase = phase, commands = emptyList()))
+        }
+        val before = persisted.toMap()
+        content()
+        taskNode("manual-task-reminder-boundary").assertTextEquals("创建不会自动设置提醒")
+        taskNode("manual-task-total").assertTextEquals("正式待办 3")
+        for ((phase, label) in expected) {
+            taskNode("reminder-status-synthetic-" + phase.name.lowercase()).assertTextEquals(label)
+            taskNode("manual-task-date-synthetic-" + phase.name.lowercase())
+                .assertTextEquals("手工创建 · 2026-10-20 15:00 · 偏移 Z · UTC")
+        }
+        compose.runOnIdle {
+            assertEquals(before, persisted); assertTrue(requests.isEmpty()); assertTrue(acknowledgements.isEmpty())
+            assertTrue(queue.isEmpty()); assertEquals(capture, state.value.text)
+        }
+        compose.onAllNodesWithText("没有系统提醒", substring = true).assertCountEquals(0)
+    }
+
     private fun task(id: String, title: String) = ManualTaskSnapshot(id, 1, title, ManualTaskStatus.OPEN, 1, "UTC", 1, schedule)
     private fun content() {
         state.value = state.value.copy(tasks = ManualTasksUiState(supported = true, available = true, items = persisted.values.toList()))

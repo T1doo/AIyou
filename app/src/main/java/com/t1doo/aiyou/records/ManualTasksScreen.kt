@@ -1,6 +1,8 @@
 package com.t1doo.aiyou.records
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -52,6 +54,10 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     val available = storageReady && tasks.available && !tasks.loading
     val canWrite = available && !tasks.busy && tasks.pending == null && !local.reminders.busy && local.reminders.pending == null
     val canChoose = canWrite && tasks.editor == null && tasks.dateEditor == null && tasks.titleEditor == null && local.reminders.editor == null
+    val countsReady = available && !tasks.busy && tasks.pending == null && tasks.error == null
+    val proposals = local.taskProposals
+    val proposalsReady = storageReady && proposals.available && !proposals.loading && proposals.error == null &&
+        proposals.editor?.let { !it.busy && it.pending == null } != false
     val now by produceState(clock.instant(), clock) {
         // Display classification only, never a scheduler or a persisted inferred deadline.
         while (true) { delay(30_000); value = clock.instant() }
@@ -67,10 +73,28 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                 contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
                 item("header") { NotebookPageHeader("待办", "由你明确创建的正式任务", stacked, companion) }
-                item("boundary") { StatusNotice("没有系统提醒", "仅保存你明确填写的日期、时刻和时区，不从标题推断，不发送通知。") }
                 item("create") {
-                    OutlinedButton(onClick = onBegin, enabled = canChoose,
-                        modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-task-begin")) { Text("创建待办") }
+                    Surface(color = AIyouColors.primaryContainer, contentColor = AIyouColors.textPrimary,
+                        shape = RoundedCornerShape(AIyouDimensions.cardRadius)) {
+                        Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceLg),
+                            verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                            Text(if (countsReady) "正式待办 ${tasks.items.size}" else "正式待办 · 待核对",
+                                style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("manual-task-total"))
+                            if (countsReady) Text("未完成 ${tasks.items.count { it.status == ManualTaskStatus.OPEN }} · " +
+                                "已完成 ${tasks.items.count { it.status == ManualTaskStatus.COMPLETED }} · " +
+                                "已取消 ${tasks.items.count { it.status == ManualTaskStatus.CANCELLED }}",
+                                style = MaterialTheme.typography.bodySmall)
+                            if (proposals.supported) Text(if (proposalsReady)
+                                "另有 ${proposals.items.count { it.proposal.state == TaskProposalState.DRAFT }} 份待确认草稿，不计入正式待办"
+                                else "待确认草稿另计 · 待核对", style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.testTag("manual-task-draft-summary"))
+                            Button(onClick = onBegin, enabled = canChoose,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget)
+                                    .testTag("manual-task-begin")) { Text("创建待办") }
+                            Text("创建不会自动设置提醒", style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.testTag("manual-task-reminder-boundary"))
+                        }
+                    }
                 }
                 item("state") {
                     Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
@@ -95,34 +119,10 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                             modifier = Modifier.testTag("manual-task-refresh")) { Text("重新读取待办") }
                     }
                 }
-                if(local.taskProposals.supported) {
-                    val proposals=local.taskProposals
-                    item("proposal-heading") {Text("待确认草稿"+(if(storageReady&&proposals.available&&!proposals.loading) " "+proposals.items.count {it.proposal.state==TaskProposalState.DRAFT} else " · 待核对"),
-                        style=MaterialTheme.typography.titleLarge,modifier=Modifier.testTag("task-proposal-heading"))}
-                    item("proposal-state") {
-                        Column {
-                            Text("人工草稿与正式待办分开计数；没有语义 AI 建议。")
-                            if(proposals.loading) Text("正在读取加密草稿…")
-                            proposals.error?.let {Text(it,color=MaterialTheme.colorScheme.error)}
-                            TextButton(enabled=storageReady&&!proposals.loading,onClick=onProposalRefresh,modifier=Modifier.testTag("task-proposal-refresh")) {Text("重新读取待确认草稿")}
-                        }
-                    }
-                    if(storageReady&&proposals.available&&!proposals.loading) {
-                        val drafts=proposals.items.filter {it.proposal.state==TaskProposalState.DRAFT}
-                        if(drafts.isEmpty()) item("proposal-empty") {Text("没有待确认草稿；可从原文摘录主动发起。")}
-                        items(drafts,key={"proposal-"+it.proposal.id}) {item ->
-                            val p=item.proposal
-                            Surface(shape=MaterialTheme.shapes.medium) {Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd).testTag("task-proposal-row-"+p.id),
-                                verticalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                                Text(p.titleInput.ifEmpty {"尚未填写标题"})
-                                Text("人工待确认 · 原文版本 "+p.binding.source.revision+" · "+p.dateInput.date.ifEmpty {"未设日期"})
-                                if(!item.sourceAvailable||!local.canUseTaskSource(p.binding)) Text("来源已失效或暂不可核对，不能确认。")
-                                TextButton(enabled=proposals.editor==null,onClick={onProposalOpen(p.id,p.version)},
-                                    modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("task-proposal-open-"+p.id)) {Text("查看、修改或拒绝")}
-                            }}
-                        }
-                        item("proposal-rejected") {Text("已拒绝草稿 "+proposals.items.count {it.proposal.state==TaskProposalState.REJECTED}+" · 不计入正式待办")}
-                    }
+                item("reminder-policy") {
+                    Text("日期与时区由你填写，提醒需逐条确认；安排状态以各条待办为准，通知送达未验证。",
+                        style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary,
+                        modifier = Modifier.testTag("manual-task-reminder-policy"))
                 }
                 if (available) {
                     if (tasks.items.isEmpty()) item("empty") { StatusNotice("还没有正式待办", "点击“创建待办”并确认保存后，才会加入清单。", state = ComponentState.EMPTY) }
@@ -131,10 +131,17 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                         ManualTaskGroup.COMPLETED to "已完成", ManualTaskGroup.CANCELLED to "已取消")) {
                         val group = tasks.items.filter { ManualTaskDates.group(it, now) == bucket }
                             .sortedWith(compareBy<ManualTaskSnapshot> { it.schedule?.date }.thenBy { it.schedule?.time }.thenBy { it.id })
-                        item("heading-" + bucket) { Text(title + " " + group.size, style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.testTag("manual-task-heading-" + bucket)) }
+                        if (group.isEmpty()) continue
+                        item("heading-" + bucket) {
+                            Surface(color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.small) {
+                                Text(title + " " + group.size, style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd)
+                                        .testTag("manual-task-heading-" + bucket))
+                            }
+                        }
                         items(group, key = { "task-" + it.id }) { task ->
-                            Surface(color = AIyouColors.surface, shape = MaterialTheme.shapes.medium) {
+                            Surface(color = AIyouColors.surface, shape = MaterialTheme.shapes.medium,
+                                border = BorderStroke(AIyouDimensions.borderWidth, AIyouColors.outlineDecorative)) {
                                 Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd).testTag("manual-task-row-" + task.id),
                                     verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                                     Text(task.title, style = MaterialTheme.typography.bodyLarge)
@@ -177,6 +184,34 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                         }
                     }
                 }
+                if(local.taskProposals.supported) {
+                    item("proposal-heading") {Text("待确认草稿"+(if(proposalsReady) " "+proposals.items.count {it.proposal.state==TaskProposalState.DRAFT} else " · 待核对"),
+                        style=MaterialTheme.typography.titleLarge,modifier=Modifier.testTag("task-proposal-heading"))}
+                    item("proposal-state") {
+                        Column {
+                            Text("人工草稿与正式待办分开计数；没有语义 AI 建议。")
+                            if(proposals.loading) Text("正在读取加密草稿…")
+                            proposals.error?.let {Text(it,color=MaterialTheme.colorScheme.error)}
+                            TextButton(enabled=storageReady&&!proposals.loading,onClick=onProposalRefresh,modifier=Modifier.testTag("task-proposal-refresh")) {Text("重新读取待确认草稿")}
+                        }
+                    }
+                    if(storageReady&&proposals.available&&!proposals.loading) {
+                        val drafts=proposals.items.filter {it.proposal.state==TaskProposalState.DRAFT}
+                        if(drafts.isEmpty()) item("proposal-empty") {Text("没有待确认草稿；可从原文摘录主动发起。")}
+                        items(drafts,key={"proposal-"+it.proposal.id}) {item ->
+                            val p=item.proposal
+                            Surface(color=AIyouColors.surfaceMuted,shape=MaterialTheme.shapes.medium) {Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd).testTag("task-proposal-row-"+p.id),
+                                verticalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                                Text(p.titleInput.ifEmpty {"尚未填写标题"})
+                                Text("人工待确认 · 原文版本 "+p.binding.source.revision+" · "+p.dateInput.date.ifEmpty {"未设日期"})
+                                if(!item.sourceAvailable||!local.canUseTaskSource(p.binding)) Text("来源已失效或暂不可核对，不能确认。")
+                                TextButton(enabled=proposals.editor==null,onClick={onProposalOpen(p.id,p.version)},
+                                    modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("task-proposal-open-"+p.id)) {Text("查看、修改或拒绝")}
+                            }}
+                        }
+                        item("proposal-rejected") {Text("已拒绝草稿 "+proposals.items.count {it.proposal.state==TaskProposalState.REJECTED}+" · 不计入正式待办")}
+                    }
+                }
                 if(!local.taskProposals.supported) item("proposals") { StatusNotice("没有待确认建议", if(local.supportsSourceTasks) "可从原文摘录手工创建待办；语义 AI 建议尚未开放，原文和草稿不会自动变成待办。" else "AI 候选确认尚未开放；原文与草稿不会自动变成正式待办。", state = ComponentState.EMPTY) }
             }
         }
@@ -208,7 +243,7 @@ private fun ManualTaskDialog(editor: ManualTaskEditor, tasks: ManualTasksUiState
                 .verticalScroll(rememberScrollState()).padding(AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                 Text("创建手工待办", style = MaterialTheme.typography.titleLarge)
-                Text("确认后加密保存在本机。最多 240 个字符；没有系统提醒，不推断时间。", style = MaterialTheme.typography.bodySmall)
+                Text("确认后加密保存在本机。最多 240 个字符；创建不会自动设置提醒，不推断时间。", style = MaterialTheme.typography.bodySmall)
                 CompositionLocalProvider(LocalSaveableStateRegistry provides null) { OutlinedTextField(state = input, enabled = storageReady && !tasks.busy && tasks.pending == null,
                     inputTransformation = InputTransformation.maxLength(ManualTasks.MAX_RAW_LENGTH),
                     label = { Text("待办标题") }, lineLimits = TextFieldLineLimits.SingleLine,
@@ -232,10 +267,11 @@ private fun ManualTaskDialog(editor: ManualTaskEditor, tasks: ManualTasksUiState
 }
 
 internal fun manualTaskDateLabel(task: ManualTaskSnapshot): String {
-    val due = task.schedule ?: return "手工创建 · 未设时间 · 没有系统提醒"
+    val reminderNote = if (task.reminder == null) " · 未设置提醒计划" else ""
+    val due = task.schedule ?: return "手工创建 · 未设时间" + reminderNote
     return "手工创建 · " + due.date + (due.time?.let { " " + it + " · 偏移 " +
         java.time.ZoneOffset.ofTotalSeconds(checkNotNull(due.offsetSeconds)).id } ?: " · 仅日期") +
-        " · " + due.timeZone + " · 没有系统提醒"
+        " · " + due.timeZone + reminderNote
 }
 
 internal class TaskDateFields(input: ManualTaskDateInput) {
@@ -269,7 +305,7 @@ internal fun TaskDateFieldsView(fields: TaskDateFields, enabled: Boolean, onChan
             lineLimits = TextFieldLineLimits.SingleLine, inputTransformation = InputTransformation.maxLength(128),
             modifier = Modifier.fillMaxWidth().testTag("manual-task-zone-input"))
     }
-    Text("时刻留空表示仅日期，不会补成某个时刻；时间必须有日期。没有系统提醒。", style = MaterialTheme.typography.bodySmall)
+    Text("时刻留空表示仅日期，不会补成某个时刻；时间必须有日期。仅填写日期时间不会安排提醒。", style = MaterialTheme.typography.bodySmall)
     val current = fields.current()
     val offsets = current.overlapOffsets()
     if (offsets.size == 2) {
@@ -307,7 +343,7 @@ private fun ManualTaskDateDialog(editor: ManualTaskDateEditor, tasks: ManualTask
                     Text(manualTaskDateLabel(target), style = MaterialTheme.typography.bodySmall)
                 } else Text("当前待办暂不可确认，请重新读取。编辑输入已保留，不会自动套到其他版本。")
                 if (target?.reminder != null) Text("变更或清除日期时间会撤销旧提醒计划；新时间需要再次单独确认提醒。")
-                if (editor.operation == ManualTaskDateOperation.CLEAR) Text("确认后移除计划日期和时刻，保留待办及当前状态。没有系统提醒。")
+                if (editor.operation == ManualTaskDateOperation.CLEAR) Text("确认后移除计划日期和时刻，保留待办及当前状态。")
                 else {
                     if (editor.operation == ManualTaskDateOperation.POSTPONE)
                         Text("请选择比原计划更晚的日期或时刻；更换时区或日期精度请用修改操作。")
