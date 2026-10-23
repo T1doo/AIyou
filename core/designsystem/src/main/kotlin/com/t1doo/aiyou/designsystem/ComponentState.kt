@@ -27,7 +27,7 @@ fun interface MascotAssetProvider {
 
     /** False means the requested pose is unavailable and a static fallback was drawn. */
     @Composable
-    fun InteractionArtwork(pose: CompanionPose, modifier: Modifier, actionModifier: Modifier = Modifier): Boolean {
+    fun interactionArtwork(pose: CompanionPose, modifier: Modifier, actionModifier: Modifier = Modifier): Boolean {
         Artwork(MascotState.Idle, modifier)
         return false
     }

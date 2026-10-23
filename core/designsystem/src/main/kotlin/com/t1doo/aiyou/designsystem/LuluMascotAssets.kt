@@ -18,14 +18,14 @@ object LuluMascotAssets : MascotAssetProvider {
     override fun labelFor(state: MascotState): String = state.description
 
     @Composable
-    override fun Artwork(state: MascotState, modifier: Modifier) { DrawLulu(CompanionPose.Idle, state, modifier) }
+    override fun Artwork(state: MascotState, modifier: Modifier) { drawLulu(CompanionPose.Idle, state, modifier) }
 
     @Composable
-    override fun InteractionArtwork(pose: CompanionPose, modifier: Modifier, actionModifier: Modifier) =
-        DrawLulu(pose, MascotState.Idle, modifier, actionModifier)
+    override fun interactionArtwork(pose: CompanionPose, modifier: Modifier, actionModifier: Modifier) =
+        drawLulu(pose, MascotState.Idle, modifier, actionModifier)
 
     @Composable
-    private fun DrawLulu(pose: CompanionPose, fallback: MascotState, modifier: Modifier,
+    private fun drawLulu(pose: CompanionPose, fallback: MascotState, modifier: Modifier,
                          actionModifier: Modifier = Modifier): Boolean {
         val resources = LocalResources.current
         val configuration = LocalConfiguration.current

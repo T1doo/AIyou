@@ -179,7 +179,7 @@ fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotA
         text = {
             Column(Modifier.testTag("companion-scroll").verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
-                val poseAvailable = assets.InteractionArtwork(ui.pose, Modifier.size(112.dp).testTag("companion-interaction-artwork"), Modifier.graphicsLayer {
+                val poseAvailable = assets.interactionArtwork(ui.pose, Modifier.size(112.dp).testTag("companion-interaction-artwork"), Modifier.graphicsLayer {
                     if (ui.pose == CompanionPose.Greeting) rotationZ = motion * 6f
                     else { translationY = -motion * 4.dp.toPx(); scaleX = 1f + motion * .04f; scaleY = scaleX }
                 })
