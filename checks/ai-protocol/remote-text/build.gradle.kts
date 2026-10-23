@@ -81,6 +81,7 @@ val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
     from("../../../app/src/main/java/com/t1doo/aiyou/records/RecordEventDateController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/CurrentImageGridController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalEvidenceController.kt")
+    listOf("SearchNavigationGate.kt", "QuestionKeywordFragments.kt", "QuestionKeywordController.kt").forEach { from("../../../app/src/main/java/com/t1doo/aiyou/records/$it") }
     from("../../../app/src/main/java/com/t1doo/aiyou/records/ManualPeopleController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/ModelConnectionsController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalConnectionSecretResolver.kt")

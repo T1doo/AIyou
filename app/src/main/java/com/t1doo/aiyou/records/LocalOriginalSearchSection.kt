@@ -37,6 +37,7 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import com.t1doo.aiyou.designsystem.AIyouDimensions
+import com.t1doo.aiyou.designsystem.aiyouFocusOutline
 
 interface OriginalSearchObserver {
     fun onResults(state: OriginalSearchState, open: (OriginalSearchHit) -> Unit)
@@ -67,11 +68,13 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     onRefreshEventDates: () -> Unit = {}, onlyImages: Boolean = false,
     onImages: (Boolean) -> Unit = {}, person: String? = null, peopleSupported: Boolean = false,
     peopleAvailable: Boolean = false, peopleError: String? = null, onPerson: (String?) -> Unit = {},
-    onRefreshPeople: () -> Unit = {}) {
+    onRefreshPeople: () -> Unit = {},onQuestionKeywords:(()->Unit)?=null) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
             Text("本机原文查找", style = MaterialTheme.typography.titleMedium)
+            if(indexSupported)onQuestionKeywords?.let{open->TextButton(onClick=open,enabled=enabled,
+                modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).aiyouFocusOutline().testTag("question-keyword-open")){Text("从问题里选词")}}
             fun transform(state: TextFieldState, maximum: Int) =
                 InputTransformation.maxLength(maximum).then {
                     // Only retire a private request counter before an actual user

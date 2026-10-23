@@ -62,6 +62,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchMatcher.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalSearchPreview.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchController.kt")
+    listOf("SearchNavigationGate.kt", "QuestionKeywordFragments.kt", "QuestionKeywordController.kt").forEach { from("../../app/src/main/java/com/t1doo/aiyou/records/$it") }
     from("../../app/src/main/java/com/t1doo/aiyou/records/RecordAiCapability.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/RecordAiUiState.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalEditUiState.kt")

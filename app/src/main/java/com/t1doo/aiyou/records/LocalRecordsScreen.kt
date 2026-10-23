@@ -136,6 +136,7 @@ fun LocalRecordsScreen(
     evidenceQuestion: (@Composable () -> Unit)? = null,
     onOpenImageTexts:(()->Unit)?=null,
     imageTextBusy:Boolean=false,
+    onQuestionKeywords:(()->Unit)?=null,
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -377,7 +378,7 @@ fun LocalRecordsScreen(
                             onlyImages = onlyImages, onImages = onSearchImages,
                             dateBasis = searchDateBasis, onDateBasis = onSearchDateBasis,
                             eventDatesAvailable = local.eventDatesAvailable, eventDatesError = local.eventDatesError,
-                            onRefreshEventDates = onRefreshEventDates)
+                            onRefreshEventDates = onRefreshEventDates,onQuestionKeywords=onQuestionKeywords)
                     else SearchSection(demo = false)
                     if (local.localSearch != null) TextButton(onClick = { onEvidenceMode(!evidenceMode) },
                         enabled = local.ready && !local.opening && local.error == null,

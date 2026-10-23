@@ -29,6 +29,7 @@ class LocalOriginalSearchController internal constructor(
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val stateFactory: (OriginalSearchState) -> MutableStateFlow<OriginalSearchState> = { MutableStateFlow(it) },
     private val onInvalidated: () -> Unit = {},
+    private val arbitrateNavigation: ((()->Unit)->Unit) = { it() },
     private val matcher: suspend (List<StoredEntry>, OriginalSearchInput) -> OriginalSearchMatches = LocalOriginalSearchMatcher::match,
 ) : AutoCloseable {
     private val lock = Any()
@@ -189,22 +190,25 @@ class LocalOriginalSearchController internal constructor(
 
     /** Production executes actual location publication inside the IO-held source/epoch lease. */
     fun open(value: OriginalSearchState, hit: OriginalSearchHit, rollback: () -> Unit = {}, publish: () -> Unit) {
+        if (Thread.holdsLock(lock)) return
         if (!canOpen(value, hit)) return
         val owner = value.owner
         val proof = value.proof
-        if (owner == null || proof == null) { if (canOpen(value, hit)) publish(); return }
+        if (owner == null || proof == null) {
+            arbitrateNavigation { synchronized(lock) { if (canOpen(value, hit)) publish() } }; return
+        }
         scope.launch(Dispatchers.IO) {
             var opened = false
             var cancellation: CancellationException? = null
             val resolved = try {
                 owner.resolve(proof, hit.entry.id) { current ->
-                    synchronized(lock) {
+                    arbitrateNavigation { synchronized(lock) {
                         if (current == hit.entry && canOpen(value, hit)) { publish(); opened = true }
-                    }
+                    } }
                 }
             } catch (cancelled: CancellationException) { cancellation = cancelled; false } catch (_: Exception) { false }
             if (!resolved || !opened) {
-                synchronized(lock) {
+                arbitrateNavigation { synchronized(lock) {
                     // Root rollback uses the exact location/nav publication token;
                     // it cannot retire a later navigation or a new composition.
                     if (opened) rollback()
@@ -214,7 +218,7 @@ class LocalOriginalSearchController internal constructor(
                             entries = value.entries, generation = value.generation, owner = value.owner,
                             indexEpoch = value.indexEpoch, inputEpoch = value.inputEpoch)
                     }
-                }
+                } }
                 onInvalidated()
             }
             cancellation?.let { throw it }
@@ -258,7 +262,12 @@ class LocalOriginalSearchController internal constructor(
         generation++
         mutableState.value = OriginalSearchState(OriginalSearchInput(), OriginalSearchStage.WAITING, generation = generation)
     }
-    fun changeInput(change: () -> Unit) = synchronized(lock) { invalidateInput(); if (!closed) change() }
+    fun changeInput(change: () -> Unit) { tryChangeInput(change) }
+    internal fun inputCallbackReentrant():Boolean=Thread.holdsLock(lock)
+    internal fun acceptsInput():Boolean=synchronized(lock){!closed}
+    internal fun tryChangeInput(change:()->Unit):Boolean=synchronized(lock){
+        if(closed)false else{invalidateInput();change();true}
+    }
     private fun pauseLocked() {
         if (!active) return
         active = false

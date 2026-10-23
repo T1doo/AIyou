@@ -234,21 +234,15 @@ class MainActivity : ComponentActivity() {
 
 /** A callback belongs to one live navigation session, including repeated opens of the same ID. */
 private class NavigationOwner(private val changed:(Long)->Unit={}) {
-    private val lock = Any()
     private val current = mutableStateOf(0L)
-    private var alive = true
-    val generation get() = synchronized(lock) { current.value }
+    val gate = com.t1doo.aiyou.records.SearchNavigationGate { current.value=it;changed(it) }
+    val generation:Long get() { current.value;return gate.generation }
     var active: Boolean
-        get() = synchronized(lock) { alive }
-        set(value) = synchronized(lock) { alive = value }
-    fun advance() = synchronized(lock) { current.value = Math.addExact(current.value, 1);changed(current.value) }
-    fun tryAdvance(expected: Long): Boolean = synchronized(lock) {
-        if (!alive || current.value != expected) false
-        else { current.value = Math.addExact(current.value, 1);changed(current.value); true }
-    }
-    fun publish(expected: Long, action: () -> Unit) = synchronized(lock) {
-        if (alive && current.value == expected) action()
-    }
+        get() = gate.active
+        set(value) {gate.active=value}
+    fun advance() = gate.advance()
+    fun tryAdvance(expected:Long)=gate.tryAdvance(expected)
+    fun publish(expected:Long,action:()->Unit)=gate.publish(expected,action)
 }
 
 /** One real reader return; a later navigation cannot complete this request. */
@@ -354,7 +348,8 @@ fun AIyouApp(
     val currentImageTextSnapshot by rememberUpdatedState(local?.imageTexts)
     val currentImageTextRecords by rememberUpdatedState(currentRecords)
     val imageTextBusy=imageTexts?.inFlight?.collectAsState()?.value==true
-    val navigation = remember { NavigationOwner{currentUnifiedState?.let{currentUnifiedController?.close(it.session)};(currentImageTextRecords?.invoke()?.imageTexts?:currentImageTextSnapshot)?.let{currentImageTextController?.close(it.session)};currentAudioRouteCallback();currentAttachments?.state?.value?.takeIf{panel->panel.focusedIntent!=null}?.let{panel->currentAttachments?.retireFocusedSource(panel.sessionId)};currentNavigationCallback(it)} }
+    val questionControllerRef=remember { java.util.concurrent.atomic.AtomicReference<com.t1doo.aiyou.records.QuestionKeywordController?>(null) }
+    val navigation = remember { NavigationOwner{questionControllerRef.get()?.retire();currentUnifiedState?.let{currentUnifiedController?.close(it.session)};(currentImageTextRecords?.invoke()?.imageTexts?:currentImageTextSnapshot)?.let{currentImageTextController?.close(it.session)};currentAudioRouteCallback();currentAttachments?.state?.value?.takeIf{panel->panel.focusedIntent!=null}?.let{panel->currentAttachments?.retireFocusedSource(panel.sessionId)};currentNavigationCallback(it)} }
     DisposableEffect(unifiedKeywords){onDispose{unifiedKeywords?.retire()}}
     DisposableEffect(audioPlayback) { onDispose { audioPlayback?.stop() } }
     DisposableEffect(navigation) { onDispose { navigation.active = false;currentNavigationCallback(null) } }
@@ -401,11 +396,10 @@ fun AIyouApp(
     var evidenceMode by remember { mutableStateOf(false) }
     var searchModeGeneration by remember { mutableLongStateOf(0L) }
     fun searchSource() = if (currentRecordsProvider != null) currentRecordsProvider?.invoke() else currentLocal
-    fun searchInput(): OriginalSearchInput {
+    fun searchInput(tagsSource:LocalRecordUiState?=searchSource()): OriginalSearchInput {
         val query = searchQuery.text
         val from = searchFrom.text
         val through = searchThrough.text
-        val tagsSource = searchSource()
         return OriginalSearchInput(query.toString(), from.toString(), through.toString(), searchMode,
             OriginalSearchInputOwnership(query, from, through, searchModeGeneration), searchTag,
             if ((searchTag != null || searchMode == OriginalSearchMode.KEYWORDS && query.isNotBlank()) &&
@@ -420,6 +414,7 @@ fun AIyouApp(
         LocalOriginalSearchController(
             currentSource = { searchSource() },
             currentInput = { searchInput() }, dispatcher = kotlinx.coroutines.Dispatchers.IO,
+            arbitrateNavigation = navigation.gate::arbitrate,
             onInvalidated = onRefreshLocalSearch,
             matcher = { entries, input ->
                 val owner = searchSource()?.localSearch
@@ -441,6 +436,51 @@ fun AIyouApp(
     var searchReturnSource by remember { mutableStateOf<List<com.t1doo.aiyou.model.StoredEntry>?>(null) }
     var readerFromSearch by remember { mutableStateOf(false) }
     var searchLocation by remember { mutableStateOf<com.t1doo.aiyou.records.OriginalReadingLocation?>(null) }
+    fun searchRouteAvailable(source:LocalRecordUiState?=searchSource()):Boolean {
+        return selectedName==Destination.MEMORIES.name&&detailEntryId==null&&!showSettings&&!demo&&!recapRoute&&
+            source?.ready==true&&!source.opening&&source.error==null&&
+            source.originalEdit==null&&source.originalHistory==null&&source.recordPackage==null&&source.recycleBin?.browsing!=true
+    }
+    fun questionBinding():com.t1doo.aiyou.records.QuestionSearchBinding? {
+        val source=searchSource()?:return null
+        val allowed=searchRouteAvailable(source)&&source.localSearch!=null&&!source.saving&&!source.savePending&&
+            source.audioTranscripts==null&&source.imageTexts==null&&source.sourcePreferences==null&&source.sourceMemories==null&&source.memoryInbox==null&&
+            source.localProcessing==null&&source.ai==null&&source.sourceTags==null&&source.candidates==null&&source.sourceTask==null&&
+            source.manualTagEditor==null&&source.manualPeopleEditor==null&&source.eventDateEditor==null
+        return if(allowed&&search.acceptsInput())com.t1doo.aiyou.records.QuestionSearchBinding(navigation.generation,source,searchInput(source))else null
+    }
+    val questionHelper=remember(search,navigation) { com.t1doo.aiyou.records.QuestionKeywordController(navigation.gate,
+        currentBinding=::questionBinding,
+        retireSearch={search.invalidateInput();evidence.clear();searchReturnAnchor=null;searchReturnInput=null;searchReturnSource=null;searchLocation=null},
+        commit={request->search.tryChangeInput {
+            androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
+                searchMode=OriginalSearchMode.KEYWORDS
+                searchQuery.edit{replace(0,length,request.query)}
+                searchFrom.edit{replace(0,length,request.from)}
+                searchThrough.edit{replace(0,length,request.through)}
+                searchDateBasis=request.basis;searchModeGeneration++
+            }
+        }}) }
+    DisposableEffect(questionHelper){questionControllerRef.set(questionHelper);onDispose{questionControllerRef.compareAndSet(questionHelper,null);questionHelper.dispose()}}
+    val questionLifecycle=androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(questionHelper,questionLifecycle){
+        val observer=androidx.lifecycle.LifecycleEventObserver{_,event->
+            when(event){
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME->questionHelper.foreground(true)
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE,androidx.lifecycle.Lifecycle.Event.ON_STOP,
+                androidx.lifecycle.Lifecycle.Event.ON_DESTROY->questionHelper.foreground(false)
+                else->Unit
+            }
+        }
+        questionLifecycle.addObserver(observer)
+        questionHelper.foreground(questionLifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))
+        onDispose{questionLifecycle.removeObserver(observer);questionHelper.foreground(false)}
+    }
+    val questionUi by questionHelper.state.collectAsState()
+    SideEffect{questionHelper.sync()}
+    questionUi?.let{com.t1doo.aiyou.records.QuestionKeywordDialog(it,questionHelper)}
+    fun changeSearchInput(change:()->Unit)=navigation.gate.inputAction(generation,search,
+        {searchRouteAvailable()&&questionHelper.state.value==null}){search.changeInput(change)}
     fun clearSearch() {
         unifiedSourceRoute=false;unifiedKeywords?.retire()
         taskSourceRoute=false
@@ -539,7 +579,7 @@ fun AIyouApp(
     val questionConsentState = questionConsentEmission.let { questionConsent.visible() }
     // Read the mode while composing: reading delegated State only inside a stable
     // SideEffect lambda does not schedule that effect when just the mode changes.
-    val searchEnabled = selected == Destination.MEMORIES && !recapRoute && !reading && !browsingRecycle &&
+    val searchEnabled = questionUi == null && selected == Destination.MEMORIES && !recapRoute && !reading && !browsingRecycle &&
         !browsingPackage && !showSettings && !demo && local != null && local.originalEdit == null && local.originalHistory == null
     val evidenceEnabled = evidenceMode && searchEnabled
     SideEffect {
@@ -1233,33 +1273,19 @@ fun AIyouApp(
                 onOpenRecycleBin = recycleBin?.let { controller -> { if (ownsNavigation() && selectedName == Destination.MEMORIES.name &&
                     detailEntryId == null && !showSettings && !demo) { navigation.advance(); clearSearch(); controller.open() } } },
                 searchState = searchState, searchQuery = searchQuery, searchFrom = searchFrom, searchThrough = searchThrough,
-                onBeforeSearchInput = { field -> search.beforeInputCommit {
-                    val source = searchSource()
-                    ownsNavigation() && selectedName == Destination.MEMORIES.name && detailEntryId == null &&
-                        !showSettings && !demo && source?.ready == true && !source.opening && source.error == null &&
-                        (field === searchQuery || field === searchFrom || field === searchThrough)
-                } },
-                onHistoryInputCommitted = search::inputCommitted,
-                onRebuildLocalSearch = { if (ownsNavigation() && selectedName == Destination.MEMORIES.name && detailEntryId == null &&
-                    currentLocal?.ready == true && currentLocal?.opening == false && currentLocal?.error == null &&
-                    currentLocal?.localSearch != null && currentLocal?.localIndexBusy == false)
-                    onRebuildLocalSearch() },
-                searchPerson = searchPerson, onSearchPerson = { person -> search.changeInput {
-                    if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) {
-                        searchPerson = person; searchModeGeneration++
+                onBeforeSearchInput = { field ->
+                    navigation.gate.inputDecision(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){
+                        search.beforeInputCommit{field===searchQuery||field===searchFrom||field===searchThrough}
                     }
-                } }, onRefreshPeople = onRefreshLocalSearch,
-                searchTag = searchTag, onSearchTag = { tag -> search.changeInput { if (ownsNavigation()) { searchTag = tag; searchModeGeneration++ } } },
-                onlyFavorites = onlyFavorites, onSearchFavorites = { value -> search.changeInput {
-                    if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) {
-                        onlyFavorites = value; searchModeGeneration++
-                    }
-                } },
-                onlyImages = onlyImages, onSearchImages = { value -> search.changeInput {
-                    if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) {
-                        onlyImages = value; imageGridMode = false; searchModeGeneration++
-                    }
-                } },
+                },
+                onHistoryInputCommitted = {navigation.gate.inputAction(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){search.inputCommitted()}},
+                onQuestionKeywords={navigation.gate.inputAction(generation,search,{searchRouteAvailable()}){questionHelper.open()}},
+                onRebuildLocalSearch = { navigation.gate.inputAction(generation,search,
+                    {searchRouteAvailable()&&questionHelper.state.value==null&&currentLocal?.localSearch!=null&&currentLocal?.localIndexBusy==false}){onRebuildLocalSearch()} },
+                searchPerson = searchPerson, onSearchPerson = { person -> changeSearchInput {searchPerson=person;searchModeGeneration++} }, onRefreshPeople = {navigation.gate.inputAction(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){onRefreshLocalSearch()}},
+                searchTag = searchTag, onSearchTag = { tag -> changeSearchInput {searchTag=tag;searchModeGeneration++} },
+                onlyFavorites = onlyFavorites, onSearchFavorites = { value -> changeSearchInput {onlyFavorites=value;searchModeGeneration++} },
+                onlyImages = onlyImages, onSearchImages = { value -> changeSearchInput {onlyImages=value;imageGridMode=false;searchModeGeneration++} },
                 imageGrid = imageGrid, imageGridMode = imageGridMode,
                 evidenceMode = evidenceMode, evidenceState = evidenceState,
                 evidenceAnswerState = evidenceAnswerState, evidenceAnswerAvailable = evidenceAnswers.available,
@@ -1307,17 +1333,13 @@ fun AIyouApp(
                 ownsImageGrid = { ownsNavigation() && detailEntryId == null &&
                     selectedName == Destination.MEMORIES.name && !showSettings && !demo && imageGridMode && onlyImages &&
                     search.visible(searchSource(), searchInput()) === searchState },
-                onRefreshFavorites = { if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo) favorites?.refresh() },
+                onRefreshFavorites = {navigation.gate.inputAction(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){favorites?.refresh()}},
                 searchMode = searchMode,
                 searchDateBasis = searchDateBasis,
-                onRefreshEventDates = { if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo)
-                    onRefreshLocalSearch() },
-                onSearchDateBasis = { value -> if (ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name && !showSettings && !demo)
-                    search.changeInput { searchDateBasis = value; searchModeGeneration++ } }, onSearchMode = { search.changeInput { if (ownsNavigation()) {
-                    searchModeGeneration++
-                    searchMode = if (searchMode == OriginalSearchMode.KEYWORDS) OriginalSearchMode.EXACT else OriginalSearchMode.KEYWORDS
-                } } },
-                onClearSearch = { if (ownsNavigation()) clearSearch() }, onOpenSearchResult = openSearchResult,
+                onRefreshEventDates = {navigation.gate.inputAction(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){onRefreshLocalSearch()}},
+                onSearchDateBasis = { value -> changeSearchInput {searchDateBasis=value;searchModeGeneration++} },
+                onSearchMode = {changeSearchInput{searchModeGeneration++;searchMode=if(searchMode==OriginalSearchMode.KEYWORDS)OriginalSearchMode.EXACT else OriginalSearchMode.KEYWORDS}},
+                onClearSearch = {navigation.gate.inputAction(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){clearSearch()}}, onOpenSearchResult = openSearchResult,
                 searchReturnAnchor = searchReturnAnchor,
                 ownsSearchReturn = { ownsNavigation() && detailEntryId == null && selectedName == Destination.MEMORIES.name &&
                     !showSettings && !demo && searchReturnInput?.copy(tagSnapshot = null, peopleSnapshot = null) == searchInput().copy(tagSnapshot = null, peopleSnapshot = null) && currentLocal?.entries === searchReturnSource &&
