@@ -12,10 +12,10 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 PRODUCTION = 'b4380bdb17e52681609a552c8542de1b705f199d'
-TEST_OWNER = 'dae7d9705149fa96ff64f36703eced4d313f724c'
+TEST_OWNER = 'd72d2766c5aa289fd1ef1e4bb044f457e3e39eaa'
 SOURCE = 'app/src/test/kotlin/com/t1doo/aiyou/CompanionSettingsPresentationTest.kt'
-TEST_SHA256 = '6aa1e8a8466bf806ebf4c6dd105fa0b263fb88efd3f09a3e05242afe359defb7'
-MESSAGE = '[ui-companion-probe] b438 finite motion admission'
+TEST_SHA256 = 'efbf8336dbb462e5f584a92830753f8b3929e339c3eaac12d5b120777e646046'
+MESSAGE = '[ui-companion-probe] b438 all action admissions'
 REF = 'refs/heads/codex/d03-short-audio-design-20261020'
 CLASS = 'com.t1doo.aiyou.CompanionSettingsPresentationTest'
 METHOD = 'finiteInteractionMotionStopsOnReductionAndBackgroundWithoutAutomaticReplay'
@@ -25,6 +25,14 @@ ALLOWED = {SOURCE, '.github/workflows/android.yml', 'scripts/diagnose-companion-
 OUTPUT = 'build/companion-motion-diagnostic'
 TRACE = 'app/build/reports/companion-motion/interactions/motion-probe.json'
 FRAMES = ('00-idle.png', '01-greeting.png', '02-encouraging.png', '02b-quiet-still.png', '03-background-still.png')
+CHECKPOINTS = {
+    'greeting-before-reduction': ('scrollStable', 'before', 'afterClick', 'firstFrame', '64ms'),
+    'encouragement-before-quiet': ('scrollStable', 'before', 'afterClick', 'firstFrame', '96ms'),
+    'quiet-cancel': ('scrollStable', 'before', 'afterClick', 'firstFrame'),
+    'encouragement-before-background': ('scrollStable', 'before', 'afterClick', 'firstFrame', '96ms'),
+    'encouragement-natural-finish': ('scrollStable', 'before', 'afterClick', 'firstFrame', '96ms', 'settled'),
+    'fallback-greeting': ('scrollStable', 'before', 'afterClick', 'firstFrame', '64ms'),
+}
 
 
 def require(value, message):
@@ -113,12 +121,13 @@ def collect(root, env):
         require(data['source_sha'] == env['GITHUB_SHA'] and data['method'] == METHOD, 'Foreign trace')
         observations = data['observations']
         require(isinstance(observations, list) and 0 < len(observations) <= 512, 'Empty/unbounded trace')
-        points = [row['point'] for row in observations]
+        points = [(row['phase'], row['point']) for row in observations]
         result['trace'] = {'path': TRACE, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
                            'observations': len(observations),
-                           'checkpoints': [point for point in ('before', 'afterClick', 'firstFrame', '96ms') if point in points]}
-        require(all(points.count(point) == 1 for point in ('before', 'afterClick', 'firstFrame', '96ms')),
-                'Incomplete/duplicate checkpoint trace remains FAIL')
+                           'checkpoints_by_phase': {phase: [point for point in expected if (phase, point) in points]
+                                                    for phase, expected in CHECKPOINTS.items()}}
+        require(all(points.count((phase, point)) == 1 for phase, expected in CHECKPOINTS.items() for point in expected),
+                'Incomplete/duplicate phase-and-point trace remains FAIL')
         require(env.get('TARGET_OUTCOME') == env.get('SCHEMA_OUTCOME') == 'success' and result['actual']['failures'] == 0, 'Original method/schema failure remains FAIL')
         require(len(result['captures']) == len(FRAMES), 'A successful complete method must produce all five captures')
         result['status'] = 'PASS'

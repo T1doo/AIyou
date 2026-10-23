@@ -50,7 +50,7 @@ class CompanionDiagnosticTests(unittest.TestCase):
         path = root / probe.TRACE
         path.parent.mkdir(parents=True, exist_ok=True)
         data = {'source_sha': '1' * 40, 'method': probe.METHOD,
-                'observations': [{'point': point} for point in ('before', 'afterClick', 'firstFrame', '96ms')]}
+                'observations': [{'phase': phase, 'point': point} for phase, points in probe.CHECKPOINTS.items() for point in points]}
         path.write_text(json.dumps(data))
         for name in probe.FRAMES:
             (path.parent / name).write_bytes(b'synthetic fixture; not actual PNG or Android evidence')
@@ -64,7 +64,8 @@ class CompanionDiagnosticTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 probe.request({**self.env(), key: value}, self.event())
         for event in [{'repository': {'private': True}, 'head_commit': {'message': probe.MESSAGE}},
-                      {'repository': {'private': False}, 'head_commit': {'message': probe.MESSAGE + ' extra'}}]:
+                      {'repository': {'private': False}, 'head_commit': {'message': probe.MESSAGE + ' extra'}},
+                      {'repository': {'private': False}, 'head_commit': {'message': '[ui-companion-probe] b438 finite motion admission'}}]:
             with self.assertRaises(ValueError):
                 probe.request(self.env(), event)
 
@@ -98,7 +99,7 @@ class CompanionDiagnosticTests(unittest.TestCase):
                 self.assertIn('not D01', result['kind'])
 
     def test_trace_identity_empty_duplicate_and_incomplete_checkpoints_cannot_pass(self):
-        for kind in ('source', 'method', 'empty', 'duplicate', 'incomplete', 'unbounded', 'missing', 'capture'):
+        for kind in ('source', 'method', 'empty', 'duplicate', 'wrong-phase', 'incomplete', 'unbounded', 'missing', 'capture'):
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp); folder = root / probe.OUTPUT; folder.mkdir(parents=True)
                 (folder / 'admission.json').write_text(json.dumps({'source_sha': '1' * 40, 'run_id': 123, 'run_attempt': 1, 'started_ns': 0}))
@@ -107,7 +108,8 @@ class CompanionDiagnosticTests(unittest.TestCase):
                 if kind == 'source': data['source_sha'] = '2' * 40
                 elif kind == 'method': data['method'] = 'other'
                 elif kind == 'empty': data['observations'] = []
-                elif kind == 'duplicate': data['observations'].append({'point': 'before'})
+                elif kind == 'duplicate': data['observations'].append(dict(data['observations'][0]))
+                elif kind == 'wrong-phase': data['observations'][0]['phase'] = 'other'
                 elif kind == 'incomplete': data['observations'].pop()
                 elif kind == 'unbounded': data['observations'] *= 129
                 elif kind == 'capture': (trace.parent / probe.FRAMES[-1]).unlink()
@@ -123,7 +125,7 @@ class CompanionDiagnosticTests(unittest.TestCase):
                          hashlib.sha256((self.formal_workflow().rstrip('\n') + '\n').encode()).hexdigest())
         selector = ("github.event_name == 'push' && github.repository == 'T1doo/AIyou' && "
                     "github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && "
-                    "github.event.head_commit.message == '[ui-companion-probe] b438 finite motion admission'")
+                    "github.event.head_commit.message == '[ui-companion-probe] b438 all action admissions'")
         self.assertEqual(5, workflow.count(selector))
         self.assertEqual(3, workflow.count('    if: ${{ !(' + selector + ') }}'))
         self.assertEqual(1, workflow.count('    if: ${{ ' + selector + ' }}'))
