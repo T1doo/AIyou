@@ -154,7 +154,8 @@ for label, folder, minimum in targets:
             "doubleFontLandscapeKeyboardDisclosureAndSearchRemainReachableWithoutCallingTools")
         additional["com.t1doo.aiyou.MixedNotebookPresentationTest"] = (
             "realNotebookUsesBundledLuluOnlyWhenPreferenceIsReadyAndVisibleWithoutWritingRecords",
-            "emptyLandscapeDoubleFontHasReachableStartAndFocusedComposerWithoutWriting")
+            "emptyLandscapeDoubleFontHasReachableStartAndFocusedComposerWithoutWriting",
+            "coldRegularFontLandscapeStartsCompactAndRetainsDraftAcrossReadOnlyActions")
         additional["com.t1doo.aiyou.QuestionKeywordPresentationTest"] = (
             "realAppRequiresExplicitDateAndQueriesOnceThenOpensUnchangedNegativeOriginal",
             "restorationAndActualActivityPauseRetireQuestionWithoutSavingOrQuerying",
@@ -301,6 +302,7 @@ for label, folder, minimum in targets:
             "failedSaveRetainsTextAndImagesAndPrivateComposerNeverEntersSavedState",
             "newSaveWhileComposerIsScrolledOnlyOffersExplicitJumpAndReaderReturnKeepsNextDraft",
             "lostClearAckHasReachableSameClearRetryAndCannotPromiseContinuedEditingBeforeVerification",
+            "viewportAndFontChangesPreserveDraftAndRangeThenSaveOnlyOnExplicitAction",
         )
         additional["com.t1doo.aiyou.FactRecapPresentationTest"] = (
             "recapExactAudioOpensManualEditorAndReturnsToSameWeekWithoutChangingOriginal",

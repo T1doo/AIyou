@@ -350,14 +350,14 @@ jobs:
           raw = source.read_bytes()
           suite = ET.fromstring(raw)
           cases = list(suite.iter('testcase'))
-          assert int(suite.get('tests', '-1')) == len(cases) == 8
+          assert int(suite.get('tests', '-1')) == len(cases) == 9
           assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
           assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
-          assert len({(case.get('classname'), case.get('name')) for case in cases}) == 8
+          assert len({(case.get('classname'), case.get('name')) for case in cases}) == 9
           target = Path('app/build/reports/capture-policy-targeted')
           target.mkdir(parents=True, exist_ok=True)
           shutil.copy2(source, target / source.name)
-          receipt = {'tests': 8, 'failures': 0, 'errors': 0, 'skipped': 0,
+          receipt = {'tests': 9, 'failures': 0, 'errors': 0, 'skipped': 0,
                      'sha256': hashlib.sha256(raw).hexdigest(), 'path': str(target / source.name)}
           (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
           print('CAPTURE_POLICY_TARGETED_XML_JSON ' + json.dumps(receipt))
