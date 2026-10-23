@@ -1,0 +1,15 @@
+// Explicit opt-in host evaluator. Does not change normal test source sets or CI.
+gradle.projectsEvaluated {
+    def root = new File(System.getenv('AIYOU_QUALITY_ROOT'))
+    def output = new File(System.getenv('AIYOU_QUALITY_OUTPUT'))
+    def target = gradle.rootProject.project(':remote-text')
+    target.extensions.getByName('kotlin').sourceSets.getByName('test').kotlin.srcDir(new File(root, 'checks/retrieval-quality/v3/src'))
+    target.tasks.named('test') {
+        systemProperty 'aiyou.quality.root', root.absolutePath
+        systemProperty 'aiyou.quality.output', output.absolutePath
+        systemProperty 'aiyou.quality.stage', System.getenv('AIYOU_QUALITY_STAGE')
+        reports.junitXml.outputLocation = new File(output, 'xml')
+        reports.html.outputLocation = new File(output, 'html')
+        binaryResultsDirectory = new File(output, 'binary')
+    }
+}

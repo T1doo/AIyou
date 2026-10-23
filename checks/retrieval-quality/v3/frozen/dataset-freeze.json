@@ -1,0 +1,41 @@
+{
+  "stage": "DATASET_FROZEN_BEFORE_LABELS_PROPOSALS_OR_QUERIES",
+  "created_utc": "2026-10-23T04:08:27.103665+00:00",
+  "product_baseline": "50e31ae31d4bfd5ab66e4602ed118612994c03f9",
+  "files": [
+    {
+      "path": "corpus.json",
+      "sha256": "12ce4c0f95b209d179228b2188c36650935c86ad5822280a95527ce5f7ccbbc2"
+    },
+    {
+      "path": "questions.json",
+      "sha256": "f181813560608ff18fc6bed64fe5b2ddddf74859cbc156905d42b2a4ac0d8479"
+    },
+    {
+      "path": "curation-revision.json",
+      "sha256": "456d36cdc3f9e5685d2effd112acf8b39adfdd1c9e82e35685e93e953e2806cd"
+    }
+  ],
+  "production_sources": [
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/QuestionKeywordController.kt",
+      "sha256": "e1be1be09e44500aa9053ece4c4608ce3a291676311ed210389f3cdbacec3f99"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/QuestionKeywordFragments.kt",
+      "sha256": "f85a01198ce2b9b1c4140dd2e9b5ea59c2ed9d7401125950c954c8773202aec8"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchController.kt",
+      "sha256": "be25c1f53ca3c5480681099eb0336b46d63dc7f4e5d1730416c737d5e65d82db"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchMatcher.kt",
+      "sha256": "8c47b70f2680ce87f93335d0b0363d3c3c5e91f62841711ea4594349879f2127"
+    },
+    {
+      "path": "core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlLocalSearchRepository.kt",
+      "sha256": "370c3b6246e7bfc9360c0453dbacf9f6e620f269d8a3843eb34c99afa5b04748"
+    }
+  ]
+}

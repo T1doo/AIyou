@@ -1,0 +1,653 @@
+{
+    "epoch": 141,
+    "scope": "actual repository snapshots after synthetic fixture installation; host SQLite with AEAD metadata, not device SQLCipher",
+    "sources": [
+        {
+            "id": "r14",
+            "revision": 1,
+            "text_sha256": "9c784db63126b61c45ae72470b3874b00a0318dada501e3f1a9c0ebcbacb76af",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "9c784db63126b61c45ae72470b3874b00a0318dada501e3f1a9c0ebcbacb76af",
+            "names": [
+                "陶宁"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿宁",
+                    "name": "陶宁"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-18"
+        },
+        {
+            "id": "r34",
+            "revision": 1,
+            "text_sha256": "e7c8b2449f2c44d3c78d0592d47f4b4e2cf160eb7587cc864cef72e395af60d3",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "e7c8b2449f2c44d3c78d0592d47f4b4e2cf160eb7587cc864cef72e395af60d3",
+            "names": [
+                "宋朔"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿朔",
+                    "name": "宋朔"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-10-16"
+        },
+        {
+            "id": "r27",
+            "revision": 1,
+            "text_sha256": "9a5bb93a45a7b4805eca5ece164b5e26036753bd51dab849e5d1d777946b55c5",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "9a5bb93a45a7b4805eca5ece164b5e26036753bd51dab849e5d1d777946b55c5",
+            "names": [
+                "贺澄"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿澄",
+                    "name": "贺澄"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-10-03"
+        },
+        {
+            "id": "r30",
+            "revision": 1,
+            "text_sha256": "5ef5a148765788db4ffad96826fce731671dd9e842844f09107c5170e23e1995",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "5ef5a148765788db4ffad96826fce731671dd9e842844f09107c5170e23e1995",
+            "names": [
+                "顾秋"
+            ],
+            "aliases": [
+                {
+                    "alias": "老顾",
+                    "name": "顾秋"
+                }
+            ],
+            "event_version": 0,
+            "event_date": null
+        },
+        {
+            "id": "r16",
+            "revision": 1,
+            "text_sha256": "9b6140ad2225636080022af1040cd0e567b4ff3e5ab01c99657ad2e4310614a4",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "9b6140ad2225636080022af1040cd0e567b4ff3e5ab01c99657ad2e4310614a4",
+            "names": [
+                "许南"
+            ],
+            "aliases": [
+                {
+                    "alias": "南南",
+                    "name": "许南"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-26"
+        },
+        {
+            "id": "r08",
+            "revision": 1,
+            "text_sha256": "69525218532fbb9ed15ab69a393a8aeaaa9e11f825e2d6549d9b345b73a1dc9e",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "69525218532fbb9ed15ab69a393a8aeaaa9e11f825e2d6549d9b345b73a1dc9e",
+            "names": [
+                "梁南"
+            ],
+            "aliases": [
+                {
+                    "alias": "南南",
+                    "name": "梁南"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-13"
+        },
+        {
+            "id": "r01",
+            "revision": 1,
+            "text_sha256": "f9a80e58664e7dc8a6486fc1cd38e8676cf2c6cdc0a40511c79aaedc7a9900f8",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "f9a80e58664e7dc8a6486fc1cd38e8676cf2c6cdc0a40511c79aaedc7a9900f8",
+            "names": [
+                "陶宁"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿宁",
+                    "name": "陶宁"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-08"
+        },
+        {
+            "id": "r07",
+            "revision": 1,
+            "text_sha256": "622ea04607c68632e8fb57b684933d5ad8286997a4fd34f8eaed3ffeac322477",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "622ea04607c68632e8fb57b684933d5ad8286997a4fd34f8eaed3ffeac322477",
+            "names": [
+                "陶宁"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿宁",
+                    "name": "陶宁"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-13"
+        },
+        {
+            "id": "r12",
+            "revision": 1,
+            "text_sha256": "54dfd7c141d198b39dfa0958cc2638e429e5b5877a2ca6268ccc553a4fb81897",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "54dfd7c141d198b39dfa0958cc2638e429e5b5877a2ca6268ccc553a4fb81897",
+            "names": [
+                "宋朔",
+                "唐序"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿朔",
+                    "name": "宋朔"
+                },
+                {
+                    "alias": "阿序",
+                    "name": "唐序"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-16"
+        },
+        {
+            "id": "r18",
+            "revision": 1,
+            "text_sha256": "f439cb6c53889392a50bdfb08f8fb4a95b458ac671ae2a5f3bb07454674df20d",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "f439cb6c53889392a50bdfb08f8fb4a95b458ac671ae2a5f3bb07454674df20d",
+            "names": [
+                "任宁"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿宁",
+                    "name": "任宁"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-21"
+        },
+        {
+            "id": "r10",
+            "revision": 1,
+            "text_sha256": "f4cf5daebd71f889100992aca2f0c8608a2a1986779007988799f71ba056090e",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "f4cf5daebd71f889100992aca2f0c8608a2a1986779007988799f71ba056090e",
+            "names": [
+                "宋朔"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿朔",
+                    "name": "宋朔"
+                }
+            ],
+            "event_version": 0,
+            "event_date": null
+        },
+        {
+            "id": "r06",
+            "revision": 1,
+            "text_sha256": "6c8404218bbb62ca15305d300c41013e7f3bb1d8150e92fcc9b286892dcd6ac2",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "6c8404218bbb62ca15305d300c41013e7f3bb1d8150e92fcc9b286892dcd6ac2",
+            "names": [
+                "顾秋"
+            ],
+            "aliases": [
+                {
+                    "alias": "老顾",
+                    "name": "顾秋"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-12"
+        },
+        {
+            "id": "r09",
+            "revision": 1,
+            "text_sha256": "36efcc97064e5e10d514086c1fd35b283bcf70207a463c626245b67854635728",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "36efcc97064e5e10d514086c1fd35b283bcf70207a463c626245b67854635728",
+            "names": [
+                "陆言"
+            ],
+            "aliases": [
+                {
+                    "alias": "小陆",
+                    "name": "陆言"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-10-14"
+        },
+        {
+            "id": "r29",
+            "revision": 1,
+            "text_sha256": "d5f6ad9a77e6ee8bb6fa915cb0ede2cedb4c53987616c35786bc78e8dc43952d",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "d5f6ad9a77e6ee8bb6fa915cb0ede2cedb4c53987616c35786bc78e8dc43952d",
+            "names": [
+                "顾岑"
+            ],
+            "aliases": [
+                {
+                    "alias": "老顾",
+                    "name": "顾岑"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-10-06"
+        },
+        {
+            "id": "r05",
+            "revision": 1,
+            "text_sha256": "4297759e0405f49baa116178ff63878fcb6c72f9961eac0982851c97aefad108",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "4297759e0405f49baa116178ff63878fcb6c72f9961eac0982851c97aefad108",
+            "names": [
+                "顾岑"
+            ],
+            "aliases": [
+                {
+                    "alias": "老顾",
+                    "name": "顾岑"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-11"
+        },
+        {
+            "id": "r32",
+            "revision": 2,
+            "text_sha256": "8695f2ffce257fba122f2445df08b30fba5d9badf575fc411574ce3a813f6806",
+            "people_version": 1,
+            "people_source_revision": 2,
+            "people_source_hash": "8695f2ffce257fba122f2445df08b30fba5d9badf575fc411574ce3a813f6806",
+            "names": [
+                "陶宁"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿宁",
+                    "name": "陶宁"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-25"
+        },
+        {
+            "id": "r04",
+            "revision": 1,
+            "text_sha256": "92f605e8ede3df61c9f764a7c0c57930dbc1b11123ee774570a971a70cb0ce44",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "92f605e8ede3df61c9f764a7c0c57930dbc1b11123ee774570a971a70cb0ce44",
+            "names": [
+                "禾安"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿禾",
+                    "name": "禾安"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-10"
+        },
+        {
+            "id": "r33",
+            "revision": 1,
+            "text_sha256": "852d7c970878374bdf0689c4b3f10d8033ce07896cd630511baf70f9121bf27c",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "852d7c970878374bdf0689c4b3f10d8033ce07896cd630511baf70f9121bf27c",
+            "names": [
+                "梁南"
+            ],
+            "aliases": [
+                {
+                    "alias": "南南",
+                    "name": "梁南"
+                }
+            ],
+            "event_version": 0,
+            "event_date": null
+        },
+        {
+            "id": "r15",
+            "revision": 1,
+            "text_sha256": "4373eb1465102d868ae5d55a008e1e2c4cd2f4030e5245ddb4983a24ef36f870",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "4373eb1465102d868ae5d55a008e1e2c4cd2f4030e5245ddb4983a24ef36f870",
+            "names": [
+                "顾秋",
+                "贺澄"
+            ],
+            "aliases": [
+                {
+                    "alias": "老顾",
+                    "name": "顾秋"
+                },
+                {
+                    "alias": "阿澄",
+                    "name": "贺澄"
+                }
+            ],
+            "event_version": 0,
+            "event_date": null
+        },
+        {
+            "id": "r13",
+            "revision": 1,
+            "text_sha256": "94864515f5f650aece03e78feebe6f71bc5cc450ae99836c39b0f5d1183e36dd",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "94864515f5f650aece03e78feebe6f71bc5cc450ae99836c39b0f5d1183e36dd",
+            "names": [
+                "唐序",
+                "贺澄"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿序",
+                    "name": "唐序"
+                },
+                {
+                    "alias": "阿澄",
+                    "name": "贺澄"
+                }
+            ],
+            "event_version": 0,
+            "event_date": null
+        },
+        {
+            "id": "r21",
+            "revision": 1,
+            "text_sha256": "3ef3ea47827f1e9161cef2a12117419fd62b02d9593628798a0e562eac7f43d4",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "3ef3ea47827f1e9161cef2a12117419fd62b02d9593628798a0e562eac7f43d4",
+            "names": [
+                "顾岑"
+            ],
+            "aliases": [
+                {
+                    "alias": "老顾",
+                    "name": "顾岑"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-23"
+        },
+        {
+            "id": "r02",
+            "revision": 1,
+            "text_sha256": "29867a330bd086040fb848ecd1b235a75f74b643bd89be0edfa24ec757d42a40",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "29867a330bd086040fb848ecd1b235a75f74b643bd89be0edfa24ec757d42a40",
+            "names": [
+                "任宁"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿宁",
+                    "name": "任宁"
+                }
+            ],
+            "event_version": 0,
+            "event_date": null
+        },
+        {
+            "id": "r24",
+            "revision": 1,
+            "text_sha256": "8b07f520fd50ec86909baf15067de3772b88fc02a17148efc8ae597748c0616f",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "8b07f520fd50ec86909baf15067de3772b88fc02a17148efc8ae597748c0616f",
+            "names": [
+                "禾安"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿禾",
+                    "name": "禾安"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-24"
+        },
+        {
+            "id": "r28",
+            "revision": 1,
+            "text_sha256": "897baf29eed0cfafd1ed0e0af2eb6a5b7a463bf20538d24fa72bb1122ce2a958",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "897baf29eed0cfafd1ed0e0af2eb6a5b7a463bf20538d24fa72bb1122ce2a958",
+            "names": [
+                "贺澄"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿澄",
+                    "name": "贺澄"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-10-08"
+        },
+        {
+            "id": "r17",
+            "revision": 1,
+            "text_sha256": "14115cea6d9f592eab090241c43d8ec7c6c56d3f908fce357c2319d859e82def",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "14115cea6d9f592eab090241c43d8ec7c6c56d3f908fce357c2319d859e82def",
+            "names": [
+                "陶宁"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿宁",
+                    "name": "陶宁"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-21"
+        },
+        {
+            "id": "r25",
+            "revision": 1,
+            "text_sha256": "7ae9e9f6a80a3f02ec88341528e25c0ba1bd78f127ad23ee1fa0b282c3036a1c",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "7ae9e9f6a80a3f02ec88341528e25c0ba1bd78f127ad23ee1fa0b282c3036a1c",
+            "names": [
+                "陆言"
+            ],
+            "aliases": [
+                {
+                    "alias": "小陆",
+                    "name": "陆言"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-10-02"
+        },
+        {
+            "id": "r22",
+            "revision": 1,
+            "text_sha256": "4dfccf53b7e4e3f50f0af23b336adcf2203ab635bb206f88bb46f30194777cd4",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "4dfccf53b7e4e3f50f0af23b336adcf2203ab635bb206f88bb46f30194777cd4",
+            "names": [
+                "顾秋"
+            ],
+            "aliases": [
+                {
+                    "alias": "老顾",
+                    "name": "顾秋"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-23"
+        },
+        {
+            "id": "r19",
+            "revision": 1,
+            "text_sha256": "7b7d90e88800a79d26eebe63fca6b9a2a0cb1aa8e20d9ec960a5611fd78778e3",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "7b7d90e88800a79d26eebe63fca6b9a2a0cb1aa8e20d9ec960a5611fd78778e3",
+            "names": [
+                "许南"
+            ],
+            "aliases": [
+                {
+                    "alias": "南南",
+                    "name": "许南"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-26"
+        },
+        {
+            "id": "r03",
+            "revision": 1,
+            "text_sha256": "6e18b8f900b10632936b776812649f3cf94c146c1d4396430251c56a88c6bb9d",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "6e18b8f900b10632936b776812649f3cf94c146c1d4396430251c56a88c6bb9d",
+            "names": [
+                "江禾"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿禾",
+                    "name": "江禾"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-10"
+        },
+        {
+            "id": "r26",
+            "revision": 1,
+            "text_sha256": "df38b9db4783d06fd909a90c4f6a50879442523ad9164a3640a194fe32bd4a16",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "df38b9db4783d06fd909a90c4f6a50879442523ad9164a3640a194fe32bd4a16",
+            "names": [
+                "陆言"
+            ],
+            "aliases": [
+                {
+                    "alias": "小陆",
+                    "name": "陆言"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-10-01"
+        },
+        {
+            "id": "r11",
+            "revision": 2,
+            "text_sha256": "d0d9fb2aa192fee025516c0533616a5566cc70493f87e99559146a9c9ea752df",
+            "people_version": 1,
+            "people_source_revision": 2,
+            "people_source_hash": "d0d9fb2aa192fee025516c0533616a5566cc70493f87e99559146a9c9ea752df",
+            "names": [
+                "宋朔",
+                "唐序"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿朔",
+                    "name": "宋朔"
+                },
+                {
+                    "alias": "阿序",
+                    "name": "唐序"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-15"
+        },
+        {
+            "id": "r20",
+            "revision": 1,
+            "text_sha256": "5716821cbb7dc5a89e4ce003159211442d4947811406a07146cdbe83162927de",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "5716821cbb7dc5a89e4ce003159211442d4947811406a07146cdbe83162927de",
+            "names": [
+                "梁南"
+            ],
+            "aliases": [
+                {
+                    "alias": "南南",
+                    "name": "梁南"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-22"
+        },
+        {
+            "id": "r23",
+            "revision": 1,
+            "text_sha256": "abc6f6ccfc1b59433b59a80bfc5b38bc2590d0f474d2e1d1e56b973b138acabe",
+            "people_version": 1,
+            "people_source_revision": 1,
+            "people_source_hash": "abc6f6ccfc1b59433b59a80bfc5b38bc2590d0f474d2e1d1e56b973b138acabe",
+            "names": [
+                "江禾"
+            ],
+            "aliases": [
+                {
+                    "alias": "阿禾",
+                    "name": "江禾"
+                }
+            ],
+            "event_version": 1,
+            "event_date": "2026-09-24"
+        }
+    ]
+}

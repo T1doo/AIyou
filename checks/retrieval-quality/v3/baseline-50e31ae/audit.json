@@ -1,0 +1,30 @@
+{
+  "checks": [
+    {
+      "stage": "calibration-01",
+      "junit_tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "method": "calibrateRealControllersAndSqlBeforeHoldout"
+    },
+    {
+      "stage": "proposals-01",
+      "junit_tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "method": "emitActualProposalsWithoutSearchingHoldout"
+    },
+    {
+      "stage": "paired-01",
+      "junit_tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "method": "runFrozenIndependentPairedPathsOnce"
+    }
+  ],
+  "actual_owner_snapshots": "PASS: 33 current source identity/hash/people/date states per route match frozen corpus",
+  "initial_audit_correction": "First ad hoc assertion incorrectly expected alphabetically sorted names. Actual canonical names preserve declared order; corrected check compares frozen declared names exactly. No corpus/observations/product/query was changed or reexecuted."
+}

@@ -1,0 +1,58 @@
+{
+  "status": "independent_agent_roles_completed_before_first_query",
+  "created_utc": "2026-10-23T04:16:11.286474+00:00",
+  "gold_actors": [
+    "/root/holdout_gold_a",
+    "/root/holdout_gold_b"
+  ],
+  "choice_actors": [
+    "/root/holdout_direct_operator",
+    "/root/holdout_assisted_operator"
+  ],
+  "adjudicator": "/root, implementation-aware, no held-out results seen; not a third independent labeler",
+  "limits": "fresh contexts, allowed input file paths and explicit task restrictions; self-attested compliance; shared configured model; no OS-enforced isolation, no human or statistical independence",
+  "materials_receipt": "role-materials.json",
+  "outputs": [
+    {
+      "path": "gold-a.json",
+      "sha256": "965e6df9a5436c13b1c336b90ea4b4fcadeed3db22b6dcad8f48ae3344d3af3e",
+      "actor": "/root/holdout_gold_a",
+      "kind": "agent",
+      "visibility_attestation": {
+        "read_paths": [
+          "/workspace/AIyou/checks/retrieval-quality/v3/frozen/corpus.json",
+          "/workspace/AIyou/checks/retrieval-quality/v3/frozen/questions.json"
+        ],
+        "statement": "实际仅通过exec_command读取上述两个文件，并完整阅读34条来源和24题。未读取其他文件、目录清单、源码、历史、实现、候选、评测结果、他人标签或操作计划；未使用网络、子代理或文件写入。以下是代理独立合成标注，不是人类标注或用户研究。"
+      }
+    },
+    {
+      "path": "gold-b.json",
+      "sha256": "0fcc0d4e2770d8fe7a4d60149323969ca256c8803e84c1131f0219b799711059",
+      "actor": "/root/holdout_gold_b",
+      "kind": "agent",
+      "visibility_attestation": {
+        "materials_seen": [
+          "/workspace/AIyou/checks/retrieval-quality/v3/frozen/corpus.json",
+          "/workspace/AIyou/checks/retrieval-quality/v3/frozen/questions.json"
+        ],
+        "scope": "仅使用exec_command完整读取上述两个文件，逐题检查全部34条来源。除任务说明和环境信息外，未读取其他文件、目录清单、源码、历史、操作计划、检索候选、运行结果或他人标签；未使用网络、子代理或文件写入。",
+        "independence_limit": "这是代理独立复核标注，不是人类独立标注或真实用户研究；材料访问范围由本代理遵守任务约束，不声称存在操作系统强制隔离。"
+      }
+    },
+    {
+      "path": "actions-direct.json",
+      "sha256": "7258e030df95122176baf7ec29bf8e1a5481bd235e5a10d5ee8c906ed2ec0296",
+      "actor": "/root/holdout_direct_operator",
+      "kind": "agent",
+      "visibility_attestation": "仅见指定questions.json问题文件及角色任务说明；未见gold、corpus、源码、助手候选、其他操作计划、历史或运行结果；未做检索、未访问网络、未使用子代理；这是代理模拟操作，无真实用户。"
+    },
+    {
+      "path": "actions-assisted.json",
+      "sha256": "51dfc1d2b7093101a78b7a94a5ba3db2bf489ab2f3027236743703edd538b984",
+      "actor": "/root/holdout_assisted_operator",
+      "kind": "agent",
+      "visibility_attestation": "我是独立本地问句助手操作者H，非真实用户；只读取本任务指定的questions.json与proposals.json，未见gold、corpus、D计划、查询结果、源码、历史或其他实现材料；未查询、未联网、未使用子代理。所有计划均为首次盲选，日期选择表示本操作者主动确认给定日期条件，不表示自动解析。"
+    }
+  ]
+}

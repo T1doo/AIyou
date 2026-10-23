@@ -1,0 +1,647 @@
+{
+  "version": 3,
+  "provenance": {
+    "actor": "/root/holdout_curator",
+    "kind": "agent; same configured model, no claim of human or statistical independence",
+    "fork_turns": "none",
+    "tool_access": "explicitly prohibited by task; agent attests no external material, not an OS-enforced data sandbox",
+    "statement": "我是独立合成检索挑战集策展代理，只见本任务说明，未见产品实现、历史分数、候选片段或运行结果；以下人物与记录均为新编虚构材料。",
+    "transcription": "parent canonically transcribed structured response; formatting differs from chat bytes"
+  },
+  "records": [
+    {
+      "id": "r01",
+      "text": "陶宁记：自行车一用力就有踩空感。把后拨附近缠住的细线取掉，再调紧变速线后，短距离试骑顺了。",
+      "captured": "2026-09-08T09:10:00Z",
+      "zone": "UTC",
+      "names": [
+        "陶宁"
+      ],
+      "aliases": [
+        {
+          "alias": "阿宁",
+          "name": "陶宁"
+        }
+      ],
+      "event_date": "2026-09-08",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r02",
+      "text": "任宁记：自行车坐垫想换成窄一点的，车链清洗也列进清单；两件事都还没动手。",
+      "captured": "2026-09-09T03:20:00Z",
+      "zone": "Asia/Shanghai",
+      "names": [
+        "任宁"
+      ],
+      "aliases": [
+        {
+          "alias": "阿宁",
+          "name": "任宁"
+        }
+      ],
+      "event_date": null,
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r03",
+      "text": "江禾记：窗台绿植浇透后先放水槽沥一阵，再放回托盘；托盘里的水当天倒掉，别让盆底一直泡着。",
+      "captured": "2026-09-10T07:40:00Z",
+      "zone": "UTC",
+      "names": [
+        "江禾"
+      ],
+      "aliases": [
+        {
+          "alias": "阿禾",
+          "name": "江禾"
+        }
+      ],
+      "event_date": "2026-09-10",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r04",
+      "text": "禾安记：窗台托盘量过尺寸了，新的接水盘能放下三只空花盆。这次只整理空盆，没有浇植物。",
+      "captured": "2026-09-10T12:00:00Z",
+      "zone": "UTC",
+      "names": [
+        "禾安"
+      ],
+      "aliases": [
+        {
+          "alias": "阿禾",
+          "name": "禾安"
+        }
+      ],
+      "event_date": "2026-09-10",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r05",
+      "text": "顾岑记：搬桌子前，把每根电线两头都贴上设备名；插头收进同一个袋子，装回去时少猜了好多。",
+      "captured": "2026-09-11T08:30:00Z",
+      "zone": "UTC",
+      "names": [
+        "顾岑"
+      ],
+      "aliases": [
+        {
+          "alias": "老顾",
+          "name": "顾岑"
+        }
+      ],
+      "event_date": "2026-09-11",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r06",
+      "text": "顾秋记：给抽屉贴标签时只写了颜色，电线仍放在原来的纸盒里。这张标签表是找文具用的。",
+      "captured": "2026-09-12T06:10:00Z",
+      "zone": "Asia/Shanghai",
+      "names": [
+        "顾秋"
+      ],
+      "aliases": [
+        {
+          "alias": "老顾",
+          "name": "顾秋"
+        }
+      ],
+      "event_date": "2026-09-12",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r07",
+      "text": "陶宁记：会议录音里有持续的风扇声，下次把录音笔移到桌边，并在开始前试听十秒。",
+      "captured": "2026-09-13T10:45:00Z",
+      "zone": "UTC",
+      "names": [
+        "陶宁"
+      ],
+      "aliases": [
+        {
+          "alias": "阿宁",
+          "name": "陶宁"
+        }
+      ],
+      "event_date": "2026-09-13",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r08",
+      "text": "梁南记：录了一段屋檐滴水声，风扇关着。这个文件留作纸灯短片的背景声音。",
+      "captured": "2026-09-13T14:20:00Z",
+      "zone": "UTC",
+      "names": [
+        "梁南"
+      ],
+      "aliases": [
+        {
+          "alias": "南南",
+          "name": "梁南"
+        }
+      ],
+      "event_date": "2026-09-13",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r09",
+      "text": "陆言记：纸模型搬运时先拆下高出的塔顶，主体固定在硬纸板上，四周留空；不要把整件直接塞进软袋。",
+      "captured": "2026-10-14T08:00:00Z",
+      "zone": "UTC",
+      "names": [
+        "陆言"
+      ],
+      "aliases": [
+        {
+          "alias": "小陆",
+          "name": "陆言"
+        }
+      ],
+      "event_date": "2026-10-14",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r10",
+      "text": "宋朔记：纸模型的说明书已经装袋，主体还摆在桌上。想买硬纸板，但这周先不搬它。",
+      "captured": "2026-10-18T09:00:00Z",
+      "zone": "UTC",
+      "names": [
+        "宋朔"
+      ],
+      "aliases": [
+        {
+          "alias": "阿朔",
+          "name": "宋朔"
+        }
+      ],
+      "event_date": null,
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r11",
+      "text": "宋朔更正：我没有把那只蓝边陶碗送给唐序，只是借给他拍照，周末还要取回来。",
+      "captured": "2026-09-15T11:25:00Z",
+      "zone": "UTC",
+      "names": [
+        "宋朔",
+        "唐序"
+      ],
+      "aliases": [
+        {
+          "alias": "阿朔",
+          "name": "宋朔"
+        },
+        {
+          "alias": "阿序",
+          "name": "唐序"
+        }
+      ],
+      "event_date": "2026-09-15",
+      "state": "current",
+      "revision": 2,
+      "old_text": "宋朔记：蓝边陶碗已经送给唐序了，不用再取回来。"
+    },
+    {
+      "id": "r12",
+      "text": "宋朔记下唐序的原话：“面团第二次发酵别只看钟，先看它有没有明显鼓起来。”这是他的做法，我还没试。",
+      "captured": "2026-09-16T05:30:00Z",
+      "zone": "Asia/Shanghai",
+      "names": [
+        "宋朔",
+        "唐序"
+      ],
+      "aliases": [
+        {
+          "alias": "阿朔",
+          "name": "宋朔"
+        },
+        {
+          "alias": "阿序",
+          "name": "唐序"
+        }
+      ],
+      "event_date": "2026-09-16",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r13",
+      "text": "唐序记：想向贺澄借折叠梯擦高窗，消息还没发出去；先把窗边的陶碗挪开。",
+      "captured": "2026-09-17T04:45:00Z",
+      "zone": "UTC",
+      "names": [
+        "唐序",
+        "贺澄"
+      ],
+      "aliases": [
+        {
+          "alias": "阿序",
+          "name": "唐序"
+        },
+        {
+          "alias": "阿澄",
+          "name": "贺澄"
+        }
+      ],
+      "event_date": null,
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r14",
+      "text": "陶宁记：上回说自行车后胎已经补好，是把前胎记混了。后胎仍会慢慢漏气，今天只换了气门帽。",
+      "captured": "2026-09-18T13:10:00Z",
+      "zone": "UTC",
+      "names": [
+        "陶宁"
+      ],
+      "aliases": [
+        {
+          "alias": "阿宁",
+          "name": "陶宁"
+        }
+      ],
+      "event_date": "2026-09-18",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r15",
+      "text": "顾秋记：贺澄说“周日那班公交可能停开”，但他也说还没核对公告。我把这句话记下来，尚未据此改行程。",
+      "captured": "2026-09-19T09:30:00Z",
+      "zone": "UTC",
+      "names": [
+        "顾秋",
+        "贺澄"
+      ],
+      "aliases": [
+        {
+          "alias": "老顾",
+          "name": "顾秋"
+        },
+        {
+          "alias": "阿澄",
+          "name": "贺澄"
+        }
+      ],
+      "event_date": null,
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r16",
+      "text": "许南记：没有取消周六的修伞预约，只是把送伞时间从上午挪到下午；确认短信已经存好。",
+      "captured": "2026-09-20T08:15:00Z",
+      "zone": "Asia/Shanghai",
+      "names": [
+        "许南"
+      ],
+      "aliases": [
+        {
+          "alias": "南南",
+          "name": "许南"
+        }
+      ],
+      "event_date": "2026-09-26",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r17",
+      "text": "阿宁的自行车清洁便签：先擦掉车链外侧浮灰，再少量上油，最后擦去多余的油。",
+      "captured": "2026-09-21T07:20:00Z",
+      "zone": "UTC",
+      "names": [
+        "陶宁"
+      ],
+      "aliases": [
+        {
+          "alias": "阿宁",
+          "name": "陶宁"
+        }
+      ],
+      "event_date": "2026-09-21",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r18",
+      "text": "阿宁的面团配方便签：这次水先留一小杯，揉开后再决定加不加；旁边写着“自行车清洁另记”。",
+      "captured": "2026-09-21T10:20:00Z",
+      "zone": "UTC",
+      "names": [
+        "任宁"
+      ],
+      "aliases": [
+        {
+          "alias": "阿宁",
+          "name": "任宁"
+        }
+      ],
+      "event_date": "2026-09-21",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r19",
+      "text": "南南的修伞清单：带上掉下来的伞骨接头，伞套不用带；纸灯架子的修补排到以后。",
+      "captured": "2026-09-22T02:40:00Z",
+      "zone": "Asia/Shanghai",
+      "names": [
+        "许南"
+      ],
+      "aliases": [
+        {
+          "alias": "南南",
+          "name": "许南"
+        }
+      ],
+      "event_date": "2026-09-26",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r20",
+      "text": "南南的纸灯便签：灯架接头先用纸胶固定，再套灯罩；那把坏伞只是临时拿来比大小。",
+      "captured": "2026-09-22T10:40:00Z",
+      "zone": "UTC",
+      "names": [
+        "梁南"
+      ],
+      "aliases": [
+        {
+          "alias": "南南",
+          "name": "梁南"
+        }
+      ],
+      "event_date": "2026-09-22",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r21",
+      "text": "老顾的快递便签：退回的支架装原盒，螺丝袋贴在盒内侧，寄出前拍一张封箱照。",
+      "captured": "2026-09-23T08:10:00Z",
+      "zone": "UTC",
+      "names": [
+        "顾岑"
+      ],
+      "aliases": [
+        {
+          "alias": "老顾",
+          "name": "顾岑"
+        }
+      ],
+      "event_date": "2026-09-23",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r22",
+      "text": "老顾的快递便签：收到的是折叠支架，纸盒留下装文具；这单不用退货，也不用封箱拍照。",
+      "captured": "2026-09-23T12:10:00Z",
+      "zone": "UTC",
+      "names": [
+        "顾秋"
+      ],
+      "aliases": [
+        {
+          "alias": "老顾",
+          "name": "顾秋"
+        }
+      ],
+      "event_date": "2026-09-23",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r23",
+      "text": "阿禾的育苗便签：种子浅埋，喷湿表面，盖子每天掀开一会儿；棋盘旁那盒不要浇水，里面是备用标签。",
+      "captured": "2026-09-24T05:00:00Z",
+      "zone": "Asia/Shanghai",
+      "names": [
+        "江禾"
+      ],
+      "aliases": [
+        {
+          "alias": "阿禾",
+          "name": "江禾"
+        }
+      ],
+      "event_date": "2026-09-24",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r24",
+      "text": "阿禾的棋具整理：黑白棋子分别装盒，缺的那枚已用标签标出；育苗盘只是拿来临时分装棋子。",
+      "captured": "2026-09-24T11:00:00Z",
+      "zone": "UTC",
+      "names": [
+        "禾安"
+      ],
+      "aliases": [
+        {
+          "alias": "阿禾",
+          "name": "禾安"
+        }
+      ],
+      "event_date": "2026-09-24",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r25",
+      "text": "陆言记：窗纱边框检查完了，右下角压条松动，准备后天带新压条来换。记笔记时上海已经过了午夜。",
+      "captured": "2026-09-30T16:15:00Z",
+      "zone": "Asia/Shanghai",
+      "names": [
+        "陆言"
+      ],
+      "aliases": [
+        {
+          "alias": "小陆",
+          "name": "陆言"
+        }
+      ],
+      "event_date": "2026-10-02",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r26",
+      "text": "陆言记：又检查了一遍窗纱，左侧没有松动，右下角压条仍待更换。这条是早上补记的。",
+      "captured": "2026-10-01T00:20:00Z",
+      "zone": "Asia/Shanghai",
+      "names": [
+        "陆言"
+      ],
+      "aliases": [
+        {
+          "alias": "小陆",
+          "name": "陆言"
+        }
+      ],
+      "event_date": "2026-10-01",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r27",
+      "text": "贺澄补记：十月三日把旧提琴送去检查，师傅说先观察琴桥倾斜情况，暂时不换弦。",
+      "captured": "2026-10-05T09:00:00Z",
+      "zone": "UTC",
+      "names": [
+        "贺澄"
+      ],
+      "aliases": [
+        {
+          "alias": "阿澄",
+          "name": "贺澄"
+        }
+      ],
+      "event_date": "2026-10-03",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r28",
+      "text": "贺澄记：约了十月八日再去看提琴，带上旧琴弦作比较。这条只记录预约安排。",
+      "captured": "2026-10-03T09:00:00Z",
+      "zone": "UTC",
+      "names": [
+        "贺澄"
+      ],
+      "aliases": [
+        {
+          "alias": "阿澄",
+          "name": "贺澄"
+        }
+      ],
+      "event_date": "2026-10-08",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r29",
+      "text": "顾岑补记校对：十月六日核过说明卡，第二页尺寸单位应统一成毫米，封面标题没有改。",
+      "captured": "2026-10-09T07:00:00Z",
+      "zone": "UTC",
+      "names": [
+        "顾岑"
+      ],
+      "aliases": [
+        {
+          "alias": "老顾",
+          "name": "顾岑"
+        }
+      ],
+      "event_date": "2026-10-06",
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r30",
+      "text": "顾秋记：文件名里写着“十月六日校对”，说明卡第二页的尺寸单位还要再核；这份笔记没有填写事件日期。",
+      "captured": "2026-10-06T07:00:00Z",
+      "zone": "UTC",
+      "names": [
+        "顾秋"
+      ],
+      "aliases": [
+        {
+          "alias": "老顾",
+          "name": "顾秋"
+        }
+      ],
+      "event_date": null,
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r31",
+      "text": "任宁记：水族箱换过滤棉前先停泵，把旧棉放进小桶，再按原来的方向装回新棉。",
+      "captured": "2026-09-14T08:00:00Z",
+      "zone": "UTC",
+      "names": [
+        "任宁"
+      ],
+      "aliases": [
+        {
+          "alias": "阿宁",
+          "name": "任宁"
+        }
+      ],
+      "event_date": "2026-09-14",
+      "state": "deleted",
+      "revision": 1
+    },
+    {
+      "id": "r32",
+      "text": "陶宁更正录音便签：试听后发现杂声来自窗边施工，风扇当时没有开；下次先关窗再试录。",
+      "captured": "2026-09-25T10:00:00Z",
+      "zone": "UTC",
+      "names": [
+        "陶宁"
+      ],
+      "aliases": [
+        {
+          "alias": "阿宁",
+          "name": "陶宁"
+        }
+      ],
+      "event_date": "2026-09-25",
+      "state": "current",
+      "revision": 2,
+      "old_text": "陶宁记：这次录音的杂声全是风扇造成的，下次一定先关风扇。"
+    },
+    {
+      "id": "r33",
+      "text": "梁南记：下周换走廊的灯泡，先量灯罩开口，再找稳固的折叠梯。现在还没有选具体哪天。",
+      "captured": "2026-10-10T11:00:00Z",
+      "zone": "UTC",
+      "names": [
+        "梁南"
+      ],
+      "aliases": [
+        {
+          "alias": "南南",
+          "name": "梁南"
+        }
+      ],
+      "event_date": null,
+      "state": "current",
+      "revision": 1
+    },
+    {
+      "id": "r34",
+      "text": "宋朔记：十月十六日给纸模型拍了尺寸照，只移动了台灯，没有拆塔顶，也没有装箱。",
+      "captured": "2026-10-19T08:00:00Z",
+      "zone": "UTC",
+      "names": [
+        "宋朔"
+      ],
+      "aliases": [
+        {
+          "alias": "阿朔",
+          "name": "宋朔"
+        }
+      ],
+      "event_date": "2026-10-16",
+      "state": "current",
+      "revision": 1
+    }
+  ]
+}

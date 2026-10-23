@@ -1,0 +1,103 @@
+{
+  "stage": "ALL_LABELS_PLANS_FROZEN_BEFORE_FIRST_QUERY",
+  "created_utc": "2026-10-23T04:16:11.287555+00:00",
+  "product_baseline": "50e31ae31d4bfd5ab66e4602ed118612994c03f9",
+  "files": [
+    {
+      "path": "corpus.json",
+      "sha256": "12ce4c0f95b209d179228b2188c36650935c86ad5822280a95527ce5f7ccbbc2"
+    },
+    {
+      "path": "questions.json",
+      "sha256": "f181813560608ff18fc6bed64fe5b2ddddf74859cbc156905d42b2a4ac0d8479"
+    },
+    {
+      "path": "curation-revision.json",
+      "sha256": "456d36cdc3f9e5685d2effd112acf8b39adfdd1c9e82e35685e93e953e2806cd"
+    },
+    {
+      "path": "dataset-freeze.json",
+      "sha256": "3fadd2034aebdc6d631b0535660b1a9b4db95f6a6c39d689296c64dabf0d134e"
+    },
+    {
+      "path": "gold-a.json",
+      "sha256": "965e6df9a5436c13b1c336b90ea4b4fcadeed3db22b6dcad8f48ae3344d3af3e"
+    },
+    {
+      "path": "gold-b.json",
+      "sha256": "0fcc0d4e2770d8fe7a4d60149323969ca256c8803e84c1131f0219b799711059"
+    },
+    {
+      "path": "gold-adjudicated.json",
+      "sha256": "38f4a1f32c61e1293306f5983fa7e36354df784735c515f49557e0c477ed519e"
+    },
+    {
+      "path": "gold-freeze.json",
+      "sha256": "a16798c786af4e0e6e1e00e39ce31b97a9d1a62d825a54a0125dfa2551c59c1e"
+    },
+    {
+      "path": "actions-direct.json",
+      "sha256": "7258e030df95122176baf7ec29bf8e1a5481bd235e5a10d5ee8c906ed2ec0296"
+    },
+    {
+      "path": "actions-assisted.json",
+      "sha256": "51dfc1d2b7093101a78b7a94a5ba3db2bf489ab2f3027236743703edd538b984"
+    },
+    {
+      "path": "proposals.json",
+      "sha256": "83ce7f6a8a4b2d60e0ae6d4927d394ea93fd109a370898292abad6440780f6b0"
+    },
+    {
+      "path": "role-materials.json",
+      "sha256": "e84b4c0e432c21596719d86441b18ffd27680241582ff56efca30eb76522e010"
+    },
+    {
+      "path": "role-receipts.json",
+      "sha256": "57a95a9aba17866d11044691da82e9f419a15551f33f81a3a7862f3fd96431fc"
+    }
+  ],
+  "production_sources": [
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/QuestionKeywordController.kt",
+      "sha256": "e1be1be09e44500aa9053ece4c4608ce3a291676311ed210389f3cdbacec3f99"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/QuestionKeywordFragments.kt",
+      "sha256": "f85a01198ce2b9b1c4140dd2e9b5ea59c2ed9d7401125950c954c8773202aec8"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchController.kt",
+      "sha256": "be25c1f53ca3c5480681099eb0336b46d63dc7f4e5d1730416c737d5e65d82db"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchMatcher.kt",
+      "sha256": "8c47b70f2680ce87f93335d0b0363d3c3c5e91f62841711ea4594349879f2127"
+    },
+    {
+      "path": "core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlLocalSearchRepository.kt",
+      "sha256": "370c3b6246e7bfc9360c0453dbacf9f6e620f269d8a3843eb34c99afa5b04748"
+    }
+  ],
+  "executor_sources": [
+    {
+      "path": "checks/retrieval-quality/v3/protocol.json",
+      "sha256": "f0298883883b0487189e3bdf5d77680ee27a87b89e3b027ced77506d7505c9f0"
+    },
+    {
+      "path": "checks/retrieval-quality/v3/run.init.gradle",
+      "sha256": "bab8a9567ee52aec13160dac6417e04acf70475ff7b94dee0460c73c1dfe5cef"
+    },
+    {
+      "path": "checks/retrieval-quality/v3/run.sh",
+      "sha256": "94b71ee4c83ed6fa143b5db39f4b1895036e63660ae949818f46eb7b83681227"
+    },
+    {
+      "path": "checks/retrieval-quality/v3/score.py",
+      "sha256": "2e1cfb4c425cadd7e3b798b827cd320cb907b53d1ad93671eefc2826b94db80f"
+    },
+    {
+      "path": "checks/retrieval-quality/v3/src/com/t1doo/aiyou/data/IndependentHoldoutEvaluation.kt",
+      "sha256": "5db3ff9f17abcf26e235bafc1a9c4b2218b5da100c978a8b3468dc6349b04e85"
+    }
+  ]
+}

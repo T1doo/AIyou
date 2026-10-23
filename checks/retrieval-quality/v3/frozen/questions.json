@@ -1,0 +1,400 @@
+{
+  "version": 3,
+  "reference_instant": "2026-10-23T12:00:00Z",
+  "reference_zone": "UTC",
+  "questions": [
+    {
+      "id": "q01",
+      "stratum": "paraphrase",
+      "question": "找找骑车使劲蹬时突然使不上力、后来怎么排查的笔记。",
+      "information_need": "找回自行车踩踏传动异常及排查处理相关素材。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q02",
+      "stratum": "paraphrase",
+      "question": "我记过怎么避免花盆下面老是存着水吗？",
+      "information_need": "查找盆栽浇水后排出余水、处理盆底积水的相关素材。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q03",
+      "stratum": "paraphrase",
+      "question": "搬完桌子以后能认清每根线该插哪儿的办法，帮我翻出来。",
+      "information_need": "找回搬动设备时标记、收纳电线以便重新连接的素材。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q04",
+      "stratum": "paraphrase",
+      "question": "有一段是讲纸做的立体作品怎么带走才不容易压坏，找一下。",
+      "information_need": "查找纸模型搬运保护、拆装或包装方法相关素材。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q05",
+      "stratum": "paraphrase",
+      "question": "帮我找水族箱里那层过滤材料怎么换的笔记。",
+      "information_need": "查找水族箱过滤材料更换步骤的相关素材。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q06",
+      "stratum": "paraphrase",
+      "question": "剪刀用钝以后怎么让它重新好剪，我有没有记过方法？",
+      "information_need": "查找剪刀刃口维护或恢复剪切效果的方法素材。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q07",
+      "stratum": "negation_and_quotation",
+      "question": "找宋朔提到把蓝边陶碗送给唐序的那些记录。",
+      "information_need": "找回围绕陶碗转送、借用或相关更正的素材，相关否定陈述也属于检索范围。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q08",
+      "stratum": "negation_and_quotation",
+      "question": "唐序说过面团发酵该怎么看，原来是怎么记的？",
+      "information_need": "查找记录唐序发酵观察方法的素材，保留说话人及引用关系。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q09",
+      "stratum": "negation_and_quotation",
+      "question": "找一下唐序向贺澄借梯子擦窗这件事的笔记。",
+      "information_need": "找回关于借梯擦窗的相关素材，包括意向、准备或尚未完成的安排。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q10",
+      "stratum": "negation_and_quotation",
+      "question": "陶宁说自行车后胎补好了的记录，帮我找找。",
+      "information_need": "查找后胎修补状态相关素材，包括对先前说法的否定或更正。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q11",
+      "stratum": "negation_and_quotation",
+      "question": "贺澄提到周日公交停开的那段话在哪里？",
+      "information_need": "找回涉及贺澄公交停开说法的记录，包含引述及核实程度的上下文。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q12",
+      "stratum": "negation_and_quotation",
+      "question": "许南取消修伞预约这事有没有相关记录？",
+      "information_need": "查找修伞预约取消或变更相关素材，包括否认取消的说明。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q13",
+      "stratum": "record_scoped_manual_person_alias",
+      "question": "找手工关联到陶宁的自行车清洁便签，正文也可能只写了阿宁。",
+      "information_need": "依据各记录自己的手工人物关系，找陶宁相关的自行车清洁素材。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q14",
+      "stratum": "record_scoped_manual_person_alias",
+      "question": "任宁那份面团加水的便签找一下，我记得正文叫他阿宁。",
+      "information_need": "依据记录级手工人物关系，查找任宁相关的面团配方或加水方法素材。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q15",
+      "stratum": "record_scoped_manual_person_alias",
+      "question": "找许南修伞要带什么的清单，可能是用南南这个称呼记的。",
+      "information_need": "依据各记录手工关联的人物，找许南相关的修伞携带物品素材。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q16",
+      "stratum": "record_scoped_manual_person_alias",
+      "question": "梁南那个纸灯架子怎么固定的便签在哪里？正文好像只写南南。",
+      "information_need": "根据记录自身的人物关联，查找梁南相关的纸灯组装素材。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q17",
+      "stratum": "record_scoped_manual_person_alias",
+      "question": "顾岑记的退支架打包办法找出来，老顾那张也算。",
+      "information_need": "依据记录级手工称呼关联，查找顾岑相关的支架退货包装素材。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q18",
+      "stratum": "record_scoped_manual_person_alias",
+      "question": "江禾的种子育苗笔记帮我找找，阿禾这个称呼也可能出现在正文里。",
+      "information_need": "依据各记录的手工人物映射，查找江禾相关的育苗操作素材。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNLIMITED"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q19",
+      "stratum": "date_basis_and_ambiguity",
+      "question": "按每条记录保存的时区换算捕获日期，找10月1日记下的窗纱检查内容；上海当地已到10月1日、UTC仍是9月30日的，也按10月1日算。",
+      "information_need": "找回按各记录自身保存时区换算后，捕获日期为2026年10月1日的窗纱检查素材。使用捕获日期，不使用人工事件日期，也不将所有记录统一换算成UTC日期；reference_zone仅用于解释相对时间。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "2026-10-01",
+        "through": "2026-10-01",
+        "date_decision": "RANGE"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q20",
+      "stratum": "date_basis_and_ambiguity",
+      "question": "按手工填写的事件日期，找10月3日送提琴检查的记录，晚几天补记的也要找。",
+      "information_need": "查找人工事件日期为2026年10月3日、涉及提琴检查的素材。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "EVENT",
+        "from": "2026-10-03",
+        "through": "2026-10-03",
+        "date_decision": "RANGE"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q21",
+      "stratum": "date_basis_and_ambiguity",
+      "question": "找手工事件日期填为10月6日的说明卡校对笔记，日期只看那个字段。",
+      "information_need": "查找人工事件日期明确填写为2026年10月6日的说明卡校对素材；正文日期或捕获日期不能替代该字段。",
+      "resolution_status": "resolved",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "EVENT",
+        "from": "2026-10-06",
+        "through": "2026-10-06",
+        "date_decision": "RANGE"
+      },
+      "ambiguity_alternatives": []
+    },
+    {
+      "id": "q22",
+      "stratum": "date_basis_and_ambiguity",
+      "question": "找10月3日的提琴记录。",
+      "information_need": "查找与提琴有关且符合所指10月3日日期条件的素材，需要确定日期采用捕获日期还是人工事件日期。",
+      "resolution_status": "clarification_required",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": null,
+        "from": "",
+        "through": "",
+        "date_decision": "UNRESOLVED"
+      },
+      "ambiguity_alternatives": [
+        "按UTC捕获日期查找2026年10月3日记下的提琴素材。",
+        "按人工事件日期查找2026年10月3日发生或安排的提琴事项素材。"
+      ]
+    },
+    {
+      "id": "q23",
+      "stratum": "date_basis_and_ambiguity",
+      "question": "找上周记下的纸模型笔记。",
+      "information_need": "查找捕获时间落在用户所指上周范围内的纸模型素材，需要确定上周的区间含义。",
+      "resolution_status": "clarification_required",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": "CAPTURED",
+        "from": "",
+        "through": "",
+        "date_decision": "UNRESOLVED"
+      },
+      "ambiguity_alternatives": [
+        "上周指参考日期之前的完整自然周，即UTC的2026年10月12日至10月18日。",
+        "上周指参考日期之前的七个完整日期，即UTC的2026年10月16日至10月22日。"
+      ]
+    },
+    {
+      "id": "q24",
+      "stratum": "date_basis_and_ambiguity",
+      "question": "下周换走廊灯泡的记录找一下。",
+      "information_need": "查找换走廊灯泡安排相关素材，需要确定下周是相对当前参考时间，还是记录原文中的相对时间。",
+      "resolution_status": "clarification_required",
+      "context": {
+        "reference_instant": "2026-10-23T12:00:00Z",
+        "reference_zone": "UTC",
+        "date_basis": null,
+        "from": "",
+        "through": "",
+        "date_decision": "UNRESOLVED"
+      },
+      "ambiguity_alternatives": [
+        "查找人工事件日期落在当前参考时间的下一自然周，即2026年10月26日至11月1日的换灯安排。",
+        "查找原文提到下周换灯的素材，其中下周相对各记录写下时的时间理解。"
+      ]
+    }
+  ]
+}

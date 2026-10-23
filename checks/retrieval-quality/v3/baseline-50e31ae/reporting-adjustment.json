@@ -1,0 +1,5 @@
+{
+  "reason": "Reporting-only after first scoring: direct path does not use helper. Previously emitted helper-action zero counters could falsely suggest zero human effort in D. Mark helper metrics N/A for D and report 21 direct typing plans plus explicit range decisions separately. No gold/plan/observations or primary metric changes; first score and frozen scorer bytes retained.",
+  "original_scorer_sha256": "2e1cfb4c425cadd7e3b798b827cd320cb907b53d1ad93671eefc2826b94db80f",
+  "current_scorer_sha256": "81dc381fb5304c6ae28f467e93f1e1540017ce0b4e62380ebf0bcbe4c6512a68"
+}

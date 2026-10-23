@@ -1,0 +1,10 @@
+{
+  "stage": "before any held-out query/proposals/labels",
+  "original_q19": {
+    "question": "按UTC的捕获日期，找9月30日记下的窗纱检查内容；上海当地已经进入10月的也算。",
+    "information_need": "找回UTC捕获日期为2026年9月30日的窗纱检查素材，日期判断使用捕获时刻而非事件日期。",
+    "from": "2026-09-30",
+    "through": "2026-09-30"
+  },
+  "reason": "Curator had not received public stored-timezone LocalDate semantics in initial task. Follow-up supplied that method contract only; curator rewrote q19. No results or gold existed."
+}

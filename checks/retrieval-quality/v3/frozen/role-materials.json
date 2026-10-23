@@ -1,0 +1,59 @@
+{
+  "status": "PREQUERY_ROLE_MATERIALS",
+  "created_utc": "2026-10-23T04:15:32.136471+00:00",
+  "same_model_bias": "All roles use the inherited configured model without overrides; fresh-context separation is not statistical/human independence or OS-enforced file isolation. Explicit task allowed-path restrictions applied before creation.",
+  "curator": {
+    "actor": "/root/holdout_curator",
+    "fork_turns": "none",
+    "allowed": "task only; no tools; later public stored-timezone date contract only",
+    "output": "parent canonical transcription of complete structured message, preserving semantic records/questions; q19 revised prequery; raw chat formatting not claimed byte-identical",
+    "output_files": [
+      {
+        "path": "corpus.json",
+        "sha256": "12ce4c0f95b209d179228b2188c36650935c86ad5822280a95527ce5f7ccbbc2"
+      },
+      {
+        "path": "questions.json",
+        "sha256": "f181813560608ff18fc6bed64fe5b2ddddf74859cbc156905d42b2a4ac0d8479"
+      },
+      {
+        "path": "curation-revision.json",
+        "sha256": "456d36cdc3f9e5685d2effd112acf8b39adfdd1c9e82e35685e93e953e2806cd"
+      }
+    ]
+  },
+  "gold_materials": [
+    {
+      "path": "corpus.json",
+      "sha256": "12ce4c0f95b209d179228b2188c36650935c86ad5822280a95527ce5f7ccbbc2"
+    },
+    {
+      "path": "questions.json",
+      "sha256": "f181813560608ff18fc6bed64fe5b2ddddf74859cbc156905d42b2a4ac0d8479"
+    }
+  ],
+  "direct_materials": [
+    {
+      "path": "questions.json",
+      "sha256": "f181813560608ff18fc6bed64fe5b2ddddf74859cbc156905d42b2a4ac0d8479"
+    }
+  ],
+  "assisted_materials": [
+    {
+      "path": "questions.json",
+      "sha256": "f181813560608ff18fc6bed64fe5b2ddddf74859cbc156905d42b2a4ac0d8479"
+    },
+    {
+      "path": "proposals.json",
+      "sha256": "83ce7f6a8a4b2d60e0ae6d4927d394ea93fd109a370898292abad6440780f6b0"
+    }
+  ],
+  "allowed_archive_paths": [
+    "/tmp/aiyou-v3-gold-a.json",
+    "/tmp/aiyou-v3-gold-b.json",
+    "/tmp/aiyou-v3-actions-direct.json",
+    "/tmp/aiyou-v3-actions-assisted.json"
+  ],
+  "product_writers": 1,
+  "ranked_holdout_observations_exist": false
+}

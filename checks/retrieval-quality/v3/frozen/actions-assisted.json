@@ -1,0 +1,612 @@
+{
+  "actor": "/root/holdout_assisted_operator",
+  "kind": "agent",
+  "visibility_attestation": "我是独立本地问句助手操作者H，非真实用户；只读取本任务指定的questions.json与proposals.json，未见gold、corpus、D计划、查询结果、源码、历史或其他实现材料；未查询、未联网、未使用子代理。所有计划均为首次盲选，日期选择表示本操作者主动确认给定日期条件，不表示自动解析。",
+  "plans": [
+    {
+      "id": "q01",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 2,
+          "end": 4,
+          "text": "骑车"
+        }
+      ],
+      "manual_terms": [
+        "自行车",
+        "传动"
+      ],
+      "term_edit_required": true,
+      "rationale": "把口语中的骑车使不上力改为自行车传动这组较短的主题词；本次会手工替换关键词。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q02",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 7,
+          "end": 9,
+          "text": "花盆"
+        }
+      ],
+      "manual_terms": [
+        "盆底",
+        "积水"
+      ],
+      "term_edit_required": true,
+      "rationale": "花盆下存水可用盆底积水更直接地概括；本次会手工输入这两个词。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q03",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 9,
+          "end": 12,
+          "text": "每根线"
+        }
+      ],
+      "manual_terms": [
+        "电线",
+        "标记"
+      ],
+      "term_edit_required": true,
+      "rationale": "每根线太口语化，改用电线与标记表达重新接线前的处理方法；本次需要手工替换。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q04",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 8,
+          "end": 12,
+          "text": "立体作品"
+        }
+      ],
+      "manual_terms": [
+        "纸模型",
+        "包装"
+      ],
+      "term_edit_required": true,
+      "rationale": "纸模型和包装更集中表达纸制立体作品的搬运保护需求；本次会手工替换。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q05",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 3,
+          "end": 6,
+          "text": "水族箱"
+        },
+        {
+          "start": 9,
+          "end": 13,
+          "text": "过滤材料"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "候选已经包含对象及材料，选这两个片段足以开始查找，无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q06",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 0,
+          "end": 2,
+          "text": "剪刀"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "剪刀是明确且短的对象词，可先据此找维护方法，无需把口语效果描述加入检索，也无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q07",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 1,
+          "end": 3,
+          "text": "宋朔"
+        },
+        {
+          "start": 6,
+          "end": 10,
+          "text": "蓝边陶碗"
+        },
+        {
+          "start": 12,
+          "end": 14,
+          "text": "唐序"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "选择两个人名及特征明显的物件，不用送给来限定事实状态；候选可直接使用，无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q08",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 0,
+          "end": 2,
+          "text": "唐序"
+        },
+        {
+          "start": 4,
+          "end": 6,
+          "text": "面团"
+        },
+        {
+          "start": 6,
+          "end": 8,
+          "text": "发酵"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "保留说话人与面团发酵主题，候选可直接使用，无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q09",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 3,
+          "end": 5,
+          "text": "唐序"
+        },
+        {
+          "start": 6,
+          "end": 8,
+          "text": "贺澄"
+        },
+        {
+          "start": 9,
+          "end": 11,
+          "text": "梯子"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "两个人名与梯子能界定这件事，不把借用是否完成写进关键词；无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q10",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 0,
+          "end": 2,
+          "text": "陶宁"
+        },
+        {
+          "start": 6,
+          "end": 8,
+          "text": "后胎"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "选择人物和后胎主题，避免用补好了排除更正记录；无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q11",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 0,
+          "end": 2,
+          "text": "贺澄"
+        },
+        {
+          "start": 6,
+          "end": 8,
+          "text": "公交"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "选择人物和公交主题，不用停开作为状态限制；候选足够简短，无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q12",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 0,
+          "end": 2,
+          "text": "许南"
+        },
+        {
+          "start": 4,
+          "end": 6,
+          "text": "修伞"
+        },
+        {
+          "start": 6,
+          "end": 8,
+          "text": "预约"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "人物及修伞预约已界定事项，不用取消限定记录；无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q13",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 6,
+          "end": 8,
+          "text": "陶宁"
+        },
+        {
+          "start": 9,
+          "end": 12,
+          "text": "自行车"
+        },
+        {
+          "start": 12,
+          "end": 14,
+          "text": "清洁"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "使用明确的人物名和自行车清洁主题；阿宁有记录级关系，不额外把称呼作为必须同时出现的词；无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q14",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 0,
+          "end": 2,
+          "text": "任宁"
+        },
+        {
+          "start": 4,
+          "end": 6,
+          "text": "面团"
+        },
+        {
+          "start": 6,
+          "end": 8,
+          "text": "加水"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "明确人物与面团加水主题已在候选中，不强制正文称呼阿宁同时出现；无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q15",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 1,
+          "end": 3,
+          "text": "许南"
+        },
+        {
+          "start": 3,
+          "end": 5,
+          "text": "修伞"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "人物与修伞主题足够简短，不把南南作为必须同时出现的正文词；无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q16",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 0,
+          "end": 2,
+          "text": "梁南"
+        },
+        {
+          "start": 4,
+          "end": 6,
+          "text": "纸灯"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "使用明确人物与纸灯主题，不把可能的称呼南南作为额外必含词；无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q17",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 0,
+          "end": 2,
+          "text": "顾岑"
+        },
+        {
+          "start": 5,
+          "end": 7,
+          "text": "支架"
+        },
+        {
+          "start": 7,
+          "end": 9,
+          "text": "打包"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "明确人物、支架及打包能表达所找内容，不强制称呼老顾同时出现；无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q18",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 0,
+          "end": 2,
+          "text": "江禾"
+        },
+        {
+          "start": 5,
+          "end": 7,
+          "text": "育苗"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "明确人物与育苗主题已足够定位，不强制称呼阿禾同时出现；无需手改。",
+      "reason": "主动确认以CAPTURED为日期依据且不限日期，再以本次关键词计划查询。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q19",
+      "decision": "confirm",
+      "selected": [],
+      "manual_terms": [
+        "窗纱",
+        "检查"
+      ],
+      "term_edit_required": true,
+      "rationale": "已给候选中没有窗纱和检查这两个所需片段；本次会手工输入主题词，并单独确认日期条件。",
+      "reason": "主动确认按各记录保存时区换算的CAPTURED日期，范围2026-10-01至2026-10-01。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "RANGE",
+        "from": "2026-10-01",
+        "through": "2026-10-01"
+      }
+    },
+    {
+      "id": "q20",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 18,
+          "end": 20,
+          "text": "提琴"
+        },
+        {
+          "start": 20,
+          "end": 22,
+          "text": "检查"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "选择提琴与检查作为主题，日期通过确认人工事件日期单独表达；无需手改。",
+      "reason": "主动确认人工填写的EVENT日期，范围2026-10-03至2026-10-03。",
+      "date_choice": {
+        "date_basis": "EVENT",
+        "date_decision": "RANGE",
+        "from": "2026-10-03",
+        "through": "2026-10-03"
+      }
+    },
+    {
+      "id": "q21",
+      "decision": "confirm",
+      "selected": [
+        {
+          "start": 15,
+          "end": 18,
+          "text": "说明卡"
+        },
+        {
+          "start": 18,
+          "end": 20,
+          "text": "校对"
+        }
+      ],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "选择说明卡与校对作为主题，日期通过确认指定字段单独表达；无需手改。",
+      "reason": "主动确认人工填写的EVENT日期，范围2026-10-06至2026-10-06。",
+      "date_choice": {
+        "date_basis": "EVENT",
+        "date_decision": "RANGE",
+        "from": "2026-10-06",
+        "through": "2026-10-06"
+      }
+    },
+    {
+      "id": "q22",
+      "decision": "abstain",
+      "selected": [],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "日期依据未确定，本次暂不选词、不编辑，等待明确捕获日期或人工事件日期。",
+      "reason": "需要用户明确10月3日采用捕获日期还是人工事件日期，不能代选。",
+      "date_choice": {
+        "date_basis": null,
+        "date_decision": "UNRESOLVED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q23",
+      "decision": "abstain",
+      "selected": [],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "上周的区间含义未确定，本次暂不选词、不编辑，等待日期范围明确。",
+      "reason": "需要用户明确上周的日期区间，不能代选自然周或前七个完整日期。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNRESOLVED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q24",
+      "decision": "abstain",
+      "selected": [],
+      "manual_terms": null,
+      "term_edit_required": false,
+      "rationale": "下周相对当前时间还是原文时间未确定，本次暂不选词、不编辑，等待时间含义明确。",
+      "reason": "需要用户明确下周的参照时间及对应日期依据，不能代选。",
+      "date_choice": {
+        "date_basis": null,
+        "date_decision": "UNRESOLVED",
+        "from": "",
+        "through": ""
+      }
+    }
+  ]
+}

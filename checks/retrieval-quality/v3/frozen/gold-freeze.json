@@ -1,0 +1,22 @@
+{
+  "stage": "GOLD_FROZEN_BEFORE_OPERATOR_PLANS_AND_QUERIES",
+  "created_utc": "2026-10-23T04:13:56.841725+00:00",
+  "files": [
+    {
+      "path": "dataset-freeze.json",
+      "sha256": "3fadd2034aebdc6d631b0535660b1a9b4db95f6a6c39d689296c64dabf0d134e"
+    },
+    {
+      "path": "gold-a.json",
+      "sha256": "965e6df9a5436c13b1c336b90ea4b4fcadeed3db22b6dcad8f48ae3344d3af3e"
+    },
+    {
+      "path": "gold-b.json",
+      "sha256": "0fcc0d4e2770d8fe7a4d60149323969ca256c8803e84c1131f0219b799711059"
+    },
+    {
+      "path": "gold-adjudicated.json",
+      "sha256": "38f4a1f32c61e1293306f5983fa7e36354df784735c515f49557e0c477ed519e"
+    }
+  ]
+}

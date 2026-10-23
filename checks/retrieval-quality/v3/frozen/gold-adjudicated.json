@@ -1,0 +1,540 @@
+{
+  "actor": "/root (implementation-aware prequery adjudicator, not a third blind labeler)",
+  "created_utc": "2026-10-23T04:13:56.841100+00:00",
+  "queries_run": 0,
+  "labels": [
+    {
+      "id": "q01",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r01",
+          "revision": 1,
+          "reason": "记录使劲踩踏时踩空，并记录清除后拨附近细线、调紧变速线及试骑反馈，直接满足传动异常与排查处理需求。",
+          "support_limits": "仅支持该次短距离试骑改善，不能证明故障长期完全消失。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r02",
+          "reason": "坐垫更换和链条清洗尚未进行，没有踩踏传动异常及排查内容。"
+        },
+        {
+          "id": "r14",
+          "reason": "讨论后胎漏气和修补状态，不是踩踏传动异常。"
+        },
+        {
+          "id": "r17",
+          "reason": "常规链条清洁上油步骤，没有异常表现或针对异常的排查联系。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q02",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r03",
+          "revision": 1,
+          "reason": "明确说明浇透后沥水、倒掉托盘余水，避免盆底持续泡水。",
+          "support_limits": "属于操作建议，未提供长期实施结果。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r04",
+          "reason": "整理空花盆和测量托盘尺寸，没有浇水后排余水的方法。"
+        },
+        {
+          "id": "r23",
+          "reason": "种子表面喷湿和育苗盖通气不涉及盆底积水处理。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q03",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r05",
+          "revision": 1,
+          "reason": "搬桌前给电线两端贴设备名并集中收纳插头，直接帮助重新连接。",
+          "support_limits": "支持该记录中的标记与收纳办法，不支持其他人的电线也已标记。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r06",
+          "reason": "标签用于文具抽屉，电线仍在原盒，没有用于设备重接的电线标记。"
+        },
+        {
+          "id": "r21",
+          "reason": "支架退货的螺丝袋固定，不涉及电线重新连接。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q04",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r09",
+          "revision": 1,
+          "reason": "直接提供纸模型拆塔顶、固定主体、四周留空及避免软袋挤压的搬运保护方法。",
+          "support_limits": "是方法记录，未明确报告实际搬运后的保护效果。"
+        },
+        {
+          "id": "r10",
+          "revision": 1,
+          "reason": "同属纸模型包装和搬运准备：说明书已装袋，主体未搬，并计划购买硬纸板。",
+          "support_limits": "只能支持包装准备与暂不搬运，不能证明主体已包装或已采取有效保护措施。"
+        },
+        {
+          "id": "r34",
+          "revision": 1,
+          "reason": "涉及纸模型拆装、装箱状态，明确否认拆塔顶和装箱，属于该宽泛需求下的相关否定材料。",
+          "support_limits": "只能证明该次拍照没有拆塔顶或装箱，不能作为已实施搬运保护方法的证据。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r20",
+          "reason": "对象是纸灯组装，没有纸模型搬运保护内容。"
+        },
+        {
+          "id": "r21",
+          "reason": "对象是退货支架，不是纸模型。"
+        }
+      ],
+      "note": "依照information_need的宽泛范围保留三条，不只保留直接给出完整方法的r09；其余未列记录不相关。"
+    },
+    {
+      "id": "q05",
+      "status": "resolved",
+      "gold": [],
+      "excluded": [
+        {
+          "id": "r31",
+          "reason": "内容虽直接吻合水族箱过滤棉更换步骤，但state为deleted，不能纳入当前gold。"
+        }
+      ],
+      "note": "没有相关的当前记录；不能使用已删除来源补足答案。其余未列记录不相关。"
+    },
+    {
+      "id": "q06",
+      "status": "resolved",
+      "gold": [],
+      "excluded": [],
+      "note": "全部34条来源均没有剪刀刃口维护或恢复剪切效果的方法；当前gold为空。"
+    },
+    {
+      "id": "q07",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r11",
+          "revision": 2,
+          "reason": "当前更正直接讨论蓝边陶碗与唐序的转交关系，否认赠送，说明只是借给他拍照。",
+          "support_limits": "不能证明赠送发生；当前文本支持借用和计划取回，old_text不是当前证据。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r13",
+          "reason": "仅提到擦窗前挪开陶碗，没有蓝边陶碗转送、借用或更正关系。"
+        }
+      ],
+      "note": "以r11 revision 2的当前否定、更正为相关素材，不复活旧版赠送说法；其余未列记录不相关。"
+    },
+    {
+      "id": "q08",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r12",
+          "revision": 1,
+          "reason": "宋朔明确引用唐序关于第二次发酵应观察明显鼓起而非只看时间的说法。",
+          "support_limits": "方法的说话人是唐序，记录人是宋朔；宋朔明确尚未试过，不能归为宋朔已实践的方法。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r18",
+          "reason": "任宁的面团加水方法，不涉及唐序或发酵观察方法。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q09",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r13",
+          "revision": 1,
+          "reason": "明确记录唐序想向贺澄借折叠梯擦高窗的意向与准备。",
+          "support_limits": "消息尚未发出，不能证明已经提出借用、借到梯子或完成擦窗。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r33",
+          "reason": "梁南计划用折叠梯换走廊灯泡，人物和用途均不同。"
+        },
+        {
+          "id": "r25",
+          "reason": "窗纱检查及换压条计划，没有借梯擦窗内容。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q10",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r14",
+          "revision": 1,
+          "reason": "直接更正后胎已补好的说法，说明之前混淆前胎，后胎仍慢漏气。",
+          "support_limits": "不能证明后胎已补好；当前仅更换气门帽，并明确仍漏气。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r01",
+          "reason": "解决的是后拨附近缠线和变速线问题，不涉及后胎修补。"
+        },
+        {
+          "id": "r17",
+          "reason": "链条清洁步骤不能证明轮胎修补状态。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q11",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r15",
+          "revision": 1,
+          "reason": "顾秋记录贺澄关于周日公交可能停开的原话，并保留尚未核对公告的上下文。",
+          "support_limits": "这是未核实的可能性引述，不能证明公交实际停开，也不能证明顾秋已经改变行程。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r13",
+          "reason": "虽关联贺澄，但内容是借梯意向，没有公交信息。"
+        },
+        {
+          "id": "r27",
+          "reason": "贺澄的提琴检查记录，不涉及公交。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q12",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r16",
+          "revision": 1,
+          "reason": "直接否认取消修伞预约，并说明送伞时间由上午调整到下午。",
+          "support_limits": "不能证明预约已取消；仅支持预约保留及送伞时段变更。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r19",
+          "reason": "是同一人物的修伞携带清单，没有预约取消或变更内容。"
+        },
+        {
+          "id": "r20",
+          "reason": "关联梁南，坏伞仅用于纸灯比大小，不能作为许南预约材料。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q13",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r17",
+          "revision": 1,
+          "reason": "记录级names及aliases把正文阿宁明确关联到陶宁，内容是链条清洁和上油步骤。",
+          "support_limits": "是清洁操作便签，未说明实际执行结果；该别名映射不能扩展到其他记录。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r18",
+          "reason": "该记录的阿宁映射为任宁，而且自行车清洁只作另记提示，没有清洁方法。"
+        },
+        {
+          "id": "r02",
+          "reason": "人物是任宁，清洗车链也只是尚未进行的清单项目。"
+        },
+        {
+          "id": "r01",
+          "reason": "虽属于陶宁，但主题是踩踏传动故障处理，没有自行车清洁步骤；清除缠线不能仅据此归为清洁便签。"
+        }
+      ],
+      "note": "按各记录人物映射判断，不将阿宁全局合并；其余未列记录不相关。"
+    },
+    {
+      "id": "q14",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r18",
+          "revision": 1,
+          "reason": "本记录将阿宁关联到任宁，具体记录揉面时预留部分水、之后决定是否加水的方法。",
+          "support_limits": "不支持将其他记录中的阿宁都视作任宁，也没有给出精确配比。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r17",
+          "reason": "这里的阿宁关联陶宁，内容是自行车清洁。"
+        },
+        {
+          "id": "r12",
+          "reason": "面团主题相近，但记录的是唐序的发酵观察方法，不是任宁加水方法。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q15",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r19",
+          "revision": 1,
+          "reason": "本记录的南南关联许南，明确列出带伞骨接头、无需带伞套。",
+          "support_limits": "是携带清单，不能证明已经送修或完成维修。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r20",
+          "reason": "南南在该记录关联梁南，坏伞只是纸灯比大小的道具。"
+        },
+        {
+          "id": "r16",
+          "reason": "虽属于许南修伞事项，但只说明预约时段变更，没有携带物品信息。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q16",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r20",
+          "revision": 1,
+          "reason": "本记录将南南关联梁南，提供纸灯架接头先用纸胶固定、再套灯罩的组装步骤。",
+          "support_limits": "不能因共享南南称呼把许南的记录归到梁南。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r19",
+          "reason": "人物是许南，纸灯修补仅提到延后，不能作为梁南组装素材。"
+        },
+        {
+          "id": "r08",
+          "reason": "梁南为纸灯短片录制背景声音，没有纸灯组装内容。"
+        },
+        {
+          "id": "r33",
+          "reason": "走廊灯泡更换准备，不是纸灯组装。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q17",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r21",
+          "revision": 1,
+          "reason": "本记录将老顾关联顾岑，具体说明退支架的原盒包装、螺丝袋固定与封箱拍照。",
+          "support_limits": "是打包办法，不能证明已经寄出或完成退货。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r22",
+          "reason": "该老顾关联顾秋，而且明确不用退货和封箱拍照，不是顾岑的退货包装素材。"
+        },
+        {
+          "id": "r05",
+          "reason": "顾岑的电线标记收纳办法，不涉及支架退货包装。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q18",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r23",
+          "revision": 1,
+          "reason": "记录级人物映射将阿禾关联江禾，内容为种子浅埋、表面喷湿及每日揭盖通气的育苗操作。",
+          "support_limits": "棋盘旁的盒子明确装备用标签，不能把它当作需要浇水的育苗容器。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r24",
+          "reason": "阿禾在该记录关联禾安，育苗盘只用于分装棋子，没有育苗操作。"
+        },
+        {
+          "id": "r03",
+          "reason": "江禾的成株盆栽浇水排余水方法，没有种子育苗内容。"
+        },
+        {
+          "id": "r04",
+          "reason": "人物是禾安，内容是空花盆整理。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q19",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r25",
+          "revision": 1,
+          "reason": "captured为2026-09-30T16:15:00Z，按本记录Asia/Shanghai换算为2026-10-01 00:15，且内容是窗纱检查。",
+          "support_limits": "事件日期2026-10-02不用于本题筛选；记录只支持压条待更换的检查与计划。"
+        },
+        {
+          "id": "r26",
+          "revision": 1,
+          "reason": "captured为2026-10-01T00:20:00Z，按Asia/Shanghai换算为2026-10-01 08:20，且内容是窗纱复查。",
+          "support_limits": "该次仍待更换压条，不能证明已经完成修理。"
+        }
+      ],
+      "excluded": [],
+      "note": "两条记录的本地捕获日期均为10月1日；不统一改用UTC日期，也不以event_date替代。其余未列记录不相关。"
+    },
+    {
+      "id": "q20",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r27",
+          "revision": 1,
+          "reason": "人工event_date明确为2026-10-03，内容是将旧提琴送去检查。",
+          "support_limits": "10月5日是捕获日期，不影响本题匹配；支持检查与暂不换弦，不能证明已换弦。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r28",
+          "reason": "虽然捕获日期为10月3日，但人工事件日期为10月8日，本题使用EVENT字段。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q21",
+      "status": "resolved",
+      "gold": [
+        {
+          "id": "r29",
+          "revision": 1,
+          "reason": "人工event_date为2026-10-06，内容是说明卡校对及第二页尺寸单位。",
+          "support_limits": "支持已核说明卡和单位应统一成毫米的校对意见，不足以证明文件修改已经完成。"
+        }
+      ],
+      "excluded": [
+        {
+          "id": "r30",
+          "reason": "event_date为null，正文文件名及捕获日期中的10月6日都不能替代人工事件日期。"
+        }
+      ],
+      "note": "其余未列记录不相关。"
+    },
+    {
+      "id": "q22",
+      "status": "clarification_required",
+      "gold": [],
+      "excluded": [],
+      "note": "未确定CAPTURED或EVENT，不能指定唯一gold或计算Recall。若采用2026-10-03捕获日期，相关集合为r28 revision 1，其内容只是10月8日的预约安排；r27捕获于10月5日不匹配。若采用2026-10-03人工事件日期，相关集合为r27 revision 1，其内容是送提琴检查；r28事件日期为10月8日不匹配。其余记录无相关提琴内容。"
+    },
+    {
+      "id": "q23",
+      "status": "clarification_required",
+      "gold": [],
+      "excluded": [],
+      "note": "上周区间未确定，不能指定唯一gold或计算Recall。按完整自然周2026-10-12至2026-10-18，相关集合为r09 revision 1和r10 revision 1。按之前七个完整日期2026-10-16至2026-10-22，相关集合为r10 revision 1和r34 revision 1。均按各记录时区的捕获日期且包含端点；r34的10月16日事件日期不能替代10月19日捕获日期。r10只支持准备与暂不搬运，r34只支持拍照及未拆塔顶、未装箱。其余未列记录不相关。"
+    },
+    {
+      "id": "q24",
+      "status": "clarification_required",
+      "gold": [],
+      "excluded": [],
+      "note": "下周的相对时间基准未确定，不能指定唯一gold或计算Recall。若指当前参考时间下一自然周2026-10-26至2026-11-01且按人工事件日期筛选，相关集合为空；r33 event_date为null，不得由正文推算补填。若指原文写下时所说的下周，相关集合为r33 revision 1，支持梁南换走廊灯泡的计划、量灯罩和找折叠梯等准备，不能证明选定具体日期或已经换灯。其余未列记录不相关。"
+    }
+  ],
+  "disagreements": [
+    {
+      "id": "q04",
+      "a": [
+        {
+          "id": "r09",
+          "revision": 1,
+          "reason": "直接提供纸模型搬运保护方法：拆下塔顶、主体固定硬纸板、四周留空，并避免整件塞入软袋。",
+          "support_limits": "是方法记录，未说明搬运后的实际损坏情况。"
+        }
+      ],
+      "b": [
+        {
+          "id": "r09",
+          "revision": 1,
+          "reason": "直接提供纸模型拆塔顶、固定主体、四周留空及避免软袋挤压的搬运保护方法。",
+          "support_limits": "是方法记录，未明确报告实际搬运后的保护效果。"
+        },
+        {
+          "id": "r10",
+          "revision": 1,
+          "reason": "同属纸模型包装和搬运准备：说明书已装袋，主体未搬，并计划购买硬纸板。",
+          "support_limits": "只能支持包装准备与暂不搬运，不能证明主体已包装或已采取有效保护措施。"
+        },
+        {
+          "id": "r34",
+          "revision": 1,
+          "reason": "涉及纸模型拆装、装箱状态，明确否认拆塔顶和装箱，属于该宽泛需求下的相关否定材料。",
+          "support_limits": "只能证明该次拍照没有拆塔顶或装箱，不能作为已实施搬运保护方法的证据。"
+        }
+      ]
+    }
+  ],
+  "adjudication": {
+    "q04": {
+      "chosen": "B broader material relevance: r09/r10/r34",
+      "reason": "question asks to find a passage; information_need explicitly includes materials related to transport protection/disassembly/packaging methods. Preparation with hardboard and explicit not-disassembled/not-boxed status are useful contextual materials. Retrieval relevance is broader than proving a protection method was carried out. Keep nonoccurrence/planning limits; do not answer that transport/packing occurred. Narrow A interpretation retained for a predeclared sensitivity table, not postresult relabeling.",
+      "primary_gold": [
+        "r09",
+        "r10",
+        "r34"
+      ],
+      "predeclared_narrow_sensitivity_gold": [
+        "r09"
+      ]
+    }
+  }
+}

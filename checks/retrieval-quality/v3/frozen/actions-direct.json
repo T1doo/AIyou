@@ -1,0 +1,387 @@
+{
+  "actor": "/root/holdout_direct_operator",
+  "kind": "agent",
+  "visibility_attestation": "仅见指定questions.json问题文件及角色任务说明；未见gold、corpus、源码、助手候选、其他操作计划、历史或运行结果；未做检索、未访问网络、未使用子代理；这是代理模拟操作，无真实用户。",
+  "plans": [
+    {
+      "id": "q01",
+      "decision": "confirm",
+      "terms": [
+        "自行车",
+        "踩踏"
+      ],
+      "rationale": "以自行车和踩踏定位使劲蹬时异常的笔记；不预先假定具体故障原因。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q02",
+      "decision": "confirm",
+      "terms": [
+        "花盆",
+        "积水"
+      ],
+      "rationale": "用物品和盆底存水问题定位浇水后处理余水的方法。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q03",
+      "decision": "confirm",
+      "terms": [
+        "电线",
+        "标记"
+      ],
+      "rationale": "以电线和标记定位搬动后能重新认清连接位置的方法。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q04",
+      "decision": "confirm",
+      "terms": [
+        "纸模型",
+        "搬运"
+      ],
+      "rationale": "用作品种类和带走时的操作定位保护方法。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q05",
+      "decision": "confirm",
+      "terms": [
+        "水族箱",
+        "过滤"
+      ],
+      "rationale": "用水族箱和过滤定位过滤材料维护、更换笔记。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q06",
+      "decision": "confirm",
+      "terms": [
+        "剪刀",
+        "磨"
+      ],
+      "rationale": "以剪刀和磨这个日常维护动作查找恢复剪切效果的方法。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q07",
+      "decision": "confirm",
+      "terms": [
+        "宋朔",
+        "陶碗"
+      ],
+      "rationale": "以提及者和陶碗定位相关记录，不把已送出作为必需关键词，便于保留更正或否定的上下文。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q08",
+      "decision": "confirm",
+      "terms": [
+        "唐序",
+        "发酵"
+      ],
+      "rationale": "用说话人和发酵主题定位原来的观察方法记述。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q09",
+      "decision": "confirm",
+      "terms": [
+        "唐序",
+        "梯子"
+      ],
+      "rationale": "用借用者和物品定位借梯擦窗的安排，也可涵盖准备或尚未完成的记录。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q10",
+      "decision": "confirm",
+      "terms": [
+        "陶宁",
+        "后胎"
+      ],
+      "rationale": "用人物和后胎定位修补状态记录，不要求正文肯定补好了。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q11",
+      "decision": "confirm",
+      "terms": [
+        "贺澄",
+        "公交"
+      ],
+      "rationale": "用人物和公交定位提及停开的原话与核实上下文。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q12",
+      "decision": "confirm",
+      "terms": [
+        "许南",
+        "修伞",
+        "预约"
+      ],
+      "rationale": "用人物、事项和预约定位取消或变更记录，不用取消作为必需条件。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q13",
+      "decision": "confirm",
+      "terms": [
+        "阿宁",
+        "自行车",
+        "清洁"
+      ],
+      "rationale": "采用问题明确给出的正文称呼，加自行车清洁主题进行首次关键词输入。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q14",
+      "decision": "confirm",
+      "terms": [
+        "阿宁",
+        "面团",
+        "加水"
+      ],
+      "rationale": "采用题中记得的正文称呼和面团加水主题定位便签。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q15",
+      "decision": "confirm",
+      "terms": [
+        "南南",
+        "修伞"
+      ],
+      "rationale": "采用题中提示可能使用的称呼，加修伞定位携带清单。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q16",
+      "decision": "confirm",
+      "terms": [
+        "南南",
+        "纸灯",
+        "固定"
+      ],
+      "rationale": "采用题中提示的正文称呼以及纸灯固定主题定位便签。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q17",
+      "decision": "confirm",
+      "terms": [
+        "老顾",
+        "支架",
+        "打包"
+      ],
+      "rationale": "采用题中明确给出的称呼和支架打包主题定位退货包装办法。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q18",
+      "decision": "confirm",
+      "terms": [
+        "阿禾",
+        "育苗"
+      ],
+      "rationale": "采用题中提示可能出现在正文的称呼，加育苗主题定位操作笔记。 明确确认日期依据为CAPTURED，日期选择为UNLIMITED，from与through均为空，不限制日期；这是确认给定条件。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNLIMITED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q19",
+      "decision": "confirm",
+      "terms": [
+        "窗纱",
+        "检查"
+      ],
+      "rationale": "以窗纱检查定位主题；明确确认按各记录自身保存时区换算的捕获日期筛选2026-10-01至2026-10-01，包括上海当地为10月1日而UTC仍为9月30日的记录。 明确确认date_decision为RANGE；这些日期条件按题目给定值手工确认，不假定关键词框会自动解析时间。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "RANGE",
+        "from": "2026-10-01",
+        "through": "2026-10-01"
+      }
+    },
+    {
+      "id": "q20",
+      "decision": "confirm",
+      "terms": [
+        "提琴",
+        "检查"
+      ],
+      "rationale": "以提琴检查定位主题；明确确认只按人工事件日期筛选2026-10-03至2026-10-03，允许之后补记。 明确确认date_decision为RANGE；这些日期条件按题目给定值手工确认，不假定关键词框会自动解析时间。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "EVENT",
+        "date_decision": "RANGE",
+        "from": "2026-10-03",
+        "through": "2026-10-03"
+      }
+    },
+    {
+      "id": "q21",
+      "decision": "confirm",
+      "terms": [
+        "说明卡",
+        "校对"
+      ],
+      "rationale": "以说明卡校对定位主题；明确确认只按人工事件日期字段筛选2026-10-06至2026-10-06，不以正文或捕获日期替代。 明确确认date_decision为RANGE；这些日期条件按题目给定值手工确认，不假定关键词框会自动解析时间。",
+      "reason": "",
+      "date_choice": {
+        "date_basis": "EVENT",
+        "date_decision": "RANGE",
+        "from": "2026-10-06",
+        "through": "2026-10-06"
+      }
+    },
+    {
+      "id": "q22",
+      "decision": "abstain",
+      "terms": [],
+      "rationale": "日期条件尚未解决，暂不提交关键词计划。",
+      "reason": "需要先确认10月3日指捕获日期还是人工事件日期，不能自行选择日期依据。",
+      "date_choice": {
+        "date_basis": null,
+        "date_decision": "UNRESOLVED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q23",
+      "decision": "abstain",
+      "terms": [],
+      "rationale": "日期条件尚未解决，暂不提交关键词计划。",
+      "reason": "需要先确认上周指上一完整自然周还是此前七个完整日期，不能自行选择区间。",
+      "date_choice": {
+        "date_basis": "CAPTURED",
+        "date_decision": "UNRESOLVED",
+        "from": "",
+        "through": ""
+      }
+    },
+    {
+      "id": "q24",
+      "decision": "abstain",
+      "terms": [],
+      "rationale": "日期条件尚未解决，暂不提交关键词计划。",
+      "reason": "需要先确认下周相对当前参考时间还是相对各记录原文时间，也需要明确日期依据，不能自行选择。",
+      "date_choice": {
+        "date_basis": null,
+        "date_decision": "UNRESOLVED",
+        "from": "",
+        "through": ""
+      }
+    }
+  ]
+}
