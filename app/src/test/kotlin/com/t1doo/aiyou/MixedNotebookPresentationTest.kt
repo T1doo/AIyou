@@ -85,10 +85,11 @@ class MixedNotebookPresentationTest {
         val local=LocalRecordUiState(ready=true,opening=false,supportsMixedCapture=true,
             mixedCapture=MixedCaptureUiState(draft=draft,supportsProcessingChoice=true))
         var writes=0
+        val fontScale=mutableStateOf(2f)
         val controller=MixedCaptureController({local},{},{writes++;false},{error("No media input")},Clock.systemUTC())
         compose.setContent {
             val density=LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density,2f)) {
+            CompositionLocalProvider(LocalDensity provides Density(density.density,fontScale.value)) {
                 AIyouTheme { AIyouApp(local=local,mixedCapture=controller,
                     display=UiPreferencesState(UiPreferences(reduceMotion=true),ready=true)) }
             }
@@ -103,6 +104,14 @@ class MixedNotebookPresentationTest {
         compose.onNodeWithTag("mixed-text").performScrollTo().assertIsDisplayed().assertIsEnabled()
             .performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
         compose.onNodeWithTag("mixed-text").assertIsFocused()
+        compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
+        compose.runOnIdle { fontScale.value=1f }
+        compose.onNodeWithTag("mixed-list").performScrollToIndex(0)
+        compose.onNodeWithText("生活的小片刻").assertDoesNotExist()
+        val regularFontHeading=compose.onNodeWithTag("mixed-notebook-heading").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue(regularFontHeading.bottom-regularFontHeading.top<=88.dp)
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").assertIsDisplayed().assertIsEnabled()
         compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
     }
 }

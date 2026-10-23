@@ -54,7 +54,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.AIyouTheme
@@ -616,7 +615,7 @@ fun AIyouApp(
         }
         if (!companionVisible) companionPanel = false
     }
-    val notebookWindowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val notebookWindowHeight = with(LocalDensity.current) { scaffoldHeightPx.toDp() }
     val compactNotebookHeader = LocalDensity.current.fontScale >= 1.5f ||
         (notebookWindowHeight>0.dp && notebookWindowHeight<=480.dp)
     val companion: (@Composable () -> Unit)? = if (companionVisible) ({
