@@ -1,0 +1,89 @@
+{
+  "version": 3,
+  "status": "DESIGN_ONLY_PENDING_INDEPENDENT_REVIEW",
+  "product_baseline": "50e31ae31d4bfd5ab66e4602ed118612994c03f9",
+  "population": "new synthetic curated challenge holdout; not random users, human study or release acceptance",
+  "planned_questions": 24,
+  "strata": {
+    "paraphrase": 6,
+    "negation_and_quotation": 6,
+    "record_scoped_manual_person_alias": 6,
+    "date_basis_and_ambiguity": 6
+  },
+  "freeze_order": [
+    "reviewed_method",
+    "independently_curated_corpus_and_questions",
+    "two_independent_relevance_judgments_and_preexecution_adjudication",
+    "isolated_direct_keyword_action_plan",
+    "actual_production_proposals_and_isolated_assisted_action_plan",
+    "joint_execution_manifest_with_content_and_source_hashes",
+    "first_production_path_observations",
+    "independent_arithmetic_and_failure_review"
+  ],
+  "independence_receipt": [
+    "role",
+    "actor_and_isolated_session",
+    "agent_or_human",
+    "visible_input_hashes",
+    "output_hash",
+    "created_at",
+    "whether_rankings_scores_peer_choices_or_gold_were_visible"
+  ],
+  "common_gold": {
+    "unit": "current original ID plus revision",
+    "same_for_all_routes": true,
+    "does_not_depend_on_literal_capability_or_quote_admissibility": true,
+    "required_per_question": ["information_need", "resolution_status", "date_context", "relevant_sources_with_rationales", "excluded_sources_with_rationales", "support_limits", "adjudication_receipt"],
+    "ambiguity": "clarification_required; record alternatives, never guess capture/event or count as Recall success",
+    "scope": "current visible original with current authenticated manual metadata; no inferred occurrence, preference, entity or dates"
+  },
+  "routes": {
+    "direct_keywords": "independent question-only keyword plan through actual LocalOriginalSearchController and indexed SQL owner; never force raw-question paste as comparator",
+    "assisted_confirmed": "isolated question plus actual QuestionKeywordFragments proposals; explicit action plan replay through actual QuestionKeywordController, navigation gate, atomic canonical commit and same original search controller"
+  },
+  "observation_fields": [
+    "question_id",
+    "route",
+    "frozen_action_plan_hash",
+    "initial_condition_hash",
+    "actual_controller_actions",
+    "submitted_terms_and_explicit_date_choice",
+    "proposal_positions_values_and_truncation",
+    "term_edit_need_and_prequery_rationale",
+    "actual_edits_and_completion",
+    "query_and_commit_counts",
+    "terminal_stage",
+    "full_ranked_original_ids_revisions_and_match_kind",
+    "sql_publication_and_exact_resolve_receipts",
+    "failure_or_abstention_reason"
+  ],
+  "metrics": {
+    "macro_recall_at_5": "mean over same resolved positive-gold questions; refusal/error/empty counts zero; unresolved and empty-gold separately listed",
+    "full_candidate_recall": "same gold before top-five truncation",
+    "no_candidate_rate_end_to_end": "READY with zero hits / all resolved questions",
+    "no_candidate_rate_ready_only": "READY with zero hits / all actual READY questions",
+    "term_manual_edit_need_rate": "prequery isolated assisted plans requiring term typing/deletion / all resolved questions; actual edits and unfinished separately; not minimum possible intervention",
+    "manual_date_entry": "separate from term edits and mandatory date confirmation",
+    "empty_gold_false_returns": "all returned IDs plus numerator/denominator; never Recall=1",
+    "all_unresolved_and_technical_failures": "retain every planned question in flow table, never remove to improve score"
+  },
+  "execution": {
+    "stage": "NOT_RUN",
+    "normal_suites_or_ci": "UNCHANGED; do not rerun for this design",
+    "once_per_question_route": true,
+    "calibration": "non-holdout executor checks first; excluded from quality denominators",
+    "same_semantic_initial_conditions": true,
+    "isolated_encrypted_sql_owners": true,
+    "no_result_driven_choice_or_gold_edits": true,
+    "no_independent_score_until_role_receipts_exist": true
+  },
+  "limitations": [
+    "small constructed set, implementation and operator selection bias remain",
+    "agent independence does not imply independent human judgment",
+    "selection plans and human confirmation are not automatic extraction accuracy",
+    "no 85-percent release-quality claim",
+    "no answer entailment or user-time claim",
+    "not complete D06, semantic search, five-type question assistance or device acceptance",
+    "real OCR, device audio, native SQLCipher device, TalkBack and performance NOT RUN"
+  ]
+}
