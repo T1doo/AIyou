@@ -220,7 +220,8 @@ for label, folder, minimum in targets:
             "uncertainReadbackRetainsExactConfirmationAndNeverShowsPrematureSuccess",
             "changedSourceHidesQuoteAndOldConfirmationThenAllowsExplicitRejectionWithoutBundleInput",
             "refreshedSourceReadFailureAndOtherOwnerVersionChangeKeepInputsButRevokeUnqualifiedRecoveryReceipt",
-            "otherOwnerConfirmationAndSourceRemovalWithdrawRecoveryReceiptInActualDialogWithoutReplacingInput")
+            "otherOwnerConfirmationAndSourceRemovalWithdrawRecoveryReceiptInActualDialogWithoutReplacingInput",
+            "failedRefreshQueueHidesUnverifiedEmptyAndRetainedDraftBodyUntilReadback")
         additional["com.t1doo.aiyou.SourceTaskPresentationTest"] = (
             "narrowDoubleFontLiteralFlowRequiresSeparateConfirmationAndJumpsToExactOriginal",
             "unknownReadbackHasNoSuccessAndRetriesSameRequestWithoutDuplicatingTask",

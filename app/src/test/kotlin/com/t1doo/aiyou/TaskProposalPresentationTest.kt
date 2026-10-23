@@ -46,6 +46,7 @@ class TaskProposalPresentationTest {
     private val drafts=linkedMapOf<String,TaskProposal>();private val tasks=linkedMapOf<String,ManualTaskSnapshot>()
     private val writes=mutableListOf<TaskProposalWrite>();private val confirms=mutableListOf<TaskProposalConfirm>()
     private var loseReadback=false;private var failReadback=false;private var sourceMetadataAvailable=true
+    private var rejectProposalQueue=false
     private fun sourceValid()=entry.currentRevision==1&&OriginalExports.hash(entry.originalText)==binding.sourceHash
     private val port=object:TaskProposalRepository {
         override fun list():List<TaskProposalItem> {if(failReadback) throw TaskProposalStorageFailure();return drafts.values.map {TaskProposalItem(it,sourceMetadataAvailable&&sourceValid())}}
@@ -84,15 +85,16 @@ class TaskProposalPresentationTest {
         override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long)=error("Not requested")
     }
     private val clock=Clock.fixed(Instant.ofEpochMilli(100),ZoneOffset.UTC)
-    private fun newController()=TaskProposalController({state.value},{state.value=it(state.value)},{queue.add(it);true},clock)
+    private fun newController()=TaskProposalController({state.value},{state.value=it(state.value)},{if(rejectProposalQueue) false else queue.add(it)},clock)
     private var proposals by mutableStateOf(newController())
     private val source=SourceTaskController({state.value},{state.value=it(state.value)},{queue.add(it);true},clock,proposalOpen={proposals.open(it)})
     private val actions=AtomicReference<TaskProposalActions>();private var registry:SaveableStateRegistry?=null
     @After fun dispose() {proposals.dispose();source.dispose()}
-    @Composable private fun Screen() {
+    @Composable private fun Screen(large:Boolean=true) {
         val saved=LocalSaveableStateRegistry.current;SideEffect {registry=saved}
         val density=LocalDensity.current
-        CompositionLocalProvider(LocalTaskProposalObserver provides TaskProposalObserver {actions.set(it)},LocalDensity provides Density(density.density,2f)) {
+        CompositionLocalProvider(LocalTaskProposalObserver provides TaskProposalObserver {actions.set(it)},
+            LocalDensity provides if(large) Density(density.density,2f) else density) {
             AIyouTheme {Box(Modifier.size(320.dp,640.dp)) {
                 AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},sourceTasks=source,taskProposals=proposals)
             }}
@@ -127,6 +129,55 @@ class TaskProposalPresentationTest {
         click("task-proposal-close");drain();taskNode("task-proposal-heading").assertTextEquals("待确认草稿 0")
         taskNode("manual-task-row-"+tasks.values.single().id).assertIsDisplayed()
     }
+    @Test fun failedRefreshQueueHidesUnverifiedEmptyAndRetainedDraftBodyUntilReadback() {
+        compose.setContent {Screen(large=false)}
+        compose.runOnIdle {proposals.initialize(owner)}
+        compose.onNodeWithText("待办").assertIsDisplayed().performClick()
+        taskNode("task-proposal-heading").assertTextEquals("待确认草稿 0")
+        compose.onNodeWithText("没有待确认草稿；可从原文摘录主动发起。").performScrollTo().assertIsDisplayed()
+        compose.runOnIdle {rejectProposalQueue=true}
+        taskNode("task-proposal-refresh").assertIsEnabled().performClick()
+        compose.runOnIdle {
+            assertTrue(state.value.taskProposals.available);assertFalse(state.value.taskProposals.loading)
+            assertTrue(state.value.taskProposals.items.isEmpty())
+            assertEquals("本机队列暂不可用，请重试。",state.value.taskProposals.error)
+            assertTrue(queue.isEmpty())
+        }
+        taskNode("manual-task-draft-summary").assertTextEquals("待确认草稿另计 · 待核对")
+        taskNode("task-proposal-heading").assertTextEquals("待确认草稿 · 待核对")
+        taskNode("task-proposal-refresh").assertIsEnabled()
+        compose.onNodeWithText("本机队列暂不可用，请重试。").performScrollTo().assertIsDisplayed()
+        compose.onAllNodesWithText("没有待确认草稿；可从原文摘录主动发起。").assertCountEquals(0)
+        compose.onAllNodesWithText("已拒绝草稿",substring=true).assertCountEquals(0)
+        compose.runOnIdle {rejectProposalQueue=false}
+        taskNode("task-proposal-refresh").performClick();drain()
+        taskNode("task-proposal-heading").assertTextEquals("待确认草稿 0")
+        compose.onNodeWithText("没有待确认草稿；可从原文摘录主动发起。").performScrollTo().assertIsDisplayed()
+
+        val retained=TaskProposal("retained",1,binding,"合成保留草稿",ManualTaskDateInput(),100,"UTC",100)
+        compose.runOnIdle {drafts[retained.id]=retained;proposals.refresh()};drain()
+        taskNode("task-proposal-row-retained").assertIsDisplayed()
+        compose.runOnIdle {rejectProposalQueue=true}
+        taskNode("task-proposal-refresh").performClick()
+        compose.runOnIdle {
+            assertTrue(state.value.taskProposals.available)
+            assertEquals(retained,state.value.taskProposals.items.single().proposal)
+            assertEquals("本机队列暂不可用，请重试。",state.value.taskProposals.error)
+        }
+        taskNode("task-proposal-heading").assertTextEquals("待确认草稿 · 待核对")
+        taskNode("task-proposal-refresh").assertIsEnabled()
+        compose.onAllNodesWithTag("task-proposal-row-retained").assertCountEquals(0)
+        compose.onAllNodesWithText("已拒绝草稿",substring=true).assertCountEquals(0)
+        compose.runOnIdle {rejectProposalQueue=false}
+        taskNode("task-proposal-refresh").performClick();drain()
+        taskNode("task-proposal-heading").assertTextEquals("待确认草稿 1")
+        taskNode("task-proposal-row-retained").assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(retained,drafts.values.single());assertTrue(writes.isEmpty());assertTrue(confirms.isEmpty())
+            assertTrue(tasks.isEmpty());assertTrue(queue.isEmpty());assertEquals(original,state.value.entries.single().originalText)
+        }
+    }
+
     @Test fun uncertainReadbackRetainsExactConfirmationAndNeverShowsPrematureSuccess() {
         compose.setContent {Screen()};compose.runOnIdle {proposals.initialize(owner)};open();title();click("task-proposal-prepare")
         loseReadback=true;click("task-proposal-confirm");drain()

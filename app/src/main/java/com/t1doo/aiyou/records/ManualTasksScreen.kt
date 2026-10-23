@@ -195,7 +195,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                             TextButton(enabled=storageReady&&!proposals.loading,onClick=onProposalRefresh,modifier=Modifier.testTag("task-proposal-refresh")) {Text("重新读取待确认草稿")}
                         }
                     }
-                    if(storageReady&&proposals.available&&!proposals.loading) {
+                    if(proposalsReady) {
                         val drafts=proposals.items.filter {it.proposal.state==TaskProposalState.DRAFT}
                         if(drafts.isEmpty()) item("proposal-empty") {Text("没有待确认草稿；可从原文摘录主动发起。")}
                         items(drafts,key={"proposal-"+it.proposal.id}) {item ->
