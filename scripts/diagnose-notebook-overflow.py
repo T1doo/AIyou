@@ -38,7 +38,8 @@ def request(env, event):
     require(env.get('GITHUB_REPOSITORY') == 'T1doo/AIyou' and event['repository']['private'] is False, 'Public original repository only')
     require(env.get('GITHUB_REF') == REF and event['head_commit']['message'] == MESSAGE, 'Wrong fixed branch or request')
     require(re.fullmatch('[0-9a-f]{40}', env.get('GITHUB_SHA', '')), 'Missing exact execution SHA')
-    require(all(re.fullmatch('[1-9][0-9]*', env.get(k, '')) for k in ('GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT')), 'Missing run/attempt')
+    require(re.fullmatch('[1-9][0-9]*', env.get('GITHUB_RUN_ID', '')), 'Missing run identity')
+    require(env.get('GITHUB_RUN_ATTEMPT') == '1', 'Only the first attempt is authorized')
 
 
 def admit(root, env):

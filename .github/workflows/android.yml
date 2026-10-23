@@ -1,5 +1,5 @@
 name: D01 Android and Preview checks
-run-name: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, '[ui-overflow-probe]') && 'DIAGNOSTIC ONLY - Notebook overflow (not D01 acceptance)' || '' }}
+run-name: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-overflow-probe] fixed Notebook measurement' && 'DIAGNOSTIC ONLY - Notebook overflow (not D01 acceptance)' || '' }}
 
 'on':
   push:
@@ -13,12 +13,12 @@ permissions:
 # One reviewed validation: 23 + 30 + 17 = at most 70 runner minutes.
 # Android and Preview consume confirmed same-SHA host artifacts in parallel.
 # Dependency/queue/cold-build time means this is NOT a 30-minute wall-clock promise.
-# The fixed diagnostic marker is push-only. Before its one approved push, require
+# The exact public-repo/branch/message tuple is push-only. Before its approved push, require
 # no open PR for that branch: PR synchronize retains the normal acceptance path.
-# Any marker-prefixed push avoids the three formal jobs; bad requests fail admit.
+# Every other push retains all three formal jobs; runtime admission also requires attempt1.
 jobs:
   contracts:
-    if: ${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, '[ui-overflow-probe]')) }}
+    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-overflow-probe] fixed Notebook measurement') }}
     name: Host contracts and generated Room evidence
     runs-on: ubuntu-24.04
     timeout-minutes: 23
@@ -227,7 +227,7 @@ jobs:
       - name: Require host sources to remain unchanged
         run: git diff --exit-code
   d01:
-    if: ${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, '[ui-overflow-probe]')) }}
+    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-overflow-probe] fixed Notebook measurement') }}
     name: Android APK Compose lint and compiled native evidence
     needs: [contracts]
     runs-on: ubuntu-24.04
@@ -690,7 +690,7 @@ jobs:
             core/data/build/reports/lint-results-debug.*
             core/designsystem/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
   preview:
-    if: ${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, '[ui-overflow-probe]')) }}
+    if: ${{ !(github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-overflow-probe] fixed Notebook measurement') }}
     name: Complete 430 Preview validation and original PNG evidence
     needs: [contracts]
     runs-on: ubuntu-24.04
@@ -791,7 +791,7 @@ jobs:
 
   notebook-overflow-diagnostic:
     name: DIAGNOSTIC ONLY - one Notebook method; not D01 acceptance
-    if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, '[ui-overflow-probe]') }}
+    if: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-overflow-probe] fixed Notebook measurement' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     concurrency:

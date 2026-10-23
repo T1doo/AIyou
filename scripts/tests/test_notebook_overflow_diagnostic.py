@@ -21,9 +21,9 @@ class NotebookDiagnosticTests(unittest.TestCase):
         lines = formal.splitlines(keepends=True)
         lines = [line for line in lines if not line.startswith('run-name:') and not line.startswith('    if: ${{ !(')]
         formal = ''.join(lines)
-        comment = ('# The fixed diagnostic marker is push-only. Before its one approved push, require\n'
+        comment = ('# The exact public-repo/branch/message tuple is push-only. Before its approved push, require\n'
                    '# no open PR for that branch: PR synchronize retains the normal acceptance path.\n'
-                   '# Any marker-prefixed push avoids the three formal jobs; bad requests fail admit.\n')
+                   '# Every other push retains all three formal jobs; runtime admission also requires attempt1.\n')
         return formal.replace(comment, '')
 
     def env(self):
@@ -49,7 +49,8 @@ class NotebookDiagnosticTests(unittest.TestCase):
     def test_only_the_exact_public_push_request_is_admitted(self):
         probe.request(self.env(), self.event())
         for key, value in [('GITHUB_REF', 'refs/heads/main'), ('GITHUB_EVENT_NAME', 'pull_request'),
-                           ('GITHUB_ACTIONS', 'false'), ('GITHUB_SHA', ''), ('GITHUB_RUN_ID', '0')]:
+                           ('GITHUB_ACTIONS', 'false'), ('GITHUB_SHA', ''), ('GITHUB_RUN_ID', '0'),
+                           ('GITHUB_RUN_ATTEMPT', '2')]:
             with self.subTest(key=key), self.assertRaises(ValueError):
                 probe.request({**self.env(), key: value}, self.event())
         for event in [{'repository': {'private': True}, 'head_commit': {'message': probe.MESSAGE}},
@@ -90,7 +91,14 @@ class NotebookDiagnosticTests(unittest.TestCase):
         # Authenticate the original bytes without requiring old Git objects in a shallow checkout.
         self.assertEqual('ba77c84c51b9e32134532a155fc0b37fd3c5d22737f8367c8fbef26402defcf3',
                          hashlib.sha256((self.formal_workflow().rstrip('\n') + '\n').encode()).hexdigest())
-        self.assertEqual(3, workflow.count("    if: ${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, '[ui-overflow-probe]')) }}"))
+        selector = ("github.event_name == 'push' && github.repository == 'T1doo/AIyou' && "
+                    "github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && "
+                    "github.event.head_commit.message == '[ui-overflow-probe] fixed Notebook measurement'")
+        self.assertEqual(5, workflow.count(selector))
+        self.assertEqual(3, workflow.count('    if: ${{ !(' + selector + ') }}'))
+        self.assertEqual(1, workflow.count('    if: ${{ ' + selector + ' }}'))
+        self.assertTrue(workflow.splitlines()[1].startswith('run-name: ${{ ' + selector + ' && '))
+        self.assertNotIn('startsWith(', workflow)
         self.assertNotIn('continue-on-error', workflow)
 
     def test_diagnostic_keeps_all_current_schema_guards_and_fixed_target(self):
