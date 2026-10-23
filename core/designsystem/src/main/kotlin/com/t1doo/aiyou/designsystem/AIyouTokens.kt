@@ -25,6 +25,10 @@ object AIyouColors {
     val companionInk = Color(0xFF513E32)
     val errorContainer = Color(0xFFFFF1EF)
     val successContainer = Color(0xFFEDF6F0)
+    val notebookSky = Color(0xFFDAEAFB)
+    val notebookMist = Color(0xFFEFF2FB)
+    val notebookLilac = Color(0xFFE7E3FA)
+    val notebookPeach = Color(0xFFFFE4CD)
 }
 
 object AIyouDimensions {

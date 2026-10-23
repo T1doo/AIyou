@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -31,8 +32,9 @@ import com.t1doo.aiyou.designsystem.AIyouDimensions
 
 /** Natural height at large font scales; system insets remain part of the chrome. */
 @Composable
-fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = true, onAction: () -> Unit) {
-    Surface(color = AIyouColors.surface) {
+fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = true,
+    containerColor: Color = AIyouColors.surface, onAction: () -> Unit) {
+    Surface(color = containerColor) {
         Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars)
             .heightIn(min = 56.dp).padding(horizontal = AIyouDimensions.pageNarrow),
             verticalAlignment = Alignment.CenterVertically,
@@ -49,8 +51,9 @@ fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = 
 }
 
 @Composable
-fun NotebookNavigation(selected: Destination?, onSelect: (Destination) -> Unit) {
-    Surface(color = AIyouColors.surface) {
+fun NotebookNavigation(selected: Destination?, onSelect: (Destination) -> Unit,
+    containerColor: Color = AIyouColors.surface) {
+    Surface(color = containerColor) {
         Row(Modifier.fillMaxWidth().selectableGroup().windowInsetsPadding(WindowInsets.navigationBars),
             verticalAlignment = Alignment.CenterVertically) {
             Destination.entries.forEach { destination ->
@@ -60,7 +63,7 @@ fun NotebookNavigation(selected: Destination?, onSelect: (Destination) -> Unit) 
                     .heightIn(min = 72.dp).padding(vertical = AIyouDimensions.spaceSm, horizontal = AIyouDimensions.spaceXs),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs, Alignment.CenterVertically)) {
-                    Surface(color = if (active) AIyouColors.primaryContainer else AIyouColors.surface,
+                    Surface(color = if (active) AIyouColors.primaryContainer else containerColor,
                         shape = MaterialTheme.shapes.small) {
                         CompositionLocalProvider(LocalContentColor provides color) {
                             Row(Modifier.padding(horizontal = AIyouDimensions.spaceLg, vertical = AIyouDimensions.spaceXs)) {

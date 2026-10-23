@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.testTag
@@ -43,6 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -92,6 +94,8 @@ fun CompanionEntry(
     motionAllowed: Boolean,
     onOpen: () -> Unit,
     assets: MascotAssetProvider = LuluMascotAssets,
+    artworkSize: Dp = 56.dp,
+    containerColor: Color = AIyouColors.surface,
 ) {
     val nod = remember { Animatable(0f) }
     var handled by remember { mutableLongStateOf(pulse) }
@@ -105,9 +109,9 @@ fun CompanionEntry(
         val value = nod.value
         SideEffect { observer(state, value) }
     }
-    Surface(onClick = onOpen, color = AIyouColors.surface, shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.size(56.dp).testTag("companion-entry").semantics { contentDescription = "打开陪伴伙伴" }) {
-        assets.Artwork(state, Modifier.size(56.dp).graphicsLayer {
+    Surface(onClick = onOpen, color = containerColor, shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.size(artworkSize).testTag("companion-entry").semantics { contentDescription = "打开陪伴伙伴" }) {
+        assets.Artwork(state, Modifier.size(artworkSize).graphicsLayer {
             translationY = nod.value * 2.dp.toPx()
             rotationZ = nod.value * 2f
         })

@@ -76,9 +76,12 @@ class MixedNotebookPresentationTest {
                     display=UiPreferencesState(UiPreferences(reduceMotion=true),ready=true)) }
             }
         }
+        compose.onNodeWithTag("mixed-jump-composer").assertDoesNotExist()
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-policy-details"))
+        compose.onNodeWithTag("mixed-policy-details").assertIsDisplayed().performClick()
         compose.onNodeWithTag("mixed-jump-composer").assertIsDisplayed().assertIsEnabled()
-            .assertHeightIsAtLeast(48.dp).assertTextEquals("开始记录").performClick()
-        compose.onNodeWithTag("mixed-text").assertIsDisplayed().assertIsEnabled()
+            .assertHeightIsAtLeast(48.dp).assertTextEquals("回到输入").performClick()
+        compose.onNodeWithTag("mixed-text").performScrollTo().assertIsDisplayed().assertIsEnabled()
             .performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
         compose.onNodeWithTag("mixed-text").assertIsFocused()
         compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }

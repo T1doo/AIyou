@@ -616,7 +616,10 @@ fun AIyouApp(
     }
     val companion: (@Composable () -> Unit)? = if (companionVisible) ({
         CompanionEntry(if (companionSaved) MascotState.Saved else MascotState.Idle,
-            companionPulse, motionAllowed, onOpen = { companionPanel = true })
+            companionPulse, motionAllowed, onOpen = { companionPanel = true },
+            artworkSize = if(selected==Destination.NOW && local?.supportsMixedCapture==true) 96.dp else 56.dp,
+            containerColor = if(selected==Destination.NOW && local?.supportsMixedCapture==true)
+                androidx.compose.ui.graphics.Color.Transparent else com.t1doo.aiyou.designsystem.AIyouColors.surface)
     }) else null
     val density = LocalDensity.current
     val imeBottomPx = WindowInsets.ime.getBottom(density)
@@ -1062,6 +1065,8 @@ fun AIyouApp(
         com.t1doo.aiyou.records.OriginalExportDialog(checkNotNull(local), exportUi, exports, ::ownsExportRoute)
     }
 
+    val notebookHome=selected==Destination.NOW && local?.supportsMixedCapture==true && !showSettings && !showLicenses &&
+        !reading && !recapRoute && !browsingPackage && !browsingRecycle && history==null && editing==null && attachmentPanel==null
     Scaffold(
         modifier = Modifier.imePadding().onSizeChanged { scaffoldHeightPx = it.height },
         topBar = {
@@ -1072,6 +1077,7 @@ fun AIyouApp(
                 else if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
                 else if (editing != null) "取消编辑" else if(reading && recapRoute) "返回回顾" else if (reading || browsingRecycle) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else if(recapRoute) "返回回忆" else "设置",
                 actionEnabled = recycleUi?.busy != true && attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
+                containerColor = if(notebookHome) com.t1doo.aiyou.designsystem.AIyouColors.notebookSky else com.t1doo.aiyou.designsystem.AIyouColors.surface,
             ) {
                 if (browsingPackage && ownsPackageRoute()) {
                     recordPackages?.close(checkNotNull(packageUi).session); navigation.advance()
@@ -1093,7 +1099,8 @@ fun AIyouApp(
             if (!imeVisible && !reading) {
                 DisposableEffect(Unit) { onDispose { navigationHeightPx = 0 } }
                 Box(Modifier.onSizeChanged { navigationHeightPx = it.height }) {
-                    NotebookNavigation(if (showSettings) null else selected, onSelect = selectDestination)
+                    NotebookNavigation(if (showSettings) null else selected, onSelect = selectDestination,
+                        containerColor = if(notebookHome) com.t1doo.aiyou.designsystem.AIyouColors.notebookMist else com.t1doo.aiyou.designsystem.AIyouColors.surface)
                 }
             }
         },

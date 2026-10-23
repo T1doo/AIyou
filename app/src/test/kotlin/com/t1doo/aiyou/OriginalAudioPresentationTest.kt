@@ -71,7 +71,15 @@ class OriginalAudioPresentationTest {
     } }
     private fun importWave() {
         click("mixed-audio-import");drain();compose.waitForIdle()
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-audio-summary"))
+        compose.onNodeWithTag("mixed-audio-summary").assertIsDisplayed()
+            .assertTextEquals("等待选择原音；尚未保存这条记录")
+        click("mixed-audio-status")
+        compose.onNodeWithTag("mixed-audio-cancel").performScrollTo().assertIsDisplayed()
+            .assertHeightIsAtLeast(48.dp).assertIsEnabled()
         compose.runOnIdle {
+            assertEquals(CaptureAudioPhase.PICKING,f.local.value.mixedCapture!!.audio.phase)
+            assertEquals(0,f.saves)
             assertEquals(1,launches.size);val intent=launches.single()
             assertEquals(Intent.ACTION_OPEN_DOCUMENT,intent.action)
             assertTrue(intent.hasCategory(Intent.CATEGORY_OPENABLE));assertTrue(intent.getBooleanExtra(Intent.EXTRA_LOCAL_ONLY,false))
