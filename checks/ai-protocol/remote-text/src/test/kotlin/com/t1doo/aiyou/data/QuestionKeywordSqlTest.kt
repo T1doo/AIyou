@@ -46,6 +46,52 @@ class QuestionKeywordSqlTest {
         assertEquals("2026-10-31",h.input.get().through);assertEquals(RecordDateBasis.CAPTURED,h.input.get().dateBasis)
         assertEquals(0,h.sql.get());h.sync();assertEquals(3,h.ready().hits.size)
     }}
+    @Test fun rejectedStartDateCannotBeClearedByTermsOrChoiceAndNeedsExplicitCorrection():Unit=runBlocking{
+        rejectedDateNeedsCorrection(start=true)
+    }
+    @Test fun rejectedEndDateCannotBeClearedByTermsOrChoiceAndNeedsExplicitCorrection():Unit=runBlocking{
+        rejectedDateNeedsCorrection(start=false)
+    }
+    @Test fun bothRejectedDatesRequireBothCorrectionsOrAnExplicitWholeRangeReplacement(){
+        for(choice in listOf(QuestionDateChoice.RANGE,QuestionDateChoice.CURRENT,QuestionDateChoice.UNLIMITED))H().use{h->
+            h.input.set(h.input.get().copy(from="2026-10-01",through="2026-10-31",ownership=Any()))
+            h.open();h.editQuestion("我种薄荷了吗？");h.editTerms("薄荷")
+            h.helper.from(h.ui(),"2026-10-02");h.helper.through(h.ui(),"2026-10-30")
+            h.helper.from(h.ui(),"2026-10-020");h.helper.through(h.ui(),"2026-10-300")
+            h.helper.basis(h.ui(),RecordDateBasis.CAPTURED);h.helper.dateChoice(h.ui(),QuestionDateChoice.RANGE)
+            h.editTerms("薄荷 我");h.helper.confirm(h.ui());h.sync()
+            assertEquals(0,h.commits.get());assertEquals(0,h.sql.get())
+            if(choice==QuestionDateChoice.RANGE){
+                h.helper.from(h.ui(),"2026-10-03");h.helper.confirm(h.ui());h.sync()
+                assertEquals(0,h.commits.get());assertEquals(0,h.sql.get())
+                h.helper.through(h.ui(),"2026-10-29")
+            }else h.helper.dateChoice(h.ui(),choice)
+            h.helper.confirm(h.ui());assertEquals(1,h.commits.get());assertEquals(0,h.sql.get())
+            val expected=when(choice){QuestionDateChoice.CURRENT->"2026-10-01" to "2026-10-31"
+                QuestionDateChoice.UNLIMITED->"" to "";else->"2026-10-03" to "2026-10-29"}
+            assertEquals(expected.first,h.input.get().from);assertEquals(expected.second,h.input.get().through)
+        }
+    }
+    private suspend fun rejectedDateNeedsCorrection(start:Boolean){
+        for(choose in listOf(false,true))H().use{h->
+            h.open();h.editQuestion("我种薄荷了吗？");h.editTerms("薄荷")
+            h.helper.from(h.ui(),"2026-10-01");h.helper.through(h.ui(),"2026-10-31")
+            val original=h.input.get()
+            if(start)h.helper.from(h.ui(),"2026-10-010")else h.helper.through(h.ui(),"2026-10-310")
+            assertNotNull(h.ui().error)
+            if(choose)h.helper.choose(h.ui(),h.ui().proposals.values.single{it.text=="我"})else h.editTerms("薄荷 我")
+            h.helper.confirm(h.ui());h.sync()
+            assertEquals("Rejected date must not commit an older range",0,h.commits.get())
+            assertEquals(0,h.sql.get());assertSame(original,h.input.get());assertNotNull(h.helper.state.value)
+            // Correcting the other endpoint cannot acknowledge this rejected endpoint.
+            if(start)h.helper.through(h.ui(),"2026-10-30")else h.helper.from(h.ui(),"2026-10-02")
+            h.helper.confirm(h.ui());h.sync();assertEquals(0,h.commits.get());assertEquals(0,h.sql.get())
+            if(start)h.helper.from(h.ui(),"2026-10-02")else h.helper.through(h.ui(),"2026-10-30")
+            h.helper.confirm(h.ui());assertEquals(1,h.commits.get());assertEquals(0,h.sql.get())
+            assertEquals("2026-10-02",h.input.get().from);assertEquals("2026-10-30",h.input.get().through)
+            h.sync();assertEquals(3,h.ready().hits.size)
+        }
+    }
     @Test fun questionRevisionForeignFragmentsOwnerAndCanonicalConditionsCannotReviveAConfirmation(){H().use{h->
         h.open();h.editQuestion("薄荷记录？");val previous=h.ui();val fragment=previous.proposals.values.first()
         h.editQuestion("新的问题？");val fresh=h.ui();h.helper.choose(previous,fragment);assertSame(fresh,h.ui())

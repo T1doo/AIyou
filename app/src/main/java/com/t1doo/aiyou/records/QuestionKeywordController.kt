@@ -28,12 +28,14 @@ class QuestionKeywordUi(val session:Long,val revision:Long,val binding:QuestionS
     val terms:String="",val dateChoice:QuestionDateChoice=QuestionDateChoice.UNDECIDED,
     val from:String=binding.input.from,val through:String=binding.input.through,
     val dateBasis:RecordDateBasis=binding.input.dateBasis,val error:String?=null,
-    val rejectedQuestion:Boolean=false,val rejectedTerms:Boolean=false,internal val lease:Any=Any()) {
+    val rejectedQuestion:Boolean=false,val rejectedTerms:Boolean=false,
+    val rejectedFrom:Boolean=false,val rejectedThrough:Boolean=false,internal val lease:Any=Any()) {
     internal fun next(question:String=this.question,proposals:QuestionKeywordFragments.Proposals=this.proposals,
         terms:String=this.terms,dateChoice:QuestionDateChoice=this.dateChoice,from:String=this.from,
         through:String=this.through,dateBasis:RecordDateBasis=this.dateBasis,error:String?=null,
-        rejectedQuestion:Boolean=this.rejectedQuestion,rejectedTerms:Boolean=this.rejectedTerms)=
-        QuestionKeywordUi(session,Math.addExact(revision,1),binding,question,proposals,terms,dateChoice,from,through,dateBasis,error,rejectedQuestion,rejectedTerms,lease)
+        rejectedQuestion:Boolean=this.rejectedQuestion,rejectedTerms:Boolean=this.rejectedTerms,
+        rejectedFrom:Boolean=this.rejectedFrom,rejectedThrough:Boolean=this.rejectedThrough)=
+        QuestionKeywordUi(session,Math.addExact(revision,1),binding,question,proposals,terms,dateChoice,from,through,dateBasis,error,rejectedQuestion,rejectedTerms,rejectedFrom,rejectedThrough,lease)
     override fun toString()="QuestionKeywordUi(redacted)"
 }
 data class QuestionKeywordCommit(val query:String,val from:String,val through:String,val basis:RecordDateBasis) {
@@ -94,12 +96,12 @@ internal class QuestionKeywordController(private val navigation:SearchNavigation
         catch(_:IllegalArgumentException){u.next(error="最多选择8词，含空格总计64个字符；可以直接编辑关键词。")}
     }
     fun dateChoice(u:QuestionKeywordUi,value:QuestionDateChoice)=change(u){when(value){
-        QuestionDateChoice.CURRENT->u.next(dateChoice=value,from=u.binding.input.from,through=u.binding.input.through,dateBasis=u.binding.input.dateBasis)
-        QuestionDateChoice.UNLIMITED->u.next(dateChoice=value,from="",through="")
+        QuestionDateChoice.CURRENT->u.next(dateChoice=value,from=u.binding.input.from,through=u.binding.input.through,dateBasis=u.binding.input.dateBasis,rejectedFrom=false,rejectedThrough=false)
+        QuestionDateChoice.UNLIMITED->u.next(dateChoice=value,from="",through="",rejectedFrom=false,rejectedThrough=false)
         else->u.next(dateChoice=value)
     }}
-    fun from(u:QuestionKeywordUi,value:String)=change(u){if(value.length>10)u.next(error="日期按YYYY-MM-DD输入；没有截断输入。")else u.next(from=value,dateChoice=QuestionDateChoice.RANGE)}
-    fun through(u:QuestionKeywordUi,value:String)=change(u){if(value.length>10)u.next(error="日期按YYYY-MM-DD输入；没有截断输入。")else u.next(through=value,dateChoice=QuestionDateChoice.RANGE)}
+    fun from(u:QuestionKeywordUi,value:String)=change(u){if(value.length>10)u.next(error="日期按YYYY-MM-DD输入；没有截断输入。",rejectedFrom=true)else u.next(from=value,dateChoice=QuestionDateChoice.RANGE,rejectedFrom=false)}
+    fun through(u:QuestionKeywordUi,value:String)=change(u){if(value.length>10)u.next(error="日期按YYYY-MM-DD输入；没有截断输入。",rejectedThrough=true)else u.next(through=value,dateChoice=QuestionDateChoice.RANGE,rejectedThrough=false)}
     fun basis(u:QuestionKeywordUi,value:RecordDateBasis)=change(u){u.next(dateBasis=value,dateChoice=QuestionDateChoice.UNDECIDED)}
     fun confirm(u:QuestionKeywordUi)=work{
         if(!current(u)){if(mutable.value===u)retireLocked();return@work}
@@ -109,6 +111,7 @@ internal class QuestionKeywordController(private val navigation:SearchNavigation
         val request=try{
             require(u.error==null)
             require(!u.rejectedQuestion&&!u.rejectedTerms)
+            require(!u.rejectedFrom&&!u.rejectedThrough)
             require(u.question.isNotBlank())
             val terms=u.terms.trim().split(Regex("\\s+")).filter{it.isNotEmpty()}
             val query=QuestionKeywordFragments.confirmedQuery(terms)
