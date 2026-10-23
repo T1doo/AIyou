@@ -135,7 +135,7 @@ class MixedNotebookPresentationTest {
         val text="合成横屏冷启动草稿"
         val draft=CaptureDraft("c5883362-094d-483a-bc55-472076c0c387",1,text,emptyList())
         val local=LocalRecordUiState(ready=true,opening=false,supportsMixedCapture=true,
-            mixedCapture=MixedCaptureUiState(draft=draft,supportsProcessingChoice=true))
+            mixedCapture=MixedCaptureUiState(draft=draft,text=text,supportsProcessingChoice=true))
         var writes=0
         val controller=MixedCaptureController({local},{},{writes++;false},{error("No media input")},Clock.systemUTC())
         compose.setContent {
@@ -149,6 +149,9 @@ class MixedNotebookPresentationTest {
         val heading=compose.onNodeWithTag("mixed-notebook-heading").assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue(heading.bottom-heading.top<=88.dp)
         assertCompanionSize(56f)
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").performScrollTo().assertIsDisplayed().assertTextEquals(text)
+        compose.onNodeWithTag("mixed-list").performScrollToIndex(0)
         compose.onNodeWithTag("companion-entry").performClick()
         compose.onNodeWithText("关闭陪伴面板").performClick()
         compose.onNodeWithText("设置").performClick()
