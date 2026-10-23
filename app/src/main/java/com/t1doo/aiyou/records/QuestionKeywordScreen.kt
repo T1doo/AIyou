@@ -24,7 +24,10 @@ import com.t1doo.aiyou.model.RecordDateBasis
 @Composable internal fun QuestionKeywordDialog(u:QuestionKeywordUi,c:QuestionKeywordController){
     DisposableEffect(c,u.session){onDispose{c.cancel(u)}}
     Dialog(onDismissRequest={c.cancel(u)},properties=DialogProperties(usePlatformDefaultWidth=false)){
-        CompositionLocalProvider(LocalSaveableStateRegistry provides null){QuestionKeywordContent(u,c::question,c::terms,c::choose,c::dateChoice,c::from,c::through,c::basis,c::confirm,c::cancel)}
+        CompositionLocalProvider(LocalSaveableStateRegistry provides null){
+            if(u.reduction!=null)KeywordReductionContent(u,c::toggleReduction,c::confirm,c::cancel)
+            else QuestionKeywordContent(u,c::question,c::terms,c::choose,c::dateChoice,c::from,c::through,c::basis,c::confirm,c::cancel)
+        }
     }
 }
 

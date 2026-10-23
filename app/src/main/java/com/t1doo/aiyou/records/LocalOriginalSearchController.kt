@@ -42,6 +42,7 @@ class LocalOriginalSearchController internal constructor(
     private var pendingInputOwner: Any? = null // opaque memory-only input identity
     private var job: Job? = null
     private var cache: OriginalSearchState? = null
+    private var acknowledgedResult: OriginalSearchState? = null
     private val mutableState = stateFactory(OriginalSearchState(OriginalSearchInput(), OriginalSearchStage.WAITING))
     val state = mutableState.asStateFlow()
 
@@ -63,6 +64,13 @@ class LocalOriginalSearchController internal constructor(
         val value = mutableState.value
         if (usable(local) && local?.entries === value.entries && value.input == input && owns(value)) value
         else OriginalSearchState(input, OriginalSearchStage.WAITING)
+    }
+
+    /** No authority is granted by the pre-commit READY emission. O(1) identity/owner fences. */
+    internal fun admitsEmptyReview(value: OriginalSearchState): Boolean = synchronized(lock) {
+        value === acknowledgedResult && mutableState.value === value && owns(value) &&
+            value.stage == OriginalSearchStage.READY && value.hits.isEmpty() &&
+            value.input.mode == OriginalSearchMode.KEYWORDS && value.owner != null && value.proof != null
     }
 
     /** Test observer only: booleans and enums, never query, dates or original text. */
@@ -111,7 +119,7 @@ class LocalOriginalSearchController internal constructor(
         generation++
         job?.cancel(); job = null
         if (!usable(local)) {
-            cache = null
+            cache = null; acknowledgedResult = null
             mutableState.value = OriginalSearchState(input, OriginalSearchStage.WAITING, entries = local?.entries,
                 generation = generation, owner = local?.localSearch, indexEpoch = local?.localSearchEpoch, inputEpoch = inputEpoch)
             return@synchronized
@@ -132,7 +140,7 @@ class LocalOriginalSearchController internal constructor(
                 inputEpoch = inputEpoch)
             return@synchronized
         }
-        cache = null
+        cache = null; acknowledgedResult = null
         val request = OriginalSearchState(input, OriginalSearchStage.RUNNING, entries = entries, generation = generation,
             owner = local.localSearch, indexEpoch = local.localSearchEpoch, inputEpoch = inputEpoch)
         mutableState.value = request
@@ -152,7 +160,7 @@ class LocalOriginalSearchController internal constructor(
                     // A fresh input/source can invalidate this worker before the next render.
                     // Wake that render to sync again; never strand a completed worker in RUNNING.
                     job = null
-                    cache = null
+                    cache = null; acknowledgedResult = null
                     mutableState.value = OriginalSearchState(input, OriginalSearchStage.WAITING,
                         entries = entries, generation = request.generation, owner = request.owner,
                         indexEpoch = request.indexEpoch, inputEpoch = request.inputEpoch)
@@ -165,11 +173,17 @@ class LocalOriginalSearchController internal constructor(
                     result.owner.publishCurrent(result.proof, ::publishResult)
                 else { publishResult(); true }
             } catch (cancelled: CancellationException) { cancellation = cancelled; false } catch (_: Exception) { false }
+            if (published) synchronized(lock) {
+                completedByRequest?.let { completed ->
+                    if (completed.stage == OriginalSearchStage.READY && completed.proof != null &&
+                        mutableState.value === completed && owns(completed)) acknowledgedResult = completed
+                }
+            }
             if (!published || result.stage == OriginalSearchStage.WAITING) {
                 synchronized(lock) {
                     if (owns(request) && (mutableState.value === request ||
                         completedByRequest != null && mutableState.value === completedByRequest)) {
-                        job = null; cache = null
+                        job = null; cache = null; acknowledgedResult = null
                         mutableState.value = OriginalSearchState(input, OriginalSearchStage.WAITING,
                             entries = entries, generation = request.generation, owner = request.owner,
                             indexEpoch = request.indexEpoch, inputEpoch = request.inputEpoch)
@@ -213,7 +227,7 @@ class LocalOriginalSearchController internal constructor(
                     // it cannot retire a later navigation or a new composition.
                     if (opened) rollback()
                     if (owns(value)) {
-                        cache = null; job = null
+                        cache = null; acknowledgedResult = null; job = null
                         mutableState.value = OriginalSearchState(value.input, OriginalSearchStage.WAITING,
                             entries = value.entries, generation = value.generation, owner = value.owner,
                             indexEpoch = value.indexEpoch, inputEpoch = value.inputEpoch)
@@ -238,6 +252,7 @@ class LocalOriginalSearchController internal constructor(
         return synchronized(lock) {
             if (closed || !allowed()) false
             else {
+                acknowledgedResult = null
                 pendingInputOwner = currentInput().ownership
                 pendingInput = true
                 inputEpoch = Math.addExact(inputEpoch, 1)
@@ -249,7 +264,7 @@ class LocalOriginalSearchController internal constructor(
     fun inputCommitted() = synchronized(lock) {
         if (closed || !pendingInput) return@synchronized
         pendingInput = false; pendingInputOwner = null
-        cache = null; job?.cancel(); job = null
+        cache = null; acknowledgedResult = null; job?.cancel(); job = null
         mutableState.value = OriginalSearchState(OriginalSearchInput(), OriginalSearchStage.WAITING,
             generation = generation, inputEpoch = inputEpoch)
     }
@@ -258,7 +273,7 @@ class LocalOriginalSearchController internal constructor(
         if (closed) return@synchronized
         pauseLocked()
         pendingInput = false; pendingInputOwner = null
-        cache = null
+        cache = null; acknowledgedResult = null
         generation++
         mutableState.value = OriginalSearchState(OriginalSearchInput(), OriginalSearchStage.WAITING, generation = generation)
     }
@@ -269,6 +284,7 @@ class LocalOriginalSearchController internal constructor(
         if(closed)false else{invalidateInput();change();true}
     }
     private fun pauseLocked() {
+        acknowledgedResult = null
         if (!active) return
         active = false
         generation++
@@ -278,7 +294,7 @@ class LocalOriginalSearchController internal constructor(
     fun clear() = synchronized(lock) {
         pauseLocked()
         pendingInput = false; pendingInputOwner = null
-        cache = null
+        cache = null; acknowledgedResult = null
         generation++
         mutableState.value = OriginalSearchState(OriginalSearchInput(), OriginalSearchStage.WAITING, generation = generation)
     }
@@ -289,7 +305,7 @@ class LocalOriginalSearchController internal constructor(
         active = false
         generation++
         job?.cancel(); job = null
-        cache = null
+        cache = null; acknowledgedResult = null
         mutableState.value = OriginalSearchState(OriginalSearchInput(), OriginalSearchStage.WAITING, generation = generation)
         scope.cancel()
     }

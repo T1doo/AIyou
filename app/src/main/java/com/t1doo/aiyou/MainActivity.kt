@@ -1280,6 +1280,8 @@ fun AIyouApp(
                 },
                 onHistoryInputCommitted = {navigation.gate.inputAction(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){search.inputCommitted()}},
                 onQuestionKeywords={navigation.gate.inputAction(generation,search,{searchRouteAvailable()}){questionHelper.open()}},
+                onReduceSearchKeywords={value->navigation.gate.inputDecision(generation,search,
+                    {searchRouteAvailable()&&questionHelper.state.value==null}){questionHelper.openReduction(value,search)}},
                 onRebuildLocalSearch = { navigation.gate.inputAction(generation,search,
                     {searchRouteAvailable()&&questionHelper.state.value==null&&currentLocal?.localSearch!=null&&currentLocal?.localIndexBusy==false}){onRebuildLocalSearch()} },
                 searchPerson = searchPerson, onSearchPerson = { person -> changeSearchInput {searchPerson=person;searchModeGeneration++} }, onRefreshPeople = {navigation.gate.inputAction(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){onRefreshLocalSearch()}},

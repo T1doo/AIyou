@@ -137,6 +137,7 @@ fun LocalRecordsScreen(
     onOpenImageTexts:(()->Unit)?=null,
     imageTextBusy:Boolean=false,
     onQuestionKeywords:(()->Unit)?=null,
+    onReduceSearchKeywords:((OriginalSearchState)->Boolean)?=null,
 ) {
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
@@ -403,6 +404,9 @@ fun LocalRecordsScreen(
                         OriginalSearchStage.INVALID -> StatusNotice("请检查查找条件", searchState.message.orEmpty(), state = ComponentState.ERROR)
                         OriginalSearchStage.FAILED -> StatusNotice("本机查找需要处理", searchState.message.orEmpty(), state = ComponentState.ERROR)
                         else -> StatusNotice("等待本机原文", "原文可读取后再显示查找结果。", state = ComponentState.LOADING)
+                    }
+                    if(searchState!=null)onReduceSearchKeywords?.let{open->
+                        KeywordReductionAction(searchState,local.ready&&!local.opening&&local.error==null,open)
                     }
                 }
                 if (destination == Destination.NOW) item("recent") { Text("最近记录", style = MaterialTheme.typography.titleLarge) }

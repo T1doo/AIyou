@@ -12,6 +12,10 @@ import kotlin.coroutines.CoroutineContext
 
 enum class OriginalSearchMode { KEYWORDS, EXACT }
 
+/** Same literal AND token boundaries for matching and bounded keyword review. */
+internal fun originalKeywordTerms(query: String): List<String> =
+    query.split(Regex("[\\p{javaWhitespace}\\p{Zs}]+" )).filter { it.isNotEmpty() }
+
 /** Memory only. Never include the query in diagnostics, saved state or persistence. */
 data class OriginalSearchInput(val query: String = "", val from: String = "", val through: String = "",
     val mode: OriginalSearchMode = OriginalSearchMode.KEYWORDS, internal val ownership: Any? = null, val tag: String? = null,
@@ -135,7 +139,7 @@ internal object LocalOriginalSearchMatcher {
         if (!wellFormed(input.query)) return OriginalSearchMatches(OriginalSearchStage.INVALID,
             message = "关键词包含不完整的字符，请重新输入。")
         val terms = if (input.mode == OriginalSearchMode.EXACT) listOf(input.query).filter { it.isNotEmpty() }
-            else input.query.split(Regex("[\\p{javaWhitespace}\\p{Zs}]+" )).filter { it.isNotEmpty() }
+            else originalKeywordTerms(input.query)
         if (input.person != null && input.peopleSnapshot == null) return OriginalSearchMatches(OriginalSearchStage.FAILED,
             message = "手工人物关联暂不可读取，请重试本机读取。")
         if (input.person != null && try { com.t1doo.aiyou.model.ManualTags.canonical(listOf(input.person)) != listOf(input.person) }

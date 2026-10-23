@@ -23,19 +23,38 @@ class QuestionSearchBinding(val navigation:Long,val source:LocalRecordUiState,va
     override fun toString()="QuestionSearchBinding(redacted)"
 }
 enum class QuestionDateChoice { UNDECIDED, CURRENT, UNLIMITED, RANGE }
+/** User-query terms only. Duplicate occurrences are separate; never a semantic proposal. */
+class KeywordReductionDraft private constructor(tokens:List<String>,val keptMask:Int) {
+    val tokens:List<String> = java.util.Collections.unmodifiableList(tokens.toList())
+    private val allMask get()=(1 shl tokens.size)-1
+    val remaining:List<String> get()=tokens.filterIndexed{index,_->keptMask and (1 shl index)!=0}
+    val canConfirm get()=keptMask in 1 until allMask
+    internal fun toggle(index:Int):KeywordReductionDraft? =
+        if(index in tokens.indices)KeywordReductionDraft(tokens,keptMask xor (1 shl index))else null
+    override fun toString()="KeywordReductionDraft(redacted)"
+    companion object {
+        fun from(query:String):KeywordReductionDraft? {
+            if(query.length>128||!com.t1doo.aiyou.model.LocalCandidates.validUnicode(query)||query.codePointCount(0,query.length)>64)return null
+            val terms=originalKeywordTerms(query)
+            if(terms.size !in 2..8||terms.any{it.codePoints().anyMatch(Character::isISOControl)})return null
+            return KeywordReductionDraft(terms,(1 shl terms.size)-1)
+        }
+    }
+}
 class QuestionKeywordUi(val session:Long,val revision:Long,val binding:QuestionSearchBinding,
     val question:String="",val proposals:QuestionKeywordFragments.Proposals=QuestionKeywordFragments.propose(""),
     val terms:String="",val dateChoice:QuestionDateChoice=QuestionDateChoice.UNDECIDED,
     val from:String=binding.input.from,val through:String=binding.input.through,
     val dateBasis:RecordDateBasis=binding.input.dateBasis,val error:String?=null,
     val rejectedQuestion:Boolean=false,val rejectedTerms:Boolean=false,
-    val rejectedFrom:Boolean=false,val rejectedThrough:Boolean=false,internal val lease:Any=Any()) {
+    val rejectedFrom:Boolean=false,val rejectedThrough:Boolean=false,internal val lease:Any=Any(),
+    val reduction:KeywordReductionDraft?=null) {
     internal fun next(question:String=this.question,proposals:QuestionKeywordFragments.Proposals=this.proposals,
         terms:String=this.terms,dateChoice:QuestionDateChoice=this.dateChoice,from:String=this.from,
         through:String=this.through,dateBasis:RecordDateBasis=this.dateBasis,error:String?=null,
         rejectedQuestion:Boolean=this.rejectedQuestion,rejectedTerms:Boolean=this.rejectedTerms,
-        rejectedFrom:Boolean=this.rejectedFrom,rejectedThrough:Boolean=this.rejectedThrough)=
-        QuestionKeywordUi(session,Math.addExact(revision,1),binding,question,proposals,terms,dateChoice,from,through,dateBasis,error,rejectedQuestion,rejectedTerms,rejectedFrom,rejectedThrough,lease)
+        rejectedFrom:Boolean=this.rejectedFrom,rejectedThrough:Boolean=this.rejectedThrough,reduction:KeywordReductionDraft?=this.reduction)=
+        QuestionKeywordUi(session,Math.addExact(revision,1),binding,question,proposals,terms,dateChoice,from,through,dateBasis,error,rejectedQuestion,rejectedTerms,rejectedFrom,rejectedThrough,lease,reduction)
     override fun toString()="QuestionKeywordUi(redacted)"
 }
 data class QuestionKeywordCommit(val query:String,val from:String,val through:String,val basis:RecordDateBasis) {
@@ -65,6 +84,22 @@ internal class QuestionKeywordController(private val navigation:SearchNavigation
         if(!navigation.active||navigation.generation!=binding.navigation)return@work
         retireSearch();serial=Math.addExact(serial,1);mutable.value=QuestionKeywordUi(serial,0,binding)
     }
+    fun openReduction(value:OriginalSearchState,search:LocalOriginalSearchController):Boolean {
+        if(search.inputCallbackReentrant())return false
+        var opened=false
+        work{
+            if(disposed||!foreground||confirming||mutable.value!=null)return@work
+            val binding=currentBinding()?:return@work
+            if(!navigation.active||navigation.generation!=binding.navigation||binding.input!=value.input||
+                binding.source.localSearch!==value.owner||binding.source.entries!==value.entries||binding.source.localSearchEpoch!=value.indexEpoch||
+                !search.admitsEmptyReview(value))return@work
+            val draft=KeywordReductionDraft.from(binding.input.query)?:return@work
+            retireSearch();serial=Math.addExact(serial,1)
+            mutable.value=QuestionKeywordUi(serial,0,binding,dateChoice=QuestionDateChoice.CURRENT,reduction=draft)
+            opened=true
+        }
+        return opened
+    }
     fun foreground(value:Boolean)=work{foreground=value;if(!value)retireLocked()}
     fun retire()=navigation.arbitrate{
         // A source-location publication already holds search while advancing navigation.
@@ -75,9 +110,14 @@ internal class QuestionKeywordController(private val navigation:SearchNavigation
     fun dispose()=work{disposed=true;foreground=false;retireLocked()}
     fun sync()=work{mutable.value?.let{if(!current(it))retireLocked()}}
     fun cancel(u:QuestionKeywordUi)=work{if(mutable.value?.let{it.session==u.session&&it.lease===u.lease}==true)retireLocked()}
-    private fun change(u:QuestionKeywordUi,action:()->QuestionKeywordUi)=work{
+    private fun change(u:QuestionKeywordUi,questionOnly:Boolean=true,action:()->QuestionKeywordUi)=work{
         if(!current(u)){if(mutable.value===u)retireLocked();return@work}
+        if(questionOnly&&u.reduction!=null)return@work
         mutable.value=action()
+    }
+    fun toggleReduction(u:QuestionKeywordUi,index:Int)=change(u,questionOnly=false){
+        val draft=u.reduction?:return@change u
+        draft.toggle(index)?.let{u.next(reduction=it)}?:u
     }
     fun question(u:QuestionKeywordUi,value:String)=change(u){
         try{u.next(question=value,proposals=QuestionKeywordFragments.propose(value),terms="",dateChoice=QuestionDateChoice.UNDECIDED,rejectedQuestion=false,rejectedTerms=false)}
@@ -110,6 +150,13 @@ internal class QuestionKeywordController(private val navigation:SearchNavigation
         }
         val request=try{
             require(u.error==null)
+            if(u.reduction!=null){
+                val base=u.binding.input;val draft=u.reduction
+                require(base.mode==OriginalSearchMode.KEYWORDS&&KeywordReductionDraft.from(base.query)?.tokens==draft.tokens)
+                require(draft.canConfirm)
+                require(u.from==base.from&&u.through==base.through&&u.dateBasis==base.dateBasis&&u.dateChoice==QuestionDateChoice.CURRENT)
+                QuestionKeywordCommit(draft.remaining.joinToString(" "),base.from,base.through,base.dateBasis)
+            }else{
             require(!u.rejectedQuestion&&!u.rejectedTerms)
             require(!u.rejectedFrom&&!u.rejectedThrough)
             require(u.question.isNotBlank())
@@ -120,7 +167,8 @@ internal class QuestionKeywordController(private val navigation:SearchNavigation
             UnifiedCaptureRange.parse(u.from,u.through)
             require(u.dateBasis!=RecordDateBasis.EVENT||u.binding.source.eventDatesAvailable)
             QuestionKeywordCommit(query,u.from,u.through,u.dateBasis)
-        }catch(_:IllegalArgumentException){mutable.value=u.next(error="请核对关键词，并明确日期依据及沿用、不限或手工范围；无效条件没有发起查找。");return@work}
+            }
+        }catch(_:IllegalArgumentException){mutable.value=u.next(error=if(u.reduction!=null)"请至少移除一个词项，并保留一个词；其他查找条件没有改变。"else "请核对关键词，并明确日期依据及沿用、不限或手工范围；无效条件没有发起查找。");return@work}
         confirming=true
         // Keep the modal blocking search until the one atomic canonical-input callback is done.
         try{
