@@ -1,0 +1,47 @@
+name: Preserve completed stage evidence
+description: Archive exact source provenance and existing outputs immediately, without rerunning tests.
+inputs:
+  stage:
+    description: Unique stage identity within this job.
+    required: true
+  outcome:
+    description: Actual producer step outcome, not an inferred test verdict.
+    required: true
+  name:
+    description: Unique artifact name within the workflow run.
+    required: true
+  paths:
+    description: Existing evidence paths; the root receipt preserves repository-relative paths.
+    required: true
+outputs:
+  artifact-id:
+    description: Immutable artifact identity from this run.
+    value: ${{ steps.archive.outputs.artifact-id }}
+  artifact-digest:
+    description: Official archive SHA256.
+    value: ${{ steps.archive.outputs.artifact-digest }}
+runs:
+  using: composite
+  steps:
+    - name: Bind archive to source and producer
+      id: provenance
+      if: always()
+      shell: bash
+      env:
+        EVIDENCE_STAGE: ${{ inputs.stage }}
+        PRODUCER_OUTCOME: ${{ inputs.outcome }}
+      run: python3 scripts/ci-stage-evidence.py --stage "$EVIDENCE_STAGE" --outcome "$PRODUCER_OUTCOME"
+    - name: Upload existing stage outputs
+      id: archive
+      if: always() && steps.provenance.outcome == 'success'
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: ${{ inputs.name }}
+        path: |
+          ${{ inputs.paths }}
+          build/ci-stage-evidence/${{ inputs.stage }}/receipt.json
+        if-no-files-found: error
+        retention-days: 14
+        # Only schema explicitly names four public generation JSON files beneath
+        # .local-evidence; no wildcard or repository-wide hidden-file upload.
+        include-hidden-files: ${{ inputs.stage == 'schema' }}

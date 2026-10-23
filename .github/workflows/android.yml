@@ -9,16 +9,28 @@ name: D01 Android and Preview checks
 permissions:
   contents: read
 
+# One reviewed validation: 23 + 30 + 17 = at most 70 runner minutes.
+# Android and Preview consume confirmed same-SHA host artifacts in parallel.
+# Dependency/queue/cold-build time means this is NOT a 30-minute wall-clock promise.
 jobs:
-  d01:
+  contracts:
+    name: Host contracts and generated Room evidence
     runs-on: ubuntu-24.04
-    # Run39531711787 took36m6s including evidence/post steps; prior35m bound cancelled it.
-    # One bounded40m job; individual test deadlines, resources and all gates stay fixed.
-    timeout-minutes: 40
+    timeout-minutes: 23
+    outputs:
+      schema_id: ${{ steps.schema_archive.outputs.artifact-id }}
+      schema_digest: ${{ steps.schema_archive.outputs.artifact-digest }}
+      protocol_id: ${{ steps.protocol_archive.outputs.artifact-id }}
+      protocol_digest: ${{ steps.protocol_archive.outputs.artifact-digest }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Require the exact workflow checkout
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
       - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           distribution: temurin
@@ -30,6 +42,7 @@ jobs:
             3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 \
             gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
       - name: Generate actual Room v15 runtime export with unchanged predecessors and native fixtures
+        id: room_schema
         run: |
           python3 scripts/check-sdk.py
           python3 scripts/verify-manual-tag-schema.py --capture
@@ -55,7 +68,33 @@ jobs:
           python3 scripts/verify-model-configuration-schema.py --verify
           python3 scripts/verify-model-capability-schema.py --verify
           python3 scripts/verify-reminder-runtime-schema.py --verify
+      - name: Preserve exact generated D02 schema and lock bytes
+        if: always()
+        run: python3 scripts/export-d02-generated-state.py
+      - name: Archive schema evidence before the next phase
+        id: schema_archive
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: schema
+          outcome: ${{ steps.room_schema.outcome }}
+          name: d01-stage-schema
+          paths: |
+            core/data/schemas/
+            core/data/src/androidTest/assets/records-schema-v11.json
+            core/data/src/androidTest/assets/records-schema-v12.json
+            core/data/src/androidTest/assets/records-schema-v13.json
+            core/data/src/androidTest/assets/records-schema-v14.json
+            .local-evidence/f05-event-date/schema-generation.json
+            .local-evidence/f05-manual-people/schema-generation.json
+            .local-evidence/d04-model-configuration/schema-generation.json
+            .local-evidence/d04-model-capability/schema-generation.json
+            app/gradle.lockfile
+            core/data/gradle.lockfile
+            core/domain/gradle.lockfile
+            core/designsystem/gradle.lockfile
       - name: Run actual domain and D04 JVM wire contracts
+        id: ai_contracts
         run: |
           python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test :remote-text:test
           python3 scripts/verify-ai-http-dependencies.py
@@ -91,24 +130,144 @@ jobs:
               'status': 'PASS', 'head': report['head'], 'source_sha256': report['source_sha256'],
               'snapshot_sha256': snapshot, 'tests': {item['module']: item['tests'] for item in report['results']}}))
           PY
+      - name: Archive protocol evidence before the next phase
+        id: protocol_archive
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: protocol
+          outcome: ${{ steps.ai_contracts.outcome }}
+          name: d01-stage-protocol
+          paths: |
+            core/domain/build/test-results/test/
+            core/domain/build/reports/tests/test/
+            core/domain/build/reports/inputs-at-test.json
+            core/ai/build/test-results/test/
+            core/ai/build/reports/tests/test/
+            core/ai/build/reports/inputs-at-test.json
+            checks/ai-protocol/build/reports/verified-contracts.json
+            checks/ai-protocol/build/reports/xml-snapshots/
+            checks/ai-protocol/remote-text/build/test-results/test/
+            checks/ai-protocol/remote-text/build/reports/tests/test/
+            checks/ai-protocol/remote-text/build/reports/inputs-at-test.json
+            checks/ai-protocol/remote-text/build/reports/erasure-process/
       - name: Run actual ViewModel queue failure regressions (host boundary)
+        id: queue
         run: |
           scripts/gradle.sh --project-dir checks/record-queue test
           python3 scripts/verify-test-results.py --queue
+      - name: Archive queue evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: queue
+          outcome: ${{ steps.queue.outcome }}
+          name: d01-stage-queue
+          paths: |
+            checks/record-queue/build/test-results/test/
+            checks/record-queue/build/reports/tests/test/
+            checks/record-queue/build/reports/attachment-process/
       - name: Verify design contracts and generated tokens
+        id: design_contracts
+        shell: bash
         run: |
-          python3 -m unittest discover -s scripts/tests -v
-          python3 scripts/generate-tokens.py --check
+          mkdir -p build/ci-stage-evidence
+          python3 -m unittest discover -s scripts/tests -v 2>&1 | tee build/ci-stage-evidence/script-tests.log
+          python3 scripts/generate-tokens.py --check 2>&1 | tee build/ci-stage-evidence/token-check.log
+      - name: Archive design evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: design
+          outcome: ${{ steps.design_contracts.outcome }}
+          name: d01-stage-design
+          paths: |
+            build/ci-stage-evidence/script-tests.log
+            build/ci-stage-evidence/token-check.log
       - name: Test actual reminder receiver and JobService chain with controlled platform ports
+        id: reminders
         run: |
           python3 scripts/jvm-gradle.py -p checks/reminder-native test
           python3 scripts/verify-reminder-native-results.py
+      - name: Archive reminder evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: reminder
+          outcome: ${{ steps.reminders.outcome }}
+          name: d01-stage-reminder
+          paths: |
+            checks/reminder-native/build/test-results/test/
+            checks/reminder-native/build/reports/tests/test/
+            checks/reminder-native/build/controlled-native-inputs.json
+            checks/reminder-native/build/controlled-native-results.json
+            checks/reminder-native/build/actual-room-export/
       - name: Test actual native diagnostic observer on host (no device claim)
+        id: trace
         run: |
           scripts/gradle.sh --project-dir checks/native-trace test
           python3 scripts/verify-test-results.py --trace
+      - name: Archive trace evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: trace
+          outcome: ${{ steps.trace.outcome }}
+          name: d01-stage-trace
+          paths: |
+            checks/native-trace/build/test-results/test/
+            checks/native-trace/build/reports/tests/test/
       - name: Require nonempty passing tests
         run: python3 scripts/verify-test-results.py
+      - name: Require host sources to remain unchanged
+        run: git diff --exit-code
+  d01:
+    name: Android APK Compose lint and compiled native evidence
+    needs: [contracts]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Require the exact workflow checkout
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Verify d01 wrapper checksum
+        run: |
+          printf '%s  %s\n' \
+            3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 \
+            gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
+      - name: Download the confirmed schema artifact from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.contracts.outputs.schema_id }}
+          path: build/ci-inputs/schema
+          merge-multiple: true
+      - name: Download same-run host domain evidence without rerunning it
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.contracts.outputs.protocol_id }}
+          path: build/ci-inputs/protocol
+          merge-multiple: true
+      - name: Authenticate schema and required host evidence against this checkout
+        id: transferred_inputs
+        run: python3 scripts/verify-ci-stage-inputs.py --schema-dir build/ci-inputs/schema --domain-dir build/ci-inputs/protocol
+      - name: Preserve the exact input transfer receipt
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: schema-inputs
+          outcome: ${{ steps.transferred_inputs.outcome }}
+          name: d01-android-inputs
+          paths: build/ci-stage-evidence/transferred-inputs/result.json
       - name: Verify already installed and licensed SDK
         run: python3 scripts/check-sdk.py
       - name: Inspect existing device test environment without installation
@@ -119,17 +278,39 @@ jobs:
         run: |
           scripts/gradle.sh :app:checkDebugAarMetadata :core:designsystem:checkDebugAarMetadata :core:data:checkDebugAarMetadata
       - name: Run actual component clipping and empty-state regression tests
+        id: components
         env:
           AIYOU_CI_ANDROID_DAEMON: 'true'
         run: |
           scripts/gradle.sh :core:designsystem:testDebugUnitTest
           python3 scripts/verify-test-results.py --component
+      - name: Archive component evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: component
+          outcome: ${{ steps.components.outcome }}
+          name: d01-stage-component
+          paths: |
+            core/designsystem/build/test-results/testDebugUnitTest/
+            core/designsystem/build/reports/tests/testDebugUnitTest/
       - name: Run production pre-open ciphertext evidence regressions
+        id: preopen
         env:
           AIYOU_CI_ANDROID_DAEMON: 'true'
         run: |
           scripts/gradle.sh :core:data:testDebugUnitTest
           python3 scripts/verify-test-results.py --evidence
+      - name: Archive preopen evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: preopen
+          outcome: ${{ steps.preopen.outcome }}
+          name: d01-stage-preopen
+          paths: |
+            core/data/build/test-results/testDebugUnitTest/
+            core/data/build/reports/tests/testDebugUnitTest/
       - name: Build debug APK
         id: assemble
         env:
@@ -137,6 +318,14 @@ jobs:
         run: |
           scripts/gradle.sh :app:assembleDebug
           sha256sum app/build/outputs/apk/debug/app-debug.apk
+      - name: Preserve debug APK
+        if: always() && steps.assemble.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: aiyou-d01-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
       - name: Inspect actual merged APK for absent INTERNET permission (device NOT RUN)
         run: python3 scripts/inspect-record-ai-permissions.py
       - name: Independently reproduce the original lazy-node failure and verify the corrected method
@@ -145,6 +334,7 @@ jobs:
           AIYOU_CI_ANDROID_DAEMON: 'true'
         run: python3 scripts/reproduce-ui-lazy-source.py --expected-head "$GITHUB_SHA"
       - name: Run actual Compose disabled-control and storage-wiring regressions (JVM simulation)
+        id: compose
         env:
           AIYOU_CI_ANDROID_DAEMON: 'true'
         run: |
@@ -401,98 +591,14 @@ jobs:
           (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
           print('FULL_OFFLINE_BACKUP_TARGETED_XML_JSON ' + json.dumps(receipt))
           PYCODE
-      - name: Compile actual D02 native-storage instrumentation APK without claiming execution
-        env:
-          AIYOU_CI_ANDROID_DAEMON: 'true'
-        run: scripts/gradle.sh :core:data:assembleDebugAndroidTest :app:assembleDebugAndroidTest
-      - name: Collect exact native methods and external probes from actual compiled APK DEX (device NOT RUN)
-        run: python3 scripts/inspect-d02-device-test-apks.py
-      - name: Verify actual license assets and APK ZIP alignment (native execution NOT RUN)
-        run: python3 scripts/inspect-d02-apks.py
-      - name: Run Android lint
-        env:
-          AIYOU_CI_ANDROID_DAEMON: 'true'
-        run: |
-          scripts/gradle.sh :app:lintDebug :core:designsystem:lintDebug :core:data:lintDebug
-          git diff --exit-code
-      - name: Generate initial Preview render smoke references
-        id: preview_generate
-        if: always() && steps.assemble.outcome == 'success'
-        env:
-          AIYOU_CI_ANDROID_DAEMON: 'true'
-        run: scripts/gradle.sh :app:updateDebugScreenshotTest
-      - name: Validate Preview render smoke
-        id: preview_validate
-        if: always() && steps.preview_generate.outcome == 'success'
-        env:
-          AIYOU_CI_ANDROID_DAEMON: 'true'
-        run: scripts/gradle.sh :app:validateDebugScreenshotTest
-      - name: Require actual complete Preview render results
-        id: preview_guard
-        if: always() && steps.preview_validate.outcome == 'success'
-        run: python3 scripts/verify-preview-results.py
-      - name: Package unchanged PNGs for attachment-sized visual review
-        id: visual_packs
-        if: always() && steps.preview_guard.outcome == 'success'
-        run: python3 scripts/package-visual-previews.py
-      - name: Preserve visual delivery manifest
-        id: visual_index
-        if: always() && steps.visual_packs.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - name: Archive compose evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
         with:
-          name: d01-visual-index
-          path: app/build/outputs/d01-visual-packs/INDEX.json
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload each unchanged bounded PNG ZIP independently
-        if: always() && steps.visual_packs.outcome == 'success' && steps.visual_index.outcome == 'success'
-        uses: ./.github/actions/upload-visual-packs
-      - name: Print complete lint findings
-        if: always()
-        run: |
-          for module in app core/designsystem core/data; do
-            report=$module/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
-            if [ -f "$report" ]; then
-              cat "$report"
-            else
-              echo "Lint text report unavailable for $module; see preceding task result."
-            fi
-          done
-      - name: Preserve exact generated D02 schema and lock bytes
-        if: always()
-        run: python3 scripts/export-d02-generated-state.py
-      - name: Preserve test and lint reports
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
+          stage: compose
+          outcome: ${{ steps.compose.outcome }}
           name: d01-reports
-          path: |
-            core/domain/build/test-results/test/
-            core/domain/build/reports/tests/test/
-            core/domain/build/reports/inputs-at-test.json
-            core/ai/build/test-results/test/
-            core/ai/build/reports/tests/test/
-            core/ai/build/reports/inputs-at-test.json
-            checks/ai-protocol/build/reports/verified-contracts.json
-            checks/ai-protocol/build/reports/xml-snapshots/
-            checks/ai-protocol/remote-text/build/test-results/test/
-            checks/ai-protocol/remote-text/build/reports/tests/test/
-            checks/ai-protocol/remote-text/build/reports/inputs-at-test.json
-            checks/ai-protocol/remote-text/build/reports/erasure-process/
-            checks/record-queue/build/test-results/test/
-            checks/record-queue/build/reports/tests/test/
-            checks/record-queue/build/reports/attachment-process/
-            checks/reminder-native/build/test-results/test/
-            checks/reminder-native/build/reports/tests/test/
-            checks/reminder-native/build/controlled-native-inputs.json
-            checks/reminder-native/build/controlled-native-results.json
-            checks/reminder-native/build/actual-room-export/
-            checks/native-trace/build/test-results/test/
-            checks/native-trace/build/reports/tests/test/
-            core/designsystem/build/test-results/testDebugUnitTest/
-            core/designsystem/build/reports/tests/testDebugUnitTest/
-            core/data/build/test-results/testDebugUnitTest/
-            core/data/build/reports/tests/testDebugUnitTest/
+          paths: |
             app/build/test-results/testDebugUnitTest/
             app/build/reports/tests/testDebugUnitTest/
             app/build/reports/storage-usage-targeted/
@@ -504,39 +610,13 @@ jobs:
             app/build/reports/local-evidence-timeline-targeted/
             app/build/reports/selected-evidence-question-targeted/
             app/build/reports/selected-question-consent-targeted/
-            app/build/reports/lint-results-debug.*
-            app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
-            core/designsystem/build/reports/lint-results-debug.*
-            core/data/build/reports/lint-results-debug.*
-            core/data/schemas/
-            core/data/src/androidTest/assets/records-schema-v11.json
-            core/data/src/androidTest/assets/records-schema-v12.json
-            core/data/src/androidTest/assets/records-schema-v13.json
-            core/data/src/androidTest/assets/records-schema-v14.json
-            .local-evidence/f05-event-date/schema-generation.json
-            .local-evidence/f05-manual-people/schema-generation.json
-            .local-evidence/d04-model-configuration/schema-generation.json
-            .local-evidence/d04-model-capability/schema-generation.json
-            app/build/reports/d02-apk-audit.json
-            app/build/reports/device-apk-manifest.json
-            app/build/reports/record-ai-permissions.json
-            app/build/outputs/apk/debug/*.zipalign.txt
-            core/data/build/outputs/apk/androidTest/debug/*.zipalign.txt
-            core/designsystem/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
-            app/build/reports/screenshotTest/
-            app/build/test-results/validateDebugScreenshotTest/
-            app/build/reports/d01-preview-manifest.json
             app/build/reports/ui-lazy-repro/
-          if-no-files-found: warn
-          retention-days: 14
-      - name: Preserve debug APK
-        if: always() && steps.assemble.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: aiyou-d01-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
+            app/build/reports/full-offline-backup-targeted/
+      - name: Compile actual D02 native-storage instrumentation APK without claiming execution
+        id: instrumentation
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: scripts/gradle.sh :core:data:assembleDebugAndroidTest :app:assembleDebugAndroidTest
       - name: Preserve D02 instrumentation APK (compiled, execution NOT RUN)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -553,6 +633,106 @@ jobs:
           path: app/build/outputs/apk/androidTest/debug/*.apk
           if-no-files-found: warn
           retention-days: 14
+      - name: Collect exact native methods and external probes from actual compiled APK DEX (device NOT RUN)
+        run: python3 scripts/inspect-d02-device-test-apks.py
+      - name: Verify actual license assets and APK ZIP alignment (native execution NOT RUN)
+        id: native_audit
+        run: python3 scripts/inspect-d02-apks.py
+      - name: Archive native evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: native
+          outcome: ${{ steps.native_audit.outcome }}
+          name: d01-stage-native
+          paths: |
+            app/build/reports/d02-apk-audit.json
+            app/build/reports/device-apk-manifest.json
+            app/build/reports/record-ai-permissions.json
+            app/build/outputs/apk/debug/*.zipalign.txt
+            core/data/build/outputs/apk/androidTest/debug/*.zipalign.txt
+      - name: Run Android lint
+        id: lint
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: |
+          scripts/gradle.sh :app:lintDebug :core:designsystem:lintDebug :core:data:lintDebug
+          git diff --exit-code
+      - name: Print complete lint findings
+        if: always()
+        run: |
+          for module in app core/designsystem core/data; do
+            report=$module/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            if [ -f "$report" ]; then
+              cat "$report"
+            else
+              echo "Lint text report unavailable for $module; see preceding task result."
+            fi
+          done
+      - name: Archive lint evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: lint
+          outcome: ${{ steps.lint.outcome }}
+          name: d01-stage-lint
+          paths: |
+            app/build/reports/lint-results-debug.*
+            app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            core/designsystem/build/reports/lint-results-debug.*
+            core/data/build/reports/lint-results-debug.*
+            core/designsystem/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+  preview:
+    name: Complete 418 Preview validation and original PNG evidence
+    needs: [contracts]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 17
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Require the exact workflow checkout
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Verify preview wrapper checksum
+        run: |
+          printf '%s  %s\n' \
+            3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 \
+            gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
+      - name: Download the confirmed schema artifact from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.contracts.outputs.schema_id }}
+          path: build/ci-inputs/schema
+          merge-multiple: true
+      - name: Authenticate schema and required host evidence against this checkout
+        id: transferred_inputs
+        run: python3 scripts/verify-ci-stage-inputs.py --schema-dir build/ci-inputs/schema
+      - name: Preserve the exact input transfer receipt
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: schema-inputs
+          outcome: ${{ steps.transferred_inputs.outcome }}
+          name: d01-preview-inputs
+          paths: build/ci-stage-evidence/transferred-inputs/result.json
+      - name: Verify the renderer existing licensed SDK
+        run: python3 scripts/check-sdk.py
+      - name: Generate initial Preview render smoke references
+        id: preview_generate
+        if: success()
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: |
+          scripts/gradle.sh :app:updateDebugScreenshotTest
+          git diff --exit-code
       - name: Preserve initial Preview render smoke images
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -563,3 +743,40 @@ jobs:
             app/build/outputs/screenshotTest-results/
           if-no-files-found: warn
           retention-days: 14
+      - name: Validate Preview render smoke
+        id: preview_validate
+        if: always() && steps.preview_generate.outcome == 'success'
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: scripts/gradle.sh :app:validateDebugScreenshotTest
+      - name: Require actual complete Preview render results
+        id: preview_guard
+        if: always() && steps.preview_validate.outcome == 'success'
+        run: python3 scripts/verify-preview-results.py
+      - name: Archive preview evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: preview
+          outcome: ${{ steps.preview_guard.outcome }}
+          name: d01-preview-reports
+          paths: |
+            app/build/reports/screenshotTest/
+            app/build/test-results/validateDebugScreenshotTest/
+            app/build/reports/d01-preview-manifest.json
+      - name: Package unchanged PNGs for attachment-sized visual review
+        id: visual_packs
+        if: always() && steps.preview_guard.outcome == 'success'
+        run: python3 scripts/package-visual-previews.py
+      - name: Preserve visual delivery manifest
+        id: visual_index
+        if: always() && steps.visual_packs.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d01-visual-index
+          path: app/build/outputs/d01-visual-packs/INDEX.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload each unchanged bounded PNG ZIP independently
+        if: always() && steps.visual_packs.outcome == 'success' && steps.visual_index.outcome == 'success'
+        uses: ./.github/actions/upload-visual-packs
