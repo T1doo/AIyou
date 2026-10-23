@@ -15,7 +15,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -101,6 +101,7 @@ class QuestionKeywordPresentationTest {
         assertEquals(setOf("positive","negative","quotation"),observed.get().hits.map{it.entry.id}.toSet())
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-negative"))
         compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-negative"))).performScrollTo().performClick()
+        compose.waitUntil(5000){compose.onAllNodesWithTag("original-text",useUnmergedTree=true).fetchSemanticsNodes().size==1}
         compose.onNodeWithTag("original-text",useUnmergedTree=true).assertTextEquals("我没有种薄荷。")
         val beforeReturn=reads.get();compose.onNodeWithText("返回列表").assertIsDisplayed().performClick()
         compose.waitUntil(10000){reads.get()>beforeReturn&&observed.get()?.let{it!==oldProofState&&it.stage==OriginalSearchStage.READY&&it.input.query=="薄荷"}==true}
