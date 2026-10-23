@@ -38,6 +38,7 @@ class MixedNotebookPresentationTest {
         val local=LocalRecordUiState(ready=true,opening=false,supportsMixedCapture=true,
             mixedCapture=MixedCaptureUiState(draft=draft,supportsProcessingChoice=true))
         val display=mutableStateOf(UiPreferencesState(UiPreferences(reduceMotion=true),ready=true))
+        val fontScale=mutableStateOf(1f)
         var writes=0
         val controller=MixedCaptureController({local},{},{writes++;false},{error("No media input")},Clock.systemUTC())
         val image=BitmapFactory.decodeResource(RuntimeEnvironment.getApplication().resources,
@@ -45,8 +46,14 @@ class MixedNotebookPresentationTest {
             BitmapFactory.Options().apply { inSampleSize=2;inScaled=false })
         assertNotNull(image);assertTrue(image.hasAlpha());assertTrue(image.width in 620..630)
         image.recycle()
-        compose.setContent { AIyouTheme { AIyouApp(local=local,mixedCapture=controller,display=display.value) } }
+        compose.setContent {
+            val density=LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density,fontScale.value)) {
+                AIyouTheme { AIyouApp(local=local,mixedCapture=controller,display=display.value) }
+            }
+        }
         compose.onNodeWithTag("mixed-list").assertExists()
+        compose.onNodeWithText("生活的小片刻").assertIsDisplayed()
         compose.onNodeWithTag("companion-entry").assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
         compose.onNodeWithText("打个招呼").performClick()
         compose.onNodeWithText("你好，慢慢记录就好。").assertIsDisplayed()
@@ -57,6 +64,16 @@ class MixedNotebookPresentationTest {
         compose.onNodeWithTag("companion-entry").assertDoesNotExist()
         compose.runOnIdle { display.value=UiPreferencesState(UiPreferences(reduceMotion=true),ready=true) }
         compose.onNodeWithTag("companion-entry").assertIsDisplayed()
+        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").assertIsDisplayed().assertIsEnabled()
+        compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
+        compose.runOnIdle { fontScale.value=2f }
+        compose.onNodeWithTag("mixed-list").performScrollToIndex(0)
+        compose.onNodeWithText("生活的小片刻").assertDoesNotExist()
+        val compactHeading=compose.onNodeWithTag("mixed-notebook-heading").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue(compactHeading.bottom-compactHeading.top<=88.dp)
+        compose.onNodeWithTag("companion-entry").assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithText("关闭陪伴面板").performClick()
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
         compose.onNodeWithTag("mixed-text").assertIsDisplayed().assertIsEnabled()
         compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
@@ -76,6 +93,8 @@ class MixedNotebookPresentationTest {
                     display=UiPreferencesState(UiPreferences(reduceMotion=true),ready=true)) }
             }
         }
+        val compactHeading=compose.onNodeWithTag("mixed-notebook-heading").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue(compactHeading.bottom-compactHeading.top<=88.dp)
         compose.onNodeWithTag("mixed-jump-composer").assertDoesNotExist()
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-policy-details"))
         compose.onNodeWithTag("mixed-policy-details").assertIsDisplayed().performClick()

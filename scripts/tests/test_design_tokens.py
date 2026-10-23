@@ -31,6 +31,10 @@ class DesignTokenContracts(unittest.TestCase):
                                "notebookSky", "notebookMist", "notebookLilac", "notebookPeach"):
                 with self.subTest(foreground=foreground, background=background):
                     self.assertGreaterEqual(contrast(colors[foreground], colors[background]), 4.5)
+        # The companion header paints these actual text roles over its gradient start.
+        for foreground in ("primary", "textPrimary"):
+            with self.subTest(foreground=foreground, background="accentDecorative"):
+                self.assertGreaterEqual(contrast(colors[foreground], colors["accentDecorative"]), 4.5)
 
     def test_filled_action_text_and_functional_outlines_are_visible(self):
         colors = TOKENS["colors"]

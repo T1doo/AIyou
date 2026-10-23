@@ -6,17 +6,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 object AIyouColors {
-    val background = Color(0xFFF5F8FD)
-    val surface = Color(0xFFFFFFFF)
-    val surfaceMuted = Color(0xFFEDF3FA)
-    val textPrimary = Color(0xFF203247)
-    val textSecondary = Color(0xFF526477)
-    val primary = Color(0xFF245D9B)
+    val background = Color(0xFFFFF8F0)
+    val surface = Color(0xFFFFFDFA)
+    val surfaceMuted = Color(0xFFFFF0E0)
+    val textPrimary = Color(0xFF30231C)
+    val textSecondary = Color(0xFF6B5141)
+    val primary = Color(0xFFA63E00)
     val onPrimary = Color(0xFFFFFFFF)
-    val accentDecorative = Color(0xFFB6D8F5)
-    val primaryContainer = Color(0xFFE0EEFC)
-    val outlineDecorative = Color(0xFFDCE6F0)
-    val outlineFunctional = Color(0xFF64819D)
+    val accentDecorative = Color(0xFFFFD4AA)
+    val primaryContainer = Color(0xFFFFE3C5)
+    val outlineDecorative = Color(0xFFE9D7C5)
+    val outlineFunctional = Color(0xFF997052)
     val success = Color(0xFF476852)
     val error = Color(0xFFA64237)
     val companionBody = Color(0xFFC7A47D)
@@ -25,10 +25,10 @@ object AIyouColors {
     val companionInk = Color(0xFF513E32)
     val errorContainer = Color(0xFFFFF1EF)
     val successContainer = Color(0xFFEDF6F0)
-    val notebookSky = Color(0xFFDAEAFB)
-    val notebookMist = Color(0xFFEFF2FB)
-    val notebookLilac = Color(0xFFE7E3FA)
-    val notebookPeach = Color(0xFFFFE4CD)
+    val notebookSky = Color(0xFFFFF0DF)
+    val notebookMist = Color(0xFFFFF8F0)
+    val notebookLilac = Color(0xFFFFEBCF)
+    val notebookPeach = Color(0xFFFFDBB8)
 }
 
 object AIyouDimensions {

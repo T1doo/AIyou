@@ -46,7 +46,7 @@ import kotlinx.coroutines.launch
 fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureController,modifier: Modifier=Modifier,
     listState: LazyListState = rememberLazyListState(), onOpenEntry: (String) -> Unit = {}, selectedEntryId: String? = null,
     defaultPolicyUnavailable: Boolean = false,audio:OriginalAudioController?=null,canImportAudio:()->Boolean={true},
-    companion: (@Composable () -> Unit)? = null,motionAllowed:Boolean=false) {
+    companion: (@Composable () -> Unit)? = null,motionAllowed:Boolean=false,compactHeader:Boolean=false) {
     val ui=local.mixedCapture ?: MixedCaptureUiState()
     val playback=audio?.state?.collectAsState()?.value ?: OriginalAudioUi()
     val foreground=audio?.foregroundState?.collectAsState()?.value==true
@@ -94,11 +94,15 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
             .padding(horizontal=16.dp).testTag("mixed-list"),state=listState,
             contentPadding=PaddingValues(top=8.dp,bottom=24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             item("heading") {
-                Surface(shape=RoundedCornerShape(28.dp),color=Color.Transparent) {
+                Surface(modifier=Modifier.testTag("mixed-notebook-heading"),shape=RoundedCornerShape(28.dp),color=Color.Transparent) {
                     Box(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(AIyouColors.accentDecorative,AIyouColors.primaryContainer,AIyouColors.notebookLilac)))
                         .drawBehind { drawCircle(AIyouColors.surface.copy(alpha=.28f),90.dp.toPx(),Offset(size.width-58.dp.toPx(),50.dp.toPx())) }) {
-                        Row(Modifier.fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(if(compactHeader) PaddingValues(horizontal=16.dp,vertical=8.dp) else PaddingValues(16.dp)),
+                            horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
+                            if(compactHeader) {
+                                Text("${day.date.monthValue}月${day.date.dayOfMonth}日",modifier=Modifier.weight(1f).semantics { heading() },
+                                    style=MaterialTheme.typography.labelMedium,color=AIyouColors.primary)
+                            } else Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                                 Text("今天 · ${day.date.monthValue}月${day.date.dayOfMonth}日",style=MaterialTheme.typography.labelMedium,color=AIyouColors.primary)
                                 Text("生活的小片刻",style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
                                 Text("都值得被记住",style=MaterialTheme.typography.bodySmall,color=AIyouColors.textPrimary)

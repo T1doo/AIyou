@@ -54,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.AIyouTheme
@@ -615,10 +616,13 @@ fun AIyouApp(
         }
         if (!companionVisible) companionPanel = false
     }
+    val notebookWindowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val compactNotebookHeader = LocalDensity.current.fontScale >= 1.5f ||
+        (notebookWindowHeight>0.dp && notebookWindowHeight<=480.dp)
     val companion: (@Composable () -> Unit)? = if (companionVisible) ({
         CompanionEntry(if (companionSaved) MascotState.Saved else MascotState.Idle,
             companionPulse, motionAllowed, onOpen = { companionPanel = true },
-            artworkSize = if(selected==Destination.NOW && local?.supportsMixedCapture==true) 96.dp else 56.dp,
+            artworkSize = if(selected==Destination.NOW && local?.supportsMixedCapture==true && !compactNotebookHeader) 96.dp else 56.dp,
             containerColor = if(selected==Destination.NOW && local?.supportsMixedCapture==true)
                 androidx.compose.ui.graphics.Color.Transparent else com.t1doo.aiyou.designsystem.AIyouColors.surface)
     }) else null
@@ -1252,6 +1256,7 @@ fun AIyouApp(
             com.t1doo.aiyou.records.MixedCaptureScreen(local,mixedCapture,modifier,
                 listState=nowList,onOpenEntry=openEntry,selectedEntryId=selectedNowId,
                 defaultPolicyUnavailable=!display.ready && display.error!=null,audio=audioPlayback,companion=companion,motionAllowed=motionAllowed,
+                compactHeader=compactNotebookHeader,
                 canImportAudio={ownsNavigation() && selectedName==Destination.NOW.name && !showSettings && !demo && !reading})
         } else if (!demo && local != null && selected != Destination.TASKS) {
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
