@@ -183,7 +183,7 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
                         Text(t.current.range?.let {"片段采样范围 [${it.startFrame}, ${it.endFrameExclusive}) · ${LocalPcmAudio.SAMPLE_RATE} Hz"}
                             ?: "未标注片段范围；仅关联此原音。原音总帧数 ${t.anchor.samples}（元数据）· ${LocalPcmAudio.SAMPLE_RATE} Hz",
                             Modifier.testTag("export-transcript-range-"+t.id))
-                        Text(t.current.text,Modifier.testTag("export-transcript-text-"+t.id))
+                        Text(t.current.text,Modifier.fillMaxWidth().testTag("export-transcript-text-"+t.id))
                     }
                     if (record.entry.originalText.codePointCount(0, record.entry.originalText.length) > 300)
                         Text("这里只预览前 300 字符，导出包含完整正文。")

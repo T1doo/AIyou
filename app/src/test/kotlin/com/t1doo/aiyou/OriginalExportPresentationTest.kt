@@ -88,7 +88,7 @@ class OriginalExportPresentationTest {
                 .assertTextEquals("未标注片段范围；仅关联此原音。原音总帧数 4（元数据）· 44100 Hz")
             compose.onAllNodes(hasText("整段原音",substring=true),useUnmergedTree=true).assertCountEquals(0)
             compose.runOnIdle {assertNull(fixture.ui().mediaPreview!!.openTranscripts!!.items.single().current.range);assertTrue(registry.intents.isEmpty())}
-            compose.onNodeWithTag("export-close").performScrollTo().performClick();compose.waitForIdle()
+            compose.onNodeWithTag("export-close").assertIsDisplayed().assertIsEnabled().assertHeightIsAtLeast(48.dp).performClick();compose.waitForIdle()
         }
     }
     @Test @Config(qualifiers = "w320dp-h640dp")
@@ -103,10 +103,11 @@ class OriginalExportPresentationTest {
         compose.onNodeWithTag("export-prepare").performScrollTo().performClick();pump()
         compose.onNodeWithTag("export-transcript-total").performScrollTo().assertTextContains("当前有效 1 条",substring=true)
         compose.onNodeWithTag("export-transcript-source-"+Fixture.TRANSCRIPT_ID).performScrollTo().assertTextContains("文字版本 1",substring=true)
-        val text=compose.onNodeWithTag("export-transcript-text-"+Fixture.TRANSCRIPT_ID).performScrollTo().assertTextEquals("合成人工转写🙂")
+        val text=compose.onNodeWithTag("export-transcript-text-"+Fixture.TRANSCRIPT_ID).performScrollTo().assertIsDisplayed().assertTextEquals("合成人工转写🙂")
         val layouts=mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         text.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult){assertTrue(it(layouts))}
-        assertEquals(2f,layouts.single().layoutInput.density.fontScale,0f);assertFalse(layouts.single().hasVisualOverflow)
+        val layout=layouts.single()
+        assertEquals(2f,layout.layoutInput.density.fontScale,0f)
         compose.runOnIdle {
             val dialog=checkNotNull(org.robolectric.shadows.ShadowDialog.getLatestDialog())
             assertEquals(2f,dialog.context.resources.configuration.fontScale,0f)
@@ -117,9 +118,19 @@ class OriginalExportPresentationTest {
                 val file=File("build/reports/tests/testDebugUnitTest/open-transcript-export/01-confirm-human-text-2x.png")
                 file.parentFile.mkdirs();file.outputStream().use {assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it))}
                 File(file.parentFile,"fontscale.json").writeText(org.json.JSONObject().put("source_sha",System.getenv("GITHUB_SHA")?:"local-not-CI")
-                    .put("fontScale",layouts.single().layoutInput.density.fontScale).put("hasVisualOverflow",layouts.single().hasVisualOverflow).toString(2))
+                    .put("fontScale",layout.layoutInput.density.fontScale).put("density",layout.layoutInput.density.density)
+                    .put("configurationFontScale",dialog.context.resources.configuration.fontScale)
+                    .put("hasVisualOverflow",layout.hasVisualOverflow).put("didOverflowWidth",layout.didOverflowWidth).put("didOverflowHeight",layout.didOverflowHeight)
+                    .put("widthPx",layout.size.width).put("heightPx",layout.size.height)
+                    .put("paragraphWidthPx",layout.multiParagraph.width).put("paragraphHeightPx",layout.multiParagraph.height)
+                    .put("minWidthPx",layout.layoutInput.constraints.minWidth).put("maxWidthPx",layout.layoutInput.constraints.maxWidth)
+                    .put("minHeightPx",layout.layoutInput.constraints.minHeight).put("maxHeightPx",layout.layoutInput.constraints.maxHeight)
+                    .put("lineCount",layout.lineCount).toString(2))
             } finally {bitmap.recycle()}
         }
+        // Preserve the original sample and hard gate; a failed sample now also retains its PNG/metrics.
+        assertFalse(layout.hasVisualOverflow)
+        assertEquals("合成人工转写🙂".length,layout.getLineEnd(layout.lineCount-1,visibleEnd=true))
         compose.onNodeWithTag("export-choose").performScrollTo().assertIsNotEnabled()
         compose.runOnIdle {
             assertTrue(fixture.ui().includeTranscripts);assertTrue(registry.intents.isEmpty())
