@@ -71,7 +71,7 @@ class AudioTranscriptPresentationTest {
     private fun click(tag:String){compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick()}
     private fun drain(){compose.runOnIdle{runBlocking{while(true)(queue.poll()?:break)(owner)}};compose.waitForIdle()}
     private fun openRecord(record:StoredEntry){compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-"+record.id));compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-"+record.id))).performClick();compose.waitForIdle()}
-    private fun openAttachments(){compose.onNodeWithText("查看附件").performScrollTo().performClick();drain()}
+    private fun openAttachments(){compose.onNodeWithText("查看附件").assertIsDisplayed().assertIsEnabled().performClick();drain()}
     private fun detail(){openRecord(entry);openAttachments();click("attachment-transcript:"+intent.id);drain()}
     private fun backToSearch(){click("transcript-close");compose.onNodeWithText("返回原文").assertIsDisplayed().performClick();compose.waitForIdle();compose.onNodeWithText("返回列表").assertIsDisplayed().performClick();compose.waitForIdle();compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.showNotebookToolsFor("transcripts-open");compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("transcripts-open"));compose.onNodeWithTag("transcripts-open").performClick();drain()}
     private fun query(text:String){compose.onNodeWithTag("transcript-keyword").performScrollTo().performTextReplacement(text);compose.onNodeWithTag("transcript-count").assertDoesNotExist();click("transcript-search");drain()}

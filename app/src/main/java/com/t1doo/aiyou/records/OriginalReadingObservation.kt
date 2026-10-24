@@ -35,6 +35,7 @@ internal interface OriginalReadingObserver {
     fun onNavigation(callbacks: OriginalReadingCallbacks)
     fun onClipboard(clipboard: Clipboard)
     fun onSelection(selection: SelectionState)
+    fun onToolsEdit(action: () -> Unit) = Unit
     fun onRecordList(state: LazyListState, imeBottomPx: Int) = Unit
     fun onListReturnStage(stage: String, generation: Long?, heightPx: Int, expectedHeightPx: Int?,
         viewportReady: Boolean, state: LazyListState) = Unit

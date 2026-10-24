@@ -261,7 +261,11 @@ fun OriginalReadingScreen(
                                     Text("长按原文选择文字；复制保留完整原文。", style = MaterialTheme.typography.bodySmall)
                                     FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                                         onEdit?.let { edit ->
-                                            TextButton(onClick = toolAction { edit(entry.id, entry.currentRevision) },
+                                            val editAction = toolAction { edit(entry.id, entry.currentRevision) }
+                                            LocalOriginalReadingObserver.current?.let { observer ->
+                                                SideEffect { observer.onToolsEdit(editAction) }
+                                            }
+                                            TextButton(onClick = editAction,
                                                 enabled = entry.originalText.isNotBlank() && !local.saving && !local.savePending,
                                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-reading-edit")) { Text(editActionLabel) }
                                         }

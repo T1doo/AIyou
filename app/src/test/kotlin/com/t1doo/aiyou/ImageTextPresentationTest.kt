@@ -99,7 +99,7 @@ class ImageTextPresentationTest {
     private fun drain(){compose.runOnIdle{runBlocking{while(true)(queue.poll()?:break)(owner)}};compose.waitForIdle()}
     private fun record(e:StoredEntry){compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-"+e.id));compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-"+e.id))).performClick();compose.waitForIdle()}
     private fun viewImage(i:AttachmentIntent){
-        compose.onNodeWithText("查看附件").performScrollTo().assertIsDisplayed().performClick();drain()
+        compose.onNodeWithText("查看附件").assertIsDisplayed().assertIsEnabled().performClick();drain()
         compose.onNodeWithTag("attachment-"+i.id).performScrollTo();compose.onNode(hasText("查看图片") and hasAnyAncestor(hasTestTag("attachment-"+i.id))).performClick();drain()
         assertEquals(i.id,attachments.state.value!!.pictureId);compose.onNodeWithTag("attachment-picture").assertIsDisplayed()
     }

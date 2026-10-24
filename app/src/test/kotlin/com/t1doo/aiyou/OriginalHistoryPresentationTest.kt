@@ -270,7 +270,9 @@ class OriginalHistoryPresentationTest {
         assertEquals(3, vm.state.value.entries.first { it.id == "original" }.currentRevision)
         compose.onNodeWithText("返回原文").performClick()
         assertEquals("合成已知最新原文", full())
-        compose.onNodeWithText("原文版本 3", substring = true).assertIsDisplayed()
+        compose.openOriginalTools()
+        compose.onNodeWithText("原文版本 3", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("original-tools-close").performClick()
         sentinel(); compose.runOnIdle { assertFalse(oldReader.copy("original", 2)) }
         assertEquals("哨兵", copied())
         compose.onNodeWithText("复制全文").performClick(); assertEquals("合成已知最新原文", copied())

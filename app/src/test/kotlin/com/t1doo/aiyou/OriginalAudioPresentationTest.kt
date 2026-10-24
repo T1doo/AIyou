@@ -102,7 +102,7 @@ class OriginalAudioPresentationTest {
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("entry-$id"))
         compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-$id"))).performScrollTo().performClick()
         compose.onNodeWithText("附件记录 · 无文字正文；请打开附件查看原始素材。").assertExists()
-        compose.onNodeWithText("查看附件").performScrollTo().performClick();drain()
+        compose.onNodeWithText("查看附件").assertIsDisplayed().assertIsEnabled().performClick();drain()
         val attachment=f.saved.single().intent.id
         compose.onNodeWithTag("attachment-audio-play:$attachment").performScrollTo().assertHeightIsAtLeast(48.dp).performClick();drain()
         compose.waitUntil(5000) { f.player.state.value.phase==OriginalAudioPhase.PLAYING }

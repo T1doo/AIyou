@@ -23,6 +23,7 @@ import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
 import com.t1doo.aiyou.records.*
+import com.t1doo.aiyou.ui.Destination
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -102,18 +103,28 @@ class OriginalReadingPriorityPresentationTest {
     }
     @Test @Config(qualifiers = "w360dp-h800dp")
     fun toolsRetireAcrossCloseReopenEntryOwnerFailureAndObservedAba() {
-        val state = mutableStateOf(local(first).copy(recordAuthorizationOwner = owner()))
-        val selected = mutableStateOf("one")
+        val state = mutableStateOf(local(first, first.copy(id = "two")).copy(recordAuthorizationOwner = owner()))
+        lateinit var navigation: OriginalReadingCallbacks
         val edits = mutableListOf<Pair<String, Int>>()
+        lateinit var toolsEdit: () -> Unit
+        val observer = object : OriginalReadingObserver {
+            override fun onNavigation(callbacks: OriginalReadingCallbacks) { navigation = callbacks }
+            override fun onClipboard(clipboard: Clipboard) = Unit
+            override fun onSelection(selection: SelectionState) = Unit
+            override fun onToolsEdit(action: () -> Unit) { toolsEdit = action }
+        }
         val restoration = StateRestorationTester(compose)
         restoration.setContent { AIyouTheme {
-            OriginalReadingScreen(selected.value, state.value, {}, { _, _ -> false }, { _, _ -> true },
-                onEdit = { id, revision -> edits += id to revision })
+            CompositionLocalProvider(LocalOriginalReadingObserver provides observer) {
+                AIyouApp(local = state.value, currentRecords = { state.value }, previewDestination = Destination.MEMORIES,
+                    previewEntryId = "one", onBeginOriginalEdit = { id, revision -> edits += id to revision })
+            }
         } }
-        fun action(): () -> Boolean {
+        fun action(): () -> Unit {
             compose.openOriginalTools()
-            return compose.onNodeWithTag("original-reading-edit").performScrollTo()
-                .fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+            compose.onNodeWithTag("original-reading-edit").performScrollTo().assertIsDisplayed().assertIsEnabled()
+            // Retain the exact application closure, not a detached Button Modifier-node action.
+            return compose.runOnIdle { toolsEdit }
         }
         val closed = action()
         compose.onNodeWithTag("original-tools-close").performClick()
@@ -121,10 +132,18 @@ class OriginalReadingPriorityPresentationTest {
         compose.runOnIdle { closed(); assertTrue(edits.isEmpty()) }
         compose.onNodeWithTag("original-tools").assertExists()
         val base = state.value
-        compose.runOnIdle { state.value = base.copy(entries = listOf(first.copy(id = "two"))); selected.value = "two" }
+        // The actual app navigation owner retires the reader, including a callback before recomposition.
+        compose.runOnIdle { navigation.selectDestination(Destination.TASKS); priorOpening(); assertTrue(edits.isEmpty()) }
         compose.onNodeWithTag("original-tools").assertDoesNotExist()
-        compose.runOnIdle { priorOpening(); assertTrue(edits.isEmpty()); selected.value = "one"; state.value = base }
-        compose.waitForIdle()
+        compose.onNodeWithText("回忆").performClick()
+        fun openRecord(id: String) {
+            compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))
+            compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-$id"))).performClick()
+        }
+        openRecord("two")
+        compose.runOnIdle { priorOpening(); assertTrue(edits.isEmpty()) }
+        compose.onNodeWithText("返回列表").performClick()
+        openRecord("one")
         compose.runOnIdle { priorOpening(); assertTrue(edits.isEmpty()) }
         val beforeOwner = action()
         compose.runOnIdle { state.value = base.copy(recordAuthorizationOwner = owner()) }
