@@ -96,6 +96,7 @@ class SourceFactPresentationTest {
     }
     private val owner=object:EntryRepository {
         override val sourceFacts=port
+        override val unifiedKeywords get()=queryPort
         override suspend fun readDraft()=null
         override suspend fun updateDraft(text:String)=error("No draft operation")
         override suspend fun saveDraft(expected:TextDraft,capturedAtMillis:Long,captureTimeZone:String)=error("No draft operation")
@@ -156,7 +157,10 @@ class SourceFactPresentationTest {
         backToList();compose.onNodeWithTag("unified-open").performScrollTo().performClick();compose.waitForIdle()
         compose.onNodeWithTag("unified-query").performTextReplacement("合成办公物品");compose.onNodeWithTag("unified-scope").performScrollTo().performClick()
         compose.onNodeWithTag("unified-scope:FACT").performScrollTo().performClick();compose.onNodeWithTag("unified-results").performScrollToIndex(2)
-        click("unified-search");drain();val hit=state.value.unifiedKeyword!!.snapshot!!.groups.single().items.single() as UnifiedKeywordEvidence.Fact
+        compose.runOnIdle{assertSame(queryPort,owner.unifiedKeywords)}
+        click("unified-search");drain()
+        compose.runOnIdle{assertNull(state.value.unifiedKeyword!!.error);assertNotNull(state.value.unifiedKeyword!!.snapshot)}
+        val hit=state.value.unifiedKeyword!!.snapshot!!.groups.single().items.single() as UnifiedKeywordEvidence.Fact
         compose.onNodeWithTag("unified-results").performScrollToIndex(3)
         compose.onNodeWithTag("unified-fact-match:"+hit.key).performScrollTo().assertTextEquals("人工主题命中 · 原文仅作出处")
         val quote=compose.onNodeWithTag("unified-fact-quote:"+hit.key).performScrollTo().fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].single();assertTrue(quote.spanStyles.isEmpty())
@@ -173,7 +177,9 @@ class SourceFactPresentationTest {
         compose.onNodeWithTag("fact-from").performScrollTo().performTextReplacement("2026-10-24")
         compose.onNodeWithTag("fact-zone").performScrollTo().performTextReplacement("UTC")
         compose.onNodeWithTag("fact-from").performTextReplacement("2026-10-240")
+        compose.runOnIdle{assertEquals("2026-10-240",state.value.sourceFacts!!.from);assertTrue(FactInput.FROM in state.value.sourceFacts!!.rejectedInput)}
         compose.onNodeWithTag("fact-quote").performScrollTo().performTextReplacement("我的合成杯子是绿色")
+        compose.runOnIdle{assertTrue(FactInput.FROM in state.value.sourceFacts!!.rejectedInput)}
         click("fact-save");assertEquals(0,writes);assertNull(state.value.sourceFacts!!.confirmation)
         val field=compose.onNodeWithTag("fact-quote").performScrollTo().assertIsDisplayed();val layouts=mutableListOf<TextLayoutResult>()
         field.performSemanticsAction(SemanticsActions.GetTextLayoutResult){assertTrue(it(layouts))};val layout=layouts.single()
@@ -194,6 +200,7 @@ class SourceFactPresentationTest {
         compose.waitForIdle();compose.onNodeWithTag("facts-dialog").assertExists();assertNotNull(state.value.sourceFacts!!.pending)
         assertTrue(state.value.sourceFacts!!.busy);assertEquals(1,retiredQueries);assertEquals(0,writes);assertEquals(1,queue.size)
         drain();assertEquals(1,writes);assertNull(state.value.sourceFacts!!.pending);assertNotNull(state.value.sourceFacts!!.notice)
+        compose.onNode(hasText("普通事实自述") and hasAnyAncestor(hasTestTag("facts-dialog"))).performScrollTo().assertIsDisplayed()
         frame("01-normal-editor");assertEquals(listOf(entry),state.value.entries)
         val s=state.value.sourceFacts!!.session;click("fact-accept:"+saved!!.id);drain();click("fact-confirm");compose.waitForIdle()
         assertEquals(s,state.value.sourceFacts!!.session);assertEquals(1,writes);drain();assertEquals(2,writes)

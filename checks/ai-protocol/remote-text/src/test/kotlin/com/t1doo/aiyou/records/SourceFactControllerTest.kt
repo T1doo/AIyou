@@ -45,6 +45,24 @@ class SourceFactControllerTest {
             h.confirm();assertEquals(FactInterval("2026-10-24","2026-10-25","UTC"),h.ui().items.single().current!!.content.interval)
         }
     }
+    @Test fun rejectedFieldDisplayFeedbackCannotAcknowledgeInputAndPreviewRemainsBounded():Unit=runBlocking {
+        for(field in listOf(FactInput.FROM,FactInput.UNTIL,FactInput.QUOTE,FactInput.TOPIC,FactInput.ZONE)) {
+            val bound=when(field){FactInput.FROM,FactInput.UNTIL->10;FactInput.QUOTE->640;FactInput.TOPIC->80;FactInput.ZONE->128}
+            for(attempt in listOf("x".repeat(bound+2),"🙂".repeat(bound/2+2)))Harness().use{h->
+                val session=h.open();h.form();h.c.edit(session,FactInput.FROM,"2026-10-24");h.c.edit(session,FactInput.UNTIL,"2026-10-25");h.c.edit(session,FactInput.ZONE,"UTC")
+                fun displayed()=h.ui().let{when(field){FactInput.FROM->it.from;FactInput.UNTIL->it.until;FactInput.QUOTE->it.quote;FactInput.TOPIC->it.topicLabel;FactInput.ZONE->it.zone}}
+                val valid=displayed();h.c.edit(session,field,attempt);assertTrue(field in h.ui().rejectedInput)
+                val echo=displayed();h.c.edit(session,field,echo)
+                h.c.edit(session,if(field==FactInput.QUOTE)FactInput.TOPIC else FactInput.QUOTE,if(field==FactInput.QUOTE)h.ui().topicLabel else h.quote)
+                h.c.affirm(session,true);h.c.save(session)
+                assertNull("Feedback of the displayed $field value is not explicit correction",h.ui().confirmation)
+                assertTrue(field in h.ui().rejectedInput);assertTrue(h.creates.isEmpty());assertTrue(echo.length<=bound+1)
+                assertFalse(echo.lastOrNull()?.let(Character::isHighSurrogate) ?: false)
+                h.c.edit(session,field,valid);h.c.save(session);assertNotNull(h.ui().confirmation)
+                h.confirm();assertEquals(1,h.creates.size)
+            }
+        }
+    }
     @Test fun admittedWriteRetiresQueriesButKeepsPendingEditorUntilActualActorSettlement():Unit=runBlocking {Harness().use{h->
         val s=h.open();h.form();h.c.save(s);h.c.confirm(s,h.ui().confirmation!!)
         assertEquals(1,h.retiredQueries);assertTrue(h.ui().busy);assertNotNull(h.ui().pending);assertEquals(s,h.ui().session)

@@ -131,11 +131,22 @@ class SourceFactController(private val current:()->LocalRecordUiState,
         if(!owns(session)||ui.busy||ui.confirmation!=null||ui.pending!=null)return
         if(field==FactInput.TOPIC&&(ui.topicExpected!=null||ui.editing!=null))return
         val bound=when(field){FactInput.QUOTE->640;FactInput.TOPIC->80;FactInput.FROM,FactInput.UNTIL->10;FactInput.ZONE->128}
-        if(value.length>bound){update(session){it.copy(rejectedInput=it.rejectedInput+field,error=null,notice=null)};return}
+        val displayed=when(field){FactInput.QUOTE->ui.quote;FactInput.TOPIC->ui.topicLabel;FactInput.FROM->ui.from;FactInput.UNTIL->ui.until;FactInput.ZONE->ui.zone}
+        // String TextField may echo its displayed value when focus/composition changes.
+        // Such feedback is not explicit correction of a previously rejected attempt.
+        if(field in ui.rejectedInput && value==displayed)return
+        val rejected=value.length>bound
+        val shown=if(rejected){
+            var end=bound+1
+            if(Character.isHighSurrogate(value[end-1]))end--
+            value.substring(0,end)
+        }else value
         update(session){old->
-            val next=when(field){FactInput.QUOTE->old.copy(quote=value);FactInput.TOPIC->old.copy(topicLabel=value)
-                FactInput.FROM->old.copy(from=value);FactInput.UNTIL->old.copy(until=value);FactInput.ZONE->old.copy(zone=value)}
-            next.copy(rejectedInput=next.rejectedInput-field,error=null,notice=null)
+            // Retain only a bounded preview, not the old accepted text. In particular the
+            // field must not rebound to a valid old date and acknowledge it on blur.
+            val next=when(field){FactInput.QUOTE->old.copy(quote=shown);FactInput.TOPIC->old.copy(topicLabel=shown)
+                FactInput.FROM->old.copy(from=shown);FactInput.UNTIL->old.copy(until=shown);FactInput.ZONE->old.copy(zone=shown)}
+            next.copy(rejectedInput=if(rejected)next.rejectedInput+field else next.rejectedInput-field,error=null,notice=null)
         }
     }
     fun affirm(session:Long,value:Boolean){val ui=current().sourceFacts?:return
