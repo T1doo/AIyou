@@ -14,10 +14,56 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import org.junit.Assert.*
 import org.junit.Test
 class AudioTranscriptViewModelTest {
+    @Test(timeout=30000) fun admittedWriteSurvivesProductionRouteReconciliationAfterFocusedPanelRetirement():Unit=runBlocking {
+        for(withdraw in listOf(false,true))Harness(100).use {h->
+            h.ready();val a=h.repo.preview(h.intent);h.repo.write(AudioTranscriptWrite(FullBackupTest.uuid(),a,null,"合成路由纠正",false,FullBackupTest.uuid(),10,AudioSampleRange(1,100)))
+            val c=h.vm.audioTranscripts;c.open();val found=h.ui{it.page!=null&&!it.busy}
+            c.locateReference(found.session,found.items.single()){ref,confirm->assertTrue(confirm{h.vm.attachments.openTranscript(ref)})}
+            withTimeout(4000){h.vm.attachments.state.first{it?.transcriptSource==true&&!it.busy}}
+            c.open(h.intent);val editor=h.ui{it.anchor!=null&&!it.busy};c.rangeMode(editor.session,AudioTranscriptRangeMode.CUSTOM);c.rangeFrom(editor.session,"0.001")
+            val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();assertTrue(h.vm.enqueueTaskOperation{entered.complete(Unit);release.await()});entered.await()
+            try {
+                if(withdraw){c.withdraw(editor.session);c.withdraw(editor.session,h.value().withdrawal!!)}else c.save(editor.session)
+                assertNull(h.vm.attachments.state.value)
+                val local=h.vm.state.value;val active=local.audioTranscripts!!
+                // Exactly the production selected-reader predicate, then the two automatic disposal callbacks.
+                if(!local.canShowTranscriptEditor(active,h.vm.attachments.state.value,h.intent.entryId,false,a)){c.close(active.session);c.releaseUi(active.session)}
+            }finally{release.complete(Unit)}
+            val drained=CompletableDeferred<Unit>();assertTrue(h.vm.enqueueTaskOperation{drained.complete(Unit)});drained.await()
+            assertEquals(1,h.writes.size);assertEquals(withdraw,h.repo.read(a)!!.withdrawn)
+            assertEquals(editor.session,h.value().session);assertNull(h.value().pending)
+        }
+    }
+    @Test(timeout=20000) fun admittedEditorStillHonorsExplicitCloseAndOwnerReplacementWithoutRevivingOldWrite():Unit=runBlocking {Harness().use {h->
+        h.ready()
+        for(replaceOwner in listOf(false,true)) {
+            val state=AtomicReference(h.vm.state.value);val queue=ConcurrentLinkedQueue<suspend(EntryRepository)->Unit>()
+            val c=AudioTranscriptController({state.get()},{change->state.updateAndGet(change)},{queue.add(it);true},Clock.systemUTC())
+            try {
+                c.open(h.intent);queue.poll()!!(h.owner);val old=state.get().audioTranscripts!!;c.edit(old.session,"合成待处理但可退出");c.save(old.session)
+                assertNotNull(state.get().audioTranscripts!!.pending)
+                if(replaceOwner) {
+                    val next=object:RecordAuthorizationRepository {
+                        override fun readAuthorization(source:SourceVersion):RecordAuthorizationSnapshot=error("No authority IO")
+                        override fun previewAuthorization(expected:RecordAuthorizationSource,purpose:TextPurpose,clock:()->java.time.Instant):RecordAuthorizationPreview=error("No authority IO")
+                        override fun changeAuthorization(request:RecordAuthorizationChange,clock:()->java.time.Instant):RecordAuthorizationReceipt=error("No authority IO")
+                    }
+                    state.set(state.get().copy(recordAuthorizationOwner=next))
+                    assertFalse(state.get().canShowTranscriptEditor(state.get().audioTranscripts!!,null,h.intent.entryId,false,null))
+                    c.releaseUi(old.session) // Actual dialog-disposal contract on owner loss.
+                }else c.close(old.session) // Explicit user close remains effective, even after admission.
+                c.open(h.intent);val fresh=state.get().audioTranscripts!!.session;assertNotEquals(old.session,fresh)
+                c.releaseUi(old.session);assertEquals(fresh,state.get().audioTranscripts!!.session)
+                while(true)(queue.poll()?:break)(h.owner)
+                assertEquals(0,h.writes.size);assertEquals(fresh,state.get().audioTranscripts!!.session);assertEquals("",state.get().audioTranscripts!!.text)
+            }finally{c.dispose()}
+        }
+    }}
     @Test(timeout=20000) fun unknownRefreshCannotLoseOriginalIntentEvenWhenReadsFail():Unit=runBlocking {Harness(100).use {h->
         h.ready();val c=h.vm.audioTranscripts;c.open(h.intent);val u=h.ui{it.anchor!=null&&!it.busy}
         c.edit(u.session,"合成未知保存");c.rangeMode(u.session,AudioTranscriptRangeMode.CUSTOM);c.rangeFrom(u.session,"0.001")
         h.loseAck=true;c.save(u.session);val pending=h.ui{it.pending!=null&&!it.busy}.pending!!
+        assertTrue(h.vm.state.value.canShowTranscriptEditor(h.value(),null,h.intent.entryId,false,null))
         h.failRead=true;val reads=h.reads.get();c.refresh(u.session)
         val drained=CompletableDeferred<Unit>();assertTrue(h.vm.enqueueTaskOperation{drained.complete(Unit)});withTimeout(4000){drained.await()}
         assertSame(pending,h.value().pending);assertEquals(reads,h.reads.get())

@@ -1,7 +1,7 @@
 package com.t1doo.aiyou
 
 import com.t1doo.aiyou.records.currentTranscriptSource
-import com.t1doo.aiyou.records.canUseRecapTranscript
+import com.t1doo.aiyou.records.canShowTranscriptEditor
 import com.t1doo.aiyou.records.currentImageTextSource
 import com.t1doo.aiyou.records.canRetainImageTexts
 
@@ -761,15 +761,15 @@ fun AIyouApp(
     }
     val transcriptUi=local?.audioTranscripts
     val transcriptRoute=!demo&&!showSettings&&transcriptUi!=null&&local?.let{it.ready&&!it.opening&&it.error==null}==true&&
-        (!recapRoute || local?.canUseRecapTranscript(transcriptUi.selected,attachmentPanel,audioSourceAnchor)==true)&&
-        (if(transcriptUi.selected==null)!reading&&selected==Destination.MEMORIES else reading&&detailEntryId==transcriptUi.selected.entryId&&attachmentPanel?.entryId==transcriptUi.selected.entryId&&attachmentPanel?.revision==transcriptUi.selected.revision)
+        (if(transcriptUi.selected==null)!recapRoute&&!reading&&selected==Destination.MEMORIES else reading&&local?.canShowTranscriptEditor(transcriptUi,attachmentPanel,detailEntryId,recapRoute,audioSourceAnchor)==true)
     LaunchedEffect(transcriptRoute,transcriptUi?.session){if(!transcriptRoute)transcriptUi?.let{audioTranscripts?.close(it.session)}}
     DisposableEffect(audioTranscripts){onDispose{audioTranscripts?.retire()}}
     if(transcriptUi!=null&&audioTranscripts!=null&&transcriptRoute){
         fun ownsTranscript():Boolean {
-            val source=currentRecordsProvider?.invoke() ?: currentLocal
-            return ownsNavigation()&&!showSettings&&!demo&&source?.audioTranscripts?.session==transcriptUi.session&&
-                (!recapRoute || source?.canUseRecapTranscript(transcriptUi.selected,attachments?.state?.value,audioSourceAnchor)==true)
+            val source=(currentRecordsProvider?.invoke() ?: currentLocal)?:return false
+            val active=source.audioTranscripts?:return false
+            return ownsNavigation()&&!showSettings&&!demo&&active.session==transcriptUi.session&&
+                (if(active.selected==null)!recapRoute else source.canShowTranscriptEditor(active,attachments?.state?.value,detailEntryId,recapRoute,audioSourceAnchor))
         }
         com.t1doo.aiyou.records.AudioTranscriptDialog(transcriptUi,audioTranscripts,::ownsTranscript){reference,confirm->
             val anchor=reference.anchor;val intent=anchor.intent

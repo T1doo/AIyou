@@ -15,7 +15,8 @@ data class AudioTranscriptUi(val session:Long,val selected:AttachmentIntent?,val
     val fromError:String?=null,val throughError:String?=null,val rangeError:String?=null,
     val anchor:AudioTranscriptSource?=null,val snapshot:AudioTranscriptSnapshot?=null,val text:String="",val keyword:String="",
     val items:List<AudioTranscriptSnapshot> = emptyList(),val page:AudioTranscriptPage?=null,val cursor:PreferenceCursor?=null,val canPrevious:Boolean=false,
-    val busy:Boolean=false,val pending:AudioTranscriptWrite?=null,val withdrawal:AudioTranscriptWrite?=null,val error:String?=null,val notice:String?=null) {override fun toString()="AudioTranscriptUi(redacted)"}
+    val busy:Boolean=false,val pending:AudioTranscriptWrite?=null,val withdrawal:AudioTranscriptWrite?=null,val error:String?=null,val notice:String?=null,
+    val editorWriteAdmitted:Boolean=false,val authorizationOwner:RecordAuthorizationRepository?=null) {override fun toString()="AudioTranscriptUi(redacted)"}
 internal fun LocalRecordUiState.currentTranscriptSource(a:AudioTranscriptSource):Boolean = ready&&!opening&&error==null&&
     entries.any{it.id==a.intent.entryId&&it.currentRevision==a.intent.revision&&OriginalExports.hash(it.originalText)==a.sourceHash&&it.policy==a.policy&&it.capturedAtMillis==a.capturedAtMillis&&it.captureTimeZone==a.zone}&&
     (!supportsLocalProcessing||localProcessingAvailable&&localProcessingVersions[a.intent.entryId]?.generation==a.generation)
@@ -25,8 +26,17 @@ internal fun LocalRecordUiState.canUseRecapTranscript(selected:AttachmentIntent?
         panel?.let { it.focusAudio==selected && it.entryId==selected.entryId && it.revision==selected.revision &&
             !it.busy && !it.readOnly && !it.unavailable && it.error==null && it.hasRecordAccess(this) &&
             it.items.any { row->row.intent==selected && row.state==AttachmentState.READY } }==true
+/** The selected editor route; shared by the real Compose route and host lifecycle checks. */
+internal fun LocalRecordUiState.canShowTranscriptEditor(u:AudioTranscriptUi,panel:AttachmentUiState?,entryId:String?,recap:Boolean,recapAnchor:AudioTranscriptSource?):Boolean {
+    val selected=u.selected?:return false
+    if(entryId!=selected.entryId||!canRetainTranscripts(u))return false
+    // Admission keeps only this authenticated editor alive, never the retired playback proof.
+    val admitted=u.editorWriteAdmitted&&u.anchor?.intent==selected
+    return (!recap||canUseRecapTranscript(selected,panel,recapAnchor)||admitted&&recapAnchor==u.anchor)&&
+        (admitted||panel?.entryId==selected.entryId&&panel.revision==selected.revision)
+}
 internal fun LocalRecordUiState.canRetainTranscripts(u:AudioTranscriptUi):Boolean {
-    if(!ready||opening||error!=null||!supportsAudioTranscripts)return false
+    if(!ready||opening||error!=null||!supportsAudioTranscripts||u.authorizationOwner!==recordAuthorizationOwner)return false
     fun source(i:AttachmentIntent,hash:String,generation:Long?=null,policy:ProcessingPolicy?=null,captured:Long?=null,zone:String?=null)=entries.any{it.id==i.entryId&&it.currentRevision==i.revision&&OriginalExports.hash(it.originalText)==hash&&(policy==null||it.policy==policy)&&(captured==null||it.capturedAtMillis==captured)&&(zone==null||it.captureTimeZone==zone)} && (generation==null||!supportsLocalProcessing||localProcessingAvailable&&localProcessingVersions[i.entryId]?.generation==generation)
     fun anchor(a:AudioTranscriptSource)=currentTranscriptSource(a)
     return (u.selected?.let{source(it,checkNotNull(u.initialHash),u.initialGeneration)}?:true)&&(u.anchor?.let(::anchor)?:true)&&(u.snapshot?.let{anchor(it.anchor)}?:true)&&(u.withdrawal?.let{anchor(it.anchor)&&(it.expected?.let{e->anchor(e.anchor)}?:true)}?:true)&&u.items.all{anchor(it.anchor)}&&(u.page?.items?.all{anchor(it.anchor)}?:true)&&(u.pending?.let{anchor(it.anchor)&&(it.expected?.let{e->anchor(e.anchor)}?:true)}?:true)
@@ -41,7 +51,7 @@ class AudioTranscriptController(private val current:()->LocalRecordUiState,priva
     fun open(intent:AttachmentIntent?=null) {sourceUi {
         val l=current();if(disposed||!l.ready||l.opening||l.error!=null||!l.supportsAudioTranscripts||l.audioTranscripts!=null||l.imageTexts!=null||l.saving||l.savePending||l.recordPackage!=null||l.recycleBin!=null||l.originalEdit!=null||l.originalHistory!=null||l.sourcePreferences!=null||l.sourceMemories!=null||l.memoryInbox!=null||l.localProcessing!=null)return@sourceUi
         val entry=intent?.let{i->l.entries.singleOrNull{it.id==i.entryId&&it.currentRevision==i.revision}?:return@sourceUi}
-        val u=AudioTranscriptUi(tokens.incrementAndGet(),intent,entry?.let{OriginalExports.hash(it.originalText)},intent?.let{l.localProcessingVersions[it.entryId]?.generation})
+        val u=AudioTranscriptUi(tokens.incrementAndGet(),intent,entry?.let{OriginalExports.hash(it.originalText)},intent?.let{l.localProcessingVersions[it.entryId]?.generation},authorizationOwner=l.recordAuthorizationOwner)
         cursors.clear();cursors.add(null);publish{it.copy(audioTranscripts=u)};load(u)
     }}
     fun close(session:Long)=synchronized(handoffLock){
@@ -103,7 +113,7 @@ class AudioTranscriptController(private val current:()->LocalRecordUiState,priva
         if(before.pending!=null&&write!==before.pending)return // UNKNOWN only admits its exact original intent.
         val req=tokens.incrementAndGet();update(before.session,before.request){
             if(it.busy||it.pending!=null&&write!==it.pending)it
-            else it.copy(request=req,busy=true,items=emptyList(),page=null,pending=write,withdrawal=null,error=null,notice=null)
+            else it.copy(request=req,busy=true,items=emptyList(),page=null,pending=write,withdrawal=null,error=null,notice=null,editorWriteAdmitted=it.editorWriteAdmitted||write!=null)
         }
         if(!owns(before.session,req))return
         afterAdmission {

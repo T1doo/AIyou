@@ -73,7 +73,9 @@ class AudioTranscriptPresentationTest {
         override suspend fun readDraft():TextDraft?=null;override suspend fun updateDraft(text:String)=error("No draft");override suspend fun saveDraft(expected:TextDraft,capturedAtMillis:Long,captureTimeZone:String)=error("No capture")
         override suspend fun entries()=state.value.entries;override suspend fun revisions(entryId:String)=emptyList<OriginalRevision>();override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long)=error("No original write")
     }
-    private val c=AudioTranscriptController({state.value},{state.value=it(state.value)},{queue.add(it);true},Clock.systemUTC())
+    private val c=AudioTranscriptController({state.value},{state.value=it(state.value)},{queue.add(it);true},Clock.systemUTC(),beforeWrite={write->
+        attachments.state.value?.takeIf{it.transcriptSource&&it.focusAudio==write.anchor.intent}?.let{attachments.retireFocusedAudio(it.sessionId)}
+    })
     private val attachments=LocalAttachmentController({queue.add(it);true},{error("No image decode")},canUsePanel={it.hasRecordAccess(state.value)})
     @After fun dispose(){c.dispose();attachments.markDisposed();runBlocking{attachments.disposeOnIo()}}
     private var viewWidth by mutableStateOf(320)
@@ -85,12 +87,52 @@ class AudioTranscriptPresentationTest {
     private fun openRecord(record:StoredEntry){compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-"+record.id));compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-"+record.id))).performClick();compose.waitForIdle()}
     private fun openAttachments(){compose.onNodeWithText("查看附件").assertIsDisplayed().assertIsEnabled().performClick();drain()}
     private fun detail(){openRecord(entry);openAttachments();click("attachment-transcript:"+intent.id);drain()}
-    private fun backToSearch(){click("transcript-close");compose.onNodeWithText("返回原文").assertIsDisplayed().performClick();compose.waitForIdle();compose.onNodeWithText("返回列表").assertIsDisplayed().performClick();compose.waitForIdle();compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.showNotebookToolsFor("transcripts-open");compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("transcripts-open"));compose.onNodeWithTag("transcripts-open").performClick();drain()}
+    private fun backToSearch(panelRetired:Boolean=false){click("transcript-close");compose.waitForIdle();if(panelRetired){assertNull(attachments.state.value)}else{compose.onNodeWithText("返回原文").assertIsDisplayed().performClick();compose.waitForIdle()};compose.onNodeWithText("返回列表").assertIsDisplayed().performClick();compose.waitForIdle();compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.showNotebookToolsFor("transcripts-open");compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("transcripts-open"));compose.onNodeWithTag("transcripts-open").performClick();drain()}
     private fun query(text:String){compose.onNodeWithTag("transcript-keyword").performScrollTo().performTextReplacement(text);compose.onNodeWithTag("transcript-count").assertDoesNotExist();click("transcript-search");drain()}
     private fun frame(name:String,tag:String) {
         val image=compose.onNodeWithTag(tag).captureToImage().asAndroidBitmap()
         val file=File("build/reports/tests/testDebugUnitTest/transcript-ranges/$name.png");file.parentFile.mkdirs()
         file.outputStream().use{check(image.compress(Bitmap.CompressFormat.PNG,100,it))}
+    }
+    /** Queue stays blocked across real AIyouApp recomposition; no callback substitutes for button clicks. */
+    private fun pendingFocusedChange(withdraw:Boolean):AudioTranscriptUi {
+        viewFont=1f;compose.setContent{Screen()};detail()
+        compose.onNodeWithTag("transcript-text").performScrollTo().performTextReplacement("合成路由转写")
+        click("transcript-save");drain();assertEquals(1,writes)
+        backToSearch();query("路由转写");click("transcript-source:"+saved!!.id);drain()
+        click("attachment-transcript:"+intent.id);drain()
+        click("transcript-range-custom");compose.onNodeWithTag("transcript-range-from").performScrollTo().performTextReplacement("0.001")
+        val before=state.value.audioTranscripts!!
+        if(withdraw){click("transcript-withdraw");click("transcript-withdraw-confirm")}else click("transcript-save")
+        compose.waitForIdle() // Consume panel removal and the actual route/disposal effects before releasing the actor queue.
+        compose.onNodeWithTag("transcript-dialog").assertIsDisplayed()
+        compose.onNodeWithTag("transcript-refresh").performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle{assertNull(attachments.state.value);assertEquals(before.session,state.value.audioTranscripts!!.session);assertNotNull(state.value.audioTranscripts!!.pending);assertEquals(1,writes)}
+        return before
+    }
+    @Test fun focusedRangeSaveSurvivesPanelRemovalAndRecompositionBeforeActorRelease(){
+        val before=pendingFocusedChange(false);drain()
+        compose.runOnIdle{assertEquals(2,writes);assertEquals(AudioSampleRange(45,441),saved!!.current.range);assertEquals(before.session,state.value.audioTranscripts!!.session);assertNull(state.value.audioTranscripts!!.pending);assertNotNull(state.value.audioTranscripts!!.notice)}
+        compose.onNodeWithTag("transcript-dialog").assertIsDisplayed()
+    }
+    @Test fun focusedWithdrawalSurvivesPanelRemovalAndRecompositionBeforeActorRelease(){
+        val before=pendingFocusedChange(true);drain()
+        compose.runOnIdle{assertEquals(2,writes);assertTrue(saved!!.withdrawn);assertEquals(before.session,state.value.audioTranscripts!!.session);assertNull(state.value.audioTranscripts!!.pending)}
+        compose.onNodeWithTag("transcript-dialog").assertIsDisplayed()
+    }
+    @Test fun explicitCloseStillCancelsAnUnstartedFocusedCorrectionAfterPanelRetirement(){
+        pendingFocusedChange(false);click("transcript-close");compose.waitForIdle();drain()
+        compose.runOnIdle{assertNull(state.value.audioTranscripts);assertEquals(1,writes);assertNull(saved!!.current.range)}
+    }
+    @Test fun ownerReplacementStillRetiresPendingFocusedWithdrawalWithoutPublishingIntoNewOwner(){
+        pendingFocusedChange(true)
+        compose.runOnIdle{state.value=state.value.copy(recordAuthorizationOwner=object:RecordAuthorizationRepository {
+            override fun readAuthorization(source:SourceVersion):RecordAuthorizationSnapshot=error("No authority IO")
+            override fun previewAuthorization(expected:RecordAuthorizationSource,purpose:TextPurpose,clock:()->java.time.Instant):RecordAuthorizationPreview=error("No authority IO")
+            override fun changeAuthorization(request:RecordAuthorizationChange,clock:()->java.time.Instant):RecordAuthorizationReceipt=error("No authority IO")
+        })}
+        compose.waitForIdle();drain()
+        compose.runOnIdle{assertNull(state.value.audioTranscripts);assertEquals(1,writes);assertFalse(saved!!.withdrawn)}
     }
     @Test fun explicitHumanRangeAtNormalAndDoubleFontReachesExactFocusedSourceWithoutAutoplay(){
         viewFont=1f;compose.setContent{Screen()};detail()
@@ -144,7 +186,7 @@ class AudioTranscriptPresentationTest {
         assertEquals(intent,attachments.state.value!!.focusAudio);compose.onNodeWithTag("attachment-"+intent.id).performScrollTo().assertIsDisplayed()
         click("attachment-transcript:"+intent.id);drain();click("transcript-withdraw");click("transcript-withdraw-cancel");assertEquals(2,writes)
         click("transcript-withdraw");click("transcript-withdraw-confirm");drain();assertTrue(saved!!.withdrawn);assertEquals(3,writes)
-        backToSearch();query("清水");assertTrue(state.value.audioTranscripts!!.items.isEmpty());assertEquals(listOf(entry),state.value.entries);assertArrayEquals(wave,runBlocking{media.read(intent.id)})
+        backToSearch(panelRetired=true);query("清水");assertTrue(state.value.audioTranscripts!!.items.isEmpty());assertEquals(listOf(entry),state.value.entries);assertArrayEquals(wave,runBlocking{media.read(intent.id)})
     }
     @Test fun unsavedManualTextAndRetiredSessionDoNotSurviveRestorationAsWriteAuthority(){
         val restoration=StateRestorationTester(compose);restoration.setContent{Screen()};detail();compose.onNodeWithTag("transcript-text").performScrollTo().performTextReplacement("仅合成人工私有输入")
