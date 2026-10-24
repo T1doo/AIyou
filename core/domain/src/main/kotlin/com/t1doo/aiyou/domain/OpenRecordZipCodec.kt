@@ -89,7 +89,8 @@ object OpenRecordZipCodec {
                                 human?.singleOrNull {it.anchor.intent.id==audio.attachmentId}?.let { t ->
                                     append("\n人工转写（可纠正派生文字，非自动识别）：\n\n")
                                     append(OriginalExportCodec.fenced("text",t.current.text))
-                                    append("\n精确来源与半开采样范围（null 表示整段）：\n\n")
+                                    append(if(t.current.range==null) "\n未标注片段范围；仅关联此原音。sourceFrames 仅为原音总帧元数据，不表示文字覆盖范围。\n\n"
+                                        else "\n精确来源与人工标注的半开采样范围：\n\n")
                                     append(OriginalExportCodec.fenced("json",transcriptJson(t)))
                                 }
                             }

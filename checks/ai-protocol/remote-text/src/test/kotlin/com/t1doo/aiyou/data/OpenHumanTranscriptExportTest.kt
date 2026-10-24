@@ -14,6 +14,26 @@ import org.junit.Test
 
 /** Synthetic encrypted store, production ZIP/controller and bounded document IO; no SAF/device. */
 class OpenHumanTranscriptExportTest {
+    @Test fun legacyV1AndCurrentV2NullRemainUnmarkedAndNeverClaimWholeAudioCoverage():Unit=runBlocking {
+        for(rangedHistory in listOf(false,true))FullFixture().use {f->
+            val h=Harness(f)
+            val first=h.save("合成未标注范围文字",range=if(rangedHistory)AudioSampleRange(1,3)else null)
+            val current=if(rangedHistory)h.save(first.current.text,first,range=null)else first
+            val backup=f.backup.capture(uuid(),100) as FullBackupData
+            try {
+                val row=backup.tables[8].single {it[5]==4L}
+                assertEquals(if(rangedHistory)2 else 1,TranscriptEncoding.portableVersion(row[10] as ByteArray))
+            }finally {backup.release()}
+            val d=Document();h.stream(h.preview(true),d);val files=unzip(d.bytes)
+            val text=json(files.getValue("human-transcripts.jsonl"))
+            assertEquals(JsonNull,text.getValue("range"));assertEquals(current.version,text.getValue("savedVersion").jsonPrimitive.long)
+            assertEquals(h.source.samples,text.getValue("sourceFrames").jsonPrimitive.int)
+            val md=files.getValue("records.md").toString(Charsets.UTF_8)
+            assertTrue(md.contains("未标注片段范围；仅关联此原音"))
+            assertTrue(md.contains("sourceFrames 仅为原音总帧元数据，不表示文字覆盖范围"))
+            assertFalse(md.contains("null 表示整段"));assertFalse(md.contains("整段原音"))
+        }
+    }
     @Test fun explicitScopeStreamsCurrentUnicodeTextExactAudioRangeAndCompleteFileHashes():Unit=runBlocking {
         FullFixture().use {f->
             val h=Harness(f);val old=h.save("合成旧文字");h.save("合成🙂\r\n```\n杯子是绿色",old,AudioSampleRange(1,3))

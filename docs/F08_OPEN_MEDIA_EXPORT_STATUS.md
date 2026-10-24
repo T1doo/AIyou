@@ -9,8 +9,10 @@ v5、`humanTranscriptCount=0` 和空 `human-transcripts.jsonl`，不能当作未
 
 `human-transcripts.jsonl` 每行是 `humanAudioTranscript`：当前人工文字、保存版本、
 文字修订、编辑时刻、来源 ID/修订/hash/generation/policy、原音附件 ID/路径/hash/
-长度、采样率和总帧数。`range=null` 表示整段；非空范围是原音中从 `startFrame`
-到 `endFrameExclusive` 的左闭右开帧区间，不使用向下取整的显示时长。Markdown
+长度、采样率和总帧数。`range=null` 表示“未标注片段范围；仅关联此原音”，不能
+推定文字覆盖整段原音；`sourceFrames` 仅为原音总帧元数据。只有明确标注的非空
+范围才表示从 `startFrame` 到 `endFrameExclusive` 的左闭右开片段，不使用向下
+取整的显示时长。Markdown
 另外标明这是可纠正人工文字，不是自动识别、原文或事实验证；不导出纠正历史、
 撤回文字、AI 内容或密钥。清单涵盖新文件的精确长度和 SHA-256。
 

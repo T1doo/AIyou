@@ -73,6 +73,25 @@ class OriginalExportPresentationTest {
         compose.onNodeWithTag("export-prepare").performScrollTo().performClick(); pump()
     }
     @Test @Config(qualifiers = "w320dp-h640dp")
+    fun legacyAndCurrentNullRangeUiNeverClaimsWholeAudioCoverage() {
+        RuntimeEnvironment.setFontScale(2f);fixture.includeAudio=true;content()
+        val legacy=AudioTranscriptVersion(1,"合成人工转写🙂",50,null)
+        val withHistory=listOf(AudioTranscriptVersion(1,"合成历史文字",50,AudioSampleRange(1,3)),AudioTranscriptVersion(2,"合成人工转写🙂",51,null))
+        for(history in listOf(listOf(legacy),withHistory)) {
+            compose.runOnIdle {fixture.transcriptHistory=history}
+            compose.showNotebookToolsFor("export-open");compose.onNodeWithTag("export-open").performScrollTo().performClick()
+            compose.onNodeWithTag("export-select-one").performScrollTo().performClick()
+            compose.onNodeWithTag("export-format-MEDIA_ZIP").performScrollTo().performClick()
+            compose.onNodeWithTag("export-include-transcripts").performScrollTo().assertIsOff().performClick()
+            compose.onNodeWithTag("export-prepare").performScrollTo().performClick();pump()
+            compose.onNodeWithTag("export-transcript-range-"+Fixture.TRANSCRIPT_ID).performScrollTo()
+                .assertTextEquals("未标注片段范围；仅关联此原音。原音总帧数 4（元数据）· 44100 Hz")
+            compose.onAllNodes(hasText("整段原音",substring=true),useUnmergedTree=true).assertCountEquals(0)
+            compose.runOnIdle {assertNull(fixture.ui().mediaPreview!!.openTranscripts!!.items.single().current.range);assertTrue(registry.intents.isEmpty())}
+            compose.onNodeWithTag("export-close").performScrollTo().performClick();compose.waitForIdle()
+        }
+    }
+    @Test @Config(qualifiers = "w320dp-h640dp")
     fun explicitHumanTranscriptScopeAtActualDoubleFontRequiresFreshPlaintextConsentAndStaysOutOfSavedState() {
         RuntimeEnvironment.setFontScale(2f)
         fixture.includeAudio=true;content()
@@ -311,6 +330,7 @@ class OriginalExportPresentationTest {
         }
     }
     private class Fixture {
+        var transcriptHistory=listOf(AudioTranscriptVersion(1,"合成人工转写🙂",50,AudioSampleRange(1,3)))
         var includeImage = false
         var includeAudio = false
         val waveBytes = LocalPcmAudio.encode(shortArrayOf(0x1234, -2, 1000, -1000))
@@ -339,8 +359,7 @@ class OriginalExportPresentationTest {
                 check(active());val base=preview(snapshot);val a=base.audios.single()
                 val anchor=AudioTranscriptSource(AttachmentIntent(a.attachmentId,a.sourceId,a.sourceRevision,a.mediaType,a.sha256,a.byteSize),
                     snapshot.records.single().contentHash,0,original.capturedAtMillis,original.captureTimeZone,original.policy,4)
-                val scope=object:OpenTranscriptScope {override val items=listOf(AudioTranscriptSnapshot(TRANSCRIPT_ID,anchor,1,false,
-                    listOf(AudioTranscriptVersion(1,"合成人工转写🙂",50,AudioSampleRange(1,3)))))}
+                val scope=object:OpenTranscriptScope {override val items=listOf(AudioTranscriptSnapshot(TRANSCRIPT_ID,anchor,transcriptHistory.size.toLong(),false,transcriptHistory))}
                 return RecordMediaPreview(snapshot,base.images,audios=base.audios,openTranscripts=scope)
             }
             override suspend fun isCurrent(preview: RecordMediaPreview) = export.isCurrent(preview.snapshot)

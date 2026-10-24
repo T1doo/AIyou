@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.t1doo.aiyou.model.OriginalExportFormat
+import com.t1doo.aiyou.model.LocalPcmAudio
 import com.t1doo.aiyou.model.OriginalExports
 import com.t1doo.aiyou.model.RecordPackageActivities
 import com.t1doo.aiyou.model.ManualTaskStatus
@@ -180,7 +181,8 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
                         Text("人工转写 · 原音 ${t.anchor.intent.id} · 保存版本 ${t.version} · 文字版本 ${t.current.revision}",
                             Modifier.testTag("export-transcript-source-"+t.id))
                         Text(t.current.range?.let {"片段采样范围 [${it.startFrame}, ${it.endFrameExclusive}) · ${LocalPcmAudio.SAMPLE_RATE} Hz"}
-                            ?: "整段原音 · ${t.anchor.samples} 帧 · ${LocalPcmAudio.SAMPLE_RATE} Hz")
+                            ?: "未标注片段范围；仅关联此原音。原音总帧数 ${t.anchor.samples}（元数据）· ${LocalPcmAudio.SAMPLE_RATE} Hz",
+                            Modifier.testTag("export-transcript-range-"+t.id))
                         Text(t.current.text,Modifier.testTag("export-transcript-text-"+t.id))
                     }
                     if (record.entry.originalText.codePointCount(0, record.entry.originalText.length) > 300)
