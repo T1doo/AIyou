@@ -8,7 +8,7 @@ internal fun ComposeTestRule.showOriginalToolsFor(tag: String) {
     if (tag !in setOf("original-reading-edit", "original-event-date-open", "original-event-date",
             "original-manual-people", "original-manual-tags", "original-recycle-move", "original-source-task",
             "original-local-processing", "original-reading-ai", "original-local-candidates", "original-source-tags",
-            "original-source-preferences", "original-source-memories")) return
+            "original-source-preferences", "original-source-facts", "original-source-memories")) return
     if (onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty()) openOriginalTools()
 }
 

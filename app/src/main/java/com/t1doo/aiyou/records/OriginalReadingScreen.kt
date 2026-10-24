@@ -152,6 +152,7 @@ fun OriginalReadingScreen(
     candidateController: LocalCandidateController? = null,
     sourceTagController: SourceTagController? = null,
     sourcePreferenceController: SourcePreferenceController? = null,
+    sourceFactController: SourceFactController? = null,
     sourceMemoryController: SourceMemoryController? = null,
     localProcessingController: LocalProcessingController? = null,
     sourceTaskController: SourceTaskController? = null,
@@ -331,6 +332,12 @@ fun OriginalReadingScreen(
                                                 entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
                                                 onClick = toolAction { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
                                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-tags")) { Text("从原文添加标签") }
+                                        }
+                                        sourceFactController?.let { controller ->
+                                            TextButton(enabled=local.supportsSourceFacts && !local.saving && !local.savePending &&
+                                                entry.originalText.isNotBlank() && entry.policy!=com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
+                                                onClick=toolAction { if(canUseCandidates(entry.id,entry.currentRevision))controller.open(com.t1doo.aiyou.model.SourceVersion(entry.id,entry.currentRevision.toLong())) },
+                                                modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("original-source-facts")) { Text("普通事实自述") }
                                         }
                                         sourcePreferenceController?.let { controller ->
                                             TextButton(enabled = local.supportsSourcePreferences && !local.saving && !local.savePending && entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,

@@ -320,6 +320,11 @@ for label, folder, minimum in targets:
             "doubleFontManualCorrectionWithdrawalAndKeywordJumpReachExactAudioWithoutChangingOriginal",
             "unsavedManualTextAndRetiredSessionDoNotSurviveRestorationAsWriteAuthority",
             "recreatedPrivateAudioRouteRetiresRetainedFocusBeforeOpeningOrLocatingAnotherRecord")
+        additional["com.t1doo.aiyou.SourceFactPresentationTest"] = (
+            "explicitCandidateSeparateAcceptanceCorrectionAndRevocationReachExactOriginalAndUnifiedFact",
+            "actualPlatformDoubleFontKeepsEndpointRejectionStickyAndUnknownSameIntentFrozen",
+            "acceptedWriteSurvivesQueryRetirementAndActualRootRecompositionWhileActorIsBlocked",
+            "realCloseAndOwnerReplacementRejectQueuedOldConfirmationWithoutNewOwnerPublication")
         additional["com.t1doo.aiyou.SourcePreferencePresentationTest"] = (
             "doubleFontPendingSeparateAcceptanceCorrectionSourceJumpAndRevokeCancellationReachProductionRoutes",
             "privateFormRestorationAndClosedConfirmationHaveNoRetainedWriteAuthority",

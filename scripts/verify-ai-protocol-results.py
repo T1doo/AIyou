@@ -33,6 +33,7 @@ def input_fingerprint():
         "app/src/test/kotlin/com/t1doo/aiyou/LocalCandidatePresentationTest.kt",
         "app/src/test/kotlin/com/t1doo/aiyou/SourceMemoryInboxPresentationTest.kt",
         "app/src/test/kotlin/com/t1doo/aiyou/SourcePreferencePresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/SourceFactPresentationTest.kt",
         "app/src/test/kotlin/com/t1doo/aiyou/AudioTranscriptPresentationTest.kt",
         "app/src/test/kotlin/com/t1doo/aiyou/FactRecapPresentationTest.kt",
         "app/src/test/kotlin/com/t1doo/aiyou/ImageTextPresentationTest.kt",

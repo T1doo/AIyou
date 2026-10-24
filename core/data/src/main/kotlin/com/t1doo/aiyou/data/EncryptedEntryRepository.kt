@@ -78,7 +78,7 @@ class EncryptedEntryRepository internal constructor(
         SqlLocalSearchRepository(borrowedSql, tagStorage, people = peopleStorage)
     override val localSearch:com.t1doo.aiyou.domain.LocalSearchRepository get()=localSearchStorage
     override val unifiedKeywords:com.t1doo.aiyou.domain.UnifiedKeywordRepository by lazy {
-        SqlUnifiedKeywordRepository(borrowedSql,localSearchStorage,transcriptStorage,imageTextStorage,preferenceStorage,sourceMemoryStorage,tagStorage,peopleStorage,attachments)
+        SqlUnifiedKeywordRepository(borrowedSql,localSearchStorage,transcriptStorage,imageTextStorage,preferenceStorage,sourceMemoryStorage,factStorage,tagStorage,peopleStorage,attachments)
     }
     private val reminderStores=ReminderRuntimeStores(borrowedSql,keyBytes)
     private val taskStorage = reminderStores.tasks

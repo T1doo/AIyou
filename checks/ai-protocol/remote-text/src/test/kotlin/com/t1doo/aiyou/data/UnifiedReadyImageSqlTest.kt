@@ -41,7 +41,7 @@ class UnifiedReadyImageSqlTest {
     }}
     @Test fun everyScopeEmptyBecomingReadyNonmatchingDeletionAndEmptyAbaInvalidate():Unit=runBlocking{
         for(scope in UnifiedKeywordScope.entries)UnifiedKeywordFixture().use{h->
-            val id=h.f.entry(text="我偏好淡茶🙂");h.audio(id);h.preference(id);memory(h,id)
+            val id=h.f.entry(text="我偏好淡茶🙂");h.fact(id);h.audio(id);h.preference(id);memory(h,id)
             // IMAGE starts empty without a derived row too; later writes must invalidate that old proof.
             val empty=search(h,scope);assertTrue(empty.groups.isEmpty());h.image(id)
             assertThrows(UnifiedKeywordConflict::class.java){runBlocking{h.repo.resolve(empty){fail("Old empty proof")}}}

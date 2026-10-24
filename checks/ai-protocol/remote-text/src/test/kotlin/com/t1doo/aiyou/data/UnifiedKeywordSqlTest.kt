@@ -19,7 +19,7 @@ class UnifiedKeywordSqlTest {
         val originalBytes=h.f.db.read("SELECT * FROM entry_revisions")
         p.groups.flatMap{it.items}.forEach{e->var admitted=false;assertTrue(h.repo.resolve(p,e){admitted=true});assertTrue(admitted)}
         assertEquals(originalBytes,h.f.db.read("SELECT * FROM entry_revisions"))
-        val foreign=SqlUnifiedKeywordRepository(h.f.gateway,h.originals,h.audios,h.images,h.preferences,h.memories,h.f.tags,h.people)
+        val foreign=SqlUnifiedKeywordRepository(h.f.gateway,h.originals,h.audios,h.images,h.preferences,h.memories,h.facts,h.f.tags,h.people)
         assertFalse(foreign.resolve(p){fail("A foreign owner must not accept this proof")})
     }}
     @Test fun fullMatchedSetIncludesOlderPagesWithBoundedSingleMediaPass():Unit=runBlocking{UnifiedKeywordFixture().use{h->
@@ -106,7 +106,8 @@ internal class UnifiedKeywordFixture(seed:Int=1,withPeople:Boolean=false):AutoCl
     val images=SqlImageTextRepository(f.gateway,f.key,media)
     val preferences=SqlSourcePreferenceRepository(f.gateway,f.key)
     val memories=SqlSourceMemoryRepository(f.gateway,f.key)
-    val repo=SqlUnifiedKeywordRepository(f.gateway,originals,audios,images,preferences,memories,f.tags,people,readyMedia)
+    val facts=SqlSourceFactRepository(f.gateway,f.key)
+    val repo=SqlUnifiedKeywordRepository(f.gateway,originals,audios,images,preferences,memories,facts,f.tags,people,readyMedia)
     suspend fun audio(id:String,text:String="合成淡茶"):AudioTranscriptSnapshot {
         val bytes=CaptureAudioSqlTest.wave();val i=AttachmentIntent(FullBackupTest.uuid(),id,1,"audio/wav",FullBackupTest.hash(bytes),bytes.size.toLong())
         f.media.save(i){bytes.inputStream()};return audios.write(AudioTranscriptSqlTest.write(audios.preview(i),text=text))
@@ -116,5 +117,9 @@ internal class UnifiedKeywordFixture(seed:Int=1,withPeople:Boolean=false):AutoCl
         val preview=preferences.preview(SourceVersion(id,1));val row=preferences.create(PreferenceCreate(FullBackupTest.uuid(),preview,FullBackupTest.uuid(),"合成口味",PreferenceContent(SourceMemoryRules.reference(preview,"我偏好淡茶🙂")),true,FullBackupTest.uuid(),10))
         return preferences.mutate(PreferenceMutation(row,PreferenceAction.ACCEPT,null,null,FullBackupTest.uuid(),20))
     }
-    override fun close(){audios.wipeKey();images.wipeKey();preferences.wipeKey();memories.wipeKey();people.wipeKey();f.close()}
+    fun fact(id:String):SourceFactSnapshot {
+        val p=facts.preview(SourceVersion(id,1));val item=facts.create(FactCreate(FullBackupTest.uuid(),p,FullBackupTest.uuid(),"合成普通事实",FactContent(SourceMemoryRules.reference(p,p.original)),true,FullBackupTest.uuid(),10))
+        return facts.mutate(FactMutation(item,FactAction.ACCEPT,null,null,FullBackupTest.uuid(),11))
+    }
+    override fun close(){audios.wipeKey();images.wipeKey();preferences.wipeKey();memories.wipeKey();facts.wipeKey();people.wipeKey();f.close()}
 }

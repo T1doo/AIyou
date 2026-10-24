@@ -71,7 +71,7 @@ class ImageTextController(private val current:()->LocalRecordUiState,
     fun open(intent:AttachmentIntent?=null){sourceUi{
         val l=current()
         if(disposed||invocation.get()!=null||!canOpen(intent)||!l.ready||l.opening||l.error!=null||!l.supportsImageTexts||l.imageTexts!=null||l.saving||l.savePending||
-            l.recordPackage!=null||l.recycleBin!=null||l.originalEdit!=null||l.originalHistory!=null||l.sourcePreferences!=null||l.sourceMemories!=null||
+            l.recordPackage!=null||l.recycleBin!=null||l.originalEdit!=null||l.originalHistory!=null||l.sourcePreferences!=null || l.sourceFacts!=null||l.sourceMemories!=null||
             l.audioTranscripts!=null||l.memoryInbox!=null||l.localProcessing!=null)return@sourceUi
         if(intent!=null&&intent.mediaType !in setOf("image/png","image/jpeg"))return@sourceUi
         val entry=intent?.let{i->l.entries.singleOrNull{it.id==i.entryId&&it.currentRevision==i.revision}?:return@sourceUi}

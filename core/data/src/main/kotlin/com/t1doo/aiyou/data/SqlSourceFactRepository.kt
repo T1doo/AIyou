@@ -17,32 +17,35 @@ internal class SqlSourceFactRepository(private val database: RecordsSqlDatabase,
         override val items=java.util.Collections.unmodifiableList(values.toList())
         override val topics=java.util.Collections.unmodifiableList(groups.toList())
     }
-    override fun captureSource(source:SourceVersion):FactSourcePage = safe { database.transaction { sourcePage(it,source) } }
-    private fun sourcePage(sql:RecordsSqlConnection,source:SourceVersion):SourcePage {
-        val preview=readSource(sql,source);val items=live(sql);validateGraph(items)
-        val snapshots=items.map { snapshot(it.row,it.payload) }
-        return SourcePage(preview,snapshots.filter { it.source==source },snapshots.distinctBy { it.topicId },items.map { it.row.id+":"+it.row.version+":"+hash(it.row.bytes) })
+    override fun captureSource(source:SourceVersion,checkCurrent:()->Unit):FactSourcePage = safe { database.transaction { sourcePage(it,source,checkCurrent) } }
+    private fun sourcePage(sql:RecordsSqlConnection,source:SourceVersion,checkCurrent:()->Unit):SourcePage {
+        val preview=readSource(sql,source,checkCurrent);val items=live(sql,checkCurrent);validateGraph(items,checkCurrent)
+        val snapshots=items.map { checkCurrent();snapshot(it.row,it.payload) }
+        return SourcePage(preview,snapshots.filter { it.source==source },snapshots.distinctBy { it.topicId },signatures(items,checkCurrent))
     }
-    override fun resolveSource(page:FactSourcePage,publish:()->Unit):Boolean = safe {
+    override fun resolveSource(page:FactSourcePage,checkCurrent:()->Unit,publish:()->Unit):Boolean = safe {
         val p=page as? SourcePage ?: return@safe false
         if(p.owner!==this)return@safe false
-        database.transaction { sql -> val fresh=sourcePage(sql,p.preview.source);val a=fresh.preview;val b=p.preview
-            if(fresh.signatures!=p.signatures || a.sourceHash!=b.sourceHash || a.generation!=b.generation || a.epoch!=b.epoch || a.policy!=b.policy || a.capturedAtMillis!=b.capturedAtMillis || a.captureTimeZone!=b.captureTimeZone)false else { publish();true }
+        database.transaction { sql ->
+        checkCurrent();val fresh=sourcePage(sql,p.preview.source,checkCurrent);val a=fresh.preview;val b=p.preview
+            if(fresh.signatures!=p.signatures || a.sourceHash!=b.sourceHash || a.generation!=b.generation || a.epoch!=b.epoch || a.policy!=b.policy || a.capturedAtMillis!=b.capturedAtMillis || a.captureTimeZone!=b.captureTimeZone)false else { checkCurrent();publish();true }
         }
     }
-    override fun acceptedForTopic(expected:SourceFactSnapshot):SourceFactSnapshot? = safe { database.transaction { sql ->
-        val all=live(sql);validateGraph(all);val actual=all.singleOrNull { it.row.id==expected.id } ?: throw FactConflict()
+    override fun acceptedForTopic(expected:SourceFactSnapshot,checkCurrent:()->Unit):SourceFactSnapshot? = safe { database.transaction { sql ->
+        checkCurrent()
+        val all=live(sql,checkCurrent);validateGraph(all,checkCurrent);val actual=all.singleOrNull { it.row.id==expected.id } ?: throw FactConflict()
         if(!snapshot(actual.row,actual.payload).same(expected))throw FactConflict()
         all.singleOrNull { it.payload.topicId==expected.topicId && it.payload.reviews.last().review==FactReview.ACCEPTED }?.let { snapshot(it.row,it.payload) }
     } }
-    override fun resolveEndpoint(expected:SourceFactSnapshot,endpoint:FactEndpoint,publish:(SourceFactSnapshot?)->Unit):Boolean = safe { database.transaction { sql ->
+    override fun resolveEndpoint(expected:SourceFactSnapshot,endpoint:FactEndpoint,checkCurrent:()->Unit,publish:(SourceFactSnapshot?)->Unit):Boolean = safe { database.transaction { sql ->
+        checkCurrent()
         // Authenticate historical reciprocal slots across the whole bounded group. The target's
         // last mutation receipt can belong to a later replacement and cannot prove this edge.
-        val all=live(sql);validateGraph(all)
+        val all=live(sql,checkCurrent);validateGraph(all,checkCurrent)
         val current=all.singleOrNull { it.row.id==expected.id } ?: throw FactConflict()
         if(!snapshot(current.row,current.payload).same(expected) || current.payload.reviews.none { it.predecessor==endpoint || it.successor==endpoint })throw FactConflict()
         val target=all.singleOrNull { it.row.id==endpoint.id }
-        publish(target?.let { snapshot(it.row,it.payload) });true
+        checkCurrent();publish(target?.let { snapshot(it.row,it.payload) });true
     } }
     private inner class Page(override val section:FactReview,override val cursor:FactCursor?,override val next:FactCursor?,
         values:List<SourceFactSnapshot>,val signatures:List<String>,override val keyword:String?=null):FactPage {
@@ -50,19 +53,21 @@ internal class SqlSourceFactRepository(private val database: RecordsSqlDatabase,
         override val items=java.util.Collections.unmodifiableList(values.toList())
         override fun toString()="FactPage(redacted)"
     }
-    override fun preview(source:SourceVersion)=safe { database.transaction { readSource(it,source) } }
-    override fun facts(source:SourceVersion):List<SourceFactSnapshot> = safe { database.transaction { sql ->
-        readSource(sql,source)
-        val all=live(sql);validateGraph(all)
+    override fun preview(source:SourceVersion,checkCurrent:()->Unit)=safe { database.transaction { readSource(it,source,checkCurrent) } }
+    override fun facts(source:SourceVersion,checkCurrent:()->Unit):List<SourceFactSnapshot> = safe { database.transaction { sql ->
+        checkCurrent()
+        readSource(sql,source,checkCurrent)
+        val all=live(sql,checkCurrent);validateGraph(all,checkCurrent)
         all.filter { it.row.source==source }.sortedWith(compareByDescending<Item>{it.row.created}.thenBy{it.row.id})
             .map { snapshot(it.row,it.payload) }
     } }
-    override fun create(request:FactCreate):SourceFactSnapshot = safe { database.transaction { sql ->
-        val source=readSource(sql,request.preview.source);val p=request.preview
+    override fun create(request:FactCreate,checkCurrent:()->Unit):SourceFactSnapshot = safe { database.transaction { sql ->
+        checkCurrent()
+        val source=readSource(sql,request.preview.source,checkCurrent);val p=request.preview
         if(source.sourceHash!=p.sourceHash || source.generation!=p.generation || source.original!=p.original || source.capturedAtMillis!=p.capturedAtMillis || source.captureTimeZone!=p.captureTimeZone || source.policy!=p.policy)throw FactConflict()
         FactRules.validate(request.content,source)
         val receipt=createReceipt(request)
-        val all=live(sql);validateGraph(all) // Replay never bypasses capacity or authenticated history.
+        val all=live(sql,checkCurrent);validateGraph(all,checkCurrent) // Replay never bypasses capacity or authenticated history.
         row(sql,request.id)?.let { old ->
             val saved=payload(old,source)
             if(old.version!=1L || old.mutation!=receipt || old.created!=request.requestedAtMillis || saved.operation!="CREATE" || saved.epoch!=p.epoch ||
@@ -86,21 +91,22 @@ internal class SqlSourceFactRepository(private val database: RecordsSqlDatabase,
         sql.execute("INSERT INTO local_candidate_batches($COLUMNS) VALUES(?,?,?,?,?,?,?,?,?,?,?)",listOf(initial.id,initial.source.sourceId,initial.source.revision,initial.hash,initial.generation,6,1,"READY",receipt,initial.created,encrypted))
         val saved=checkNotNull(row(sql,initial.id));check(payload(saved,source)==data);snapshot(saved,data)
     } }
-    override fun mutate(request:FactMutation):SourceFactSnapshot = safe { database.transaction { sql ->
-        val expected=request.expected;val source=readSource(sql,expected.source);val old=row(sql,expected.id) ?: throw FactConflict()
+    override fun mutate(request:FactMutation,checkCurrent:()->Unit):SourceFactSnapshot = safe { database.transaction { sql ->
+        checkCurrent()
+        val expected=request.expected;val source=readSource(sql,expected.source,checkCurrent);val old=row(sql,expected.id) ?: throw FactConflict()
         val before=payload(old,source);val receipt=mutationReceipt(request)
         if(old.mutation==receipt) {
             if(old.version!=expected.rowVersion+1 || before.operation!=request.action.name || before.expectedVersion!=expected.rowVersion ||
                 before.expectedContentRevision!=expected.current?.revision || before.previousReview!=expected.review?.review || before.at!=request.requestedAtMillis)throw FactConflict()
             request.replacing?.let { prior ->
-                val a=row(sql,prior.id) ?: throw FactConflict();val p=payload(a,readSource(sql,prior.source))
+                val a=row(sql,prior.id) ?: throw FactConflict();val p=payload(a,readSource(sql,prior.source,checkCurrent))
                 if(a.version!=prior.rowVersion+1 || a.mutation!=receipt || p.operation!="REPLACE_OLD")throw FactConflict()
             }
-            validateGraph(live(sql));return@transaction snapshot(old,before)
+            validateGraph(live(sql,checkCurrent),checkCurrent);return@transaction snapshot(old,before)
         }
         if(!snapshot(old,before).same(expected) || old.version==Long.MAX_VALUE)throw FactConflict()
         val latest=before.reviews.last();val decision=FactRules.decision(latest.review,request.action)
-        val all=live(sql);validateGraph(all)
+        val all=live(sql,checkCurrent);validateGraph(all,checkCurrent)
         var next=before
         if(request.action==FactAction.ACCEPT) {
             val active=all.filter { it.payload.topicId==before.topicId && it.payload.reviews.last().review==FactReview.ACCEPTED }
@@ -113,7 +119,7 @@ internal class SqlSourceFactRepository(private val database: RecordsSqlDatabase,
                 val link=FactEndpoint(old.id,before.contents.last().revision,request.mutationId,receipt)
                 val retired=prior.payload.copy(reviews=prior.payload.reviews.dropLast(1)+review.copy(review=FactReview.SUPERSEDED,priorReview=FactReview.ACCEPTED,reviewedAtMillis=request.requestedAtMillis,successor=link),
                     operation="REPLACE_OLD",expectedVersion=prior.row.version,expectedContentRevision=review.contentRevision,previousReview=review.review,at=request.requestedAtMillis)
-                save(sql,prior.row,retired,receipt,readSource(sql,prior.row.source))
+                save(sql,prior.row,retired,receipt,readSource(sql,prior.row.source,checkCurrent),checkCurrent)
                 next=next.copy(reviews=next.reviews.dropLast(1)+latest.copy(review=decision,reviewedAtMillis=request.requestedAtMillis,predecessor=FactEndpoint(prior.row.id,review.contentRevision,request.mutationId,receipt)))
             }
         }
@@ -125,66 +131,85 @@ internal class SqlSourceFactRepository(private val database: RecordsSqlDatabase,
                 reviews=before.reviews.dropLast(1)+latest.copy(review=FactReview.SUPERSEDED,priorReview=latest.review,reviewedAtMillis=request.requestedAtMillis)+FactCheckpoint(before.contents.size+1,FactReview.PROPOSED,null,request.requestedAtMillis))
         } else next.copy(reviews=next.reviews.dropLast(1)+next.reviews.last().copy(review=decision,reviewedAtMillis=request.requestedAtMillis))
         next=next.copy(operation=request.action.name,expectedVersion=old.version,expectedContentRevision=before.contents.last().revision,previousReview=latest.review,at=request.requestedAtMillis)
-        val saved=save(sql,old,next,receipt,source);validateGraph(live(sql));snapshot(saved,next)
+        val saved=save(sql,old,next,receipt,source,checkCurrent);validateGraph(live(sql,checkCurrent),checkCurrent);snapshot(saved,next)
     } }
-    private fun save(sql:RecordsSqlConnection,old:Row,p:FactPayload,receipt:String,source:SourceMemoryPreview):Row {
+    private fun save(sql:RecordsSqlConnection,old:Row,p:FactPayload,receipt:String,source:SourceMemoryPreview,checkCurrent:()->Unit):Row {
+        checkCurrent()
         val next=old.copy(version=Math.addExact(old.version,1),mutation=receipt)
         if(sql.execute("UPDATE local_candidate_batches SET version=?,lastMutationId=?,payload=? WHERE id=? AND ruleVersion=6 AND version=? AND state='READY'",listOf(next.version,receipt,cipher.seal(aad(next),p),old.id,old.version))!=1)throw FactConflict()
         val saved=checkNotNull(row(sql,old.id));check(saved.version==next.version && saved.mutation==receipt && payload(saved,source)==p);return saved
     }
-    private fun live(sql:RecordsSqlConnection):List<Item> {
+    private fun live(sql:RecordsSqlConnection,checkCurrent:()->Unit = {}):List<Item> {
+        checkCurrent()
         val size=sql.query("SELECT count(*),COALESCE(sum(length(payload)),0) FROM local_candidate_batches WHERE ruleVersion=6 AND state='READY'").single()
         if((size[0] as Long)>128 || (size[1] as Long)>4_194_304)throw FactLimit()
+        val sources=HashMap<SourceVersion,SourceMemoryPreview>()
         return sql.query("SELECT $SELECT_COLUMNS FROM local_candidate_batches WHERE ruleVersion=6 AND state='READY' ORDER BY id LIMIT 129").map { cells ->
-            val row=decode(cells);val source=readSource(sql,row.source);Item(row,payload(row,source))
+            checkCurrent();val row=decode(cells)
+            val source=sources.getOrPut(row.source){readSource(sql,row.source,checkCurrent)}
+            Item(row,payload(row,source))
         }
     }
-    override fun capture(section:FactReview,cursor:FactCursor?):FactPage = safe { database.transaction { capture(it,section,cursor) } }
-    private fun capture(sql:RecordsSqlConnection,section:FactReview,cursor:FactCursor?):Page {
+    override fun capture(section:FactReview,cursor:FactCursor?,checkCurrent:()->Unit):FactPage = safe { database.transaction { capture(it,section,cursor,checkCurrent) } }
+    private fun capture(sql:RecordsSqlConnection,section:FactReview,cursor:FactCursor?,checkCurrent:()->Unit):Page {
         require(section in setOf(FactReview.PROPOSED,FactReview.ACCEPTED))
-        val all=live(sql);validateGraph(all)
+        val all=live(sql,checkCurrent);validateGraph(all,checkCurrent)
         val page=if(cursor==null)"" else " AND (c.createdAtMillis<? OR (c.createdAtMillis=? AND c.id>?))"
         val args=if(cursor==null)emptyList() else listOf(cursor.createdAtMillis,cursor.createdAtMillis,cursor.id)
         val rows=sql.query("SELECT "+COLUMNS.split(',').joinToString { if(it=="payload") "CASE WHEN length(c.payload)<=32797 THEN c.payload ELSE NULL END" else "c.$it" }+" FROM local_candidate_batches c JOIN entries e ON e.id=c.entryId LEFT JOIN remote_source_access a ON a.entryId=e.id WHERE c.ruleVersion=6 AND c.state='READY' AND e.currentRevision=c.sourceRevision AND e.privacyPolicy IN ('LOCAL_ONLY','REMOTE_ALLOWED') AND COALESCE(a.deleted,0)=0 AND NOT EXISTS(SELECT 1 FROM permanent_erasure_receipts p WHERE p.entryId=e.id)"+page+" ORDER BY c.createdAtMillis DESC,c.id LIMIT 21",args)
         val selected=rows.take(20).map(::decode);require(selected.sumOf { it.bytes.size }<=655940)
-        val items=selected.map { snapshot(it,payload(it,readSource(sql,it.source))) }
+        val items=selected.map { checkCurrent();snapshot(it,payload(it,readSource(sql,it.source,checkCurrent))) }
         return Page(section,cursor,if(rows.size>20)selected.last().let { FactCursor(it.created,it.id) } else null,
-            items.filter { it.review?.review==section },all.map { it.row.id+":"+it.row.version+":"+hash(it.row.bytes) })
+            items.filter { it.review?.review==section },signatures(all,checkCurrent))
     }
-    override fun searchAccepted(keyword:String,cursor:FactCursor?):FactPage {
+    override fun searchAccepted(keyword:String,cursor:FactCursor?,checkCurrent:()->Unit):FactPage {
         FactKeywords.validate(keyword)
-        return safe { database.transaction { searchAccepted(it,keyword,cursor) } }
+        return safe { database.transaction { searchAccepted(it,keyword,cursor,checkCurrent) } }
     }
-    private fun searchAccepted(sql:RecordsSqlConnection,keyword:String,cursor:FactCursor?):Page {
+    private fun searchAccepted(sql:RecordsSqlConnection,keyword:String,cursor:FactCursor?,checkCurrent:()->Unit):Page {
         // Authenticate the entire bounded live set and graph BEFORE matching and paging.
         // Filtering a raw LIMIT 21 page would silently miss older accepted statements.
-        val all=live(sql);validateGraph(all)
+        val all=live(sql,checkCurrent);validateGraph(all,checkCurrent)
         val matches=all.filter { it.payload.reviews.last().review==FactReview.ACCEPTED &&
             (it.payload.topicLabel.contains(keyword) || it.payload.contents.last().content.reference.quote.contains(keyword)) }
             .sortedWith(compareByDescending<Item> { it.row.created }.thenBy { it.row.id })
             .filter { cursor==null || it.row.created<cursor.createdAtMillis || it.row.created==cursor.createdAtMillis && it.row.id>cursor.id }
         val selected=matches.take(20)
         return Page(FactReview.ACCEPTED,cursor,if(matches.size>20)selected.last().row.let {FactCursor(it.created,it.id)} else null,
-            selected.map {snapshot(it.row,it.payload)},all.map {it.row.id+":"+it.row.version+":"+hash(it.row.bytes)},keyword)
+            selected.map {snapshot(it.row,it.payload)},signatures(all,checkCurrent),keyword)
     }
-    internal fun keywordSet(keyword:String):KeywordSet<SourceFactSnapshot> {
+    /** One authenticated scan for selection; one fresh scan for each final common SQL check.
+     * The callback is metadata-only admission, never an entries/snapshot traversal. */
+    internal fun keywordSet(keyword:String,checkCurrent:()->Unit = {}):KeywordSet<SourceFactSnapshot> = safe {
         FactKeywords.validate(keyword)
-        return database.transaction { sql ->
-            val first=searchAccepted(sql,keyword,null)
-            val all=live(sql);validateGraph(all)
-            val items=ArrayList<SourceFactSnapshot>();var cursor:FactCursor?=null
-            do {val p=searchAccepted(sql,keyword,cursor);items.addAll(p.items);cursor=p.next}while(cursor!=null)
-            KeywordSet(items,all.map{it.row.source}) { current -> searchAccepted(current,keyword,null).signatures==first.signatures }
+        database.transaction { sql ->
+        checkCurrent()
+            val all=live(sql,checkCurrent);validateGraph(all,checkCurrent)
+            val signature=signatures(all,checkCurrent)
+            val items=all.filter { checkCurrent();it.payload.reviews.last().review==FactReview.ACCEPTED &&
+                (it.payload.topicLabel.contains(keyword)||it.payload.contents.last().content.reference.quote.contains(keyword)) }
+                .map { checkCurrent();snapshot(it.row,it.payload) }
+            fun current(sql:RecordsSqlConnection,guard:()->Unit):Boolean {
+                val now=live(sql,guard);validateGraph(now,guard)
+                return signatures(now,guard)==signature
+            }
+            checkCurrent()
+            KeywordSet(items,all.map {it.row.source},guardedCurrent={connection,guard->current(connection,guard)}) {connection->current(connection,{})}
         }
     }
-    override fun resolve(page:FactPage,item:SourceFactSnapshot?,publish:()->Unit):Boolean = safe {
+    private fun signatures(items:List<Item>,checkCurrent:()->Unit)=items.map {
+        checkCurrent();it.row.id+":"+it.row.version+":"+hash(it.row.bytes)
+    }
+    override fun resolve(page:FactPage,item:SourceFactSnapshot?,checkCurrent:()->Unit,publish:()->Unit):Boolean = safe {
         val p=page as? Page ?: return@safe false
         if(p.owner!==this || item!=null && p.items.none { it===item })return@safe false
-        database.transaction { sql -> val fresh=p.keyword?.let {searchAccepted(sql,it,p.cursor)} ?: capture(sql,p.section,p.cursor)
-            if(fresh.signatures!=p.signatures || fresh.next!=p.next)false else { publish();true }
+        database.transaction { sql ->
+        checkCurrent();val fresh=p.keyword?.let {searchAccepted(sql,it,p.cursor,checkCurrent)} ?: capture(sql,p.section,p.cursor,checkCurrent)
+            if(fresh.signatures!=p.signatures || fresh.next!=p.next)false else { checkCurrent();publish();true }
         }
     }
-    private fun readSource(sql:RecordsSqlConnection,expected:SourceVersion):SourceMemoryPreview {
+    private fun readSource(sql:RecordsSqlConnection,expected:SourceVersion,checkCurrent:()->Unit = {}):SourceMemoryPreview {
+        checkCurrent()
         val r=sql.query("SELECT e.currentRevision,r.originalText,r.contentHash,e.capturedAtMillis,e.captureTimeZone,e.privacyPolicy,COALESCE(a.generation,0),COALESCE(a.deleted,0) FROM entries e JOIN entry_revisions r ON r.entryId=e.id AND r.revision=e.currentRevision LEFT JOIN remote_source_access a ON a.entryId=e.id WHERE e.id=? AND length(CAST(r.originalText AS BLOB))<=400000",listOf(expected.sourceId)).singleOrNull() ?: throw FactConflict()
         if(r[0]!=expected.revision || r[7]!=0L || r[5]=="AI_NONE" || sql.query("SELECT entryId FROM permanent_erasure_receipts WHERE entryId=? LIMIT 1",listOf(expected.sourceId)).isNotEmpty())throw FactConflict()
         val epoch=sql.query("SELECT epoch FROM local_search_epoch WHERE slot=1").single().single() as Long
@@ -214,14 +239,15 @@ internal class SqlSourceFactRepository(private val database: RecordsSqlDatabase,
     }
     private fun snapshot(row:Row,p:FactPayload?)=SourceFactSnapshot(row.id,row.source,row.hash,row.generation,row.version,
         if(p==null)FactAvailability.INVALIDATED else FactAvailability.AVAILABLE,row.created,p?.captured,p?.zone,p?.policy,p?.topicId,p?.topicLabel,p?.contents.orEmpty(),p?.reviews.orEmpty())
-    private fun validateGraph(items:List<Item>) {
+    private fun validateGraph(items:List<Item>,checkCurrent:()->Unit = {}) {
         require(items.size<=128)
         if(items.groupingBy { it.row.source }.eachCount().values.any { it>20 })throw FactLimit()
         items.groupBy { it.payload.topicId }.values.forEach { group ->
             require(group.map { it.payload.topicLabel }.distinct().size==1 && group.count { it.payload.reviews.last().review==FactReview.ACCEPTED }<=1)
         }
         val byId=items.associateBy { it.row.id };require(byId.size==items.size)
-        items.forEach { item -> item.payload.reviews.forEach { checkpoint ->
+        items.forEach { item -> checkCurrent();item.payload.reviews.forEach { checkpoint ->
+            checkCurrent()
             fun check(edge:FactEndpoint?,predecessor:Boolean) {
                 if(edge==null)return
                 val other=byId[edge.id] ?: return // No content is retained or authority recovered from an unavailable endpoint.
@@ -234,6 +260,7 @@ internal class SqlSourceFactRepository(private val database: RecordsSqlDatabase,
         } }
         val visited=mutableSetOf<Pair<String,Int>>();val visiting=mutableSetOf<Pair<String,Int>>()
         fun visit(id:String,rev:Int) {
+            checkCurrent()
             val key=id to rev;if(key in visited)return;require(visiting.add(key))
             val item=checkNotNull(byId[id]);val c=item.payload.reviews.single { it.contentRevision==rev }
             c.successor?.takeIf { it.id in byId }?.let { visit(it.id,it.contentRevision) }

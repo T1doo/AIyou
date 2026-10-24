@@ -86,6 +86,9 @@ data class LocalRecordUiState(
     val imageTexts:ImageTextUi?=null,
     val supportsSourcePreferences: Boolean = false,
     val sourcePreferences: PreferenceUiState? = null,
+    val supportsSourceFacts:Boolean=false,
+    val sourceFactOwner:com.t1doo.aiyou.domain.SourceFactRepository?=null,
+    val sourceFacts:FactUiState?=null,
     val supportsSourceMemories: Boolean = false,
     val sourceMemories: SourceMemoryUiState? = null,
     val supportsMemoryInbox: Boolean = false,
@@ -239,7 +242,7 @@ class LocalRecordsViewModel internal constructor(
         if (editsDisposed || appAccessCommands.get() != 0 || !local.ready || local.opening || local.error != null ||
             local.saving || local.savePending || local.captureDiscard != null || local.localIndexBusy ||
             local.originalEdit != null || local.originalHistory != null || attachments.state.value != null ||
-            local.ai != null || local.sourceTask != null || local.sourceTags != null || local.sourceMemories != null || local.memoryInbox != null || local.sourcePreferences != null || local.audioTranscripts != null || local.imageTexts != null ||
+            local.ai != null || local.sourceTask != null || local.sourceTags != null || local.sourceMemories != null || local.memoryInbox != null || local.sourcePreferences != null || local.sourceFacts!=null || local.audioTranscripts != null || local.imageTexts != null ||
             local.localProcessing != null || local.factRecap != null || local.candidates != null ||
             local.originalExport != null || local.recordPackage != null || local.recycleBin != null ||
             local.manualTagEditor != null || local.manualPeopleEditor != null || local.eventDateEditor != null ||
@@ -316,6 +319,8 @@ class LocalRecordsViewModel internal constructor(
     })
     val sourcePreferences = SourcePreferenceController({ mutableState.value }, { change -> update(change) },
         { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock)
+    val sourceFacts=SourceFactController({mutableState.value},{change->update(change)},
+        {action->submit(Command.LocalCandidates(action)).isSuccess},clock,beforeOpen={unifiedKeywords.retire()},beforeWrite={unifiedKeywords.retire()})
     val exports = OriginalExportController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.OriginalExport(action)).isSuccess }, clock = clock, decodeImage = decodeCapture)
     val recordPackages = RecordPackageController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -531,7 +536,7 @@ class LocalRecordsViewModel internal constructor(
                 reminders.dispose()
                 candidates.dispose()
                 sourceTags.dispose()
-                unifiedKeywords.dispose(); sourceMemories.dispose(); memoryInbox.dispose(); sourcePreferences.dispose();audioTranscripts.dispose();imageTexts.dispose()
+                unifiedKeywords.dispose(); sourceMemories.dispose(); memoryInbox.dispose(); sourcePreferences.dispose();sourceFacts.dispose();audioTranscripts.dispose();imageTexts.dispose()
                 exports.dispose()
                 recordPackages.dispose()
                 recycleBin.dispose()
@@ -597,8 +602,8 @@ class LocalRecordsViewModel internal constructor(
                 proposed.entries.none { it.id == panel.source.sourceId && it.currentRevision.toLong() == panel.source.revision &&
                     com.t1doo.aiyou.model.OriginalExports.hash(it.originalText) == panel.sourceHash })) proposed.copy(localProcessing = null) else proposed
             val safe = if (scoped.supportsLocalProcessing && !scoped.localProcessingAvailable) scoped.copy(
-                candidates = null, sourceTags = null, sourceMemories = null, sourcePreferences = null, ai = null, factRecap = null) else scoped
-            val preference = reconcilePreferences(reconcileMemoryInbox(previous, reconcileFactRecap(previous,safe)))
+                candidates = null, sourceTags = null, sourceMemories = null, sourcePreferences = null, sourceFacts=null, ai = null, factRecap = null) else scoped
+            val preference = reconcileFacts(reconcilePreferences(reconcileMemoryInbox(previous, reconcileFactRecap(previous,safe))))
             val transcript=preference.audioTranscripts
             val candidate=if(transcript!=null&&(editsDisposed||!preference.canRetainTranscripts(transcript)))preference.copy(audioTranscripts=null)else preference
             val pictureText=candidate.imageTexts
@@ -654,6 +659,11 @@ class LocalRecordsViewModel internal constructor(
             else reviewed.copy(ai = null)
         }
         if(changedSource&&observed!=null)unifiedObserver?.retireObserved(observed)
+    }
+
+    private fun reconcileFacts(local:LocalRecordUiState):LocalRecordUiState {
+        val ui=local.sourceFacts?:return local
+        return if(editsDisposed||!local.canRetainFactSources(ui))local.copy(sourceFacts=null)else local
     }
 
     private fun reconcilePreferences(local: LocalRecordUiState): LocalRecordUiState {
@@ -1386,6 +1396,7 @@ class LocalRecordsViewModel internal constructor(
                 supportsAudioTranscripts=store.audioTranscripts!=null,
                 supportsImageTexts=store.imageTexts!=null,
                 supportsSourcePreferences = store.sourcePreferences != null,
+                supportsSourceFacts=store.sourceFacts!=null,sourceFactOwner=store.sourceFacts,
                 supportsSourceMemories = store.sourceMemories != null,
                 supportsMemoryInbox = store.sourceMemories?.inbox != null,
                 supportsManualPeople = store.manualPeople != null, manualPeopleOwner = store.manualPeople, manualPeople = peopleValues.orEmpty(),
@@ -1484,6 +1495,7 @@ class LocalRecordsViewModel internal constructor(
         sourceTasks.invalidateSource(id)
         mutableState.value.candidates?.takeIf { it.source.sourceId == id }?.let { candidates.close(it.session) }
         mutableState.value.sourceTags?.takeIf { it.source.sourceId == id }?.let { sourceTags.close(it.session) }
+        sourceFacts.retire()
         mutableState.value.sourcePreferences?.takeIf { it.source?.sourceId == id || it.items.any { item -> item.source.sourceId == id } }?.let { sourcePreferences.close(it.session) }
         mutableState.value.sourceMemories?.takeIf { it.source.sourceId == id }?.let { sourceMemories.close(it.session) }
         mutableState.value.ai?.takeIf { it.source.sourceId == id }?.let { ai.leave(it.sessionId) }
@@ -1564,7 +1576,7 @@ class LocalRecordsViewModel internal constructor(
         reminders.dispose()
         candidates.dispose()
         sourceTags.dispose()
-        unifiedKeywords.dispose(); sourceMemories.dispose(); memoryInbox.dispose(); sourcePreferences.dispose()
+        unifiedKeywords.dispose(); sourceMemories.dispose(); memoryInbox.dispose(); sourcePreferences.dispose();sourceFacts.dispose()
         exports.dispose()
         recordPackages.dispose()
         recycleBin.dispose()

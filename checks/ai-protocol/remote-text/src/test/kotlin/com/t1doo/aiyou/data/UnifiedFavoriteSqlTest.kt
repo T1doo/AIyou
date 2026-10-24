@@ -21,7 +21,7 @@ class UnifiedFavoriteSqlTest {
     }}
     @Test fun everyScopeEmptyToNonemptyOffPageUnfavoriteAndAbaInvalidateOldReceipt():Unit=runBlocking{
         for(scope in UnifiedKeywordScope.entries)UnifiedKeywordFixture().use{h->
-            val id=h.f.entry(text="我偏好淡茶🙂");h.audio(id);h.image(id);h.preference(id);memory(h,id)
+            val id=h.f.entry(text="我偏好淡茶🙂");h.fact(id);h.audio(id);h.image(id);h.preference(id);memory(h,id)
             val empty=search(h,scope);assertTrue(empty.groups.isEmpty())
             favorite(h,id,true)
             assertThrows(UnifiedKeywordConflict::class.java){runBlocking{h.repo.resolve(empty){fail("Empty favorite proof revived")}}}
@@ -126,7 +126,7 @@ class UnifiedFavoriteSqlTest {
     }}
     @Test fun favoriteSurvivesRevisionButOldEvidenceForeignOwnerAndSourcePolicyDoNot():Unit=runBlocking{UnifiedKeywordFixture().use{h->
         val id=h.f.entry(text="合成淡茶");h.audio(id);favorite(h,id,true);val p=search(h,UnifiedKeywordScope.AUDIO)
-        val cold=SqlUnifiedKeywordRepository(h.f.gateway,h.originals,h.audios,h.images,h.preferences,h.memories,h.f.tags,h.people)
+        val cold=SqlUnifiedKeywordRepository(h.f.gateway,h.originals,h.audios,h.images,h.preferences,h.memories,h.facts,h.f.tags,h.people)
         assertFalse(cold.resolve(p){fail("Foreign owner")})
         assertTrue(cold.search("淡茶",UnifiedKeywordScope.ALL,UnifiedCaptureRange(),null,null,true,{}).onlyFavorites)
         h.f.revise(id,"合成修订淡茶")

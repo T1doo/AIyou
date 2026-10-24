@@ -25,7 +25,7 @@ internal fun sameUnifiedFavorites(a:Map<String,com.t1doo.aiyou.model.RecordFavor
 internal fun LocalRecordUiState.canRetainUnifiedSession(u:UnifiedKeywordUi):Boolean {
     if(!ready||opening||error!=null||unifiedKeywordOwner!==u.owner||saving||savePending||
         originalEdit!=null||originalHistory!=null||recordPackage!=null||recycleBin!=null||
-        audioTranscripts!=null||imageTexts!=null||sourcePreferences!=null||sourceMemories!=null||memoryInbox!=null||
+        audioTranscripts!=null||imageTexts!=null||sourcePreferences!=null||sourceFacts!=null||sourceMemories!=null||memoryInbox!=null||
         localProcessing!=null||ai!=null||sourceTags!=null||candidates!=null||sourceTask!=null||manualTagEditor!=null||manualPeopleEditor!=null||eventDateEditor!=null)return false
     return true
 }
@@ -76,7 +76,7 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
         val people=u?.let{it.person!=null||it.personPicker||it.personBusy}?:activePeople
         val favorites=u?.onlyFavorites?:activeFavorites
         val images=u?.onlyReadyImages?:activeImages
-        UnifiedKeywordRetirement(pair.first,pair.second,lifetime,scope==UnifiedKeywordScope.ALL||scope==UnifiedKeywordScope.ACCEPTED_MEMORY||dates||tags||people||favorites||images,tags,people,favorites,images)
+        UnifiedKeywordRetirement(pair.first,pair.second,lifetime,scope==UnifiedKeywordScope.ALL||scope==UnifiedKeywordScope.ACCEPTED_MEMORY||scope==UnifiedKeywordScope.FACT||dates||tags||people||favorites||images,tags,people,favorites,images)
     }
     internal fun retireObserved(observed:UnifiedKeywordRetirement)=synchronized(handoffLock){
         val u=current().unifiedKeyword;val pair=u?.let{it.session to it.request}?:activeRequest
@@ -349,6 +349,13 @@ internal fun unifiedOriginalLocation(item:UnifiedKeywordEvidence,keyword:String)
             if(originalSearchPreview(item.entry,hit)==null)return null
             hit.matchStartCodePoint to hit.matchEndCodePoint}
         is UnifiedKeywordEvidence.Preference->item.value.current?.content?.reference?.let{it.start to it.end}?:return null
+        is UnifiedKeywordEvidence.Fact->{
+            val ref=item.value.current?.content?.reference?:return null
+            val at=ref.quote.indexOf(keyword)
+            if(at>=0&&keyword.isNotEmpty()){
+                val start=ref.start+ref.quote.codePointCount(0,at);start to start+keyword.codePointCount(0,keyword.length)
+            }else ref.start to ref.end
+        }
         is UnifiedKeywordEvidence.AcceptedMemory->{val m=item.value;val ref=m.content.reference
             if(m.quoteMatch){val at=ref.quote.indexOf(keyword);if(at<0||keyword.isEmpty())return null
                 val start=ref.start+ref.quote.codePointCount(0,at);start to start+keyword.codePointCount(0,keyword.length)

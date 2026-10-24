@@ -26,7 +26,7 @@ import com.t1doo.aiyou.designsystem.aiyouFocusOutline
 internal fun unifiedScopeLabel(s:UnifiedKeywordScope)=when(s){
     UnifiedKeywordScope.ALL->"全部内容";UnifiedKeywordScope.ORIGINAL->"原文";UnifiedKeywordScope.AUDIO->"人工转写"
     UnifiedKeywordScope.IMAGE->"图片文字";UnifiedKeywordScope.PREFERENCE->"已采纳普通偏好"
-    UnifiedKeywordScope.ACCEPTED_MEMORY->"已采纳事件与当次情绪"
+    UnifiedKeywordScope.ACCEPTED_MEMORY->"已采纳事件与当次情绪";UnifiedKeywordScope.FACT->"已采纳普通事实自述"
 }
 private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
     is UnifiedKeywordEvidence.Original->e.entry.originalText
@@ -34,6 +34,7 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
     is UnifiedKeywordEvidence.Image->e.value.current.text
     is UnifiedKeywordEvidence.Preference->e.value.topicLabel.orEmpty()+"\n"+e.value.current?.content?.reference?.quote.orEmpty()
     is UnifiedKeywordEvidence.AcceptedMemory->e.value.content.reference.quote
+    is UnifiedKeywordEvidence.Fact->e.value.current?.content?.reference?.quote.orEmpty()
 }
 @Composable private fun KeywordExcerpt(e:UnifiedKeywordEvidence,keyword:String){
     if(e is UnifiedKeywordEvidence.Original){
@@ -41,6 +42,15 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
         val preview=originalSearchPreview(e.entry,hit)?:return
         val spans=if(preview.highlightEnd>preview.highlightStart)listOf(AnnotatedString.Range(SpanStyle(fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary),preview.highlightStart,preview.highlightEnd))else emptyList()
         Text(AnnotatedString(preview.text,spans),Modifier.testTag("unified-excerpt:"+e.key));return
+    }
+    if(e is UnifiedKeywordEvidence.Fact){
+        val quote=e.value.current?.content?.reference?.quote?:return
+        val quoted=quote.contains(keyword)
+        Text("人工确认自述，不代表事实核验。")
+        KeywordText(e.value.topicLabel.orEmpty(),keyword,"unified-fact-topic:"+e.key)
+        Text(if(quoted)"逐字原文命中"else"人工主题命中 · 原文仅作出处",Modifier.testTag("unified-fact-match:"+e.key))
+        KeywordText(quote,if(quoted)keyword else "","unified-fact-quote:"+e.key)
+        return
     }
     if(e is UnifiedKeywordEvidence.AcceptedMemory){
         val m=e.value
@@ -147,7 +157,7 @@ private fun evidenceText(e:UnifiedKeywordEvidence)=when(e){
                         Text("捕获日期："+java.time.Instant.ofEpochMilli(g.binding.captured).atZone(java.time.ZoneId.of(g.binding.zone)).toLocalDate()+" · "+g.binding.zone,
                             modifier=Modifier.testTag("unified-capture-date:"+g.key),style=MaterialTheme.typography.bodySmall)
                         g.items.forEach{e->key(e.key){
-                            Text(when(e){is UnifiedKeywordEvidence.Original->"原文命中";is UnifiedKeywordEvidence.Audio->"人工转写 · 非自动识别";is UnifiedKeywordEvidence.Image->if(e.value.engine.synthetic)"合成端口测试结果 · 非真实 OCR"else if(e.value.current.humanCorrection)"图片文字 · 人工纠正"else"图片提取文字";is UnifiedKeywordEvidence.Preference->"已采纳普通偏好 · 人工确认";is UnifiedKeywordEvidence.AcceptedMemory->if(e.value.content.kind==SourceMemoryKind.EVENT)"已采纳事件线索"else"已采纳当次情绪线索"})
+                            Text(when(e){is UnifiedKeywordEvidence.Original->"原文命中";is UnifiedKeywordEvidence.Audio->"人工转写 · 非自动识别";is UnifiedKeywordEvidence.Image->if(e.value.engine.synthetic)"合成端口测试结果 · 非真实 OCR"else if(e.value.current.humanCorrection)"图片文字 · 人工纠正"else"图片提取文字";is UnifiedKeywordEvidence.Preference->"已采纳普通偏好 · 人工确认";is UnifiedKeywordEvidence.Fact->"已采纳普通事实自述 · 人工确认";is UnifiedKeywordEvidence.AcceptedMemory->if(e.value.content.kind==SourceMemoryKind.EVENT)"已采纳事件线索"else"已采纳当次情绪线索"})
                             KeywordExcerpt(e,u.keyword)
                             TextButton({if(canUse())c.locate(u.session,e,onLocate)},enabled=!u.busy,modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline().testTag("unified-source:"+e.key)){Text(when(e){is UnifiedKeywordEvidence.Audio->"查看精确原音";is UnifiedKeywordEvidence.Image->"查看精确原图";else->"查看逐字原文出处"})}
                         }}

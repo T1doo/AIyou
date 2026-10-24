@@ -114,6 +114,7 @@ fun LocalRecordsScreen(
     onOpenUnified:(()->Unit)?=null,
     onOpenTranscripts:(()->Unit)?=null,
     onOpenPreferences: (() -> Unit)? = null,
+    onOpenFacts: (() -> Unit)? = null,
     onOpenMemoryInbox: (() -> Unit)? = null,
     onOpenAcceptedMemories: (() -> Unit)? = null,
     onBeforeSearchInput: (TextFieldState) -> Boolean = { true },
@@ -294,6 +295,7 @@ fun LocalRecordsScreen(
                         (onOpenTranscripts != null && local.supportsAudioTranscripts) ||
                         (onOpenImageTexts != null && local.supportsImageTexts) ||
                         (onOpenPreferences != null && local.supportsSourcePreferences) ||
+                        (onOpenFacts != null && local.supportsSourceFacts) ||
                         ((onOpenMemoryInbox != null || onOpenAcceptedMemories != null) && local.supportsMemoryInbox))) {
                         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
                             NotebookPageHeader(destination.label, "${local.entries.size} 条本机记录", stackSummary, companion)
@@ -301,6 +303,7 @@ fun LocalRecordsScreen(
                             val hasReviewTools = (onOpenImageTexts != null && local.supportsImageTexts) ||
                                 (onOpenTranscripts != null && local.supportsAudioTranscripts) ||
                                 (onOpenPreferences != null && local.supportsSourcePreferences) ||
+                        (onOpenFacts != null && local.supportsSourceFacts) ||
                                 ((onOpenMemoryInbox != null || onOpenAcceptedMemories != null) && local.supportsMemoryInbox) ||
                                 (onOpenFactRecap != null && local.supportsFactRecaps) || imageTextBusy
                             val hasManageTools = (onBeginRecordPackage != null && local.supportsRecordPackages) ||
@@ -324,6 +327,9 @@ fun LocalRecordsScreen(
                             FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                             if(onOpenImageTexts!=null && local.supportsImageTexts)TextButton(onOpenImageTexts,enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("image-texts-open")){Text("找回图片文字与原图")}
                             if(onOpenTranscripts!=null && local.supportsAudioTranscripts)TextButton(onOpenTranscripts,enabled=local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("transcripts-open")){Text("找回人工转写与原音")}
+                            if(onOpenFacts!=null && local.supportsSourceFacts)TextButton(onOpenFacts,
+                                enabled=local.ready&&!local.opening&&local.error==null,
+                                modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("facts-open")) { Text("普通事实自述与人工审阅") }
                             if (onOpenPreferences != null && local.supportsSourcePreferences) TextButton(onOpenPreferences,
                                 enabled = local.ready && !local.opening && local.error == null,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("preferences-open")) { Text("普通偏好自述与人工审阅") }

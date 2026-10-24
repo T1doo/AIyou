@@ -71,7 +71,7 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
 
     fun open(source:SourceVersion?=null,section:PreferenceReview=PreferenceReview.PROPOSED) {
         val local=current()
-        if(!available(local) || local.saving || local.savePending || local.sourcePreferences!=null || local.sourceMemories!=null || local.memoryInbox!=null || local.localProcessing!=null || local.recordPackage!=null || local.recycleBin!=null || local.originalEdit!=null || local.originalHistory!=null || local.ai!=null || local.sourceTask!=null || local.sourceTags!=null || local.candidates!=null || local.factRecap!=null || local.originalExport!=null || local.manualTagEditor!=null || local.manualPeopleEditor!=null || local.eventDateEditor!=null)return
+        if(!available(local) || local.saving || local.savePending || local.sourcePreferences!=null || local.sourceFacts!=null || local.sourceMemories!=null || local.memoryInbox!=null || local.localProcessing!=null || local.recordPackage!=null || local.recycleBin!=null || local.originalEdit!=null || local.originalHistory!=null || local.ai!=null || local.sourceTask!=null || local.sourceTags!=null || local.candidates!=null || local.factRecap!=null || local.originalExport!=null || local.manualTagEditor!=null || local.manualPeopleEditor!=null || local.eventDateEditor!=null)return
         val entry=source?.let { s -> local.entries.singleOrNull { it.id==s.sourceId && it.currentRevision.toLong()==s.revision && it.policy!=ProcessingPolicy.AI_NONE } ?: return }
         if(source!=null && !sourceCurrent(source,OriginalExports.hash(checkNotNull(entry).originalText),local))return
         val ui=PreferenceUiState(tokens.incrementAndGet(),source,entry?.let { OriginalExports.hash(it.originalText) },section=section)

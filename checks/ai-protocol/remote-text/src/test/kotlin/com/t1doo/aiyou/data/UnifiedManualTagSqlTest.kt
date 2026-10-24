@@ -14,7 +14,7 @@ class UnifiedManualTagSqlTest {
         assertEquals("52454bc7abc9c2c770f7e9dd58105501d5cefe295208fbdc67d64b64e1de82d6",page.choices.single{it.name=="淡茶"}.id)
         assertEquals(page.choices.size,page.choices.map{it.id}.distinct().size)
         assertEquals(listOf("A","a","é","é","淡茶","\uE000","𠀀"),page.choices.map{it.name})
-        val cold=SqlUnifiedKeywordRepository(h.f.gateway,h.originals,h.audios,h.images,h.preferences,h.memories,h.f.tags,h.people)
+        val cold=SqlUnifiedKeywordRepository(h.f.gateway,h.originals,h.audios,h.images,h.preferences,h.memories,h.facts,h.f.tags,h.people)
         assertEquals(page.choices.map{it.id},cold.tagChoices(null,{}).choices.map{it.id})
         assertThrows(UnifiedKeywordConflict::class.java){runBlocking{cold.selectTag(page,page.choices.first(),{})}}
         val ids=ManualTagValueIds(h.f.key);val other=ManualTagValueIds(ByteArray(32){(it+2).toByte()})
@@ -43,7 +43,7 @@ class UnifiedManualTagSqlTest {
         val tag=select(h,"饮食");val day=UnifiedCaptureRange.parse("1970-01-01","1970-01-01")
         for(scope in UnifiedKeywordScope.entries){val p=h.repo.search("淡茶",scope,day,tag,{})
             assertSame(tag,p.tag);assertEquals(a,p.groups.single().binding.source.sourceId)
-            assertEquals(if(scope==UnifiedKeywordScope.ALL)5 else 1,p.groups.single().items.size)
+            assertEquals(if(scope==UnifiedKeywordScope.ALL)6 else 1,p.groups.single().items.size)
             assertTrue(h.repo.resolve(p,p.groups.single().items.first()){})
         }
         assertTrue(h.repo.search("饮食",UnifiedKeywordScope.ALL,day,tag,{}).groups.isEmpty())
@@ -178,7 +178,7 @@ class UnifiedManualTagSqlTest {
         assertEquals(source.f.tags.read(id).names,target.f.tags.read(id).names)
         val fresh=select(target,"合成标签");assertNotEquals(old.id,fresh.id)
         assertThrows(UnifiedKeywordConflict::class.java){runBlocking{target.repo.search("淡茶",UnifiedKeywordScope.ALL,UnifiedCaptureRange(),old,{})}}
-        assertEquals(5,target.repo.search("淡茶",UnifiedKeywordScope.ALL,UnifiedCaptureRange(),fresh,{}).groups.single().items.size)
+        assertEquals(6,target.repo.search("淡茶",UnifiedKeywordScope.ALL,UnifiedCaptureRange(),fresh,{}).groups.single().items.size)
         assertEquals(12L,target.f.db.read("PRAGMA user_version").single().single())
     }}}
     companion object {

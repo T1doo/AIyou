@@ -15,7 +15,7 @@ class UnifiedManualPersonSqlTest {
         assertEquals("a77a4e03c8795ec65fac51a312011214b93ca90f59c8c93155c4f3ad138749b7",page.choices.single{it.name=="淡茶"}.id)
         assertEquals(page.choices.size,page.choices.map{it.id}.distinct().size)
         assertEquals(listOf("A","a","é","é","淡茶","\uE000","𠀀"),page.choices.map{it.name})
-        val cold=SqlUnifiedKeywordRepository(h.f.gateway,h.originals,h.audios,h.images,h.preferences,h.memories,h.f.tags,h.people)
+        val cold=SqlUnifiedKeywordRepository(h.f.gateway,h.originals,h.audios,h.images,h.preferences,h.memories,h.facts,h.f.tags,h.people)
         assertEquals(page.choices.map{it.id},cold.personChoices(null,{}).choices.map{it.id})
         assertThrows(UnifiedKeywordConflict::class.java){runBlocking{cold.selectPerson(page,page.choices.first(),{})}}
         val ids=ManualPersonValueIds(h.f.key);val other=ManualPersonValueIds(ByteArray(32){(it+2).toByte()})
@@ -44,7 +44,7 @@ class UnifiedManualPersonSqlTest {
         val tag=select(h,"饮食");val day=UnifiedCaptureRange.parse("1970-01-01","1970-01-01")
         for(scope in UnifiedKeywordScope.entries){val p=search(h,"淡茶",scope,day,tag,{})
             assertSame(tag,p.person);assertEquals(a,p.groups.single().binding.source.sourceId)
-            assertEquals(if(scope==UnifiedKeywordScope.ALL)5 else 1,p.groups.single().items.size)
+            assertEquals(if(scope==UnifiedKeywordScope.ALL)6 else 1,p.groups.single().items.size)
             assertTrue(h.repo.resolve(p,p.groups.single().items.first()){})
         }
         assertTrue(search(h,"饮食",UnifiedKeywordScope.ALL,day,tag,{}).groups.isEmpty())
@@ -184,7 +184,7 @@ class UnifiedManualPersonSqlTest {
         assertEquals(source.people.read(id).names,target.people.read(id).names)
         val fresh=select(target,"合成标签");assertNotEquals(old.id,fresh.id)
         assertThrows(UnifiedKeywordConflict::class.java){runBlocking{search(target,"淡茶",UnifiedKeywordScope.ALL,UnifiedCaptureRange(),old,{})}}
-        assertEquals(5,search(target,"淡茶",UnifiedKeywordScope.ALL,UnifiedCaptureRange(),fresh,{}).groups.single().items.size)
+        assertEquals(6,search(target,"淡茶",UnifiedKeywordScope.ALL,UnifiedCaptureRange(),fresh,{}).groups.single().items.size)
         assertEquals(12L,target.f.db.read("PRAGMA user_version").single().single())
     }}}
     @Test fun fiveTypesIntersectKeywordDateTagAndManualNameWithoutInferringIdentity():Unit=runBlocking{UnifiedKeywordFixture(withPeople=true).use{h->
@@ -196,7 +196,7 @@ class UnifiedManualPersonSqlTest {
         val person=select(h,"合成甲");val tag=UnifiedManualTagSqlTest.select(h,"饮食");val day=UnifiedCaptureRange.parse("1970-01-01","1970-01-01")
         for(scope in UnifiedKeywordScope.entries){val p=h.repo.search("淡茶",scope,day,tag,person,{})
             assertSame(tag,p.tag);assertSame(person,p.person);assertEquals(a,p.groups.single().binding.source.sourceId)
-            assertEquals(if(scope==UnifiedKeywordScope.ALL)5 else 1,p.groups.single().items.size);assertTrue(h.repo.resolve(p,p.groups.single().items.first()){})
+            assertEquals(if(scope==UnifiedKeywordScope.ALL)6 else 1,p.groups.single().items.size);assertTrue(h.repo.resolve(p,p.groups.single().items.first()){})
         }
         assertTrue(h.repo.search("合成甲",UnifiedKeywordScope.ALL,day,tag,person,{}).groups.isEmpty())
         assertTrue(h.repo.search("饮食",UnifiedKeywordScope.ALL,day,tag,person,{}).groups.isEmpty())

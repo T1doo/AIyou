@@ -16,7 +16,7 @@ class UnifiedCaptureDateSqlTest {
         val utc=entry(h,instant,"UTC");all(h,utc)
         val found=h.repo.search("淡茶",UnifiedKeywordScope.ALL,day,{})
         assertEquals(day,found.captureRange);assertEquals(listOf(sh),found.groups.map{it.binding.source.sourceId})
-        assertEquals(setOf("O:","A:","I:","P:","M:"),found.groups.single().items.map{it.key.take(2)}.toSet())
+        assertEquals(setOf("O:","A:","I:","P:","M:","F:"),found.groups.single().items.map{it.key.take(2)}.toSet())
         assertTrue(found.groups.single().items.all{it.binding.captured==instant&&it.binding.zone=="Asia/Shanghai"})
         var admitted=false;assertTrue(h.repo.resolve(found,found.groups.single().items.first()){admitted=true});assertTrue(admitted)
         assertEquals(2,h.repo.search("淡茶",UnifiedKeywordScope.ALL).groups.size)
@@ -80,6 +80,6 @@ class UnifiedCaptureDateSqlTest {
         internal fun entry(h:UnifiedKeywordFixture,at:Long,zone:String,text:String="我偏好淡茶🙂"):String {
             val id=h.f.entry(text=text);h.f.db.write("UPDATE entries SET capturedAtMillis=?,captureTimeZone=? WHERE id=?",at,zone,id);return id
         }
-        internal suspend fun all(h:UnifiedKeywordFixture,id:String){h.audio(id);h.image(id);h.preference(id);AcceptedMemoryKeywordSqlTest.memory(h,id,"合成淡茶备注")}
+        internal suspend fun all(h:UnifiedKeywordFixture,id:String){h.audio(id);h.image(id);h.preference(id);h.fact(id);AcceptedMemoryKeywordSqlTest.memory(h,id,"合成淡茶备注")}
     }
 }

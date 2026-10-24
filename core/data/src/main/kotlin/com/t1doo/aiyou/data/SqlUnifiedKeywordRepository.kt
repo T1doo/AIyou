@@ -16,7 +16,7 @@ internal class KeywordSet<T>(items:List<T>,sources:List<SourceVersion>,
 internal class SqlUnifiedKeywordRepository(private val database:RecordsSqlDatabase,
     private val originals:SqlLocalSearchRepository,private val audio:SqlAudioTranscriptRepository,
     private val images:SqlImageTextRepository,private val preferences:SqlSourcePreferenceRepository,
-    private val memories:SqlSourceMemoryRepository,tagStorage:SqlManualTagRepository,peopleStorage:SqlManualPeopleRepository,media:AttachmentStore?=null):UnifiedKeywordRepository {
+    private val memories:SqlSourceMemoryRepository,private val facts:SqlSourceFactRepository,tagStorage:SqlManualTagRepository,peopleStorage:SqlManualPeopleRepository,media:AttachmentStore?=null):UnifiedKeywordRepository {
     private val readyImages=UnifiedReadyImages(database,media)
     private val favorites=UnifiedFavorites(SqlRecordFavoriteRepository(database))
     private val tags=UnifiedManualTags(database,tagStorage)
@@ -30,7 +30,7 @@ internal class SqlUnifiedKeywordRepository(private val database:RecordsSqlDataba
     private inner class Proof(override val keyword:String,override val scope:UnifiedKeywordScope,override val captureRange:UnifiedCaptureRange,
         override val tag:UnifiedTagSelection?,override val person:UnifiedPersonSelection?,override val onlyFavorites:Boolean,override val onlyReadyImages:Boolean,val imageReceipt:UnifiedReadyImages.Receipt?,val favoriteReceipt:UnifiedFavorites.Receipt?,val original:LocalSearchSnapshot?,val audioSet:KeywordSet<AudioTranscriptSnapshot>?,
         val imageSet:KeywordSet<ImageTextSnapshot>?,val preferenceSet:KeywordSet<SourcePreferenceSnapshot>?,
-        val memorySet:KeywordSet<AcceptedMemoryKeywordHit>?,
+        val memorySet:KeywordSet<AcceptedMemoryKeywordHit>?,val factSet:KeywordSet<SourceFactSnapshot>?,
         bindings:List<UnifiedKeywordBinding>,groups:List<UnifiedKeywordGroup>):UnifiedKeywordSnapshot {
         val owner=this@SqlUnifiedKeywordRepository
         override val bindings=java.util.Collections.unmodifiableList(bindings.toList())
@@ -71,6 +71,7 @@ internal class SqlUnifiedKeywordRepository(private val database:RecordsSqlDataba
         val a=if(selected(scope,UnifiedKeywordScope.AUDIO))audio.keywordSet(keyword)else null
         val i=if(selected(scope,UnifiedKeywordScope.IMAGE))images.keywordSet(keyword)else null
         val p=if(selected(scope,UnifiedKeywordScope.PREFERENCE))preferences.keywordSet(keyword)else null
+        val f=if(selected(scope,UnifiedKeywordScope.FACT))facts.keywordSet(keyword,checkCurrent)else null
         checkCurrent()
         val sourceMatch:((RecordsSqlConnection,SourceVersion)->Boolean)?=if(tag==null&&person==null&&!onlyFavorites&&!onlyReadyImages)null else {sql,source->
             // Evaluate both: an outside-tag row must not skip person/alias authentication.
@@ -83,12 +84,12 @@ internal class SqlUnifiedKeywordRepository(private val database:RecordsSqlDataba
         val m=if(selected(scope,UnifiedKeywordScope.ACCEPTED_MEMORY))memories.keywordSet(keyword,captureRange,checkCurrent,sourceMatch)else null
         return database.transaction { sql ->
             checkCurrent()
-            if(o!=null&&!originals.keywordCurrentWithin(sql,o,checkCurrent)||a?.current(sql,checkCurrent)==false||i?.current(sql,checkCurrent)==false||p?.current(sql,checkCurrent)==false||m?.current(sql,checkCurrent)==false)throw UnifiedKeywordConflict()
+            if(o!=null&&!originals.keywordCurrentWithin(sql,o,checkCurrent)||a?.current(sql,checkCurrent)==false||i?.current(sql,checkCurrent)==false||p?.current(sql,checkCurrent)==false||m?.current(sql,checkCurrent)==false||f?.current(sql,checkCurrent)==false)throw UnifiedKeywordConflict()
             if(tag!=null)tags.validate(sql,tag,checkCurrent)
             if(person!=null)people.validate(sql,person,checkCurrent)
             names.third?.let{favorites.validate(sql,it,checkCurrent)}
             imageReceipt?.let{readyImages.validate(sql,it,checkCurrent)}
-            val sources=(o?.entries.orEmpty().map{SourceVersion(it.id,it.currentRevision.toLong())}+a?.sources.orEmpty()+i?.sources.orEmpty()+p?.sources.orEmpty()+m?.sources.orEmpty()).distinct()
+            val sources=(o?.entries.orEmpty().map{SourceVersion(it.id,it.currentRevision.toLong())}+a?.sources.orEmpty()+i?.sources.orEmpty()+p?.sources.orEmpty()+m?.sources.orEmpty()+f?.sources.orEmpty()).distinct()
             val bindings=sources.map{binding(sql,it)}
             val bySource=bindings.associateBy{it.source}
             fun bound(source:SourceVersion)=checkNotNull(bySource[source])
@@ -97,11 +98,12 @@ internal class SqlUnifiedKeywordRepository(private val database:RecordsSqlDataba
             a?.items?.forEach{evidence+=UnifiedKeywordEvidence.Audio(bound(it.anchor.source),it)}
             i?.items?.forEach{evidence+=UnifiedKeywordEvidence.Image(bound(it.anchor.source),it)}
             p?.items?.forEach{evidence+=UnifiedKeywordEvidence.Preference(bound(it.source),it)}
+            f?.items?.forEach{checkCurrent();evidence+=UnifiedKeywordEvidence.Fact(bound(it.source),it)}
             m?.items?.forEach{require(it.binding==bound(it.binding.source));evidence+=UnifiedKeywordEvidence.AcceptedMemory(it)}
             require(evidence.map{it.key}.distinct().size==evidence.size)
             val groups=evidence.filter{captureRange.contains(it.binding.captured,it.binding.zone)&&(tag==null||tags.matches(sql,it.binding.source,tag))&&(person==null||people.matches(sql,it.binding.source,person))&&(!onlyFavorites||favorites.matches(sql,it.binding.source))&&(!onlyReadyImages||readyImages.matches(sql,it.binding.source))}.groupBy{it.binding}.map{(b,rows)->UnifiedKeywordGroup(b,rows.sortedBy{it.key})}
                 .sortedWith(compareByDescending<UnifiedKeywordGroup>{it.binding.captured}.thenBy{it.binding.source.sourceId})
-            checkCurrent();Proof(keyword,scope,captureRange,tag,person,onlyFavorites,onlyReadyImages,imageReceipt,names.third,o,a,i,p,m,bindings,groups)
+            checkCurrent();Proof(keyword,scope,captureRange,tag,person,onlyFavorites,onlyReadyImages,imageReceipt,names.third,o,a,i,p,m,f,bindings,groups)
         }
     }
     override suspend fun resolve(snapshot:UnifiedKeywordSnapshot,item:UnifiedKeywordEvidence?,admit:()->Unit)=resolve(snapshot,item,{},admit)
@@ -119,7 +121,7 @@ internal class SqlUnifiedKeywordRepository(private val database:RecordsSqlDataba
             p.imageReceipt?.let{readyImages.validate(sql,it,checkCurrent)}
             if(p.original!=null&&!originals.keywordCurrentWithin(sql,p.original,checkCurrent)||p.audioSet?.current?.invoke(sql)==false||
                 p.imageSet?.current?.invoke(sql)==false||p.preferenceSet?.current?.invoke(sql)==false||
-                p.memorySet?.current(sql,checkCurrent)==false||
+                p.memorySet?.current(sql,checkCurrent)==false||p.factSet?.current(sql,checkCurrent)==false||
                 p.bindings.any{binding(sql,it.source)!=it})false
             else {checkCurrent();admit();true} // No old UI guard after the private admission.
         }

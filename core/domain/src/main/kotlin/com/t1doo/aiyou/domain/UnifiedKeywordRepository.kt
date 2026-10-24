@@ -31,7 +31,7 @@ enum class UnifiedCaptureRangeProblem { FROM, THROUGH, ORDER }
 class UnifiedCaptureRangeInvalid(val problem:UnifiedCaptureRangeProblem):IllegalArgumentException("Invalid capture date range")
 class UnifiedCaptureRangeUnsupported:IllegalStateException("Capture date range is unavailable")
 
-enum class UnifiedKeywordScope { ALL, ORIGINAL, AUDIO, IMAGE, PREFERENCE, ACCEPTED_MEMORY }
+enum class UnifiedKeywordScope { ALL, ORIGINAL, AUDIO, IMAGE, PREFERENCE, ACCEPTED_MEMORY, FACT }
 data class UnifiedKeywordBinding(val source:SourceVersion,val hash:String,val generation:Long,
     val captured:Long,val zone:String,val policy:ProcessingPolicy) {
     override fun toString()="UnifiedKeywordBinding(redacted)"
@@ -42,6 +42,7 @@ sealed class UnifiedKeywordEvidence(val binding:UnifiedKeywordBinding) {
     class Audio(binding:UnifiedKeywordBinding,val value:AudioTranscriptSnapshot):UnifiedKeywordEvidence(binding) {override val key="A:${value.id}"}
     class Image(binding:UnifiedKeywordBinding,val value:ImageTextSnapshot):UnifiedKeywordEvidence(binding) {override val key="I:${value.id}"}
     class Preference(binding:UnifiedKeywordBinding,val value:SourcePreferenceSnapshot):UnifiedKeywordEvidence(binding) {override val key="P:${value.id}"}
+    class Fact(binding:UnifiedKeywordBinding,val value:SourceFactSnapshot):UnifiedKeywordEvidence(binding) {override val key="F:${value.id}"}
     class AcceptedMemory(val value:AcceptedMemoryKeywordHit):UnifiedKeywordEvidence(value.binding) {override val key="M:${value.id}"}
     override fun toString()="UnifiedKeywordEvidence(redacted)"
 }

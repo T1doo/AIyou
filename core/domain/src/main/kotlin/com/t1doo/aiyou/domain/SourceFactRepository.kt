@@ -20,18 +20,18 @@ interface FactSourcePage {
     val topics: List<SourceFactSnapshot>
 }
 interface SourceFactRepository {
-    fun preview(source: SourceVersion): SourceMemoryPreview
-    fun facts(source: SourceVersion): List<SourceFactSnapshot>
-    fun captureSource(source: SourceVersion): FactSourcePage
-    fun resolveSource(page: FactSourcePage, publish: () -> Unit): Boolean
-    fun acceptedForTopic(expected: SourceFactSnapshot): SourceFactSnapshot?
-    fun resolveEndpoint(expected: SourceFactSnapshot, endpoint: FactEndpoint, publish: (SourceFactSnapshot?) -> Unit): Boolean
-    fun create(request: FactCreate): SourceFactSnapshot
-    fun mutate(request: FactMutation): SourceFactSnapshot
-    fun capture(section: FactReview, cursor: FactCursor? = null): FactPage
-    fun searchAccepted(keyword: String, cursor: FactCursor? = null): FactPage
+    fun preview(source: SourceVersion, checkCurrent: () -> Unit = {}): SourceMemoryPreview
+    fun facts(source: SourceVersion, checkCurrent: () -> Unit = {}): List<SourceFactSnapshot>
+    fun captureSource(source: SourceVersion, checkCurrent: () -> Unit = {}): FactSourcePage
+    fun resolveSource(page: FactSourcePage, checkCurrent: () -> Unit = {}, publish: () -> Unit): Boolean
+    fun acceptedForTopic(expected: SourceFactSnapshot, checkCurrent: () -> Unit = {}): SourceFactSnapshot?
+    fun resolveEndpoint(expected: SourceFactSnapshot, endpoint: FactEndpoint, checkCurrent: () -> Unit = {}, publish: (SourceFactSnapshot?) -> Unit): Boolean
+    fun create(request: FactCreate, checkCurrent: () -> Unit = {}): SourceFactSnapshot
+    fun mutate(request: FactMutation, checkCurrent: () -> Unit = {}): SourceFactSnapshot
+    fun capture(section: FactReview, cursor: FactCursor? = null, checkCurrent: () -> Unit = {}): FactPage
+    fun searchAccepted(keyword: String, cursor: FactCursor? = null, checkCurrent: () -> Unit = {}): FactPage
     /** Reauthenticate the same bounded page before publishing or opening a source. */
-    fun resolve(page: FactPage, item: SourceFactSnapshot? = null, publish: () -> Unit): Boolean
+    fun resolve(page: FactPage, item: SourceFactSnapshot? = null, checkCurrent: () -> Unit = {}, publish: () -> Unit): Boolean
 }
 class FactConflict : IllegalStateException("Fact or source changed")
 class FactUnavailable : IllegalStateException("Fact storage unavailable")

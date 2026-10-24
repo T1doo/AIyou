@@ -4,6 +4,7 @@ import com.t1doo.aiyou.records.currentTranscriptSource
 import com.t1doo.aiyou.records.canShowTranscriptEditor
 import com.t1doo.aiyou.records.currentImageTextSource
 import com.t1doo.aiyou.records.canRetainImageTexts
+import com.t1doo.aiyou.records.canRetainFactSources
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -198,7 +199,7 @@ class MainActivity : ComponentActivity() {
                 favorites = records.favorites, eventDates = records.eventDates,
                 candidates = records.candidates,
                 sourceTags = records.sourceTags, people = records.people, modelConnections = records.modelConnections,
-                sourceMemories = records.sourceMemories, memoryInbox = records.memoryInbox, sourcePreferences = records.sourcePreferences, audioTranscripts=records.audioTranscripts, imageTexts=records.imageTexts, unifiedKeywords=records.unifiedKeywords,
+                sourceMemories = records.sourceMemories, memoryInbox = records.memoryInbox, sourcePreferences = records.sourcePreferences, sourceFacts=records.sourceFacts, audioTranscripts=records.audioTranscripts, imageTexts=records.imageTexts, unifiedKeywords=records.unifiedKeywords,
                 sourceTasks = records.sourceTasks,
                 taskProposals = records.taskProposals,
                 reminders = records.reminders,
@@ -216,7 +217,7 @@ class MainActivity : ComponentActivity() {
                     accessIdle && access.retirementReady(id)) })
     }
     override fun onResume() { super.onResume(); packageRecords?.audioForeground(true);packagePicker?.resumed() }
-    override fun onPause() { packageRecords?.unifiedKeywords?.retire(); packageRecords?.audioForeground(false);packageRecords?.state?.value?.sourcePreferences?.let { packageRecords?.sourcePreferences?.close(it.session) };packageRecords?.state?.value?.memoryInbox?.let { packageRecords?.memoryInbox?.close(it.session) }; packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); packageRecords?.audioTranscripts?.retire();packageRecords?.state?.value?.imageTexts?.let{packageRecords?.imageTexts?.close(it.session)}; super.onPause() }
+    override fun onPause() { packageRecords?.unifiedKeywords?.retire(); packageRecords?.sourceFacts?.retire(); packageRecords?.audioForeground(false);packageRecords?.state?.value?.sourcePreferences?.let { packageRecords?.sourcePreferences?.close(it.session) };packageRecords?.state?.value?.memoryInbox?.let { packageRecords?.memoryInbox?.close(it.session) }; packageRecords?.factRecaps?.cancel(); packagePicker?.paused(); packageRecords?.audioTranscripts?.retire();packageRecords?.state?.value?.imageTexts?.let{packageRecords?.imageTexts?.close(it.session)}; super.onPause() }
     override fun onSaveInstanceState(outState: Bundle) { packagePicker?.save(outState); super.onSaveInstanceState(outState) }
     override fun onDestroy() {
         reminderClicks.clear()
@@ -284,6 +285,7 @@ fun AIyouApp(
     factRecaps: com.t1doo.aiyou.records.FactRecapController? = null,
     audioTranscripts: com.t1doo.aiyou.records.AudioTranscriptController?=null,
     sourcePreferences: com.t1doo.aiyou.records.SourcePreferenceController? = null,
+    sourceFacts: com.t1doo.aiyou.records.SourceFactController? = null,
     memoryInbox: com.t1doo.aiyou.records.SourceMemoryInboxController? = null,
     display: UiPreferencesState = UiPreferencesState(),
     onDisplayChange: (UiPreferences) -> Unit = {},
@@ -387,6 +389,7 @@ fun AIyouApp(
     // This bit only makes a restored private source route fail closed; no source proof enters Bundle.
     var inboxSourceRoute by rememberSaveable { mutableStateOf(false) }
     var unifiedSourceRoute by remember { mutableStateOf(false) }
+    DisposableEffect(sourceFacts) { onDispose { sourceFacts?.retire() } }
     DisposableEffect(sourcePreferences) { onDispose { currentRecords?.invoke()?.sourcePreferences?.let { sourcePreferences?.close(it.session) } } }
     DisposableEffect(memoryInbox) { onDispose { currentRecords?.invoke()?.memoryInbox?.let { memoryInbox?.close(it.session) } } }
     DisposableEffect(factRecaps) { onDispose { factRecaps?.close() } }
@@ -455,7 +458,7 @@ fun AIyouApp(
     fun questionBinding():com.t1doo.aiyou.records.QuestionSearchBinding? {
         val source=searchSource()?:return null
         val allowed=searchRouteAvailable(source)&&source.localSearch!=null&&!source.saving&&!source.savePending&&
-            source.audioTranscripts==null&&source.imageTexts==null&&source.sourcePreferences==null&&source.sourceMemories==null&&source.memoryInbox==null&&
+            source.audioTranscripts==null&&source.imageTexts==null&&source.sourcePreferences==null&&source.sourceFacts==null&&source.sourceMemories==null&&source.memoryInbox==null&&
             source.localProcessing==null&&source.ai==null&&source.sourceTags==null&&source.candidates==null&&source.sourceTask==null&&
             source.manualTagEditor==null&&source.manualPeopleEditor==null&&source.eventDateEditor==null
         return if(allowed&&search.acceptsInput())com.t1doo.aiyou.records.QuestionSearchBinding(navigation.generation,source,searchInput(source))else null
@@ -544,6 +547,7 @@ fun AIyouApp(
             audioSourceAnchor=null;audioSourceReference=null;imageSourceAnchor=null
             (currentRecordsProvider?.invoke() ?: currentLocal)?.imageTexts?.let{imageTexts?.close(it.session)}
             (currentRecordsProvider?.invoke() ?: currentLocal)?.sourcePreferences?.let { sourcePreferences?.close(it.session) }
+            sourceFacts?.retire()
             (currentRecordsProvider?.invoke() ?: currentLocal)?.sourceMemories?.let { sourceMemories?.close(it.session) }
             detailEntryId = null; inboxSourceRoute = false
             unifiedSourceRoute=false;unifiedKeywords?.retire()
@@ -791,6 +795,33 @@ fun AIyouApp(
                 if(ownsNavigation()&&!showSettings&&!demo&&currentLocal?.currentImageTextSource(anchor)==true){
                     navigation.advance();search.pause();readerFromSearch=false;tailReturnRequest=null;searchLocation=null
                     audioSourceAnchor=null;audioSourceReference=null;imageSourceAnchor=anchor;inboxSourceRoute=true;detailEntryId=intent.entryId;attachments?.openImage(intent)
+                }
+            }
+        }
+    }
+    val factUi = local?.sourceFacts
+    // The editor owns its authenticated source, not a query or attachment panel. Retiring
+    // those proofs after an admitted write must not dispose the pending editor.
+    val factRoute = !demo && !showSettings && !recapRoute && !browsingPackage && !browsingRecycle &&
+        factUi?.let { ui -> local?.canRetainFactSources(ui)==true &&
+            (if(ui.source==null) !reading && selected==Destination.MEMORIES
+             else reading && detailEntryId==ui.source.sourceId) }==true
+    LaunchedEffect(factRoute,factUi?.session) { if(!factRoute)factUi?.let { sourceFacts?.close(it.session) } }
+    if(factUi!=null && sourceFacts!=null && factRoute) {
+        fun ownsFact()=ownsNavigation() && !showSettings && !demo && !recapRoute &&
+            currentLocal?.sourceFacts?.let { it.session==factUi.session && it.owner===factUi.owner && currentLocal?.canRetainFactSources(it)==true }==true &&
+            (if(factUi.source==null) detailEntryId==null && selectedName==Destination.MEMORIES.name else detailEntryId==factUi.source.sourceId)
+        com.t1doo.aiyou.records.SourceFactDialog(factUi,sourceFacts,::ownsFact) { location,confirm ->
+            // SQL/file work is complete. The lock order is navigation -> fact lifecycle.
+            navigation.publish(generation) {
+                val latest=currentRecordsProvider?.invoke() ?: currentLocal
+                val entry=latest?.entries?.singleOrNull { it.id==location.entryId && it.currentRevision==location.revision }
+                if(ownsFact() && latest?.sourceFactOwner===factUi.owner && entry!=null &&
+                    entry.policy!=com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE &&
+                    com.t1doo.aiyou.model.OriginalExports.hash(entry.originalText)==location.contentHash) confirm {
+                    navigation.advance();search.pause();readerFromSearch=false;tailReturnRequest=null
+                    audioSourceAnchor=null;audioSourceReference=null;imageSourceAnchor=null
+                    searchLocation=location;unifiedSourceRoute=false;inboxSourceRoute=true;detailEntryId=location.entryId
                 }
             }
         }
@@ -1215,7 +1246,7 @@ fun AIyouApp(
                 eventDateController = eventDates, canUseEventDate = canCopy,
                 candidateController = candidates,
                 sourceTagController = sourceTags,
-                sourcePreferenceController = sourcePreferences,
+                sourcePreferenceController = sourcePreferences, sourceFactController=sourceFacts,
                 sourceMemoryController = sourceMemories,
                 localProcessingController = localProcessing,
                 sourceTaskController = sourceTasks,
@@ -1317,6 +1348,8 @@ fun AIyouApp(
                 onOpenUnified=unifiedKeywords?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
                 onOpenImageTexts=imageTexts?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
                 onOpenTranscripts=audioTranscripts?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
+                onOpenFacts = sourceFacts?.let { controller -> { if(ownsNavigation() && selected==Destination.MEMORIES &&
+                    !reading && !showSettings && !demo) { navigation.advance();clearSearch();controller.open() } } },
                 onOpenPreferences = sourcePreferences?.let { controller -> { if (ownsNavigation() && selected == Destination.MEMORIES &&
                     !reading && !showSettings && !demo) { navigation.advance(); clearSearch(); controller.open() } } },
                 onOpenMemoryInbox = memoryInbox?.let { controller -> { if (ownsNavigation() && selected == Destination.MEMORIES &&

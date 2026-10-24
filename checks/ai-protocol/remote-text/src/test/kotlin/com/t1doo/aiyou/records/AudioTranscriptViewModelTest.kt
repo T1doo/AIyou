@@ -270,9 +270,10 @@ class AudioTranscriptViewModelTest {
         private val images=if(unified)SqlImageTextRepository(f.gateway,f.key,f.media)else null
         private val preferences=if(unified)SqlSourcePreferenceRepository(f.gateway,f.key)else null
         private val memories=if(unified)SqlSourceMemoryRepository(f.gateway,f.key)else null
+        private val facts=if(unified)SqlSourceFactRepository(f.gateway,f.key)else null
         private val people=if(unified)SqlManualPeopleRepository(f.gateway,f.key)else null
-        private val combined=if(unified)SqlUnifiedKeywordRepository(f.gateway,SqlLocalSearchRepository(f.gateway,f.tags),repo,images!!,preferences!!,memories!!,f.tags,people!!,f.media)else null
-        private val base=SqliteVmEntryRepository(f.db,f.gateway,RemoteTextTransactions(f.gateway)){f.media.close();f.media.awaitIdle();f.gateway.stopAndAwaitIdle();repo.wipeKey();images?.wipeKey();preferences?.wipeKey();memories?.wipeKey();people?.wipeKey()}
+        private val combined=if(unified)SqlUnifiedKeywordRepository(f.gateway,SqlLocalSearchRepository(f.gateway,f.tags),repo,images!!,preferences!!,memories!!,facts!!,f.tags,people!!,f.media)else null
+        private val base=SqliteVmEntryRepository(f.db,f.gateway,RemoteTextTransactions(f.gateway)){f.media.close();f.media.awaitIdle();f.gateway.stopAndAwaitIdle();repo.wipeKey();images?.wipeKey();preferences?.wipeKey();memories?.wipeKey();facts?.wipeKey();people?.wipeKey()}
         val owner:EntryRepository=object:EntryRepository by base,AutoCloseable{
             override val unifiedKeywords=combined
             override val audioTranscripts=port;override val attachments=f.media;override val captureRecords=f.capture;override val localProcessing=SqlLocalProcessingRepository(f.gateway)
