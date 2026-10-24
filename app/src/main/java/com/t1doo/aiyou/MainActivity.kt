@@ -527,11 +527,12 @@ fun AIyouApp(
     val browsingPackage = packageUi != null && (selected == Destination.MEMORIES || settingsPackageRoute) && detailEntryId == null && !showSettings && !demo
     val recycleUi = local?.recycleBin
     val browsingRecycle = recycleUi?.browsing == true && selected == Destination.MEMORIES && detailEntryId == null && !showSettings && !demo
+    val observedAttachmentPanel = attachments?.state?.collectAsState()?.value
     var audioSourceReference by remember { mutableStateOf<com.t1doo.aiyou.domain.AudioTranscriptPlaybackReference?>(null) }
     var audioSourceAnchor by remember { mutableStateOf<com.t1doo.aiyou.model.AudioTranscriptSource?>(null) }
     var imageSourceAnchor by remember { mutableStateOf<com.t1doo.aiyou.model.ImageTextSource?>(null) }
     val lostImageSource=imageSourceAnchor?.let{local?.currentImageTextSource(it)!=true}==true
-    val lostAudioSource=audioSourceAnchor?.let{local?.currentTranscriptSource(it)!=true}==true || attachments?.state?.value?.let{it.transcriptSource&&(audioSourceReference==null||it.transcriptReference!==audioSourceReference)}==true
+    val lostAudioSource=audioSourceAnchor?.let{local?.currentTranscriptSource(it)!=true}==true || observedAttachmentPanel?.let{it.transcriptSource&&(audioSourceReference==null||it.transcriptReference!==audioSourceReference)}==true
     val lostInboxSource = inboxSourceRoute && detailEntryId != null && (searchLocation == null && audioSourceAnchor==null && imageSourceAnchor==null || lostAudioSource || lostImageSource)
     LaunchedEffect(inboxSourceRoute,detailEntryId){if(!inboxSourceRoute||detailEntryId!=audioSourceAnchor?.intent?.entryId){audioSourceAnchor=null;audioSourceReference=null}}
     LaunchedEffect(inboxSourceRoute,detailEntryId){if(!inboxSourceRoute||detailEntryId!=imageSourceAnchor?.intent?.entryId)imageSourceAnchor=null}
@@ -634,7 +635,6 @@ fun AIyouApp(
     val imeVisible = imeBottomPx > 0
     val origin = selected
     val readerId = detailEntryId
-    val observedAttachmentPanel = attachments?.state?.collectAsState()?.value
     val attachmentPanel = observedAttachmentPanel?.takeIf{panel->reading&&panel.entryId==detailEntryId&&
         ( !panel.transcriptSource || audioSourceReference!=null&&panel.transcriptReference===audioSourceReference)&&
         (panel.focusAudio==null || audioSourceAnchor?.let{anchor->anchor.intent==panel.focusAudio&&local?.currentTranscriptSource(anchor)==true}==true)&&
