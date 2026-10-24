@@ -109,7 +109,7 @@ class FactRecapPresentationTest {
         val text=compose.onNodeWithTag("original-text").fetchSemanticsNode().config[SemanticsProperties.Text].single().text
         assertEquals(f.records[5].originalText,text);assertTrue(text.endsWith("合成全文尾部5"))
         val snapshot=f.local.value.factRecap!!.snapshot
-        compose.onNodeWithTag("original-manual-tags").performScrollTo().performClick();drain()
+        compose.originalTool("original-manual-tags").performScrollTo().performClick();drain()
         compose.onNodeWithTag("manual-tag-close").performScrollTo().performClick();drain()
         compose.runOnIdle {assertSame(snapshot,f.local.value.factRecap!!.snapshot)}
         compose.onNodeWithText("返回回顾").performClick();drain()

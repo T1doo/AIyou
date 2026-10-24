@@ -115,7 +115,7 @@ class UnifiedKeywordPresentationTest {
         compose.onNodeWithTag("original-text").assertTextEquals(item.entry.originalText)
         compose.runOnIdle{assertEquals(0,f.writes)}
     }
-    private fun click(tag:String){compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick();compose.waitForIdle()}
+    private fun click(tag:String){ compose.showOriginalToolsFor(tag);compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick();compose.waitForIdle()}
     private fun keyboardEnter(node:SemanticsNodeInteraction){
         val view=(node.fetchSemanticsNode().root as ViewRootForTest).view
         compose.runOnIdle{assertTrue(view.isAttachedToWindow);assertTrue(view.requestFocusFromTouch())};compose.waitForIdle()

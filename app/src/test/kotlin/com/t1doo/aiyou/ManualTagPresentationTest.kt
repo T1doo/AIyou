@@ -113,7 +113,7 @@ class ManualTagPresentationTest {
         compose.runOnIdle { found.open(found.state.hits.single()) }; compose.waitForIdle()
         assertEquals(state.value.entries.first().originalText, compose.onNodeWithTag("original-text").fetchSemanticsNode().config[SemanticsProperties.Text].single().text)
         // A genuine repository read creates fresh snapshot identities even without a mutation.
-        compose.onNodeWithTag("original-manual-tags").performClick(); pump()
+        compose.originalTool("original-manual-tags").performClick(); pump()
         compose.onNodeWithTag("manual-tag-close").performScrollTo().performClick()
         compose.runOnIdle { navigation.get().returnToList() }
         result { it.stage == OriginalSearchStage.READY && it.input.tag == TAG }
@@ -196,7 +196,7 @@ class ManualTagPresentationTest {
         }
     }
     private fun pump() { compose.runOnIdle { runBlocking { queued.removeFirst()(store) } }; compose.waitForIdle() }
-    private fun openTags() { compose.runOnIdle { navigation.get().openEntry("one") }; compose.waitForIdle(); compose.onNodeWithTag("original-manual-tags").performClick(); pump() }
+    private fun openTags() { compose.runOnIdle { navigation.get().openEntry("one") }; compose.waitForIdle(); compose.originalTool("original-manual-tags").performClick(); pump() }
     private fun chooseTag() {
         compose.onNodeWithTag("original-search-tag").performScrollTo().performClick(); compose.waitForIdle()
         val index = persisted.values.flatMap { it.names }.distinct().sorted().indexOf(TAG)

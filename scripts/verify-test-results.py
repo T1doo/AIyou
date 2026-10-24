@@ -405,6 +405,12 @@ for label, folder, minimum in targets:
             "uncertainPreferenceWriteKeepsActualProtectedTreeAbsentUntilExplicitReadAndNewVerification")
         additional["com.t1doo.aiyou.AppAccessStartupPresentationTest"] = (
             "productionLockedStartupAndRecreationNeverOpenRecordsOrExposeTheirSurface",)
+        additional["com.t1doo.aiyou.OriginalReadingPriorityPresentationTest"] = (
+            "normalReaderPrioritizesOriginalAndAttachmentsBeforeDisclosedTools",
+            "narrowDoubleFontReaderKeepsFirstLineAndPrimaryActionsBeforeScrolling",
+            "shortLandscapeReaderKeepsFirstLineAndPrimaryActionsBeforeScrolling",
+            "toolsRetireAcrossCloseReopenEntryOwnerFailureAndObservedAba",
+            "toolsPreserveExactHighlightSelectionAndScrollWhileChangedSourceFailsClosed")
         additional["com.t1doo.aiyou.LocalOriginalSearchPresentationTest"] = (
             "searchCardsHighlightVerifiedOriginalUnicodeKeepOrderAndClearWithoutTouchingSource",
             "searchCardFirstHitIsVisibleAtDoubleFontAndRevisionDeletionRetireItsHighlightAndAction",

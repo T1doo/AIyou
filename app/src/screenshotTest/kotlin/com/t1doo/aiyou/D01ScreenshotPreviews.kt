@@ -187,8 +187,13 @@ private val readingLocal = restoredLocal.copy(entries = listOf(longOriginal))
 fun LocalLongListRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES, local = readingLocal) } }
 
 @PreviewTest @LocalRecordPreviews @Composable
-fun LocalOriginalReadRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
-    local = readingLocal, previewEntryId = longOriginal.id) } }
+fun LocalOriginalReadRender() {
+    // Same production reader/attachment entry; synthetic port never opens storage or a picker.
+    val attachments = remember { com.t1doo.aiyou.records.LocalAttachmentController(
+        { false }, { error("Preview does not decode media") }) }
+    AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,
+        local = readingLocal, currentRecords = { readingLocal }, attachments = attachments, previewEntryId = longOriginal.id) }
+}
 
 @PreviewTest @LocalRecordPreviews @Composable
 fun LocalMissingOriginalRender() { AIyouTheme { AIyouApp(previewDestination = Destination.MEMORIES,

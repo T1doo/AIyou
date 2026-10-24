@@ -140,7 +140,7 @@ class ManualAliasRecallPresentationTest {
         fun field(tag: String, value: String) { compose.onNodeWithTag(tag).performScrollTo().performTextReplacement(value) }
         fun pump() { compose.runOnIdle { runBlocking { queue.removeFirst()(store) } }; compose.waitForIdle() }
         compose.runOnIdle { navigation.openEntry(original.id) }; compose.waitForIdle()
-        compose.onNodeWithTag("original-manual-people").performScrollTo().performClick(); pump()
+        compose.originalTool("original-manual-people").performScrollTo().performClick(); pump()
         compose.onNodeWithTag("manual-alias-toggle").performScrollTo().performClick()
         field("manual-alias-input", "未提交私密别名"); field("manual-alias-target", "小林")
         compose.runOnIdle { assertFalse(containsPrivateInput(registry!!.performSave(), "未提交私密别名")) }

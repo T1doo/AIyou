@@ -99,12 +99,12 @@ class HistoryEditPresentationTest {
     private fun loaded() { compose.waitUntil(5000) { vm.state.value.originalHistory?.loading == false }; compose.waitForIdle() }
     private fun oldVersion(fromEditor: Boolean = false) {
         if (fromEditor) compose.onNodeWithTag("original-edit-history").performScrollTo().performClick()
-        else compose.onNodeWithText("历史版本").performClick()
+        else compose.originalToolText("历史版本").performClick()
         loaded()
         compose.onNodeWithTag("history-list").performScrollToNode(hasText("阅读版本 1"))
         compose.onNodeWithText("阅读版本 1").performClick(); loaded()
     }
-    private fun use() { compose.onNodeWithTag("original-reading-edit").assertIsDisplayed().performClick(); compose.waitForIdle() }
+    private fun use() { compose.originalTool("original-reading-edit").assertIsDisplayed().performClick(); compose.waitForIdle() }
     private fun input() = compose.onNodeWithTag("original-edit-text").fetchSemanticsNode().config[SemanticsProperties.EditableText].text
     private fun save() { compose.onNodeWithTag("original-edit-save").performScrollTo().performClick() }
     private fun saved() { compose.waitUntil(5000) { vm.state.value.originalEdit == null }; compose.waitForIdle() }
@@ -129,7 +129,7 @@ class HistoryEditPresentationTest {
     }
 
     @Test fun replacementCancelBackAndExplicitConfirmationPreserveIndependentDraft() {
-        val store = start(); compose.onNodeWithText("编辑原文").performClick()
+        val store = start(); compose.originalToolText("编辑原文").performClick()
         compose.onNodeWithTag("original-edit-text").performTextReplacement("合成未保存修改\n🌿")
         val previous = vm.state.value.originalEdit!!; oldVersion(fromEditor = true); use()
         compose.onNodeWithText("替换未保存的修改？").assertIsDisplayed()
@@ -205,7 +205,7 @@ class HistoryEditPresentationTest {
     fun narrowLargeFontFullUnicodeSourceAndReplacementPrimaryActionsRemainReachable() {
         val text = "界🌿\n".repeat(24_999) + "尾🌿终"; assertEquals(100_000, text.length)
         val store = start(Store(oldText = text), narrow = true)
-        compose.onNodeWithText("编辑原文").performClick()
+        compose.originalToolText("编辑原文").performClick()
         compose.onNodeWithTag("original-edit-text").performTextReplacement("合成未保存输入")
         oldVersion(fromEditor = true); use()
         compose.onNodeWithTag("history-replace-cancel").assertIsDisplayed()

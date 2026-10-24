@@ -112,6 +112,7 @@ class RecordEventDatePresentationTest {
     // Test-only geometry before each scroll: identify an oversized target separately
     // from SDK-main-thread Trace retention. No field values or originals are logged.
     private fun control(tag:String):SemanticsNodeInteraction {
+        compose.showOriginalToolsFor(tag)
         val target=compose.onNodeWithTag(tag)
         val node=target.fetchSemanticsNode()
         val viewport=generateSequence(node.parent){it.parent}.firstOrNull {
@@ -204,7 +205,7 @@ class RecordEventDatePresentationTest {
         control("event-date-preview").assertTextContains("清除事件日期",substring=true)
         confirm();assertNull(durable.getValue("one").date);assertEquals(3L,durable.getValue("one").version)
         compose.onNodeWithTag("event-date-close").performClick()
-        compose.onNodeWithTag("original-event-date").assertTextEquals("事件日期：未补记（未知）")
+        compose.originalTool("original-event-date").assertTextEquals("事件日期：未补记（未知）")
         compose.onNodeWithText("记录日期：1970-01-01 00:00 · UTC · 原文版本 1").assertExists()
         compose.runOnIdle{assertEquals(one,state.value.entries.first());assertEquals("synthetic-private-draft",state.value.text)}
     }

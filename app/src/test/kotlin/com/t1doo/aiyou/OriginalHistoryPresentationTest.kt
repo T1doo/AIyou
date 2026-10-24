@@ -116,7 +116,7 @@ class OriginalHistoryPresentationTest {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-original"))
         compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-original"))).performClick()
     }
-    private fun history() { compose.onNodeWithText("历史版本").performClick(); loaded() }
+    private fun history() { compose.originalToolText("历史版本").performClick(); loaded() }
     private fun loaded() { compose.waitUntil(5000) { vm.state.value.originalHistory?.loading == false }; compose.waitForIdle() }
     private fun revision(number: Int) {
         compose.onNodeWithTag("history-list").performScrollToNode(hasText("阅读版本 $number"))
@@ -183,7 +183,7 @@ class OriginalHistoryPresentationTest {
         val store = start(); val list = compose.onNode(hasScrollToIndexAction())
         list.performScrollToNode(hasTestTag("entry-original"))
         val anchor = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value(); assertTrue(anchor > 0f)
-        open(); compose.onNodeWithText("编辑原文").performClick()
+        open(); compose.originalToolText("编辑原文").performClick()
         compose.onNodeWithTag("original-edit-text").performTextReplacement("合成保留中的用户修改")
         val editor = callbacks; val editSession = vm.state.value.originalEdit!!.sessionId
         editHistory(); revision(1)
@@ -206,7 +206,7 @@ class OriginalHistoryPresentationTest {
     }
 
     @Test fun failedListAndSelectedOriginalReadsHidePlaintextAndRetryWithoutDiscardingEdits() {
-        val store = start(); open(); compose.onNodeWithText("编辑原文").performClick()
+        val store = start(); open(); compose.originalToolText("编辑原文").performClick()
         compose.onNodeWithTag("original-edit-text").performTextReplacement("合成失败期间的修改")
         store.failHistory = true; editHistory()
         compose.onAllNodesWithTag("history-list").assertCountEquals(0)
@@ -223,7 +223,7 @@ class OriginalHistoryPresentationTest {
     }
 
     @Test fun versionChangeAndDeletionDuringReadsNeverReplaceUserInputOrShowStaleHistory() {
-        val store = start(Store(delayFirstHistory = true)); open(); compose.onNodeWithText("编辑原文").performClick()
+        val store = start(Store(delayFirstHistory = true)); open(); compose.originalToolText("编辑原文").performClick()
         compose.onNodeWithTag("original-edit-text").performTextReplacement("合成当前用户输入")
         compose.onNodeWithTag("original-edit-history").performScrollTo().performClick()
         compose.waitUntil(5000) { store.historyStarted.isCompleted }
@@ -243,9 +243,9 @@ class OriginalHistoryPresentationTest {
     @Test fun closedReopenedAndDisposedHistoryRejectsRetainedReadsCopiesAndNavigation() {
         val restoration = StateRestorationTester(compose)
         val store = start(Store(delayFirstHistory = true), restoration = restoration); open()
-        compose.onNodeWithText("历史版本").performClick(); compose.waitUntil(5000) { store.historyStarted.isCompleted }
+        compose.originalToolText("历史版本").performClick(); compose.waitUntil(5000) { store.historyStarted.isCompleted }
         val old = callbacks; val oldSession = vm.state.value.originalHistory!!.sessionId
-        compose.onNodeWithText("返回原文").performClick(); compose.onNodeWithText("历史版本").performClick()
+        compose.onNodeWithText("返回原文").performClick(); compose.originalToolText("历史版本").performClick()
         val next = vm.state.value.originalHistory!!.sessionId; assertNotEquals(oldSession, next)
         compose.runOnIdle { old.backHistory(oldSession); old.retryHistory(oldSession); old.selectHistory(oldSession, 1) }
         store.releaseHistory.complete(Unit); loaded(); assertEquals(next, vm.state.value.originalHistory!!.sessionId)
@@ -263,7 +263,7 @@ class OriginalHistoryPresentationTest {
     @Test fun knownVersionChangeReturningWithoutRetryShowsCurrentAndRejectsOldCopy() {
         val store = start(Store(delayFirstHistory = true)); open()
         val oldReader = callbacks
-        compose.onNodeWithText("历史版本").performClick()
+        compose.originalToolText("历史版本").performClick()
         compose.waitUntil(5000) { store.historyStarted.isCompleted }
         store.advance("合成已知最新原文"); store.releaseHistory.complete(Unit); loaded()
         assertNotNull(vm.state.value.originalHistory!!.error)
@@ -319,7 +319,7 @@ class OriginalHistoryPresentationTest {
         val store = start(Store(delayCaptureFailure = true), destination = Destination.NOW)
         compose.onNode(hasSetTextAction()).performTextReplacement("合成排队的此刻草稿")
         compose.waitUntil(5000) { store.captureStarted.isCompleted }
-        compose.onNodeWithText("回忆").performClick(); open(); compose.onNodeWithText("编辑原文").performClick()
+        compose.onNodeWithText("回忆").performClick(); open(); compose.originalToolText("编辑原文").performClick()
         compose.onNodeWithTag("original-edit-text").performTextReplacement("合成原文修改")
         compose.onNodeWithTag("original-edit-history").performScrollTo().performClick()
         store.releaseCapture.complete(Unit); loaded(); compose.waitUntil(5000) { vm.state.value.error != null }; compose.waitForIdle()
@@ -338,7 +338,7 @@ class OriginalHistoryPresentationTest {
         compose.onAllNodesWithTag("original-text").assertCountEquals(0)
         assertTrue(vm.state.value.originalHistory!!.unavailable)
         compose.runOnIdle { back.onBackPressed() }; loaded(); compose.onNodeWithText("返回原文").performClick()
-        compose.onNodeWithText("编辑原文").performClick()
+        compose.originalToolText("编辑原文").performClick()
         compose.onNodeWithTag("original-edit-text").performTextReplacement("合成保存中修改")
         compose.onNodeWithTag("original-edit-save").performScrollTo().performClick()
         compose.waitUntil(5000) { store.revisionStarted.isCompleted }

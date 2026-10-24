@@ -132,7 +132,7 @@ class OriginalEditPresentationTest {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-original"))
         compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-original"))).performClick()
     }
-    private fun edit() = compose.onNodeWithText("编辑原文").performClick()
+    private fun edit() = compose.originalToolText("编辑原文").performClick()
     private fun replace(text: String) = compose.onNodeWithTag("original-edit-text").performTextReplacement(text)
     private fun save() = compose.onNodeWithTag("original-edit-save").performScrollTo().performClick()
     private fun cancel() = compose.onNodeWithTag("original-edit-cancel").performScrollTo().performClick()

@@ -72,7 +72,7 @@ class RecordConnectionReviewPresentationTest {
         assertEquals(1,h.changes);assertEquals(1,h.confirmations);assertEquals(granted,h.actual.consent)
         compose.onNodeWithTag("local-processing-notice").performScrollTo().assertTextEquals("已保存这条记录的连接和单一用途授权；未发送记录，也未创建请求。未改变新草稿的默认处理范围。");h.noSending()
     }
-    private fun click(tag:String){compose.onNodeWithTag(tag).performScrollTo().performClick()}
+    private fun click(tag:String){ compose.showOriginalToolsFor(tag);compose.onNodeWithTag(tag).performScrollTo().performClick()}
     private fun drain(h:Harness){compose.runOnIdle {runBlocking {while(true)(h.queue.poll()?:break)(h.store)}};compose.waitForIdle()}
     private fun open(){compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"));compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-one"))).performClick();click("original-local-processing");drain(active)}
     private lateinit var active:Harness

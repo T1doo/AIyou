@@ -22,11 +22,13 @@ import androidx.compose.foundation.text.selection.SelectionState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,6 +57,7 @@ import com.t1doo.aiyou.designsystem.PrivacyChip
 import com.t1doo.aiyou.designsystem.StatusNotice
 import com.t1doo.aiyou.model.StoredEntry
 import com.t1doo.aiyou.model.OriginalExports
+import java.util.concurrent.atomic.AtomicBoolean
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -159,6 +162,14 @@ fun OriginalReadingScreen(
     // Resolve the current local source on every update; navigation never carries plaintext.
     val entry = local.entries.firstOrNull { it.id == entryId }
     var copyDenied by remember(entry?.id, entry?.currentRevision) { mutableStateOf(false) }
+    // An opening is owned by this rendered reader, never a reusable entry ID.
+    // The live identity rejects callbacks before disposal; the lease also rejects observed ABA.
+    val toolsOwner = remember(local.recordAuthorizationOwner, local.manualPeopleOwner, entry, local.ready, local.opening,
+        local.error, requiredSource) { Any() }
+    val liveToolsOwner by rememberUpdatedState(toolsOwner)
+    val toolsAlive = remember(toolsOwner) { AtomicBoolean(true) }
+    DisposableEffect(toolsAlive) { onDispose { toolsAlive.set(false) } }
+    var toolsSession by remember(toolsOwner) { mutableStateOf<Any?>(null) }
     Box(modifier.fillMaxSize().background(AIyouColors.surface), contentAlignment = Alignment.TopCenter) {
         Column(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize()
             .padding(AIyouDimensions.pageNarrow), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
@@ -175,14 +186,8 @@ fun OriginalReadingScreen(
                     requiredSourceMessage,state=ComponentState.ERROR,
                     modifier=Modifier.verticalScroll(rememberScrollState()))
                 else -> {
-                    Text(metadataText ?: originalMetadata(entry), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-                    if (local.supportsEventDates) {
-                        val date = local.eventDates[entry.id]?.date
-                        Text(if (!local.eventDatesAvailable || !local.eventDates.containsKey(entry.id)) "事件日期：暂不可读取"
-                            else if (date == null) "事件日期：未补记（未知）"
-                            else "事件日期：${date.localDate} · ${date.timeZone} · 仅日期，无时刻",
-                            style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("original-event-date"))
-                    }
+                    // The reading surface keeps provenance/policy visible; detailed metadata is disclosed explicitly.
+                    metadataText?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary) }
                     PrivacyChip(entry.policy)
                     local.packageOrigins[entry.id]?.takeIf { local.packageOriginsAvailable }?.let { origin ->
                         Text("加密包恢复副本 · 原文版本 " + origin.sourceRevision + " · 包创建于 " +
@@ -192,7 +197,6 @@ fun OriginalReadingScreen(
                     }
                     if (!local.packageOriginsAvailable) Text(local.packageOriginsError ?: "恢复来源暂不可核对。",
                         style = MaterialTheme.typography.bodySmall)
-                    Text("长按选择文字，或复制全文。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                     local.originalEditNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = AIyouColors.success) }
                     if (local.supportsFavorites) {
                         val favorite = local.favorites[entry.id]
@@ -222,96 +226,125 @@ fun OriginalReadingScreen(
                         } == true }?.let { Text(it, style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.testTag("original-favorite-notice")) }
                     }
-                    // Keep detail actions reachable without consuming the full original viewport.
-                    FlowRow(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())
-                        .testTag("original-actions"), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                    FlowRow(Modifier.testTag("original-actions"),
+                        horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                         TextButton(onClick = {
                             if (canCopy(entry.id, entry.currentRevision)) copyDenied = !onCopy(entry.id, entry.currentRevision)
-                        },
-                            modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("复制全文") }
-                        onEdit?.let { edit ->
-                            TextButton(onClick = { edit(entry.id, entry.currentRevision) },
-                                enabled = entry.originalText.isNotBlank() && !local.saving && !local.savePending,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-reading-edit")) { Text(editActionLabel) }
-                        }
-                        onHistory?.let { history ->
-                            TextButton(onClick = { history(entry.id, entry.currentRevision) },
-                                enabled = !local.saving && !local.savePending,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text(historyActionLabel) }
-                        }
+                        }, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("复制全文") }
                         onAttachments?.let { attachments ->
                             TextButton(onClick = { attachments(entry.id, entry.currentRevision) },
                                 enabled = !local.saving && !local.savePending,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("查看附件") }
                         }
-                        eventDateController?.let { controller ->
-                            val dateSource = local.metadataReadingSource(entry.id, entry.currentRevision)
-                            TextButton(onClick = { if (canUseEventDate(entry.id, entry.currentRevision))
-                                dateSource?.let { controller.open(it) { canUseEventDate(entry.id, entry.currentRevision) } } },
-                                enabled = local.supportsEventDates && dateSource != null && !local.saving && !local.savePending,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-event-date-open")) { Text("补记／纠正事件日期") }
-                        }
-                        if (local.supportsManualPeople) {
-                            Text(if (local.manualPeopleAvailable) local.manualPeople[entry.id]?.names?.takeIf { it.isNotEmpty() }
-                                ?.joinToString("、", prefix = "关联人物：") ?: "尚未关联人物" else "人物关联暂不可读取")
-                            val peopleSource = local.manualPeopleReadingSource(entry.id, entry.currentRevision)
-                            if (peopleSource == null) Text("人物编辑来源暂不可核对，请返回列表重试本机读取。")
-                            onOpenPeople?.let { open -> TextButton(onClick = { peopleSource?.let(open) },
-                                enabled = peopleSource != null && !local.saving && !local.savePending,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-manual-people")) { Text("关联／移除人物") } }
-                        }
-                        onOpenTags?.let { openTags ->
-                            TextButton(onClick = { openTags(entry.id, entry.currentRevision) },
-                                enabled = !local.saving && !local.savePending,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-manual-tags")) { Text("手工标签") }
-                        }
-                        onMoveToRecycleBin?.let { move ->
-                            TextButton(onClick = { move(entry.id, entry.currentRevision) },
-                                enabled = local.supportsRecycleBin && !local.saving && !local.savePending && local.recycleBin == null,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-recycle-move")) { Text("移入回收站") }
-                        }
-                        sourceTaskController?.let { controller ->
-                            TextButton(enabled=local.supportsSourceTasks&&!local.saving&&!local.savePending&&entry.originalText.isNotBlank(),
-                                onClick={if(canUseSourceTask()) controller.openOriginal(entry.id,entry.currentRevision)},
-                                modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("original-source-task")) { Text("从原文摘录创建待办") }
-                        }
-                        localProcessingController?.let { controller ->
-                            val authorizationSource = local.authorizationReadingSource(entry.id, entry.currentRevision)
-                            TextButton(enabled = local.supportsLocalProcessing && !local.saving && !local.savePending &&
-                                (local.recordAuthorizationOwner == null || authorizationSource != null),
-                                onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) {
-                                    if (authorizationSource != null) controller.open(authorizationSource)
-                                    else if (local.recordAuthorizationOwner == null) controller.open(entry.id, entry.currentRevision)
-                                } },
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-local-processing")) { Text("处理范围") }
-                        }
-                        onOpenAi?.let { openAi ->
-                            TextButton(onClick = { openAi(entry.id, entry.currentRevision) },
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
-                                    .testTag("original-reading-ai")) { Text("AI 整理") }
-                        }
-                        candidateController?.let { controller ->
-                            TextButton(enabled = local.supportsCandidates && !local.saving && !local.savePending &&
-                                entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
-                                onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-local-candidates")) { Text("本机摘录候选") }
-                        }
-                        sourceTagController?.let { controller ->
-                            TextButton(enabled = local.supportsSourceTags && !local.saving && !local.savePending &&
-                                entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
-                                onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-tags")) { Text("从原文添加标签") }
-                        }
-                        sourcePreferenceController?.let { controller ->
-                            TextButton(enabled = local.supportsSourcePreferences && !local.saving && !local.savePending && entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
-                                onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(com.t1doo.aiyou.model.SourceVersion(entry.id, entry.currentRevision.toLong())) },
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-preferences")) { Text("普通偏好自述") }
-                        }
-                        sourceMemoryController?.let { controller ->
-                            TextButton(enabled = local.supportsSourceMemories && !local.saving && !local.savePending && entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
-                                onClick = { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-memories")) { Text("事件与当次情绪") }
-                        }
+                        TextButton(onClick = { if (toolsAlive.get() && liveToolsOwner === toolsOwner) toolsSession = Any() },
+                            modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-tools-open")) { Text("更多工具") }
+                    }
+                    toolsSession?.let { session ->
+                        val ownsTools = { toolsAlive.get() && liveToolsOwner === toolsOwner && toolsSession === session }
+                        val closeTools = { if (ownsTools()) toolsSession = null }
+                        val toolAction: (() -> Unit) -> (() -> Unit) = { action -> {
+                            if (ownsTools()) { toolsSession = null; action() }
+                        } }
+                        AlertDialog(onDismissRequest = closeTools,
+                            title = { Text("记录信息与工具") },
+                            text = {
+                                Column(Modifier.verticalScroll(rememberScrollState()).testTag("original-tools"),
+                                    verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                                    Text(metadataText ?: originalMetadata(entry), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                                    if (local.supportsEventDates) {
+                                        val date = local.eventDates[entry.id]?.date
+                                        Text(if (!local.eventDatesAvailable || !local.eventDates.containsKey(entry.id)) "事件日期：暂不可读取"
+                                            else if (date == null) "事件日期：未补记（未知）"
+                                            else "事件日期：${date.localDate} · ${date.timeZone} · 仅日期，无时刻",
+                                            style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("original-event-date"))
+                                    }
+                                    Text("长按原文选择文字；复制保留完整原文。", style = MaterialTheme.typography.bodySmall)
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                                        onEdit?.let { edit ->
+                                            TextButton(onClick = toolAction { edit(entry.id, entry.currentRevision) },
+                                                enabled = entry.originalText.isNotBlank() && !local.saving && !local.savePending,
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-reading-edit")) { Text(editActionLabel) }
+                                        }
+                                        onHistory?.let { history ->
+                                            TextButton(onClick = toolAction { history(entry.id, entry.currentRevision) },
+                                                enabled = !local.saving && !local.savePending,
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text(historyActionLabel) }
+                                        }
+                                        eventDateController?.let { controller ->
+                                            val dateSource = local.metadataReadingSource(entry.id, entry.currentRevision)
+                                            TextButton(onClick = toolAction { if (canUseEventDate(entry.id, entry.currentRevision))
+                                                dateSource?.let { controller.open(it) { canUseEventDate(entry.id, entry.currentRevision) } } },
+                                                enabled = local.supportsEventDates && dateSource != null && !local.saving && !local.savePending,
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-event-date-open")) { Text("补记／纠正事件日期") }
+                                        }
+                                        if (local.supportsManualPeople) {
+                                            Text(if (local.manualPeopleAvailable) local.manualPeople[entry.id]?.names?.takeIf { it.isNotEmpty() }
+                                                ?.joinToString("、", prefix = "关联人物：") ?: "尚未关联人物" else "人物关联暂不可读取")
+                                            val peopleSource = local.manualPeopleReadingSource(entry.id, entry.currentRevision)
+                                            if (peopleSource == null) Text("人物编辑来源暂不可核对，请返回列表重试本机读取。")
+                                            onOpenPeople?.let { open -> TextButton(onClick = toolAction { peopleSource?.let(open) },
+                                                enabled = peopleSource != null && !local.saving && !local.savePending,
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-manual-people")) { Text("关联／移除人物") } }
+                                        }
+                                        onOpenTags?.let { openTags ->
+                                            TextButton(onClick = toolAction { openTags(entry.id, entry.currentRevision) },
+                                                enabled = !local.saving && !local.savePending,
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-manual-tags")) { Text("手工标签") }
+                                        }
+                                        onMoveToRecycleBin?.let { move ->
+                                            TextButton(onClick = toolAction { move(entry.id, entry.currentRevision) },
+                                                enabled = local.supportsRecycleBin && !local.saving && !local.savePending && local.recycleBin == null,
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-recycle-move")) { Text("移入回收站") }
+                                        }
+                                        sourceTaskController?.let { controller ->
+                                            TextButton(enabled=local.supportsSourceTasks&&!local.saving&&!local.savePending&&entry.originalText.isNotBlank(),
+                                                onClick=toolAction {if(canUseSourceTask()) controller.openOriginal(entry.id,entry.currentRevision)},
+                                                modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("original-source-task")) { Text("从原文摘录创建待办") }
+                                        }
+                                        localProcessingController?.let { controller ->
+                                            val authorizationSource = local.authorizationReadingSource(entry.id, entry.currentRevision)
+                                            TextButton(enabled = local.supportsLocalProcessing && !local.saving && !local.savePending &&
+                                                (local.recordAuthorizationOwner == null || authorizationSource != null),
+                                                onClick = toolAction { if (canUseCandidates(entry.id, entry.currentRevision)) {
+                                                    if (authorizationSource != null) controller.open(authorizationSource)
+                                                    else if (local.recordAuthorizationOwner == null) controller.open(entry.id, entry.currentRevision)
+                                                } },
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-local-processing")) { Text("处理范围") }
+                                        }
+                                        onOpenAi?.let { openAi ->
+                                            TextButton(onClick = toolAction { openAi(entry.id, entry.currentRevision) },
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
+                                                    .testTag("original-reading-ai")) { Text("AI 整理") }
+                                        }
+                                        candidateController?.let { controller ->
+                                            TextButton(enabled = local.supportsCandidates && !local.saving && !local.savePending &&
+                                                entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
+                                                onClick = toolAction { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-local-candidates")) { Text("本机摘录候选") }
+                                        }
+                                        sourceTagController?.let { controller ->
+                                            TextButton(enabled = local.supportsSourceTags && !local.saving && !local.savePending &&
+                                                entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
+                                                onClick = toolAction { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-tags")) { Text("从原文添加标签") }
+                                        }
+                                        sourcePreferenceController?.let { controller ->
+                                            TextButton(enabled = local.supportsSourcePreferences && !local.saving && !local.savePending && entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
+                                                onClick = toolAction { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(com.t1doo.aiyou.model.SourceVersion(entry.id, entry.currentRevision.toLong())) },
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-preferences")) { Text("普通偏好自述") }
+                                        }
+                                        sourceMemoryController?.let { controller ->
+                                            TextButton(enabled = local.supportsSourceMemories && !local.saving && !local.savePending && entry.originalText.isNotBlank() && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE,
+                                                onClick = toolAction { if (canUseCandidates(entry.id, entry.currentRevision)) controller.open(entry.id, entry.currentRevision) },
+                                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-source-memories")) { Text("事件与当次情绪") }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = closeTools, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
+                                    .testTag("original-tools-close")) { Text("返回原文") }
+                            })
                     }
                     HorizontalDivider(color = AIyouColors.outlineDecorative)
                     local.localProcessing?.takeIf { it.source.sourceId == entry.id && it.source.revision == entry.currentRevision.toLong() }?.let { ui ->

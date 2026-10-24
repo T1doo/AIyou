@@ -98,7 +98,7 @@ class SourcePreferencePresentationTest {
             AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},sourcePreferences=controller)
         }}}
     }
-    private fun click(tag:String) {compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick()}
+    private fun click(tag:String) { compose.showOriginalToolsFor(tag);compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick()}
     private fun drain() {compose.runOnIdle {runBlocking {while(true)(queue.poll()?:break)(owner)}};compose.waitForIdle()}
     private fun reader() {compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"));compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-one"))).performClick()}
     private fun open() {click("original-source-preferences");drain()}

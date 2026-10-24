@@ -55,7 +55,7 @@ class RecycleBinPresentationTest {
     }
     private fun moveDialog() {
         openOriginal()
-        compose.onNodeWithTag("original-recycle-move").assertIsDisplayed().assertIsEnabled().performClick(); pump()
+        compose.originalTool("original-recycle-move").assertIsDisplayed().assertIsEnabled().performClick(); pump()
     }
     private fun browse() {
         // After deleting the visible row, the remembered timeline can keep its
@@ -67,7 +67,7 @@ class RecycleBinPresentationTest {
         content(); moveDialog(); compose.onNodeWithText("移入回收站？").assertExists()
         compose.onNodeWithText("已经导出、另存或发给服务商的数据无法通过本次操作撤回。").performScrollTo().assertExists()
         compose.onNodeWithTag("recycle-cancel").performClick(); compose.runOnIdle { assertFalse(f.deleted); assertTrue(f.applied.isEmpty()) }
-        compose.onNodeWithTag("original-recycle-move").assertIsDisplayed().assertIsEnabled().performClick(); pump()
+        compose.originalTool("original-recycle-move").assertIsDisplayed().assertIsEnabled().performClick(); pump()
         compose.onNodeWithTag("recycle-confirm").performClick()
         compose.runOnIdle { assertFalse(f.deleted); assertTrue(f.state.value.recycleBin!!.confirmation!!.busy) }
         pump(); compose.runOnIdle { assertTrue(f.deleted); assertTrue(f.state.value.entries.isEmpty()); navigation.get().returnToList() }
@@ -117,7 +117,7 @@ class RecycleBinPresentationTest {
     }
     @Test fun retainedReaderAndConfirmationCallbacksRejectNavigationAndNewSessionBeforeRecomposition() {
         content(); openOriginal()
-        val move = compose.onNodeWithTag("original-recycle-move").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        val move = compose.originalTool("original-recycle-move").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
         compose.runOnIdle { navigation.get().selectDestination(Destination.TASKS); move(); assertNull(f.state.value.recycleBin); assertTrue(f.queue.isEmpty()) }
         compose.runOnIdle { navigation.get().selectDestination(Destination.MEMORIES) }
         moveDialog(); val confirm = compose.onNodeWithTag("recycle-confirm").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!

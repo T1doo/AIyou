@@ -162,7 +162,7 @@ class LocalCandidatePresentationTest {
         compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-" + id))).performClick()
     }
     private fun openCandidates() {
-        compose.onNodeWithTag("original-local-candidates").performScrollTo().performClick()
+        compose.originalTool("original-local-candidates").performScrollTo().performClick()
         drain()
     }
     private fun drain() {

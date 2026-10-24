@@ -171,13 +171,13 @@ class OriginalEditRecoveryPresentationTest {
         start(repo)
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-original"))
         compose.onNodeWithText("阅读全文").performClick()
-        compose.onNodeWithText("历史版本").performScrollTo().performClick()
+        compose.originalToolText("历史版本").performScrollTo().performClick()
         compose.waitUntil(5000) { vm.state.value.originalHistory?.loading == false }
         compose.onNodeWithTag("history-list").performScrollToNode(hasText("阅读版本 1"))
         compose.onNodeWithText("阅读版本 1").performClick()
         compose.waitUntil(5000) { vm.state.value.originalHistory?.let { !it.loading && it.selectedRevision == 1 } == true }
         assertEquals(1, repo.writes); assertNull(runBlocking { cipher.read("original") })
-        compose.onNodeWithTag("original-reading-edit").performScrollTo().performClick()
+        compose.originalTool("original-reading-edit").performScrollTo().performClick()
         compose.waitUntil(5000) { vm.state.value.originalEdit?.loadingDraft == false }
         assertFalse(vm.state.value.originalEdit!!.conflict)
         compose.onNodeWithText("来源：历史版本 1 · 基于原文版本 2 · 不要据此推断 · 人工编辑").performScrollTo().assertIsDisplayed()

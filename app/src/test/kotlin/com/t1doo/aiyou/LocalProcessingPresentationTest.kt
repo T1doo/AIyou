@@ -84,7 +84,7 @@ class LocalProcessingPresentationTest {
             } }
         }
     }
-    private fun click(tag:String) { compose.onNodeWithTag(tag).performScrollTo().performClick() }
+    private fun click(tag:String) { compose.showOriginalToolsFor(tag); compose.onNodeWithTag(tag).performScrollTo().performClick() }
     private fun drain() { compose.runOnIdle { runBlocking { while(true) (queue.poll()?:break)(owner) } };compose.waitForIdle() }
     private fun openReader() {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"))

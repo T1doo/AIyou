@@ -121,7 +121,7 @@ class ManualPeoplePresentationTest {
         };compose.waitForIdle()
     }
     private fun openEditor(){compose.runOnIdle{navigation.openEntry("one")};compose.waitForIdle()
-        compose.onNodeWithTag("original-manual-people").performScrollTo().performClick();pump()}
+        compose.originalTool("original-manual-people").performScrollTo().performClick();pump()}
     private fun pump(){compose.runOnIdle{runBlocking{queue.removeFirst()(store)}};compose.waitForIdle()}
     private fun field(tag:String,text:String)=compose.onNodeWithTag(tag).performScrollTo().performTextReplacement(text)
     private fun assertInputEquals(value:String)=compose.onNodeWithTag("manual-people-input").assert(

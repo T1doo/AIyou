@@ -100,7 +100,7 @@ class TaskProposalPresentationTest {
             }}
         }
     }
-    private fun click(tag:String) {compose.onNodeWithTag(tag).performScrollTo().performClick()}
+    private fun click(tag:String) { compose.showOriginalToolsFor(tag);compose.onNodeWithTag(tag).performScrollTo().performClick()}
     private fun taskNode(tag:String):SemanticsNodeInteraction {
         // Find and compose offscreen LazyColumn items before looking up their child nodes.
         compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(tag))
