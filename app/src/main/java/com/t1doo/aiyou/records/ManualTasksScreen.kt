@@ -14,6 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import java.time.Clock
@@ -21,6 +24,7 @@ import kotlinx.coroutines.delay
 import com.t1doo.aiyou.designsystem.*
 import com.t1doo.aiyou.model.*
 import com.t1doo.aiyou.ui.NotebookPageHeader
+import com.t1doo.aiyou.ui.LocalProcessingStatus
 
 /** Optional read-only observer of the real presentation callbacks; contains no stored title. */
 class ManualTaskCallbacks(val begin: () -> Unit, val create: (Long, String) -> Unit,
@@ -58,6 +62,8 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     val proposals = local.taskProposals
     val proposalsReady = storageReady && proposals.available && !proposals.loading && proposals.error == null &&
         proposals.editor?.let { !it.busy && it.pending == null } != false
+    // Disclosure retains no task/proof/input and is never saved into an Android Bundle.
+    var detailsExpanded by remember(local.recordAuthorizationOwner, local.ready) { mutableStateOf(false) }
     val now by produceState(clock.instant(), clock) {
         // Display classification only, never a scheduler or a persisted inferred deadline.
         while (true) { delay(30_000); value = clock.instant() }
@@ -68,31 +74,56 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     BoxWithConstraints(modifier.fillMaxSize()) {
         val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
         val stacked = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
+        // These are content constraints after Scaffold bars and IME padding, not screen height.
+        // Resolve in this composition; no post-layout size feedback or Preview-specific branch.
+        val compactHeader = LocalDensity.current.fontScale >= 1.5f || (maxHeight > 0.dp && maxHeight <= 360.dp)
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             LazyColumn(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize().testTag("manual-task-list"),
-                contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
-                verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
-                item("header") { NotebookPageHeader("待办", "由你明确创建的正式任务", stacked, companion) }
+                contentPadding = PaddingValues(horizontal = margin,
+                    vertical = if (compactHeader) AIyouDimensions.spaceSm else AIyouDimensions.spaceMd),
+                verticalArrangement = Arrangement.spacedBy(if (compactHeader) AIyouDimensions.spaceMd else AIyouDimensions.sectionGap)) {
+                item("header") {
+                    if (compactHeader) Row(Modifier.fillMaxWidth().testTag("manual-task-compact-header"),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                            Text("待办", Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
+                            LocalProcessingStatus()
+                        }
+                        companion?.invoke()
+                    } else NotebookPageHeader("待办", "由你明确创建的正式任务", stacked, companion)
+                }
                 item("create") {
                     Surface(color = AIyouColors.primaryContainer, contentColor = AIyouColors.textPrimary,
                         shape = RoundedCornerShape(AIyouDimensions.cardRadius)) {
-                        Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceLg),
+                        Column(Modifier.fillMaxWidth().padding(if (compactHeader) AIyouDimensions.spaceMd else AIyouDimensions.spaceLg),
                             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                            Text(if (countsReady) "正式待办 ${tasks.items.size}" else "正式待办 · 待核对",
-                                style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("manual-task-total"))
-                            if (countsReady) Text("未完成 ${tasks.items.count { it.status == ManualTaskStatus.OPEN }} · " +
-                                "已完成 ${tasks.items.count { it.status == ManualTaskStatus.COMPLETED }} · " +
-                                "已取消 ${tasks.items.count { it.status == ManualTaskStatus.CANCELLED }}",
-                                style = MaterialTheme.typography.bodySmall)
-                            if (proposals.supported) Text(if (proposalsReady)
-                                "另有 ${proposals.items.count { it.proposal.state == TaskProposalState.DRAFT }} 份待确认草稿，不计入正式待办"
-                                else "待确认草稿另计 · 待核对", style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.testTag("manual-task-draft-summary"))
                             Button(onClick = onBegin, enabled = canChoose,
                                 modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget)
                                     .testTag("manual-task-begin")) { Text("创建待办") }
                             Text("创建不会自动设置提醒", style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.testTag("manual-task-reminder-boundary"))
+                            Text("提醒需逐条确认，安排不等于送达。", style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.testTag("manual-task-reminder-policy"))
+                            Text(if (countsReady) "正式待办 ${tasks.items.size}" else "正式待办 · 待核对",
+                                style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("manual-task-total"))
+                            if (proposals.supported) Text(if (proposalsReady)
+                                "待确认草稿 ${proposals.items.count { it.proposal.state == TaskProposalState.DRAFT }} · 单独计数"
+                                else "待确认草稿 · 待核对", style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.testTag("manual-task-draft-summary"))
+                            TextButton(onClick = { detailsExpanded = !detailsExpanded },
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-task-details")
+                                    .semantics { stateDescription = if (detailsExpanded) "已展开" else "已收起" }) {
+                                Text(if (detailsExpanded) "收起说明" else "计数与提醒说明")
+                            }
+                            if (detailsExpanded) {
+                                if (countsReady) Text("未完成 ${tasks.items.count { it.status == ManualTaskStatus.OPEN }} · " +
+                                    "已完成 ${tasks.items.count { it.status == ManualTaskStatus.COMPLETED }} · " +
+                                    "已取消 ${tasks.items.count { it.status == ManualTaskStatus.CANCELLED }}",
+                                    style = MaterialTheme.typography.bodySmall)
+                                Text("日期与时区由你填写，提醒需逐条确认；安排状态以各条待办为准，通知送达未验证。",
+                                    style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary,
+                                    modifier = Modifier.testTag("manual-task-details-copy"))
+                            }
                         }
                     }
                 }
@@ -118,11 +149,6 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                         if (available && !tasks.busy && tasks.pending == null) TextButton(onClick = onRefresh,
                             modifier = Modifier.testTag("manual-task-refresh")) { Text("重新读取待办") }
                     }
-                }
-                item("reminder-policy") {
-                    Text("日期与时区由你填写，提醒需逐条确认；安排状态以各条待办为准，通知送达未验证。",
-                        style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary,
-                        modifier = Modifier.testTag("manual-task-reminder-policy"))
                 }
                 if (available) {
                     if (tasks.items.isEmpty()) item("empty") { StatusNotice("还没有正式待办", "点击“创建待办”并确认保存后，才会加入清单。", state = ComponentState.EMPTY) }

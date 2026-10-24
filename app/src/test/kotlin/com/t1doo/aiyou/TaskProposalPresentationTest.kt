@@ -143,7 +143,7 @@ class TaskProposalPresentationTest {
             assertEquals("本机队列暂不可用，请重试。",state.value.taskProposals.error)
             assertTrue(queue.isEmpty())
         }
-        taskNode("manual-task-draft-summary").assertTextEquals("待确认草稿另计 · 待核对")
+        taskNode("manual-task-draft-summary").assertTextEquals("待确认草稿 · 待核对")
         taskNode("task-proposal-heading").assertTextEquals("待确认草稿 · 待核对")
         taskNode("task-proposal-refresh").assertIsEnabled()
         compose.onNodeWithText("本机队列暂不可用，请重试。").performScrollTo().assertIsDisplayed()

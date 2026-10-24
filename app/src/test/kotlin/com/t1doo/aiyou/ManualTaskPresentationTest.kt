@@ -21,6 +21,8 @@ import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
 import com.t1doo.aiyou.records.*
 import com.t1doo.aiyou.ui.Destination
+import com.t1doo.aiyou.ui.UiPreferences
+import com.t1doo.aiyou.ui.UiPreferencesState
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -168,7 +170,9 @@ class ManualTaskPresentationTest {
     @Test
     @Config(sdk = [35], qualifiers = "w320dp-h640dp")
     fun narrowDoubleFontKeepsCreateCloseAndNavigationReachableAndRevokesOldPageCallbacks() {
-        content(large = true)
+        content(large = true, withCompanion = true)
+        assertInitialCreateFullyVisible()
+        compose.onNodeWithTag("manual-task-compact-header").assertIsDisplayed()
         taskNode("manual-task-reminder-boundary").assertTextEquals("创建不会自动设置提醒")
         assertTrue(taskNode("manual-task-begin").getUnclippedBoundsInRoot().height >= 48.dp)
         begin("合成私密输入")
@@ -334,16 +338,17 @@ class ManualTaskPresentationTest {
         val draft = TaskProposal("draft-one", 1, binding, "合成尚待确认的草稿", ManualTaskDateInput(), 55, "UTC", 55)
         state.value = state.value.copy(taskProposals = TaskProposalsUiState(supported = true, available = true,
             items = listOf(TaskProposalItem(draft, false), TaskProposalItem(draft.copy(id = "rejected", state = TaskProposalState.REJECTED), false))))
-        content()
+        content(withCompanion = true)
+        assertInitialCreateFullyVisible()
         taskNode("manual-task-total").assertTextEquals("正式待办 2")
         taskNode("manual-task-date-open").assertTextEquals("手工创建 · 未设时间 · 未设置提醒计划")
-        taskNode("manual-task-draft-summary").assertTextEquals("另有 1 份待确认草稿，不计入正式待办")
+        taskNode("manual-task-draft-summary").assertTextEquals("待确认草稿 1 · 单独计数")
         taskNode("task-proposal-heading").assertTextEquals("待确认草稿 1")
         begin("合成新建待办")
         compose.onNodeWithTag("manual-task-create").performScrollTo().performClick()
         assertEquals(2, persisted.size); pump()
         taskNode("manual-task-total").assertTextEquals("正式待办 3")
-        taskNode("manual-task-draft-summary").assertTextEquals("另有 1 份待确认草稿，不计入正式待办")
+        taskNode("manual-task-draft-summary").assertTextEquals("待确认草稿 1 · 单独计数")
         assertEquals(1, identities.size); assertTrue(persisted.values.all { it.reminder == null })
         assertEquals(draft, state.value.taskProposals.items.first().proposal)
         assertEquals(capture, state.value.text); assertTrue(queued.isEmpty())
@@ -353,19 +358,42 @@ class ManualTaskPresentationTest {
     @Config(sdk = [35], qualifiers = "w800dp-h360dp")
     fun landscapeDashboardKeepsCreateCancelAndConfirmedCompletionReachable() {
         persisted["landscape"] = snapshot("landscape", "合成横屏待办")
-        content()
-        taskNode("manual-task-begin").assertIsEnabled().performClick()
+        content(withCompanion = true)
+        assertInitialCreateFullyVisible()
+        compose.onNodeWithTag("manual-task-compact-header").assertIsDisplayed()
+        compose.onNodeWithTag("manual-task-begin").assertIsEnabled().performClick()
         compose.onNodeWithTag("manual-task-input").performScrollTo().performTextReplacement("合成未提交标题")
         compose.onNodeWithTag("manual-task-create").performScrollTo().assertIsDisplayed().assertIsEnabled()
         compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
         assertEquals(1, persisted.size); assertTrue(queued.isEmpty())
-        taskNode("manual-task-reminder-policy").assertTextEquals("日期与时区由你填写，提醒需逐条确认；安排状态以各条待办为准，通知送达未验证。")
+        taskNode("manual-task-reminder-policy").assertTextEquals("提醒需逐条确认，安排不等于送达。")
+        taskNode("manual-task-details").performClick()
+        taskNode("manual-task-details-copy").assertTextEquals("日期与时区由你填写，提醒需逐条确认；安排状态以各条待办为准，通知送达未验证。")
+        taskNode("manual-task-details").performClick()
+        compose.onAllNodesWithTag("manual-task-details-copy").assertCountEquals(0)
+        assertTrue(queued.isEmpty()); assertTrue(identities.isEmpty())
         taskNode("manual-task-complete-landscape").assertIsEnabled().performClick()
         assertEquals(ManualTaskStatus.OPEN, persisted.getValue("landscape").status)
         pump(); assertEquals(ManualTaskStatus.COMPLETED, persisted.getValue("landscape").status)
         taskNode("manual-task-heading-COMPLETED").assertTextEquals("已完成 1")
         taskNode("manual-task-total").assertTextEquals("正式待办 1")
         assertNull(persisted.getValue("landscape").reminder); assertEquals(capture, state.value.text)
+    }
+
+    private fun assertInitialCreateFullyVisible() {
+        // No performScrollTo/scrollToNode: verify the settled cold entry at scroll position zero.
+        val list = compose.onNodeWithTag("manual-task-list")
+        assertEquals(0f, list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value(), 0f)
+        compose.onNodeWithTag("companion-entry").assertIsDisplayed()
+        val create = compose.onNodeWithTag("manual-task-begin").assertIsDisplayed().assertIsEnabled()
+        val bounds = create.getUnclippedBoundsInRoot()
+        val viewport = list.getUnclippedBoundsInRoot()
+        assertTrue(bounds.height >= 48.dp)
+        assertTrue(bounds.left >= viewport.left && bounds.right <= viewport.right)
+        assertTrue(bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
+        compose.onNodeWithTag("manual-task-reminder-boundary").assertIsDisplayed().assertTextEquals("创建不会自动设置提醒")
+        compose.onNodeWithTag("manual-task-reminder-policy").assertIsDisplayed().assertTextEquals("提醒需逐条确认，安排不等于送达。")
+        compose.onAllNodesWithTag("manual-task-details-copy").assertCountEquals(0)
     }
 
     private fun taskNode(tag: String): SemanticsNodeInteraction {
@@ -378,14 +406,15 @@ class ManualTaskPresentationTest {
     }
     private fun openDate(id: String) { taskNode("manual-task-date-open-" + id).performClick(); compose.waitForIdle() }
     private fun saveDate() { compose.onNodeWithTag("manual-task-date-save").performScrollTo().performClick() }
-    private fun content(large: Boolean = false) { runBlocking { controller.initialize(store) }; compose.setContent { TestScreen(large) }; compose.waitForIdle() }
-    @Composable private fun TestScreen(large: Boolean) {
+    private fun content(large: Boolean = false, withCompanion: Boolean = false) { runBlocking { controller.initialize(store) }; compose.setContent { TestScreen(large, withCompanion) }; compose.waitForIdle() }
+    @Composable private fun TestScreen(large: Boolean, withCompanion: Boolean = false) {
         val saved = LocalSaveableStateRegistry.current; SideEffect { registry = saved }
         val density = LocalDensity.current
         CompositionLocalProvider(LocalManualTasksObserver provides observer,
             LocalDensity provides if (large) Density(density.density, 2f) else density) {
             Box(if (large) Modifier.size(320.dp, 640.dp) else Modifier) {
                 AIyouTheme { AIyouApp(previewDestination = Destination.TASKS, local = state.value, currentRecords = { state.value },
+                    display = if (withCompanion) UiPreferencesState(UiPreferences(reduceMotion = true), ready = true) else UiPreferencesState(),
                     onTaskBegin = controller::begin, onTaskEdit = controller::edit, onTaskCreate = controller::create,
                     onTaskChange = controller::change, onTaskRetry = controller::retry, onTaskRefresh = controller::refresh,
                     onTaskClose = controller::close, onTaskCreationDate = controller::editCreationDate,
