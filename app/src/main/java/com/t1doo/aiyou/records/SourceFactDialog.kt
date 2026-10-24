@@ -30,6 +30,7 @@ internal fun SourceFactDialog(ui:FactUiState,controller:SourceFactController,can
     var chooseTopic by remember(ui.session) { mutableStateOf(false) }
     fun edit(field:FactInput,value:String) { if(canUse())controller.edit(ui.session,field,value) }
     fun rejected(field:FactInput)=field in ui.rejectedInput
+    val overflowHint="超长输入未接纳；当前仅显示有界预览，请改正后再保存。"
     Dialog(onDismissRequest={if(canUse())controller.close(ui.session)},properties=DialogProperties(usePlatformDefaultWidth=false)) {
         CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
             Surface(Modifier.fillMaxWidth().padding(16.dp).heightIn(max=height),shape=MaterialTheme.shapes.large) {
@@ -79,8 +80,18 @@ internal fun SourceFactDialog(ui:FactUiState,controller:SourceFactController,can
                                 Text("原文开头提示（最多320字；其他位置请先在原文选择复制）")
                                 SelectionContainer { Text(original.substring(0,end)) }
                             }
-                            OutlinedTextField(ui.quote,{edit(FactInput.QUOTE,it)},label={Text("逐字原文片段（最多320字）")},isError=rejected(FactInput.QUOTE),supportingText={if(rejected(FactInput.QUOTE))Text("超长输入未接纳；当前仅显示有界预览，请改正后再保存。")},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-quote"))
-                            OutlinedTextField(ui.topicLabel,{edit(FactInput.TOPIC,it)},label={Text("新建普通事实主题/上下文（最多40字）")},isError=rejected(FactInput.TOPIC),supportingText={if(rejected(FactInput.TOPIC))Text("超长输入未接纳；当前仅显示有界预览，请改正后再保存。")},enabled=editable && ui.topicExpected==null && ui.editing==null,modifier=Modifier.fillMaxWidth().testTag("fact-topic-label"))
+                            OutlinedTextField(ui.quote,{edit(FactInput.QUOTE,it)},
+                                label={Text("原文片段",Modifier.width(IntrinsicSize.Max).testTag("fact-label:QUOTE"))},isError=rejected(FactInput.QUOTE),
+                                supportingText={Column {
+                                    Text("逐字原文片段（最多320字）",Modifier.fillMaxWidth().testTag("fact-help:QUOTE"))
+                                    if(rejected(FactInput.QUOTE))Text(overflowHint,Modifier.fillMaxWidth().testTag("fact-error:QUOTE"))
+                                }},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-quote"))
+                            OutlinedTextField(ui.topicLabel,{edit(FactInput.TOPIC,it)},
+                                label={Text("主题/上下文",Modifier.width(IntrinsicSize.Max).testTag("fact-label:TOPIC"))},isError=rejected(FactInput.TOPIC),
+                                supportingText={Column {
+                                    Text("新建普通事实主题/上下文（最多40字）",Modifier.fillMaxWidth().testTag("fact-help:TOPIC"))
+                                    if(rejected(FactInput.TOPIC))Text(overflowHint,Modifier.fillMaxWidth().testTag("fact-error:TOPIC"))
+                                }},enabled=editable && ui.topicExpected==null && ui.editing==null,modifier=Modifier.fillMaxWidth().testTag("fact-topic-label"))
                             Text("主题由你划分；跨主题不会自动识别同义或冲突。本片不改主题名，也不跨主题搬移旧项。",style=MaterialTheme.typography.bodySmall)
                             if(ui.editing==null) {
                                 TextButton(onClick={chooseTopic=!chooseTopic},enabled=editable,modifier=Modifier.heightIn(min=48.dp)) { Text("选择现有主题") }
@@ -89,9 +100,24 @@ internal fun SourceFactDialog(ui:FactUiState,controller:SourceFactController,can
                                 }
                                 if(ui.topicExpected!=null)TextButton(onClick={if(canUse())controller.topic(ui.session,null)},enabled=editable,modifier=Modifier.heightIn(min=48.dp)) { Text("改为新主题") }
                             }
-                            OutlinedTextField(ui.from,{edit(FactInput.FROM,it)},label={Text("生效起始日（YYYY-MM-DD，未知留空）")},isError=rejected(FactInput.FROM),supportingText={if(rejected(FactInput.FROM))Text("超长输入未接纳；当前仅显示有界预览，请改正后再保存。")},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-from"))
-                            OutlinedTextField(ui.until,{edit(FactInput.UNTIL,it)},label={Text("结束日（不含此日，未知留空）")},isError=rejected(FactInput.UNTIL),supportingText={if(rejected(FactInput.UNTIL))Text("超长输入未接纳；当前仅显示有界预览，请改正后再保存。")},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-until"))
-                            OutlinedTextField(ui.zone,{edit(FactInput.ZONE,it)},label={Text("日期时区（IANA，如 Asia/Shanghai；全未知留空）")},isError=rejected(FactInput.ZONE),supportingText={if(rejected(FactInput.ZONE))Text("超长输入未接纳；当前仅显示有界预览，请改正后再保存。")},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-zone"))
+                            OutlinedTextField(ui.from,{edit(FactInput.FROM,it)},
+                                label={Text("生效起始日",Modifier.width(IntrinsicSize.Max).testTag("fact-label:FROM"))},isError=rejected(FactInput.FROM),
+                                supportingText={Column {
+                                    Text("生效起始日（YYYY-MM-DD，未知留空）",Modifier.fillMaxWidth().testTag("fact-help:FROM"))
+                                    if(rejected(FactInput.FROM))Text(overflowHint,Modifier.fillMaxWidth().testTag("fact-error:FROM"))
+                                }},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-from"))
+                            OutlinedTextField(ui.until,{edit(FactInput.UNTIL,it)},
+                                label={Text("结束日",Modifier.width(IntrinsicSize.Max).testTag("fact-label:UNTIL"))},isError=rejected(FactInput.UNTIL),
+                                supportingText={Column {
+                                    Text("结束日（不含此日，未知留空）",Modifier.fillMaxWidth().testTag("fact-help:UNTIL"))
+                                    if(rejected(FactInput.UNTIL))Text(overflowHint,Modifier.fillMaxWidth().testTag("fact-error:UNTIL"))
+                                }},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-until"))
+                            OutlinedTextField(ui.zone,{edit(FactInput.ZONE,it)},
+                                label={Text("日期时区",Modifier.width(IntrinsicSize.Max).testTag("fact-label:ZONE"))},isError=rejected(FactInput.ZONE),
+                                supportingText={Column {
+                                    Text("日期时区（IANA，如 Asia/Shanghai；全未知留空）",Modifier.fillMaxWidth().testTag("fact-help:ZONE"))
+                                    if(rejected(FactInput.ZONE))Text(overflowHint,Modifier.fillMaxWidth().testTag("fact-error:ZONE"))
+                                }},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-zone"))
                             Row { Checkbox(ui.affirmed,{if(canUse())controller.affirm(ui.session,it)},enabled=editable,modifier=Modifier.testTag("fact-affirm"));Text("我确认这是本人明确的普通事实自述，不是引用、假设、计划或敏感身份/健康/关系推断。") }
                             Button(onClick={if(canUse())controller.save(ui.session)},enabled=editable,modifier=Modifier.heightIn(min=48.dp).testTag("fact-save")) { Text(if(ui.editing==null)"仅保存为待确认候选" else "纠正并重新待确认") }
                             if(ui.editing!=null)TextButton(onClick={if(canUse())controller.cancelCorrection(ui.session)},enabled=editable,modifier=Modifier.heightIn(min=48.dp)) { Text("取消纠正") }

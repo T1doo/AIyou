@@ -11,6 +11,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.text.TextLayoutResult
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import android.graphics.Bitmap
 import java.io.File
 import org.json.JSONObject
+import org.json.JSONArray
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.shadows.ShadowDialog
 import org.robolectric.annotation.GraphicsMode
@@ -145,6 +147,72 @@ class SourceFactPresentationTest {
         val file=File("build/reports/tests/testDebugUnitTest/source-facts/$name.png");file.parentFile.mkdirs()
         file.outputStream().use{check(image.compress(Bitmap.CompressFormat.PNG,100,it))}
     }
+    private fun verifyFormLayout(fontScale:Float,frameName:String){
+        data class Spec(val role:String,val tag:String,val label:String,val help:String)
+        data class Region(val bounds:DpRect,val layout:TextLayoutResult,val expected:String)
+        data class Row(val spec:Spec,val field:DpRect,val label:Region,val help:Region,val error:Region?)
+        val specs=listOf(
+            Spec("QUOTE","fact-quote","原文片段","逐字原文片段（最多320字）"),
+            Spec("TOPIC","fact-topic-label","主题/上下文","新建普通事实主题/上下文（最多40字）"),
+            Spec("FROM","fact-from","生效起始日","生效起始日（YYYY-MM-DD，未知留空）"),
+            Spec("UNTIL","fact-until","结束日","结束日（不含此日，未知留空）"),
+            Spec("ZONE","fact-zone","日期时区","日期时区（IANA，如 Asia/Shanghai；全未知留空）"))
+        val receipt=JSONObject().put("source_sha",System.getenv("GITHUB_SHA")?:"local-not-CI")
+            .put("fontScale",fontScale).put("units","dp, unclipped bounds in one unchanged dialog viewport")
+            .put("anchor",if(fontScale==2f)"fact-quote"else"dialog title").put("status","NOT_COMPLETE")
+        val measured=JSONArray();receipt.put("fields",measured)
+        fun rect(b:DpRect)=JSONObject().put("left",b.left.value).put("top",b.top.value).put("right",b.right.value).put("bottom",b.bottom.value)
+        fun text(tag:String,expected:String):Region {
+            val node=compose.onNodeWithTag(tag,useUnmergedTree=true).assertTextEquals(expected)
+            val layouts=mutableListOf<TextLayoutResult>()
+            node.performSemanticsAction(SemanticsActions.GetTextLayoutResult){assertTrue(it(layouts))}
+            return Region(node.getUnclippedBoundsInRoot(),layouts.single(),expected)
+        }
+        fun capture(){
+            val file=File("build/reports/tests/testDebugUnitTest/source-facts/$frameName-layout.json")
+            file.parentFile.mkdirs();file.writeText(receipt.toString(2));frame(frameName)
+        }
+        try {
+            compose.waitForIdle()
+            receipt.put("viewport",rect(compose.onNodeWithTag("facts-dialog").getUnclippedBoundsInRoot()))
+            val rejected=checkNotNull(state.value.sourceFacts).rejectedInput
+            val rows=specs.map{spec->
+                val field=compose.onNodeWithTag(spec.tag).getUnclippedBoundsInRoot()
+                val label=text("fact-label:"+spec.role,spec.label);val help=text("fact-help:"+spec.role,spec.help)
+                val errors=compose.onAllNodesWithTag("fact-error:"+spec.role,useUnmergedTree=true).fetchSemanticsNodes()
+                assertEquals(if(FactInput.valueOf(spec.role) in rejected)1 else 0,errors.size)
+                val error=if(errors.isEmpty())null else text("fact-error:"+spec.role,"超长输入未接纳；当前仅显示有界预览，请改正后再保存。")
+                measured.put(JSONObject().put("role",spec.role).put("field",rect(field)).put("label",rect(label.bounds)).put("help",rect(help.bounds))
+                    .put("labelLines",label.layout.lineCount).put("labelOverflow",label.layout.hasVisualOverflow)
+                    .put("helpLines",help.layout.lineCount).put("helpOverflow",help.layout.hasVisualOverflow)
+                    .put("error",error?.let{rect(it.bounds)}?:JSONObject.NULL))
+                Row(spec,field,label,help,error)
+            }
+            rows.forEachIndexed{index,row->
+                for(region in listOfNotNull(row.label,row.help,row.error)){
+                    val b=region.bounds;val f=row.field
+                    assertTrue(row.spec.role+" requires finite real bounds",listOf(b.left.value,b.top.value,b.right.value,b.bottom.value).all{it.isFinite()})
+                    assertEquals(fontScale,region.layout.layoutInput.density.fontScale,0f);assertFalse(region.layout.hasVisualOverflow)
+                    assertEquals(region.expected.length,region.layout.getLineEnd(region.layout.lineCount-1,visibleEnd=true))
+                    assertTrue(row.spec.role+" text must stay inside its own field",b.left>=f.left&&b.right<=f.right&&b.top>=f.top&&b.bottom<=f.bottom)
+                }
+                assertEquals(row.spec.role+" floating label must remain one line",1,row.label.layout.lineCount)
+                assertTrue(row.help.bounds.top>=row.label.bounds.bottom)
+                row.error?.let{assertTrue(it.bounds.top>=row.help.bounds.bottom)}
+                if(index>0){
+                    val previous=rows[index-1].field
+                    assertTrue(row.spec.role+" field overlaps previous field",row.field.top>=previous.bottom)
+                    assertTrue(row.spec.role+" label overlaps previous field",row.label.bounds.top>=previous.bottom)
+                }
+            }
+            receipt.put("status","PASS")
+        }catch(t:Throwable){
+            receipt.put("status","FAIL").put("failure_type",t.javaClass.simpleName)
+            runCatching{capture()}.exceptionOrNull()?.let{t.addSuppressed(it)}
+            throw t
+        }
+        capture()
+    }
     @Test fun explicitCandidateSeparateAcceptanceCorrectionAndRevocationReachExactOriginalAndUnifiedFact(){
         RuntimeEnvironment.setFontScale(1f);compose.setContent {Screen()};reader();open();form();click("fact-save")
         click("fact-cancel");assertEquals(0,writes);click("fact-save");confirm();assertEquals(1,creates)
@@ -185,8 +253,8 @@ class SourceFactPresentationTest {
         field.performSemanticsAction(SemanticsActions.GetTextLayoutResult){assertTrue(it(layouts))};val layout=layouts.single()
         assertEquals(2f,layout.layoutInput.density.fontScale,0f);assertFalse(layout.hasVisualOverflow);assertEquals(state.value.sourceFacts!!.quote.length,layout.getLineEnd(layout.lineCount-1,visibleEnd=true))
         compose.runOnIdle{assertEquals(2f,checkNotNull(ShadowDialog.getLatestDialog()).context.resources.configuration.fontScale,0f)}
-        frame("02-double-font")
-        val json=File("build/reports/tests/testDebugUnitTest/source-facts/fontscale.json");json.writeText(JSONObject().put("source_sha",System.getenv("GITHUB_SHA")?:"local-not-CI").put("fontScale",layout.layoutInput.density.fontScale).put("hasVisualOverflow",layout.hasVisualOverflow).put("lineCount",layout.lineCount).toString(2))
+        val json=File("build/reports/tests/testDebugUnitTest/source-facts/fontscale.json");json.parentFile.mkdirs();json.writeText(JSONObject().put("source_sha",System.getenv("GITHUB_SHA")?:"local-not-CI").put("fontScale",layout.layoutInput.density.fontScale).put("hasVisualOverflow",layout.hasVisualOverflow).put("lineCount",layout.lineCount).toString(2))
+        verifyFormLayout(2f,"02-double-font")
         for(tag in listOf("fact-save","fact-close"))compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertIsEnabled().assertHeightIsAtLeast(48.dp)
         compose.onNodeWithTag("fact-from").performScrollTo().performTextReplacement("2026-10-24");click("fact-save")
         compose.runOnIdle{loseAck=true};confirm();val pending=state.value.sourceFacts!!.pending!!
@@ -201,7 +269,7 @@ class SourceFactPresentationTest {
         assertTrue(state.value.sourceFacts!!.busy);assertEquals(1,retiredQueries);assertEquals(0,writes);assertEquals(1,queue.size)
         drain();assertEquals(1,writes);assertNull(state.value.sourceFacts!!.pending);assertNotNull(state.value.sourceFacts!!.notice)
         compose.onNode(hasText("普通事实自述") and hasAnyAncestor(hasTestTag("facts-dialog"))).performScrollTo().assertIsDisplayed()
-        frame("01-normal-editor");assertEquals(listOf(entry),state.value.entries)
+        verifyFormLayout(1f,"01-normal-editor");assertEquals(listOf(entry),state.value.entries)
         val s=state.value.sourceFacts!!.session;click("fact-accept:"+saved!!.id);drain();click("fact-confirm");compose.waitForIdle()
         assertEquals(s,state.value.sourceFacts!!.session);assertEquals(1,writes);drain();assertEquals(2,writes)
     }
