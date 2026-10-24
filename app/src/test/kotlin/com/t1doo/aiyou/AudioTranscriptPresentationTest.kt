@@ -124,6 +124,22 @@ class AudioTranscriptPresentationTest {
             .put("firstLineHeightPx",(layout.getLineBottom(0)-layout.getLineTop(0)).toDouble())
             .put("layoutWidthPx",layout.size.width).put("layoutHeightPx",layout.size.height)
             .put("lineCount",layout.lineCount).put("hasVisualOverflow",layout.hasVisualOverflow)
+            .put("text_sha256",OriginalExports.hash(layout.layoutInput.text.text))
+    }
+    private fun recordEditorScale(fontCase:String,measurement:JSONObject) {
+        check(fontCase in setOf("normal","double"))
+        val head=System.getenv("GITHUB_SHA")?:ProcessBuilder("git","rev-parse","HEAD").redirectErrorStream(true).start().let{process->
+            try {
+                check(process.waitFor(5,java.util.concurrent.TimeUnit.SECONDS)&&process.exitValue()==0)
+                process.inputStream.bufferedReader().use{it.readText().trim()}
+            }finally{if(process.isAlive)process.destroy()}
+        }
+        check(Regex("[0-9a-f]{40}").matches(head))
+        val file=File("build/reports/tests/testDebugUnitTest/transcript-ranges/editor-fontscale-$fontCase.json")
+        file.parentFile.mkdirs()
+        file.writeText(JSONObject().put("source_sha",head).put("font_case",fontCase)
+            .put("kind","Actual production Dialog resources and text layout; JVM simulation, not device evidence")
+            .put("measurement",measurement).toString(2))
     }
     private fun visibleControl(tag:String)=compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertIsEnabled().also{
         it.assertHeightIsAtLeast(48.dp)
@@ -169,7 +185,7 @@ class AudioTranscriptPresentationTest {
         compose.waitForIdle();drain()
         compose.runOnIdle{assertNull(state.value.audioTranscripts);assertEquals(1,writes);assertFalse(saved!!.withdrawn)}
     }
-    @Test fun explicitHumanRangeAtNormalAndDoubleFontReachesExactFocusedSourceWithoutAutoplay(){
+    @Test fun normalPlatformFontRecordsActualRangeEditorLayoutWithoutSavingPrivateInput(){
         RuntimeEnvironment.setFontScale(1f)
         viewFont=1f;compose.setContent{Screen()};detail()
         compose.onNodeWithTag("transcript-text").performScrollTo().performTextReplacement("合成人工片段 · 不自动播放")
@@ -177,13 +193,20 @@ class AudioTranscriptPresentationTest {
         click("transcript-range-tail");compose.onNodeWithTag("transcript-range-through").performScrollTo().performTextReplacement("0.005")
         val normal=editorScale(1f)
         visibleControl("transcript-save");frame("01-normal-editor","transcript-dialog")
-        // A Dialog has its own AndroidComposeView: update platform resources as well as the host.
+        recordEditorScale("normal",normal)
+        assertEquals(0,writes);assertEquals("0.001",state.value.audioTranscripts!!.rangeFrom)
+        visibleControl("transcript-close").performClick();drain()
+        assertNull(state.value.audioTranscripts);assertEquals(0,writes)
+    }
+    @Test fun explicitHumanRangeAtNormalAndDoubleFontReachesExactFocusedSourceWithoutAutoplay(){
+        // Configure before creating production content. This is a font-layout test, not a live
+        // Activity configuration-change test; the verifier compares the separate 1x sample.
         RuntimeEnvironment.setFontScale(2f)
-        compose.runOnIdle{viewFont=2f};compose.waitForIdle()
+        viewFont=2f;compose.setContent{Screen()};detail()
+        compose.onNodeWithTag("transcript-text").performScrollTo().performTextReplacement("合成人工片段 · 不自动播放")
+        click("transcript-range-custom");compose.onNodeWithTag("transcript-range-from").performScrollTo().performTextReplacement("0.001")
+        click("transcript-range-tail");compose.onNodeWithTag("transcript-range-through").performScrollTo().performTextReplacement("0.005")
         val large=editorScale(2f)
-        assertEquals(normal.getDouble("density"),large.getDouble("density"),0.0)
-        assertTrue("Actual text line height must grow, without assuming linear Android SP scaling",
-            large.getDouble("firstLineHeightPx")>normal.getDouble("firstLineHeightPx"))
         visibleControl("transcript-range-from").assertTextContains("0.001")
         visibleControl("transcript-range-through").performTextReplacement("9999999")
         visibleControl("transcript-save").performClick();drain();assertEquals(0,writes)
@@ -194,11 +217,7 @@ class AudioTranscriptPresentationTest {
         compose.onNodeWithTag("transcript-range-through-error").assertDoesNotExist()
         visibleControl("transcript-close") // Check cancellation remains reachable, without discarding this unsaved edit.
         visibleControl("transcript-save");frame("02-double-font-editor","transcript-dialog")
-        val scaleFile=File("build/reports/tests/testDebugUnitTest/transcript-ranges/editor-fontscale.json")
-        scaleFile.parentFile.mkdirs()
-        scaleFile.writeText(JSONObject().put("source_sha",System.getenv("GITHUB_SHA")?:"local-unbound")
-            .put("kind","Actual production Dialog resources and text layout; JVM simulation, not device evidence")
-            .put("normal",normal).put("double",large).toString(2))
+        recordEditorScale("double",large)
         compose.runOnIdle{assertEquals(0,writes);assertEquals("0.001",state.value.audioTranscripts!!.rangeFrom)}
         click("transcript-save");drain();assertEquals(AudioSampleRange(45,221),saved!!.current.range)
         click("transcript-withdraw")

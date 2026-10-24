@@ -4,7 +4,52 @@ from pathlib import Path
 import argparse
 import hashlib
 import json
+import math
+import os
+import subprocess
 import xml.etree.ElementTree as ET
+
+
+def verify_transcript_fontscale(folder: Path, head: str) -> dict:
+    """Join real independent-window samples; labels and larger PNGs are not font evidence."""
+    if len(head) != 40 or any(c not in "0123456789abcdef" for c in head):
+        raise ValueError("Invalid font-evidence source SHA")
+    samples, files = {}, []
+    for label, scale in (("normal", 1.0), ("double", 2.0)):
+        path = folder / f"editor-fontscale-{label}.json"
+        raw = path.read_bytes()
+        if not 0 < len(raw) <= 4096:
+            raise ValueError("Missing or oversized font measurement")
+        value = json.loads(raw)
+        if value.get("source_sha") != head or value.get("font_case") != label:
+            raise ValueError("Font measurement source/case mismatch")
+        sample = value["measurement"]
+        for key in ("configurationFontScale", "layoutFontScale"):
+            if type(sample[key]) not in (int, float) or sample[key] != scale:
+                raise ValueError("Dialog did not consume the requested platform font scale")
+        for key in ("density", "firstLineHeightPx"):
+            if type(sample[key]) not in (int, float) or not math.isfinite(sample[key]) or sample[key] <= 0:
+                raise ValueError("Invalid real font metric")
+        for key in ("layoutWidthPx", "layoutHeightPx", "lineCount"):
+            if type(sample[key]) is not int or sample[key] <= 0:
+                raise ValueError("Empty text layout")
+        digest = sample["text_sha256"]
+        if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+            raise ValueError("Missing exact input-text identity")
+        if sample["hasVisualOverflow"] is not False:
+            raise ValueError("Real editor paragraph overflowed")
+        samples[label] = sample
+        files.append({"path": path.name, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()})
+    normal, large = samples["normal"], samples["double"]
+    if normal["density"] != large["density"] or normal["text_sha256"] != large["text_sha256"]:
+        raise ValueError("Font comparison changed pixel density or input text")
+    if large["firstLineHeightPx"] <= normal["firstLineHeightPx"]:
+        raise ValueError("Actual editor text did not grow")
+    receipt = {"source_sha": head, "kind": "Paired production Dialog measurements on JVM; not device evidence",
+               "normal": normal, "double": large, "input_files": files}
+    (folder / "editor-fontscale.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    return receipt
+
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
@@ -264,6 +309,7 @@ for label, folder, minimum in targets:
             "doubleFontControlledExtractionCorrectionKeywordJumpAndConfirmedDeletionReachExactOriginal",
             "restoredPrivateImageSourceRetiresRetainedAThenBViewerAndLookupCannotDisplayA")
         additional["com.t1doo.aiyou.AudioTranscriptPresentationTest"] = (
+            "normalPlatformFontRecordsActualRangeEditorLayoutWithoutSavingPrivateInput",
             "focusedRangeSaveSurvivesPanelRemovalAndRecompositionBeforeActorRelease",
             "focusedWithdrawalSurvivesPanelRemovalAndRecompositionBeforeActorRelease",
             "explicitCloseStillCancelsAnUnstartedFocusedCorrectionAfterPanelRetirement",
@@ -821,3 +867,10 @@ for label, folder, minimum in targets:
                 if len(matches) != 1:
                     raise SystemExit(f"FAIL: required edit recovery case={owner}.{name} actual={len(matches)}")
                 print(f"PASS: required edit recovery case={owner}.{name} actual=1 failures=0 errors=0 skipped=0")
+
+if args.ui:
+    head = os.environ.get("GITHUB_SHA") or subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=root, text=True, timeout=5).strip()
+    font_receipt = verify_transcript_fontscale(
+        root / "app/build/reports/tests/testDebugUnitTest/transcript-ranges", head)
+    print("TRANSCRIPT_FONT_SCALE_JSON " + json.dumps(font_receipt))
