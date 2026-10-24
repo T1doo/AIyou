@@ -10,6 +10,8 @@ import android.graphics.Bitmap
 import java.io.File
 import org.robolectric.annotation.GraphicsMode
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -30,7 +32,10 @@ import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowDialog
+import org.json.JSONObject
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[35],qualifiers="w320dp-h640dp")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -94,6 +99,36 @@ class AudioTranscriptPresentationTest {
         val file=File("build/reports/tests/testDebugUnitTest/transcript-ranges/$name.png");file.parentFile.mkdirs()
         file.outputStream().use{check(image.compress(Bitmap.CompressFormat.PNG,100,it))}
     }
+    /** Observe the production Dialog's Android resources and its real editable-text layout. */
+    private fun editorScale(expected:Float):JSONObject {
+        val field=compose.onNodeWithTag("transcript-text").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        val layouts=mutableListOf<TextLayoutResult>()
+        field.performSemanticsAction(SemanticsActions.GetTextLayoutResult){assertTrue(it(layouts))}
+        assertEquals("Exactly one real editable-text layout",1,layouts.size)
+        val layout=layouts.single()
+        assertEquals(expected,layout.layoutInput.density.fontScale,0f)
+        assertFalse("Editor text must not overflow its actual paragraph",layout.hasVisualOverflow)
+        assertTrue(layout.lineCount>0)
+        assertEquals(state.value.audioTranscripts!!.text,layout.layoutInput.text.text)
+        assertEquals(layout.layoutInput.text.length,layout.getLineEnd(layout.lineCount-1,visibleEnd=true))
+        var configurationScale=0f
+        compose.runOnIdle{
+            val dialog=checkNotNull(ShadowDialog.getLatestDialog())
+            assertTrue(dialog.isShowing)
+            configurationScale=dialog.context.resources.configuration.fontScale
+            assertEquals(expected,configurationScale,0f)
+        }
+        return JSONObject().put("configurationFontScale",configurationScale.toDouble())
+            .put("layoutFontScale",layout.layoutInput.density.fontScale.toDouble())
+            .put("density",layout.layoutInput.density.density.toDouble())
+            .put("firstLineHeightPx",(layout.getLineBottom(0)-layout.getLineTop(0)).toDouble())
+            .put("layoutWidthPx",layout.size.width).put("layoutHeightPx",layout.size.height)
+            .put("lineCount",layout.lineCount).put("hasVisualOverflow",layout.hasVisualOverflow)
+    }
+    private fun visibleControl(tag:String)=compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertIsEnabled().also{
+        it.assertHeightIsAtLeast(48.dp)
+        assertEquals("Whole control must be inside the Dialog viewport",it.getUnclippedBoundsInRoot(),it.getBoundsInRoot())
+    }
     /** Queue stays blocked across real AIyouApp recomposition; no callback substitutes for button clicks. */
     private fun pendingFocusedChange(withdraw:Boolean):AudioTranscriptUi {
         viewFont=1f;compose.setContent{Screen()};detail()
@@ -135,15 +170,41 @@ class AudioTranscriptPresentationTest {
         compose.runOnIdle{assertNull(state.value.audioTranscripts);assertEquals(1,writes);assertFalse(saved!!.withdrawn)}
     }
     @Test fun explicitHumanRangeAtNormalAndDoubleFontReachesExactFocusedSourceWithoutAutoplay(){
+        RuntimeEnvironment.setFontScale(1f)
         viewFont=1f;compose.setContent{Screen()};detail()
         compose.onNodeWithTag("transcript-text").performScrollTo().performTextReplacement("合成人工片段 · 不自动播放")
         click("transcript-range-custom");compose.onNodeWithTag("transcript-range-from").performScrollTo().performTextReplacement("0.001")
         click("transcript-range-tail");compose.onNodeWithTag("transcript-range-through").performScrollTo().performTextReplacement("0.005")
-        compose.onNodeWithTag("transcript-save").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertIsEnabled();frame("01-normal-editor","transcript-dialog")
+        val normal=editorScale(1f)
+        visibleControl("transcript-save");frame("01-normal-editor","transcript-dialog")
+        // A Dialog has its own AndroidComposeView: update platform resources as well as the host.
+        RuntimeEnvironment.setFontScale(2f)
         compose.runOnIdle{viewFont=2f};compose.waitForIdle()
-        compose.onNodeWithTag("transcript-save").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertIsEnabled();frame("02-double-font-editor","transcript-dialog")
+        val large=editorScale(2f)
+        assertEquals(normal.getDouble("density"),large.getDouble("density"),0.0)
+        assertTrue("Actual text line height must grow, without assuming linear Android SP scaling",
+            large.getDouble("firstLineHeightPx")>normal.getDouble("firstLineHeightPx"))
+        visibleControl("transcript-range-from").assertTextContains("0.001")
+        visibleControl("transcript-range-through").performTextReplacement("9999999")
+        visibleControl("transcript-save").performClick();drain();assertEquals(0,writes)
+        val error=compose.onNodeWithTag("transcript-range-through-error").performScrollTo().assertIsDisplayed()
+            .assertTextEquals("终点输入过长，请明确纠正。")
+        assertEquals(error.getUnclippedBoundsInRoot(),error.getBoundsInRoot())
+        visibleControl("transcript-range-through").performTextReplacement("0.005")
+        compose.onNodeWithTag("transcript-range-through-error").assertDoesNotExist()
+        visibleControl("transcript-close") // Check cancellation remains reachable, without discarding this unsaved edit.
+        visibleControl("transcript-save");frame("02-double-font-editor","transcript-dialog")
+        val scaleFile=File("build/reports/tests/testDebugUnitTest/transcript-ranges/editor-fontscale.json")
+        scaleFile.parentFile.mkdirs()
+        scaleFile.writeText(JSONObject().put("source_sha",System.getenv("GITHUB_SHA")?:"local-unbound")
+            .put("kind","Actual production Dialog resources and text layout; JVM simulation, not device evidence")
+            .put("normal",normal).put("double",large).toString(2))
         compose.runOnIdle{assertEquals(0,writes);assertEquals("0.001",state.value.audioTranscripts!!.rangeFrom)}
         click("transcript-save");drain();assertEquals(AudioSampleRange(45,221),saved!!.current.range)
+        click("transcript-withdraw")
+        visibleControl("transcript-withdraw-confirm")
+        visibleControl("transcript-withdraw-cancel").performClick();drain()
+        assertEquals(1,writes);assertFalse(saved!!.withdrawn);assertEquals(AudioSampleRange(45,221),saved!!.current.range)
         compose.runOnIdle{viewWidth=320;viewHeight=640;viewFont=2f};compose.waitForIdle()
         backToSearch();query("人工片段");click("transcript-source:"+saved!!.id);drain()
         compose.runOnIdle{val p=attachments.state.value!!;assertTrue(p.transcriptSource);assertEquals(anchor,p.transcriptReference!!.anchor);assertEquals(AudioSampleRange(45,221),p.transcriptReference!!.range);assertEquals(1,writes)}
