@@ -94,7 +94,7 @@ class AppAccessPresentationTest {
     private fun phase(expected: AppAccessPhase) {
         compose.waitForIdle()
         try {
-            compose.waitUntil(2_000) { controller.state.value.phase == expected }
+            compose.waitUntil(2_000) { compose.runOnIdle { controller.state.value.phase == expected } }
         } catch (failure: ComposeTimeoutException) {
             throw AssertionError("App access phase expected=$expected observed=${controller.state.value.phase} writes=${preferenceWrites?.get()}", failure)
         }
