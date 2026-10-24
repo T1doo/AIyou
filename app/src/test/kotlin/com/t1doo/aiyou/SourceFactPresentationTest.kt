@@ -36,7 +36,6 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.*
@@ -61,8 +60,6 @@ class SourceFactPresentationTest {
     private var failRead=false;private var loseAck=false
     private var retiredQueries=0
     private var registry:SaveableStateRegistry?=null
-    private val formMeasure=AtomicReference<Pair<Long,FactLabelMeasureTrace>>()
-    private val measureObserver:(Long,FactLabelMeasureTrace)->Unit={session,trace->formMeasure.set(session to trace)}
     private val port=object:SourceFactRepository {
         override fun preview(source:SourceVersion,checkCurrent:()->Unit):SourceMemoryPreview {check(!failRead && source==this@SourceFactPresentationTest.source);return SourceMemoryPreview(source,OriginalExports.hash(entry.originalText),0,entry.originalText,55,"UTC",ProcessingPolicy.LOCAL_ONLY,1)}
         override fun facts(source:SourceVersion,checkCurrent:()->Unit)=listOfNotNull(saved)
@@ -133,9 +130,7 @@ class SourceFactPresentationTest {
     @After fun dispose(){controller.dispose();unified.dispose()}
     @Composable private fun Screen() {
         val currentRegistry=LocalSaveableStateRegistry.current;SideEffect {registry=currentRegistry}
-        AIyouTheme {CompositionLocalProvider(LocalFactFormMeasureObserver provides measureObserver) {
-            AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},sourceFacts=controller,unifiedKeywords=unified)
-        }}
+        AIyouTheme {AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},sourceFacts=controller,unifiedKeywords=unified)}
     }
     private fun click(tag:String) { compose.showOriginalToolsFor(tag);compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertIsEnabled().performClick();compose.waitForIdle()}
     private fun drain() {compose.runOnIdle {runBlocking {while(true)(queue.poll()?:break)(owner)}};compose.waitForIdle()}
@@ -166,7 +161,7 @@ class SourceFactPresentationTest {
             Spec("UNTIL","fact-until","结束日","结束日（不含此日，未知留空）"),
             Spec("ZONE","fact-zone","日期时区","日期时区（IANA，如 Asia/Shanghai；全未知留空）"))
         val receipt=JSONObject().put("source_sha",System.getenv("GITHUB_SHA")?:"local-not-CI")
-            .put("purpose","measurement observation only; no layout fix")
+            .put("purpose","fact form layout validation; actual TextLayout and modifier coordinates")
             .put("fontScale",fontScale).put("units","dp, unclipped bounds in one unchanged dialog viewport")
             .put("anchor",if(fontScale==2f)"fact-quote"else"dialog title").put("status","NOT_COMPLETE")
         val measured=JSONArray();receipt.put("fields",measured)
@@ -188,7 +183,7 @@ class SourceFactPresentationTest {
                 .put("contentCoordinates",coordinates(info.coordinates)).put("modifiers",modifiers)
         }
         fun fieldLayout(tag:String):JSONObject {
-            val merged=compose.onNodeWithTag(tag).fetchSemanticsNode()
+            val merged=compose.onNodeWithTag(tag).assert(hasSetTextAction()).fetchSemanticsNode()
             val unmerged=compose.onNodeWithTag(tag,useUnmergedTree=true).fetchSemanticsNode()
             return layout(merged.layoutInfo)
                 .put("mergedMergesDescendants",merged.config.isMergingSemanticsOfDescendants)
@@ -219,18 +214,6 @@ class SourceFactPresentationTest {
         try {
             compose.waitForIdle()
             receipt.put("viewport",rect(compose.onNodeWithTag("facts-dialog").getUnclippedBoundsInRoot()))
-            val sample=checkNotNull(formMeasure.get()) {"Missing actual Dialog measurement"}
-            val sameSession=sample.first==checkNotNull(state.value.sourceFacts).session
-            val trace=sample.second
-            val predictions=JSONArray()
-            trace.predictions.forEach {p->predictions.put(JSONObject().put("label",p.label)
-                .put("widthPx",p.widthPx).put("heightPx",p.heightPx).put("fontSize",p.fontSize).put("lineHeight",p.lineHeight)
-                .put("style",p.style).put("density",p.density).put("fontScale",p.fontScale)
-                .put("softWrap",p.softWrap).put("maxLines",p.maxLines).put("constraints",p.constraints))}
-            receipt.put("productionMeasurement",JSONObject().put("sameSession",sameSession)
-                .put("density",trace.density).put("fontScale",trace.fontScale).put("reservedHalfPx",trace.reservedHalfPx)
-                .put("measuredHalfPx",trace.measuredHalfPx).put("insetPx",trace.insetPx).put("insetDp",trace.insetDp.value)
-                .put("predictions",predictions))
             val rejected=checkNotNull(state.value.sourceFacts).rejectedInput
             val rows=specs.map{spec->
                 val field=compose.onNodeWithTag(spec.tag).getUnclippedBoundsInRoot()
@@ -246,8 +229,6 @@ class SourceFactPresentationTest {
                     .put("labelLayout",layout(compose.onNodeWithTag("fact-label:"+spec.role,useUnmergedTree=true).fetchSemanticsNode().layoutInfo)))
                 Row(spec,field,label,help,error)
             }
-            assertTrue("Dialog measurement must belong to the current session",sameSession)
-            assertEquals(fontScale,trace.fontScale,0f)
             rows.forEachIndexed{index,row->
                 for(region in listOfNotNull(row.label,row.help,row.error)){
                     val b=region.bounds;val f=row.field
