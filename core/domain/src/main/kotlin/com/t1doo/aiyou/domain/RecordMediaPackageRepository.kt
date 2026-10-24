@@ -22,7 +22,16 @@ interface RecordMediaPackageRepository {
         throw UnsupportedOperationException("Original edit draft migration unavailable")
     }
     suspend fun previewOpenZip(snapshot: OriginalExportSnapshot, active: () -> Boolean): RecordMediaPreview = preview(snapshot)
+    suspend fun previewOpenZipWithTranscripts(snapshot: OriginalExportSnapshot, active: () -> Boolean): RecordMediaPreview {
+        throw UnsupportedOperationException("Human transcript export unavailable")
+    }
     suspend fun isCurrent(preview: RecordMediaPreview): Boolean
+    /** After provider write/read close ACKs. Publication follows the authoritative read commit ACK. */
+    suspend fun confirmOpenZip(preview: RecordMediaPreview, publish: () -> Unit): Boolean {
+        check(preview.openTranscripts == null) { "Human transcript proof requires its issuing repository" }
+        if (!isCurrent(preview)) return false
+        publish(); return true
+    }
     suspend fun seal(preview: RecordMediaPreview, password: CharArray): PreparedRecordMediaPackage
     /** Explicitly confirmed plaintext ZIP; current originals + every current image/WAV, no restore capability. */
     suspend fun exportOpenZip(preview: RecordMediaPreview): PreparedRecordMediaPackage {

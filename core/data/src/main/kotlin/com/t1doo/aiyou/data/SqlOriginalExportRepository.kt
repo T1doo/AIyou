@@ -39,7 +39,7 @@ internal class SqlOriginalExportRepository(private val database: RecordsSqlDatab
             }
         }
     }
-    private fun currentWithin(sql: RecordsSqlConnection, snapshot: OriginalExportSnapshot) = snapshot.records.all { record ->
+    internal fun currentWithin(sql: RecordsSqlConnection, snapshot: OriginalExportSnapshot) = snapshot.records.all { record ->
         try { record.same(read(sql, SourceVersion(record.entry.id, record.entry.currentRevision.toLong()))) }
         catch (_: OriginalExportConflict) { false }
     }

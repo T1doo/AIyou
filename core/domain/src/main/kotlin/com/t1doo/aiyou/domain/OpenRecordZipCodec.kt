@@ -15,6 +15,7 @@ class OpenRecordZipCancelled : IllegalStateException("Open export retired")
 object OpenRecordZipCodec {
     const val FORMAT_VERSION = 1
     const val AUDIO_FORMAT_VERSION = 4
+    const val HUMAN_TRANSCRIPT_FORMAT_VERSION = 5
     const val MAX_FILE_BYTES = RecordMediaPackages.MAX_IMAGE_TOTAL + 2L * OriginalExports.MAX_BYTES + 262144L
     fun imagePath(image: RecordPackageImage) = "images/" + image.attachmentId +
         if (image.mediaType == "image/png") ".png" else ".jpg"
@@ -33,6 +34,7 @@ object OpenRecordZipCodec {
             require(preview.audios.count { it.sourceId == record.entry.id } == record.audioCount)
         }
         val hasAudio = preview.audios.isNotEmpty()
+        val human = preview.openTranscripts?.items?.toList()
         return object : PreparedRecordMediaPackage {
             private val used = AtomicBoolean()
             private val released = AtomicBoolean()
@@ -65,8 +67,14 @@ object OpenRecordZipCodec {
                     })
                     try { if (jsonl.size > OriginalExports.MAX_BYTES) throw OriginalExportTooLarge(); writeFile("records.jsonl", jsonl) }
                     finally { jsonl.fill(0) }
+                    if (human != null) {
+                        val text=OriginalExports.utf8(human.joinToString("\n",postfix=if(human.isEmpty()) "" else "\n") { transcriptJson(it) })
+                        try { if(text.size>OriginalExports.MAX_BYTES)throw OriginalExportTooLarge();writeFile("human-transcripts.jsonl",text) }
+                        finally {text.fill(0)}
+                    }
                     val markdown = OriginalExports.utf8(buildString {
-                        if (hasAudio) append("# 爱忆选定原文与媒体资料包\n\n明文开放格式资料包，非完整备份。原音逐字节保留，可能包含私人谈话；不含人工转写或语音识别结果。保留手填事件日期与 IANA 时区；未知或已清除为 null，不补时刻。原图保留原始元数据，可能含位置等隐私。\n\n")
+                        if (human != null) append("# 爱忆选定原文与媒体资料包\n\n明文开放格式资料包，非完整备份。明确包含当前有效的人工转写；不是自动语音识别或原文事实验证，不含纠正历史或已撤回文字。原图和原音可能包含位置或私人谈话。\n\n")
+                        else if (hasAudio) append("# 爱忆选定原文与媒体资料包\n\n明文开放格式资料包，非完整备份。原音逐字节保留，可能包含私人谈话；不含人工转写或语音识别结果。保留手填事件日期与 IANA 时区；未知或已清除为 null，不补时刻。原图保留原始元数据，可能含位置等隐私。\n\n")
                         else append("# 爱忆选定图文资料包\n\n明文开放格式资料包，非完整备份。保留手填事件日期与 IANA 时区；未知或已清除为 null，不补时刻。原图保留原始元数据，可能含位置等隐私。\n\n")
                         preview.snapshot.records.forEachIndexed { index, record ->
                             append("## 记录 ${index + 1}\n\n")
@@ -78,6 +86,12 @@ object OpenRecordZipCodec {
                             }
                             preview.audios.filter { it.sourceId == record.entry.id }.forEach { audio ->
                                 append("\n[原音]("); append(audioPath(audio)); append(")\n")
+                                human?.singleOrNull {it.anchor.intent.id==audio.attachmentId}?.let { t ->
+                                    append("\n人工转写（可纠正派生文字，非自动识别）：\n\n")
+                                    append(OriginalExportCodec.fenced("text",t.current.text))
+                                    append("\n精确来源与半开采样范围（null 表示整段）：\n\n")
+                                    append(OriginalExportCodec.fenced("json",transcriptJson(t)))
+                                }
                             }
                             append("\n")
                         }
@@ -96,11 +110,12 @@ object OpenRecordZipCodec {
                         } finally { bytes.fill(0) }
                     }
                     fresh()
-                    val manifest = OriginalExports.utf8("{\"format\":\"AIyou-open-records\",\"formatVersion\":" + (if (hasAudio) AUDIO_FORMAT_VERSION else if(preview.snapshot.records.any { it.people.aliases.isNotEmpty() }) 3 else if(preview.snapshot.records.any { it.people.version > 0 }) 2 else 1) + ",\"schemaVersion\":1," +
+                    val manifest = OriginalExports.utf8("{\"format\":\"AIyou-open-records\",\"formatVersion\":" + (if(human!=null) HUMAN_TRANSCRIPT_FORMAT_VERSION else if (hasAudio) AUDIO_FORMAT_VERSION else if(preview.snapshot.records.any { it.people.aliases.isNotEmpty() }) 3 else if(preview.snapshot.records.any { it.people.version > 0 }) 2 else 1) + ",\"schemaVersion\":1," +
                         "\"snapshotId\":" + q(preview.snapshot.id) + ",\"createdAtMillis\":" + preview.snapshot.createdAtMillis +
                         ",\"encrypted\":false,\"recordCount\":" + preview.snapshot.records.size + ",\"imageCount\":" + preview.images.size +
                         (if (hasAudio) ",\"audioCount\":" + preview.audios.size + ",\"audioBytes\":" + preview.audios.sumOf { it.byteSize } else "") +
-                        ",\"scope\":[\"currentOriginals\",\"manualTags\",\"eventDates\",\"originalImages\"" + (if (hasAudio) ",\"originalAudio\"" else "") + (if(preview.snapshot.records.any { it.people.version > 0 }) ",\"manualPeople\"" else "") + (if(preview.snapshot.records.any { it.people.aliases.isNotEmpty() }) ",\"manualAliases\"" else "") + "],\"excluded\":[\"history\",\"tasks\",\"keys\",\"aiDerived\"]," +
+                        (if(human!=null) ",\"humanTranscriptCount\":"+human.size else "") +
+                        ",\"scope\":[\"currentOriginals\",\"manualTags\",\"eventDates\",\"originalImages\"" + (if(human!=null) ",\"currentHumanTranscripts\"" else "") + (if (hasAudio) ",\"originalAudio\"" else "") + (if(preview.snapshot.records.any { it.people.version > 0 }) ",\"manualPeople\"" else "") + (if(preview.snapshot.records.any { it.people.aliases.isNotEmpty() }) ",\"manualAliases\"" else "") + "],\"excluded\":[\"history\",\"tasks\",\"keys\",\"aiDerived\"]," +
                         "\"hashAlgorithm\":\"SHA-256\",\"manifestSelfHash\":false,\"images\":[" + preview.images.joinToString(",") { imageJson(it) } +
                         "]" + (if (hasAudio) ",\"audios\":[" + preview.audios.joinToString(",") { audioJson(it) } + "]" else "") +
                         ",\"files\":[" + files.joinToString(",") + "]}\n")
@@ -109,6 +124,16 @@ object OpenRecordZipCodec {
                 } finally { zip.close() }
             }
         }
+    }
+    private fun transcriptJson(t:AudioTranscriptSnapshot):String {
+        val a=t.anchor;val i=a.intent;val v=t.current;val range=v.range
+        return "{\"type\":\"humanAudioTranscript\",\"id\":"+q(t.id)+",\"savedVersion\":"+t.version+
+            ",\"textRevision\":"+v.revision+",\"text\":"+q(v.text)+",\"editedAtMillis\":"+v.at+
+            ",\"sourceId\":"+q(i.entryId)+",\"sourceRevision\":"+i.revision+",\"sourceHash\":"+q(a.sourceHash)+
+            ",\"sourceGeneration\":"+a.generation+",\"sourcePolicy\":"+q(a.policy.name)+
+            ",\"attachmentId\":"+q(i.id)+",\"audioPath\":"+q("audio/"+i.id+".wav")+",\"audioSha256\":"+q(i.sha256)+
+            ",\"audioByteSize\":"+i.byteSize+",\"sampleRate\":"+LocalPcmAudio.SAMPLE_RATE+",\"sourceFrames\":"+a.samples+
+            ",\"range\":"+(range?.let {"{\"startFrame\":"+it.startFrame+",\"endFrameExclusive\":"+it.endFrameExclusive+"}"}?:"null")+"}"
     }
     private fun imageJson(image: RecordPackageImage) = "{\"path\":" + q(imagePath(image)) +
         ",\"sourceId\":" + q(image.sourceId) + ",\"sourceRevision\":" + image.sourceRevision +

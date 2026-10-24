@@ -97,6 +97,33 @@ internal class SqlAudioTranscriptRepository(private val database:RecordsSqlDatab
         validateSet(values);return values
     }
     private fun validateSet(rows:List<Pair<Row,TranscriptPayload>>) {if(rows.size>128||rows.groupingBy{it.second.anchor.source}.eachCount().values.any{it>20})throw AudioTranscriptLimit();require(rows.map{it.second.anchor.intent.id}.distinct().size==rows.size)}
+    private inner class ExportScope(val snapshot:OriginalExportSnapshot,val audios:List<RecordPackageAudio>,
+        val signatures:List<String>,items:List<AudioTranscriptSnapshot>):OpenTranscriptScope {
+        val owner=this@SqlAudioTranscriptRepository
+        override val items:List<AudioTranscriptSnapshot> = java.util.Collections.unmodifiableList(items.toList())
+        override fun toString()="OpenTranscriptScope(redacted)"
+    }
+    internal fun openExportWithin(sql:RecordsSqlConnection,snapshot:OriginalExportSnapshot,audios:List<RecordPackageAudio>):OpenTranscriptScope {
+        check(!retired)
+        // Authenticate ALL READY rows, including withdrawn/history, before selecting this exact media set.
+        val all=live(sql);val ids=audios.map {it.attachmentId}.toSet()
+        val selected=all.filter {it.second.anchor.intent.id in ids}
+        selected.forEach { (_,p) ->
+            val a=p.anchor;val i=a.intent
+            require(audios.any {it.attachmentId==i.id && it.sourceId==i.entryId && it.sourceRevision==i.revision && it.sha256==i.sha256 && it.byteSize==i.byteSize})
+            require(snapshot.records.any {it.entry.id==i.entryId && it.entry.currentRevision==i.revision && it.contentHash==a.sourceHash &&
+                it.sourceGeneration==a.generation && it.entry.capturedAtMillis==a.capturedAtMillis && it.entry.captureTimeZone==a.zone && it.entry.policy==a.policy})
+        }
+        return ExportScope(snapshot,java.util.Collections.unmodifiableList(audios.toList()),
+            selected.map {it.first.id+":"+it.first.version+":"+hash(it.first.bytes)},
+            selected.filterNot {it.second.withdrawn}.map {this.snapshot(it.first,it.second)})
+    }
+    internal fun openExportCurrentWithin(sql:RecordsSqlConnection,scope:OpenTranscriptScope,snapshot:OriginalExportSnapshot,audios:List<RecordPackageAudio>):Boolean {
+        val proof=scope as? ExportScope?:return false
+        if(proof.owner!==this || proof.snapshot!==snapshot || proof.audios!=audios || retired)return false
+        val now=openExportWithin(sql,snapshot,audios) as ExportScope
+        return proof.signatures==now.signatures && proof.items.size==now.items.size && proof.items.zip(now.items).all{(a,b)->a.same(b)}
+    }
     private inner class Page(override val keyword:String,override val cursor:PreferenceCursor?,override val next:PreferenceCursor?,items:List<AudioTranscriptSnapshot>,val signatures:List<String>):AudioTranscriptPage {val owner=this@SqlAudioTranscriptRepository;override val items:List<AudioTranscriptSnapshot> = java.util.Collections.unmodifiableList(items.toList());override fun toString()="AudioTranscriptPage(redacted)"}
     override suspend fun search(keyword:String,cursor:PreferenceCursor?):AudioTranscriptPage = safe {
         PreferenceKeywords.validate(keyword)

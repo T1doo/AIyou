@@ -13,7 +13,8 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
     private val packages: SqlRecordPackageRepository,
     private val activities:SqlRecordPackageActivities? = null,
     private val edits: EncryptedOriginalEditStore? = null,
-    private val captureGate:CaptureDraftGate?=null) : RecordMediaPackageRepository {
+    private val captureGate:CaptureDraftGate?=null,
+    private val transcripts:SqlAudioTranscriptRepository?=null) : RecordMediaPackageRepository {
     private val cipher = RecordMediaPackageCipher()
     override suspend fun preview(snapshot: OriginalExportSnapshot): RecordMediaPreview = checkedPreview(snapshot) { true }
     override suspend fun previewActivities(snapshot:OriginalExportSnapshot):RecordMediaPreview = safely {
@@ -39,6 +40,16 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         preview
     }
     override suspend fun previewOpenZip(snapshot: OriginalExportSnapshot, active: () -> Boolean): RecordMediaPreview = checkedPreview(snapshot, active)
+    override suspend fun previewOpenZipWithTranscripts(snapshot:OriginalExportSnapshot,active:()->Boolean):RecordMediaPreview {
+        val base=checkedPreview(snapshot,active)
+        val scope=database.transaction {sql->
+            if(!active())throw OpenRecordZipCancelled()
+            check((originals as? SqlOriginalExportRepository)?.currentWithin(sql,snapshot)==true && inventoryWithin(sql,snapshot)==base.media)
+            checkNotNull(transcripts).openExportWithin(sql,snapshot,base.audios)
+        }
+        if(!active())throw OpenRecordZipCancelled()
+        return RecordMediaPreview(snapshot,base.images,audios=base.audios,openTranscripts=scope).also {check(isCurrent(it))}
+    }
     override suspend fun previewEditDrafts(snapshot: OriginalExportSnapshot, includeActivities: Boolean): RecordMediaPreview = safely {
         val base = previewHistory(snapshot, includeActivities)
         RecordMediaPreview(snapshot, base.images, base.activities, base.history, captureEdits(snapshot),base.audios).also {
@@ -67,10 +78,23 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
             (preview.history?.let { sameHistory(it, history(preview.snapshot)) } ?: true) &&
             preview.media == inventory(preview.snapshot, preview.history) &&
             (preview.editDrafts?.let { it == captureEdits(preview.snapshot) } ?: true) &&
-            (preview.activities?.let {checkNotNull(activities).current(preview.snapshot,it)} ?: true)
+            (preview.activities?.let {checkNotNull(activities).current(preview.snapshot,it)} ?: true) &&
+            (preview.openTranscripts?.let {database.transaction {sql->openCurrentWithin(sql,preview,it)}} ?: true)
     } catch (e: CancellationException) { throw e } catch (_: Exception) { false }
+    private fun openCurrentWithin(sql:RecordsSqlConnection,preview:RecordMediaPreview,scope:OpenTranscriptScope):Boolean =
+        (originals as? SqlOriginalExportRepository)?.currentWithin(sql,preview.snapshot)==true &&
+            inventoryWithin(sql,preview.snapshot)==preview.media &&
+            checkNotNull(transcripts).openExportCurrentWithin(sql,scope,preview.snapshot,preview.audios)
+    override suspend fun confirmOpenZip(preview:RecordMediaPreview,publish:()->Unit):Boolean {
+        if(!isCurrent(preview))return false
+        val confirmed=preview.openTranscripts?.let {scope->database.transaction {sql->openCurrentWithin(sql,preview,scope)}} ?: true
+        // A failed/lost transaction ACK must not publish success after the provider has closed.
+        if(confirmed)publish()
+        return confirmed
+    }
     override suspend fun seal(preview: RecordMediaPreview, password: CharArray): PreparedRecordMediaPackage {
         try {
+            require(preview.openTranscripts==null) // The optional plaintext scope never enters encrypted migration formats.
             check(isCurrent(preview))
             return cipher.seal(preview,password,{ media.read(it.attachmentId) },{ isCurrent(preview) })
         } finally { password.fill('\u0000') }
@@ -123,7 +147,9 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
             old.tags == now.tags && old.eventDate == now.eventDate && old.sourcePeopleVersion == now.sourcePeopleVersion && old.people == now.people && old.peopleAliases == now.peopleAliases && old.history.size == now.history.size && old.history.zip(now.history).all { (a, b) ->
                 a.revision == b.revision && a.originalText == b.originalText && a.contentHash == b.contentHash && a.createdAtMillis == b.createdAtMillis } }
 
-    private fun inventory(snapshot: OriginalExportSnapshot, history: List<RecordPackageOriginal>? = null): List<RecordPackageAttachment> = database.transaction { sql ->
+    private fun inventory(snapshot: OriginalExportSnapshot, history: List<RecordPackageOriginal>? = null): List<RecordPackageAttachment> =
+        database.transaction {sql->inventoryWithin(sql,snapshot,history)}
+    private fun inventoryWithin(sql:RecordsSqlConnection,snapshot:OriginalExportSnapshot,history:List<RecordPackageOriginal>?=null):List<RecordPackageAttachment> {
         val images = mutableListOf<RecordPackageAttachment>()
         val versions = history?.flatMap { record -> record.history.map { record.sourceId to it.revision } }
             ?: snapshot.records.map { it.entry.id to it.entry.currentRevision }
@@ -140,7 +166,7 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
                 } else throw RecordPackageConflict() // This batch cannot promise a complete copy of unsupported media.
             }
         }
-        images.filterIsInstance<RecordPackageImage>()+images.filterIsInstance<RecordPackageAudio>()
+        return images.filterIsInstance<RecordPackageImage>()+images.filterIsInstance<RecordPackageAudio>()
     }
 
     override suspend fun restore(verified:VerifiedRecordPackage,newIds:List<String>,importedAtMillis:Long):RecordPackageRestoreResult =

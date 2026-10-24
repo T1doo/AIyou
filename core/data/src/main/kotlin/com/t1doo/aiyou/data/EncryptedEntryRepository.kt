@@ -92,7 +92,7 @@ class EncryptedEntryRepository internal constructor(
         SqlOriginalExportRepository(borrowedSql, tagStorage,packageActivities,peopleStorage)
     private val packageStorage = SqlRecordPackageRepository(borrowedSql, tagStorage,activities=packageActivities, people=peopleStorage,captureGate=captureStorage.mutationGate)
     private val mediaPackageStorage =
-        SqlRecordMediaPackageRepository(borrowedSql, originalExport, attachmentStorage, packageStorage,packageActivities, originalEditStorage,captureGate=captureStorage.mutationGate)
+        SqlRecordMediaPackageRepository(borrowedSql, originalExport, attachmentStorage, packageStorage,packageActivities, originalEditStorage,captureGate=captureStorage.mutationGate,transcripts=transcriptStorage)
     override val mediaPackages: com.t1doo.aiyou.domain.RecordMediaPackageRepository get() = mediaPackageStorage
     override val fullBackups: com.t1doo.aiyou.domain.FullBackupRepository =
         SqlFullBackupRepository(borrowedSql,keyBytes,attachmentStorage,originalEditStorage,mediaPackageStorage,captureGate=captureStorage.mutationGate)

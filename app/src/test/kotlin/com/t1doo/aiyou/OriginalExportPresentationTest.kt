@@ -73,6 +73,48 @@ class OriginalExportPresentationTest {
         compose.onNodeWithTag("export-prepare").performScrollTo().performClick(); pump()
     }
     @Test @Config(qualifiers = "w320dp-h640dp")
+    fun explicitHumanTranscriptScopeAtActualDoubleFontRequiresFreshPlaintextConsentAndStaysOutOfSavedState() {
+        RuntimeEnvironment.setFontScale(2f)
+        fixture.includeAudio=true;content()
+        compose.showNotebookToolsFor("export-open");compose.onNodeWithTag("export-open").performScrollTo().performClick()
+        compose.onNodeWithTag("export-select-one").performScrollTo().performClick()
+        compose.onNodeWithTag("export-format-MEDIA_ZIP").performScrollTo().performClick()
+        compose.onNodeWithTag("export-include-transcripts").performScrollTo().assertIsOff().assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithTag("export-include-transcripts").assertIsOn()
+        compose.onNodeWithTag("export-prepare").performScrollTo().performClick();pump()
+        compose.onNodeWithTag("export-transcript-total").performScrollTo().assertTextContains("当前有效 1 条",substring=true)
+        compose.onNodeWithTag("export-transcript-source-"+Fixture.TRANSCRIPT_ID).performScrollTo().assertTextContains("文字版本 1",substring=true)
+        val text=compose.onNodeWithTag("export-transcript-text-"+Fixture.TRANSCRIPT_ID).performScrollTo().assertTextEquals("合成人工转写🙂")
+        val layouts=mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        text.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult){assertTrue(it(layouts))}
+        assertEquals(2f,layouts.single().layoutInput.density.fontScale,0f);assertFalse(layouts.single().hasVisualOverflow)
+        compose.runOnIdle {
+            val dialog=checkNotNull(org.robolectric.shadows.ShadowDialog.getLatestDialog())
+            assertEquals(2f,dialog.context.resources.configuration.fontScale,0f)
+            val decor=checkNotNull(dialog.window).decorView
+            val bitmap=android.graphics.Bitmap.createBitmap(decor.width,decor.height,android.graphics.Bitmap.Config.ARGB_8888)
+            try {
+                decor.draw(android.graphics.Canvas(bitmap))
+                val file=File("build/reports/tests/testDebugUnitTest/open-transcript-export/01-confirm-human-text-2x.png")
+                file.parentFile.mkdirs();file.outputStream().use {assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it))}
+                File(file.parentFile,"fontscale.json").writeText(org.json.JSONObject().put("source_sha",System.getenv("GITHUB_SHA")?:"local-not-CI")
+                    .put("fontScale",layouts.single().layoutInput.density.fontScale).put("hasVisualOverflow",layouts.single().hasVisualOverflow).toString(2))
+            } finally {bitmap.recycle()}
+        }
+        compose.onNodeWithTag("export-choose").performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle {
+            assertTrue(fixture.ui().includeTranscripts);assertTrue(registry.intents.isEmpty())
+            fixture.controller.includeTranscripts(fixture.ui().session,false)
+            assertTrue("The confirmed scope cannot change in PREVIEW",fixture.ui().includeTranscripts)
+            assertNoPrivateState(checkNotNull(saved).performSave(),listOf("合成人工转写🙂",Fixture.TRANSCRIPT_ID,"openTranscripts","includeTranscripts"))
+        }
+        compose.onNodeWithTag("export-risk").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithTag("export-choose").performScrollTo().assertIsEnabled().assertHeightIsAtLeast(48.dp).performClick();pump()
+        compose.runOnIdle {assertEquals("application/zip",registry.intents.single().type);registry.dispatchResult(registry.codes.single(),null as Uri?)}
+        compose.onNodeWithTag("export-choose").performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle {assertFalse(fixture.ui().riskAccepted);assertEquals("合成独立草稿",fixture.state.value.text)}
+    }
+    @Test @Config(qualifiers = "w320dp-h640dp")
     fun narrowAudioZipShowsExactSourceAndSeparatePlaintextConsentWithoutOpeningMedia() {
         fixture.includeAudio = true; fixture.original = fixture.original.copy(originalText = "")
         fixture.state.value = fixture.state.value.copy(entries = listOf(fixture.original))
@@ -293,6 +335,14 @@ class OriginalExportPresentationTest {
                     java.security.MessageDigest.getInstance("SHA-256").digest(imageBytes).joinToString("") { "%02x".format(it) })) else emptyList(),
                 audios = if (includeAudio) listOf(RecordPackageAudio("one", original.currentRevision, AUDIO_ID, "audio/wav", waveBytes.size.toLong(),
                     java.security.MessageDigest.getInstance("SHA-256").digest(waveBytes).joinToString("") { "%02x".format(it) })) else emptyList())
+            override suspend fun previewOpenZipWithTranscripts(snapshot:OriginalExportSnapshot,active:()->Boolean):RecordMediaPreview {
+                check(active());val base=preview(snapshot);val a=base.audios.single()
+                val anchor=AudioTranscriptSource(AttachmentIntent(a.attachmentId,a.sourceId,a.sourceRevision,a.mediaType,a.sha256,a.byteSize),
+                    snapshot.records.single().contentHash,0,original.capturedAtMillis,original.captureTimeZone,original.policy,4)
+                val scope=object:OpenTranscriptScope {override val items=listOf(AudioTranscriptSnapshot(TRANSCRIPT_ID,anchor,1,false,
+                    listOf(AudioTranscriptVersion(1,"合成人工转写🙂",50,AudioSampleRange(1,3)))))}
+                return RecordMediaPreview(snapshot,base.images,audios=base.audios,openTranscripts=scope)
+            }
             override suspend fun isCurrent(preview: RecordMediaPreview) = export.isCurrent(preview.snapshot)
             override suspend fun readOpenImage(preview: RecordMediaPreview, image: RecordPackageImage) = imageBytes.copyOf()
             override suspend fun exportOpenZip(preview: RecordMediaPreview) = OpenRecordZipCodec.prepare(preview, { if (it is RecordPackageAudio) waveBytes.copyOf() else imageBytes.copyOf() }, { isCurrent(preview) })
@@ -320,6 +370,7 @@ class OriginalExportPresentationTest {
             controller.choose(preview.session, preview.snapshot.id, preview.format, preview.epoch); drain()
         }
         companion object {
+            const val TRANSCRIPT_ID="00000000-0000-4000-8000-000000000123"
             const val IMAGE_ID = "00000000-0000-4000-8000-000000000001"
             const val AUDIO_ID = "00000000-0000-4000-8000-000000000002"
             val PNG = java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNQCp35HwADvQIQaYgMTgAAAABJRU5ErkJggg==")

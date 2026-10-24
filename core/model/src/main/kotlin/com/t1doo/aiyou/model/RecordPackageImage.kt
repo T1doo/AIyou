@@ -30,9 +30,13 @@ object RecordPackageAttachments {
     fun descriptor(sourceId:String,revision:Int,id:String,mime:String,size:Long,hash:String):RecordPackageAttachment =
         if(mime=="audio/wav")RecordPackageAudio(sourceId,revision,id,mime,size,hash) else RecordPackageImage(sourceId,revision,id,mime,size,hash)
 }
+/** Repository-issued scope; null excludes human text, an empty scope explicitly includes none. */
+interface OpenTranscriptScope { val items: List<AudioTranscriptSnapshot> }
+
 class RecordMediaPreview(val snapshot: OriginalExportSnapshot, images: List<RecordPackageImage>,
     val activities: RecordPackageActivities? = null, history: List<RecordPackageOriginal>? = null,
-    editDrafts: List<OriginalEditDraft>? = null, audios:List<RecordPackageAudio> = emptyList()) {
+    editDrafts: List<OriginalEditDraft>? = null, audios:List<RecordPackageAudio> = emptyList(),
+    val openTranscripts: OpenTranscriptScope? = null) {
     /** Null means excluded; empty means the explicitly selected scope contains no active edits. */
     val editDrafts = editDrafts?.let { Collections.unmodifiableList(it.toList()) }
     val images = Collections.unmodifiableList(images.toList())
@@ -41,6 +45,17 @@ class RecordMediaPreview(val snapshot: OriginalExportSnapshot, images: List<Reco
     val history = history?.let { Collections.unmodifiableList(it.toList()) }
     val imageBytes = images.sumOf { it.byteSize }
     init {
+        openTranscripts?.let { scope ->
+            require(history == null && editDrafts == null && activities == null)
+            require(scope.items.size <= audios.size && scope.items.map { it.id }.distinct().size == scope.items.size)
+            scope.items.forEach { item ->
+                val a=item.anchor;val i=a.intent
+                require(!item.withdrawn && audios.any { it.attachmentId==i.id && it.sourceId==i.entryId &&
+                    it.sourceRevision==i.revision && it.sha256==i.sha256 && it.byteSize==i.byteSize })
+                require(snapshot.records.any { it.entry.id==i.entryId && it.entry.currentRevision==i.revision &&
+                    it.contentHash==a.sourceHash && it.sourceGeneration==a.generation && it.entry.policy==a.policy })
+            }
+        }
         require(media.size<=RecordMediaPackages.MAX_IMAGES && media.sumOf { it.byteSize }<=RecordMediaPackages.MAX_IMAGE_TOTAL)
         require(media.map { it.attachmentId }.distinct().size==media.size)
         if (editDrafts != null) RecordEditDraftPackages.validate(editDrafts, checkNotNull(history))

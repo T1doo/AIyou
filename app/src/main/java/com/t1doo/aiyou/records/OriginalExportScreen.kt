@@ -84,13 +84,21 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
                 "原文与媒体 ZIP 含选定当前原文、手工标签、手工人物称呼、手填事件日期及 IANA 时区、原图、原音 WAV、Markdown、JSONL 和哈希清单。不含历史版本、待办或密钥，不能用于完整恢复。图片与原音合计最多 20 件、64 MiB；单图最多 16 MiB，原音沿用本机短音频上限。缺失或损坏会使整个导出失败，不会省略原音。"
                 else if(ui.includeActivities) "导出选定当前原文、手工标签、手工人物称呼、手填事件日期及 IANA 时区，以及本机全部已保存正式待办和待确认草稿。正式待办包含未完成、已完成、已取消；草稿只含已保存 DRAFT，不含未保存表单或已处理历史。各最多 256 条，超限整体失败。不含附件、提醒、密钥或联网授权，不能用于完整恢复。"
                 else "仅导出选定当前原文、手工标签、手工人物称呼和手填事件日期及 IANA 时区。不含附件、历史版本、待办或密钥，不能用于完整恢复。")
-            Text("人工转写不包含在开放导出中；完整保留请使用全量加密备份。")
+            Text(if(ui.format==OriginalExportFormat.MEDIA_ZIP) "可另选包含当前有效的人工转写；默认不包含，不导出纠正历史或已撤回文字。完整保留请使用全量加密备份。"
+                else "人工转写不包含在此格式中；可选择媒体 ZIP 并明确勾选，或使用全量加密备份。")
             Text("文件是明文。目的地可能是云盘，访问该文件的人可以读取内容。请自行选择可信位置；写入可能覆盖所选已有文件，建议创建新文件。")
             Text("需要保密或跨设备恢复时，建议使用独立口令加密包。")
             if (ui.format == OriginalExportFormat.MEDIA_ZIP) Text("原图可能含拍摄位置等原始元数据；原音可能含私人谈话。它们会以明文写入 ZIP，不会生成转写。需要加密时请使用加密记录包。")
             if (!available) Text("本机记录暂不可读取，预览已隐藏；恢复记录后再继续。")
             when (ui.phase) {
                 OriginalExportPhase.SELECTING -> {
+                    if(ui.format==OriginalExportFormat.MEDIA_ZIP)
+                        Row(Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("export-include-transcripts")
+                            .toggleable(ui.includeTranscripts,enabled=available && !ui.busy,role=Role.Checkbox,
+                                onValueChange={act {controller.includeTranscripts(ui.session,it)}}),verticalAlignment=Alignment.CenterVertically) {
+                            Checkbox(ui.includeTranscripts,onCheckedChange=null)
+                            Text("包含当前人工转写与片段范围（明文，可不选）",Modifier.weight(1f))
+                        }
                     if(ui.format != OriginalExportFormat.MEDIA_ZIP && local.tasks.supported && local.taskProposals.supported)
                         Row(Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("export-include-activities")
                             .toggleable(ui.includeActivities,role=Role.Checkbox,onValueChange={included -> act {controller.includeActivities(ui.session,included)}}),
@@ -135,6 +143,11 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
             if (snapshotVisible && ui.phase != OriginalExportPhase.SELECTING) ui.snapshot?.let { snapshot ->
                 Text("确认快照 · ${snapshot.records.size} 条原文 · ${ui.format.name}")
                 ui.mediaPreview?.let { media ->
+                    media.openTranscripts?.let {scope->
+                        Text("已明确包含人工转写范围 · 当前有效 ${scope.items.size} 条"+
+                            if(scope.items.isEmpty()) "；本次集合为空，不等于未选择该范围。" else "；不是自动语音识别结果。",
+                            Modifier.testTag("export-transcript-total"))
+                    }
                     Text("已认证 ${media.images.size} 张原图 · ${media.imageBytes} 字节", Modifier.testTag("export-image-total"))
                     if (media.audios.isNotEmpty()) Text("已认证 ${media.audios.size} 段原音 · ${media.audios.sumOf { it.byteSize }} 字节",
                         Modifier.testTag("export-audio-total"))
@@ -163,6 +176,13 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
                         Text("原音 ${audio.attachmentId} · WAV · 版本 ${audio.sourceRevision} · ${audio.byteSize} 字节\nSHA-256 ${audio.sha256}",
                             style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("export-audio-" + audio.attachmentId))
                     }
+                    ui.mediaPreview?.openTranscripts?.items?.filter {it.anchor.intent.entryId==record.entry.id}?.forEach {t->
+                        Text("人工转写 · 原音 ${t.anchor.intent.id} · 保存版本 ${t.version} · 文字版本 ${t.current.revision}",
+                            Modifier.testTag("export-transcript-source-"+t.id))
+                        Text(t.current.range?.let {"片段采样范围 [${it.startFrame}, ${it.endFrameExclusive}) · ${LocalPcmAudio.SAMPLE_RATE} Hz"}
+                            ?: "整段原音 · ${t.anchor.samples} 帧 · ${LocalPcmAudio.SAMPLE_RATE} Hz")
+                        Text(t.current.text,Modifier.testTag("export-transcript-text-"+t.id))
+                    }
                     if (record.entry.originalText.codePointCount(0, record.entry.originalText.length) > 300)
                         Text("这里只预览前 300 字符，导出包含完整正文。")
                 }
@@ -178,7 +198,7 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
                         controller.acceptRisk(ui.session, snapshot.id, ui.format, ui.epoch, value)
                     } }), verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(ui.riskAccepted, onCheckedChange = null)
-                    Text("我确认导出以上快照，理解明文、云盘和覆盖已有文件的风险。", Modifier.weight(1f))
+                    Text("我确认导出以上快照"+(if(ui.includeTranscripts)"（含已选人工转写范围）" else "")+"，理解明文、云盘和覆盖已有文件的风险。", Modifier.weight(1f))
                 }
                 OutlinedButton(enabled = ui.riskAccepted, onClick = { act {
                     controller.choose(ui.session, snapshot.id, ui.format, ui.epoch)
