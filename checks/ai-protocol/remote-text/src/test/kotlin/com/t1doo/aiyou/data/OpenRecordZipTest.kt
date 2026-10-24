@@ -317,6 +317,55 @@ class OpenRecordZipTest {
             assertTrue(held!!.all { it == 0.toByte() })
         }
     }
+    @Test(timeout = 60_000) fun twentyMediaAndExactly64MiBStreamAuthenticatedOriginalsAndRejectOneExtraByte(): Unit = runBlocking {
+        for (exactBytes in listOf(false, true)) MixedCaptureSqlTest.fixture().use { f ->
+            val capture = MixedCaptureSqlTest.repo(f)
+            val draft = capture.edit(capture.current(), "合成媒体容量边界")
+            capture.save(draft, 5, "UTC")
+            val id = draft.id; val wave = CaptureAudioSqlTest.wave()
+            val audio = AttachmentIntent(uuid(), id, 1, "audio/wav", PermanentErasureFixture.hash(wave), wave.size.toLong())
+            f.media.save(audio) { wave.inputStream() }
+            val sizes = if (exactBytes) List(3) { RecordMediaPackages.MAX_IMAGE_BYTES.toInt() } +
+                (RecordMediaPackages.MAX_IMAGE_BYTES.toInt() - wave.size) else List(19) { PNG.size }
+            var lastImage: AttachmentIntent? = null
+            for (size in sizes) {
+                val bytes = if (size == PNG.size) PNG.copyOf() else pngAtSize(size)
+                try {
+                    val intent = f.attachment(id, bytes); f.media.save(intent) { bytes.inputStream() }; lastImage = intent
+                } finally { bytes.fill(0) }
+            }
+            val p = preview(f, listOf(id))
+            assertEquals(if (exactBytes) 5 else 20, p.media.size)
+            if (exactBytes) assertEquals(RecordMediaPackages.MAX_IMAGE_TOTAL, p.media.sumOf { it.byteSize })
+            val ready = repo(f).exportOpenZip(p)
+            var authenticatedReads = 0
+            f.mediaCheckpoint = { if (it == "locked") authenticatedReads++ }
+            val sink = object : OutputStream() {
+                var bytes = 0L; var largestWrite = 0
+                override fun write(value: Int) { bytes++ }
+                override fun write(buffer: ByteArray, offset: Int, length: Int) {
+                    require(offset >= 0 && length >= 0 && offset <= buffer.size - length)
+                    bytes += length; largestWrite = maxOf(largestWrite, length)
+                }
+            }
+            try { ready.writeTo(sink) { true } } finally { ready.release() }
+            assertEquals(p.media.size, authenticatedReads)
+            assertTrue(sink.bytes in 1..OpenRecordZipCodec.MAX_FILE_BYTES); assertTrue(sink.largestWrite <= 8192)
+            if (exactBytes) {
+                val old = checkNotNull(lastImage); val bytes = pngAtSize(old.byteSize.toInt() + 1)
+                try {
+                    val replacement = f.attachment(id, bytes)
+                    f.db.write("DELETE FROM attachments WHERE id=?", old.id)
+                    f.media.save(replacement) { bytes.inputStream() }
+                } finally { bytes.fill(0) }
+                assertEquals(RecordMediaPackages.MAX_IMAGE_TOTAL + 1, f.db.read(
+                    "SELECT SUM(byteSize) FROM attachments WHERE entryId=? AND revision=1 AND state='READY'", id).single().single())
+                authenticatedReads = 0
+                assertFalse(repo(f).isCurrent(p)); fails { preview(f, listOf(id)) }
+                assertEquals(0, authenticatedReads) // Inventory rejects before any original is decrypted.
+            }
+        }
+    }
     private class Harness(f: PermanentErasureFixture, id: String) {
         private val originals = SqlOriginalExportRepository(f.gateway, f.tags)
         private val media = repo(f)
@@ -373,6 +422,19 @@ class OpenRecordZipTest {
             val capture = MixedCaptureSqlTest.repo(f); var draft = capture.current()
             if (text.isNotEmpty()) draft = capture.edit(draft, text)
             draft = capture.add(draft, MixedCaptureSqlTest.intent(draft), PNG); capture.save(draft, 5, "UTC"); return draft.id
+        }
+        private fun pngAtSize(size: Int): ByteArray {
+            // A valid private ancillary PNG chunk, not trailing bytes or an invalid image signature stub.
+            require(size >= PNG.size + 12)
+            val bytes = ByteArray(size); val at = PNG.size - 12; val payload = size - PNG.size - 12
+            PNG.copyInto(bytes, endIndex = at)
+            fun number(offset: Int, value: Long) { for (i in 0..3) bytes[offset + i] = (value ushr (24 - 8 * i)).toByte() }
+            number(at, payload.toLong()); "npAD".toByteArray(Charsets.US_ASCII).copyInto(bytes, at + 4)
+            val crc = java.util.zip.CRC32().apply { update(bytes, at + 4, payload + 4) }.value
+            number(at + 8 + payload, crc); PNG.copyInto(bytes, at + payload + 12, at)
+            val dimensions = PngPayloadValidator.validate(bytes)
+            check(dimensions.width == 1 && dimensions.height == 1)
+            return bytes
         }
         private suspend fun audioEntry(f: PermanentErasureFixture, mixed: Boolean = false): String {
             val capture = MixedCaptureSqlTest.repo(f); var draft = capture.current()
