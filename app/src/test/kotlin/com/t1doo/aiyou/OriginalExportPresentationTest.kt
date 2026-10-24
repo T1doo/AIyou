@@ -17,6 +17,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.domain.*
@@ -70,6 +71,34 @@ class OriginalExportPresentationTest {
         compose.showNotebookToolsFor("export-open");compose.onNodeWithTag("export-open").performScrollTo().performClick()
         compose.onNodeWithTag("export-select-one").performScrollTo().performClick()
         compose.onNodeWithTag("export-prepare").performScrollTo().performClick(); pump()
+    }
+    @Test @Config(qualifiers = "w320dp-h640dp")
+    fun narrowAudioZipShowsExactSourceAndSeparatePlaintextConsentWithoutOpeningMedia() {
+        fixture.includeAudio = true; fixture.original = fixture.original.copy(originalText = "")
+        fixture.state.value = fixture.state.value.copy(entries = listOf(fixture.original))
+        content(true)
+        compose.showNotebookToolsFor("export-open"); compose.onNodeWithTag("export-open").performScrollTo().performClick()
+        compose.onNodeWithTag("export-select-one").performScrollTo().performClick()
+        compose.onNodeWithTag("export-format-MEDIA_ZIP").performScrollTo().performClick()
+        compose.onNodeWithTag("export-prepare").performScrollTo().performClick(); pump()
+        compose.onNodeWithTag("export-audio-total").performScrollTo().assertTextEquals("已认证 1 段原音 · ${fixture.waveBytes.size} 字节")
+        compose.onNodeWithTag("export-audio-" + Fixture.AUDIO_ID).performScrollTo()
+            .assertTextContains("版本 1", substring = true).assertTextContains(Fixture.AUDIO_ID, substring = true)
+        compose.onNodeWithTag("export-choose").performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle {
+            assertEquals(OriginalExportPhase.PREVIEW, fixture.ui().phase)
+            assertEquals(1, fixture.ui().mediaPreview!!.audios.size); assertTrue(fixture.ui().mediaPreview!!.images.isEmpty())
+            assertFalse(fixture.ui().riskAccepted); assertTrue(registry.intents.isEmpty())
+            assertEquals("合成独立草稿", fixture.state.value.text); assertEquals("", fixture.original.originalText)
+        }
+        compose.onNodeWithTag("export-risk").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithTag("export-choose").performScrollTo().assertIsDisplayed().assertIsEnabled().assertHeightIsAtLeast(48.dp).performClick(); pump()
+        compose.runOnIdle {
+            assertEquals("application/zip", registry.intents.single().type)
+            registry.dispatchResult(registry.codes.single(), null as Uri?)
+        }
+        compose.onNodeWithTag("export-choose").performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle { assertFalse(fixture.ui().riskAccepted); assertFalse(fixture.ui().hasFile); assertEquals("合成独立草稿", fixture.state.value.text) }
     }
     @Test fun imageOnlyZipShowsActualAuthenticatedPictureAndRequiresConsentBeforeZipIntent() {
         fixture.includeImage = true; fixture.original = fixture.original.copy(originalText = "")
@@ -241,6 +270,8 @@ class OriginalExportPresentationTest {
     }
     private class Fixture {
         var includeImage = false
+        var includeAudio = false
+        val waveBytes = LocalPcmAudio.encode(shortArrayOf(0x1234, -2, 1000, -1000))
         var imageBytes = PNG.copyOf()
         var original = StoredEntry("one", 1, "合成私密原文🙂".repeat(70), 42, "Asia/Shanghai", ProcessingPolicy.LOCAL_ONLY)
         private val tags = ManualTagSnapshot("one", 1, listOf("合成私密标签"))
@@ -251,17 +282,20 @@ class OriginalExportPresentationTest {
             override fun capture(sources: List<SourceVersion>, snapshotId: String, createdAtMillis: Long, refreshCurrent: Boolean): OriginalExportSnapshot {
                 if (!refreshCurrent && sources.single().revision != original.currentRevision.toLong()) throw OriginalExportConflict()
                 return OriginalExportSnapshot(snapshotId, createdAtMillis, listOf(OriginalExportRecord(original, OriginalExports.hash(original.originalText), tags,
-                    imageCount = if (includeImage) 1 else 0)))
+                    imageCount = if (includeImage) 1 else 0, audioCount = if (includeAudio) 1 else 0)))
             }
-            override fun isCurrent(snapshot: OriginalExportSnapshot) = snapshot.records.single().entry == original && snapshot.records.single().tags.version == tags.version
+            override fun isCurrent(snapshot: OriginalExportSnapshot) = snapshot.records.single().entry == original && snapshot.records.single().tags.version == tags.version &&
+                snapshot.records.single().imageCount == (if (includeImage) 1 else 0) && snapshot.records.single().audioCount == (if (includeAudio) 1 else 0)
         }
         private val media = object : RecordMediaPackageRepository {
             override suspend fun preview(snapshot: OriginalExportSnapshot) = RecordMediaPreview(snapshot, if (includeImage) listOf(
                 RecordPackageImage("one", original.currentRevision, IMAGE_ID, "image/png", imageBytes.size.toLong(),
-                    java.security.MessageDigest.getInstance("SHA-256").digest(imageBytes).joinToString("") { "%02x".format(it) })) else emptyList())
+                    java.security.MessageDigest.getInstance("SHA-256").digest(imageBytes).joinToString("") { "%02x".format(it) })) else emptyList(),
+                audios = if (includeAudio) listOf(RecordPackageAudio("one", original.currentRevision, AUDIO_ID, "audio/wav", waveBytes.size.toLong(),
+                    java.security.MessageDigest.getInstance("SHA-256").digest(waveBytes).joinToString("") { "%02x".format(it) })) else emptyList())
             override suspend fun isCurrent(preview: RecordMediaPreview) = export.isCurrent(preview.snapshot)
             override suspend fun readOpenImage(preview: RecordMediaPreview, image: RecordPackageImage) = imageBytes.copyOf()
-            override suspend fun exportOpenZip(preview: RecordMediaPreview) = OpenRecordZipCodec.prepare(preview, { imageBytes.copyOf() }, { isCurrent(preview) })
+            override suspend fun exportOpenZip(preview: RecordMediaPreview) = OpenRecordZipCodec.prepare(preview, { if (it is RecordPackageAudio) waveBytes.copyOf() else imageBytes.copyOf() }, { isCurrent(preview) })
             override suspend fun seal(preview: RecordMediaPreview, password: CharArray): PreparedRecordMediaPackage = error("Unrelated")
             override suspend fun open(source: () -> InputStream, password: CharArray): VerifiedRecordPackage = error("Unrelated")
             override suspend fun restore(verified: VerifiedRecordPackage, newIds: List<String>, importedAtMillis: Long): RecordPackageRestoreResult = error("Unrelated")
@@ -287,6 +321,7 @@ class OriginalExportPresentationTest {
         }
         companion object {
             const val IMAGE_ID = "00000000-0000-4000-8000-000000000001"
+            const val AUDIO_ID = "00000000-0000-4000-8000-000000000002"
             val PNG = java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNQCp35HwADvQIQaYgMTgAAAABJRU5ErkJggg==")
         }
     }

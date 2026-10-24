@@ -335,7 +335,7 @@ class OriginalExportController internal constructor(
         if (ui.epoch != epoch) ui else ui.copy(phase = if (failure is OriginalExportConflict) OriginalExportPhase.CHANGED else OriginalExportPhase.FAILED,
             readingImageId = null, picture = null, pictureId = null,
             riskAccepted = false, notice = null, error = when (failure) {
-                is OriginalExportConflict -> "所选原文、标签、图片、正式待办或待确认草稿已变化，未自动改用新内容。请重新预览最新内容后再确认。" +
+                is OriginalExportConflict -> "所选原文、标签、附件（图片／原音）、正式待办或待确认草稿已变化，未自动改用新内容。请重新预览最新内容后再确认。" +
                     if (ui.hasFile) "所选文件可能不完整，请检查或明确删除。" else ""
                 is OriginalExportTooLarge -> "选择的数据较多，请关闭后减少选择，再重新预览。"
                 is RecordPackageActivityLimit -> (when (failure.bound) {

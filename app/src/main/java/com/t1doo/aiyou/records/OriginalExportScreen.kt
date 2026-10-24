@@ -81,13 +81,13 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
         text = { Column(Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(if (ui.format == OriginalExportFormat.MEDIA_ZIP)
-                "图文 ZIP 含选定当前原文、手工标签、手工人物称呼、手填事件日期及 IANA 时区、原图、Markdown、JSONL 和哈希清单。不含历史版本、待办或密钥，不能用于完整恢复。最多 20 张图，单图 16 MiB，原图合计 64 MiB；缺图或损坏会使整个导出失败。"
+                "原文与媒体 ZIP 含选定当前原文、手工标签、手工人物称呼、手填事件日期及 IANA 时区、原图、原音 WAV、Markdown、JSONL 和哈希清单。不含历史版本、待办或密钥，不能用于完整恢复。图片与原音合计最多 20 件、64 MiB；单图最多 16 MiB，原音沿用本机短音频上限。缺失或损坏会使整个导出失败，不会省略原音。"
                 else if(ui.includeActivities) "导出选定当前原文、手工标签、手工人物称呼、手填事件日期及 IANA 时区，以及本机全部已保存正式待办和待确认草稿。正式待办包含未完成、已完成、已取消；草稿只含已保存 DRAFT，不含未保存表单或已处理历史。各最多 256 条，超限整体失败。不含附件、提醒、密钥或联网授权，不能用于完整恢复。"
                 else "仅导出选定当前原文、手工标签、手工人物称呼和手填事件日期及 IANA 时区。不含附件、历史版本、待办或密钥，不能用于完整恢复。")
             Text("人工转写不包含在开放导出中；完整保留请使用全量加密备份。")
             Text("文件是明文。目的地可能是云盘，访问该文件的人可以读取内容。请自行选择可信位置；写入可能覆盖所选已有文件，建议创建新文件。")
             Text("需要保密或跨设备恢复时，建议使用独立口令加密包。")
-            if (ui.format == OriginalExportFormat.MEDIA_ZIP) Text("原图包含原始元数据，可能含拍摄位置等隐私。需要加密时请使用加密记录包。")
+            if (ui.format == OriginalExportFormat.MEDIA_ZIP) Text("原图可能含拍摄位置等原始元数据；原音可能含私人谈话。它们会以明文写入 ZIP，不会生成转写。需要加密时请使用加密记录包。")
             if (!available) Text("本机记录暂不可读取，预览已隐藏；恢复记录后再继续。")
             when (ui.phase) {
                 OriginalExportPhase.SELECTING -> {
@@ -106,7 +106,7 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
                                 onValueChange = { act { controller.toggle(ui.session, entry.id, entry.currentRevision) } }),
                             verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(checked, onCheckedChange = null)
-                            Text(entry.originalText.takeCodePoints(80).ifBlank { "纯图片记录 · ${entry.id}" }, Modifier.weight(1f))
+                            Text(entry.originalText.takeCodePoints(80).ifBlank { "附件记录 · ${entry.id}" }, Modifier.weight(1f))
                         }
                     }
                     Text("已选 ${ui.selection.size} 条")
@@ -126,7 +126,7 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
                             label = { Text(when (format) {
                                 OriginalExportFormat.MARKDOWN -> "Markdown"
                                 OriginalExportFormat.JSONL -> "JSONL"
-                                OriginalExportFormat.MEDIA_ZIP -> "图文 ZIP"
+                                OriginalExportFormat.MEDIA_ZIP -> "原文与媒体 ZIP"
                             }) },
                             modifier = Modifier.testTag("export-format-" + format.name))
                     }
@@ -134,7 +134,11 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
             }
             if (snapshotVisible && ui.phase != OriginalExportPhase.SELECTING) ui.snapshot?.let { snapshot ->
                 Text("确认快照 · ${snapshot.records.size} 条原文 · ${ui.format.name}")
-                ui.mediaPreview?.let { media -> Text("已认证 ${media.images.size} 张原图 · ${media.imageBytes} 字节", Modifier.testTag("export-image-total")) }
+                ui.mediaPreview?.let { media ->
+                    Text("已认证 ${media.images.size} 张原图 · ${media.imageBytes} 字节", Modifier.testTag("export-image-total"))
+                    if (media.audios.isNotEmpty()) Text("已认证 ${media.audios.size} 段原音 · ${media.audios.sumOf { it.byteSize }} 字节",
+                        Modifier.testTag("export-audio-total"))
+                }
                 snapshot.records.forEach { record ->
                     Text("记录 ${record.entry.id} · 版本 ${record.entry.currentRevision}")
                     Text("记录时间 ${record.entry.capturedAtMillis} · ${record.entry.captureTimeZone}")
@@ -154,6 +158,10 @@ fun OriginalExportDialog(local: LocalRecordUiState, ui: OriginalExportUiState,
                             Image(picture.image, "选定原图预览", contentScale = ContentScale.Fit,
                                 modifier = Modifier.fillMaxWidth().height(180.dp).testTag("export-picture"))
                         }
+                    }
+                    ui.mediaPreview?.audios?.filter { it.sourceId == record.entry.id }?.forEach { audio ->
+                        Text("原音 ${audio.attachmentId} · WAV · 版本 ${audio.sourceRevision} · ${audio.byteSize} 字节\nSHA-256 ${audio.sha256}",
+                            style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("export-audio-" + audio.attachmentId))
                     }
                     if (record.entry.originalText.codePointCount(0, record.entry.originalText.length) > 300)
                         Text("这里只预览前 300 字符，导出包含完整正文。")

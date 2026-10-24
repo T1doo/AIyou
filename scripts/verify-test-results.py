@@ -360,6 +360,7 @@ for label, folder, minimum in targets:
             "rereadPendingErasureDisablesRestoreAndContinuesTheDurableConfirmation",
             "retainedPermanentEraseButtonCannotRetargetAfterSelectionChangesBeforeRecomposition")
         additional["com.t1doo.aiyou.OriginalExportPresentationTest"] = (
+            "narrowAudioZipShowsExactSourceAndSeparatePlaintextConsentWithoutOpeningMedia",
             "imageOnlyZipShowsActualAuthenticatedPictureAndRequiresConsentBeforeZipIntent",
             "mixedZipMalformedAuthenticatedOriginalFailsBeforePreviewOrSystemPicker",
             "actualDialogRequiresSelectionPreviewAndFreshPlaintextConsentBeforeSystemDocumentIntent",

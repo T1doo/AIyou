@@ -4,7 +4,7 @@ import com.t1doo.aiyou.model.*
 import java.io.InputStream
 import java.io.OutputStream
 
-/** One bounded image at a time; never an in-memory representation of the entire package. */
+/** One bounded attachment at a time; never an in-memory representation of the entire package. */
 interface PreparedRecordMediaPackage {
     suspend fun writeTo(output: OutputStream, active: () -> Boolean)
     fun release()
@@ -24,7 +24,7 @@ interface RecordMediaPackageRepository {
     suspend fun previewOpenZip(snapshot: OriginalExportSnapshot, active: () -> Boolean): RecordMediaPreview = preview(snapshot)
     suspend fun isCurrent(preview: RecordMediaPreview): Boolean
     suspend fun seal(preview: RecordMediaPreview, password: CharArray): PreparedRecordMediaPackage
-    /** Explicitly confirmed plaintext ZIP; current originals + every current image, no restore capability. */
+    /** Explicitly confirmed plaintext ZIP; current originals + every current image/WAV, no restore capability. */
     suspend fun exportOpenZip(preview: RecordMediaPreview): PreparedRecordMediaPackage {
         throw UnsupportedOperationException("Open image export unavailable")
     }

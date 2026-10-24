@@ -76,7 +76,7 @@ internal class SqlRecordMediaPackageRepository(private val database: RecordsSqlD
         } finally { password.fill('\u0000') }
     }
     override suspend fun exportOpenZip(preview: RecordMediaPreview): PreparedRecordMediaPackage {
-        if (preview.audios.isNotEmpty() || preview.history != null || preview.editDrafts != null || !isCurrent(preview)) throw OriginalExportConflict()
+        if (preview.history != null || preview.editDrafts != null || !isCurrent(preview)) throw OriginalExportConflict()
         return OpenRecordZipCodec.prepare(preview, { image ->
             val bytes = media.read(image.attachmentId)
             try { RecordMediaPackageCipher.checkImage(image, bytes); bytes }

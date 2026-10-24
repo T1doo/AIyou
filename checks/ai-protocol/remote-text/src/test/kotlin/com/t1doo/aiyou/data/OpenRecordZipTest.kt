@@ -179,6 +179,144 @@ class OpenRecordZipTest {
             val revoked = repo(f).exportOpenZip(p); revoked.release(); fails { revoked.writeTo(ByteArrayOutputStream()) { true } }
         }
     }
+    @Test fun currentPureAudioAndMixedMediaExportExactWaveWithPortableSourceManifest(): Unit = runBlocking {
+        for (mixed in listOf(false, true)) MixedCaptureSqlTest.fixture().use { f ->
+            val id = audioEntry(f, mixed); val p = preview(f, listOf(id))
+            assertEquals(1, p.audios.size); assertEquals(if (mixed) 1 else 0, p.images.size)
+            val originalCipher = f.mediaRoot.resolve(p.audios.single().attachmentId + ".aead").readBytes()
+            val ready = repo(f).exportOpenZip(p); val doc = Document()
+            try { OriginalExportIo.writeZipAndVerify(doc, ready) { true } } finally { ready.release() }
+            val files = unzip(doc.bytes)
+            val audio = p.audios.single(); val path = "audio/${audio.attachmentId}.wav"
+            assertEquals(setOf("records.md", "records.jsonl", "manifest.json", path) + p.images.map(OpenRecordZipCodec::imagePath), files.keys)
+            assertArrayEquals(CaptureAudioSqlTest.wave(), files.getValue(path))
+            assertEquals(4, LocalPcmAudio.inspect(files.getValue(path)).samples)
+            val manifest = Json.parseToJsonElement(files.getValue("manifest.json").toString(Charsets.UTF_8)).jsonObject
+            assertEquals(4, manifest.getValue("formatVersion").jsonPrimitive.int)
+            assertEquals(1, manifest.getValue("audioCount").jsonPrimitive.int)
+            val descriptor = manifest.getValue("audios").jsonArray.single().jsonObject
+            assertEquals(id, descriptor.getValue("sourceId").jsonPrimitive.content)
+            assertEquals(1, descriptor.getValue("sourceRevision").jsonPrimitive.int)
+            assertEquals(audio.attachmentId, descriptor.getValue("attachmentId").jsonPrimitive.content)
+            assertEquals(audio.byteSize, descriptor.getValue("byteSize").jsonPrimitive.long)
+            assertEquals(audio.sha256, descriptor.getValue("sha256").jsonPrimitive.content)
+            assertEquals(path, descriptor.getValue("path").jsonPrimitive.content)
+            val record = Json.parseToJsonElement(files.getValue("records.jsonl").toString(Charsets.UTF_8).trim()).jsonObject
+            assertEquals(p.snapshot.records.single().entry.originalText, record.getValue("originalText").jsonPrimitive.content)
+            assertEquals(descriptor, record.getValue("audios").jsonArray.single())
+            assertTrue(files.getValue("records.md").toString(Charsets.UTF_8).contains("[原音]($path)"))
+            manifest.getValue("files").jsonArray.forEach { value ->
+                val row = value.jsonObject; val bytes = files.getValue(row.getValue("path").jsonPrimitive.content)
+                assertEquals(bytes.size.toLong(), row.getValue("byteSize").jsonPrimitive.long)
+                assertEquals(PermanentErasureFixture.hash(bytes), row.getValue("sha256").jsonPrimitive.content)
+            }
+            assertTrue(doc.outputClosed && doc.inputClosed); assertEquals(0, doc.deletions)
+            assertArrayEquals(originalCipher, f.mediaRoot.resolve(audio.attachmentId + ".aead").readBytes())
+        }
+    }
+    @Test fun audioReplacementWithSameCountDuringReadbackCannotConfirmStaleMediaSet(): Unit = runBlocking {
+        MixedCaptureSqlTest.fixture().use { f ->
+            val id = audioEntry(f); val h = Harness(f, id); h.picker()
+            val approved = h.ui.mediaPreview!!; val old = approved.audios.single(); val doc = Document()
+            doc.onRead = {
+                doc.onRead = null
+                val replacement = AttachmentIntent(uuid(), id, 1, "audio/wav", old.sha256, old.byteSize)
+                runBlocking { f.media.save(replacement) { CaptureAudioSqlTest.wave().inputStream() } }
+                f.db.write("DELETE FROM attachments WHERE id=?", old.attachmentId)
+                // Counts/text still match; only the exact approved attachment set has changed.
+                assertTrue(SqlOriginalExportRepository(f.gateway, f.tags).isCurrent(approved.snapshot))
+                assertFalse(runBlocking { repo(f).isCurrent(approved) })
+            }
+            h.controller.picked(h.ui.session, h.ui.requestKey!!, doc); h.drain()
+            assertEquals(OriginalExportPhase.CHANGED, h.ui.phase)
+            assertTrue(h.ui.hasFile); assertNull(h.ui.notice); assertFalse(h.ui.riskAccepted)
+            assertTrue(doc.outputClosed && doc.inputClosed); assertEquals(0, doc.deletions)
+        }
+    }
+    @Test fun audioMissingCorruptNonReadyAndChangedSourceFailBeforeOrDuringTheConfirmedWrite(): Unit = runBlocking {
+        for (mode in listOf("missing", "corrupt", "failed", "malformedWave", "sourceDuringWrite")) MixedCaptureSqlTest.fixture().use { f ->
+            val id = audioEntry(f); val h = Harness(f, id)
+            val audio = f.media.list(id, 1).single().intent
+            if (mode == "sourceDuringWrite") {
+                h.picker(); val doc = Document()
+                doc.onWrite = { doc.onWrite = null; f.tags.replace(ManualTagMutation(id, 0, listOf("合成已变化标签"), uuid())) }
+                h.controller.picked(h.ui.session, h.ui.requestKey!!, doc); h.drain()
+                assertTrue(h.ui.phase in setOf(OriginalExportPhase.FAILED, OriginalExportPhase.CHANGED))
+                assertTrue(h.ui.hasFile); assertTrue(doc.outputClosed); assertNull(h.ui.notice); assertEquals(0, doc.deletions)
+            } else {
+                val file = f.mediaRoot.resolve(audio.id + ".aead")
+                when (mode) {
+                    "missing" -> Files.delete(file.toPath())
+                    "corrupt" -> file.writeBytes(file.readBytes().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() })
+                    "malformedWave" -> {
+                        val bad = CaptureAudioSqlTest.wave().also { it[24] = (it[24].toInt() xor 1).toByte() }
+                        f.media.save(AttachmentIntent(uuid(), id, 1, "audio/wav", PermanentErasureFixture.hash(bad), bad.size.toLong())) { bad.inputStream() }
+                    }
+                    else -> f.db.write("UPDATE attachments SET state='FAILED' WHERE id=?", audio.id)
+                }
+                h.controller.open(); h.controller.toggle(h.ui.session, id, 1)
+                h.controller.format(h.ui.session, OriginalExportFormat.MEDIA_ZIP); h.controller.prepare(h.ui.session); h.drain()
+                assertEquals(mode, OriginalExportPhase.FAILED, h.ui.phase)
+                assertNull(h.ui.snapshot); assertNull(h.ui.requestKey); assertFalse(h.ui.hasFile)
+            }
+            assertFalse(h.ui.riskAccepted); assertEquals(1, f.db.read("SELECT id FROM entries").size)
+        }
+    }
+    @Test fun audioProviderFailuresCancellationAndLatePickerNeverClaimSuccessOrDeleteAutomatically(): Unit = runBlocking {
+        MixedCaptureSqlTest.fixture().use { f ->
+            val id = audioEntry(f)
+            for (mode in listOf("write", "outputClose", "read", "inputClose", "mismatch", "truncated", "extra", "zero")) {
+                val h = Harness(f, id); h.picker(); val doc = Document(mode)
+                h.controller.picked(h.ui.session, h.ui.requestKey!!, doc); h.drain()
+                assertEquals(mode, OriginalExportPhase.FAILED, h.ui.phase)
+                assertTrue(h.ui.hasFile); assertNull(h.ui.notice); assertFalse(h.ui.riskAccepted); assertEquals(0, doc.deletions)
+                assertFalse(h.ui.error!!.contains("sensitive-provider"))
+            }
+            val h = Harness(f, id); h.picker(); val session = h.ui.session; val key = h.ui.requestKey!!; val doc = Document()
+            doc.onWrite = { h.controller.cancel(session) }
+            h.controller.picked(session, key, doc); h.drain()
+            assertEquals(OriginalExportPhase.CANCELLED, h.ui.phase); assertTrue(doc.outputClosed); assertTrue(h.ui.hasFile)
+            assertEquals(0, doc.deletions); h.controller.close(session); h.controller.open()
+            val late = Document(); h.controller.picked(session, key, late); h.drain()
+            assertEquals(0, late.opens); assertEquals(0, late.deletions)
+        }
+    }
+    @Test fun mixedMediaWipesEachAuthenticatedBufferAndKeepsSharedCountAndByteBounds(): Unit = runBlocking {
+        MixedCaptureSqlTest.fixture().use { f ->
+            val one = audioEntry(f, true); val two = audioEntry(f); val p = preview(f, listOf(one, two))
+            val retained = mutableListOf<ByteArray>(); var reads = 0
+            val ready = OpenRecordZipCodec.prepare(p, { item ->
+                assertTrue(retained.all { bytes -> bytes.all { it == 0.toByte() } }); reads++
+                f.media.read(item.attachmentId).also(retained::add)
+            }, { repo(f).isCurrent(p) })
+            try { ready.writeTo(ByteArrayOutputStream()) { true } } finally { ready.release() }
+            assertEquals(3, reads); assertTrue(retained.all { bytes -> bytes.all { it == 0.toByte() } })
+            val image = p.images.single(); val audio = p.audios.first()
+            // Same shared inventory limits: audio is not an extra allowance outside image capacity.
+            val capacitySnapshot = OriginalExportSnapshot(uuid(), 10, p.snapshot.records.map { record ->
+                OriginalExportRecord(record.entry, record.contentHash, record.tags, record.sourceGeneration,
+                    imageCount = 9, eventDate = record.eventDate, people = record.people, audioCount = 1)
+            })
+            val capacityImages = capacitySnapshot.records.flatMap { record -> List(9) {
+                image.copy(sourceId = record.entry.id, attachmentId = uuid())
+            } }
+            val atLimit = RecordMediaPreview(capacitySnapshot, capacityImages, audios = p.audios)
+            val bounded = OpenRecordZipCodec.prepare(atLimit, { error("Capacity-only check never opens media") }, { true })
+            bounded.release()
+            fails { RecordMediaPreview(p.snapshot, List(19) { image.copy(attachmentId = uuid()) }, audios = p.audios) }
+            fails { RecordMediaPreview(p.snapshot, List(4) { image.copy(attachmentId = uuid(), byteSize = RecordMediaPackages.MAX_IMAGE_BYTES) }, audios = listOf(audio)) }
+            val mixedOnly = OriginalExportSnapshot(uuid(), 10, listOf(p.snapshot.records.first()))
+            fails { OpenRecordZipCodec.prepare(RecordMediaPreview(mixedOnly, p.images), { PNG.copyOf() }, { true }) }
+            val audioOnly = RecordMediaPreview(OriginalExportSnapshot(uuid(), 10, listOf(p.snapshot.records.last())),
+                emptyList(), audios = listOf(p.audios.last()))
+            var active = true; var held: ByteArray? = null
+            val stopped = OpenRecordZipCodec.prepare(audioOnly, { item ->
+                f.media.read(item.attachmentId).also { held = it; active = false }
+            }, { true })
+            try { fails { stopped.writeTo(ByteArrayOutputStream()) { active } } } finally { stopped.release() }
+            assertTrue(held!!.all { it == 0.toByte() })
+        }
+    }
     private class Harness(f: PermanentErasureFixture, id: String) {
         private val originals = SqlOriginalExportRepository(f.gateway, f.tags)
         private val media = repo(f)
@@ -235,6 +373,17 @@ class OpenRecordZipTest {
             val capture = MixedCaptureSqlTest.repo(f); var draft = capture.current()
             if (text.isNotEmpty()) draft = capture.edit(draft, text)
             draft = capture.add(draft, MixedCaptureSqlTest.intent(draft), PNG); capture.save(draft, 5, "UTC"); return draft.id
+        }
+        private suspend fun audioEntry(f: PermanentErasureFixture, mixed: Boolean = false): String {
+            val capture = MixedCaptureSqlTest.repo(f); var draft = capture.current()
+            if (mixed) {
+                draft = capture.edit(draft, "合成图音原文🌿")
+                draft = capture.add(draft, MixedCaptureSqlTest.intent(draft), PNG)
+            }
+            val reservation = CaptureAudioSqlTest.reserve(capture, draft, CaptureAudioSqlTest.wave())
+            val ready = capture.addAudio(reservation, CaptureAudioSqlTest.wave())
+            capture.mutationGate.finish(reservation, ready)
+            capture.save(ready, 5, "UTC"); return ready.id
         }
         private suspend fun preview(f: PermanentErasureFixture, ids: List<String>) = repo(f).preview(SqlOriginalExportRepository(f.gateway, f.tags).capture(ids.map { SourceVersion(it, 1) }, uuid(), 10))
         private fun unzip(bytes: ByteArray): Map<String, ByteArray> = buildMap {

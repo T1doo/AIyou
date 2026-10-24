@@ -42,7 +42,20 @@ class CaptureAudioPackageTest {
                     framed.fill(0);legacy.fill(0)
                     target.db.transaction { it.execute("UPDATE record_package_receipts SET state=? WHERE id=?",listOf(journal[1],journal[0])) }
                 }
-                assertThrows(OriginalExportConflict::class.java) { runBlocking { repo.exportOpenZip(preview) } }
+                val openZip = repo.exportOpenZip(preview)
+                try {
+                    val output = java.io.ByteArrayOutputStream(); openZip.writeTo(output) { true }
+                    java.util.zip.ZipInputStream(output.toByteArray().inputStream()).use { zip ->
+                        var found = false
+                        while (true) {
+                            val file = zip.nextEntry ?: break
+                            if (file.name == "audio/${preview.audios.single().attachmentId}.wav") {
+                                assertArrayEquals(CaptureAudioSqlTest.wave(), zip.readBytes()); found = true
+                            }
+                        }
+                        assertTrue(found)
+                    }
+                } finally { openZip.release() }
             } finally { pack.release() }
         } }
     }
