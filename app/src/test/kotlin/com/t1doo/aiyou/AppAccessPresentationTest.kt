@@ -93,11 +93,15 @@ class AppAccessPresentationTest {
     }
     private fun phase(expected: AppAccessPhase) {
         compose.waitForIdle()
+        val started = System.nanoTime()
         try {
             compose.waitUntil(2_000) { compose.runOnIdle { controller.state.value.phase == expected } }
         } catch (failure: ComposeTimeoutException) {
-            throw AssertionError("App access phase expected=$expected observed=${controller.state.value.phase} writes=${preferenceWrites?.get()}", failure)
+            throw AssertionError("App access phase expected=$expected observed=${controller.state.value.phase} writes=${preferenceWrites?.get()} elapsedNanos=${System.nanoTime()-started}", failure)
         }
+        val elapsed = System.nanoTime()-started
+        assertTrue("App access phase expected=$expected observed=${controller.state.value.phase} writes=${preferenceWrites?.get()} elapsedNanos=$elapsed exceeded 2000ms",
+            elapsed in 0L..2_000_000_000L)
         compose.waitForIdle()
         assertEquals(expected, controller.state.value.phase)
     }
