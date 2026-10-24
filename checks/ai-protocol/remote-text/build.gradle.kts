@@ -44,7 +44,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     listOf("ErasureFileProtocol.kt", "PermanentErasureSqlSchema.kt", "SqlPermanentErasureRepository.kt", "DrainingRecordsStorage.kt", "PermanentErasureRecovery.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
-    listOf("ManualTagSqlSchema.kt", "ManualTagCipher.kt", "SqlManualTagRepository.kt", "SqlSourceTagRepository.kt", "SourceMemoryCipher.kt", "SqlSourceMemoryRepository.kt", "SourcePreferenceCipher.kt", "SqlSourcePreferenceRepository.kt", "SqlAudioTranscriptRepository.kt", "AudioTranscriptCipher.kt", "SqlImageTextRepository.kt", "ImageTextCipher.kt").forEach {
+    listOf("ManualTagSqlSchema.kt", "ManualTagCipher.kt", "SqlManualTagRepository.kt", "SqlSourceTagRepository.kt", "SourceMemoryCipher.kt", "SqlSourceMemoryRepository.kt", "SourcePreferenceCipher.kt", "SqlSourcePreferenceRepository.kt", "SourceFactCipher.kt", "SqlSourceFactRepository.kt", "SqlAudioTranscriptRepository.kt", "AudioTranscriptCipher.kt", "SqlImageTextRepository.kt", "ImageTextCipher.kt").forEach {
         from("../../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
     }
     listOf("ManualTaskSqlSchema.kt", "ManualTaskCipher.kt", "ReminderRuntimeCipherFields.kt", "SqlManualTaskRepository.kt", "SqlOriginalExportRepository.kt", "SqlRecycleBinRepository.kt").forEach {

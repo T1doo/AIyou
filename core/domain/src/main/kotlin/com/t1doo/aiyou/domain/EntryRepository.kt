@@ -27,6 +27,7 @@ interface EntryRepository {
     val audioTranscripts: AudioTranscriptRepository? get() = null
     val imageTexts: ImageTextRepository? get() = null
     val sourcePreferences: SourcePreferenceRepository? get() = null
+    val sourceFacts: SourceFactRepository? get() = null
     val localCandidates: LocalCandidateRepository? get() = null
     val favorites: RecordFavoriteRepository? get() = null
     val eventDates: RecordEventDateRepository? get() = null
