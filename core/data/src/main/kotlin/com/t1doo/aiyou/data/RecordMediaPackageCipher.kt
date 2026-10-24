@@ -24,8 +24,9 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
         try {
             RecordPackages.password(password)
             metadata=FullBackupCodec.encode(data)
+            val version=data.version
             val salt=ByteArray(16).also(random::nextBytes);val prefix=ByteArray(8).also(random::nextBytes)
-            val header=ByteBuffer.allocate(40).put(when(data.version) { 8 -> MAGIC8;9 -> MAGICF9;10 -> MAGICF10;11 -> MAGICF11;12 -> MAGICF12;else -> error("Unknown full version") }).putInt(data.version).putInt(RecordPackages.ITERATIONS).put(salt).put(prefix).array()
+            val header=ByteBuffer.allocate(40).put(when(version) { 8 -> MAGIC8;9 -> MAGICF9;10 -> MAGICF10;11 -> MAGICF11;12 -> MAGICF12;13 -> MAGICF13;else -> error("Unknown full version") }).putInt(version).putInt(RecordPackages.ITERATIONS).put(salt).put(prefix).array()
             key=RecordPackageCrypto.derive(password,salt,beforeKdf)
             return Prepared(header,metadata,checkNotNull(key),data.media,read,current).also { key=null;metadata=null }
         } finally { key?.fill(0);metadata?.fill(0);password.fill('\u0000') }
@@ -35,9 +36,9 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
         try {
             RecordPackages.password(password)
             return source().use { input ->
-                val header=exact(input,40);val magic=header.copyOfRange(0,8);require(magic.contentEquals(MAGIC8) || magic.contentEquals(MAGICF9) || magic.contentEquals(MAGICF10) || magic.contentEquals(MAGICF11) || magic.contentEquals(MAGICF12))
+                val header=exact(input,40);val magic=header.copyOfRange(0,8);require(magic.contentEquals(MAGIC8) || magic.contentEquals(MAGICF9) || magic.contentEquals(MAGICF10) || magic.contentEquals(MAGICF11) || magic.contentEquals(MAGICF12) || magic.contentEquals(MAGICF13))
                 val fields=ByteBuffer.wrap(header,8,32)
-                require(fields.int==(if(magic.contentEquals(MAGIC8)) 8 else if(magic.contentEquals(MAGICF9)) 9 else if(magic.contentEquals(MAGICF10)) 10 else if(magic.contentEquals(MAGICF11)) 11 else 12) && fields.int==RecordPackages.ITERATIONS)
+                require(fields.int==(if(magic.contentEquals(MAGIC8)) 8 else if(magic.contentEquals(MAGICF9)) 9 else if(magic.contentEquals(MAGICF10)) 10 else if(magic.contentEquals(MAGICF11)) 11 else if(magic.contentEquals(MAGICF12)) 12 else 13) && fields.int==RecordPackages.ITERATIONS)
                 val salt=ByteArray(16).also(fields::get)
                 val first=exact(input,4);require(ByteBuffer.wrap(first).int in 16..FullBackupCodec.MAX_METADATA+16)
                 key=RecordPackageCrypto.derive(password,salt,beforeKdf)
@@ -278,6 +279,7 @@ internal class RecordMediaPackageCipher(private val random: SecureRandom = Secur
         private val MAGIC6 = "AIYOUPK6".toByteArray(Charsets.US_ASCII)
         private val MAGIC7 = "AIYOUPK7".toByteArray(Charsets.US_ASCII)
         private val MAGIC9 = "AIYOUPK9".toByteArray(Charsets.US_ASCII)
+        private val MAGICF13 = "AIYOUF13".toByteArray(Charsets.US_ASCII)
         private val MAGICF12 = "AIYOUF12".toByteArray(Charsets.US_ASCII)
         private val MAGICF11 = "AIYOUF11".toByteArray(Charsets.US_ASCII)
         private val MAGICF10 = "AIYOUF10".toByteArray(Charsets.US_ASCII)

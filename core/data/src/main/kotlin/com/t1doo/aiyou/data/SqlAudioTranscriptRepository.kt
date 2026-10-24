@@ -43,8 +43,8 @@ internal class SqlAudioTranscriptRepository(private val database:RecordsSqlDatab
                 } else if(old==null||!snapshot(old,payload(old)).same(expected))throw AudioTranscriptConflict()
                 val history=if(request.withdraw)checkNotNull(expected).history else {
                     val h=expected?.history.orEmpty();if(h.size>=8)throw AudioTranscriptLimit()
-                    if(expected!=null&&!expected.withdrawn&&expected.current.text==request.text)throw AudioTranscriptConflict()
-                    h+AudioTranscriptVersion(h.size+1,checkNotNull(request.text),request.at)
+                    if(expected!=null&&!expected.withdrawn&&expected.current.text==request.text&&expected.current.range==request.range)throw AudioTranscriptConflict()
+                    h+AudioTranscriptVersion(h.size+1,checkNotNull(request.text),request.at,request.range)
                 }
                 val p=TranscriptPayload(request.anchor,history,request.withdraw,expected?.version?:0,request.at)
                 val cells=listOf(request.id,request.anchor.intent.entryId,request.anchor.intent.revision.toLong(),request.anchor.sourceHash,request.anchor.generation,4L,(expected?.version?:0)+1,"READY",receipt,old?.created?:request.at,byteArrayOf())
@@ -97,7 +97,16 @@ internal class SqlAudioTranscriptRepository(private val database:RecordsSqlDatab
         if(p.signatures!=fresh.signatures||p.next!=fresh.next)return@safe false
         val confirmed=database.transaction{sql->val last=page(sql,p.keyword,p.cursor);last.signatures==p.signatures&&last.next==p.next};if(confirmed)publish();confirmed
     }
-    private fun receipt(r:AudioTranscriptWrite):String {val b=PackageWriter(131072).use{w->w.string("human-transcript-write-v1",64);w.string(r.id,36);TranscriptEncoding.anchor(w,r.anchor);w.i64(r.expected?.version?:0);r.expected?.let{e->w.i32(if(e.withdrawn)1 else 0);w.i32(e.history.size);e.history.forEach{w.i32(it.revision);w.string(it.text,4000);w.i64(it.at)}};w.string(r.mutationId,36);w.i64(r.at);w.i32(if(r.withdraw)1 else 0);w.string(r.text.orEmpty(),4000);w.bytes()};return try{hash(b)}finally{b.fill(0)}}
+    private fun receipt(r:AudioTranscriptWrite):String {
+        val ranged=r.range!=null||r.expected?.history.orEmpty().any {it.range!=null}
+        val b=PackageWriter(131072).use {w->
+            w.string(if(ranged)"human-transcript-write-v2"else "human-transcript-write-v1",64)
+            w.string(r.id,36);TranscriptEncoding.anchor(w,r.anchor);w.i64(r.expected?.version?:0)
+            r.expected?.let {e->w.i32(if(e.withdrawn)1 else 0);w.i32(e.history.size);e.history.forEach {w.i32(it.revision);w.string(it.text,4000);w.i64(it.at);if(ranged)TranscriptEncoding.range(w,it.range)}}
+            w.string(r.mutationId,36);w.i64(r.at);w.i32(if(r.withdraw)1 else 0);w.string(r.text.orEmpty(),4000)
+            if(ranged)TranscriptEncoding.range(w,r.range);w.bytes()
+        };return try {hash(b)}finally {b.fill(0)}
+    }
     fun portable(cells:List<Any?>,restoring:Boolean):List<Any?> {val r=decode(cells);if(r.state=="INVALIDATED"){require(r.bytes.isEmpty());return cells};return cells.toMutableList().also{it[10]=cipher.portable(aad(r),r.bytes,restoring)}}
     fun validateFullWithin(sql:RecordsSqlConnection){live(sql);sql.query("SELECT $COLUMNS FROM local_candidate_batches WHERE ruleVersion=4 AND state='INVALIDATED' LIMIT 4097").forEach{require(decode(it).bytes.isEmpty())}}
     fun validatePortable(data:FullBackupData) {

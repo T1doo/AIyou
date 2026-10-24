@@ -128,7 +128,7 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
             }
         }
     }
-    private fun operation(data:FullBackupData)=when(data.version) { 8 -> OP;9 -> "FULL_BACKUP_IMPORT_V9";10 -> "FULL_BACKUP_IMPORT_V10";11 -> "FULL_BACKUP_IMPORT_V11";12 -> "FULL_BACKUP_IMPORT_V12";else -> error("Unknown full version") }
+    private fun operation(data:FullBackupData)=when(data.version) { 8 -> OP;9 -> "FULL_BACKUP_IMPORT_V9";10 -> "FULL_BACKUP_IMPORT_V10";11 -> "FULL_BACKUP_IMPORT_V11";12 -> "FULL_BACKUP_IMPORT_V12";13 -> "FULL_BACKUP_IMPORT_V13";else -> error("Unknown full version") }
     private fun verifyRestored(expected:FullBackupData,actual:FullBackupData) {
         // Logical rows are keyed sets. SQL BINARY and the edit store have different sort orders,
         // while authenticated image frames retain their explicit document order throughout IO.
@@ -201,7 +201,7 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
         mediaPackages.validatePortableLedger(data)
         data.tables[12].forEach { row -> when(row[3]) {
             "PACKAGE_MEDIA_INTENT" -> mediaPackages.validateCompletedForFullBackup(row)
-            OP,"FULL_BACKUP_IMPORT_V9","FULL_BACKUP_IMPORT_V10","FULL_BACKUP_IMPORT_V11","FULL_BACKUP_IMPORT_V12" -> { RecordPackages.uuid(row[1] as String);require(row[0]==PREFIX+row[1] && row[2]==(if(row[3]==OP) 8L else if(row[3]=="FULL_BACKUP_IMPORT_V9") 9L else if(row[3]=="FULL_BACKUP_IMPORT_V10") 10L else if(row[3]=="FULL_BACKUP_IMPORT_V11") 11L else 12L) && (row[4] as String).matches(Regex("DONE:[0-9a-f]{64}"))) }
+            OP,"FULL_BACKUP_IMPORT_V9","FULL_BACKUP_IMPORT_V10","FULL_BACKUP_IMPORT_V11","FULL_BACKUP_IMPORT_V12","FULL_BACKUP_IMPORT_V13" -> { RecordPackages.uuid(row[1] as String);require(row[0]==PREFIX+row[1] && row[2]==(if(row[3]==OP) 8L else if(row[3]=="FULL_BACKUP_IMPORT_V9") 9L else if(row[3]=="FULL_BACKUP_IMPORT_V10") 10L else if(row[3]=="FULL_BACKUP_IMPORT_V11") 11L else if(row[3]=="FULL_BACKUP_IMPORT_V12") 12L else 13L) && (row[4] as String).matches(Regex("DONE:[0-9a-f]{64}"))) }
             "CAPTURE_SAVED","CAPTURE_DISCARDED" -> {
                 RecordPackages.uuid(row[1] as String)
                 require(row[0]==(row[3] as String)+":"+row[1] && row[2]==1L)
