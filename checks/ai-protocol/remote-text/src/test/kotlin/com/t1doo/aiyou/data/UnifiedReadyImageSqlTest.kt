@@ -13,21 +13,29 @@ class UnifiedReadyImageSqlTest {
     private fun memory(h:UnifiedKeywordFixture,id:String)=AcceptedMemoryKeywordSqlTest.memory(h,id,"淡茶")
     private suspend fun populate(h:UnifiedKeywordFixture,id:String){h.audio(id);h.image(id);h.preference(id);memory(h,id)}
     @Test fun allFiveTypesIntersectCurrentReadyOriginalWithDatesTagsPeopleAndFavorite():Unit=runBlocking{UnifiedKeywordFixture(withPeople=true).use{h->
-        val yes=h.f.entry(text="我偏好淡茶🙂");populate(h,yes)
-        val noImage=h.f.entry(text="我偏好淡茶🙂");h.audio(noImage);h.preference(noImage);memory(h,noImage)
-        val noFavorite=h.f.entry(text="我偏好淡茶🙂");populate(h,noFavorite)
-        for(id in listOf(yes,noImage,noFavorite)){
-            h.f.tags.replace(ManualTagMutation(id,0,listOf("合成标签"),FullBackupTest.uuid()))
-            h.people.replace(ManualPeopleMutation(h.people.read(id),listOf("合成人物"),FullBackupTest.uuid()))
+        val yes=h.f.entry(text="我偏好淡茶🙂")
+        val noImage=h.f.entry(text="我偏好淡茶🙂")
+        val noFavorite=h.f.entry(text="我偏好淡茶🙂")
+        val noTag=h.f.entry(text="我偏好淡茶🙂")
+        val noPerson=h.f.entry(text="我偏好淡茶🙂")
+        val noDate=h.f.entry(text="我偏好淡茶🙂")
+        h.f.db.write("UPDATE entries SET capturedAtMillis=172800000 WHERE id=?",noDate)
+        for(id in listOf(yes,noImage,noFavorite,noTag,noPerson,noDate)){
+            if(id==noImage){h.audio(id);h.preference(id);memory(h,id)}else populate(h,id)
+            h.fact(id)
+            h.f.tags.replace(ManualTagMutation(id,0,listOf(if(id==noTag)"其他标签"else"合成标签"),FullBackupTest.uuid()))
+            h.people.replace(ManualPeopleMutation(h.people.read(id),listOf(if(id==noPerson)"其他人物"else"合成人物"),FullBackupTest.uuid()))
             if(id!=noFavorite)UnifiedFavoriteSqlTest.favorite(h,id,true)
         }
-        val tags=h.repo.tagChoices(null,{});val tag=h.repo.selectTag(tags,tags.choices.single(),{})
-        val persons=h.repo.personChoices(null,{});val person=h.repo.selectPerson(persons,persons.choices.single(),{})
+        val tags=h.repo.tagChoices(null,{});val tag=h.repo.selectTag(tags,tags.choices.single{it.name=="合成标签"},{})
+        val persons=h.repo.personChoices(null,{});val person=h.repo.selectPerson(persons,persons.choices.single{it.name=="合成人物"},{})
         val p=h.repo.search("淡茶",UnifiedKeywordScope.ALL,UnifiedCaptureRange.parse("1970-01-01","1970-01-01"),tag,person,true,true,{})
-        assertTrue(p.onlyReadyImages);assertEquals(listOf(yes),p.groups.map{it.binding.source.sourceId});assertEquals(5,p.groups.single().items.size)
+        assertTrue(p.onlyReadyImages);assertEquals(listOf(yes),p.groups.map{it.binding.source.sourceId});assertEquals(6,p.groups.single().items.size)
+        assertEquals(setOf("O:","A:","I:","P:","M:","F:"),p.groups.single().items.map{it.key.take(2)}.toSet())
         for(item in p.groups.single().items){var called=false;assertTrue(h.repo.resolve(p,item){called=true});assertTrue(called)}
         assertTrue(h.lastReadyPlaintext!!.all{it==0.toByte()})
-        assertEquals(2,search(h).groups.size) // noImage's audio cannot qualify.
+        assertEquals(setOf(yes,noFavorite,noTag,noPerson,noDate),search(h).groups.map{it.binding.source.sourceId}.toSet()) // Only READY restriction remains.
+
     }}
     @Test fun readyQualificationDoesNotChangeLegacyAnyStateOrInventTextForImageOnly():Unit=runBlocking{UnifiedKeywordFixture().use{h->
         val ready=h.f.entry(text="合成淡茶");h.f.image(ready)

@@ -5,6 +5,7 @@ import com.t1doo.aiyou.records.canShowTranscriptEditor
 import com.t1doo.aiyou.records.currentImageTextSource
 import com.t1doo.aiyou.records.canRetainImageTexts
 import com.t1doo.aiyou.records.canRetainFactSources
+import com.t1doo.aiyou.records.canUseFactNavigation
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -816,9 +817,10 @@ fun AIyouApp(
             navigation.publish(generation) {
                 val latest=currentRecordsProvider?.invoke() ?: currentLocal
                 val entry=latest?.entries?.singleOrNull { it.id==location.entryId && it.currentRevision==location.revision }
-                if(ownsFact() && latest?.sourceFactOwner===factUi.owner && entry!=null &&
+                if(ownsFact() && latest!=null && latest.sourceFactOwner===factUi.owner && entry!=null &&
                     entry.policy!=com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE &&
-                    com.t1doo.aiyou.model.OriginalExports.hash(entry.originalText)==location.contentHash) confirm {
+                    com.t1doo.aiyou.model.OriginalExports.hash(entry.originalText)==location.contentHash &&
+                    latest.canUseFactNavigation(confirm,location)) confirm {
                     navigation.advance();search.pause();readerFromSearch=false;tailReturnRequest=null
                     audioSourceAnchor=null;audioSourceReference=null;imageSourceAnchor=null
                     searchLocation=location;unifiedSourceRoute=false;inboxSourceRoute=true;detailEntryId=location.entryId

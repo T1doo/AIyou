@@ -417,7 +417,7 @@ fun OriginalReadingScreen(
                         val end = currentLocation?.let { entry.originalText.offsetByCodePoints(0, it.endCodePoint) }
                         val annotated = remember(entry.originalText, currentLocation) {
                             AnnotatedString.Builder(entry.originalText).apply {
-                                if (start != null && end != null) addStyle(SpanStyle(
+                                if (currentLocation?.highlightRange == true && start != null && end != null) addStyle(SpanStyle(
                                     background = AIyouColors.surfaceMuted, fontWeight = FontWeight.Bold), start, end)
                             }.toAnnotatedString()
                         }

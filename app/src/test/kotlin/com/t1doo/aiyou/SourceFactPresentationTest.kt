@@ -118,7 +118,8 @@ class SourceFactPresentationTest {
         }
     }
     private val unified=UnifiedKeywordController({state.value},{state.value=it(state.value)},{queue.add(it);true})
-    init {state.value=state.value.copy(sourceFactOwner=port,unifiedKeywordOwner=queryPort)}
+    init {state.value=state.value.copy(sourceFactOwner=port,unifiedKeywordOwner=queryPort,
+        supportsLocalProcessing=true,localProcessingVersions=mapOf(entry.id to LocalProcessingVersion(source,0)))}
     private val controller=SourceFactController({state.value},{state.value=it(state.value)},{queue.add(it);true},Clock.fixed(Instant.ofEpochMilli(100),ZoneOffset.UTC),beforeOpen={unified.retire()},beforeWrite={retiredQueries++;unified.retire()})
     @After fun dispose(){controller.dispose();unified.dispose()}
     @Composable private fun Screen() {
@@ -160,6 +161,8 @@ class SourceFactPresentationTest {
         compose.onNodeWithTag("unified-fact-match:"+hit.key).performScrollTo().assertTextEquals("人工主题命中 · 原文仅作出处")
         val quote=compose.onNodeWithTag("unified-fact-quote:"+hit.key).performScrollTo().fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].single();assertTrue(quote.spanStyles.isEmpty())
         click("unified-source:"+hit.key);drain();compose.onNodeWithTag("original-text").assertTextEquals(entry.originalText)
+        val original=compose.onNodeWithTag("original-text").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].single()
+        assertTrue("Topic-only finding must not highlight the original as a keyword match",original.spanStyles.isEmpty())
         open();click("fact-revoke:"+saved!!.id);drain();val version=saved!!.rowVersion;click("fact-cancel");assertEquals(version,saved!!.rowVersion)
         click("fact-revoke:"+saved!!.id);drain();confirm();assertEquals(FactReview.REVOKED,saved!!.review!!.review)
         click("fact-close");backToList();global();click("fact-section-ACCEPTED");drain();assertTrue(state.value.sourceFacts!!.items.isEmpty())

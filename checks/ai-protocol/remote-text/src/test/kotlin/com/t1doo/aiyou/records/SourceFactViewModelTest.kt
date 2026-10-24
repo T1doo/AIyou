@@ -48,6 +48,28 @@ class SourceFactViewModelTest {
         assertTrue(h.store.facts(h.f.source).isEmpty())
         assertEquals(listOf("INVALIDATED",0L),h.f.db.read("SELECT state,length(payload) FROM local_candidate_batches WHERE ruleVersion=6").single())
     }}
+    @Test(timeout=15_000) fun favoriteReadCanObserveTargetGenerationWithoutRetiringTheValidBPageButOldEndpointMustNotNavigate():Unit=runBlocking {Harness().use{h->
+        h.ready();val p=h.store.preview(h.f.source);val a0=h.store.create(FactCreate(id(),p,id(),"合成历史主题",FactContent(SourceMemoryRules.reference(p,"我不喝咖啡🙂")),true,id(),10))
+        val a=h.store.mutate(FactMutation(a0,FactAction.ACCEPT,null,null,id(),11))
+        val bSource=SourceVersion("synthetic-vm-endpoint-b",1);val text="我平时喝淡茶"
+        h.f.db.transaction{sql->sql.execute("INSERT INTO entries(id,currentRevision,capturedAtMillis,captureTimeZone,privacyPolicy) VALUES(?,1,5,'UTC','LOCAL_ONLY')",listOf(bSource.sourceId))
+            sql.execute("INSERT INTO entry_revisions VALUES(?,1,?,?,5)",listOf(bSource.sourceId,text,OriginalExports.hash(text)))}
+        val bp=h.store.preview(bSource);val b0=h.store.create(FactCreate(id(),bp,a.topicId!!,a.topicLabel!!,FactContent(SourceMemoryRules.reference(bp,text)),true,id(),20,a))
+        val b=h.store.mutate(FactMutation(b0,FactAction.ACCEPT,null,a,id(),21))
+        h.vm.refreshLocalSearch();withTimeout(3_000){h.vm.state.first{it.entries.any{e->e.id==bSource.sourceId}&&it.localProcessingVersions.containsKey(bSource.sourceId)}}
+        h.vm.sourceFacts.open(section=FactReview.ACCEPTED);val ui=h.await{it.page!=null&&!it.busy};assertEquals(listOf(b.id),ui.items.map{it.id})
+        val deferred=kotlinx.coroutines.CompletableDeferred<UnifiedKeywordHandoff>()
+        h.vm.sourceFacts.endpoint(ui.session,ui.items.single(),b.review!!.predecessor!!){_,proof->deferred.complete(proof)}
+        val proof=withTimeout(3_000){deferred.await()}
+        val policy=SqlLocalProcessingRepository(h.f.gateway);val off=policy.change(LocalProcessingChange(policy.read(a.source),LocalProcessingChoice.AI_NONE,"vm-endpoint-off"))
+        policy.change(LocalProcessingChange(off,LocalProcessingChoice.LOCAL_ONLY,"vm-endpoint-on"))
+        // Actual production read entry publishes versions without routing through the blanket
+        // refreshProcessingVersions retirement. The adapter deliberately retains delivery.
+        h.vm.favorites.refresh();withTimeout(3_000){h.vm.state.first{!it.favoritesLoading&&it.localProcessingVersions[a.source.sourceId]?.generation==2L}}
+        assertEquals(ui.session,h.ui().session);assertTrue(h.vm.state.value.canRetainFactSources(h.ui()))
+        var nav=0;assertFalse("Observed A generation cannot authorize the old private target",proof{nav++});assertEquals(0,nav)
+    }}
+    private fun id()=java.util.UUID.randomUUID().toString()
     private class Harness:AutoCloseable {
         val f=LocalCandidateFixture();val store=SqlSourceFactRepository(f.gateway,LocalCandidateFixture.KEY)
         val writes=CopyOnWriteArrayList<FactCreate>();@Volatile var loseAck=false;@Volatile var blockDraft=false
@@ -61,6 +83,7 @@ class SourceFactViewModelTest {
         val owner:EntryRepository=object:EntryRepository by base,AutoCloseable {
             override val sourceFacts=port
             override val localProcessing=SqlLocalProcessingRepository(f.gateway)
+            override val favorites=SqlRecordFavoriteRepository(f.gateway)
             override suspend fun updateDraft(text:String):TextDraft {if(blockDraft){blockDraft=false;entered.countDown();check(release.await(3,TimeUnit.SECONDS))};return base.updateDraft(text)}
             override suspend fun prepare(){check(f.db.read("PRAGMA user_version").single().single()==10L)}
             override fun close()=base.close()

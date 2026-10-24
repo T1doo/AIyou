@@ -31,6 +31,7 @@ class SourceFactQuerySqlTest {
             val fact=h.repo.search("绿色",UnifiedKeywordScope.FACT)
             val hit=fact.groups.single().items.single() as UnifiedKeywordEvidence.Fact
             assertEquals(accepted.id,hit.value.id);assertEquals(source,hit.binding.source)
+            assertTrue(com.t1doo.aiyou.records.unifiedOriginalLocation(hit,"绿色")!!.highlightRange)
             val all=h.repo.search("绿色",UnifiedKeywordScope.ALL)
             assertEquals(setOf("O:${source.sourceId}:1","F:${accepted.id}"),all.groups.single().items.map{it.key}.toSet())
             var admissions=0;assertTrue(h.repo.resolve(fact,hit){admissions++});assertEquals(1,admissions)
@@ -53,6 +54,7 @@ class SourceFactQuerySqlTest {
             val location=com.t1doo.aiyou.records.unifiedOriginalLocation(hit,"办公")!!
             assertEquals(accepted.current!!.content.reference.start,location.startCodePoint)
             assertEquals(accepted.current!!.content.reference.end,location.endCodePoint)
+            assertFalse("A topic-only jump locates provenance without claiming an original keyword match",location.highlightRange)
             assertFalse(accepted.current!!.content.reference.quote.contains("办公"))
         }
     }

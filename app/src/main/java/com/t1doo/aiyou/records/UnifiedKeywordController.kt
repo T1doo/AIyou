@@ -344,6 +344,7 @@ internal fun unifiedOriginalHit(item:UnifiedKeywordEvidence.Original,keyword:Str
 
 internal fun unifiedOriginalLocation(item:UnifiedKeywordEvidence,keyword:String):OriginalReadingLocation? {
     val b=item.binding
+    var highlightRange=true
     val range=when(item){
         is UnifiedKeywordEvidence.Original->{val hit=unifiedOriginalHit(item,keyword)?:return null
             if(originalSearchPreview(item.entry,hit)==null)return null
@@ -354,7 +355,7 @@ internal fun unifiedOriginalLocation(item:UnifiedKeywordEvidence,keyword:String)
             val at=ref.quote.indexOf(keyword)
             if(at>=0&&keyword.isNotEmpty()){
                 val start=ref.start+ref.quote.codePointCount(0,at);start to start+keyword.codePointCount(0,keyword.length)
-            }else ref.start to ref.end
+            }else {highlightRange=false;ref.start to ref.end}
         }
         is UnifiedKeywordEvidence.AcceptedMemory->{val m=item.value;val ref=m.content.reference
             if(m.quoteMatch){val at=ref.quote.indexOf(keyword);if(at<0||keyword.isEmpty())return null
@@ -362,5 +363,5 @@ internal fun unifiedOriginalLocation(item:UnifiedKeywordEvidence,keyword:String)
             }else ref.start to ref.end}
         else->return null
     }
-    return OriginalReadingLocation(b.source.sourceId,b.source.revision.toInt(),b.hash,range.first,range.second)
+    return OriginalReadingLocation(b.source.sourceId,b.source.revision.toInt(),b.hash,range.first,range.second,highlightRange)
 }

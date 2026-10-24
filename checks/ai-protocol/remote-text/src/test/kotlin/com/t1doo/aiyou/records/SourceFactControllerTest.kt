@@ -126,6 +126,59 @@ class SourceFactControllerTest {
         val saved=h.store.facts(other).single();assertEquals(2L,saved.rowVersion);assertEquals(FactReview.ACCEPTED,saved.review!!.review)
         assertEquals(FactReview.SUPERSEDED,h.store.facts(h.f.source).single().review!!.review)
     }}
+    @Test fun historicalEndpointHandoffRejectsObservedGenerationAbaEvenWhenOriginalAndCurrentBStayUnchanged():Unit=runBlocking {Harness().use{h->
+        val p=h.store.preview(h.f.source);val first=h.store.create(FactCreate(id(),p,id(),"合成历史主题",FactContent(SourceMemoryRules.reference(p,h.quote)),true,id(),10))
+        val a=h.store.mutate(FactMutation(first,FactAction.ACCEPT,null,null,id(),11))
+        val bSource=SourceVersion("synthetic-endpoint-b",1);h.addSource(bSource,"我平时喝淡茶")
+        val bp=h.store.preview(bSource);val pending=h.store.create(FactCreate(id(),bp,a.topicId!!,a.topicLabel!!,FactContent(SourceMemoryRules.reference(bp,bp.original)),true,id(),20,a))
+        val b=h.store.mutate(FactMutation(pending,FactAction.ACCEPT,null,a,id(),21))
+        val processing=SqlLocalProcessingRepository(h.f.gateway)
+        h.state.updateAndGet{it.copy(supportsLocalProcessing=true,localProcessingVersions=processing.versions())}
+        h.c.open(section=FactReview.ACCEPTED);h.drain();val ui=h.ui()
+        assertEquals(listOf(b.id),ui.items.map{it.id});assertTrue(ui.items.none{it.source==a.source})
+        var ticket:UnifiedKeywordHandoff?=null;var location:OriginalReadingLocation?=null
+        h.c.endpoint(ui.session,ui.items.single(),checkNotNull(b.review!!.predecessor)){l,proof->location=l;ticket=proof};h.drain()
+        assertNotNull(ticket);assertEquals(a.source.sourceId,location!!.entryId)
+        val off=processing.change(LocalProcessingChange(processing.read(a.source),LocalProcessingChoice.AI_NONE,"synthetic-endpoint-off"))
+        processing.change(LocalProcessingChange(off,LocalProcessingChoice.LOCAL_ONLY,"synthetic-endpoint-on"))
+        h.state.updateAndGet{it.copy(localProcessingVersions=processing.versions())}
+        assertEquals(2L,h.state.get().localProcessingVersions.getValue(a.source.sourceId).generation)
+        assertTrue("B page itself is still valid; A exists only in the delayed private target",h.state.get().canRetainFactSources(h.ui()))
+        assertEquals(a.source.revision,location!!.revision.toLong());assertEquals(a.sourceHash,location!!.contentHash)
+        var navigations=0;assertFalse("Old A generation must not navigate",ticket!!{navigations++});assertEquals(0,navigations)
+    }}
+    @Test fun privateHistoricalTargetAllowsExactlyOneRealLocationAndRejectsUnknownOwnerAndCopiedLocation():Unit=runBlocking {Harness().use{h->
+        val p=h.store.preview(h.f.source);val seed=h.store.create(FactCreate(id(),p,id(),"合成历史主题",FactContent(SourceMemoryRules.reference(p,h.quote)),true,id(),10))
+        val a=h.store.mutate(FactMutation(seed,FactAction.ACCEPT,null,null,id(),11))
+        val source=SourceVersion("synthetic-endpoint-controls",1);h.addSource(source,"我平时喝淡茶")
+        val bp=h.store.preview(source);val candidate=h.store.create(FactCreate(id(),bp,a.topicId!!,a.topicLabel!!,FactContent(SourceMemoryRules.reference(bp,bp.original)),true,id(),20,a))
+        val b=h.store.mutate(FactMutation(candidate,FactAction.ACCEPT,null,a,id(),21));val versions=SqlLocalProcessingRepository(h.f.gateway).versions()
+        h.state.updateAndGet{it.copy(supportsLocalProcessing=true,localProcessingVersions=versions)}
+        var ticket:UnifiedKeywordHandoff?=null;var location:OriginalReadingLocation?=null
+        suspend fun capture(){h.c.open(section=FactReview.ACCEPTED);h.drain();val u=h.ui();h.c.endpoint(u.session,u.items.single(),b.review!!.predecessor!!){l,t->location=l;ticket=t};h.drain()}
+        capture();val first=ticket!!;val firstLocation=location!!
+        val fake=object:UnifiedKeywordHandoff{override fun invoke(action:()->Unit):Boolean {action();return true}}
+        assertFalse(h.state.get().canUseFactNavigation(fake,firstLocation))
+        assertFalse("Copied display fields are not the minted location",h.state.get().canUseFactNavigation(first,firstLocation.copy()))
+        assertTrue(h.state.get().canUseFactNavigation(first,firstLocation));var nav=0
+        assertTrue(first{nav++});assertFalse(first{nav++});assertEquals(1,nav)
+        capture();val ownerTicket=ticket!!;val ownerLocation=location!!
+        val otherOwner=object:SourceFactRepository by h.port {}
+        h.state.updateAndGet{it.copy(sourceFactOwner=otherOwner)}
+        assertFalse(h.state.get().canUseFactNavigation(ownerTicket,ownerLocation));assertFalse(ownerTicket{nav++});assertSame(otherOwner,h.state.get().sourceFactOwner)
+        h.state.updateAndGet{it.copy(sourceFactOwner=h.port)};assertFalse(ownerTicket{nav++})
+        h.c.close(h.ui().session);capture();val unknown=ticket!!;val unknownLocation=location!!
+        h.state.updateAndGet{it.copy(localProcessingVersions=versions-a.source.sourceId)}
+        assertTrue(h.state.get().canRetainFactSources(h.ui()))
+        assertFalse(h.state.get().canUseFactNavigation(unknown,unknownLocation));assertFalse(unknown{nav++});assertNotNull(h.ui().error);assertFalse(h.ui().busy)
+        h.state.updateAndGet{it.copy(localProcessingVersions=versions)};assertFalse(unknown{nav++});assertEquals(1,nav)
+        h.c.refresh(h.ui().session);h.drain();val fresh=h.ui().session
+        assertFalse(ownerTicket{nav++});assertFalse(unknown{nav++});assertEquals(fresh,h.ui().session);assertEquals(1,nav)
+        h.c.close(fresh);capture();val unsupported=ticket!!;val unsupportedLocation=location!!
+        h.state.updateAndGet{it.copy(supportsLocalProcessing=false)}
+        assertFalse(h.state.get().canUseFactNavigation(unsupported,unsupportedLocation));assertFalse(unsupported{nav++})
+        h.state.updateAndGet{it.copy(supportsLocalProcessing=true)};assertFalse(unsupported{nav++});assertEquals(1,nav)
+    }}
     private fun id()=java.util.UUID.randomUUID().toString()
     private class Harness:AutoCloseable {
         val f=LocalCandidateFixture();val text=f.original;val quote="我不喝咖啡🙂"
@@ -144,7 +197,8 @@ class SourceFactControllerTest {
         }
         val base=SqliteVmEntryRepository(f.db,f.gateway,RemoteTextTransactions(f.gateway)){}
         val owner:EntryRepository=object:EntryRepository by base {override val sourceFacts=port}
-        val state=AtomicReference(LocalRecordUiState(ready=true,opening=false,entries=listOf(StoredEntry(f.source.sourceId,1,text,5,"Asia/Shanghai",ProcessingPolicy.LOCAL_ONLY)),supportsSourceFacts=true,sourceFactOwner=port))
+        val state=AtomicReference(LocalRecordUiState(ready=true,opening=false,entries=listOf(StoredEntry(f.source.sourceId,1,text,5,"Asia/Shanghai",ProcessingPolicy.LOCAL_ONLY)),supportsSourceFacts=true,sourceFactOwner=port,
+            supportsLocalProcessing=true,localProcessingVersions=SqlLocalProcessingRepository(f.gateway).versions()))
         val c=SourceFactController({state.get()},{change->state.updateAndGet(change)},{q.add(it);true},Clock.fixed(Instant.ofEpochMilli(50),ZoneOffset.UTC),beforeWrite={retiredQueries++})
         fun ui()=checkNotNull(state.get().sourceFacts)
         suspend fun drain(){while(true)(q.poll()?:break)(owner)}
@@ -155,7 +209,7 @@ class SourceFactControllerTest {
         fun addSource(source:SourceVersion,text:String){f.db.transaction{sql->
             sql.execute("INSERT INTO entries(id,currentRevision,capturedAtMillis,captureTimeZone,privacyPolicy) VALUES(?,1,5,'UTC','LOCAL_ONLY')",listOf(source.sourceId))
             sql.execute("INSERT INTO entry_revisions VALUES(?,1,?,?,5)",listOf(source.sourceId,text,OriginalExports.hash(text)))}
-            state.updateAndGet{it.copy(entries=it.entries+StoredEntry(source.sourceId,1,text,5,"UTC",ProcessingPolicy.LOCAL_ONLY))}
+            state.updateAndGet{it.copy(entries=it.entries+StoredEntry(source.sourceId,1,text,5,"UTC",ProcessingPolicy.LOCAL_ONLY),localProcessingVersions=SqlLocalProcessingRepository(f.gateway).versions())}
         }
         override fun close(){c.dispose();f.gateway.stopAndAwaitIdle();store.wipeKey();f.close()}
     }

@@ -24,6 +24,11 @@ data class FactUiState(val session:Long,val owner:SourceFactRepository,val sourc
     override fun toString()="FactUiState(redacted)"
 }
 
+/** Only this file can mint a target-bound navigation proof after real SQL acknowledgement. */
+private interface FactNavigationProof:UnifiedKeywordHandoff { fun current(local:LocalRecordUiState,location:OriginalReadingLocation):Boolean }
+internal fun LocalRecordUiState.canUseFactNavigation(handoff:UnifiedKeywordHandoff,location:OriginalReadingLocation):Boolean =
+    (handoff as? FactNavigationProof)?.current(this,location)==true
+
 /** Every retained private proof counts, including intents whose rows are outside the visible page. */
 internal fun LocalRecordUiState.canRetainFactSources(ui:FactUiState):Boolean {
     if(!ready || opening || error!=null || !supportsSourceFacts || sourceFactOwner!==ui.owner || supportsLocalProcessing && !localProcessingAvailable)return false
@@ -233,23 +238,41 @@ class SourceFactController(private val current:()->LocalRecordUiState,
                     val ref=result.contents.single{it.revision==edge.contentRevision}.content.reference
                     // Recheck the off-screen target against the latest observed source too.
                     if(!current().canRetainFactSources(ui.copy(items=listOf(result))))throw FactConflict()
-                    publishLocation(run,OriginalReadingLocation(result.source.sourceId,result.source.revision.toInt(),result.sourceHash,ref.start,ref.end),onLocate)
+                    publishLocation(run,result,OriginalReadingLocation(result.source.sourceId,result.source.revision.toInt(),result.sourceHash,ref.start,ref.end),onLocate)
                 }
             }catch(_:Retired){}catch(c:CancellationException){throw c}catch(_:Exception){failed(session,run.request,null)}
         })failed(session,run.request,null)
     }
-    private fun publishLocation(run:Run,location:OriginalReadingLocation,onLocate:(OriginalReadingLocation,UnifiedKeywordHandoff)->Unit) {
+    private fun publishLocation(run:Run,target:SourceFactSnapshot,location:OriginalReadingLocation,onLocate:(OriginalReadingLocation,UnifiedKeywordHandoff)->Unit) {
         if(!owns(run.session,run.request))return
+        // The resolved historical target may not be present in the current page. Keep the
+        // exact SQL-authenticated snapshot private through navigation and the final CAS.
+        fun fresh(local:LocalRecordUiState):Boolean {
+            val ui=local.sourceFacts?:return false
+            if(!local.supportsLocalProcessing || !local.localProcessingAvailable ||
+                local.localProcessingVersions[target.source.sourceId]!=LocalProcessingVersion(target.source,target.generation))return false
+            return ui.session==run.session && ui.request==run.request && ui.owner===run.owner &&
+                local.canRetainFactSources(ui.copy(items=ui.items+target))
+        }
+        if(!fresh(current())){failed(run.session,run.request,null);return}
         var used=false
-        val handoff=object:UnifiedKeywordHandoff{
+        val handoff=object:FactNavigationProof {
+            override fun current(local:LocalRecordUiState,requested:OriginalReadingLocation):Boolean=synchronized(lifecycle) {
+                if(requested!==location)return@synchronized false
+                if(used||disposed||lifetime!=run.lifetime||activeSession!=run.session||activeRequest!=run.request)false
+                else if(!fresh(local)||!fresh(this@SourceFactController.current())) {
+                    used=true;failed(run.session,run.request,null);false
+                }else true
+            }
             override fun invoke(action:()->Unit):Boolean=synchronized(lifecycle){
-                if(used||disposed||lifetime!=run.lifetime||!owns(run.session,run.request))false
+                if(!current(this@SourceFactController.current(),location))false
                 else {
                     var accepted=false
-                    publish{local->val ui=local.sourceFacts
-                        accepted=ui!=null&&ui.session==run.session&&ui.request==run.request&&local.canRetainFactSources(ui)
+                    publish{local->accepted=fresh(local)
                         if(accepted)local.copy(sourceFacts=null)else local}
-                    if(!accepted)false else {used=true;activeSession=0;activeRequest=0;cursors.clear();action();true}
+                    used=true
+                    if(!accepted){failed(run.session,run.request,null);false}
+                    else {activeSession=0;activeRequest=0;cursors.clear();action();true}
                 }
             }
         }
@@ -267,7 +290,7 @@ class SourceFactController(private val current:()->LocalRecordUiState,
                 val resolved=ui.sourcePage?.let{run.owner.resolveSource(it,check,publish)}?:ui.page?.let{run.owner.resolve(it,item,check,publish)}?:false
                 check();if(!resolved||!admitted)throw FactConflict()
                 val ref=checkNotNull(item.current).content.reference
-                publishLocation(run,OriginalReadingLocation(item.source.sourceId,item.source.revision.toInt(),item.sourceHash,ref.start,ref.end),onLocate)
+                publishLocation(run,item,OriginalReadingLocation(item.source.sourceId,item.source.revision.toInt(),item.sourceHash,ref.start,ref.end),onLocate)
             }catch(_:Retired){}catch(c:CancellationException){throw c}catch(_:Exception){failed(session,run.request,null)}
         })failed(session,run.request,null)
     }
