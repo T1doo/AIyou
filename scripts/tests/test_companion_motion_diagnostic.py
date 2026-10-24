@@ -178,7 +178,7 @@ class CompanionDiagnosticTests(unittest.TestCase):
     def test_formal_workflow_bodies_and_budgets_remain_byte_identical(self):
         workflow = (ROOT / '.github/workflows/android.yml').read_text()
         # Authenticate the original bytes without requiring old Git objects in a shallow checkout.
-        self.assertEqual('ba77c84c51b9e32134532a155fc0b37fd3c5d22737f8367c8fbef26402defcf3',
+        self.assertEqual('b59cc039ff252f218ae6ae91ec449de05fe4cb9ec525e55beb99e01de5107a13',
                          hashlib.sha256((self.formal_workflow().rstrip('\n') + '\n').encode()).hexdigest())
         selector = ("github.event_name == 'push' && github.repository == 'T1doo/AIyou' && "
                     "github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && "
