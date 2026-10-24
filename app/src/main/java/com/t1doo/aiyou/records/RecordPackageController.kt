@@ -98,13 +98,28 @@ class RecordPackageController internal constructor(private val current: () -> Lo
     }
     fun detachPickerOwner(owner: Any) { if (pickerOwner === owner) { current().recordPackage?.let { cancel(it.session) }; pickerOwner = null } }
     fun open() { sourceUi { openSourceOwned() } }
-    private fun openSourceOwned() {
+    internal fun canOpenFullHome(): Boolean {
         val local = current()
-        if (!available(local) || local.recordPackage != null || local.originalExport != null || local.recycleBin != null ||
+        return canOpenSource(local) && local.supportsFullBackup
+    }
+    /** UI admission only: no queue, snapshot, cipher, file picker or restore work. */
+    internal fun openFullHome(): Long? {
+        var session: Long? = null
+        sourceUi { session = openSourceOwned(fullMode = true) }
+        return session
+    }
+    private fun canOpenSource(local: LocalRecordUiState): Boolean =
+        available(local) && !(local.recordPackage != null || local.originalExport != null || local.recycleBin != null ||
             local.originalEdit != null || local.originalHistory != null || local.manualTagEditor != null || local.saving || local.savePending ||
-            local.taskProposals.editor!=null || local.sourceTask!=null || local.tasks.editor!=null || local.tasks.dateEditor!=null) return
-        retire(); val ui = RecordPackageUiState(sessions.incrementAndGet())
-        publish { if (available(it) && it.recordPackage == null) it.copy(recordPackage = ui) else it }
+            local.taskProposals.editor!=null || local.sourceTask!=null || local.tasks.editor!=null || local.tasks.dateEditor!=null)
+    private fun openSourceOwned(fullMode: Boolean = false): Long? {
+        val local = current()
+        if (!canOpenSource(local) || fullMode && !local.supportsFullBackup) return null
+        retire(); val ui = RecordPackageUiState(sessions.incrementAndGet(), fullMode = fullMode)
+        publish { if (available(it) && it.recordPackage == null &&
+            (!fullMode || canOpenSource(it) && it.supportsFullBackup &&
+                it.recordAuthorizationOwner === local.recordAuthorizationOwner)) it.copy(recordPackage = ui) else it }
+        return current().recordPackage?.takeIf { it === ui }?.session
     }
     fun selectExport(session: Long) {
         val ui = panel(session) ?: return

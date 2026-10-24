@@ -361,6 +361,14 @@ fun AIyouApp(
     fun ownsNavigation() = navigation.active && navigation.generation == generation
     var selectedName by rememberSaveable { mutableStateOf(previewDestination.name) }
     var showSettings by rememberSaveable { mutableStateOf(previewSettings) }
+    val settingsBackupLifetime = remember(recordPackages, local?.recordAuthorizationOwner) {
+        java.util.concurrent.atomic.AtomicBoolean(true)
+    }
+    DisposableEffect(settingsBackupLifetime) { onDispose { settingsBackupLifetime.set(false) } }
+    // In-memory navigation receipt only; a restored/new owner cannot inherit this settings handoff.
+    var settingsBackupReturn by remember(recordPackages, local?.recordAuthorizationOwner) {
+        mutableStateOf<Pair<Long, String>?>(null)
+    }
     var showLicenses by rememberSaveable { mutableStateOf(false) }
     var demo by rememberSaveable { mutableStateOf(previewDemo) }
     var stateName by rememberSaveable { mutableStateOf(previewState.name) }
@@ -513,7 +521,10 @@ fun AIyouApp(
     val context = LocalContext.current
     val selected = Destination.valueOf(selectedName)
     val packageUi = local?.recordPackage
-    val browsingPackage = packageUi != null && selected == Destination.MEMORIES && detailEntryId == null && !showSettings && !demo
+    val settingsPackageRoute = settingsBackupReturn?.let {
+        it.first == packageUi?.session && it.second == selectedName && packageUi?.fullMode == true
+    } == true
+    val browsingPackage = packageUi != null && (selected == Destination.MEMORIES || settingsPackageRoute) && detailEntryId == null && !showSettings && !demo
     val recycleUi = local?.recycleBin
     val browsingRecycle = recycleUi?.browsing == true && selected == Destination.MEMORIES && detailEntryId == null && !showSettings && !demo
     var audioSourceAnchor by remember { mutableStateOf<com.t1doo.aiyou.model.AudioTranscriptSource?>(null) }
@@ -834,6 +845,7 @@ fun AIyouApp(
             navigation.tryAdvance(generation)) {
             currentLocal?.recycleBin?.let { recycleBin?.close(it.session) }
             currentLocal?.recordPackage?.let { recordPackages?.close(it.session) }
+            settingsBackupReturn = null
             currentLocal?.eventDateEditor?.let { eventDates?.close(it.session) }
             factRecaps?.close();recapRoute=false
             clearSearch()
@@ -1039,12 +1051,40 @@ fun AIyouApp(
     val exportUi = local?.originalExport
     fun ownsExportRoute() = ownsNavigation() && selectedName == Destination.MEMORIES.name &&
         detailEntryId == null && !showSettings && !demo && currentLocal?.recycleBin == null && currentLocal?.recordPackage == null
-    fun ownsPackageRoute() = ownsNavigation() && selectedName == Destination.MEMORIES.name &&
+    fun ownsPackageRoute() = ownsNavigation() && (selectedName == Destination.MEMORIES.name || settingsPackageRoute) &&
         detailEntryId == null && !showSettings && !demo && currentLocal?.recycleBin == null &&
         currentLocal?.recordPackage?.session == packageUi?.session
+    fun closePackageRoute() {
+        if (!ownsPackageRoute()) return
+        recordPackages?.close(checkNotNull(packageUi).session)
+        settingsBackupReturn = null
+        if (settingsPackageRoute) showSettings = true
+        navigation.advance()
+    }
+    val settingsBackupOwner = local?.recordAuthorizationOwner
+    fun canOpenSettingsBackup(): Boolean {
+        val latest = searchSource() ?: return false
+        return settingsBackupLifetime.get() && ownsNavigation() && showSettings && !showLicenses && !demo && detailEntryId == null &&
+            latest.recordAuthorizationOwner === settingsBackupOwner && latest.ready && !latest.opening &&
+            latest.error == null && !latest.saving && !latest.savePending && recordPackages?.canOpenFullHome() == true
+    }
+    val openSettingsBackup: () -> Unit = {
+        navigation.publish(generation) {
+            if (canOpenSettingsBackup()) {
+                recordPackages?.openFullHome()?.let { session ->
+                    if (searchSource()?.recordAuthorizationOwner === settingsBackupOwner) {
+                        settingsBackupReturn = session to selectedName
+                        clearSearch()
+                        showSettings = false
+                        navigation.advance()
+                    } else recordPackages?.close(session)
+                }
+            }
+        }
+    }
     SideEffect { if (packageUi != null && !ownsPackageRoute()) recordPackages?.close(packageUi.session) }
     BackHandler(enabled = browsingPackage) {
-        if (ownsPackageRoute()) { recordPackages?.close(checkNotNull(packageUi).session); navigation.advance() }
+        closePackageRoute()
     }
     SideEffect {
         if (exportUi != null && !ownsExportRoute()) exports?.close(exportUi.session)
@@ -1081,14 +1121,14 @@ fun AIyouApp(
           Column {
             NotebookAppBar(
                 if (browsingPackage) { if(packageUi?.fullMode==true) "完整备份与恢复" else "加密原文包" } else if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else if(recapRoute) "本机回顾" else "爱忆 AIyou",
-                if (browsingPackage) "返回列表" else if (viewingPicture) {if(attachmentPanel?.focusImage!=null) "返回原文" else "返回附件列表"} else if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
+                if (browsingPackage) { if (settingsPackageRoute) "返回设置" else "返回列表" } else if (viewingPicture) {if(attachmentPanel?.focusImage!=null) "返回原文" else "返回附件列表"} else if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
                 else if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
                 else if (editing != null) "取消编辑" else if(reading && recapRoute) "返回回顾" else if (reading || browsingRecycle) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else if(recapRoute) "返回回忆" else "设置",
                 actionEnabled = recycleUi?.busy != true && attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
                 containerColor = if(notebookHome) com.t1doo.aiyou.designsystem.AIyouColors.notebookSky else com.t1doo.aiyou.designsystem.AIyouColors.surface,
             ) {
                 if (browsingPackage && ownsPackageRoute()) {
-                    recordPackages?.close(checkNotNull(packageUi).session); navigation.advance()
+                    closePackageRoute()
                 } else if (browsingRecycle && ownsRecycleRoute()) {
                     recycleBin?.close(checkNotNull(recycleUi).session); navigation.advance()
                 } else if (reading && recycleUi == null) returnToList() else if(recapRoute && ownsNavigation()) {
@@ -1123,6 +1163,9 @@ fun AIyouApp(
                 onDemo = { if (ownsNavigation()) { navigation.advance(); clearSearch(); demo = !demo } },
                 onDemoState = { if (ownsNavigation()) { navigation.advance(); stateName = it.name } },
                 modifier = modifier, hasRecordPackages=local?.supportsRecordPackages==true, hasFullBackup=local?.supportsFullBackup==true, storageUsage = storageUsage,
+                onOpenFullBackup = openSettingsBackup,
+                fullBackupUnavailable = if (canOpenSettingsBackup()) null else if (demo)
+                    "虚构示例不提供资料库操作。" else "本机资料暂未就绪或当前操作尚未结束，请核对后重试。",
                 appAccessSection = appAccessSettings,
                 modelConnectionSection = if(modelConnections==null || demo) null else ({
                     com.t1doo.aiyou.ui.ModelConnectionSettings(modelConnections,local?.modelConnectionOwner,

@@ -397,10 +397,9 @@ fun LocalHistoricalAttachmentEntryRender() {
         previewEntryId = longOriginal.id, attachments = capability) }
 }
 
-// Production settings and original neutral companion; render smoke, not device evidence.
+// Same production settings identity and viewport matrix; synthetic non-executing backup ports.
 @PreviewTest @LocalRecordPreviews @Composable
-fun LocalSettingsRender() { AIyouTheme { AIyouApp(previewSettings = true,
-    display = UiPreferencesState(UiPreferences(), ready = true), local = restoredLocal) } }
+fun LocalSettingsRender() { NotebookLibraryPreview(fullBackup=false,settings=true) }
 
 @PreviewTest
 @Preview(name = "陪伴面板", widthDp = 360, heightDp = 800, locale = "zh-rCN")
@@ -411,7 +410,7 @@ fun LocalCompanionRender() { AIyouTheme { CompanionDialog(onClose = {}, motionAl
 // Full production entry points, synthetic local state, and explicitly non-executing
 // actor/SAF ports. This is a layout render, not a storage/navigation execution test.
 @Composable
-private fun NotebookLibraryPreview(fullBackup:Boolean) {
+private fun NotebookLibraryPreview(fullBackup:Boolean,settings:Boolean=false) {
     val clock=remember { java.time.Clock.fixed(java.time.Instant.parse("2026-10-23T12:00:00Z"),java.time.ZoneOffset.UTC) }
     val owner=remember { object:com.t1doo.aiyou.domain.UnifiedKeywordRepository {
         override suspend fun search(keyword:String,scope:com.t1doo.aiyou.domain.UnifiedKeywordScope):com.t1doo.aiyou.domain.UnifiedKeywordSnapshot = error("Preview does not query")
@@ -438,7 +437,7 @@ private fun NotebookLibraryPreview(fullBackup:Boolean) {
         override fun launch(export:Boolean,requestKey:String,callback:(com.t1doo.aiyou.records.SelectedRecordPackageDocument?)->Unit)=false
         override fun cancel(requestKey:String)=Unit
     } }
-    AIyouTheme { AIyouApp(previewDestination=Destination.MEMORIES,local=local,currentRecords=current,
+    AIyouTheme { AIyouApp(previewDestination=Destination.MEMORIES,previewSettings=settings,local=local,currentRecords=current,
         display=UiPreferencesState(UiPreferences(reduceMotion=true),ready=true),unifiedKeywords=unified,
         imageTexts=images,audioTranscripts=audio,sourcePreferences=preferences,memoryInbox=memories,
         factRecaps=recaps,exports=exports,recycleBin=recycle,recordPackages=packages,recordPackagePicker=picker) }

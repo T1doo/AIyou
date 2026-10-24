@@ -19,6 +19,8 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
+import androidx.compose.material3.Surface
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -47,6 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** Observe the owned callback itself in tests, before Compose's detachable click/sound wrapper. */
 internal val LocalRecapPreferenceActionObserver = staticCompositionLocalOf<((FactRecapPeriod, () -> Unit) -> Unit)?> { null }
 internal val LocalCaptureDefaultActionObserver = staticCompositionLocalOf<((ProcessingPolicy, () -> Unit) -> Unit)?> { null }
+internal val LocalSettingsBackupActionObserver = staticCompositionLocalOf<((() -> Unit) -> Unit)?> { null }
 
 @Composable
 fun SettingsScreen(
@@ -65,23 +68,42 @@ fun SettingsScreen(
     appAccessSection: (@Composable () -> Unit)? = null,
     hasFullBackup: Boolean = false,
     modelConnectionSection: (@Composable () -> Unit)? = null,
+    onOpenFullBackup: (() -> Unit)? = null,
+    fullBackupUnavailable: String? = null,
 ) {
     val owner = remember { AtomicBoolean(true) }
     DisposableEffect(owner) { onDispose { owner.set(false) } }
     val currentDisplay by rememberUpdatedState(display)
     val currentChange by rememberUpdatedState(onDisplayChange)
+    // Keep this owned navigation callback bound to its rendering generation, unlike ordinary preferences.
+    val openBackup: () -> Unit = {
+        if (owner.get() && fullBackupUnavailable == null) onOpenFullBackup?.invoke()
+    }
+    LocalSettingsBackupActionObserver.current?.invoke(openBackup)
     fun change(update: (UiPreferences) -> UiPreferences) {
         val confirmed = currentDisplay
         if (owner.get() && confirmed.ready && !confirmed.busy && !confirmed.saveUnconfirmed) currentChange(update(confirmed.preferences))
     }
-    BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.surface)) {
+    BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.background)) {
         val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize()
                 .verticalScroll(rememberScrollState()).testTag("settings-scroll").padding(margin),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
-                Text("按你的节奏使用爱忆", style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.semantics { heading() })
+                Surface(color = AIyouColors.primaryContainer, shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.fillMaxWidth().testTag("settings-data-safety")) {
+                    Column(Modifier.padding(AIyouDimensions.spaceMd),
+                        verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                        Text("资料与安全", style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.semantics { heading() })
+                        Button(onClick = openBackup, enabled = onOpenFullBackup != null && fullBackupUnavailable == null,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget)
+                                .testTag("settings-full-backup")) { Text("完整备份与恢复") }
+                        Text(fullBackupUnavailable ?: "仅打开操作首页，备份和恢复都需另行确认。",
+                            style = MaterialTheme.typography.bodySmall, color = AIyouColors.textPrimary,
+                            modifier = Modifier.testTag("settings-backup-boundary"))
+                    }
+                }
                 SettingsGroup("陪伴与显示") {
                     Text("一只安静的水豚，陪你记下一点生活。", style = MaterialTheme.typography.bodyMedium, color = AIyouColors.textSecondary)
                     PreferenceSwitch("显示陪伴伙伴", "可随时关闭，不影响记录。", display.preferences.showCompanion,
@@ -145,9 +167,11 @@ fun SettingsScreen(
                         actionLabel = "重试核对默认范围", onAction = onRetryDisplay) }
                     Text(if (hasAttachments) "文字、草稿与已保存记录的图片附件保存在本机。" else "文字与草稿保存在本机。",
                         style = MaterialTheme.typography.bodyMedium)
-                    Text(if(hasFullBackup) "记录保存不需要模型或网络。可在回忆的加密包入口制作选定记录包，或备份完整资料库并恢复到空库；录音和系统提醒尚未开放。"
-                        else if(hasRecordPackages) "记录保存不需要模型或网络。可在回忆中制作选定记录与原图的加密包并恢复；整库备份、录音和系统提醒尚未开放。"
-                        else "记录保存不需要模型或网络。整库备份、录音与系统提醒尚未开放。",
+                    Text(if(hasFullBackup) "记录保存不需要模型或网络。完整备份与恢复可从本页进入；选定记录包仍在回忆中。完整恢复仅限严格空资料库。"
+                        else if(hasRecordPackages) "记录保存不需要模型或网络。可在回忆中制作选定记录与原图的加密包并恢复；当前未提供完整资料库备份。"
+                        else "记录保存不需要模型或网络；此会话未提供加密包入口。",
+                        style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                    Text("创建待办不会自动安排提醒；提醒需逐条确认并核对系统授权。已安排不等于已送达。麦克风录音尚未接入。",
                         style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                 }
                 SettingsGroup("模型连接") {

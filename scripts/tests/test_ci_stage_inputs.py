@@ -66,7 +66,7 @@ class StageInputTests(unittest.TestCase):
             report = protocol / "checks/ai-protocol/build/reports/verified-contracts.json"
             save(report, {"head": env["GITHUB_SHA"], "status": "PASS", "source_sha256": "a" * 64, "results": [module]})
             save(protocol / "core/domain/build/reports/inputs-at-test.json", {"source_sha256": "a" * 64})
-            remote = {"module": "remote-text", "tests": 26, "failures": 0, "errors": 0, "skipped": 0, "methods": [], "xml": []}
+            remote = {"module": "remote-text", "tests": 27, "failures": 0, "errors": 0, "skipped": 0, "methods": [], "xml": []}
             for name, (cls, count) in inputs.BACKUP_XML.items():
                 backup_suite = ET.Element("testsuite", tests=str(count), failures="0", errors="0", skipped="0")
                 for index in range(count):

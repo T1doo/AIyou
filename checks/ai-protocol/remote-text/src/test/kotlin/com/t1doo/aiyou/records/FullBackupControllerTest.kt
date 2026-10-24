@@ -17,6 +17,42 @@ import org.junit.Test
 
 /** Actual controller, serial queue, independently keyed SQL owners, cipher and streaming document IO. */
 class FullBackupControllerTest {
+    @Test fun fullHomeEntryIsUiOnlyAndRejectsBlockedFrozenOrChangedOwnerAdmission() {
+        var local=LocalRecordUiState(ready=true,opening=false,supportsRecordPackages=true,supportsFullBackup=true,
+            text="合成不应被备份入口改写的草稿")
+        var queued=0
+        val gate=CaptureDraftGate()
+        val controller=RecordPackageController({local},{local=it(local)},{queued++;false},JcaRecordPackageCipher(),
+            Clock.systemUTC(),sourceUi={gate.sourceUi(it)})
+        val base=local
+        assertTrue(controller.canOpenFullHome())
+        val pin=checkNotNull(gate.preparePlayback())
+        assertNull(controller.openFullHome());assertNull(local.recordPackage);assertEquals(0,queued)
+        gate.finishPlayback(pin)
+        val session=checkNotNull(controller.openFullHome());val home=checkNotNull(local.recordPackage)
+        assertEquals(session,home.session);assertTrue(home.fullMode);assertEquals(RecordPackagePhase.HOME,home.phase)
+        assertNull(home.requestKey);assertNull(home.fullSummary);assertNull(home.fullDigest)
+        assertNull(controller.openFullHome());assertSame(home,local.recordPackage)
+        controller.close(session)
+        val unknown=RecordPackageUiState(91,RecordPackagePhase.UNCERTAIN,fullMode=true)
+        for(blocked in listOf(base.copy(ready=false),base.copy(opening=true),base.copy(error="合成读取失败"),
+            base.copy(saving=true),base.copy(savePending=true),base.copy(supportsFullBackup=false),
+            base.copy(recordPackage=unknown))) {
+            local=blocked;assertFalse(controller.canOpenFullHome());assertNull(controller.openFullHome())
+            assertSame(blocked.recordPackage,local.recordPackage);assertEquals(base.text,local.text)
+        }
+        val otherOwner=object:RecordAuthorizationRepository {
+            override fun readAuthorization(source:SourceVersion):RecordAuthorizationSnapshot=error("No authorization IO")
+            override fun previewAuthorization(expected:RecordAuthorizationSource,purpose:TextPurpose,clock:()->java.time.Instant):RecordAuthorizationPreview=error("No authorization IO")
+            override fun changeAuthorization(request:RecordAuthorizationChange,clock:()->java.time.Instant):RecordAuthorizationReceipt=error("No authorization IO")
+        }
+        local=base
+        val changed=RecordPackageController({local},{update->local=update(local.copy(recordAuthorizationOwner=otherOwner))},
+            {queued++;false},JcaRecordPackageCipher(),Clock.systemUTC())
+        assertNull(changed.openFullHome());assertNull(local.recordPackage);assertEquals(base.text,local.text)
+        assertEquals(0,queued)
+        controller.dispose();assertFalse(controller.canOpenFullHome());assertNull(controller.openFullHome())
+    }
     @Test fun fullExportAndDistinctAuthenticatedRestoreConfirmationUseActualProductionStorage():Unit=runBlocking {
         FullFixture().use { source -> FullFixture(99).use { target ->
             source.image(source.entry());val export=Harness(source);export.controller.open();export.controller.fullHome(export.ui.session)

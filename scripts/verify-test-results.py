@@ -317,6 +317,10 @@ for label, folder, minimum in targets:
             "explicitWeekZoneEmptyResultPrivateSavedStateAndAccurateBackupSettings",
         )
         additional["com.t1doo.aiyou.FullBackupPresentationTest"] = (
+            "settingsNormalBackupEntryReturnsWithExactDraftAndNoImplicitIo",
+            "settingsNarrowDoubleFontBackupEntryIsFullyVisibleBeforeAnyScroll",
+            "settingsShortLandscapeBackupEntryIsFullyVisibleBeforeAnyScroll",
+            "settingsBackupRejectsUnreadyPendingUnknownAndRetiredCallbacks",
             "actualRootFullScopeRequiresExplicitAcceptanceAndMatchingIndependentPasswords",
             "fullRestoreAuthenticatesManifestThenRequiresSeparateEmptyTargetConfirmation",
             "narrowDoubleFontRecreationDropsPasswordsAndNavigationRetiresPickerBeforeRecomposition",

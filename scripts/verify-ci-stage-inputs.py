@@ -18,7 +18,7 @@ SCHEMA_EXTRAS = ["core/data/src/androidTest/assets/records-schema-v%d.json" % n 
     "app/gradle.lockfile", "core/data/gradle.lockfile", "core/domain/gradle.lockfile", "core/designsystem/gradle.lockfile"]
 BACKUP_XML = {
     "TEST-com.t1doo.aiyou.data.FullBackupTest.xml": ("com.t1doo.aiyou.data.FullBackupTest", 18),
-    "TEST-com.t1doo.aiyou.records.FullBackupControllerTest.xml": ("com.t1doo.aiyou.records.FullBackupControllerTest", 8),
+    "TEST-com.t1doo.aiyou.records.FullBackupControllerTest.xml": ("com.t1doo.aiyou.records.FullBackupControllerTest", 9),
 }
 DOMAIN_TARGET = "core/domain/build/test-results/test"
 BACKUP_TARGET = "checks/ai-protocol/remote-text/build/test-results/test"
