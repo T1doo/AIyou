@@ -9,7 +9,7 @@ import androidx.activity.result.contract.ActivityResultContract
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.core.app.ActivityOptionsCompat
 import com.t1doo.aiyou.designsystem.AIyouTheme
@@ -62,6 +62,7 @@ class AppAccessPresentationTest {
     private val actions = AtomicReference<AppAccessSettingsActions>()
     private val opens = AtomicInteger()
     private val retires = AtomicInteger()
+    private var preferenceWrites: AtomicInteger? = null
     private val boundaryReady = mutableStateOf(true)
     private var credentialAvailable = true
     private val original = "合成受保护原文🙂，完整文字保留。"
@@ -69,6 +70,7 @@ class AppAccessPresentationTest {
     @After fun close() { if (::controller.isInitialized) controller.dispose(); scope.cancel() }
 
     private fun content(storage: Storage, largeFont: Boolean = false) {
+        preferenceWrites = storage.writes
         controller = AppAccessController(storage, scope, {
             if (boundaryReady.value) { retires.incrementAndGet(); true } else false
         }, {})
@@ -90,7 +92,13 @@ class AppAccessPresentationTest {
         }
     }
     private fun phase(expected: AppAccessPhase) {
-        compose.waitForIdle(); compose.waitUntil(2_000) { controller.state.value.phase == expected }; compose.waitForIdle()
+        compose.waitForIdle()
+        try {
+            compose.waitUntil(2_000) { controller.state.value.phase == expected }
+        } catch (failure: ComposeTimeoutException) {
+            throw AssertionError("App access phase expected=$expected observed=${controller.state.value.phase} writes=${preferenceWrites?.get()}", failure)
+        }
+        compose.waitForIdle()
         assertEquals(expected, controller.state.value.phase)
     }
     private fun launched(count: Int) {
