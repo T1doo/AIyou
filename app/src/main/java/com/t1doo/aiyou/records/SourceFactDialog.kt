@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -33,6 +34,20 @@ internal fun SourceFactDialog(ui:FactUiState,controller:SourceFactController,can
     val overflowHint="超长输入未接纳；当前仅显示有界预览，请改正后再保存。"
     Dialog(onDismissRequest={if(canUse())controller.close(ui.session)},properties=DialogProperties(usePlatformDefaultWidth=false)) {
         CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
+            val labelDensity=LocalDensity.current
+            val labelMeasurer=rememberTextMeasurer()
+            val labelStyle=MaterialTheme.typography.bodySmall
+            val labelTopInset=remember(labelMeasurer,labelStyle,labelDensity) {
+                with(labelDensity) {
+                    // Material 1.4 reserves half the styled line height, but places half the
+                    // actual label height above the border. Reserve any font-metric excess now.
+                    val reserved=(labelStyle.lineHeight.toDp()/2).roundToPx()
+                    val measured=listOf("原文片段","主题/上下文","生效起始日","结束日","日期时区").maxOf {
+                        labelMeasurer.measure(it,style=labelStyle,softWrap=false,maxLines=1).size.height/2
+                    }
+                    (measured-reserved).coerceAtLeast(0).toDp()
+                }
+            }
             Surface(Modifier.fillMaxWidth().padding(16.dp).heightIn(max=height),shape=MaterialTheme.shapes.large) {
                 Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp).testTag("facts-dialog"),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                     Text("普通事实自述",style=MaterialTheme.typography.titleLarge)
@@ -85,13 +100,13 @@ internal fun SourceFactDialog(ui:FactUiState,controller:SourceFactController,can
                                 supportingText={Column {
                                     Text("逐字原文片段（最多320字）",Modifier.fillMaxWidth().testTag("fact-help:QUOTE"))
                                     if(rejected(FactInput.QUOTE))Text(overflowHint,Modifier.fillMaxWidth().testTag("fact-error:QUOTE"))
-                                }},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-quote"))
+                                }},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-quote").padding(top=labelTopInset))
                             OutlinedTextField(ui.topicLabel,{edit(FactInput.TOPIC,it)},
                                 label={Text("主题/上下文",Modifier.width(IntrinsicSize.Max).testTag("fact-label:TOPIC"))},isError=rejected(FactInput.TOPIC),
                                 supportingText={Column {
                                     Text("新建普通事实主题/上下文（最多40字）",Modifier.fillMaxWidth().testTag("fact-help:TOPIC"))
                                     if(rejected(FactInput.TOPIC))Text(overflowHint,Modifier.fillMaxWidth().testTag("fact-error:TOPIC"))
-                                }},enabled=editable && ui.topicExpected==null && ui.editing==null,modifier=Modifier.fillMaxWidth().testTag("fact-topic-label"))
+                                }},enabled=editable && ui.topicExpected==null && ui.editing==null,modifier=Modifier.fillMaxWidth().testTag("fact-topic-label").padding(top=labelTopInset))
                             Text("主题由你划分；跨主题不会自动识别同义或冲突。本片不改主题名，也不跨主题搬移旧项。",style=MaterialTheme.typography.bodySmall)
                             if(ui.editing==null) {
                                 TextButton(onClick={chooseTopic=!chooseTopic},enabled=editable,modifier=Modifier.heightIn(min=48.dp)) { Text("选择现有主题") }
@@ -105,19 +120,19 @@ internal fun SourceFactDialog(ui:FactUiState,controller:SourceFactController,can
                                 supportingText={Column {
                                     Text("生效起始日（YYYY-MM-DD，未知留空）",Modifier.fillMaxWidth().testTag("fact-help:FROM"))
                                     if(rejected(FactInput.FROM))Text(overflowHint,Modifier.fillMaxWidth().testTag("fact-error:FROM"))
-                                }},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-from"))
+                                }},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-from").padding(top=labelTopInset))
                             OutlinedTextField(ui.until,{edit(FactInput.UNTIL,it)},
                                 label={Text("结束日",Modifier.width(IntrinsicSize.Max).testTag("fact-label:UNTIL"))},isError=rejected(FactInput.UNTIL),
                                 supportingText={Column {
                                     Text("结束日（不含此日，未知留空）",Modifier.fillMaxWidth().testTag("fact-help:UNTIL"))
                                     if(rejected(FactInput.UNTIL))Text(overflowHint,Modifier.fillMaxWidth().testTag("fact-error:UNTIL"))
-                                }},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-until"))
+                                }},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-until").padding(top=labelTopInset))
                             OutlinedTextField(ui.zone,{edit(FactInput.ZONE,it)},
                                 label={Text("日期时区",Modifier.width(IntrinsicSize.Max).testTag("fact-label:ZONE"))},isError=rejected(FactInput.ZONE),
                                 supportingText={Column {
                                     Text("日期时区（IANA，如 Asia/Shanghai；全未知留空）",Modifier.fillMaxWidth().testTag("fact-help:ZONE"))
                                     if(rejected(FactInput.ZONE))Text(overflowHint,Modifier.fillMaxWidth().testTag("fact-error:ZONE"))
-                                }},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-zone"))
+                                }},enabled=editable,modifier=Modifier.fillMaxWidth().testTag("fact-zone").padding(top=labelTopInset))
                             Row { Checkbox(ui.affirmed,{if(canUse())controller.affirm(ui.session,it)},enabled=editable,modifier=Modifier.testTag("fact-affirm"));Text("我确认这是本人明确的普通事实自述，不是引用、假设、计划或敏感身份/健康/关系推断。") }
                             Button(onClick={if(canUse())controller.save(ui.session)},enabled=editable,modifier=Modifier.heightIn(min=48.dp).testTag("fact-save")) { Text(if(ui.editing==null)"仅保存为待确认候选" else "纠正并重新待确认") }
                             if(ui.editing!=null)TextButton(onClick={if(canUse())controller.cancelCorrection(ui.session)},enabled=editable,modifier=Modifier.heightIn(min=48.dp)) { Text("取消纠正") }
