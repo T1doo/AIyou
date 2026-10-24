@@ -30,6 +30,8 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordEditDraftPackageCodec.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordMediaPackageCipher.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/FullBackupCodec.kt")
+    from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/AudioTranscriptCipher.kt")
+    from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/PortableCipherCell.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/CaptureDraftCodec.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/RecordPackageActivityCodec.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalRecordsViewModel.kt")

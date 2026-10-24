@@ -6,7 +6,13 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 
+enum class AudioTranscriptRangeMode { WHOLE, SAVED, CUSTOM }
+
 data class AudioTranscriptUi(val session:Long,val selected:AttachmentIntent?,val initialHash:String?,val initialGeneration:Long?,val request:Long=0,
+    val rangeMode:AudioTranscriptRangeMode=AudioTranscriptRangeMode.WHOLE,val rangeLoaded:Boolean=false,
+    val rangeFrom:String="0",val rangeThrough:String="",val rangeToEnd:Boolean=true,
+    val fromRejected:Boolean=false,val throughRejected:Boolean=false,
+    val fromError:String?=null,val throughError:String?=null,val rangeError:String?=null,
     val anchor:AudioTranscriptSource?=null,val snapshot:AudioTranscriptSnapshot?=null,val text:String="",val keyword:String="",
     val items:List<AudioTranscriptSnapshot> = emptyList(),val page:AudioTranscriptPage?=null,val cursor:PreferenceCursor?=null,val canPrevious:Boolean=false,
     val busy:Boolean=false,val pending:AudioTranscriptWrite?=null,val withdrawal:AudioTranscriptWrite?=null,val error:String?=null,val notice:String?=null) {override fun toString()="AudioTranscriptUi(redacted)"}
@@ -27,6 +33,7 @@ internal fun LocalRecordUiState.canRetainTranscripts(u:AudioTranscriptUi):Boolea
 }
 class AudioTranscriptController(private val current:()->LocalRecordUiState,private val publish:((LocalRecordUiState)->LocalRecordUiState)->Unit,
     private val enqueue:(suspend(EntryRepository)->Unit)->Boolean,private val clock:Clock,private val sourceUi:((()->Unit)->Unit)={it()}) {
+    private val handoffLock=Any();private var lifetime=0L;private var handoffSession:Long?=null
     private val tokens=AtomicLong();private val cursors=mutableListOf<PreferenceCursor?>();@Volatile private var disposed=false
     private fun owns(session:Long,request:Long?=null):Boolean {val local=current();val u=local.audioTranscripts?:return false;return !disposed&&u.session==session&&(request==null||request==u.request)&&local.canRetainTranscripts(u)}
     private fun update(session:Long,request:Long?=null,change:(AudioTranscriptUi)->AudioTranscriptUi)=publish{local->val u=local.audioTranscripts;if(disposed||u==null||u.session!=session||request!=null&&u.request!=request||!local.canRetainTranscripts(u))local else local.copy(audioTranscripts=change(u).takeIf{local.canRetainTranscripts(it)})}
@@ -36,7 +43,36 @@ class AudioTranscriptController(private val current:()->LocalRecordUiState,priva
         val u=AudioTranscriptUi(tokens.incrementAndGet(),intent,entry?.let{OriginalExports.hash(it.originalText)},intent?.let{l.localProcessingVersions[it.entryId]?.generation})
         cursors.clear();cursors.add(null);publish{it.copy(audioTranscripts=u)};load(u)
     }}
-    fun close(session:Long){publish{if(it.audioTranscripts?.session==session)it.copy(audioTranscripts=null)else it}}
+    fun close(session:Long)=synchronized(handoffLock){
+        if(current().audioTranscripts?.session==session||handoffSession==session){lifetime=Math.addExact(lifetime,1);handoffSession=null}
+        publish{if(it.audioTranscripts?.session==session)it.copy(audioTranscripts=null)else it}
+    }
+    /** Old dialog disposal cannot revoke an already admitted navigation handoff. */
+    fun releaseUi(session:Long)=synchronized(handoffLock){if(current().audioTranscripts?.session==session)close(session)}
+    fun retire()=synchronized(handoffLock){lifetime=Math.addExact(lifetime,1);handoffSession=null;publish{it.copy(audioTranscripts=null)}}
+    private fun editRange(session:Long,change:(AudioTranscriptUi)->AudioTranscriptUi){sourceUi{
+        val u=current().audioTranscripts?:return@sourceUi
+        if(owns(session)&&u.selected!=null&&!u.busy&&u.pending==null&&u.withdrawal==null&&u.anchor!=null)update(session){change(it).copy(rangeLoaded=true,notice=null)}
+    }}
+    fun rangeMode(session:Long,mode:AudioTranscriptRangeMode)=editRange(session){u->
+        if(mode==u.rangeMode||mode==AudioTranscriptRangeMode.SAVED&&u.snapshot?.current?.range==null)u
+        else u.copy(rangeMode=mode)
+    }
+    fun rangeFrom(session:Long,value:String)=editRange(session){it.copy(rangeFrom=value.take(64),fromRejected=value.length>6,fromError=if(value.length>6)"起点输入过长，请明确纠正。"else null,rangeError=null)}
+    fun rangeThrough(session:Long,value:String)=editRange(session){it.copy(rangeThrough=value.take(64),throughRejected=value.length>6,throughError=if(value.length>6)"终点输入过长，请明确纠正。"else null,rangeError=null)}
+    fun rangeToEnd(session:Long,value:Boolean)=editRange(session){it.copy(rangeToEnd=value,rangeThrough=if(value)""else it.rangeThrough,throughRejected=false,throughError=null,rangeError=null)}
+    private fun validatedRange(u:AudioTranscriptUi):AudioSampleRange? {
+        when(u.rangeMode){
+            AudioTranscriptRangeMode.WHOLE->return null
+            AudioTranscriptRangeMode.SAVED->return checkNotNull(u.snapshot?.current?.range)
+            AudioTranscriptRangeMode.CUSTOM->Unit
+        }
+        if(u.fromRejected||u.throughRejected||u.fromError!=null||u.throughError!=null||u.rangeError!=null)throw IllegalArgumentException()
+        val samples=checkNotNull(u.anchor).samples
+        try{AudioSampleRange.parse(u.rangeFrom,"",true,samples)}catch(_:Exception){update(u.session){it.copy(fromError="起点需为非负秒数，最多3位小数，并小于原音结尾。")};throw IllegalArgumentException()}
+        if(!u.rangeToEnd)try{AudioSampleRange.parse("0",u.rangeThrough,false,samples)}catch(_:Exception){update(u.session){it.copy(throughError="终点需为正秒数，最多3位小数，且不能超出原音。")};throw IllegalArgumentException()}
+        return try{AudioSampleRange.parse(u.rangeFrom,if(u.rangeToEnd)""else u.rangeThrough,u.rangeToEnd,samples)}catch(_:Exception){update(u.session){it.copy(rangeError="终点必须在起点之后，范围不能为空。")};throw IllegalArgumentException()}
+    }
     fun edit(session:Long,value:String){sourceUi{val u=current().audioTranscripts?:return@sourceUi;if(owns(session)&&u.selected!=null&&!u.busy&&u.pending==null&&u.withdrawal==null&&u.anchor!=null&&value.length<=2000)update(session){it.copy(text=value,error=null,notice=null)}}}
     fun keyword(session:Long,value:String){val u=current().audioTranscripts?:return;if(!owns(session)||u.selected!=null||u.pending!=null||value.length>256||value==u.keyword)return;cursors.clear();cursors.add(null);update(session){it.copy(keyword=value,request=tokens.incrementAndGet(),items=emptyList(),page=null,cursor=null,canPrevious=false,busy=false,error=null,notice=null)}}
     fun search(session:Long){val u=current().audioTranscripts?:return;if(!owns(session)||u.selected!=null||u.busy||u.pending!=null)return;try{PreferenceKeywords.validate(u.keyword)}catch(_:Exception){update(session){it.copy(error="关键词最多64字，不能含控制字符或不完整字符。")};return};cursors.clear();cursors.add(null);val n=u.copy(cursor=null,canPrevious=false);update(session){n};load(n)}
@@ -48,19 +84,52 @@ class AudioTranscriptController(private val current:()->LocalRecordUiState,priva
     fun cancelWithdraw(session:Long,confirmation:AudioTranscriptWrite){if(owns(session))update(session){if(it.withdrawal===confirmation)it.copy(withdrawal=null)else it}}
     fun save(session:Long){sourceUi{saveOwned(session,false)}}
     private fun saveOwned(session:Long,withdraw:Boolean){val u=current().audioTranscripts?:return;if(!owns(session)||u.busy||u.pending!=null||u.anchor==null||!withdraw&&u.withdrawal!=null)return
-        try{if(!withdraw){AudioTranscripts.text(u.text);require(u.snapshot==null||u.snapshot.withdrawn||u.snapshot.current.text!=u.text)};val r=AudioTranscriptWrite(u.snapshot?.id?:UUID.randomUUID().toString(),u.anchor,u.snapshot,if(withdraw)null else u.text,withdraw,UUID.randomUUID().toString(),clock.millis());load(u,r)}catch(_:Exception){update(session){it.copy(error="请填写最多1000字的完整人工文字；纠正需有变化。最多保留8个内容版本，仍可撤回。")}}
+        try{
+            val range=if(withdraw)null else validatedRange(u)
+            if(!withdraw){AudioTranscripts.text(u.text);require(u.snapshot==null||u.snapshot.withdrawn||u.snapshot.current.text!=u.text||u.snapshot.current.range!=range)}
+            val r=AudioTranscriptWrite(u.snapshot?.id?:UUID.randomUUID().toString(),u.anchor,u.snapshot,if(withdraw)null else u.text,withdraw,UUID.randomUUID().toString(),clock.millis(),range)
+            load(u,r)
+        }catch(_:Exception){update(session){it.copy(error="请核对人工文字和范围；纠正需有变化。最多保留8个内容版本，仍可撤回。")}}
     }
     fun retry(session:Long){sourceUi{val u=current().audioTranscripts?:return@sourceUi;if(owns(session)&&!u.busy&&u.pending!=null)load(u,u.pending)}}
     private fun load(before:AudioTranscriptUi,write:AudioTranscriptWrite?=null){val req=tokens.incrementAndGet();update(before.session){it.copy(request=req,busy=true,items=emptyList(),page=null,pending=write,withdrawal=null,error=null,notice=null)}
         if(!owns(before.session,req))return
         if(!enqueue{store->if(!owns(before.session,req))return@enqueue;try{val repo=checkNotNull(store.audioTranscripts)
-            if(before.selected!=null){val anchor=before.anchor?:repo.preview(before.selected);val saved=write?.let{repo.write(it)};val found=repo.read(anchor);if(saved!=null&&found?.same(saved)!=true)throw AudioTranscriptConflict();if(!owns(before.session,req))return@enqueue;update(before.session,req){it.copy(anchor=anchor,snapshot=found,text=if(found?.withdrawn==true)"" else found?.current?.text.orEmpty(),busy=false,pending=null,error=null,notice=if(write!=null)"人工转写已在本机核对；原音与原文未改。"else null)}}
-            else{val p=repo.search(before.keyword,before.cursor);if(!repo.resolve(p){if(owns(before.session,req))update(before.session,req){it.copy(page=p,items=p.items,busy=false,error=null)}})throw AudioTranscriptConflict()}
+            if(before.selected!=null){val anchor=before.anchor?:repo.preview(before.selected);val saved=write?.let{repo.write(it)};val found=repo.read(anchor);if(saved!=null&&found?.same(saved)!=true)throw AudioTranscriptConflict();if(!owns(before.session,req))return@enqueue;update(before.session,req){it.copy(rangeMode=if(it.rangeLoaded)it.rangeMode else if(found?.current?.range!=null)AudioTranscriptRangeMode.SAVED else AudioTranscriptRangeMode.WHOLE,rangeLoaded=true,anchor=anchor,snapshot=found,text=if(found?.withdrawn==true)"" else found?.current?.text.orEmpty(),busy=false,pending=null,error=null,notice=if(write!=null)"人工转写已在本机核对；原音与原文未改。"else null)}}
+            else{val p=repo.search(before.keyword,before.cursor);var confirmed=false;if(!repo.resolve(p){confirmed=true}||!confirmed)throw AudioTranscriptConflict();if(owns(before.session,req))update(before.session,req){it.copy(page=p,items=p.items,busy=false,error=null)}}
         }catch(c:CancellationException){throw c}catch(_:Exception){failed(before.session,req,write)}})failed(before.session,req,write)
     }
-    fun locate(session:Long,item:AudioTranscriptSnapshot,onLocate:(AudioTranscriptSource)->Unit){val u=current().audioTranscripts?:return;if(!owns(session)||u.busy||u.pending!=null||u.items.none{it===item})return;val req=tokens.incrementAndGet();update(session){it.copy(request=req,busy=true)}
-        if(!enqueue{store->if(!owns(session,req))return@enqueue;try{val repo=checkNotNull(store.audioTranscripts);val page=u.page?:throw AudioTranscriptConflict();var valid=false;if(!repo.resolve(page,item){valid=true}||!valid)throw AudioTranscriptConflict();val found=repo.read(item.anchor);if(found==null||!found.same(item)||found.withdrawn)throw AudioTranscriptConflict();var admitted=false;publish{l->val v=l.audioTranscripts;admitted=!disposed&&v?.session==session&&v.request==req&&l.canRetainTranscripts(v);if(admitted)l.copy(audioTranscripts=null)else l};if(admitted)onLocate(item.anchor)}catch(c:CancellationException){throw c}catch(_:Exception){failed(session,req,null)}})failed(session,req,null)
+    fun locate(session:Long,item:AudioTranscriptSnapshot,onLocate:(AudioTranscriptSource)->Unit)=locateReference(session,item){ref,confirm->confirm{onLocate(ref.anchor)}}
+    fun locateReference(session:Long,item:AudioTranscriptSnapshot,onLocate:(AudioTranscriptPlaybackReference,UnifiedKeywordHandoff)->Unit){
+        val u=current().audioTranscripts?:return
+        if(!owns(session)||u.busy||u.pending!=null||u.items.none{it===item})return
+        val epoch=synchronized(handoffLock){handoffSession=session;lifetime}
+        val req=tokens.incrementAndGet();update(session){it.copy(request=req,busy=true)}
+        if(!enqueue{store->if(!owns(session,req))return@enqueue;try{
+            val repo=checkNotNull(store.audioTranscripts);val page=u.page?:throw AudioTranscriptConflict()
+            val reference=repo.playbackReference(item)
+            var valid=false
+            if(!repo.resolve(page,item){valid=true}||!valid)throw AudioTranscriptConflict()
+            var admitted=false
+            publish{l->val v=l.audioTranscripts;admitted=!disposed&&v?.session==session&&v.request==req&&l.canRetainTranscripts(v);if(admitted)l.copy(audioTranscripts=null)else l}
+            if(admitted){
+                var used=false
+                val confirm=object:UnifiedKeywordHandoff {
+                    override val audioPlayback=reference
+                    override fun invoke(action:()->Unit):Boolean=synchronized(handoffLock){
+                    val l=current()
+                    if(used||disposed||lifetime!=epoch||handoffSession!=session||l.audioTranscripts!=null||!l.canRetainTranscripts(u))false
+                    else{used=true;handoffSession=null;action();true}
+                }}
+                if(synchronized(handoffLock){!disposed&&lifetime==epoch&&handoffSession==session})onLocate(reference,confirm)
+            }
+        }catch(c:CancellationException){throw c}catch(_:Exception){failed(session,req,null)}})failed(session,req,null)
     }
     private fun failed(session:Long,req:Long,write:AudioTranscriptWrite?){if(owns(session,req))update(session,req){it.copy(busy=false,items=emptyList(),page=null,pending=write,error="结果尚未核对，未显示成功或空结果。保留同次请求核对；来源变化后旧请求失效。",notice=null)}}
-    fun dispose(){disposed=true;publish{it.copy(audioTranscripts=null)}}
+    fun dispose()=synchronized(handoffLock){disposed=true;retire()}
+}
+
+internal fun transcriptRangeLabel(range:AudioSampleRange?):String = if(range==null)"整段原音" else {
+    fun seconds(frame:Int)=String.format(java.util.Locale.ROOT,"%.6f",frame.toDouble()/LocalPcmAudio.SAMPLE_RATE).trimEnd('0').trimEnd('.')
+    "人工片段 · 约 ${seconds(range.startFrame)}–${seconds(range.endFrameExclusive)} 秒（结束不含）"
 }

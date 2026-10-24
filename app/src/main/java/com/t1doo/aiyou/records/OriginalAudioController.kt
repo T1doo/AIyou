@@ -42,6 +42,8 @@ class OriginalAudioController internal constructor(
         var job:Job?=null
         var unknown=false
         var readDone=false
+        var startFrame=0
+        var endFrame=0
     }
     val busy get()=state.value.busy
     val isResumed get()=resumed
@@ -53,6 +55,10 @@ class OriginalAudioController internal constructor(
     fun playDraft():Boolean = start(null)
     fun playAttachment(session:Long,id:String):Boolean {
         val p=panel() ?: return false
+        if(p.transcriptSource) {
+            val ref=p.transcriptReference?:return false
+            if(ref.anchor.intent!=p.focusAudio||ref.anchor.intent.id!=id||ref.anchor.intent.entryId!=p.entryId||ref.anchor.intent.revision!=p.revision)return false
+        }
         if(p.sessionId!=session || p.focusedIntent?.id?.let{it!=id}==true || !p.hasRecordAccess(current()) || p.busy || p.selection!=null || p.error!=null || p.unavailable ||
             p.items.none { it.intent.id==id && it.intent.mediaType=="audio/wav" && it.state==AttachmentState.READY })return false
         return start(p,id)
@@ -79,7 +85,7 @@ class OriginalAudioController internal constructor(
     private fun live(r:Request)=synchronized(monitor) {
         request===r && !retired && !r.stopped && resumed && r.route==route && r.foreground==foregroundEpoch &&
             (r.panel==null || panel()?.let { it.sessionId==r.panel.sessionId && it.revision==r.panel.revision &&
-                it.historyOwner==r.panel.historyOwner && it.hasRecordAccess(current()) && !it.unavailable && it.error==null }==true)
+                it.historyOwner==r.panel.historyOwner && it.transcriptSource==r.panel.transcriptSource && it.transcriptReference===r.panel.transcriptReference && it.hasRecordAccess(current()) && !it.unavailable && it.error==null }==true)
     }
     private suspend fun read(store:EntryRepository,r:Request) {
         var bytes:ByteArray?=null
@@ -94,6 +100,16 @@ class OriginalAudioController internal constructor(
                     try { require(checkNotNull(checkNotNull(store.captureRecords).peek()).sameSnapshot(actual)) }
                     catch(e:Exception) { it.fill(0);throw e }
                 }
+            } else if(p.transcriptSource) {
+                validatePanel(store,p)
+                val authenticated=checkNotNull(store.audioTranscripts).playback(checkNotNull(p.transcriptReference),r.pin)
+                try {
+                    require(p.focusAudio==p.transcriptReference.anchor.intent&&p.focusAudio.id==r.id&&p.focusAudio.entryId==p.entryId&&p.focusAudio.revision==p.revision)
+                    validatePanel(store,p)
+                    r.startFrame=authenticated.range?.startFrame?:0
+                    r.endFrame=authenticated.range?.endFrameExclusive?:LocalPcmAudio.inspect(authenticated.wave).samples
+                    authenticated.wave
+                }catch(t:Throwable){authenticated.wave.fill(0);throw t}
             } else {
                 val expected=checkNotNull(p.items.singleOrNull { it.intent.id==r.id })
                 require(expected.state==AttachmentState.READY && expected.intent.mediaType=="audio/wav")
@@ -108,11 +124,14 @@ class OriginalAudioController internal constructor(
                 }
             }
             val info=LocalPcmAudio.inspect(bytes)
+            if(p?.transcriptSource!=true){r.startFrame=0;r.endFrame=info.samples}
+            require(r.startFrame>=0&&r.endFrame>r.startFrame&&r.endFrame<=info.samples)
+            val count=r.endFrame-r.startFrame
             require(live(r))
             synchronized(monitor) {
                 check(live(r));r.wave=bytes;bytes=null;r.readDone=true
-                mutable.value=OriginalAudioUi(OriginalAudioPhase.FOCUS,r.id,info.durationMillis)
-                r.job=scope.launch(start=CoroutineStart.ATOMIC) { run(r,info.samples) }
+                mutable.value=OriginalAudioUi(OriginalAudioPhase.FOCUS,r.id,count*1000L/LocalPcmAudio.SAMPLE_RATE)
+                r.job=scope.launch(start=CoroutineStart.ATOMIC) { run(r,count) }
             }
         } catch(_:Exception) { bytes?.fill(0);r.readDone=true;finish(r,"原音暂不可播放或来源已变化；文件保留。") }
     }
@@ -129,6 +148,7 @@ class OriginalAudioController internal constructor(
         store.recycleBin?.read(p.entryId)?.let { require(!it.deleted && it.generation==expected.generation) }
     }
     private inline fun step(r:Request,action:()->Unit):Boolean {
+        if(!r.gate.isPlaybackActive(r.pin))return false
         val admitted=synchronized(monitor) { live(r) }
         if(admitted)action()
         return admitted
@@ -148,7 +168,7 @@ class OriginalAudioController internal constructor(
                 if(written<total) {
                     val n=minOf(scratch.size,total-written)
                     val wave=checkNotNull(r.wave)
-                    repeat(n) { i -> val at=44+(written+i)*2;scratch[i]=((wave[at].toInt() and 255) or (wave[at+1].toInt() shl 8)).toShort() }
+                    repeat(n) { i -> val at=44+(r.startFrame+written+i)*2;scratch[i]=((wave[at].toInt() and 255) or (wave[at+1].toInt() shl 8)).toShort() }
                     var accepted=0
                     if(!step(r) { accepted=sink.write(scratch,n) })break
                     require(accepted in 0..n);written+=accepted;scratch.fill(0)

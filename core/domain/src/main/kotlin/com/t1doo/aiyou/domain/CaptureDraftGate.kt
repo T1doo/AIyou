@@ -38,6 +38,7 @@ class CaptureDraftGate {
             sourceWriters==0 && destructive.isEmpty())
         pin.active=true
     }
+    @Synchronized fun isPlaybackActive(pin:PlaybackPin):Boolean = playback===pin && pin.gate===this && pin.active && !retired
     @Synchronized fun finishPlayback(pin:PlaybackPin) { check(playback===pin);playback=null }
     @Synchronized fun <T> sourceUi(action:()->T):T? = if(playback!=null || retired)null else action()
     /** Source-only writers do not change the capture reservation/cutoff contract. */

@@ -14,6 +14,42 @@ import java.util.concurrent.atomic.AtomicLong
 
 /** Synthetic WAV/ports, actual SQL/JCA capture and source authentication. No audio device. */
 class OriginalAudioControllerTest {
+    @Test fun authenticatedFragmentUsesActualHalfOpenPcmWithShortWritesAndWaitsForPlayedHead():Unit=runBlocking {
+        for(range in listOf(AudioSampleRange(1,3),AudioSampleRange(3,4),AudioSampleRange(0,1)))Harness().use {h->
+            h.fragment(range);assertEquals(0,h.sink.opened.get());val p=h.attachment!!;h.sink.zeroWrites=1;h.sink.limit=1
+            assertTrue(h.player.playAttachment(p.sessionId,p.focusAudio!!.id));h.drain()
+            val expected=listOf<Short>(0x1234,-2,1000,-1000).subList(range.startFrame,range.endFrameExclusive)
+            h.until{h.sink.accepted.size==expected.size}
+            assertEquals(expected,h.sink.accepted.toList());assertEquals(OriginalAudioPhase.PLAYING,h.player.state.value.phase)
+            assertTrue(h.g.frozen);h.sink.played.set(expected.size.toLong());h.await(OriginalAudioPhase.IDLE)
+            assertEquals(1,h.sink.closes.get());assertFalse(h.g.frozen);assertTrue(h.borrowedWave!!.all{it==0.toByte()})
+        }
+    }
+    @Test fun fragmentCloseUnknownKeepsActualBufferAndPinUntilSameHandleAcknowledgesRelease():Unit=runBlocking {
+        Harness().use {h->
+            h.fragment(AudioSampleRange(1,4));val p=h.attachment!!;h.sink.failClose=true
+            assertTrue(h.player.playAttachment(p.sessionId,p.focusAudio!!.id));h.drain();h.until{h.sink.accepted.size==3}
+            h.player.stop();h.await(OriginalAudioPhase.CLOSING_UNKNOWN)
+            assertTrue(h.g.frozen);assertTrue(h.borrowedWave!!.any{it!=0.toByte()})
+            assertFalse(h.player.playAttachment(p.sessionId,p.focusAudio.id))
+            h.sink.failClose=false;h.player.stop();h.await(OriginalAudioPhase.IDLE)
+            assertFalse(h.g.frozen);assertTrue(h.borrowedWave!!.all{it==0.toByte()});assertEquals(1,h.sink.opened.get())
+        }
+    }
+    @Test fun missingForgedOrSupersededFragmentProofCannotFallBackToWholeAndOwnerLossStopsOutput():Unit=runBlocking {
+        for(kind in listOf("missing","forged","range-aba","owner"))Harness().use {h->
+            h.fragment(AudioSampleRange(1,3));val p=h.attachment!!;val ref=p.transcriptReference!!
+            when(kind) {
+                "missing"->{h.attachment=p.copy(transcriptReference=null);assertFalse(h.player.playAttachment(p.sessionId,p.focusAudio!!.id));assertEquals(0,h.sink.opened.get());return@use}
+                "forged"->h.attachment=p.copy(transcriptReference=object:AudioTranscriptPlaybackReference{override val anchor=ref.anchor;override val range=AudioSampleRange(0,4)})
+                "range-aba"->{val old=h.transcripts.read(ref.anchor)!!;val b=h.transcripts.write(AudioTranscriptWrite(old.id,old.anchor,old,old.current.text,false,FullBackupTest.uuid(),20,AudioSampleRange(2,4)));h.transcripts.write(AudioTranscriptWrite(b.id,b.anchor,b,b.current.text,false,FullBackupTest.uuid(),21,old.current.range))}
+            }
+            assertTrue(h.player.playAttachment(p.sessionId,p.focusAudio!!.id));h.drain()
+            if(kind=="owner") {h.until{h.sink.accepted.size==2};h.attachment=p.copy(sessionId=p.sessionId+1);h.await(OriginalAudioPhase.IDLE);assertEquals(listOf<Short>(-2,1000),h.sink.accepted.toList())}
+            else {assertEquals(0,h.sink.opened.get());assertTrue(h.sink.accepted.isEmpty())}
+            assertFalse(h.g.frozen)
+        }
+    }
     @Test fun focusLossCallbackClosesQueuedAudioReleasesPinAndCannotResumeWithoutNewClick():Unit=runBlocking {
         Harness().use { h ->
             h.draft();assertTrue(h.player.playDraft());h.drain();h.await(OriginalAudioPhase.PLAYING)
@@ -166,11 +202,16 @@ class OriginalAudioControllerTest {
     }
     private class Harness:AutoCloseable {
         val f=FullFixture();val g=f.capture.mutationGate;val sink=Sink()
+        val transcripts=SqlAudioTranscriptRepository(f.gateway,f.key,OwnerAttachmentStore(f.media,g),g)
+        var borrowedWave:ByteArray?=null
         @Volatile var local=LocalRecordUiState(ready=true,opening=false)
         @Volatile var attachment:AttachmentUiState?=null
         val queue=ConcurrentLinkedQueue<suspend(EntryRepository)->Unit>()
         @Volatile var lossCallback:(()->Unit)?=null
         val store=object:EntryRepository {
+            override val audioTranscripts=object:AudioTranscriptRepository by transcripts {
+                override suspend fun playback(reference:AudioTranscriptPlaybackReference,pin:CaptureDraftGate.PlaybackPin)=transcripts.playback(reference,pin).also{borrowedWave=it.wave}
+            }
             override val captureRecords=f.capture
             override val attachments=OwnerAttachmentStore(f.media,g)
             override val localProcessing=SqlLocalProcessingRepository(f.gateway,g)
@@ -201,9 +242,14 @@ class OriginalAudioControllerTest {
             local=local.copy(entries=entries,mixedCapture=null,supportsLocalProcessing=true,localProcessingVersions=versions)
             attachment=AttachmentUiState(1,ready.id,1,loading=false,items=f.media.list(ready.id,1))
         }
+        suspend fun fragment(range:AudioSampleRange) {
+            saved();val p=attachment!!;val i=p.items.single().intent
+            val a=transcripts.preview(i);val saved=transcripts.write(AudioTranscriptWrite(FullBackupTest.uuid(),a,null,"合成人工片段",false,FullBackupTest.uuid(),10,range))
+            attachment=p.copy(focusAudio=i,transcriptSource=true,transcriptReference=transcripts.playbackReference(saved))
+        }
         suspend fun drain() { while(true) { val a=queue.poll() ?: return;a(store) } }
         suspend fun until(condition:()->Boolean)=withTimeout(5000) { while(!condition()) { drain();delay(5) } }
         suspend fun await(phase:OriginalAudioPhase)=until { player.state.value.phase==phase }
-        override fun close() { runBlocking { player.stop();player.closeAndJoin() };f.close() }
+        override fun close() { runBlocking { player.stop();player.closeAndJoin() };transcripts.wipeKey();f.close() }
     }
 }

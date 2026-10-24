@@ -5,6 +5,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
+import android.graphics.Bitmap
+import java.io.File
+import org.robolectric.annotation.GraphicsMode
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.*
@@ -29,6 +33,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[35],qualifiers="w320dp-h640dp")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AudioTranscriptPresentationTest {
     @get:Rule val compose=createComposeRule()
     private val entry=StoredEntry("synthetic-audio-record",1,"合成原音说明，不是转写。",55,"UTC",ProcessingPolicy.LOCAL_ONLY)
@@ -44,10 +49,14 @@ class AudioTranscriptPresentationTest {
     private val state=mutableStateOf(LocalRecordUiState(ready=true,opening=false,entries=listOf(entry),supportsAudioTranscripts=true))
     private val queue=ConcurrentLinkedQueue<suspend(EntryRepository)->Unit>();private var saved:AudioTranscriptSnapshot?=null;private var writes=0;private var registry:SaveableStateRegistry?=null
     private val port=object:AudioTranscriptRepository {
+        override suspend fun playbackReference(snapshot:AudioTranscriptSnapshot):AudioTranscriptPlaybackReference {
+            check(savedFor(snapshot.anchor)?.same(snapshot)==true&&!snapshot.withdrawn)
+            return object:AudioTranscriptPlaybackReference {override val anchor=snapshot.anchor;override val range=snapshot.current.range}
+        }
         override suspend fun preview(intent:AttachmentIntent)=when(intent){this@AudioTranscriptPresentationTest.intent->anchor;intentB->anchorB;else->error("Unknown original")}
         override suspend fun read(anchor:AudioTranscriptSource)=savedFor(anchor)
         override suspend fun write(request:AudioTranscriptWrite):AudioTranscriptSnapshot {val old=savedFor(request.anchor);check(if(old==null)request.expected==null else request.expected?.same(old)==true);writes++
-            val history=if(request.withdraw)old!!.history else old?.history.orEmpty()+AudioTranscriptVersion((old?.history?.size?:0)+1,request.text!!,request.at)
+            val history=if(request.withdraw)old!!.history else old?.history.orEmpty()+AudioTranscriptVersion((old?.history?.size?:0)+1,request.text!!,request.at,request.range)
             return AudioTranscriptSnapshot(request.id,request.anchor,(old?.version?:0)+1,request.withdraw,history).also{if(request.anchor==anchor)saved=it else savedB=it}
         }
         override suspend fun search(keyword:String,cursor:PreferenceCursor?):AudioTranscriptPage {val values=listOfNotNull(saved,savedB).filter{!it.withdrawn&&it.current.text.contains(keyword)};return object:AudioTranscriptPage{override val keyword=keyword;override val cursor=cursor;override val next:PreferenceCursor?=null;override val items=values}}
@@ -67,7 +76,10 @@ class AudioTranscriptPresentationTest {
     private val c=AudioTranscriptController({state.value},{state.value=it(state.value)},{queue.add(it);true},Clock.systemUTC())
     private val attachments=LocalAttachmentController({queue.add(it);true},{error("No image decode")},canUsePanel={it.hasRecordAccess(state.value)})
     @After fun dispose(){c.dispose();attachments.markDisposed();runBlocking{attachments.disposeOnIo()}}
-    @Composable private fun Screen(){val d=LocalDensity.current;val r=LocalSaveableStateRegistry.current;SideEffect{registry=r};CompositionLocalProvider(LocalDensity provides Density(d.density,2f)){AIyouTheme{Box(Modifier.size(320.dp,640.dp)){AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},attachments=attachments,audioTranscripts=c)}}}}
+    private var viewWidth by mutableStateOf(320)
+    private var viewHeight by mutableStateOf(640)
+    private var viewFont by mutableStateOf(2f)
+    @Composable private fun Screen(){val d=LocalDensity.current;val r=LocalSaveableStateRegistry.current;SideEffect{registry=r};CompositionLocalProvider(LocalDensity provides Density(d.density,viewFont)){AIyouTheme{Box(Modifier.size(viewWidth.dp,viewHeight.dp)){AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},attachments=attachments,audioTranscripts=c)}}}}
     private fun click(tag:String){compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick()}
     private fun drain(){compose.runOnIdle{runBlocking{while(true)(queue.poll()?:break)(owner)}};compose.waitForIdle()}
     private fun openRecord(record:StoredEntry){compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-"+record.id));compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-"+record.id))).performClick();compose.waitForIdle()}
@@ -75,6 +87,55 @@ class AudioTranscriptPresentationTest {
     private fun detail(){openRecord(entry);openAttachments();click("attachment-transcript:"+intent.id);drain()}
     private fun backToSearch(){click("transcript-close");compose.onNodeWithText("返回原文").assertIsDisplayed().performClick();compose.waitForIdle();compose.onNodeWithText("返回列表").assertIsDisplayed().performClick();compose.waitForIdle();compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.showNotebookToolsFor("transcripts-open");compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("transcripts-open"));compose.onNodeWithTag("transcripts-open").performClick();drain()}
     private fun query(text:String){compose.onNodeWithTag("transcript-keyword").performScrollTo().performTextReplacement(text);compose.onNodeWithTag("transcript-count").assertDoesNotExist();click("transcript-search");drain()}
+    private fun frame(name:String,tag:String) {
+        val image=compose.onNodeWithTag(tag).captureToImage().asAndroidBitmap()
+        val file=File("build/reports/tests/testDebugUnitTest/transcript-ranges/$name.png");file.parentFile.mkdirs()
+        file.outputStream().use{check(image.compress(Bitmap.CompressFormat.PNG,100,it))}
+    }
+    @Test fun explicitHumanRangeAtNormalAndDoubleFontReachesExactFocusedSourceWithoutAutoplay(){
+        viewFont=1f;compose.setContent{Screen()};detail()
+        compose.onNodeWithTag("transcript-text").performScrollTo().performTextReplacement("合成人工片段 · 不自动播放")
+        click("transcript-range-custom");compose.onNodeWithTag("transcript-range-from").performScrollTo().performTextReplacement("0.001")
+        click("transcript-range-tail");compose.onNodeWithTag("transcript-range-through").performScrollTo().performTextReplacement("0.005")
+        compose.onNodeWithTag("transcript-save").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertIsEnabled();frame("01-normal-editor","transcript-dialog")
+        compose.runOnIdle{viewFont=2f};compose.waitForIdle()
+        compose.onNodeWithTag("transcript-save").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertIsEnabled();frame("02-double-font-editor","transcript-dialog")
+        compose.runOnIdle{assertEquals(0,writes);assertEquals("0.001",state.value.audioTranscripts!!.rangeFrom)}
+        click("transcript-save");drain();assertEquals(AudioSampleRange(45,221),saved!!.current.range)
+        compose.runOnIdle{viewWidth=320;viewHeight=640;viewFont=2f};compose.waitForIdle()
+        backToSearch();query("人工片段");click("transcript-source:"+saved!!.id);drain()
+        compose.runOnIdle{val p=attachments.state.value!!;assertTrue(p.transcriptSource);assertEquals(anchor,p.transcriptReference!!.anchor);assertEquals(AudioSampleRange(45,221),p.transcriptReference!!.range);assertEquals(1,writes)}
+        compose.onNodeWithTag("attachment-audio-play:"+intent.id).performScrollTo().assertIsDisplayed().assertIsNotEnabled()
+        frame("04-focused-source","attachment-scroll") // No platform output was injected into this synthetic UI fixture.
+        assertEquals(entry.originalText,state.value.entries.single().originalText)
+    }
+    @Test @Config(sdk=[35],qualifiers="w800dp-h360dp")
+    fun actualLandscapeWindowKeepsRangeInputAndSaveReachableWithoutChangingTextOrSource(){
+        viewWidth=800;viewHeight=360;viewFont=1f
+        compose.setContent{Screen()};detail()
+        compose.onNodeWithTag("transcript-text").performScrollTo().performTextReplacement("合成横屏人工片段")
+        click("transcript-range-custom");compose.onNodeWithTag("transcript-range-from").performScrollTo().performTextReplacement("0.001")
+        click("transcript-range-tail");compose.onNodeWithTag("transcript-range-through").performScrollTo().performTextReplacement("0.005")
+        compose.onNodeWithTag("transcript-save").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertIsEnabled()
+        frame("03-landscape-editor","transcript-dialog")
+        assertEquals(0,writes);assertEquals("0.001",state.value.audioTranscripts!!.rangeFrom)
+        click("transcript-save");drain();assertEquals(AudioSampleRange(45,221),saved!!.current.range)
+        assertEquals(entry.originalText,state.value.entries.single().originalText)
+    }
+    @Test fun invalidCustomEndpointRemainsVisibleThroughTextEditAndRefreshUntilExplicitCorrection(){
+        compose.setContent{Screen()};detail();click("transcript-range-custom")
+        compose.onNodeWithTag("transcript-range-from").performScrollTo().performTextReplacement("9999999")
+        compose.onNodeWithTag("transcript-text").performScrollTo().performTextReplacement("合成私有范围输入")
+        click("transcript-save");drain();assertEquals(0,writes)
+        compose.onNodeWithTag("transcript-range-from-error").performScrollTo().assertTextEquals("起点输入过长，请明确纠正。")
+        click("transcript-refresh");drain();click("transcript-range-custom")
+        compose.onNodeWithTag("transcript-text").performScrollTo().performTextReplacement("仅改字不能接受旧范围")
+        click("transcript-save");drain();assertEquals(0,writes)
+        compose.onNodeWithTag("transcript-range-from-error").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("transcript-range-from").performScrollTo().performTextReplacement("0")
+        click("transcript-save");drain();assertEquals(1,writes);assertEquals(AudioSampleRange(0,441),saved!!.current.range)
+        assertFalse(registry!!.performSave().toString().contains("9999999"));assertEquals(entry.originalText,state.value.entries.single().originalText)
+    }
     @Test fun doubleFontManualCorrectionWithdrawalAndKeywordJumpReachExactAudioWithoutChangingOriginal(){
         compose.setContent{Screen()};detail();val save=compose.onNodeWithTag("transcript-save").performScrollTo().assertIsDisplayed();assertTrue(save.getUnclippedBoundsInRoot().height>=48.dp)
         compose.onNodeWithTag("transcript-text").performScrollTo().performTextReplacement("合成人工稿：淡茶");click("transcript-save");drain();assertEquals(1,writes)

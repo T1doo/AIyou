@@ -12,6 +12,29 @@ import java.time.Clock
 import java.util.concurrent.TimeUnit
 
 class UnifiedKeywordViewModelTest {
+    @Test(timeout=15000) fun initialIndexEpochCanRetireFavoriteQueryBeforeItsActorCommandBegins():Unit=runBlocking {Harness(withFavorites=true,holdInitialIndex=true).use {h->
+        withTimeout(4000){h.vm.state.first{it.ready&&!it.opening&&it.unifiedKeywordOwner===h.port}}
+        assertTrue(h.indexEntered.await(4,TimeUnit.SECONDS));val epoch=h.vm.state.value.localSearchEpoch!!
+        h.vm.unifiedKeywords.open();val u=h.value();h.vm.unifiedKeywords.keyword(u.session,"淡茶");h.vm.unifiedKeywords.favorites(u.session,true);h.vm.unifiedKeywords.search(u.session)
+        assertNotNull(h.vm.state.value.unifiedKeyword);h.indexRelease.countDown()
+        val drained=CompletableDeferred<Unit>();assertTrue(h.vm.enqueueTaskOperation{drained.complete(Unit)});withTimeout(4000){drained.await()}
+        assertTrue(h.vm.state.value.localSearchEpoch!!>epoch);assertNull(h.vm.state.value.unifiedKeyword)
+        assertEquals(0,h.calls) // The expected repository-entry barrier cannot fire for a retired queued request.
+    }}
+    @Test(timeout=20000) fun rangeOnlyAbaCannotReuseUnifiedProofAndPrivateUiNullHandoffRetiresWithoutNavigation():Unit=runBlocking {Harness().use {h->
+        h.ready();h.open("淡茶");var u=h.ui{it.snapshot!=null&&!it.busy}
+        val old=u.visibleGroups.single().items.filterIsInstance<UnifiedKeywordEvidence.Audio>().single().value
+        val b=h.data.audios.write(AudioTranscriptWrite(old.id,old.anchor,old,old.current.text,false,FullBackupTest.uuid(),70,AudioSampleRange(1,4)))
+        h.data.audios.write(AudioTranscriptWrite(b.id,b.anchor,b,b.current.text,false,FullBackupTest.uuid(),71,null))
+        var nav=0;h.vm.unifiedKeywords.locate(u.session,u.visibleGroups.single().items.filterIsInstance<UnifiedKeywordEvidence.Audio>().single()){_,_->nav++}
+        h.ui{it.error!=null&&!it.busy};assertEquals(0,nav)
+        h.vm.unifiedKeywords.search(u.session);u=h.ui{it.snapshot!=null&&!it.busy}
+        val item=u.visibleGroups.single().items.filterIsInstance<UnifiedKeywordEvidence.Audio>().single()
+        val ready=CompletableDeferred<UnifiedKeywordHandoff>()
+        h.vm.unifiedKeywords.locate(u.session,item){found,confirm->assertSame(item,found);assertTrue(h.data.audios.ownsPlaybackReference(confirm.audioPlayback!!));ready.complete(confirm)}
+        val offer=withTimeout(4000){ready.await()};assertNull(h.vm.state.value.unifiedKeyword)
+        h.vm.unifiedKeywords.retire();assertFalse(offer{nav++});h.vm.unifiedKeywords.resume();assertNull(h.vm.state.value.unifiedKeyword);assertEquals(0,nav)
+    }}
     @Test fun postCasRetirementOrDisposalCannotNavigateOrResurrectReturnSeed():Unit=runBlocking{
         for(dispose in listOf(false,true))HandoffFixture().use{h->
             h.load();val u=h.state.get().unifiedKeyword!!;val item=u.visibleGroups.single().items.first()
@@ -691,11 +714,12 @@ class UnifiedKeywordViewModelTest {
         val state=h.vm.state.value;val e=state.entries.single{it.id==id};h.vm.favorites.set(id,e.currentRevision,OriginalExports.hash(e.originalText),state.favorites.getValue(id).version,value)
         withTimeout(4000){h.vm.state.first{it.favoriteWrites[id]==null&&it.favoritesAvailable&&it.favorites[id]?.isFavorite==value}}
     }
-    private class Harness(extra:Int=0,withMemory:Boolean=false,withPeople:Boolean=false,withFavorites:Boolean=false,private val withImages:Boolean=false):AutoCloseable {
+    private class Harness(extra:Int=0,withMemory:Boolean=false,withPeople:Boolean=false,private val withFavorites:Boolean=false,private val withImages:Boolean=false,private val holdInitialIndex:Boolean=false):AutoCloseable {
         val data=UnifiedKeywordFixture(withPeople=withPeople);val id=data.f.entry(text="合成淡茶")
         val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();var block=false
         var first:UnifiedKeywordSnapshot?=null;var calls=0;var loseFavoriteAck=false
-        init{runBlocking{data.audio(id);if(withImages)data.f.image(id);repeat(extra){data.audio(data.f.entry(text="合成淡茶"))};if(withMemory)AcceptedMemoryKeywordSqlTest.memory(data,id,"备注专词")}}
+        val indexEntered=java.util.concurrent.CountDownLatch(1);val indexRelease=java.util.concurrent.CountDownLatch(1)
+        init{runBlocking{data.audio(id);if(withImages)data.f.image(id);repeat(extra){data.audio(data.f.entry(text="合成淡茶"))};if(withMemory)AcceptedMemoryKeywordSqlTest.memory(data,id,"备注专词");if(holdInitialIndex)UnifiedFavoriteSqlTest.favorite(data,id,true)}}
         val port:UnifiedKeywordRepository=object:UnifiedKeywordRepository by data.repo{
             override suspend fun search(keyword:String,scope:UnifiedKeywordScope,captureRange:UnifiedCaptureRange,tag:UnifiedTagSelection?,person:UnifiedPersonSelection?,onlyFavorites:Boolean,onlyReadyImages:Boolean,checkCurrent:()->Unit):UnifiedKeywordSnapshot {
                 calls++;val result=data.repo.search(keyword,scope,captureRange,tag,person,onlyFavorites,onlyReadyImages,checkCurrent)
@@ -731,6 +755,7 @@ class UnifiedKeywordViewModelTest {
         private val base=SqliteVmEntryRepository(data.f.db,data.f.gateway,RemoteTextTransactions(data.f.gateway)){data.f.media.close();data.f.media.awaitIdle();data.f.gateway.stopAndAwaitIdle()}
         val owner:EntryRepository=object:EntryRepository by base,AutoCloseable{
             override val unifiedKeywords=port
+            override val audioTranscripts=data.audios
             override val manualTags=data.f.tags
             override val manualPeople=if(withPeople)data.people else null
             override val localProcessing=if(withPeople||withFavorites)SqlLocalProcessingRepository(data.f.gateway)else null
@@ -740,7 +765,12 @@ class UnifiedKeywordViewModelTest {
                     if(loseFavoriteAck){loseFavoriteAck=false;error("Synthetic committed favorite ACK loss")};return saved
                 }
             }else null
-            override val localSearch=if(withFavorites||withImages)data.originals else null
+            override val localSearch=if(withFavorites||withImages)object:LocalSearchRepository by data.originals {
+                override fun batch():LocalSearchProgress {
+                    if(holdInitialIndex){indexEntered.countDown();check(indexRelease.await(4,TimeUnit.SECONDS))}
+                    return data.originals.batch()
+                }
+            }else null
             override val sourceMemories=if(withMemory)data.memories else null
             override suspend fun prepare(){check(data.f.db.read("PRAGMA user_version").single().single()==12L)}
             override fun close()=base.close()
@@ -748,7 +778,7 @@ class UnifiedKeywordViewModelTest {
         val vm=LocalRecordsViewModel(Application(),{owner},Clock.systemUTC())
         suspend fun ready()=withTimeout(4000){
             vm.state.first{it.ready&&!it.opening&&it.unifiedKeywordOwner===port}
-            if(withImages){
+            if(withImages||withFavorites){
                 // Initial open publishes before scheduling its index command. Two serial markers
                 // prove that the initial (single-source) batch really finished, with no timing sleeps.
                 repeat(2){val ack=CompletableDeferred<Unit>();check(vm.enqueueTaskOperation{ack.complete(Unit)});ack.await()}
@@ -758,7 +788,7 @@ class UnifiedKeywordViewModelTest {
         fun value()=checkNotNull(vm.state.value.unifiedKeyword)
         fun open(keyword:String,scope:UnifiedKeywordScope=UnifiedKeywordScope.ALL,from:String="",through:String=""){vm.unifiedKeywords.open();val u=value();vm.unifiedKeywords.scope(u.session,scope);vm.unifiedKeywords.keyword(u.session,keyword);vm.unifiedKeywords.from(u.session,from);vm.unifiedKeywords.through(u.session,through);vm.unifiedKeywords.search(u.session)}
         suspend fun ui(predicate:(UnifiedKeywordUi)->Boolean)=withTimeout(8000){vm.state.first{it.unifiedKeyword?.let(predicate)==true}.unifiedKeyword!!}
-        override fun close(){release.complete(Unit);vm.clearForHostTest();assertTrue(base.closed.await(4,TimeUnit.SECONDS));base.closeFailure.get()?.let{throw it};data.close()}
+        override fun close(){indexRelease.countDown();release.complete(Unit);vm.clearForHostTest();assertTrue(base.closed.await(4,TimeUnit.SECONDS));base.closeFailure.get()?.let{throw it};data.close()}
     }
     /** Real repository/controller, with a publication barrier AFTER the real atomic state CAS.
      * No production-only testing hook, simulated pause is the actual retire/dispose entry. */

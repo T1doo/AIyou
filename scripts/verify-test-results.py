@@ -264,6 +264,9 @@ for label, folder, minimum in targets:
             "doubleFontControlledExtractionCorrectionKeywordJumpAndConfirmedDeletionReachExactOriginal",
             "restoredPrivateImageSourceRetiresRetainedAThenBViewerAndLookupCannotDisplayA")
         additional["com.t1doo.aiyou.AudioTranscriptPresentationTest"] = (
+            "explicitHumanRangeAtNormalAndDoubleFontReachesExactFocusedSourceWithoutAutoplay",
+            "actualLandscapeWindowKeepsRangeInputAndSaveReachableWithoutChangingTextOrSource",
+            "invalidCustomEndpointRemainsVisibleThroughTextEditAndRefreshUntilExplicitCorrection",
             "doubleFontManualCorrectionWithdrawalAndKeywordJumpReachExactAudioWithoutChangingOriginal",
             "unsavedManualTextAndRetiredSessionDoNotSurviveRestorationAsWriteAuthority",
             "recreatedPrivateAudioRouteRetiresRetainedFocusBeforeOpeningOrLocatingAnotherRecord")

@@ -41,8 +41,11 @@ data class AttachmentUiState(val sessionId: Long, val entryId: String, val revis
     val selection: AttachmentSelection? = null, val readingId: String? = null,
     val picture: AttachmentPicture? = null, val error: String? = null,
     val notice: String? = null, val unavailable: Boolean = false,
-    val historyOwner: AttachmentHistoryOwner? = null, val retainJpegMetadata: Boolean = true, val focusAudio:AttachmentIntent?=null, val focusImage:AttachmentIntent?=null,val pictureId:String?=null) {
-    init { require(focusAudio==null||focusImage==null) }
+    val historyOwner: AttachmentHistoryOwner? = null, val retainJpegMetadata: Boolean = true, val focusAudio:AttachmentIntent?=null, val focusImage:AttachmentIntent?=null,val pictureId:String?=null, val transcriptSource:Boolean=false, val transcriptReference:com.t1doo.aiyou.domain.AudioTranscriptPlaybackReference?=null) {
+    init { require(focusAudio==null||focusImage==null)
+        require(!transcriptSource||focusAudio!=null)
+        require(transcriptReference==null||transcriptSource&&transcriptReference.anchor.intent==focusAudio&&transcriptReference.anchor.intent.entryId==entryId&&transcriptReference.anchor.intent.revision==revision)
+    }
     val focusedIntent get()=focusAudio?:focusImage
     val readOnly get() = historyOwner != null
     val saving get() = selection?.phase == AttachmentImportPhase.SAVING
@@ -96,9 +99,13 @@ class LocalAttachmentController(
     }
 
     fun openAudio(intent:AttachmentIntent) {sourceUi {if(intent.mediaType=="audio/wav")openPanel(intent.entryId,intent.revision,null,intent)}}
-    private fun openPanel(entryId: String, revision: Int, owner: AttachmentHistoryOwner?,focus:AttachmentIntent?=null,image:AttachmentIntent?=null) {
+    fun openTranscript(reference:com.t1doo.aiyou.domain.AudioTranscriptPlaybackReference) {sourceUi {
+        val i=reference.anchor.intent
+        if(i.mediaType=="audio/wav")openPanel(i.entryId,i.revision,null,i,transcript=reference)
+    }}
+    private fun openPanel(entryId: String, revision: Int, owner: AttachmentHistoryOwner?,focus:AttachmentIntent?=null,image:AttachmentIntent?=null,transcript:com.t1doo.aiyou.domain.AudioTranscriptPlaybackReference?=null) {
         if (disposed || mutable.value != null || revision <= 0) return
-        val panel = AttachmentUiState(ids.incrementAndGet(), entryId, revision, historyOwner = owner,focusAudio=focus,focusImage=image)
+        val panel = AttachmentUiState(ids.incrementAndGet(), entryId, revision, historyOwner = owner,focusAudio=focus,focusImage=image,transcriptSource=transcript!=null,transcriptReference=transcript)
         if (mutable.compareAndSet(null, panel)) refresh(panel.sessionId)
     }
 

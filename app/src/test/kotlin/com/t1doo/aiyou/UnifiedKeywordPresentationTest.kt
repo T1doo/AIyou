@@ -470,6 +470,17 @@ class UnifiedKeywordPresentationTest {
             favorites=records.mapIndexed{n,e->e.id to RecordFavoriteSnapshot(e.id,if(n==0)1 else 0,n==0)}.toMap())}
         val store:EntryRepository=object:EntryRepository {
             override val unifiedKeywords=repo
+            override val audioTranscripts=object:AudioTranscriptRepository {
+                override suspend fun playbackReference(snapshot:AudioTranscriptSnapshot):AudioTranscriptPlaybackReference {
+                    check(evidence.filterIsInstance<UnifiedKeywordEvidence.Audio>().any{it.value.same(snapshot)}&&!snapshot.withdrawn)
+                    return object:AudioTranscriptPlaybackReference {override val anchor=snapshot.anchor;override val range=snapshot.current.range}
+                }
+                override suspend fun preview(intent:AttachmentIntent)=error("Unrelated synthetic UI port")
+                override suspend fun read(anchor:AudioTranscriptSource)=error("Unrelated synthetic UI port")
+                override suspend fun write(request:AudioTranscriptWrite)=error("No transcript writes")
+                override suspend fun search(keyword:String,cursor:PreferenceCursor?)=error("Unrelated synthetic UI port")
+                override suspend fun resolve(page:AudioTranscriptPage,item:AudioTranscriptSnapshot?,publish:()->Unit)=error("Unrelated synthetic UI port")
+            }
             override val sourceMemories=memoryPort
             override val attachments=object:AttachmentStore {
                 override suspend fun save(intent:AttachmentIntent,source:()->java.io.InputStream):LocalAttachment{writes++;error("No source writes")}

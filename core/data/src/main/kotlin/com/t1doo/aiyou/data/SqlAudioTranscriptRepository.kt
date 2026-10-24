@@ -5,6 +5,7 @@ import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
 
 internal class SqlAudioTranscriptRepository(private val database:RecordsSqlDatabase,key:ByteArray,private val media:AttachmentStore?=null,private val gate:CaptureDraftGate?=null):AudioTranscriptRepository {
+    @Volatile private var retired=false
     private val cipher=AudioTranscriptCipher(key)
     private data class Row(val cells:List<Any?>) {val id get()=cells[0] as String;val version get()=cells[6] as Long;val state get()=cells[7] as String;val bytes get()=cells[10] as ByteArray;val created get()=cells[9] as Long}
     private fun hash(b:ByteArray)=MessageDigest.getInstance("SHA-256").digest(b).joinToString(""){"%02x".format(it.toInt() and 255)}
@@ -29,6 +30,38 @@ internal class SqlAudioTranscriptRepository(private val database:RecordsSqlDatab
     override suspend fun read(anchor:AudioTranscriptSource):AudioTranscriptSnapshot? = safe {
         if(preview(anchor.intent)!=anchor)throw AudioTranscriptConflict()
         database.transaction{sql->current(sql,anchor);val all=live(sql);all.singleOrNull{it.second.anchor==anchor}?.let{snapshot(it.first,it.second)}}
+    }
+    private class PlaybackRef(val owner:SqlAudioTranscriptRepository,val saved:AudioTranscriptSnapshot,val digest:String):AudioTranscriptPlaybackReference {
+        override val anchor get()=saved.anchor
+        override val range get()=saved.current.range
+        override fun toString()="AudioTranscriptPlaybackReference(redacted)"
+    }
+    override fun ownsPlaybackReference(reference:AudioTranscriptPlaybackReference)=!retired && reference is PlaybackRef && reference.owner===this
+    private fun authenticated(sql:RecordsSqlConnection,ref:PlaybackRef) {
+        require(ownsPlaybackReference(ref));current(sql,ref.anchor)
+        val row=row(sql,ref.saved.id)?:throw AudioTranscriptConflict()
+        if(row.state!="READY"||hash(row.bytes)!=ref.digest||!snapshot(row,payload(row)).same(ref.saved)||ref.saved.withdrawn)throw AudioTranscriptConflict()
+    }
+    override suspend fun playbackReference(snapshot:AudioTranscriptSnapshot):AudioTranscriptPlaybackReference = safe {
+        if(retired||snapshot.withdrawn||preview(snapshot.anchor.intent)!=snapshot.anchor)throw AudioTranscriptConflict()
+        database.transaction {sql->
+            current(sql,snapshot.anchor);val row=row(sql,snapshot.id)?:throw AudioTranscriptConflict()
+            if(row.state!="READY"||!snapshot(row,payload(row)).same(snapshot))throw AudioTranscriptConflict()
+            PlaybackRef(this,snapshot,hash(row.bytes))
+        }
+    }
+    override suspend fun playback(reference:AudioTranscriptPlaybackReference,pin:CaptureDraftGate.PlaybackPin):AudioTranscriptPlayback = safe {
+        val ref=reference as? PlaybackRef?:throw AudioTranscriptConflict()
+        val owner=checkNotNull(gate)
+        require(owner.isPlaybackActive(pin)&&ownsPlaybackReference(ref))
+        database.transaction {authenticated(it,ref)}
+        val bytes=checkNotNull(media).read(ref.anchor.intent.id)
+        try {
+            require(bytes.size.toLong()==ref.anchor.intent.byteSize&&hash(bytes)==ref.anchor.intent.sha256&&LocalPcmAudio.inspect(bytes).samples==ref.anchor.samples)
+            database.transaction {authenticated(it,ref)}
+            require(owner.isPlaybackActive(pin)&&ownsPlaybackReference(ref))
+            AudioTranscriptPlayback(bytes,ref.saved.current.range)
+        }catch(t:Throwable){bytes.fill(0);throw t}
     }
     override suspend fun write(request:AudioTranscriptWrite):AudioTranscriptSnapshot = safe {
         suspend fun commit():AudioTranscriptSnapshot {
@@ -115,7 +148,7 @@ internal class SqlAudioTranscriptRepository(private val database:RecordsSqlDatab
             validateSet(rows);if(rows.sumOf{it.first.bytes.size.toLong()}>4_194_304)throw AudioTranscriptLimit()
         }finally{allocated.forEach{it.fill(0)}}
     }
-    fun wipeKey(){cipher.wipe()}
+    fun wipeKey(){retired=true;cipher.wipe()}
     private suspend inline fun <T> safe(block:()->T):T=try{block()}catch(c:CancellationException){throw c}catch(c:AudioTranscriptConflict){throw c}catch(c:AudioTranscriptLimit){throw c}catch(_:Exception){throw AudioTranscriptUnavailable()}
     companion object {private const val COLUMNS="id,entryId,sourceRevision,sourceHash,generation,ruleVersion,version,state,lastMutationId,createdAtMillis,payload"}
 }

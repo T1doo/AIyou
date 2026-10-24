@@ -45,7 +45,10 @@ internal fun LocalRecordUiState.canRetainUnified(u:UnifiedKeywordUi):Boolean {
 
 /** Invoke confirmation only while holding the caller's navigation owner. The controller never
  * holds its lifecycle lock while waiting for navigation: lock order is navigation -> lifecycle. */
-typealias UnifiedKeywordHandoff = ((()->Unit)->Boolean)
+fun interface UnifiedKeywordHandoff {
+    operator fun invoke(action:()->Unit):Boolean
+    val audioPlayback:AudioTranscriptPlaybackReference? get()=null
+}
 internal class UnifiedKeywordRetirement(val session:Long,val request:Long,val lifetime:Long,val completeSources:Boolean,val tags:Boolean=false,val people:Boolean=false,val favorites:Boolean=false,val images:Boolean=false)
 
 class UnifiedKeywordController(private val current:()->LocalRecordUiState,
@@ -267,6 +270,10 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
             if(!owns(before.session,req)||store.unifiedKeywords!==before.owner)return@enqueue
             try {
                 val checkCurrent={if(!requestCurrent(before.session,req,epoch,before.owner)||store.unifiedKeywords!==before.owner||before.onlyFavorites&&!current().unifiedFavoritesReady())throw Retired()}
+                val audioReference=if(item is UnifiedKeywordEvidence.Audio) {
+                    val reference=checkNotNull(store.audioTranscripts).playbackReference(item.value)
+                    checkCurrent();reference
+                }else null
                 val result=if(proof==null)when {
                     before.onlyReadyImages->before.owner.search(before.keyword,before.scope,range,before.tag,before.person,before.onlyFavorites,true,checkCurrent)
                     before.onlyFavorites->before.owner.search(before.keyword,before.scope,range,before.tag,before.person,true,checkCurrent)
@@ -289,7 +296,9 @@ class UnifiedKeywordController(private val current:()->LocalRecordUiState,
                         if(admitted)l.copy(unifiedKeyword=null)else l}
                     if(admitted){
                         var used=false
-                        val confirm:UnifiedKeywordHandoff={action->synchronized(handoffLock){
+                        val confirm=object:UnifiedKeywordHandoff {
+                            override val audioPlayback=audioReference
+                            override fun invoke(action:()->Unit):Boolean=synchronized(handoffLock){
                             val l=current()
                             if(used||disposed||lifetime!=epoch||l.unifiedKeyword!=null||!l.canRetainUnified(before.copy(snapshot=result)))false
                             else {
