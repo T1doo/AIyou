@@ -304,7 +304,12 @@ class LocalRecordsViewModel internal constructor(
         { action -> submit(Command.MemoryInbox(action)).isSuccess },beforeOpen={unifiedKeywords.retire()})
     val sourceMemories = SourceMemoryController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.LocalCandidates(action)).isSuccess }, clock = clock,beforeOpen={unifiedKeywords.retire()})
-    val audioTranscripts=AudioTranscriptController({mutableState.value},{change->update(change)},{action->submit(Command.LocalCandidates(action)).isSuccess},clock,::sourceUi)
+    val audioTranscripts=AudioTranscriptController({mutableState.value},{change->update(change)},{action->submit(Command.LocalCandidates(action)).isSuccess},clock,::sourceUi,
+        beforeWrite={write->
+            unifiedKeywords.retire() // Every unified proof authenticates the whole transcript collection.
+            attachments.state.value?.takeIf{it.transcriptSource&&it.focusAudio==write.anchor.intent}
+                ?.let{attachments.retireFocusedAudio(it.sessionId)}
+        })
     val imageTexts=ImageTextController({mutableState.value},{change->update(change)},{action->submit(Command.LocalCandidates(action)).isSuccess},clock,imageTextRecognizer,::sourceUi,canOpen={intent->
         val panel=attachments.state.value
         if(intent==null)panel==null else panel?.let{it.entryId==intent.entryId&&it.revision==intent.revision&&it.pictureId==intent.id&&it.picture!=null&&!it.busy&&it.selection==null&&!it.readOnly&&!it.unavailable&&it.error==null&&it.hasRecordAccess(mutableState.value)&&it.items.any{row->row.intent==intent&&row.state==com.t1doo.aiyou.model.AttachmentState.READY}}==true

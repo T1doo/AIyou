@@ -57,7 +57,7 @@ fun OriginalAudioStatus(controller:OriginalAudioController,modifier:Modifier=Mod
             OriginalAudioPhase.IDLE -> ui.error.orEmpty()
             OriginalAudioPhase.LOADING -> "正在认证原音和来源"
             OriginalAudioPhase.FOCUS -> "正在准备前台播放"
-            OriginalAudioPhase.PLAYING -> "正在播放原音 · ${ui.playedMillis/1000} / ${ui.durationMillis/1000} 秒"
+            OriginalAudioPhase.PLAYING -> "正在播放原音 · 已播放 ${ui.playedMillis} 毫秒 / ${ui.durationLabel}"
             OriginalAudioPhase.CLOSING -> "正在关闭播放；请等待实际释放确认"
             OriginalAudioPhase.CLOSING_UNKNOWN -> ui.error.orEmpty()
         })

@@ -8,7 +8,8 @@ import kotlinx.coroutines.flow.asStateFlow
 
 enum class OriginalAudioPhase { IDLE, LOADING, FOCUS, PLAYING, CLOSING, CLOSING_UNKNOWN }
 data class OriginalAudioUi(val phase:OriginalAudioPhase=OriginalAudioPhase.IDLE,val attachmentId:String?=null,
-    val durationMillis:Long=0,val playedMillis:Long=0,val error:String?=null) {
+    val durationMillis:Long=0,val playedMillis:Long=0,val error:String?=null,val durationSamples:Int=0) {
+    val durationLabel get()=if(durationSamples>0&&durationMillis==0L)"不足1毫秒"else "$durationMillis 毫秒"
     val busy get()=phase!=OriginalAudioPhase.IDLE
     override fun toString()="OriginalAudioUi(phase=$phase, redacted)"
 }
@@ -130,7 +131,7 @@ class OriginalAudioController internal constructor(
             require(live(r))
             synchronized(monitor) {
                 check(live(r));r.wave=bytes;bytes=null;r.readDone=true
-                mutable.value=OriginalAudioUi(OriginalAudioPhase.FOCUS,r.id,count*1000L/LocalPcmAudio.SAMPLE_RATE)
+                mutable.value=OriginalAudioUi(OriginalAudioPhase.FOCUS,r.id,count*1000L/LocalPcmAudio.SAMPLE_RATE,durationSamples=count)
                 r.job=scope.launch(start=CoroutineStart.ATOMIC) { run(r,count) }
             }
         } catch(_:Exception) { bytes?.fill(0);r.readDone=true;finish(r,"原音暂不可播放或来源已变化；文件保留。") }

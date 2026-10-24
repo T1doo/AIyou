@@ -14,6 +14,66 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import org.junit.Assert.*
 import org.junit.Test
 class AudioTranscriptViewModelTest {
+    @Test(timeout=20000) fun unknownRefreshCannotLoseOriginalIntentEvenWhenReadsFail():Unit=runBlocking {Harness(100).use {h->
+        h.ready();val c=h.vm.audioTranscripts;c.open(h.intent);val u=h.ui{it.anchor!=null&&!it.busy}
+        c.edit(u.session,"合成未知保存");c.rangeMode(u.session,AudioTranscriptRangeMode.CUSTOM);c.rangeFrom(u.session,"0.001")
+        h.loseAck=true;c.save(u.session);val pending=h.ui{it.pending!=null&&!it.busy}.pending!!
+        h.failRead=true;val reads=h.reads.get();c.refresh(u.session)
+        val drained=CompletableDeferred<Unit>();assertTrue(h.vm.enqueueTaskOperation{drained.complete(Unit)});withTimeout(4000){drained.await()}
+        assertSame(pending,h.value().pending);assertEquals(reads,h.reads.get())
+        c.edit(u.session,"不得替换未知文字");c.rangeMode(u.session,AudioTranscriptRangeMode.WHOLE);c.rangeFrom(u.session,"0");c.save(u.session)
+        assertSame(pending,h.value().pending);assertEquals("合成未知保存",h.value().text);assertEquals("0.001",h.value().rangeFrom)
+        c.retry(u.session);h.ui{!it.busy};assertSame(pending,h.value().pending)
+        h.failRead=false;c.retry(u.session);val done=h.ui{it.pending==null&&it.notice!=null&&!it.busy}
+        assertEquals(pending.range,done.snapshot!!.current.range);assertTrue(h.writes.all{it===pending});assertEquals(1L,done.snapshot!!.version)
+    }}
+    @Test(timeout=30000) fun admittedRangeCorrectionAndWithdrawalRetireFocusedProofAndBothUiNullOffersBeforeActorRuns():Unit=runBlocking {
+        for(kind in listOf("focused","standalone","unified"))for(withdraw in listOf(false,true))Harness(100,unified=true).use {h->
+            h.ready();val anchor=h.repo.preview(h.intent)
+            h.repo.write(AudioTranscriptWrite(FullBackupTest.uuid(),anchor,null,"合成退休范围",false,FullBackupTest.uuid(),10,AudioSampleRange(1,100)))
+            val c=h.vm.audioTranscripts;var offer:UnifiedKeywordHandoff?=null
+            if(kind=="unified") {
+                val q=h.vm.unifiedKeywords;q.open();val session=h.vm.state.value.unifiedKeyword!!.session;q.keyword(session,"退休范围");q.search(session)
+                val found=withTimeout(4000){h.vm.state.first{it.unifiedKeyword?.snapshot!=null&&it.unifiedKeyword?.busy==false}.unifiedKeyword!!}
+                q.locate(session,found.visibleGroups.single().items.single()){_,confirm->offer=confirm}
+                withTimeout(4000){while(offer==null)delay(5)}
+            }else {
+                c.open();val found=h.ui{it.page!=null&&!it.busy}
+                c.locateReference(found.session,found.items.single()){ref,confirm->if(kind=="focused")assertTrue(confirm{h.vm.attachments.openTranscript(ref)})else offer=confirm}
+                if(kind=="focused")withTimeout(4000){h.vm.attachments.state.first{it?.transcriptSource==true&&!it.busy}}
+                else withTimeout(4000){while(offer==null)delay(5)}
+            }
+            c.open(h.intent);val editor=h.ui{it.anchor!=null&&!it.busy};val panel=h.vm.attachments.state.value
+            c.rangeMode(editor.session,AudioTranscriptRangeMode.CUSTOM);c.rangeFrom(editor.session,"");c.save(editor.session)
+            assertEquals(0,h.writes.size);assertSame(panel,h.vm.attachments.state.value) // Rejected input cannot retire a reader.
+            c.rangeFrom(editor.session,"0.001")
+            val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>()
+            assertTrue(h.vm.enqueueTaskOperation{entered.complete(Unit);release.await()});withTimeout(4000){entered.await()}
+            try {
+                if(withdraw){c.withdraw(editor.session);assertSame(panel,h.vm.attachments.state.value);c.withdraw(editor.session,h.value().withdrawal!!)}else c.save(editor.session)
+                assertNotNull(h.value().pending);assertEquals(0,h.writes.size)
+                if(kind=="focused")assertNull(h.vm.attachments.state.value)
+                else {var navigations=0;assertFalse(offer!!{navigations++});assertEquals(0,navigations)}
+            }finally{release.complete(Unit)}
+            h.ui{!it.busy&&it.pending==null};assertEquals(1,h.writes.size)
+            c.close(editor.session);c.open();val fresh=h.ui{it.page!=null&&!it.busy}
+            offer?.let{assertFalse(it{error("Old offer must not navigate into the new owner session")});assertEquals(fresh.session,h.value().session)}
+        }
+    }
+    @Test(timeout=20000) fun mutationRetirementRunsOutsideCaptureMonitorBeforeQueueAndRejectedInputDoesNotRetire():Unit=runBlocking {Harness().use {h->
+        h.ready();val state=AtomicReference(h.vm.state.value);val queue=ConcurrentLinkedQueue<suspend(EntryRepository)->Unit>()
+        val gate=h.f.capture.mutationGate;var retired=0;var reject=false
+        val c=AudioTranscriptController({state.get()},{change->state.updateAndGet(change)},
+            {action->if(state.get().audioTranscripts?.pending!=null){assertEquals(1,retired);assertFalse(Thread.holdsLock(gate))};if(reject)false else{queue.add(action);true}},Clock.systemUTC(),
+            sourceUi={gate.sourceUi(it)},beforeWrite={assertFalse(Thread.holdsLock(gate));assertSame(it,state.get().audioTranscripts!!.pending);retired++})
+        try {
+            c.open(h.intent);queue.poll()!!(h.owner);val session=state.get().audioTranscripts!!.session
+            c.save(session);assertEquals(0,retired);assertTrue(queue.isEmpty())
+            c.edit(session,"合成有效保存");reject=true;c.save(session)
+            val pending=state.get().audioTranscripts!!.pending;assertNotNull(pending);assertEquals(1,retired);assertFalse(state.get().audioTranscripts!!.busy)
+            c.refresh(session);c.save(session);assertEquals(1,retired);assertSame(pending,state.get().audioTranscripts!!.pending)
+        }finally{c.dispose()}
+    }}
     @Test(timeout=20000) fun actualEditorBothQueriesFocusedPanelAndExplicitPlayProduceOnlyAuthenticatedSamples():Unit=runBlocking {
         class Sink:OriginalAudioOutput {
             val samples=java.util.Collections.synchronizedList(mutableListOf<Short>())
@@ -159,8 +219,8 @@ class AudioTranscriptViewModelTest {
                 AttachmentIntent(FullBackupTest.uuid(),id,1,"audio/wav",FullBackupTest.hash(bytes),bytes.size.toLong()).also{i->f.media.save(i){bytes.inputStream()}}
             }
         };val repo=SqlAudioTranscriptRepository(f.gateway,f.key,f.media,f.capture.mutationGate)
-        val writes=mutableListOf<AudioTranscriptWrite>();@Volatile var loseAck=false
-        private val port=object:AudioTranscriptRepository by repo{override suspend fun write(request:AudioTranscriptWrite)=repo.write(request).also{writes+=request;if(loseAck){loseAck=false;throw AudioTranscriptUnavailable()}}}
+        val writes=mutableListOf<AudioTranscriptWrite>();@Volatile var loseAck=false;@Volatile var failRead=false;val reads=java.util.concurrent.atomic.AtomicInteger()
+        private val port=object:AudioTranscriptRepository by repo{override suspend fun read(anchor:AudioTranscriptSource):AudioTranscriptSnapshot?{reads.incrementAndGet();if(failRead)throw AudioTranscriptUnavailable();return repo.read(anchor)};override suspend fun write(request:AudioTranscriptWrite)=repo.write(request).also{writes+=request;if(loseAck){loseAck=false;throw AudioTranscriptUnavailable()}}}
         private val images=if(unified)SqlImageTextRepository(f.gateway,f.key,f.media)else null
         private val preferences=if(unified)SqlSourcePreferenceRepository(f.gateway,f.key)else null
         private val memories=if(unified)SqlSourceMemoryRepository(f.gateway,f.key)else null

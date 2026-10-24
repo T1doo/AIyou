@@ -58,7 +58,7 @@ import com.t1doo.aiyou.domain.AudioTranscriptPlaybackReference
                 TextButton({if(canUse())c.next(u.session)},enabled=editable&&u.page?.next!=null,modifier=Modifier.heightIn(min=48.dp)){Text("下一页")}
             }
             if(u.pending!=null)TextButton({if(canUse())c.retry(u.session)},enabled=!u.busy,modifier=Modifier.heightIn(min=48.dp).testTag("transcript-retry")){Text("核对同次保存")}
-            TextButton({if(canUse())c.refresh(u.session)},enabled=!u.busy,modifier=Modifier.heightIn(min=48.dp).testTag("transcript-refresh")){Text("仅刷新实际状态，不重复保存")}
+            TextButton({if(canUse())c.refresh(u.session)},enabled=editable,modifier=Modifier.heightIn(min=48.dp).testTag("transcript-refresh")){Text("仅刷新实际状态，不重复保存")}
             TextButton({if(canUse())c.close(u.session)},modifier=Modifier.heightIn(min=48.dp).testTag("transcript-close")){Text("关闭人工转写")}
         }}}
     }

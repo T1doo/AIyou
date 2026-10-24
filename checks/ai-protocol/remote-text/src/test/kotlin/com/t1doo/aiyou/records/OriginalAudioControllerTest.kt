@@ -21,6 +21,8 @@ class OriginalAudioControllerTest {
             val expected=listOf<Short>(0x1234,-2,1000,-1000).subList(range.startFrame,range.endFrameExclusive)
             h.until{h.sink.accepted.size==expected.size}
             assertEquals(expected,h.sink.accepted.toList());assertEquals(OriginalAudioPhase.PLAYING,h.player.state.value.phase)
+            assertEquals(expected.size,h.player.state.value.durationSamples);assertEquals(0L,h.player.state.value.durationMillis)
+            assertEquals("不足1毫秒",h.player.state.value.durationLabel)
             assertTrue(h.g.frozen);h.sink.played.set(expected.size.toLong());h.await(OriginalAudioPhase.IDLE)
             assertEquals(1,h.sink.closes.get());assertFalse(h.g.frozen);assertTrue(h.borrowedWave!!.all{it==0.toByte()})
         }
