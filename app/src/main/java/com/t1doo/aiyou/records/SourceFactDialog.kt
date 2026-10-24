@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -22,6 +23,15 @@ internal fun FactReview.label()=when(this) {
     FactReview.SUPERSEDED -> "已被取代";FactReview.REVOKED -> "已撤回采纳"
 }
 private fun FactInterval.label()=if(zone==null)"有效区间：未说明" else "有效区间：${fromDate ?: "起点未说明"} 至 ${untilExclusive ?: "终点未说明"}（终点不含）· $zone"
+
+/** Diagnostic numbers for fixed public labels only; no source content or layout authority. */
+internal data class FactLabelPrediction(val label:String,val widthPx:Int,val heightPx:Int,
+    val fontSize:String,val lineHeight:String,val density:Float,val fontScale:Float,
+    val softWrap:Boolean,val maxLines:Int,val constraints:String,val style:String)
+internal data class FactLabelMeasureTrace(val density:Float,val fontScale:Float,
+    val reservedHalfPx:Int,val measuredHalfPx:Int,val insetPx:Int,val insetDp:Dp,
+    val predictions:List<FactLabelPrediction>)
+internal val LocalFactFormMeasureObserver=staticCompositionLocalOf<((Long,FactLabelMeasureTrace)->Unit)?> {null}
 
 @Composable
 internal fun SourceFactDialog(ui:FactUiState,controller:SourceFactController,canUse:()->Boolean,onLocate:(OriginalReadingLocation,UnifiedKeywordHandoff)->Unit) {
@@ -37,16 +47,26 @@ internal fun SourceFactDialog(ui:FactUiState,controller:SourceFactController,can
             val labelDensity=LocalDensity.current
             val labelMeasurer=rememberTextMeasurer()
             val labelStyle=MaterialTheme.typography.bodySmall
-            val labelTopInset=remember(labelMeasurer,labelStyle,labelDensity) {
+            val labelMeasurement=remember(labelMeasurer,labelStyle,labelDensity) {
                 with(labelDensity) {
                     // Material 1.4 reserves half the styled line height, but places half the
                     // actual label height above the border. Reserve any font-metric excess now.
                     val reserved=(labelStyle.lineHeight.toDp()/2).roundToPx()
-                    val measured=listOf("原文片段","主题/上下文","生效起始日","结束日","日期时区").maxOf {
-                        labelMeasurer.measure(it,style=labelStyle,softWrap=false,maxLines=1).size.height/2
+                    val predictions=listOf("原文片段","主题/上下文","生效起始日","结束日","日期时区").map {
+                        val result=labelMeasurer.measure(it,style=labelStyle,softWrap=false,maxLines=1)
+                        val input=result.layoutInput
+                        FactLabelPrediction(it,result.size.width,result.size.height,
+                            input.style.fontSize.toString(),input.style.lineHeight.toString(),
+                            input.density.density,input.density.fontScale,input.softWrap,input.maxLines,input.constraints.toString(),input.style.toString())
                     }
-                    (measured-reserved).coerceAtLeast(0).toDp()
+                    val measured=predictions.maxOf {it.heightPx/2}
+                    val inset=(measured-reserved).coerceAtLeast(0)
+                    FactLabelMeasureTrace(density,fontScale,reserved,measured,inset,inset.toDp(),predictions)
                 }
+            }
+            val labelTopInset=labelMeasurement.insetDp
+            LocalFactFormMeasureObserver.current?.let { observer ->
+                SideEffect {observer(ui.session,labelMeasurement)}
             }
             Surface(Modifier.fillMaxWidth().padding(16.dp).heightIn(max=height),shape=MaterialTheme.shapes.large) {
                 Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp).testTag("facts-dialog"),verticalArrangement=Arrangement.spacedBy(8.dp)) {
