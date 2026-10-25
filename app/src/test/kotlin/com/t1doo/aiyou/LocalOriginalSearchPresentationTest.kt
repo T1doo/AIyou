@@ -87,6 +87,89 @@ import org.robolectric.annotation.Implements
 @Config(sdk = [35], qualifiers = "w360dp-h1000dp")
 class LocalOriginalSearchPresentationTest {
     @get:Rule val compose = createComposeRule()
+    @Test
+    @Config(sdk = [35], qualifiers = "w320dp-h640dp")
+    fun emptyAdvancedFiltersUseRealKeyboardDisclosureWithoutQueryOrInputReplacement() {
+        val state = local(entry("one", "合成浏览原文"))
+        val port = UiSearchPort { state.value }
+        state.value = state.value.copy(localSearch = port, localSearchEpoch = 7)
+        content(state, largeFont = true)
+        val before = observation { it.state.stage == OriginalSearchStage.BROWSE }
+        val inputs = compose.runOnIdle { checkNotNull(actualInputs.get()) }
+        compose.onAllNodes(hasTestTag("original-search-from")).assertCountEquals(0)
+        compose.onNodeWithTag("original-search-query").assertExists()
+        compose.onNodeWithTag("original-search-mode").assertExists()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("original-search-filters"))
+        val disclosure = compose.onNodeWithTag("original-search-filters").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        val bounds = disclosure.getUnclippedBoundsInRoot()
+        val viewport = compose.onNode(hasScrollToIndexAction()).getUnclippedBoundsInRoot()
+        assertTrue(bounds.height >= 48.dp && bounds.width >= 48.dp)
+        assertTrue(bounds.left >= viewport.left && bounds.right <= viewport.right && bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
+        compose.runOnIdle { assertTrue(checkNotNull(actualView.get()).requestFocusFromTouch()) }
+        compose.waitForIdle()
+        disclosure.performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
+        disclosure.assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+        compose.onNodeWithTag("original-search-from").assertExists()
+        assertEquals("已展开", disclosure.fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+        disclosure.performClick()
+        compose.onAllNodes(hasTestTag("original-search-from")).assertCountEquals(0)
+        compose.runOnIdle {
+            assertSame(inputs.query, actualInputs.get().query); assertSame(inputs.from, actualInputs.get().from)
+            assertSame(inputs.through, actualInputs.get().through)
+            assertEquals(before.state.inputEpoch, observations.get().state.inputEpoch)
+            assertEquals(0, port.queries.get()); assertEquals(0, draftChanges); assertEquals(0, saves)
+        }
+        // This expansion comes only from the actual query, not the disclosure.
+        // Removing the focus latch would unmount the date as its last value clears.
+        field("original-search-query", "合成"); ready("合成")
+        compose.onNodeWithTag("original-search-from").performScrollTo().performClick().assertIsFocused()
+            .performTextReplacement("2026-10-13")
+        field("original-search-query", "")
+        compose.onNodeWithTag("original-search-from").performScrollTo().performClick().assertIsFocused().performTextReplacement("")
+        observation { it.state.stage == OriginalSearchStage.BROWSE }
+        compose.onNodeWithTag("original-search-from").assertExists().assertIsFocused()
+        assertSame(inputs.from, compose.runOnIdle { actualInputs.get().from })
+        assertEquals("synthetic-private-untouched-draft", state.value.text)
+    }
+
+    @Test fun pendingPersonInputAndReadErrorsKeepAdvancedFiltersVisibleUntilExplicitClear() {
+        val state = local(entry("one", "合成浏览原文"))
+        val port = UiSearchPort { state.value }
+        state.value = state.value.copy(localSearch = port, localSearchEpoch = 7,
+            supportsManualPeople = true, manualPeopleAvailable = true)
+        val baseline = state.value
+        content(state); observation { it.state.stage == OriginalSearchStage.BROWSE }
+        compose.showOriginalSearchFilters()
+        compose.onNodeWithTag("original-search-person-input").performScrollTo().performClick().performTextReplacement("未应用称呼🙂")
+        compose.onNodeWithTag("original-search-filters").performScrollTo().assertIsNotEnabled()
+        assertEquals("未应用称呼🙂", editable("original-search-person-input"))
+        field("original-search-person-input", "")
+        compose.onNodeWithTag("original-search-person-apply").performScrollTo().performClick()
+        compose.onNodeWithText("称呼需为1–40个字符，不可包含控制字符。").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("original-search-filters").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("original-search-clear").performScrollTo().performClick()
+        observation { it.state.stage == OriginalSearchStage.BROWSE }
+        compose.onAllNodes(hasTestTag("original-search-person-input")).assertCountEquals(0)
+        for ((changed, target) in listOf(
+            baseline.copy(localIndexBusy = true) to "original-search-rebuild",
+            baseline.copy(localIndexError = "合成索引错误") to "original-search-rebuild",
+            baseline.copy(manualTagsError = "合成标签读取失败") to "original-search-tag",
+            baseline.copy(supportsFavorites = true, favoritesLoading = true, favoritesAvailable = false) to "original-search-favorites-retry",
+            baseline.copy(manualPeopleAvailable = false, manualPeopleError = "合成人物读取失败") to "original-search-person-retry")) {
+            compose.runOnIdle { state.value = changed }
+            compose.onNodeWithTag("original-search-filters").performScrollTo().assertIsNotEnabled()
+            compose.onNodeWithTag(target).performScrollTo().assertIsDisplayed()
+            compose.runOnIdle { state.value = baseline }
+            compose.onAllNodes(hasTestTag("original-search-from")).assertCountEquals(0)
+        }
+        compose.showOriginalSearchFilters()
+        assertEquals("", editable("original-search-person-input"))
+        compose.onAllNodes(hasText("称呼需为1–40个字符，不可包含控制字符。")).assertCountEquals(0)
+        compose.runOnIdle {
+            assertEquals(0, port.queries.get()); assertEquals(0, draftChanges); assertEquals(0, saves)
+            assertEquals("synthetic-private-untouched-draft", state.value.text)
+        }
+    }
     private data class Observation(val state: OriginalSearchState, val open: (OriginalSearchHit) -> Unit, val serial: Long)
     private val observations = AtomicReference<Observation>()
     private val serials = AtomicLong()
@@ -308,6 +391,7 @@ class LocalOriginalSearchPresentationTest {
         assertTrue(bounds.height >= AIyouDimensions.minTouchTarget)
         assertTrue(bounds.left >= viewport.left && bounds.right <= viewport.right); assertTrue(bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
         clear.performClick(); observation { it.state.stage == OriginalSearchStage.BROWSE }
+        compose.showOriginalSearchFilters()
         assertEquals("", editable("original-search-query")); assertEquals("", editable("original-search-from")); assertEquals("", editable("original-search-through"))
         compose.onNodeWithTag("original-search-mode").performScrollTo().assertIsEnabled()
         assertEquals(OriginalSearchMode.KEYWORDS, observations.get().state.input.mode); assertNull(state.value.error)
@@ -385,6 +469,7 @@ class LocalOriginalSearchPresentationTest {
         assertEquals(listOf("one"), beforeClear.state.hits.map { it.entry.id })
         val beforeClearInputs = compose.runOnIdle { checkNotNull(actualInputs.get()) }
         compose.onNodeWithTag("original-search-clear").performScrollTo().performClick(); observation { it.state.stage == OriginalSearchStage.BROWSE }
+        compose.showOriginalSearchFilters()
         for (tag in listOf("original-search-query", "original-search-from", "original-search-through")) {
             compose.runOnIdle {
                 val actual = checkNotNull(actualInputs.get()).field(tag)
@@ -411,6 +496,7 @@ class LocalOriginalSearchPresentationTest {
         compose.runOnIdle { assertNoSavedInput(checkNotNull(saveableRegistry).performSave(), marker, "2026-10-13") }
         restoration.emulateSavedInstanceStateRestore()
         observation { it.serial > retained.serial && it.state.stage == OriginalSearchStage.BROWSE }
+        compose.showOriginalSearchFilters()
         assertEquals("", editable("original-search-query")); assertEquals("", editable("original-search-from")); assertEquals("", editable("original-search-through"))
         assertEquals(OriginalSearchMode.KEYWORDS, observations.get().state.input.mode)
         compose.runOnIdle { retained.open(retained.state.hits.single()) }; assertNoReader()
@@ -551,11 +637,13 @@ class LocalOriginalSearchPresentationTest {
 
     /** Compose wiring shell; real after-callback SQL commit failures are separate host tests. */
     private class UiSearchPort(private val source: () -> LocalRecordUiState) : LocalSearchRepository {
+        val queries = AtomicInteger()
         @Volatile var afterLocation: (() -> Unit)? = null
         override fun epoch() = 7L
         override fun batch() = LocalSearchProgress(0, false, 7)
         override fun rebuild() = 8L
         override fun candidates(request: LocalSearchRequest) = object : LocalSearchSnapshot {
+            init { queries.incrementAndGet() }
             override val epoch = 7L
             override val entries = source().entries
             override val tags = emptyMap<String, com.t1doo.aiyou.model.ManualTagSnapshot>()

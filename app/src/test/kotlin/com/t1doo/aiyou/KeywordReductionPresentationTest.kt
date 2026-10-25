@@ -92,7 +92,7 @@ class KeywordReductionPresentationTest {
     private fun openReduction(){compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("keyword-reduction-open"));click("keyword-reduction-open");compose.onNodeWithTag("keyword-reduction-original").assertExists()}
 
     @Test fun realAppRequiresRemovalAndConfirmationPreservesDatesThenOpensExactOriginal(){
-        content();field("original-search-from","2026-10-10");field("original-search-through","2026-10-10");field("original-search-query","蓝绳 悬挂");ready("蓝绳 悬挂")
+        content();compose.showOriginalSearchFilters();field("original-search-from","2026-10-10");field("original-search-through","2026-10-10");field("original-search-query","蓝绳 悬挂");ready("蓝绳 悬挂")
         assertTrue(observed.get().hits.isEmpty());val before=reads.get();openReduction()
         compose.onNodeWithTag("keyword-reduction-original").assertTextEquals("蓝绳 悬挂")
         compose.onNodeWithTag("keyword-reduction-confirm").performScrollTo().assertIsNotEnabled();assertEquals(before,reads.get())

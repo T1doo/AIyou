@@ -473,6 +473,8 @@ for label, folder, minimum in targets:
             "toolsRetireAcrossCloseReopenEntryOwnerFailureAndObservedAba",
             "toolsPreserveExactHighlightSelectionAndScrollWhileChangedSourceFailsClosed")
         additional["com.t1doo.aiyou.LocalOriginalSearchPresentationTest"] = (
+            "emptyAdvancedFiltersUseRealKeyboardDisclosureWithoutQueryOrInputReplacement",
+            "pendingPersonInputAndReadErrorsKeepAdvancedFiltersVisibleUntilExplicitClear",
             "searchCardsHighlightVerifiedOriginalUnicodeKeepOrderAndClearWithoutTouchingSource",
             "searchCardFirstHitIsVisibleAtDoubleFontAndRevisionDeletionRetireItsHighlightAndAction",
             "editableKeywordExactAndSavedZoneDateFieldsOpenEveryOriginalCharacterWithoutTouchingDraft",

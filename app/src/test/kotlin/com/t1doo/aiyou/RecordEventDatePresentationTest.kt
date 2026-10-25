@@ -235,6 +235,7 @@ class RecordEventDatePresentationTest {
         durable["one"]=RecordEventDateSnapshot("one",1,RecordEventDate("2024-03-10","America/New_York"))
         state.value=state.value.copy(eventDates=durable.toMap())
         compose.setContent{Screen()}
+        compose.showOriginalSearchFilters()
         control("original-search-date-basis").performClick()
         compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.dateBasis==RecordDateBasis.EVENT}==true}
         assertEquals(listOf("one"),results.get().hits.map{it.entry.id})
@@ -253,6 +254,7 @@ class RecordEventDatePresentationTest {
         compose.waitUntil(2_000){results.get()?.stage==OriginalSearchStage.BROWSE}
         assertEquals(RecordDateBasis.CAPTURED,results.get().input.dateBasis)
         compose.runOnIdle{state.value=state.value.copy(eventDatesAvailable=false,eventDatesError="合成读取失败")}
+        compose.showOriginalSearchFilters()
         control("original-search-date-basis").performClick()
         compose.waitUntil(2_000){results.get()?.stage==OriginalSearchStage.FAILED}
         control("original-search-event-date-retry").assertIsEnabled().performClick()

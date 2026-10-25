@@ -198,6 +198,7 @@ class ManualTagPresentationTest {
     private fun pump() { compose.runOnIdle { runBlocking { queued.removeFirst()(store) } }; compose.waitForIdle() }
     private fun openTags() { compose.runOnIdle { navigation.get().openEntry("one") }; compose.waitForIdle(); compose.originalTool("original-manual-tags").performClick(); pump() }
     private fun chooseTag() {
+        compose.showOriginalSearchFilters()
         compose.onNodeWithTag("original-search-tag").performScrollTo().performClick(); compose.waitForIdle()
         val index = persisted.values.flatMap { it.names }.distinct().sorted().indexOf(TAG)
         compose.onNodeWithTag("original-search-tag-option-$index").performClick()

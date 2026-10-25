@@ -89,7 +89,7 @@ class RecordFavoritePresentationTest {
         compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-$id"))).performClick()
     }
     private fun drain(){compose.runOnIdle{runBlocking{while(queue.isNotEmpty())queue.removeFirst()(store)}};compose.waitForIdle()}
-    private fun onlyFavorites(){compose.onNodeWithTag("original-search-favorites").performScrollTo().performClick();readyFavorites()}
+    private fun onlyFavorites(){compose.showOriginalSearchFilters();compose.onNodeWithTag("original-search-favorites").performScrollTo().performClick();readyFavorites()}
     private fun readyFavorites(){compose.waitForIdle();compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.onlyFavorites}==true}}
 
     @Test fun actualReaderChoiceFavoriteTimelineCombinedLookupAndUnfavoriteReturn(){

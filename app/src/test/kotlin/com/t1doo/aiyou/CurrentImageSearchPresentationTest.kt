@@ -111,6 +111,7 @@ class CurrentImageSearchPresentationTest {
     @Test fun imageFilterStartsOffCombinesLiteralAndDatesAndClearResetsEveryCondition(){
         compose.setContent{Screen()};await{it.stage==OriginalSearchStage.BROWSE}
         assertFalse(results.get().input.onlyImages)
+        compose.showOriginalSearchFilters()
         reveal("original-search-images").performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.onlyImages}
         assertEquals(listOf(picture.id),results.get().hits.map{it.entry.id})
@@ -126,6 +127,7 @@ class CurrentImageSearchPresentationTest {
     }
     @Test fun narrowDoubleFontFilterIsReachableAndReadFailureCannotBecomeEmptySuccess(){
         compose.setContent{Screen(true)}
+        compose.showOriginalSearchFilters()
         val control=reveal("original-search-images").assertIsDisplayed().assertIsEnabled()
         assertTrue(control.getUnclippedBoundsInRoot().height>=48.dp)
         compose.runOnIdle{failRead=true};control.performClick()
@@ -139,6 +141,7 @@ class CurrentImageSearchPresentationTest {
     @Test fun gridRequiresExplicitToggleKeepsFailureCardAndOpensOriginalSource(){
         compose.setContent{Screen()};await{it.stage==OriginalSearchStage.BROWSE}
         compose.onAllNodesWithTag("original-search-grid").assertCountEquals(0)
+        compose.showOriginalSearchFilters()
         reveal("original-search-images").performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.onlyImages}
         compose.onAllNodesWithTag("image-grid-entry-picture").assertCountEquals(0)
@@ -151,6 +154,7 @@ class CurrentImageSearchPresentationTest {
     }
     @Test fun narrowDoubleFontGridToggleAndFailureCardRemainReachableAndClearReturnsToList(){
         compose.setContent{Screen(true)}
+        compose.showOriginalSearchFilters()
         reveal("original-search-images").performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.onlyImages}
         val toggle=reveal("original-search-grid").assertIsDisplayed().assertIsEnabled()

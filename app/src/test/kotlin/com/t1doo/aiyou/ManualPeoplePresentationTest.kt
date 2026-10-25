@@ -86,7 +86,7 @@ class ManualPeoplePresentationTest {
         assertEquals(entries,state.value.entries)
     }
     @Test fun explicitPersonAndKeywordSavedZoneDateOpenOriginalAndRetireStalePersonResult(){
-        content();field("original-search-person-input","小林")
+        content();compose.showOriginalSearchFilters();field("original-search-person-input","小林")
         compose.onNodeWithTag("original-search-person-apply").performScrollTo().performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.person=="小林"};assertEquals(2,result!!.hits.size)
         field("original-search-query","咖啡");field("original-search-from","2026-10-14");field("original-search-through","2026-10-14")

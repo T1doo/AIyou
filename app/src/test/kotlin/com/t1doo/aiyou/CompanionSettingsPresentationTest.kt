@@ -426,6 +426,17 @@ class CompanionSettingsPresentationTest {
                     onDisplayChange = { changes++ }, onRetryDisplay = { retries++ }) }
             }
         }
+        val intro = compose.onNodeWithText("一只安静的水豚，陪你记下一点生活。", useUnmergedTree = true)
+            .performScrollTo().assertIsDisplayed()
+        val introLayouts = mutableListOf<TextLayoutResult>()
+        intro.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { assertTrue(it(introLayouts)) }
+        val introLayout = introLayouts.single()
+        assertEquals("一只安静的水豚，陪你记下一点生活。", introLayout.layoutInput.text.text)
+        assertEquals(2f, introLayout.layoutInput.density.fontScale, 0f)
+        assertFalse("Full-width balanced intro must not clip: ${introLayout.size} / ${introLayout.layoutInput.constraints}", introLayout.hasVisualOverflow)
+        val finalLine = introLayout.layoutInput.text.text.substring(introLayout.getLineStart(introLayout.lineCount - 1),
+            introLayout.getLineEnd(introLayout.lineCount - 1, visibleEnd = true)).trim().removeSuffix("。")
+        assertTrue("The unchanged intro must not strand one final character: $finalLine", finalLine.codePointCount(0, finalLine.length) >= 2)
         val companion = compose.onNodeWithTag("companion-switch").performScrollTo().assertIsDisplayed()
         val title = compose.onNodeWithText("显示陪伴伙伴", useUnmergedTree = true)
         val layouts = mutableListOf<TextLayoutResult>()

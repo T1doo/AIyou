@@ -422,7 +422,10 @@ fun LocalRecordsScreen(
                             onlyImages = onlyImages, onImages = onSearchImages,
                             dateBasis = searchDateBasis, onDateBasis = onSearchDateBasis,
                             eventDatesAvailable = local.eventDatesAvailable, eventDatesError = local.eventDatesError,
-                            onRefreshEventDates = onRefreshEventDates,onQuestionKeywords=onQuestionKeywords)
+                            onRefreshEventDates = onRefreshEventDates,onQuestionKeywords=onQuestionKeywords,
+                            searchNeedsAttention = searchState.stage == OriginalSearchStage.WAITING ||
+                                searchState.stage == OriginalSearchStage.RUNNING || searchState.stage == OriginalSearchStage.INVALID ||
+                                searchState.stage == OriginalSearchStage.FAILED)
                     else SearchSection(demo = false)
                     if (local.localSearch != null) TextButton(onClick = { onEvidenceMode(!evidenceMode) },
                         enabled = local.ready && !local.opening && local.error == null,

@@ -34,6 +34,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -107,7 +108,8 @@ fun SettingsScreen(
                     }
                 }
                 SettingsGroup("陪伴与显示") {
-                    Text("一只安静的水豚，陪你记下一点生活。", style = MaterialTheme.typography.bodyMedium, color = AIyouColors.textSecondary)
+            Text("一只安静的水豚，陪你记下一点生活。", modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium.copy(lineBreak = LineBreak.Heading), color = AIyouColors.textSecondary)
                     PreferenceSwitch("显示陪伴伙伴", "可随时关闭，不影响记录。", display.preferences.showCompanion,
                         display.ready && !display.busy && !display.saveUnconfirmed, "companion-switch") {
                         change { value -> value.copy(showCompanion = it) }

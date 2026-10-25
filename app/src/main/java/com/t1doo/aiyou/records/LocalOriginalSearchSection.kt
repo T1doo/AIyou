@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.input.key.Key
@@ -43,6 +44,7 @@ import com.t1doo.aiyou.designsystem.AIyouColors
 import com.t1doo.aiyou.designsystem.aiyouFocusOutline
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 
 interface OriginalSearchObserver {
     fun onResults(state: OriginalSearchState, open: (OriginalSearchHit) -> Unit)
@@ -73,7 +75,20 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     onRefreshEventDates: () -> Unit = {}, onlyImages: Boolean = false,
     onImages: (Boolean) -> Unit = {}, person: String? = null, peopleSupported: Boolean = false,
     peopleAvailable: Boolean = false, peopleError: String? = null, onPerson: (String?) -> Unit = {},
-    onRefreshPeople: () -> Unit = {},onQuestionKeywords:(()->Unit)?=null) {
+    onRefreshPeople: () -> Unit = {},onQuestionKeywords:(()->Unit)?=null,
+    searchNeedsAttention: Boolean = false) {
+    // These owners live outside the disclosure, never in SavedState. Collapsing an
+    // empty filter must not replace its actual editable/Undo object or hide errors.
+    var filtersExpanded by remember(query, from, through) { mutableStateOf(false) }
+    val personInput = remember(query, person) { TextFieldState(person.orEmpty()) }
+    val personInvalid = remember(query, person) { mutableStateOf(false) }
+    val keepFiltersVisible = query.text.isNotEmpty() || from.text.isNotEmpty() || through.text.isNotEmpty() ||
+        mode != OriginalSearchMode.KEYWORDS || dateBasis != com.t1doo.aiyou.model.RecordDateBasis.CAPTURED ||
+        tag != null || person != null || onlyFavorites || onlyImages || !enabled || searchNeedsAttention ||
+        tagsError != null || (indexSupported && (indexBusy || indexError != null)) ||
+        (favoritesSupported && (favoritesLoading || !favoritesAvailable || favoritesError != null)) ||
+        (peopleSupported && (!peopleAvailable || peopleError != null || personInput.text.isNotEmpty() || personInvalid.value))
+    val showFilters = filtersExpanded || keepFiltersVisible
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
             fun transform(state: TextFieldState, maximum: Int) =
                 InputTransformation.maxLength(maximum).then {
@@ -129,8 +144,16 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
             border = BorderStroke(AIyouDimensions.borderWidth, AIyouColors.outlineDecorative)) {
           Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
               verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-            Text("筛选与范围", style = MaterialTheme.typography.titleMedium,
-                color = AIyouColors.primary, modifier = Modifier.semantics { heading() })
+            TextButton(onClick = { filtersExpanded = !filtersExpanded }, enabled = enabled && !keepFiltersVisible,
+                modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget)
+                    .aiyouFocusOutline().testTag("original-search-filters")
+                    .semantics { stateDescription = if (showFilters) "已展开" else "已收起" }) {
+                Text(if (keepFiltersVisible) "筛选与范围 · 已展开" else if (showFilters) "筛选与范围 · 收起" else "筛选与范围 · 展开",
+                    modifier = Modifier.fillMaxWidth().semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = AIyouColors.primary)
+            }
+            if (!showFilters) Text("日期 · 人物 · 标签 · 收藏 · 图片", style = MaterialTheme.typography.bodySmall,
+                color = AIyouColors.textSecondary)
+            if (showFilters) {
             Text("关键词可在当前原文、手工标签或你为本条记录确认的别名关系中满足；精确片段只查原文。标签和别名命中只供查找，不构成原文出处。",
                 style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = { onDateBasis(if (dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED)
@@ -148,16 +171,19 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
             key(from) { CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
             OutlinedTextField(state = from,
                 enabled = enabled, label = { Text("开始日期（YYYY-MM-DD，可留空）") },
-                modifier = Modifier.fillMaxWidth().then(historyKeys(from)).testTag("original-search-from"),
+                modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) filtersExpanded = true }
+                    .then(historyKeys(from)).testTag("original-search-from"),
                 lineLimits = TextFieldLineLimits.SingleLine, inputTransformation = transform(from, 10))
             } }
             key(through) { CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
             OutlinedTextField(state = through,
                 enabled = enabled, label = { Text("结束日期（YYYY-MM-DD，可留空）") },
-                modifier = Modifier.fillMaxWidth().then(historyKeys(through)).testTag("original-search-through"),
+                modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) filtersExpanded = true }
+                    .then(historyKeys(through)).testTag("original-search-through"),
                 lineLimits = TextFieldLineLimits.SingleLine, inputTransformation = transform(through, 10))
             } }
-            if (peopleSupported) LocalPeopleFilter(person, enabled, peopleAvailable, peopleError, onPerson, onRefreshPeople)
+            if (peopleSupported) LocalPeopleFilter(person, enabled, peopleAvailable, peopleError, onPerson, onRefreshPeople,
+                personInput, personInvalid, onInputFocused = { filtersExpanded = true })
             var choosing by remember { mutableStateOf(false) }
             TextButton(onClick = { choosing = true }, enabled = enabled && tagsAvailable,
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-tag")) {
@@ -201,6 +227,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                     modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-rebuild")) {
                     Text("重新整理本机查找")
                 }
+            }
             }
           }
         }
