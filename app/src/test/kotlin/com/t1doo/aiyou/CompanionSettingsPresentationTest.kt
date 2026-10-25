@@ -101,22 +101,81 @@ class CompanionSettingsPresentationTest {
         var writes = 0
         val display = mutableStateOf(UiPreferencesState(UiPreferences(reduceMotion = true), ready = true))
         val local = LocalRecordUiState(ready = true, opening = false, text = "合成动作前草稿")
+        val output = java.io.File("build/reports/companion-motion/extra-poses").apply { mkdirs() }
+        val trace = org.json.JSONArray()
+        val runs = java.util.IdentityHashMap<CompanionInteraction.Run, Int>()
+        var phase = "open"
+        var composition = 0
+        fun observe(point: String, buttons: org.json.JSONObject? = null) {
+            check(trace.length() < 128)
+            trace.put(org.json.JSONObject().put("phase", phase).put("point", point)
+                .put("clock_ms", compose.mainClock.currentTime).put("pose", observed.pose.name)
+                .put("feedback", observed.feedback.name).put("foreground", observed.foreground)
+                .put("retired", observed.retired).put("motion", motion)
+                .put("run", observed.run?.let { runs.getOrPut(it) { runs.size + 1 } } ?: org.json.JSONObject.NULL)
+                .put("buttons", buttons ?: org.json.JSONObject.NULL))
+            java.io.File(output, "admission.json").writeText(org.json.JSONObject()
+                .put("source_sha", System.getenv("GITHUB_SHA") ?: "local-unbound")
+                .put("observations", trace).toString(2))
+        }
         compose.mainClock.autoAdvance = false
         compose.setContent {
             CompositionLocalProvider(LocalCompanionInteractionObserver provides { state, value, callbacks ->
                 observed = state; motion = value; actions = callbacks
+                observe("composition-${++composition}")
             }) { AIyouTheme { AIyouApp(local = local, display = display.value, onSave = { writes++ }) } }
         }
         fun frame() { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
         compose.onNodeWithContentDescription("打开陪伴伙伴").performClick()
         repeat(2) { frame() }
         val images = mutableListOf<android.graphics.Bitmap>()
-        val output = java.io.File("build/reports/companion-motion/extra-poses").apply { mkdirs() }
+        val starts = listOf("companion-greet", "companion-encourage", "companion-think", "companion-yawn")
+        fun buttons(): org.json.JSONObject {
+            val result = org.json.JSONObject()
+            for (tag in starts + "companion-quiet") {
+                val nodes = compose.onAllNodesWithTag(tag).fetchSemanticsNodes()
+                val values = org.json.JSONArray()
+                nodes.forEach { node -> values.put(org.json.JSONObject()
+                    .put("disabled", node.config.contains(SemanticsProperties.Disabled))
+                    .put("left", node.boundsInRoot.left).put("top", node.boundsInRoot.top)
+                    .put("right", node.boundsInRoot.right).put("bottom", node.boundsInRoot.bottom)) }
+                result.put(tag, org.json.JSONObject().put("count", nodes.size).put("nodes", values))
+            }
+            return result
+        }
+        fun consumed(expected: CompanionPose) {
+            var ready = false
+            var frames = 0
+            while (!ready && frames < 4) {
+                frame(); frames++
+                val sample = buttons()
+                val unique = (starts + "companion-quiet").all { sample.getJSONObject(it).getInt("count") == 1 }
+                val startDisabled = unique && starts.all {
+                    sample.getJSONObject(it).getJSONArray("nodes").getJSONObject(0).getBoolean("disabled") == (expected != CompanionPose.Idle)
+                }
+                val quietEnabled = unique && !sample.getJSONObject("companion-quiet").getJSONArray("nodes").getJSONObject(0).getBoolean("disabled")
+                compose.runOnIdle {
+                    observe("publication-$frames", sample)
+                    ready = observed.foreground && !observed.retired && observed.pose == expected && observed.feedback == expected &&
+                        (if (expected == CompanionPose.Idle) observed.run == null else observed.run != null) && startDisabled && quietEnabled
+                }
+            }
+            compose.runOnIdle {
+                assertTrue("Real action was not consumed within four frames: $trace", ready)
+                assertEquals(expected, observed.pose); assertEquals(expected, observed.feedback)
+                assertEquals(0f, motion, 0f); assertEquals(0, writes)
+            }
+        }
         for ((tag, pose) in listOf("companion-think" to CompanionPose.Thinking, "companion-yawn" to CompanionPose.Yawning)) {
+            phase = tag
             compose.onNodeWithTag(tag).performScrollTo()
-            frame()
+            frame() // Finish the scroll/layout separately from action publication.
+            val before = buttons()
+            compose.runOnIdle { observe("before-click", before) }
             compose.onNodeWithTag(tag).assertIsDisplayed().assertIsEnabled().assertHeightIsAtLeast(48.dp).performClick()
-            frame()
+            val after = buttons()
+            compose.runOnIdle { observe("after-click", after) }
+            consumed(pose)
             compose.runOnIdle {
                 assertEquals(pose, observed.pose); assertNotNull(observed.run); assertEquals(0f, motion, 0f)
                 assertEquals(0, writes)
@@ -124,15 +183,23 @@ class CompanionSettingsPresentationTest {
             compose.onNodeWithTag("companion-artwork-fallback").assertDoesNotExist()
             compose.onNodeWithTag("companion-interaction-artwork").performScrollTo()
             frame()
+            val capturedRun = observed.run
+            compose.runOnIdle { assertNotNull(capturedRun); assertEquals(pose, observed.pose); assertEquals(0f, motion, 0f); observe("before-capture") }
             val bitmap = compose.onNodeWithTag("companion-interaction-artwork").captureToImage().asAndroidBitmap()
+            compose.runOnIdle { assertSame(capturedRun, observed.run); assertEquals(pose, observed.pose); assertEquals(0f, motion, 0f); observe("after-capture") }
             images += bitmap
             java.io.File(output, "$tag.png").outputStream().use {
                 assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
             }
+            phase = "$tag-quiet"
             compose.onNodeWithTag("companion-quiet").performScrollTo()
             frame()
+            val quietBefore = buttons()
+            compose.runOnIdle { observe("before-click", quietBefore) }
             compose.onNodeWithTag("companion-quiet").assertIsDisplayed().performClick()
-            frame()
+            val quietAfter = buttons()
+            compose.runOnIdle { observe("after-click", quietAfter) }
+            consumed(CompanionPose.Idle)
             compose.runOnIdle { assertNull(observed.run); assertEquals(CompanionPose.Idle, observed.pose); assertEquals(0f, motion, 0f) }
         }
         assertFalse("Two explicit poses must render different bundled artwork", images[0].sameAs(images[1]))
