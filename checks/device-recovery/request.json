@@ -1,0 +1,15 @@
+{
+  "kind": "one-isolated-d08-saf-recovery",
+  "executionApproved": false,
+  "productionSha": "958ab2a08536161d8a0776ef155b6368d7df09c6",
+  "artifactRun": 40123738360,
+  "artifactId": 12572840840,
+  "artifactDigest": "475285ec3ccd6d16605e6c0fca6051a3cb68ddf9ae29998aa36699d0e22254a4",
+  "apkSha256": "dadce271185cc1ff1e8a577f1986d4b4290fbcb60daf7dd187c7088b5d1b693a",
+  "jobMinutes": 35,
+  "driverSeconds": 1920,
+  "cleanupSeconds": 120,
+  "attempt": 1,
+  "newTermsAcceptance": false,
+  "realData": false
+}

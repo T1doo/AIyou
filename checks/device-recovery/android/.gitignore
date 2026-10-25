@@ -1,0 +1,4 @@
+.gradle/
+build/
+gradle/verification-metadata.xml
+local.properties
