@@ -24,14 +24,16 @@ fun FactRecapScreen(local: LocalRecordUiState,controller: FactRecapController,li
         item("intro") { Text("本机日／周回顾",style=MaterialTheme.typography.headlineSmall)
             Text("按记录保存时间整理，不代表事件发生时间。只回看原文与手工标签，不生成 AI 叙事或心理判断。")
             Text("补记、纠正或清除事件日期不会移动这里的记录分组；按事件日找原文，请在回忆中选择“事件日期”检索。") }
-        item("date") { OutlinedTextField(u.date,{controller.input(it,u.zone,u.period)},label={Text("日期 YYYY-MM-DD")},
+        item("date") { OutlinedTextField(u.date,{controller.input(date=it)},label={Text("日期 YYYY-MM-DD")},
+            isError=u.dateRejected,supportingText=if(u.dateRejected) {{Text("日期输入超过10个字符，未接受；请重新编辑日期。",Modifier.fillMaxWidth().testTag("recap-date-rejected"))}} else null,
             enabled=ready,modifier=Modifier.fillMaxWidth().testTag("recap-date")) }
-        item("zone") { OutlinedTextField(u.zone,{controller.input(u.date,it,u.period)},label={Text("回顾时区，例如 Asia/Shanghai")},
+        item("zone") { OutlinedTextField(u.zone,{controller.input(zone=it)},label={Text("回顾时区，例如 Asia/Shanghai")},
+            isError=u.zoneRejected,supportingText=if(u.zoneRejected) {{Text("时区输入超过64个字符，未接受；请重新编辑时区。",Modifier.fillMaxWidth().testTag("recap-zone-rejected"))}} else null,
             enabled=ready,modifier=Modifier.fillMaxWidth().testTag("recap-zone")) }
         item("period") { Column { Text("一周从周一开始，至下周一零点前；按所选时区自然日划分。")
-            OutlinedButton({controller.input(u.date,u.zone,FactRecapPeriod.DAY)},enabled=ready,
+            OutlinedButton({controller.input(period=FactRecapPeriod.DAY)},enabled=ready,
                 modifier=Modifier.heightIn(min=48.dp).testTag("recap-day")){Text("单日"+if(u.period==FactRecapPeriod.DAY) " · 已选" else "")}
-            OutlinedButton({controller.input(u.date,u.zone,FactRecapPeriod.WEEK)},enabled=ready,
+            OutlinedButton({controller.input(period=FactRecapPeriod.WEEK)},enabled=ready,
                 modifier=Modifier.heightIn(min=48.dp).testTag("recap-week")){Text("所在周"+if(u.period==FactRecapPeriod.WEEK) " · 已选" else "")}
         } }
         item("range-preview") {

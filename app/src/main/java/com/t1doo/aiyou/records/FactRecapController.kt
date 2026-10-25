@@ -7,12 +7,14 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 
 data class FactRecapUiState(val date: String="",val zone: String="UTC",val period: FactRecapPeriod=FactRecapPeriod.DAY,
-    val loading: Boolean=false,val snapshot: FactRecapSnapshot?=null,val error: String?=null) {
+    val loading: Boolean=false,val snapshot: FactRecapSnapshot?=null,val error: String?=null,
+    val dateRejected: Boolean=false,val zoneRejected: Boolean=false) {
     override fun toString()="FactRecapUiState(loading=$loading, redacted)"
 }
 
 /** One interpretation shared by the pre-generation preview and the actual request. */
 internal fun FactRecapUiState.requestedRange(): FactRecapRange {
+    require(!dateRejected && !zoneRejected)
     require(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(date))
     return FactRecapRange(LocalDate.parse(date), period, zone)
 }
@@ -33,9 +35,17 @@ class FactRecapController internal constructor(private val current: ()->LocalRec
         // Copy the confirmed preference once. Later preference reads/writes never mutate this request.
         change { FactRecapUiState(LocalDate.now(clock).toString(),clock.zone.id,defaultPeriod) }
     }
-    fun input(date: String,zone: String,period: FactRecapPeriod):Unit=synchronized(ownershipGate) {
-        if(ui()==null || date.length>10 || zone.length>64) return
-        generation.incrementAndGet();change { it.copy(date=date,zone=zone,period=period,loading=false,snapshot=null,error=null) }
+    fun input(date: String?=null,zone: String?=null,period: FactRecapPeriod?=null):Unit=synchronized(ownershipGate) {
+        val u=ui() ?: return
+        // Rejected edits also retire the old range and any queued result. Never retain the raw oversized text.
+        // Omitted fields are untouched: switching period or editing the other field cannot clear a rejection.
+        val rejectedDate=if(date==null)u.dateRejected else date.length>10
+        val rejectedZone=if(zone==null)u.zoneRejected else zone.length>64
+        generation.incrementAndGet();change { it.copy(
+            date=if(date==null || rejectedDate)it.date else date,
+            zone=if(zone==null || rejectedZone)it.zone else zone,period=period ?: it.period,
+            dateRejected=rejectedDate,zoneRejected=rejectedZone,loading=false,snapshot=null,
+            error=if(rejectedDate || rejectedZone) "超长输入未被接受；请修改对应字段。旧范围和旧回顾已停用。" else null) }
     }
     fun cancel():Unit=synchronized(ownershipGate) { if(ui()==null) return;generation.incrementAndGet();change { it.copy(loading=false,snapshot=null,error=null) } }
     fun close():Unit=synchronized(ownershipGate) { generation.incrementAndGet();publish { it.copy(factRecap=null) } }

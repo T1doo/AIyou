@@ -12,6 +12,63 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class FactRecapControllerTest {
+    @Test fun rejectedOversizedRangeHidesPriorRecapAndCannotReuseItsSourceOrGenerateOldRange():Unit=runBlocking {
+        for (badDate in listOf(true, false)) FactRecapHarness().use { h ->
+            h.c.open(); h.c.generate(); h.drain()
+            val old = checkNotNull(h.ui.snapshot).cards.single()
+            val date = h.ui.date
+            val zone = h.ui.zone
+            var opens = 0
+            h.c.source(old) { opens++ }
+            h.c.input(if (badDate) date + "0" else date, if (badDate) zone else "x".repeat(65), h.ui.period)
+            assertNull("Rejected range input must hide the previous private recap", h.ui.snapshot)
+            assertNotNull("Rejected input needs an explicit error", h.ui.error)
+            h.drain(); assertEquals(0, opens)
+            h.c.generate()
+            assertFalse(h.ui.loading); assertNull(h.ui.snapshot); assertTrue("Must not query the old accepted range", h.queue.isEmpty())
+        }
+    }
+
+    @Test fun rejectedOversizedRangeDuringCaptureCannotPublishTheOldRange():Unit=runBlocking {
+        for (badDate in listOf(true, false)) FactRecapHarness().use { h ->
+            h.c.open()
+            h.afterCapture = { h.c.input(if (badDate) h.ui.date + "0" else h.ui.date,
+                if (badDate) h.ui.zone else "x".repeat(65), h.ui.period) }
+            h.c.generate(); h.drain()
+            assertNull("A rejected edit must retire an already captured old result", h.ui.snapshot)
+            assertFalse(h.ui.loading); assertNotNull(h.ui.error)
+            h.c.generate(); assertTrue(h.queue.isEmpty())
+        }
+    }
+
+    @Test fun onlyExplicitCorrectionOfEachRejectedFieldReenablesTheRequestedRange():Unit=runBlocking {
+        for (badDate in listOf(true, false)) FactRecapHarness().use { h ->
+            h.c.open()
+            val date = h.ui.date
+            if (badDate) h.c.input(date = date + "0") else h.c.input(zone = "x".repeat(65))
+            assertEquals(badDate, h.ui.dateRejected); assertEquals(!badDate, h.ui.zoneRejected)
+            h.c.input(period = FactRecapPeriod.WEEK)
+            if (badDate) h.c.input(zone = "Asia/Shanghai") else h.c.input(date = "2026-10-16")
+            h.c.cancel(); h.c.generate()
+            assertThrows(Exception::class.java) { h.ui.requestedRange() }
+            assertTrue(h.queue.isEmpty()); assertFalse(h.ui.loading); assertNull(h.ui.snapshot)
+            assertEquals(badDate, h.ui.dateRejected); assertEquals(!badDate, h.ui.zoneRejected)
+            assertTrue(h.ui.date.length <= 10); assertTrue(h.ui.zone.length <= 64)
+            if (badDate) h.c.input(date = date) else h.c.input(zone = "UTC")
+            val expected = h.ui.requestedRange()
+            h.c.generate(); h.drain(); assertEquals(expected, h.ui.snapshot!!.range)
+            assertEquals(FactRecapPeriod.WEEK, expected.period)
+        }
+        FactRecapHarness().use { h ->
+            h.c.open(); val date = h.ui.date
+            h.c.input(date = date + "0", zone = "x".repeat(65))
+            h.c.input(date = date)
+            assertFalse(h.ui.dateRejected); assertTrue(h.ui.zoneRejected)
+            h.c.generate(); assertTrue(h.queue.isEmpty())
+            h.c.input(zone = "UTC"); h.c.generate(); h.drain(); assertNotNull(h.ui.snapshot)
+        }
+    }
+
     @Test fun defaultWeekIsCopiedOnOpenAndManualDayDoesNotChangeTheNextDefault():Unit=runBlocking {
         FactRecapHarness().use { h->
             val preferred=FactRecapPeriod.WEEK

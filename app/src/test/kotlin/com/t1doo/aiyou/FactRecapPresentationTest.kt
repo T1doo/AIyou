@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -138,6 +139,65 @@ class FactRecapPresentationTest {
         compose.onNodeWithTag("original-text").assertDoesNotExist();compose.runOnIdle {assertNull(f.local.value.factRecap!!.snapshot)}
         click("recap-generate");click("recap-cancel");drain();compose.runOnIdle {assertNull(f.local.value.factRecap!!.snapshot);assertFalse(f.local.value.factRecap!!.loading)}
         generate();click("recap-cancel");compose.onNodeWithTag("recap-excerpt:"+card.source.sourceId).assertDoesNotExist()
+        val originalRecords = f.records
+        val captures = File("build/reports/tests/testDebugUnitTest/recap-rejected-input").apply { mkdirs() }
+        val measurements = org.json.JSONArray()
+        for (badDate in listOf(true, false)) {
+            generate()
+            val before = checkNotNull(f.local.value.factRecap)
+            val tag = if (badDate) "recap-date" else "recap-zone"
+            val errorTag = if (badDate) "recap-date-rejected" else "recap-zone-rejected"
+            val raw = if (badDate) before.date + "0" else "x".repeat(65)
+            compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag(tag))
+            compose.onNodeWithTag(tag).performTextReplacement(raw)
+            // The supporting error grows this same field; verify scroll reachability, not automatic/first-screen placement.
+            compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag(tag))
+            val error = compose.onNodeWithTag(errorTag, useUnmergedTree = true)
+            error.assertIsDisplayed().assertTextContains("未接受", substring = true)
+            val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            error.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { assertTrue(it(layouts)) }
+            assertEquals(1, layouts.size); assertEquals(2f, layouts.single().layoutInput.density.fontScale, 0f)
+            assertFalse("The actual rejected-input explanation must remain readable", layouts.single().hasVisualOverflow)
+            val bounds = error.getUnclippedBoundsInRoot()
+            val viewport = compose.onNodeWithTag("recap-list").getUnclippedBoundsInRoot()
+            assertTrue("The complete error must stay within the visible list", bounds.top >= viewport.top && bounds.bottom <= viewport.bottom &&
+                bounds.left >= viewport.left && bounds.right <= viewport.right)
+            measurements.put(org.json.JSONObject().put("field", tag).put("fontScale", layouts.single().layoutInput.density.fontScale)
+                .put("hasVisualOverflow", layouts.single().hasVisualOverflow).put("lineCount", layouts.single().lineCount)
+                .put("top", bounds.top.value).put("bottom", bounds.bottom.value)
+                .put("viewportTop", viewport.top.value).put("viewportBottom", viewport.bottom.value))
+            File(captures, "layout.json").writeText(org.json.JSONObject().put("source_sha", System.getenv("GITHUB_SHA") ?: "local-unbound")
+                .put("kind", "Actual root TextLayout at provided fontScale2; unclipped dp bounds, not device or dynamic configuration evidence")
+                .put("fields", measurements).toString(2))
+            compose.runOnIdle {
+                val ui = checkNotNull(f.local.value.factRecap)
+                assertNull(ui.snapshot); assertFalse(ui.loading); assertTrue(f.queue.isEmpty())
+                assertEquals(badDate, ui.dateRejected); assertEquals(!badDate, ui.zoneRejected)
+                assertFalse(registry!!.performSave().toString().contains(raw))
+            }
+            val image = compose.onNodeWithTag("recap-list").captureToImage().asAndroidBitmap()
+            File(captures, if (badDate) "01-date-rejected-2x.png" else "02-zone-rejected-2x.png").outputStream().use {
+                assertTrue(image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+            }
+            click("recap-week")
+            val otherTag = if (badDate) "recap-zone" else "recap-date"
+            compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag(otherTag))
+            compose.onNodeWithTag(otherTag).performTextReplacement(if (badDate) "Asia/Shanghai" else "2026-10-16")
+            click("recap-cancel")
+            compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag("recap-generate"))
+            compose.onNodeWithTag("recap-generate").assertIsNotEnabled()
+            compose.runOnIdle {
+                f.c.generate() // Negative actor guard: a bypassed disabled button must still do no IO.
+                assertTrue(f.queue.isEmpty()); assertNull(f.local.value.factRecap!!.snapshot)
+                assertEquals(badDate, f.local.value.factRecap!!.dateRejected)
+                assertEquals(!badDate, f.local.value.factRecap!!.zoneRejected)
+            }
+            compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag(tag))
+            compose.onNodeWithTag(tag).performTextClearance().performTextInput(if (badDate) before.date else "UTC")
+            error.assertDoesNotExist()
+            generate()
+            compose.runOnIdle { assertNotNull(f.local.value.factRecap!!.snapshot); assertSame(originalRecords, f.records) }
+        }
     }
     @Test fun explicitWeekZoneEmptyResultPrivateSavedStateAndAccurateBackupSettings() {
         content();open();click("recap-week")
