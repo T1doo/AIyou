@@ -204,9 +204,38 @@ class CompanionSettingsPresentationTest {
         }
         assertFalse("Two explicit poses must render different bundled artwork", images[0].sameAs(images[1]))
         val retired = checkNotNull(actions)
-        compose.onNodeWithText("关闭陪伴面板").performClick()
-        frame()
-        compose.runOnIdle { retired.think(); retired.yawn(); assertEquals(0, writes) }
+        phase = "close"
+        fun closingSample(): org.json.JSONObject {
+            val sample = buttons()
+            val closeNodes = compose.onAllNodesWithText("关闭陪伴面板").fetchSemanticsNodes()
+            val bounds = org.json.JSONArray()
+            closeNodes.forEach { node -> bounds.put(org.json.JSONObject()
+                .put("disabled", node.config.contains(SemanticsProperties.Disabled))
+                .put("left", node.boundsInRoot.left).put("top", node.boundsInRoot.top)
+                .put("right", node.boundsInRoot.right).put("bottom", node.boundsInRoot.bottom)) }
+            return sample.put("close_nodes", closeNodes.size).put("close_bounds", bounds)
+                .put("artwork_nodes", compose.onAllNodesWithTag("companion-interaction-artwork").fetchSemanticsNodes().size)
+        }
+        val closeBefore = closingSample()
+        compose.runOnIdle { observe("before-click", closeBefore) }
+        compose.onNodeWithText("关闭陪伴面板").assertIsDisplayed().assertIsEnabled()
+            .assertHeightIsAtLeast(48.dp).performClick()
+        val closeAfter = closingSample()
+        compose.runOnIdle { observe("after-click", closeAfter) }
+        var removed = false
+        var closingFrames = 0
+        while (!removed && closingFrames < 4) {
+            frame(); closingFrames++
+            val sample = closingSample()
+            removed = sample.getInt("close_nodes") == 0 && sample.getInt("artwork_nodes") == 0 &&
+                (starts + "companion-quiet").all { sample.getJSONObject(it).getInt("count") == 0 }
+            compose.runOnIdle { observe("publication-$closingFrames", sample) }
+        }
+        assertTrue("Real close was not consumed within four frames: $trace", removed)
+        compose.onNodeWithText("关闭陪伴面板").assertDoesNotExist()
+        compose.onNodeWithContentDescription("此刻，想记下什么").assertTextEquals(local.text)
+        compose.runOnIdle { observe("before-retired-callbacks"); retired.think(); retired.yawn(); assertEquals(0, writes); observe("after-retired-callbacks") }
+        // Do not poll for recovery after a retired callback: it must leave the closed tree absent.
         compose.onNodeWithText("关闭陪伴面板").assertDoesNotExist()
         compose.onNodeWithContentDescription("此刻，想记下什么").assertTextEquals(local.text)
     }
