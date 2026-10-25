@@ -70,7 +70,9 @@ Original formal and old device workflows are unchanged.
 
 - One standard `ubuntu-24.04` job, hard limit **35 minutes**. The admission receipt
   gives setup/build/download/execution/cleanup a shared **1,920-second** monotonic
-  deadline with 120 seconds reserved for cleanup; checkout/action startup is also
+  deadline with separate 120-second evidence and 120-second cleanup reserves;
+  evidence is attempted before uninstall even after a failed instrumentation
+  shell, and the original failure remains a failure. Checkout/action startup is also
   bounded by the job limit. Device instrumentation receives at most 960 seconds
   of the remaining budget. No budget extension, retry or TCG fallback.
 - Existing JDK17, AGP9.4.1, wrapper/verification metadata, SDK Platform37.0 r2,

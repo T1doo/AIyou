@@ -100,6 +100,33 @@ class AdmissionTests(unittest.TestCase):
 
 
 class CleanupTests(unittest.TestCase):
+    def test_instrumentation_failure_collects_existing_evidence_before_cleanup_and_stays_failure(self):
+        entry = entry_module(); events = []; report = {}
+        png = b"\x89PNG\r\n\x1a\n" + b"\0\0\0\rIHDR" + (2).to_bytes(4, "big") * 2
+        original = TimeoutError("controlled shell timeout")
+        def instrument(): events.append("instrument"); raise original
+        def read(name, timeout):
+            self.assertLessEqual(timeout, 5); events.append("read:" + name)
+            if name == "junit.xml": raise FileNotFoundError("unfinished method")
+            return png if name.endswith(".png") else b"synthetic result"
+        def save(name, raw): events.append("save:" + name)
+        with self.assertRaises(TimeoutError) as caught:
+            try: entry.instrument_and_collect(instrument, read, save, 1000, report, clock=lambda: 100)
+            finally: events.append("cleanup")
+        self.assertIs(caught.exception, original)
+        self.assertEqual([s[5:] for s in events if s.startswith("read:")], list(FILES))
+        self.assertEqual(events[-2:], ["save:03-deleted.png", "cleanup"])
+        self.assertEqual(report["instrumentationFailure"], "TimeoutError")
+        self.assertEqual(report["missingEvidence"], [{"name": "junit.xml", "failureType": "FileNotFoundError"}])
+
+    def test_evidence_deadline_never_extends_and_partial_evidence_cannot_pass(self):
+        entry = entry_module(); report = {}; read = mock.Mock(); save = mock.Mock()
+        with self.assertRaisesRegex(RuntimeError, "Incomplete"):
+            entry.instrument_and_collect(lambda: "terminal", read, save, 200, report, clock=lambda: 100)
+        read.assert_not_called(); save.assert_not_called()
+        self.assertEqual(len(report["missingEvidence"]), 5)
+        self.assertTrue(all(x["failureType"] == "TimeoutError" for x in report["missingEvidence"]))
+
     def test_absent_package_has_no_mutation_and_replaced_apk_is_retained(self):
         entry = entry_module()
         for changed in (False, True):

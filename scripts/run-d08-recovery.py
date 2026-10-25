@@ -29,6 +29,8 @@ PROJECT = ROOT / "checks/device-recovery/android"
 REQUEST = ROOT / "checks/device-recovery/request.json"
 APK = ROOT / ".local-evidence/d08-fixed-apk/app-debug.apk"
 HARNESS_DIR = PROJECT / "build/outputs/apk/debug"
+COLLECT_SECONDS = 120
+CLEANUP_SECONDS = 120
 
 
 def load_driver():
@@ -144,6 +146,34 @@ def cleanup_package(command, adb, serial, package, expected_hash, prefix):
     after = command([adb, "-s", serial, "shell", "pm", "path", package], prefix + "-absent", require=False)
     if after.stdout.strip() or after.stderr.strip() or after.returncode not in (0, 1):
         raise RuntimeError("Owned package removal unconfirmed")
+
+
+def instrument_and_collect(instrument, read, save, deadline, report, clock=time.monotonic):
+    """Collect before caller cleanup, even after a failed/aborted shell command.
+    The original exception stays primary; partial evidence can never grant PASS.
+    No device retry and no deadline extension. Reader launch/stop gets a 20s margin.
+    """
+    original_error = None; terminal = ""
+    try: terminal = instrument()
+    except BaseException as error:
+        original_error = error
+        report["instrumentationFailure"] = type(error).__name__
+    files = {}; missing = []
+    collect_end = min(clock() + COLLECT_SECONDS, deadline - CLEANUP_SECONDS)
+    for name in FILES:
+        try:
+            timeout = min(5, collect_end - clock() - 20)
+            if timeout <= 0: raise TimeoutError("Evidence budget exhausted; no further read")
+            raw = read(name, timeout)
+            evidence_frame(name, raw)
+            save(name, raw)
+            files[name] = raw
+        except Exception as error:
+            missing.append({"name": name, "failureType": type(error).__name__})
+    report["missingEvidence"] = missing
+    if original_error is not None: raise original_error
+    if missing: raise RuntimeError("Incomplete real evidence; available files retained, no success")
+    return terminal, files
 
 
 def execute():
@@ -267,25 +297,22 @@ def execute():
         run([adb, "-s", serial, "push", APK, remote + "/app.apk"], "push-fixed-apk", env=env)
         probe_install_attempted = True
         run([adb, "-s", serial, "install", "-t", harness], "install-own-probe", env=env)
-        remaining = min(960, int(supervisor.deadline - time.monotonic() - 120))
+        # Keep the evidence window even when the instrumentation shell itself fails.
+        remaining = min(960, int(supervisor.deadline - time.monotonic() - CLEANUP_SECONDS - COLLECT_SECONDS - 20))
         if remaining < 60: raise RuntimeError("Insufficient remaining actual-device budget")
         app_creation_attempted = True
-        terminal = run([adb, "-s", serial, "shell", "am", "instrument", "-w", "-r", "-e", "run_token", token,
+        def instrument():
+            return run([adb, "-s", serial, "shell", "am", "instrument", "-w", "-r", "-e", "run_token", token,
                         "-e", "production_sha", SOURCE, "-e", "budget_ms", str(remaining * 1000),
                         PROBE + "/.RecoveryInstrumentation"], "actual-ui-instrumentation", env=env, timeout=remaining).stdout
-        files = {}; missing = []
-        for name in FILES:
-            try:
-                encoding = "base64" if name.endswith(".png") else "cat"
-                value = run([adb, "-s", serial, "exec-out", "run-as", PROBE, encoding, "files/evidence/" + name],
-                            "read-" + name, env=env).stdout
-                raw = base64.b64decode("".join(value.split()), validate=True) if encoding == "base64" else value.encode()
-                evidence_frame(name, raw); files[name] = raw
-                (output / name).write_bytes(raw); emit_probe(name, raw)
-            except Exception as e:
-                missing.append({"name": name, "failureType": type(e).__name__})
-        report["missingEvidence"] = missing
-        if missing: raise RuntimeError("Incomplete real evidence; available files retained, no success")
+        def read(name, timeout):
+            encoding = "base64" if name.endswith(".png") else "cat"
+            value = run([adb, "-s", serial, "exec-out", "run-as", PROBE, encoding, "files/evidence/" + name],
+                        "read-" + name, env=env, timeout=timeout, deadline_bound=False).stdout
+            return base64.b64decode("".join(value.split()), validate=True) if encoding == "base64" else value.encode()
+        def save(name, raw):
+            (output / name).write_bytes(raw); emit_probe(name, raw)
+        terminal, files = instrument_and_collect(instrument, read, save, supervisor.deadline, report)
         result = json.loads(files["result.json"])
         validate_device_result(terminal, result, files["junit.xml"], token)
         report.update(result="PASS: one actual synthetic SAF/new-install recovery, not D01/device-wide acceptance", probe=result,
