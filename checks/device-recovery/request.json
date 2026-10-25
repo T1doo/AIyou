@@ -1,6 +1,6 @@
 {
   "kind": "one-isolated-d08-saf-recovery",
-  "executionApproved": false,
+  "executionApproved": true,
   "productionSha": "958ab2a08536161d8a0776ef155b6368d7df09c6",
   "artifactRun": 40123738360,
   "artifactId": 12572840840,
