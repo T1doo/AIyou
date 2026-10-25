@@ -62,25 +62,86 @@ class CompanionSettingsPresentationTest {
         compose.runOnIdle { assertEquals(0f, motion, 0f) }
         compose.onNodeWithTag("companion-quiet").performScrollTo().assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(CompanionPose.Idle, observed.pose); assertEquals(CompanionPose.Idle, observed.feedback) }
+        for ((tag, text, pose) in listOf(
+            Triple("companion-think", "慢慢想，不着急。这只是陪伴动作。", CompanionPose.Thinking),
+            Triple("companion-yawn", "打个哈欠，歇一小会儿。", CompanionPose.Yawning))) {
+            compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertIsEnabled()
+                .assertHeightIsAtLeast(48.dp).performClick()
+            compose.onNodeWithText(text).performScrollTo().assertIsDisplayed()
+            compose.runOnIdle { assertEquals(pose, observed.feedback); assertEquals(0f, motion, 0f); assertEquals(0, writes) }
+            compose.onNodeWithTag("companion-quiet").performScrollTo().performClick()
+            compose.runOnIdle { assertNull(observed.run); assertEquals(CompanionPose.Idle, observed.feedback) }
+        }
         compose.onNodeWithTag("companion-encourage").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
         compose.onNodeWithText("按自己的节奏来，小小一步也很好。").performScrollTo().assertIsDisplayed()
         val retired = checkNotNull(callbacks)
         compose.onNodeWithText("关闭陪伴面板").assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
         compose.onNodeWithContentDescription("打开陪伴伙伴").performClick()
         compose.runOnIdle {
-            retired.greet(); retired.encourage(); retired.quiet(); retired.close()
+            retired.greet(); retired.encourage(); retired.think(); retired.yawn(); retired.quiet(); retired.close()
             assertEquals(CompanionPose.Idle, observed.feedback); assertEquals(0, writes)
         }
         compose.onNodeWithText("关闭陪伴面板").assertIsDisplayed()
         val hidden = checkNotNull(callbacks)
         compose.runOnIdle { display.value = display.value.copy(preferences = display.value.preferences.copy(showCompanion = false)) }
         compose.onNodeWithText("关闭陪伴面板").assertDoesNotExist()
-        compose.runOnIdle { hidden.greet(); hidden.encourage(); hidden.close() }
+        compose.runOnIdle { hidden.greet(); hidden.encourage(); hidden.think(); hidden.yawn(); hidden.close() }
         compose.onNodeWithContentDescription("打开陪伴伙伴").assertDoesNotExist()
         compose.runOnIdle { display.value = display.value.copy(preferences = display.value.preferences.copy(showCompanion = true)) }
         compose.onNodeWithText("关闭陪伴面板").assertDoesNotExist()
         compose.onNodeWithContentDescription("此刻，想记下什么").assertTextEquals(local.text)
         compose.runOnIdle { assertEquals(0, writes) }
+    }
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun thinkingAndYawningUseDistinctLocalArtworkAndCancelWithoutRecordSideEffects() {
+        var observed = CompanionInteraction.Snapshot()
+        var motion = 0f
+        var actions: CompanionDialogActions? = null
+        var writes = 0
+        val display = mutableStateOf(UiPreferencesState(UiPreferences(reduceMotion = true), ready = true))
+        val local = LocalRecordUiState(ready = true, opening = false, text = "合成动作前草稿")
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CompositionLocalProvider(LocalCompanionInteractionObserver provides { state, value, callbacks ->
+                observed = state; motion = value; actions = callbacks
+            }) { AIyouTheme { AIyouApp(local = local, display = display.value, onSave = { writes++ }) } }
+        }
+        fun frame() { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
+        compose.onNodeWithContentDescription("打开陪伴伙伴").performClick()
+        repeat(2) { frame() }
+        val images = mutableListOf<android.graphics.Bitmap>()
+        val output = java.io.File("build/reports/companion-motion/extra-poses").apply { mkdirs() }
+        for ((tag, pose) in listOf("companion-think" to CompanionPose.Thinking, "companion-yawn" to CompanionPose.Yawning)) {
+            compose.onNodeWithTag(tag).performScrollTo()
+            frame()
+            compose.onNodeWithTag(tag).assertIsDisplayed().assertIsEnabled().assertHeightIsAtLeast(48.dp).performClick()
+            frame()
+            compose.runOnIdle {
+                assertEquals(pose, observed.pose); assertNotNull(observed.run); assertEquals(0f, motion, 0f)
+                assertEquals(0, writes)
+            }
+            compose.onNodeWithTag("companion-artwork-fallback").assertDoesNotExist()
+            compose.onNodeWithTag("companion-interaction-artwork").performScrollTo()
+            frame()
+            val bitmap = compose.onNodeWithTag("companion-interaction-artwork").captureToImage().asAndroidBitmap()
+            images += bitmap
+            java.io.File(output, "$tag.png").outputStream().use {
+                assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+            }
+            compose.onNodeWithTag("companion-quiet").performScrollTo()
+            frame()
+            compose.onNodeWithTag("companion-quiet").assertIsDisplayed().performClick()
+            frame()
+            compose.runOnIdle { assertNull(observed.run); assertEquals(CompanionPose.Idle, observed.pose); assertEquals(0f, motion, 0f) }
+        }
+        assertFalse("Two explicit poses must render different bundled artwork", images[0].sameAs(images[1]))
+        val retired = checkNotNull(actions)
+        compose.onNodeWithText("关闭陪伴面板").performClick()
+        frame()
+        compose.runOnIdle { retired.think(); retired.yawn(); assertEquals(0, writes) }
+        compose.onNodeWithText("关闭陪伴面板").assertDoesNotExist()
+        compose.onNodeWithContentDescription("此刻，想记下什么").assertTextEquals(local.text)
     }
 
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)

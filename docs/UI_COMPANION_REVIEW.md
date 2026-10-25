@@ -1,5 +1,25 @@
 # Production interface and optional local companion
 
+## Additional explicit local poses — 2026-10-25
+
+The existing panel now also offers “一起想一想” and “打个哈欠”, using the
+unchanged, reference-based `lulu_think.png` and `lulu_yawn.png` originals listed
+in [artwork provenance](../assets/IP_USAGE.md). These are local companion
+actions, never model-processing indicators or inferences from private records.
+The existing finite-run ownership, quiet cancellation, reduced-motion,
+background, power-save and close/owner retirement rules are reused. No record,
+task, network, storage or permission capability is added. The bitmap cache has
+five fixed poses, decoded lazily at 627px, bounded to about 7.5 MiB per consumer.
+
+The existing pure state tests exercise both new poses, busy-action rejection,
+background cancellation and stale completion/retired-panel isolation. The UI
+gate additionally requires real button clicks, distinct native bitmap captures,
+zero reduced-motion transforms, quiet/close cancellation and an unchanged
+capture draft with zero saves. The new method and all original methods remain
+mandatory. Its captures are controlled Compose/Robolectric evidence, not device
+animation, TalkBack or a physical system-font test. Android execution and the
+new captures are pending until the candidate's formal CI actually runs.
+
 ## Current two-action slice — 2026-10-23
 
 Tested source: `f55f5fb8b4693c75725f2804281e2fe9a5b0af45`.

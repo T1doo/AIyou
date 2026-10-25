@@ -514,6 +514,7 @@ for label, folder, minimum in targets:
             "failedWriteKeepsConfirmedValuesAndRetryPersistsTheRequestedChoice",
             "corruptPreferencesArePreservedAndNeverFlashTheCompanion")
         additional["com.t1doo.aiyou.CompanionSettingsPresentationTest"] = (
+            "thinkingAndYawningUseDistinctLocalArtworkAndCancelWithoutRecordSideEffects",
             "explicitDoubleFontInteractionsCancelAndRetireWithoutWritingOrReopeningThePanel",
             "finiteInteractionMotionStopsOnReductionAndBackgroundWithoutAutomaticReplay",
             "captureDefaultHasExplicitLocalChoicesAndRetiredOrUnconfirmedActionsCannotChangeIt",

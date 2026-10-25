@@ -67,7 +67,8 @@ import kotlinx.coroutines.delay
 internal val LocalCompanionObserver = staticCompositionLocalOf<((MascotState, Float) -> Unit)?> { null }
 
 internal data class CompanionDialogActions(val greet: () -> Unit, val encourage: () -> Unit,
-                                         val quiet: () -> Unit, val close: () -> Unit)
+                                         val quiet: () -> Unit, val close: () -> Unit,
+                                         val think: () -> Unit, val yawn: () -> Unit)
 internal val LocalCompanionInteractionObserver = staticCompositionLocalOf<
     ((CompanionInteraction.Snapshot, Float, CompanionDialogActions) -> Unit)?> { null }
 
@@ -147,7 +148,8 @@ fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotA
         CompanionDialogActions({ act(CompanionPose.Greeting) }, { act(CompanionPose.Encouraging) }, {
             interaction.foreground(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
             ui = interaction.quiet()
-        }, { if (interaction.retire()) currentClose() })
+        }, { if (interaction.retire()) currentClose() },
+            { act(CompanionPose.Thinking) }, { act(CompanionPose.Yawning) })
     }
     DisposableEffect(interaction, lifecycle) {
         fun update() { ui = interaction.foreground(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
@@ -180,13 +182,20 @@ fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotA
             Column(Modifier.testTag("companion-scroll").verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
                 val poseAvailable = assets.interactionArtwork(ui.pose, Modifier.size(112.dp).testTag("companion-interaction-artwork"), Modifier.graphicsLayer {
-                    if (ui.pose == CompanionPose.Greeting) rotationZ = motion * 6f
-                    else { translationY = -motion * 4.dp.toPx(); scaleX = 1f + motion * .04f; scaleY = scaleX }
+                    when (ui.pose) {
+                        CompanionPose.Greeting -> rotationZ = motion * 6f
+                        CompanionPose.Encouraging -> { translationY = -motion * 4.dp.toPx(); scaleX = 1f + motion * .04f; scaleY = scaleX }
+                        CompanionPose.Thinking -> rotationZ = -motion * 3f
+                        CompanionPose.Yawning -> { translationY = motion * 2.dp.toPx(); scaleX = 1f - motion * .02f; scaleY = scaleX }
+                        CompanionPose.Idle -> Unit
+                    }
                 })
                 Text(when (ui.feedback) {
                     CompanionPose.Greeting -> "你好，慢慢记录就好。"
                     CompanionPose.Encouraging -> "按自己的节奏来，小小一步也很好。"
                     CompanionPose.Idle -> "想记就记，停一会儿也很好。"
+                    CompanionPose.Thinking -> "慢慢想，不着急。这只是陪伴动作。"
+                    CompanionPose.Yawning -> "打个哈欠，歇一小会儿。"
                 }, Modifier.testTag("companion-feedback").semantics { liveRegion = LiveRegionMode.Polite },
                     style = MaterialTheme.typography.bodyLarge)
                 Text("本地小互动，不读取或修改你的记录。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
@@ -197,6 +206,10 @@ fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotA
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-greet")) { Text("打个招呼") }
                 OutlinedButton(onClick = actions.encourage, enabled = ui.foreground && ui.run == null && !ui.retired,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-encourage")) { Text("给我一点鼓励") }
+                OutlinedButton(onClick = actions.think, enabled = ui.foreground && ui.run == null && !ui.retired,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-think")) { Text("一起想一想") }
+                OutlinedButton(onClick = actions.yawn, enabled = ui.foreground && ui.run == null && !ui.retired,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-yawn")) { Text("打个哈欠") }
                 TextButton(onClick = actions.quiet, enabled = ui.foreground && !ui.retired,
                     modifier = Modifier.heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-quiet")) { Text("安静陪伴") }
             }

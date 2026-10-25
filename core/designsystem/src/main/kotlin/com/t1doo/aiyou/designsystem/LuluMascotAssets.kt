@@ -29,7 +29,7 @@ object LuluMascotAssets : MascotAssetProvider {
                          actionModifier: Modifier = Modifier): Boolean {
         val resources = LocalResources.current
         val configuration = LocalConfiguration.current
-        // Three fixed 1254px sources, decoded lazily at627px: at most about4.5MiB
+        // Five fixed 1254px sources, decoded lazily at627px: at most about7.5MiB
         // per mounted consumer. No network or repeated decode on each animation frame.
         val decoded = remember(resources, configuration) { mutableMapOf<CompanionPose, ImageBitmap?>() }
         fun bitmapFor(requested: CompanionPose): ImageBitmap? {
@@ -38,6 +38,8 @@ object LuluMascotAssets : MascotAssetProvider {
                     CompanionPose.Idle -> R.drawable.lulu_hello
                     CompanionPose.Greeting -> R.drawable.lulu_wave
                     CompanionPose.Encouraging -> R.drawable.lulu_encourage
+                    CompanionPose.Thinking -> R.drawable.lulu_think
+                    CompanionPose.Yawning -> R.drawable.lulu_yawn
                 }
                 decoded[requested] = BitmapFactory.decodeResource(resources, resource,
                     BitmapFactory.Options().apply { inSampleSize = 2; inScaled = false })?.asImageBitmap()

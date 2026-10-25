@@ -21,6 +21,14 @@ class CompanionInteractionTest {
         assertEquals(CompanionPose.Idle, panel.finish(run).pose)
         assertEquals(CompanionPose.Greeting, panel.snapshot.feedback)
         assertEquals(CompanionPose.Encouraging, panel.start(CompanionPose.Encouraging).pose)
+        for (pose in listOf(CompanionPose.Thinking, CompanionPose.Yawning)) {
+            panel.quiet()
+            val action = checkNotNull(panel.start(pose).run)
+            assertEquals(pose, panel.snapshot.pose)
+            assertSame(action, panel.start(CompanionPose.Greeting).run)
+            assertEquals(CompanionPose.Idle, panel.finish(action).pose)
+            assertEquals(pose, panel.snapshot.feedback)
+        }
     }
 
     @Test fun quietCancelsAndOldCompletionCannotFinishTheNextExplicitAction() {
@@ -74,5 +82,15 @@ class CompanionInteractionTest {
         assertNull(failure.get())
         assertEquals(CompanionInteraction.Snapshot(retired = true), old.snapshot)
         assertSame(freshRun, fresh.snapshot.run)
+        for (pose in listOf(CompanionPose.Thinking, CompanionPose.Yawning)) {
+            fresh.quiet()
+            val action = checkNotNull(fresh.start(pose).run)
+            fresh.foreground(false)
+            assertNull(fresh.foreground(true).run)
+            val replacement = checkNotNull(fresh.start(pose).run)
+            assertSame(replacement, fresh.finish(action).run)
+            old.start(pose)
+            assertEquals(CompanionInteraction.Snapshot(retired = true), old.snapshot)
+        }
     }
 }
