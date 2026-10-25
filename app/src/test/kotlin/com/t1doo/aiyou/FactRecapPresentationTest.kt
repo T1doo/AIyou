@@ -193,7 +193,8 @@ class FactRecapPresentationTest {
                 assertEquals(!badDate, f.local.value.factRecap!!.zoneRejected)
             }
             compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag(tag))
-            compose.onNodeWithTag(tag).performTextClearance().performTextInput(if (badDate) before.date else "UTC")
+            compose.onNodeWithTag(tag).performTextClearance()
+            compose.onNodeWithTag(tag).performTextInput(if (badDate) before.date else "UTC")
             error.assertDoesNotExist()
             generate()
             compose.runOnIdle { assertNotNull(f.local.value.factRecap!!.snapshot); assertSame(originalRecords, f.records) }
