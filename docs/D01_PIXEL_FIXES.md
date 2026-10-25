@@ -52,3 +52,27 @@ Library组件ZIP正常materialize失败；单张原图
 Scaffold的padding和consumeWindowInsets；没有滚动到底/键盘交互执行证据，
 不能单凭首屏定为遮挡。完整只读核对保存在交付证据d01-scroll-insets-readonly.md。
 设备、滚动、IME、性能与TalkBack仍NOT RUN。
+
+## 2026-10-25：回忆筛选标题的自然宽度与语义宽度
+
+后续维护使用真实 AIyouApp 路径及合成原文，不改变以上历史证据。
+固定单方法诊断 [40181858471](https://github.com/T1doo/AIyou/actions/runs/40181858471)
+在634c7aa15dad188d29bbf5d4a9e9dded9ee62067执行1例、1失败：
+标题实际布局140×41px，语义段落232×41px，仅宽溢出；首图文字完整。
+精确Compose1.12.1源码中，绘制段落按自然宽度收缩，语义接口用父级最大约束
+重建MultiParagraph并配原layoutSize，因此原hasVisualOverflow硬门比较140<232。
+该证据不表示字形实际被裁切，也不推断未采样的内部缓存分支。
+
+d711fc9b07892631057d25107cbfd26f4b960bed仅为标题与状态Text增加
+width(IntrinsicSize.Max)，保留父约束、字号、文字、节点、按钮和全部原断言。
+复验 [40182564077](https://github.com/T1doo/AIyou/actions/runs/40182564077)
+绑定0b830ef80cb66f38512ade82998c0a0bf1284280，attempt1，实际1例通过、零失败/错误/跳过。
+两次独立测量均为BROWSE、fontScale2、queries0、140×41px布局及140×41px段落，
+宽高溢出均false；真实键盘展开后像素由“展开”变为“收起”，原owner及输入断言完成。
+首帧与修前红图逐字节相同；这次修复消除语义度量差异，没有伪造新的字形改善。
+
+[原始XML、日志与两帧PNG/JSON](https://github.com/T1doo/AIyou/actions/runs/40182564077/artifacts/12595255189)
+ZIP为120337B，SHA256为17fb4a6240b2f70782944cc6c19616a338f407ac00d56f898431cb508dae429e。
+图片是滚动至筛选入口后的200%状态对照，不是三尺寸首屏或真机验收；
+展开内容在当前视口下方，不能凭截图声称全部筛选同时可见。
+本记录提交时，仅上述单方法复验通过；完整正式三路仍待本提交实际运行。
