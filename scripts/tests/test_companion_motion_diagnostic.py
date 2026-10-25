@@ -184,7 +184,8 @@ class CompanionDiagnosticTests(unittest.TestCase):
                     "github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && "
                     "github.event.head_commit.message == '[ui-companion-probe] b438 actual button publication'")
         self.assertEqual(5, workflow.count(selector))
-        self.assertEqual(3, workflow.count('    if: ${{ !(' + selector + ') }}'))
+        heading = selector.replace('[ui-companion-probe] b438 actual button publication', '[ui-heading-probe] 1b25 settled disclosure overflow')
+        self.assertEqual(3, workflow.count('    if: ${{ !((' + selector + ') || (' + heading + ')) }}'))
         self.assertEqual(1, workflow.count('    if: ${{ ' + selector + ' }}'))
         self.assertTrue(workflow.splitlines()[1].startswith('run-name: ${{ ' + selector + ' && '))
         self.assertNotIn('startsWith(', workflow)
@@ -192,7 +193,7 @@ class CompanionDiagnosticTests(unittest.TestCase):
 
     def test_diagnostic_keeps_all_current_schema_guards_and_fixed_target(self):
         workflow = (ROOT / '.github/workflows/android.yml').read_text()
-        diagnostic = workflow.split('\n  companion-motion-diagnostic:\n', 1)[1]
+        diagnostic = workflow.split('\n  companion-motion-diagnostic:\n', 1)[1].split('\n  memory-heading-diagnostic:\n', 1)[0]
         import re
         expected = set(re.findall(r'python3 scripts/verify-([a-z-]+)-schema.py --capture', self.formal_workflow()))
         loops = re.findall(r'for kind in ([a-z -]+); do', diagnostic)
