@@ -18,6 +18,13 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
+import android.graphics.Bitmap
+import java.io.File
+import org.json.JSONObject
+import org.robolectric.annotation.GraphicsMode
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalDensity
@@ -89,6 +96,7 @@ class LocalOriginalSearchPresentationTest {
     @get:Rule val compose = createComposeRule()
     @Test
     @Config(sdk = [35], qualifiers = "w320dp-h640dp")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun emptyAdvancedFiltersUseRealKeyboardDisclosureWithoutQueryOrInputReplacement() {
         val state = local(entry("one", "合成浏览原文"))
         val port = UiSearchPort { state.value }
@@ -105,12 +113,32 @@ class LocalOriginalSearchPresentationTest {
         val viewport = compose.onNode(hasScrollToIndexAction()).getUnclippedBoundsInRoot()
         assertTrue(bounds.height >= 48.dp && bounds.width >= 48.dp)
         assertTrue(bounds.left >= viewport.left && bounds.right <= viewport.right && bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
+        val headingLayouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText("筛选与范围", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { assertTrue(it(headingLayouts)) }
+        assertEquals(1, headingLayouts.single().lineCount)
+        assertFalse(headingLayouts.single().hasVisualOverflow)
+        fun frame(name: String) {
+            assertEquals(OriginalSearchStage.BROWSE, observations.get().state.stage)
+            assertEquals(0, port.queries.get())
+            val directory = File("build/reports/tests/testDebugUnitTest/original-search-disclosure").apply { mkdirs() }
+            val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+            File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            File(directory, "$name.json").writeText(JSONObject()
+                .put("source_sha", System.getenv("GITHUB_SHA") ?: "local-not-CI")
+                .put("stage", observations.get().state.stage.name)
+                .put("disclosure", disclosure.fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+                .put("queries", port.queries.get()).put("fontScale", headingLayouts.single().layoutInput.density.fontScale)
+                .toString(2))
+        }
+        frame("01-browse-collapsed-double-font")
         compose.runOnIdle { assertTrue(checkNotNull(actualView.get()).requestFocusFromTouch()) }
         compose.waitForIdle()
         disclosure.performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
         disclosure.assertIsFocused().performKeyInput { pressKey(Key.Enter) }
         compose.onNodeWithTag("original-search-from").assertExists()
         assertEquals("已展开", disclosure.fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+        frame("02-browse-expanded-double-font")
         disclosure.performClick()
         compose.onAllNodes(hasTestTag("original-search-from")).assertCountEquals(0)
         compose.runOnIdle {

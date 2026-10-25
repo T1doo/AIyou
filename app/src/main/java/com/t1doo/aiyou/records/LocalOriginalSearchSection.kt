@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -148,8 +149,12 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget)
                     .aiyouFocusOutline().testTag("original-search-filters")
                     .semantics { stateDescription = if (showFilters) "已展开" else "已收起" }) {
-                Text(if (keepFiltersVisible) "筛选与范围 · 已展开" else if (showFilters) "筛选与范围 · 收起" else "筛选与范围 · 展开",
-                    modifier = Modifier.fillMaxWidth().semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = AIyouColors.primary)
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                    Text("筛选与范围", modifier = Modifier.semantics { heading() },
+                        style = MaterialTheme.typography.titleMedium, color = AIyouColors.primary)
+                    Text(if (keepFiltersVisible) "已展开" else if (showFilters) "收起" else "展开",
+                        style = MaterialTheme.typography.titleMedium, color = AIyouColors.primary)
+                }
             }
             if (!showFilters) Text("日期 · 人物 · 标签 · 收藏 · 图片", style = MaterialTheme.typography.bodySmall,
                 color = AIyouColors.textSecondary)
