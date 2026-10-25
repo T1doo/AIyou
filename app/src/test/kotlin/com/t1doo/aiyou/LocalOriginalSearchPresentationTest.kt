@@ -113,25 +113,38 @@ class LocalOriginalSearchPresentationTest {
         val viewport = compose.onNode(hasScrollToIndexAction()).getUnclippedBoundsInRoot()
         assertTrue(bounds.height >= 48.dp && bounds.width >= 48.dp)
         assertTrue(bounds.left >= viewport.left && bounds.right <= viewport.right && bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
-        val headingLayouts = mutableListOf<TextLayoutResult>()
-        compose.onNodeWithText("筛选与范围", useUnmergedTree = true)
-            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { assertTrue(it(headingLayouts)) }
-        assertEquals(1, headingLayouts.single().lineCount)
-        assertFalse(headingLayouts.single().hasVisualOverflow)
-        fun frame(name: String) {
+        fun frame(name: String): TextLayoutResult {
             assertEquals(OriginalSearchStage.BROWSE, observations.get().state.stage)
             assertEquals(0, port.queries.get())
             val directory = File("build/reports/tests/testDebugUnitTest/original-search-disclosure").apply { mkdirs() }
-            val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
-            File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            val headingLayouts = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText("筛选与范围", useUnmergedTree = true)
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { assertTrue(it(headingLayouts)) }
+            val heading = headingLayouts.single()
             File(directory, "$name.json").writeText(JSONObject()
                 .put("source_sha", System.getenv("GITHUB_SHA") ?: "local-not-CI")
                 .put("stage", observations.get().state.stage.name)
                 .put("disclosure", disclosure.fetchSemanticsNode().config[SemanticsProperties.StateDescription])
-                .put("queries", port.queries.get()).put("fontScale", headingLayouts.single().layoutInput.density.fontScale)
+                .put("queries", port.queries.get()).put("fontScale", heading.layoutInput.density.fontScale)
+                .put("headingSizePx", heading.size.toString())
+                .put("headingConstraints", heading.layoutInput.constraints.toString())
+                .put("headingParagraphWidthPx", heading.multiParagraph.width)
+                .put("headingParagraphHeightPx", heading.multiParagraph.height)
+                .put("headingLineCount", heading.lineCount)
+                .put("headingWidthOverflow", heading.didOverflowWidth)
+                .put("headingHeightOverflow", heading.didOverflowHeight)
+                .put("headingBoundsDp", compose.onNodeWithText("筛选与范围", useUnmergedTree = true).getUnclippedBoundsInRoot().toString())
+                .put("disclosureBoundsDp", disclosure.getUnclippedBoundsInRoot().toString())
                 .toString(2))
+            val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+            File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            return heading
         }
-        frame("01-browse-collapsed-double-font")
+        val heading = frame("01-browse-collapsed-double-font")
+        assertEquals(1, heading.lineCount)
+        assertFalse("Heading size=${heading.size}, paragraph=${heading.multiParagraph.width}x${heading.multiParagraph.height}, " +
+            "constraints=${heading.layoutInput.constraints}, widthOverflow=${heading.didOverflowWidth}, heightOverflow=${heading.didOverflowHeight}",
+            heading.hasVisualOverflow)
         compose.runOnIdle { assertTrue(checkNotNull(actualView.get()).requestFocusFromTouch()) }
         compose.waitForIdle()
         disclosure.performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
