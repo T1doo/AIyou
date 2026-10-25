@@ -12,11 +12,11 @@ import time
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
-PRODUCTION = '1b25e2e0fef9037304cef89a96de63bdac03628f'
+PRODUCTION = 'd711fc9b07892631057d25107cbfd26f4b960bed'
 TEST_OWNER = 'a3ecad2d565663d8b0ab636c33e1ff42e89ac9e2'
 SOURCE = 'app/src/test/kotlin/com/t1doo/aiyou/LocalOriginalSearchPresentationTest.kt'
 TEST_SHA256 = 'e8527848704841f039b9a47896869731af66f8030fb00c738237c2037c36fdd3'
-MESSAGE = '[ui-heading-probe] 1b25 settled disclosure overflow'
+MESSAGE = '[ui-heading-probe] d711 bounded intrinsic disclosure'
 REF = 'refs/heads/codex/d03-short-audio-design-20261020'
 CLASS = 'com.t1doo.aiyou.LocalOriginalSearchPresentationTest'
 METHOD = 'emptyAdvancedFiltersUseRealKeyboardDisclosureWithoutQueryOrInputReplacement'

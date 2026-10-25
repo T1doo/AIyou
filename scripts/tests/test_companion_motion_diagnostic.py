@@ -184,7 +184,7 @@ class CompanionDiagnosticTests(unittest.TestCase):
                     "github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && "
                     "github.event.head_commit.message == '[ui-companion-probe] b438 actual button publication'")
         self.assertEqual(5, workflow.count(selector))
-        heading = selector.replace('[ui-companion-probe] b438 actual button publication', '[ui-heading-probe] 1b25 settled disclosure overflow')
+        heading = selector.replace('[ui-companion-probe] b438 actual button publication', '[ui-heading-probe] d711 bounded intrinsic disclosure')
         self.assertEqual(3, workflow.count('    if: ${{ !((' + selector + ') || (' + heading + ')) }}'))
         self.assertEqual(1, workflow.count('    if: ${{ ' + selector + ' }}'))
         self.assertTrue(workflow.splitlines()[1].startswith('run-name: ${{ ' + selector + ' && '))
