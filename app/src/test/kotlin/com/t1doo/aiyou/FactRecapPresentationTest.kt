@@ -180,10 +180,22 @@ class FactRecapPresentationTest {
                 assertTrue(image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
             }
             click("recap-week")
+            compose.runOnIdle {
+                assertEquals("Period selection cannot confirm a rejected date", badDate, f.local.value.factRecap!!.dateRejected)
+                assertEquals("Period selection cannot confirm a rejected zone", !badDate, f.local.value.factRecap!!.zoneRejected)
+            }
             val otherTag = if (badDate) "recap-zone" else "recap-date"
             compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag(otherTag))
             compose.onNodeWithTag(otherTag).performTextReplacement(if (badDate) "Asia/Shanghai" else "2026-10-16")
+            compose.runOnIdle {
+                assertEquals("Other-field input cannot confirm a rejected date", badDate, f.local.value.factRecap!!.dateRejected)
+                assertEquals("Other-field input cannot confirm a rejected zone", !badDate, f.local.value.factRecap!!.zoneRejected)
+            }
             click("recap-cancel")
+            compose.runOnIdle {
+                assertEquals("Cancel cannot confirm a rejected date", badDate, f.local.value.factRecap!!.dateRejected)
+                assertEquals("Cancel cannot confirm a rejected zone", !badDate, f.local.value.factRecap!!.zoneRejected)
+            }
             compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag("recap-generate"))
             compose.onNodeWithTag("recap-generate").assertIsNotEnabled()
             compose.runOnIdle {

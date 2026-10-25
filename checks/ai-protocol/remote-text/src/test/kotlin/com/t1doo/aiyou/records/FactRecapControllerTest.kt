@@ -12,6 +12,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class FactRecapControllerTest {
+    @Test fun displayedValueFeedbackCannotConfirmARejectedRange():Unit=runBlocking {
+        for (badDate in listOf(true, false)) FactRecapHarness().use { h ->
+            h.c.open(); val date = h.ui.date; val zone = h.ui.zone
+            if (badDate) h.c.input(date = date + "0") else h.c.input(zone = "x".repeat(65))
+            // Losing focus can return the bounded value still displayed by the field.
+            // It is not evidence that the user corrected the rejected attempt.
+            h.c.input(date = date, zone = zone, period = FactRecapPeriod.WEEK)
+            h.c.cancel(); h.c.generate()
+            assertEquals(badDate, h.ui.dateRejected); assertEquals(!badDate, h.ui.zoneRejected)
+            assertThrows(Exception::class.java) { h.ui.requestedRange() }
+            assertTrue(h.queue.isEmpty()); assertNull(h.ui.snapshot); assertFalse(h.ui.loading)
+            if (badDate) { h.c.input(date = ""); h.c.input(date = date) }
+            else { h.c.input(zone = ""); h.c.input(zone = zone) }
+            h.c.generate(); h.drain(); assertNotNull(h.ui.snapshot)
+        }
+    }
+
     @Test fun rejectedOversizedRangeHidesPriorRecapAndCannotReuseItsSourceOrGenerateOldRange():Unit=runBlocking {
         for (badDate in listOf(true, false)) FactRecapHarness().use { h ->
             h.c.open(); h.c.generate(); h.drain()
@@ -54,7 +71,8 @@ class FactRecapControllerTest {
             assertTrue(h.queue.isEmpty()); assertFalse(h.ui.loading); assertNull(h.ui.snapshot)
             assertEquals(badDate, h.ui.dateRejected); assertEquals(!badDate, h.ui.zoneRejected)
             assertTrue(h.ui.date.length <= 10); assertTrue(h.ui.zone.length <= 64)
-            if (badDate) h.c.input(date = date) else h.c.input(zone = "UTC")
+            if (badDate) { h.c.input(date = ""); h.c.input(date = date) }
+            else { h.c.input(zone = ""); h.c.input(zone = "UTC") }
             val expected = h.ui.requestedRange()
             h.c.generate(); h.drain(); assertEquals(expected, h.ui.snapshot!!.range)
             assertEquals(FactRecapPeriod.WEEK, expected.period)
@@ -62,10 +80,10 @@ class FactRecapControllerTest {
         FactRecapHarness().use { h ->
             h.c.open(); val date = h.ui.date
             h.c.input(date = date + "0", zone = "x".repeat(65))
-            h.c.input(date = date)
+            h.c.input(date = ""); h.c.input(date = date)
             assertFalse(h.ui.dateRejected); assertTrue(h.ui.zoneRejected)
             h.c.generate(); assertTrue(h.queue.isEmpty())
-            h.c.input(zone = "UTC"); h.c.generate(); h.drain(); assertNotNull(h.ui.snapshot)
+            h.c.input(zone = ""); h.c.input(zone = "UTC"); h.c.generate(); h.drain(); assertNotNull(h.ui.snapshot)
         }
     }
 

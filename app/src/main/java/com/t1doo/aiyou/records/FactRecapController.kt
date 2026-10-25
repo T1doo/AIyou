@@ -39,8 +39,10 @@ class FactRecapController internal constructor(private val current: ()->LocalRec
         val u=ui() ?: return
         // Rejected edits also retire the old range and any queued result. Never retain the raw oversized text.
         // Omitted fields are untouched: switching period or editing the other field cannot clear a rejection.
-        val rejectedDate=if(date==null)u.dateRejected else date.length>10
-        val rejectedZone=if(zone==null)u.zoneRejected else zone.length>64
+        // String fields may echo their displayed value on focus/composition changes.
+        // An unchanged bounded value cannot confirm a rejected edit; require actual editing first.
+        val rejectedDate=if(date==null || u.dateRejected && date==u.date)u.dateRejected else date.length>10
+        val rejectedZone=if(zone==null || u.zoneRejected && zone==u.zone)u.zoneRejected else zone.length>64
         generation.incrementAndGet();change { it.copy(
             date=if(date==null || rejectedDate)it.date else date,
             zone=if(zone==null || rejectedZone)it.zone else zone,period=period ?: it.period,
