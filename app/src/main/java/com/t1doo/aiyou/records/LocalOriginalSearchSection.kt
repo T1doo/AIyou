@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.TextFieldLineLimits
@@ -150,9 +152,10 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                     .aiyouFocusOutline().testTag("original-search-filters")
                     .semantics { stateDescription = if (showFilters) "已展开" else "已收起" }) {
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                    Text("筛选与范围", modifier = Modifier.semantics { heading() },
+                    Text("筛选与范围", modifier = Modifier.width(IntrinsicSize.Max).semantics { heading() },
                         style = MaterialTheme.typography.titleMedium, color = AIyouColors.primary)
                     Text(if (keepFiltersVisible) "已展开" else if (showFilters) "收起" else "展开",
+                        modifier = Modifier.width(IntrinsicSize.Max),
                         style = MaterialTheme.typography.titleMedium, color = AIyouColors.primary)
                 }
             }
