@@ -10,6 +10,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
@@ -425,6 +426,16 @@ class CompanionSettingsPresentationTest {
                     onDisplayChange = { changes++ }, onRetryDisplay = { retries++ }) }
             }
         }
+        val companion = compose.onNodeWithTag("companion-switch").performScrollTo().assertIsDisplayed()
+        val title = compose.onNodeWithText("显示陪伴伙伴", useUnmergedTree = true)
+        val layouts = mutableListOf<TextLayoutResult>()
+        title.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { assertTrue(it(layouts)) }
+        assertEquals("Large-font switch title must not leave its final character on a separate line", 1, layouts.single().lineCount)
+        assertFalse(layouts.single().hasVisualOverflow)
+        val titleBounds = title.getUnclippedBoundsInRoot()
+        val companionBounds = companion.getUnclippedBoundsInRoot()
+        assertTrue(titleBounds.left >= companionBounds.left && titleBounds.right <= companionBounds.right &&
+            titleBounds.top >= companionBounds.top && titleBounds.bottom <= companionBounds.bottom)
         val toggle = compose.onNodeWithTag("motion-switch").performScrollTo().assertIsDisplayed()
         val bounds = toggle.getUnclippedBoundsInRoot()
         assertTrue(bounds.height >= 48.dp && bounds.width >= 48.dp)

@@ -34,6 +34,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -222,15 +223,26 @@ private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
 
 @Composable
 private fun PreferenceSwitch(title: String, detail: String, checked: Boolean, enabled: Boolean, tag: String, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget).testTag(tag)
+    BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget).testTag(tag)
         .background(AIyouColors.surfaceMuted, MaterialTheme.shapes.medium).aiyouFocusOutline()
         .toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
-        .padding(AIyouDimensions.spaceMd), verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(detail, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+        .padding(AIyouDimensions.spaceMd)) {
+        val stackControl = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
+        if (stackControl) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge)
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                Switch(checked, onCheckedChange = null, enabled = enabled, modifier = Modifier.align(Alignment.End))
+            }
+        } else {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                    Text(title, style = MaterialTheme.typography.bodyLarge)
+                    Text(detail, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                }
+                Switch(checked, onCheckedChange = null, enabled = enabled)
+            }
         }
-        Switch(checked, onCheckedChange = null, enabled = enabled)
     }
 }
