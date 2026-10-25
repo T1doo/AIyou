@@ -430,8 +430,13 @@ class CompanionSettingsPresentationTest {
         val title = compose.onNodeWithText("显示陪伴伙伴", useUnmergedTree = true)
         val layouts = mutableListOf<TextLayoutResult>()
         title.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { assertTrue(it(layouts)) }
-        assertEquals("Large-font switch title must not leave its final character on a separate line", 1, layouts.single().lineCount)
-        assertFalse(layouts.single().hasVisualOverflow)
+        val titleLayout = layouts.single()
+        assertEquals("Large-font switch title must not leave its final character on a separate line", 1, titleLayout.lineCount)
+        assertFalse("Title size=${titleLayout.size}, paragraph=${titleLayout.multiParagraph.width}x${titleLayout.multiParagraph.height}, " +
+            "constraints=${titleLayout.layoutInput.constraints}, density=${titleLayout.layoutInput.density.density}, " +
+            "fontScale=${titleLayout.layoutInput.density.fontScale}, lineCount=${titleLayout.lineCount}, " +
+            "widthOverflow=${titleLayout.didOverflowWidth}, heightOverflow=${titleLayout.didOverflowHeight}",
+            titleLayout.hasVisualOverflow)
         val titleBounds = title.getUnclippedBoundsInRoot()
         val companionBounds = companion.getUnclippedBoundsInRoot()
         assertTrue(titleBounds.left >= companionBounds.left && titleBounds.right <= companionBounds.right &&

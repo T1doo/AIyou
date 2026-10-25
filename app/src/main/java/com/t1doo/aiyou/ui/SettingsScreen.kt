@@ -230,8 +230,8 @@ private fun PreferenceSwitch(title: String, detail: String, checked: Boolean, en
         val stackControl = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
         if (stackControl) {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                Text(title, style = MaterialTheme.typography.bodyLarge)
-                Text(detail, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                Text(title, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyLarge)
+                Text(detail, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
                 Switch(checked, onCheckedChange = null, enabled = enabled, modifier = Modifier.align(Alignment.End))
             }
         } else {
