@@ -1,5 +1,6 @@
 package com.t1doo.aiyou.records
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import com.t1doo.aiyou.model.ManualTagSnapshot
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,7 +39,10 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import com.t1doo.aiyou.designsystem.AIyouDimensions
+import com.t1doo.aiyou.designsystem.AIyouColors
 import com.t1doo.aiyou.designsystem.aiyouFocusOutline
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 
 interface OriginalSearchObserver {
     fun onResults(state: OriginalSearchState, open: (OriginalSearchHit) -> Unit)
@@ -69,12 +74,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     onImages: (Boolean) -> Unit = {}, person: String? = null, peopleSupported: Boolean = false,
     peopleAvailable: Boolean = false, peopleError: String? = null, onPerson: (String?) -> Unit = {},
     onRefreshPeople: () -> Unit = {},onQuestionKeywords:(()->Unit)?=null) {
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
-        Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
-            verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-            Text("本机原文查找", style = MaterialTheme.typography.titleMedium)
-            if(indexSupported)onQuestionKeywords?.let{open->TextButton(onClick=open,enabled=enabled,
-                modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).aiyouFocusOutline().testTag("question-keyword-open")){Text("从问题里选词")}}
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
             fun transform(state: TextFieldState, maximum: Int) =
                 InputTransformation.maxLength(maximum).then {
                     // Only retire a private request counter before an actual user
@@ -98,19 +98,39 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 // a platform legacy fallback cannot insert a literal z/y.
                 history
             }
+        Surface(color = AIyouColors.primaryContainer, shape = MaterialTheme.shapes.large) {
+          Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
+              verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+            Text("本机原文查找", style = MaterialTheme.typography.titleMedium,
+                color = AIyouColors.primary, modifier = Modifier.semantics { heading() })
             // The actual editable/Undo object is the caller's memory-only state.
             key(query) { CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
             OutlinedTextField(state = query,
                 enabled = enabled, label = { Text("关键词或精确片段") },
+                shape = MaterialTheme.shapes.medium,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = AIyouColors.surfaceMuted,
+                    unfocusedContainerColor = AIyouColors.background,
+                    disabledContainerColor = AIyouColors.surfaceMuted),
                 modifier = Modifier.fillMaxWidth().then(historyKeys(query)).testTag("original-search-query"),
                 lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 3),
                 inputTransformation = transform(query, 100_000),
                 keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, capitalization = KeyboardCapitalization.None))
             } }
+            if(indexSupported)onQuestionKeywords?.let{open->TextButton(onClick=open,enabled=enabled,
+                modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).aiyouFocusOutline().testTag("question-keyword-open")){Text("从问题里选词")}}
             TextButton(onClick = onMode, enabled = enabled,
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-mode")) {
                 Text(if (mode == OriginalSearchMode.EXACT) "精确片段 · 区分大小写和空白" else "关键词 · 全部包含，忽略大小写")
             }
+          }
+        }
+        Surface(color = AIyouColors.surface, shape = MaterialTheme.shapes.large,
+            border = BorderStroke(AIyouDimensions.borderWidth, AIyouColors.outlineDecorative)) {
+          Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
+              verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+            Text("筛选与范围", style = MaterialTheme.typography.titleMedium,
+                color = AIyouColors.primary, modifier = Modifier.semantics { heading() })
             Text("关键词可在当前原文、手工标签或你为本条记录确认的别名关系中满足；精确片段只查原文。标签和别名命中只供查找，不构成原文出处。",
                 style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = { onDateBasis(if (dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED)
@@ -182,6 +202,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                     Text("重新整理本机查找")
                 }
             }
+          }
         }
     }
 }

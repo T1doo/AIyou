@@ -1,7 +1,7 @@
 package com.t1doo.aiyou.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -42,6 +42,7 @@ import com.t1doo.aiyou.designsystem.AIyouColors
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.ComponentState
 import com.t1doo.aiyou.designsystem.StatusNotice
+import com.t1doo.aiyou.designsystem.aiyouFocusOutline
 import com.t1doo.aiyou.model.FactRecapPeriod
 import com.t1doo.aiyou.model.ProcessingPolicy
 import java.util.concurrent.atomic.AtomicBoolean
@@ -207,18 +208,24 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-        Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) { content() }
-        HorizontalDivider(Modifier.padding(top = AIyouDimensions.spaceLg), color = AIyouColors.outlineDecorative)
+    Surface(color = AIyouColors.surface, shape = MaterialTheme.shapes.large,
+        border = BorderStroke(AIyouDimensions.borderWidth, AIyouColors.outlineDecorative),
+        modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(AIyouDimensions.spaceLg),
+            verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
+            Text(title, Modifier.fillMaxWidth().semantics { heading() },
+                color = AIyouColors.primary, style = MaterialTheme.typography.titleLarge)
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) { content() }
+        }
     }
 }
 
 @Composable
 private fun PreferenceSwitch(title: String, detail: String, checked: Boolean, enabled: Boolean, tag: String, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget).testTag(tag)
+        .background(AIyouColors.surfaceMuted, MaterialTheme.shapes.medium).aiyouFocusOutline()
         .toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
-        .padding(vertical = AIyouDimensions.spaceSm), verticalAlignment = Alignment.CenterVertically,
+        .padding(AIyouDimensions.spaceMd), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
