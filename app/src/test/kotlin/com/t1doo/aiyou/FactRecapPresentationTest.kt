@@ -154,7 +154,7 @@ class FactRecapPresentationTest {
             label.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { assertTrue(it(layouts)) }
             assertEquals(1, layouts.size); assertEquals(scale, layouts.single().layoutInput.density.fontScale, 0f)
             assertEquals("The short floating label must not wrap into the neighboring content", 1, layouts.single().lineCount)
-            assertFalse("Time-zone label must stay readable: size=${layouts.single().size}, constraints=${layouts.single().layoutInput.constraints}", layouts.single().hasVisualOverflow)
+            assertFalse("Time-zone label must stay readable: size=${layouts.single().size}, constraints=${layouts.single().layoutInput.constraints}, paragraph=${layouts.single().multiParagraph.width}x${layouts.single().multiParagraph.height}, overflowWidth=${layouts.single().didOverflowWidth}, overflowHeight=${layouts.single().didOverflowHeight}", layouts.single().hasVisualOverflow)
             val bounds = label.getUnclippedBoundsInRoot()
             val viewport = compose.onNodeWithTag("recap-list").getUnclippedBoundsInRoot()
             val dateBounds = compose.onNodeWithTag("recap-date").getUnclippedBoundsInRoot()

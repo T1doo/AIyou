@@ -27,7 +27,7 @@ fun FactRecapScreen(local: LocalRecordUiState,controller: FactRecapController,li
         item("date") { OutlinedTextField(u.date,{controller.input(date=it)},label={Text("日期 YYYY-MM-DD")},
             isError=u.dateRejected,supportingText=if(u.dateRejected) {{Text("日期输入超过10个字符，未接受；请重新编辑日期。",Modifier.fillMaxWidth().testTag("recap-date-rejected"))}} else null,
             enabled=ready,modifier=Modifier.fillMaxWidth().testTag("recap-date")) }
-        item("zone") { OutlinedTextField(u.zone,{controller.input(zone=it)},label={Text("回顾时区",Modifier.testTag("recap-zone-label"))},
+        item("zone") { OutlinedTextField(u.zone,{controller.input(zone=it)},label={Text("回顾时区",Modifier.width(IntrinsicSize.Max).testTag("recap-zone-label"))},
             isError=u.zoneRejected,supportingText={
                 if(u.zoneRejected) Text("时区输入超过64个字符，未接受；请重新编辑时区。",Modifier.fillMaxWidth().testTag("recap-zone-rejected"))
                 else Text("例如 Asia/Shanghai 或 UTC。",Modifier.fillMaxWidth().testTag("recap-zone-example"))
