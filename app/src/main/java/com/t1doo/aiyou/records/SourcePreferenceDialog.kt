@@ -23,7 +23,7 @@ internal fun PreferenceReview.label()=when(this) {
 private fun PreferenceInterval.label()=if(zone==null)"有效区间：未说明" else "有效区间：${fromDate ?: "起点未说明"} 至 ${untilExclusive ?: "终点未说明"}（终点不含）· $zone"
 
 @Composable
-internal fun SourcePreferenceDialog(ui:PreferenceUiState,controller:SourcePreferenceController,canUse:()->Boolean,onLocate:(OriginalReadingLocation)->Unit) {
+internal fun SourcePreferenceDialog(ui:PreferenceUiState,controller:SourcePreferenceController,canUse:()->Boolean,onLocate:(OriginalReadingLocation,UnifiedKeywordHandoff)->Unit) {
     val height=with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp()*0.9f }
     DisposableEffect(controller,ui.session) { onDispose { controller.close(ui.session) } }
     val editable=!ui.busy && ui.pending==null && ui.confirmation==null

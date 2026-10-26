@@ -12,6 +12,12 @@ sealed interface PreferenceIntent {
     class Mutate(val request:PreferenceMutation):PreferenceIntent { override fun toString()="PreferenceMutationIntent(redacted)" }
 }
 data class PreferenceConfirmation(val token:Long,val intent:PreferenceIntent) { override fun toString()="PreferenceConfirmation(redacted)" }
+/** Only a SQL-acknowledged private target can authorize its exact navigation location. */
+private interface PreferenceNavigationProof:UnifiedKeywordHandoff {
+    fun current(local:LocalRecordUiState,location:OriginalReadingLocation):Boolean
+}
+internal fun LocalRecordUiState.canUsePreferenceNavigation(handoff:UnifiedKeywordHandoff,location:OriginalReadingLocation):Boolean =
+    (handoff as? PreferenceNavigationProof)?.current(this,location)==true
 data class PreferenceUiState(val session:Long,val source:SourceVersion?,val sourceHash:String?,val request:Long=0,
     val sourcePage:PreferenceSourcePage?=null,val page:PreferencePage?=null,val items:List<SourcePreferenceSnapshot> = emptyList(),
     val section:PreferenceReview=PreferenceReview.PROPOSED,val cursor:PreferenceCursor?=null,val canPrevious:Boolean=false,val keyword:String="",
@@ -60,8 +66,8 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
         val local=current();val ui=local.sourcePreferences ?: return false
         return available(local) && ui.session==session && (request==null || request==ui.request) && local.canRetainPreferenceSources(ui)
     }
-    private fun update(session:Long,request:Long?=null,change:(PreferenceUiState)->PreferenceUiState)=publish { local ->
-        if(!available(local) || local.sourcePreferences?.session!=session || (request!=null && local.sourcePreferences.request!=request) || !local.canRetainPreferenceSources(local.sourcePreferences))local else {
+    private fun update(session:Long,request:Long?=null,expectedOwner:SourcePreferenceRepository?=null,change:(PreferenceUiState)->PreferenceUiState)=publish { local ->
+        if(expectedOwner!=null && local.sourcePreferenceOwner!==expectedOwner || !available(local) || local.sourcePreferences?.session!=session || (request!=null && local.sourcePreferences.request!=request) || !local.canRetainPreferenceSources(local.sourcePreferences))local else {
             val next=change(checkNotNull(local.sourcePreferences))
             // Validate the proposed state in the same publication/CAS as its private content.
             // A delayed comparison must authenticate both sources against the latest observed UI.
@@ -163,33 +169,60 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
         val next=ui.copy(cursor=cursors.last(),canPrevious=cursors.size>1);update(session) { next };execute(next,null)
     }
     fun history(session:Long,id:String) { if(owns(session))update(session) { it.copy(historyId=if(it.historyId==id)null else id) } }
-    fun endpoint(session:Long,item:SourcePreferenceSnapshot,edge:PreferenceEndpoint,onLocate:(OriginalReadingLocation)->Unit) {
+    fun endpoint(session:Long,item:SourcePreferenceSnapshot,edge:PreferenceEndpoint,onLocate:(OriginalReadingLocation,UnifiedKeywordHandoff)->Unit) {
         val ui=current().sourcePreferences ?: return
         if(!owns(session) || ui.busy || ui.pending!=null || ui.confirmation!=null || ui.items.none { it===item })return
         val req=tokens.incrementAndGet();update(session) { it.copy(busy=true,request=req) }
         if(!enqueue { store ->
             if(!owns(session,req))return@enqueue
-            try { checkNotNull(store.sourcePreferences).resolveEndpoint(item,edge) { target ->
+            try {
+                val owner=checkNotNull(store.sourcePreferences)
+                var target:SourcePreferenceSnapshot?=null;var admitted=false
+                val resolved=owner.resolveEndpoint(item,edge) { target=it;admitted=true }
+                // The transaction's callback is admission only; navigation waits for commit ACK.
+                check(resolved && admitted)
                 if(owns(session,req)) {
-                    if(target==null)update(session,req) { it.copy(busy=false,notice="历史取代关系的原项已不可用；没有恢复旧内容或旧采纳。") }
+                    val result=target
+                    if(result==null)update(session,req) { it.copy(busy=false,notice="历史取代关系的原项已不可用；没有恢复旧内容或旧采纳。") }
                     else {
-                        val ref=target.contents.single { it.revision==edge.contentRevision }.content.reference
-                        publishLocation(session,req,OriginalReadingLocation(target.source.sourceId,target.source.revision.toInt(),target.sourceHash,ref.start,ref.end),onLocate)
+                        val ref=result.contents.single { it.revision==edge.contentRevision }.content.reference
+                        publishLocation(session,req,owner,result,OriginalReadingLocation(result.source.sourceId,result.source.revision.toInt(),result.sourceHash,ref.start,ref.end),onLocate)
                     }
                 }
-            } } catch(c:CancellationException) { throw c } catch(_:Exception) { failed(session,req,null) }
+            } catch(c:CancellationException) { throw c } catch(_:Exception) { failed(session,req,null) }
         })failed(session,req,null)
     }
-    private fun publishLocation(session:Long,request:Long,location:OriginalReadingLocation,onLocate:(OriginalReadingLocation)->Unit) {
-        var admitted=false
-        publish { local ->
-            val ui=local.sourcePreferences
-            admitted=ui!=null && ui.session==session && ui.request==request && available(local) && local.canRetainPreferenceSources(ui)
-            if(admitted)local.copy(sourcePreferences=null) else local
+    private fun publishLocation(session:Long,request:Long,owner:SourcePreferenceRepository,target:SourcePreferenceSnapshot,
+        location:OriginalReadingLocation,onLocate:(OriginalReadingLocation,UnifiedKeywordHandoff)->Unit) {
+        fun fresh(local:LocalRecordUiState):Boolean {
+            val ui=local.sourcePreferences?:return false
+            return available(local) && local.sourcePreferenceOwner===owner && local.supportsLocalProcessing &&
+                local.localProcessingAvailable && local.localProcessingVersions[target.source.sourceId]==LocalProcessingVersion(target.source,target.generation) &&
+                ui.session==session && ui.request==request && local.canRetainPreferenceSources(ui.copy(items=ui.items+target))
         }
-        if(admitted)onLocate(location)
+        if(!fresh(current())) {failed(session,request,null,owner);return}
+        val expectedLocation=location
+        val proof=object:PreferenceNavigationProof {
+            private var used=false
+            override fun current(local:LocalRecordUiState,location:OriginalReadingLocation):Boolean=synchronized(this) {
+                if(used || location!==expectedLocation)return@synchronized false
+                if(!fresh(local)||!fresh(this@SourcePreferenceController.current())) {
+                    used=true;failed(session,request,null,owner);false
+                } else true
+            }
+            override fun invoke(action:()->Unit):Boolean=synchronized(this) {
+                if(!current(this@SourcePreferenceController.current(),location))false else {
+                    var admitted=false
+                    publish { local -> admitted=fresh(local);if(admitted)local.copy(sourcePreferences=null)else local }
+                    used=true
+                    if(!admitted) {failed(session,request,null,owner);false} else {action();true}
+                }
+            }
+        }
+        // The caller takes navigation first, then invokes this proof. No SQL/IO lock is held.
+        onLocate(location,proof)
     }
-    fun locate(session:Long,item:SourcePreferenceSnapshot,onLocate:(OriginalReadingLocation)->Unit) {
+    fun locate(session:Long,item:SourcePreferenceSnapshot,onLocate:(OriginalReadingLocation,UnifiedKeywordHandoff)->Unit) {
         val ui=current().sourcePreferences ?: return
         if(!owns(session) || ui.busy || ui.pending!=null || ui.confirmation!=null || ui.items.none { it===item })return
         val req=tokens.incrementAndGet();update(session) { it.copy(busy=true,request=req) }
@@ -197,12 +230,14 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
             if(!owns(session,req))return@enqueue
             try {
                 val repo=checkNotNull(store.sourcePreferences)
-                val publish={ if(owns(session,req)) {
-                    val ref=checkNotNull(item.current).content.reference
-                    publishLocation(session,req,OriginalReadingLocation(item.source.sourceId,item.source.revision.toInt(),item.sourceHash,ref.start,ref.end),onLocate)
-                } }
+                var admitted=false
+                val publish={admitted=true}
                 val accepted=ui.sourcePage?.let { repo.resolveSource(it,publish) } ?: ui.page?.let { repo.resolve(it,item,publish) } ?: false
-                if(!accepted)failed(session,req,null)
+                if(!accepted || !admitted)failed(session,req,null)
+                else if(owns(session,req)) {
+                    val ref=checkNotNull(item.current).content.reference
+                    publishLocation(session,req,repo,item,OriginalReadingLocation(item.source.sourceId,item.source.revision.toInt(),item.sourceHash,ref.start,ref.end),onLocate)
+                }
             } catch(c:CancellationException) { throw c } catch(_:Exception) { failed(session,req,null) }
         })failed(session,req,null)
     }
@@ -234,8 +269,8 @@ class SourcePreferenceController(private val current:()->LocalRecordUiState,
             } catch(c:CancellationException) { throw c } catch(_:Exception) { failed(before.session,req,intent) }
         })failed(before.session,req,intent)
     }
-    private fun failed(session:Long,request:Long,intent:PreferenceIntent?) {
-        if(owns(session,request))update(session,request) { it.copy(busy=false,items=emptyList(),sourcePage=null,page=null,confirmation=null,pending=intent,
+    private fun failed(session:Long,request:Long,intent:PreferenceIntent?,expectedOwner:SourcePreferenceRepository?=null) {
+        if(owns(session,request))update(session,request,expectedOwner) { it.copy(busy=false,items=emptyList(),sourcePage=null,page=null,confirmation=null,pending=intent,
             notice=null,error="读取或写入结果尚未核对，未显示成功或空列表。可核对同次请求，或仅刷新实际状态；来源变化时旧请求会被拒绝。") }
     }
     fun dispose() { disposed=true;publish { it.copy(sourcePreferences=null) };cursors.clear() }

@@ -91,6 +91,7 @@ class SourcePreferencePresentationTest {
         override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long)=error("No source write")
     }
     private val controller=SourcePreferenceController({state.value},{state.value=it(state.value)},{queue.add(it);true},Clock.fixed(Instant.ofEpochMilli(100),ZoneOffset.UTC))
+    init {state.value=state.value.copy(sourcePreferenceOwner=port,supportsLocalProcessing=true,localProcessingVersions=mapOf(entry.id to LocalProcessingVersion(source,0)))}
     @After fun dispose()=controller.dispose()
     @Composable private fun Screen() {
         val density=LocalDensity.current;val currentRegistry=LocalSaveableStateRegistry.current;SideEffect {registry=currentRegistry}

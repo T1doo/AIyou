@@ -62,7 +62,7 @@ class SourcePreferenceViewModelTest {
         val created=h.store.create(PreferenceCreate(java.util.UUID.randomUUID().toString(),p,java.util.UUID.randomUUID().toString(),"合成口味",PreferenceContent(SourceMemoryRules.reference(p,"我不喝咖啡🙂")),true,java.util.UUID.randomUUID().toString(),40))
         h.store.mutate(SourcePreferenceSqlTest.change(created,PreferenceAction.ACCEPT))
         h.vm.sourcePreferences.open(section=PreferenceReview.ACCEPTED);val ui=h.ui {it.page!=null&&!it.busy};val located=kotlinx.coroutines.CompletableDeferred<OriginalReadingLocation>()
-        h.vm.sourcePreferences.locate(ui.session,ui.items.single()) {located.complete(it)}
+        h.vm.sourcePreferences.locate(ui.session,ui.items.single()) {location,proof->assertTrue(proof{located.complete(location)})}
         withTimeout(3_000) {h.vm.state.first {it.sourcePreferences==null}}
         val location=withTimeout(3_000) {located.await()}
         assertEquals(0,location.startCodePoint);assertEquals(6,location.endCodePoint);assertEquals(OriginalExports.hash(h.f.original),location.contentHash)
@@ -158,11 +158,11 @@ class SourcePreferenceViewModelTest {
         h.vm.sourcePreferences.keyword(ui.session,"咖啡🙂");assertNull(h.value().page);assertTrue(h.value().items.isEmpty())
         h.vm.sourcePreferences.search(ui.session);val found=h.ui {it.page?.keyword=="咖啡🙂"&&!it.busy};val item=found.items.single()
         assertEquals(old.id,item.id)
-        h.vm.sourcePreferences.keyword(ui.session,"淡茶");h.vm.sourcePreferences.locate(ui.session,item) {fail("Old query retains no jump authority")}
+        h.vm.sourcePreferences.keyword(ui.session,"淡茶");h.vm.sourcePreferences.locate(ui.session,item) {_,_->fail("Old query retains no jump authority")}
         h.vm.sourcePreferences.search(ui.session);h.ui {it.page?.keyword=="淡茶"&&!it.busy};assertTrue(h.value().items.isEmpty())
         h.vm.sourcePreferences.keyword(ui.session,"合成口味");h.vm.sourcePreferences.search(ui.session);val topic=h.ui {it.page?.keyword=="合成口味"&&!it.busy}
         val location=kotlinx.coroutines.CompletableDeferred<OriginalReadingLocation>()
-        h.vm.sourcePreferences.locate(ui.session,topic.items.single()) {location.complete(it)}
+        h.vm.sourcePreferences.locate(ui.session,topic.items.single()) {target,proof->assertTrue(proof{location.complete(target)})}
         val target=withTimeout(3_000) {location.await()};assertEquals(old.source.sourceId,target.entryId)
         assertEquals(0,target.startCodePoint);assertEquals(6,target.endCodePoint);assertEquals(0,h.remoteCalls)
     }}
@@ -211,6 +211,94 @@ class SourcePreferenceViewModelTest {
                 }
                 assertTrue(h.mutations.isEmpty());assertEquals(0,h.remoteCalls)
             } finally {release.countDown();controller.dispose()}
+        }
+    }
+    @Test(timeout=15_000) fun historicalEndpointCannotPublishAfterObservedTargetGenerationChangesAtFinalPublication():Unit=Harness().use {h ->runBlocking {
+        h.ready();val (old,candidate)=h.seedComparison()
+        h.store.mutate(SourcePreferenceSqlTest.change(candidate,PreferenceAction.ACCEPT).let {
+            PreferenceMutation(it.expected,it.action,it.content,old,it.mutationId,it.requestedAtMillis)
+        })
+        h.observeSources()
+        val local=java.util.concurrent.atomic.AtomicReference(h.vm.state.value)
+        val queue=java.util.ArrayDeque<suspend(EntryRepository)->Unit>()
+        var armed=false;var navigations=0
+        val controller=SourcePreferenceController({local.get()},{change ->
+            var before=local.get();val proposed=change(before)
+            if(armed && before.sourcePreferences!=null && proposed.sourcePreferences==null) {
+                armed=false
+                val original=before.localProcessingVersions.getValue(old.source.sourceId)
+                before=before.copy(localProcessingVersions=before.localProcessingVersions+(old.source.sourceId to original.copy(generation=original.generation+2)))
+                local.set(before)
+                local.set(change(before))
+            } else local.set(proposed)
+        },{queue.add(it);true},Clock.fixed(Instant.ofEpochMilli(50),ZoneOffset.UTC))
+        try {
+            controller.open(section=PreferenceReview.ACCEPTED);queue.removeFirst()(h.owner)
+            val ui=local.get().sourcePreferences!!;val item=ui.items.single()
+            assertEquals(candidate.id,item.id);assertTrue(ui.items.none {it.source==old.source})
+            armed=true
+            controller.endpoint(ui.session,item,item.review!!.predecessor!!) {_,proof->proof{navigations++}}
+            queue.removeFirst()(h.owner)
+            assertEquals("A changed authorization generation must reject the old historical target",0,navigations)
+        } finally {controller.dispose()}
+    }}
+    @Test(timeout=20_000) fun acknowledgedHistoricalTargetIsOneShotAndRejectsAbaUnknownOwnerClosureAndFailedAck():Unit=runBlocking {
+        for(mode in 0..5)Harness().use {h ->
+            h.ready();val (old,candidate)=h.seedComparison()
+            val accepted=h.store.mutate(SourcePreferenceSqlTest.change(candidate,PreferenceAction.ACCEPT,replacing=old));h.observeSources()
+            val local=java.util.concurrent.atomic.AtomicReference(h.vm.state.value)
+            val queue=java.util.ArrayDeque<suspend(EntryRepository)->Unit>()
+            val repo=if(mode==5)object:SourcePreferenceRepository by h.owner.sourcePreferences!! {
+                override fun resolveEndpoint(expected:SourcePreferenceSnapshot,endpoint:PreferenceEndpoint,publish:(SourcePreferenceSnapshot?)->Unit):Boolean {
+                    assertTrue(h.store.resolveEndpoint(expected,endpoint,publish));throw PreferenceUnavailable()
+                }
+            } else h.owner.sourcePreferences!!
+            val owner=object:EntryRepository by h.owner {override val sourcePreferences=repo}
+            local.updateAndGet {it.copy(sourcePreferenceOwner=repo)}
+            val controller=SourcePreferenceController({local.get()},{change->local.updateAndGet(change)},{queue.add(it);true},Clock.fixed(Instant.ofEpochMilli(50),ZoneOffset.UTC))
+            var ticket:UnifiedKeywordHandoff?=null;var location:OriginalReadingLocation?=null;var navigations=0
+            try {
+                controller.open(section=PreferenceReview.ACCEPTED);queue.removeFirst()(owner)
+                val ui=local.get().sourcePreferences!!
+                controller.endpoint(ui.session,ui.items.single(),accepted.review!!.predecessor!!){l,p->location=l;ticket=p}
+                queue.removeFirst()(owner)
+                if(mode==5) {
+                    assertNull("A callback followed by failed transaction ACK must never hand off",ticket)
+                    assertNotNull(local.get().sourcePreferences!!.error)
+                } else {
+                    val proof=checkNotNull(ticket);val target=checkNotNull(location)
+                    assertEquals(old.source.sourceId,target.entryId);assertNotNull(local.get().sourcePreferences)
+                    assertTrue(local.get().canRetainPreferenceSources(local.get().sourcePreferences!!))
+                    when(mode) {
+                        0 -> {
+                            val fake=UnifiedKeywordHandoff {it();true}
+                            assertFalse(local.get().canUsePreferenceNavigation(fake,target))
+                            assertFalse(local.get().canUsePreferenceNavigation(proof,target.copy()))
+                            assertTrue(local.get().canUsePreferenceNavigation(proof,target))
+                            assertTrue(proof{navigations++});assertFalse(proof{navigations++});assertEquals(1,navigations)
+                            assertNull(local.get().sourcePreferences)
+                        }
+                        1 -> {
+                            val processing=SqlLocalProcessingRepository(h.f.gateway)
+                            val off=processing.change(LocalProcessingChange(processing.read(old.source),LocalProcessingChoice.AI_NONE,SourcePreferenceSqlTest.id()))
+                            processing.change(LocalProcessingChange(off,LocalProcessingChoice.LOCAL_ONLY,SourcePreferenceSqlTest.id()))
+                            local.updateAndGet {it.copy(localProcessingVersions=processing.versions())}
+                            assertTrue("The current B page is still valid; A is the private historical target",local.get().canRetainPreferenceSources(local.get().sourcePreferences!!))
+                        }
+                        2 -> local.updateAndGet {it.copy(sourcePreferenceOwner=object:SourcePreferenceRepository by repo {})}
+                        3 -> local.updateAndGet {it.copy(localProcessingVersions=it.localProcessingVersions-old.source.sourceId)}
+                        4 -> {controller.close(ui.session);controller.open(section=PreferenceReview.ACCEPTED);queue.removeFirst()(owner);assertNotEquals(ui.session,local.get().sourcePreferences!!.session)}
+                    }
+                    if(mode!=0) {
+                        val beforeReject=local.get()
+                        assertFalse(proof{navigations++});assertEquals(0,navigations)
+                        if(mode==2)assertSame("An old owner's rejected proof must not publish even an error into the new owner",beforeReject,local.get())
+                        local.updateAndGet {it.copy(sourcePreferenceOwner=repo,localProcessingVersions=h.vm.state.value.localProcessingVersions)}
+                        assertFalse("Restoring display state must not resurrect the spent proof",proof{navigations++})
+                    }
+                }
+                assertTrue(h.mutations.isEmpty());assertEquals(0,h.remoteCalls)
+            } finally {controller.dispose()}
         }
     }
     private class Harness:AutoCloseable {

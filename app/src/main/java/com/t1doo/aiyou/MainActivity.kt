@@ -5,6 +5,7 @@ import com.t1doo.aiyou.records.canShowTranscriptEditor
 import com.t1doo.aiyou.records.currentImageTextSource
 import com.t1doo.aiyou.records.canRetainImageTexts
 import com.t1doo.aiyou.records.canRetainFactSources
+import com.t1doo.aiyou.records.canUsePreferenceNavigation
 import com.t1doo.aiyou.records.canUseFactNavigation
 
 import android.os.Bundle
@@ -838,12 +839,14 @@ fun AIyouApp(
             currentLocal?.sourcePreferences?.session == preferenceUi.session &&
             (if (preferenceUi.source == null) detailEntryId == null && selectedName == Destination.MEMORIES.name
              else detailEntryId == preferenceUi.source.sourceId)
-        com.t1doo.aiyou.records.SourcePreferenceDialog(preferenceUi, sourcePreferences, ::ownsPreference) { location ->
-            // Controller has already retired the panel after authenticating its source under the owner lease.
+        com.t1doo.aiyou.records.SourcePreferenceDialog(preferenceUi, sourcePreferences, ::ownsPreference) { location,confirm ->
+            // Retire the panel only after the exact SQL-acknowledged target is rechecked under navigation.
             navigation.publish(generation) {
-                val entry = currentLocal?.entries?.singleOrNull { it.id == location.entryId && it.currentRevision == location.revision }
-                if (ownsNavigation() && !showSettings && !demo && entry != null && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE &&
-                    com.t1doo.aiyou.model.OriginalExports.hash(entry.originalText) == location.contentHash) {
+                val latest=currentRecordsProvider?.invoke() ?: currentLocal
+                val entry = latest?.entries?.singleOrNull { it.id == location.entryId && it.currentRevision == location.revision }
+                if (ownsPreference() && latest!=null && entry != null && entry.policy != com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE &&
+                    com.t1doo.aiyou.model.OriginalExports.hash(entry.originalText) == location.contentHash &&
+                    latest.canUsePreferenceNavigation(confirm,location)) confirm {
                     navigation.advance(); search.pause(); readerFromSearch = false; tailReturnRequest = null
                     searchLocation = location; inboxSourceRoute = true; detailEntryId = location.entryId
                 }
