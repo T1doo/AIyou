@@ -27,8 +27,11 @@ fun FactRecapScreen(local: LocalRecordUiState,controller: FactRecapController,li
         item("date") { OutlinedTextField(u.date,{controller.input(date=it)},label={Text("日期 YYYY-MM-DD")},
             isError=u.dateRejected,supportingText=if(u.dateRejected) {{Text("日期输入超过10个字符，未接受；请重新编辑日期。",Modifier.fillMaxWidth().testTag("recap-date-rejected"))}} else null,
             enabled=ready,modifier=Modifier.fillMaxWidth().testTag("recap-date")) }
-        item("zone") { OutlinedTextField(u.zone,{controller.input(zone=it)},label={Text("回顾时区，例如 Asia/Shanghai")},
-            isError=u.zoneRejected,supportingText=if(u.zoneRejected) {{Text("时区输入超过64个字符，未接受；请重新编辑时区。",Modifier.fillMaxWidth().testTag("recap-zone-rejected"))}} else null,
+        item("zone") { OutlinedTextField(u.zone,{controller.input(zone=it)},label={Text("回顾时区",Modifier.testTag("recap-zone-label"))},
+            isError=u.zoneRejected,supportingText={
+                if(u.zoneRejected) Text("时区输入超过64个字符，未接受；请重新编辑时区。",Modifier.fillMaxWidth().testTag("recap-zone-rejected"))
+                else Text("例如 Asia/Shanghai 或 UTC。",Modifier.fillMaxWidth().testTag("recap-zone-example"))
+            },
             enabled=ready,modifier=Modifier.fillMaxWidth().testTag("recap-zone")) }
         item("period") { Column { Text("一周从周一开始，至下周一零点前；按所选时区自然日划分。")
             OutlinedButton({controller.input(period=FactRecapPeriod.DAY)},enabled=ready,

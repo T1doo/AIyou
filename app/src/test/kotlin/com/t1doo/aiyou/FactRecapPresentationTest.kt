@@ -44,12 +44,13 @@ class FactRecapPresentationTest {
     @get:Rule val temporary=TemporaryFolder()
     private val f=Fixture();private var registry:SaveableStateRegistry?=null
     private val display=mutableStateOf(UiPreferencesState(UiPreferences(showCompanion=false,reduceMotion=true),ready=true))
+    private val recapFontScale=mutableFloatStateOf(2f)
     @org.junit.After fun closeAudio(){f.closeFails=false;f.player.stop();runBlocking {f.player.closeAndJoin()};f.transcripts.dispose();f.attachments.markDisposed();runBlocking{f.attachments.disposeOnIo()}}
     private fun content(preferences: UiPreferencesViewModel?=null,
         observeDefault: ((FactRecapPeriod, () -> Unit) -> Unit)?=null) {compose.setContent {
         registry=LocalSaveableStateRegistry.current;val d=LocalDensity.current
         val confirmed=preferences?.state?.collectAsState()?.value ?: display.value
-        CompositionLocalProvider(LocalDensity provides Density(d.density,2f),LocalRecapPreferenceActionObserver provides observeDefault) {
+        CompositionLocalProvider(LocalDensity provides Density(d.density,recapFontScale.floatValue),LocalRecapPreferenceActionObserver provides observeDefault) {
             AIyouTheme {AIyouApp(previewDestination=Destination.MEMORIES,local=f.local.value,factRecaps=f.c,attachments=f.attachments,
                 audioTranscripts=f.transcripts,audioPlayback=f.player,onAudioRouteChanged=f.player::routeChanged,currentRecords={f.local.value},display=confirmed,onDisplayChange={preferences?.change(it)},onRetryDisplay={preferences?.retry()},
                 onOpenTags=f.tags::open,onTagClose=f.tags::close)}
@@ -142,6 +143,49 @@ class FactRecapPresentationTest {
         val originalRecords = f.records
         val captures = File("build/reports/tests/testDebugUnitTest/recap-rejected-input").apply { mkdirs() }
         val measurements = org.json.JSONArray()
+        val zoneLabels = org.json.JSONArray()
+        fun verifyZoneLabel(scale: Float, state: String, imageFile: String) {
+            // Preserve the actual scrolled viewport even if a later geometry assertion fails.
+            val image = compose.onNodeWithTag("recap-list").captureToImage().asAndroidBitmap()
+            File(captures, imageFile).outputStream().use { assertTrue(image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)) }
+            val label = compose.onNodeWithTag("recap-zone-label", useUnmergedTree = true)
+            label.assertIsDisplayed().assertTextEquals("回顾时区")
+            val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            label.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { assertTrue(it(layouts)) }
+            assertEquals(1, layouts.size); assertEquals(scale, layouts.single().layoutInput.density.fontScale, 0f)
+            assertEquals("The short floating label must not wrap into the neighboring content", 1, layouts.single().lineCount)
+            assertFalse("Time-zone label must stay readable: size=${layouts.single().size}, constraints=${layouts.single().layoutInput.constraints}", layouts.single().hasVisualOverflow)
+            val bounds = label.getUnclippedBoundsInRoot()
+            val viewport = compose.onNodeWithTag("recap-list").getUnclippedBoundsInRoot()
+            val dateBounds = compose.onNodeWithTag("recap-date").getUnclippedBoundsInRoot()
+            assertTrue("Time-zone label $bounds must remain inside $viewport", bounds.top >= viewport.top && bounds.bottom <= viewport.bottom && bounds.left >= viewport.left && bounds.right <= viewport.right)
+            assertTrue("Time-zone label $bounds must stay below date field $dateBounds", bounds.top >= dateBounds.bottom)
+            zoneLabels.put(org.json.JSONObject().put("state", state).put("fontScale", scale)
+                .put("lineCount", layouts.single().lineCount).put("hasVisualOverflow", layouts.single().hasVisualOverflow)
+                .put("top", bounds.top.value).put("bottom", bounds.bottom.value).put("dateFieldBottom", dateBounds.bottom.value))
+        }
+        val beforeSizing = checkNotNull(f.local.value.factRecap)
+        compose.runOnIdle { recapFontScale.floatValue = 1f }
+        compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag("recap-date"))
+        verifyZoneLabel(1f, "normal", "00-zone-normal-1x.png")
+        val example = compose.onNodeWithTag("recap-zone-example", useUnmergedTree = true)
+        example.assertIsDisplayed().assertTextEquals("例如 Asia/Shanghai 或 UTC。")
+        val exampleLayouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        example.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { assertTrue(it(exampleLayouts)) }
+        assertEquals(1, exampleLayouts.size); assertEquals(1f, exampleLayouts.single().layoutInput.density.fontScale, 0f)
+        assertFalse(exampleLayouts.single().hasVisualOverflow)
+        val exampleBounds = example.getUnclippedBoundsInRoot()
+        val normalViewport = compose.onNodeWithTag("recap-list").getUnclippedBoundsInRoot()
+        assertTrue(exampleBounds.top >= normalViewport.top && exampleBounds.bottom <= normalViewport.bottom &&
+            exampleBounds.left >= normalViewport.left && exampleBounds.right <= normalViewport.right)
+        compose.runOnIdle {
+            assertTrue(f.queue.isEmpty()); assertNull(f.local.value.factRecap!!.snapshot)
+            assertEquals(beforeSizing.date, f.local.value.factRecap!!.date)
+            assertEquals(beforeSizing.zone, f.local.value.factRecap!!.zone)
+            assertEquals(beforeSizing.period, f.local.value.factRecap!!.period)
+            assertFalse(f.local.value.factRecap!!.dateRejected); assertFalse(f.local.value.factRecap!!.zoneRejected)
+            recapFontScale.floatValue = 2f
+        }
         for (badDate in listOf(true, false)) {
             generate()
             val before = checkNotNull(f.local.value.factRecap)
@@ -152,6 +196,7 @@ class FactRecapPresentationTest {
             compose.onNodeWithTag(tag).performTextReplacement(raw)
             // The supporting error grows this same field; verify scroll reachability, not automatic/first-screen placement.
             compose.onNodeWithTag("recap-list").performScrollToNode(hasTestTag(tag))
+            verifyZoneLabel(2f, if (badDate) "date-rejected" else "zone-rejected", if (badDate) "01-date-rejected-2x.png" else "02-zone-rejected-2x.png")
             val error = compose.onNodeWithTag(errorTag, useUnmergedTree = true)
             error.assertIsDisplayed().assertTextContains("未接受", substring = true)
             val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
@@ -167,17 +212,13 @@ class FactRecapPresentationTest {
                 .put("top", bounds.top.value).put("bottom", bounds.bottom.value)
                 .put("viewportTop", viewport.top.value).put("viewportBottom", viewport.bottom.value))
             File(captures, "layout.json").writeText(org.json.JSONObject().put("source_sha", System.getenv("GITHUB_SHA") ?: "local-unbound")
-                .put("kind", "Actual root TextLayout at provided fontScale2; unclipped dp bounds, not device or dynamic configuration evidence")
-                .put("fields", measurements).toString(2))
+                .put("kind", "Actual root TextLayout at provided fontScale1/2; unclipped dp bounds, not device or dynamic configuration evidence")
+                .put("fields", measurements).put("zoneLabels", zoneLabels).toString(2))
             compose.runOnIdle {
                 val ui = checkNotNull(f.local.value.factRecap)
                 assertNull(ui.snapshot); assertFalse(ui.loading); assertTrue(f.queue.isEmpty())
                 assertEquals(badDate, ui.dateRejected); assertEquals(!badDate, ui.zoneRejected)
                 assertFalse(registry!!.performSave().toString().contains(raw))
-            }
-            val image = compose.onNodeWithTag("recap-list").captureToImage().asAndroidBitmap()
-            File(captures, if (badDate) "01-date-rejected-2x.png" else "02-zone-rejected-2x.png").outputStream().use {
-                assertTrue(image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
             }
             click("recap-week")
             compose.runOnIdle {
