@@ -23,19 +23,29 @@ internal fun RecordEventDateDialog(ui: RecordEventDateEditor, pending: RecordEve
         AlertDialog(onDismissRequest = { controller.close(ui.session) },
             properties = DialogProperties(usePlatformDefaultWidth = false),
             title = { Text("事件发生日期 · 手工补记") },
-            text = { Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+            // Observe the real visible viewport, rather than the translated scroll content.
+            text = { Box(Modifier.fillMaxWidth().testTag("event-date-content")) {
+                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("只保存单日日历日期和 IANA 时区，不补时刻。未知请留空；不会从原文、今天或记录时间推测。")
                 val saved = ui.snapshot?.date
                 Text(if (ui.snapshot == null) "已保存事件日期：尚未读取" else if (saved == null) "已保存事件日期：未补记（未知）"
                     else "已保存事件日期：${saved.localDate} · ${saved.timeZone}")
                 Text("记录捕获时间和原文版本保持不变。回顾继续按记录时间分组。")
-                OutlinedTextField(ui.dateInput, { if (current()) controller.edit(ui.session, it, ui.zoneInput) },
-                    label = { Text("事件日期 YYYY-MM-DD（未知留空）") }, singleLine = true,
+                OutlinedTextField(ui.dateInput, { if (current()) controller.edit(ui.session, date = it) },
+                    label = { Text("事件日期", Modifier.width(IntrinsicSize.Max).testTag("event-date-date-label")) }, singleLine = true,
+                    isError = ui.dateRejected, supportingText = {
+                        if (ui.dateRejected) Text("刚才的日期输入超过10个字符，未接受；请重新编辑日期。", Modifier.fillMaxWidth().testTag("event-date-date-rejected"))
+                        else Text("YYYY-MM-DD；未知请留空，不补时刻。", Modifier.fillMaxWidth().testTag("event-date-date-format"))
+                    },
                     enabled = !ui.busy && !ui.conflict && pending == null && ui.snapshot != null,
                     modifier = Modifier.fillMaxWidth().testTag("event-date-input"))
-                OutlinedTextField(ui.zoneInput, { if (current()) controller.edit(ui.session, ui.dateInput, it) },
-                    label = { Text("IANA 时区，例如 Asia/Shanghai") }, singleLine = true,
+                OutlinedTextField(ui.zoneInput, { if (current()) controller.edit(ui.session, zone = it) },
+                    label = { Text("事件时区", Modifier.width(IntrinsicSize.Max).testTag("event-date-zone-label")) }, singleLine = true,
+                    isError = ui.zoneRejected, supportingText = {
+                        if (ui.zoneRejected) Text("刚才的时区输入超过128个字符，未接受；请重新编辑时区。", Modifier.fillMaxWidth().testTag("event-date-zone-rejected"))
+                        else Text("IANA 时区，例如 Asia/Shanghai；未知请留空。", Modifier.fillMaxWidth().testTag("event-date-zone-format"))
+                    },
                     enabled = !ui.busy && !ui.conflict && pending == null && ui.snapshot != null,
                     modifier = Modifier.fillMaxWidth().testTag("event-date-zone"))
                 if (ui.busy) Text("正在确认本机事件日期…")
@@ -50,13 +60,14 @@ internal fun RecordEventDateDialog(ui: RecordEventDateEditor, pending: RecordEve
                     Text("请确认这是事件发生日期。保存后记录日期、原文和原文版本均不变。")
                     val confirm = { if (current()) controller.confirm(ui.session, preview.id) }
                     LocalRecordEventDateConfirmObserver.current?.let { observer -> SideEffect { observer(confirm) } }
-                    Button(confirm, enabled = !ui.busy && !ui.conflict,
+                    Button(confirm, enabled = !ui.busy && !ui.conflict && pending == null &&
+                        (next == null || !ui.dateRejected && !ui.zoneRejected),
                         modifier = Modifier.heightIn(min = 48.dp).testTag("event-date-confirm")) { Text(if (next == null) "确认清除事件日期" else "确认保存事件日期") }
                     TextButton({ if (current()) controller.cancelPreview(ui.session, preview.id) }, enabled = !ui.busy,
                         modifier = Modifier.heightIn(min = 48.dp).testTag("event-date-cancel-preview")) { Text("返回修改") }
                 } else {
                     Button({ if (current()) controller.preview(ui.session) },
-                        enabled = !ui.busy && !ui.conflict && pending == null && ui.snapshot != null,
+                        enabled = !ui.busy && !ui.conflict && pending == null && ui.snapshot != null && !ui.dateRejected && !ui.zoneRejected,
                         modifier = Modifier.heightIn(min = 48.dp).testTag("event-date-preview-set")) { Text("预览这次日期") }
                     TextButton({ if (current()) controller.preview(ui.session, clear = true) },
                         enabled = !ui.busy && !ui.conflict && pending == null && saved != null,
@@ -68,7 +79,7 @@ internal fun RecordEventDateDialog(ui: RecordEventDateEditor, pending: RecordEve
                         Text(if (pending != null && !pending.conflict) "重试确认同一次选择" else "重新读取事件日期")
                     }
                 }
-            } },
+            } } },
             confirmButton = { TextButton({ controller.close(ui.session) },
                 modifier = Modifier.heightIn(min = 48.dp).testTag("event-date-close")) { Text("关闭") } })
     }

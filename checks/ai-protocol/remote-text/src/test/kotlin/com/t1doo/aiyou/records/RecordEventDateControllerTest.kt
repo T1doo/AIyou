@@ -13,6 +13,66 @@ import org.junit.Test
 
 /** Actual controller/matcher over explicit synthetic ports; durable SQL is tested separately. */
 class RecordEventDateControllerTest {
+    @Test fun rejectedFieldSurvivesFeedbackOtherInputAndReadUntilThatFieldIsActuallyCorrected() {
+        for (badDate in listOf(true, false)) Harness().use { h ->
+            h.open(); val session = h.ui().session
+            h.controller.edit(session, "2024-01-01", "UTC")
+            if (badDate) h.controller.edit(session, date = "2024-01-010") else h.controller.edit(session, zone = "x".repeat(129))
+            h.controller.edit(session, "2024-01-01", "UTC") // Display feedback is not explicit correction.
+            if (badDate) h.controller.edit(session, zone = "Asia/Shanghai") else h.controller.edit(session, date = "2024-02-29")
+            h.controller.retry(session); h.drain(); h.controller.preview(session)
+            assertEquals(badDate, h.ui().dateRejected); assertEquals(!badDate, h.ui().zoneRejected)
+            assertNull(h.ui().preview); assertTrue(h.queue.isEmpty()); assertTrue(h.calls.isEmpty())
+            assertTrue(h.ui().dateInput.length <= 10); assertTrue(h.ui().zoneInput.length <= 128)
+            if (badDate) { h.controller.edit(session, date = ""); h.controller.edit(session, date = "2024-02-29") }
+            else { h.controller.edit(session, zone = ""); h.controller.edit(session, zone = "Asia/Shanghai") }
+            assertFalse(h.ui().dateRejected); assertFalse(h.ui().zoneRejected)
+            h.controller.preview(session); h.controller.confirm(session, checkNotNull(h.ui().preview).id); h.drain()
+            assertEquals(RecordEventDate("2024-02-29", "Asia/Shanghai"), h.durable.getValue("one").date)
+            assertEquals(1, h.calls.size); assertEquals("private-draft", h.state.text); assertEquals(h.entry, h.state.entries.single())
+        }
+    }
+
+    @Test fun rejectedEditRetiresOldClearButFreshExplicitClearRemainsAnIndependentFrozenIntent() {
+        Harness().use { h ->
+            val saved = RecordEventDateSnapshot("one", 1, RecordEventDate("2024-01-01", "UTC"))
+            h.durable["one"] = saved; h.state = h.state.copy(eventDates = mapOf("one" to saved))
+            h.open(); val session = h.ui().session
+            h.controller.preview(session, clear = true); val oldClear = checkNotNull(h.ui().preview).id
+            h.controller.edit(session, date = "2024-01-010", zone = "x".repeat(129))
+            h.controller.confirm(session, oldClear); assertTrue(h.calls.isEmpty()); assertTrue(h.queue.isEmpty())
+            h.controller.preview(session, clear = true); val freshClear = checkNotNull(h.ui().preview).id
+            assertNotEquals(oldClear, freshClear); assertNull(h.ui().preview!!.date)
+            h.lose = true; h.controller.confirm(session, freshClear); h.drain()
+            val pending = h.state.eventDateWrites.getValue("one")
+            h.controller.edit(session, "2024-02-29", "Asia/Shanghai"); h.controller.preview(session); h.controller.preview(session, clear = true)
+            assertSame(pending, h.state.eventDateWrites.getValue("one")); assertNull(h.ui().preview)
+            assertTrue(h.ui().dateRejected); assertTrue(h.ui().zoneRejected)
+            h.controller.retry(session); h.drain()
+            assertSame(h.calls[0], h.calls[1]); assertNull(h.calls[0].date); assertNull(h.durable.getValue("one").date)
+            assertEquals(2L, h.durable.getValue("one").version); assertTrue(h.state.eventDateWrites.isEmpty())
+            assertTrue(h.ui().dateRejected); assertTrue(h.ui().zoneRejected)
+            assertTrue(h.ui().notice!!.contains("此前超长输入仍未接受")); assertEquals("", h.ui().dateInput); assertEquals("", h.ui().zoneInput)
+            h.controller.preview(session); h.controller.preview(session, clear = true)
+            assertNull(h.ui().preview); assertTrue(h.queue.isEmpty()); assertEquals(2, h.calls.size)
+        }
+    }
+
+    @Test fun oversizedInputRetiresPreviewAndRejectsRetainedConfirmBeforeAnyWrite() {
+        for (badDate in listOf(true, false)) Harness().use { h ->
+            h.open(); val session = h.ui().session
+            h.controller.edit(session, "2024-01-01", "UTC"); h.controller.preview(session)
+            val retained = checkNotNull(h.ui().preview).id
+            h.controller.edit(session, if (badDate) "2024-01-010" else "2024-01-01", if (badDate) "UTC" else "x".repeat(129))
+            val afterRejectedEdit = h.ui().preview
+            h.controller.confirm(session, retained); h.drain()
+            assertTrue("A rejected edit must make the old confirmation perform zero writes; actual calls=${h.calls.size}", h.calls.isEmpty())
+            assertNull("A rejected edit must retire its previous preview immediately", afterRejectedEdit)
+            assertNotNull(h.ui().error); assertNull(h.durable.getValue("one").date)
+            assertTrue(h.queue.isEmpty()); assertEquals("private-draft", h.state.text); assertEquals(h.entry, h.state.entries.single())
+        }
+    }
+
     @Test fun manualSetCorrectionAndClearRequireSeparatePreviewAndNeverReviseOriginal() = Harness().use { h ->
         h.open(); val source = h.state.entries.single(); val editor = h.ui()
         assertEquals("", editor.dateInput); assertEquals("", editor.zoneInput)

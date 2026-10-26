@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -18,12 +19,14 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
 import com.t1doo.aiyou.records.*
 import com.t1doo.aiyou.ui.Destination
 import java.util.concurrent.atomic.AtomicReference
+import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
@@ -32,6 +35,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Real App/Compose/controller, explicit synthetic ports; no device/SQLCipher claim. */
 @RunWith(RobolectricTestRunner::class)
@@ -137,6 +141,80 @@ class RecordEventDatePresentationTest {
     }
     private fun preview(){control("event-date-preview-set").performClick()}
     private fun confirm(){control("event-date-confirm").performClick();drain()}
+
+    @Test
+    @Config(qualifiers="w320dp-h800dp")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun rejectedDateAndZoneAtActualDoubleFontRetireConfirmationUntilExplicitCorrection() {
+        RuntimeEnvironment.setFontScale(2f)
+        assertEquals(2f,RuntimeEnvironment.getFontScale(),0f)
+        assertEquals(320,RuntimeEnvironment.getApplication().resources.configuration.screenWidthDp)
+        compose.setContent{Screen()}; open()
+        val captures=File("build/reports/tests/testDebugUnitTest/event-date-rejected-input").apply{mkdirs()}
+        val measured=org.json.JSONArray()
+        for(badDate in listOf(true,false)) {
+            fill("2024-02-29","Asia/Shanghai"); preview()
+            control("event-date-confirm").assertIsDisplayed().assertIsEnabled()
+            val retained=checkNotNull(retainedConfirm.get()); val writes=calls.size
+            val session=state.value.eventDateEditor!!.session
+            val field=if(badDate)"event-date-input" else "event-date-zone"
+            val errorTag=if(badDate)"event-date-date-rejected" else "event-date-zone-rejected"
+            val labelTag=if(badDate)"event-date-date-label" else "event-date-zone-label"
+            val raw=if(badDate)"2024-02-290" else "x".repeat(129)
+            control(field).performTextReplacement(raw)
+            control(field).assertIsDisplayed().assertIsEnabled()
+            // Bring the actual floating label into view too; this checks explicit
+            // scroll reachability, not automatic field placement or the first screen.
+            compose.onNodeWithTag(labelTag,useUnmergedTree=true).performScrollTo().assertIsDisplayed()
+            val bitmap=compose.onNodeWithTag("event-date-content").captureToImage().asAndroidBitmap()
+            File(captures,if(badDate)"01-date-rejected-2x.png" else "02-zone-rejected-2x.png").outputStream().use {
+                assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it))
+            }
+            val error=compose.onNodeWithTag(errorTag,useUnmergedTree=true)
+            error.assertIsDisplayed().assertTextContains("未接受",substring=true)
+            val layouts=mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            error.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult){assertTrue(it(layouts))}
+            assertEquals(1,layouts.size); assertEquals(2f,layouts.single().layoutInput.density.fontScale,0f)
+            assertFalse("Actual Dialog error must not overflow: ${layouts.single().size}",layouts.single().hasVisualOverflow)
+            val bounds=error.getUnclippedBoundsInRoot(); val viewport=compose.onNodeWithTag("event-date-content").getUnclippedBoundsInRoot()
+            assertTrue("Error $bounds must remain inside actual Dialog viewport $viewport",bounds.top>=viewport.top && bounds.bottom<=viewport.bottom && bounds.left>=viewport.left && bounds.right<=viewport.right)
+            val label=compose.onNodeWithTag(labelTag,useUnmergedTree=true)
+            label.assertIsDisplayed()
+            val labelLayouts=mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            label.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult){assertTrue(it(labelLayouts))}
+            assertEquals(1,labelLayouts.size); assertEquals(1,labelLayouts.single().lineCount); assertFalse(labelLayouts.single().hasVisualOverflow)
+            val labelBounds=label.getUnclippedBoundsInRoot()
+            assertTrue("Label $labelBounds must remain inside actual Dialog viewport $viewport",labelBounds.top>=viewport.top && labelBounds.bottom<=viewport.bottom && labelBounds.left>=viewport.left && labelBounds.right<=viewport.right)
+            measured.put(org.json.JSONObject().put("field",field).put("fontScale",layouts.single().layoutInput.density.fontScale)
+                .put("lineCount",layouts.single().lineCount).put("hasVisualOverflow",layouts.single().hasVisualOverflow)
+                .put("errorTop",bounds.top.value).put("errorBottom",bounds.bottom.value)
+                .put("viewportTop",viewport.top.value).put("viewportBottom",viewport.bottom.value).put("viewportWidth",viewport.width.value)
+                .put("labelTop",labelBounds.top.value).put("labelBottom",labelBounds.bottom.value))
+            File(captures,"layout.json").writeText(org.json.JSONObject().put("source_sha",System.getenv("GITHUB_SHA")?:"local-unbound")
+                .put("kind","Actual platform-configured fontScale2 Dialog on w320dp-h800dp; explicit scroll viewport, not physical device")
+                .put("fields",measured).toString(2))
+            compose.onNodeWithTag("event-date-preview").assertDoesNotExist()
+            compose.onNodeWithTag("event-date-confirm").assertDoesNotExist()
+            control(if(badDate)"event-date-zone" else "event-date-input").performTextReplacement(if(badDate)"UTC" else "2024-04-01")
+            control("event-date-retry").performClick(); drain()
+            control("event-date-preview-set").assertIsNotEnabled()
+            compose.runOnIdle {
+                retained(); controller.preview(session)
+                assertTrue(queue.isEmpty()); assertEquals(writes,calls.size); assertNull(state.value.eventDateEditor!!.preview)
+                assertEquals(badDate,state.value.eventDateEditor!!.dateRejected); assertEquals(!badDate,state.value.eventDateEditor!!.zoneRejected)
+                assertFalse(checkNotNull(registry).performSave().toString().contains(raw))
+            }
+            control(field).performTextClearance()
+            control(field).performTextInput(if(badDate)"2024-03-10" else "UTC")
+            compose.onNodeWithTag(errorTag,useUnmergedTree=true).assertDoesNotExist()
+            preview(); confirm()
+            assertEquals(writes+1,calls.size)
+            assertEquals(RecordEventDate(if(badDate)"2024-03-10" else "2024-04-01","UTC"),durable.getValue("one").date)
+            assertEquals(one,state.value.entries.first()); assertEquals("synthetic-private-draft",state.value.text)
+        }
+        compose.onNodeWithTag("event-date-close").assertIsDisplayed().performClick()
+        compose.runOnIdle{assertNull(state.value.eventDateEditor);assertTrue(state.value.eventDateWrites.isEmpty())}
+    }
 
     @Test fun standaloneDoubleFontDateFieldsHaveFiniteLayout(){
         System.err.println("DATE_ISOLATION before-fields-only")

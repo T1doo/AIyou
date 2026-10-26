@@ -236,6 +236,7 @@ for label, folder, minimum in targets:
             "gridRequiresExplicitToggleKeepsFailureCardAndOpensOriginalSource",
             "narrowDoubleFontGridToggleAndFailureCardRemainReachableAndClearReturnsToList")
         additional["com.t1doo.aiyou.RecordEventDatePresentationTest"] = (
+            "rejectedDateAndZoneAtActualDoubleFontRetireConfirmationUntilExplicitCorrection",
             "narrowDoubleFontManualSetCorrectionAndClearEachRequireVisiblePreview",
             "uncertainSaveRetainsSameIntentAndStaleConfirmCannotWriteAfterNavigation",
             "eventDateBasisCombinesKeywordTagFavoriteAndNeverMatchesUnknownCaptureDate")

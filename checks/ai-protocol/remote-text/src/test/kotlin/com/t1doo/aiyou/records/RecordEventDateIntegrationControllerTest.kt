@@ -18,6 +18,27 @@ import org.junit.Test
 
 /** Real controllers and v11 SQL; metadata read failures occur after acknowledged original writes. */
 class RecordEventDateIntegrationControllerTest {
+    @Test(timeout=20_000) fun rejectedEventDateCannotCommitRetainedPreviewAndExplicitCorrectionWritesOnlyNewChoice(): Unit = runBlocking {
+        for (badDate in listOf(true, false)) Harness().use { h ->
+            val id = h.seed(); h.refresh(); val entries = h.local.entries
+            val controller = RecordEventDateController({h.local},{h.local=it(h.local)},{h.queue.addLast(it);true})
+            try {
+                controller.open(id,1); h.drain(); val session = h.local.eventDateEditor!!.session
+                controller.edit(session,"2024-01-01","UTC"); controller.preview(session)
+                val old = checkNotNull(h.local.eventDateEditor!!.preview).id
+                controller.edit(session,if(badDate)"2024-01-010" else "2024-01-01",if(badDate)"UTC" else "x".repeat(129))
+                controller.confirm(session,old); h.drain()
+                assertNull(h.dates.read(id).date); assertEquals(0L,h.dates.read(id).version)
+                controller.preview(session); assertNull(h.local.eventDateEditor!!.preview); assertTrue(h.queue.isEmpty())
+                controller.edit(session,date="",zone=""); controller.edit(session,DAY.localDate,DAY.timeZone)
+                controller.preview(session); controller.confirm(session,checkNotNull(h.local.eventDateEditor!!.preview).id); h.drain()
+                assertEquals(DAY,h.dates.read(id).date); assertEquals(1L,h.dates.read(id).version)
+                assertEquals(entries,h.rows()); assertEquals("separate private input",h.local.text)
+                assertTrue(h.local.eventDateWrites.isEmpty()); assertNotNull(h.local.eventDateEditor!!.notice)
+            } finally {controller.dispose()}
+        }
+    }
+
     @Test(timeout=20_000) fun mixedCaptureRefreshesUnknownEventDateAndMetadataReadFailureCannotUndoCommittedSave(): Unit = runBlocking {
         for (failRead in listOf(false,true)) Harness().use { h ->
             val capture=MixedCaptureController({h.local},{h.local=it(h.local)},{h.queue.addLast(it);true},

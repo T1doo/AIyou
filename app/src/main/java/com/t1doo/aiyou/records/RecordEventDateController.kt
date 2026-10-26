@@ -25,12 +25,14 @@ class RecordEventDateEditor internal constructor(val session: Long, val entryId:
     internal val sourceHash: String, internal val sourceGeneration: Long, val snapshot: RecordEventDateSnapshot? = null,
     val dateInput: String = "", val zoneInput: String = "", val busy: Boolean = true,
     val preview: RecordEventDatePreview? = null, val conflict: Boolean = false,
-    val error: String? = null, val notice: String? = null) {
+    val error: String? = null, val notice: String? = null,
+    val dateRejected: Boolean = false, val zoneRejected: Boolean = false) {
     fun copy(snapshot: RecordEventDateSnapshot? = this.snapshot, dateInput: String = this.dateInput,
         zoneInput: String = this.zoneInput, busy: Boolean = this.busy, preview: RecordEventDatePreview? = this.preview,
-        conflict: Boolean = this.conflict, error: String? = this.error, notice: String? = this.notice) =
+        conflict: Boolean = this.conflict, error: String? = this.error, notice: String? = this.notice,
+        dateRejected: Boolean = this.dateRejected, zoneRejected: Boolean = this.zoneRejected) =
         RecordEventDateEditor(session, entryId, revision, sourceHash, sourceGeneration, snapshot, dateInput, zoneInput,
-            busy, preview, conflict, error, notice)
+            busy, preview, conflict, error, notice, dateRejected, zoneRejected)
     override fun toString() = "RecordEventDateEditor(busy=$busy, redacted)"
 }
 class RecordEventDateWrite internal constructor(val token: Long, internal val intent: RecordEventDateMutation,
@@ -80,17 +82,29 @@ class RecordEventDateController internal constructor(
     fun close(session: Long) {
         publish { if (disposed || it.eventDateEditor?.session != session) it else it.copy(eventDateEditor = null) }
     }
-    fun edit(session: Long, date: String, zone: String) {
-        val editor = current().eventDateEditor?.takeIf { it.session == session && live(it) && source(it) &&
-            !it.busy && !it.conflict && current().eventDateWrites[it.entryId] == null } ?: return
-        if (date.length > 10 || zone.length > 128) return
-        update(editor) { it.copy(dateInput = date, zoneInput = zone, preview = null, error = null, notice = null) }
+    fun edit(session: Long, date: String? = null, zone: String? = null) = publish { local ->
+        val editor = local.eventDateEditor
+        if (editor == null || editor.session != session || !live(editor, local) || !source(editor, local) ||
+            editor.busy || editor.conflict || local.eventDateWrites[editor.entryId] != null) local else {
+            // Never retain rejected raw text or let focus feedback confirm its old displayed value.
+            val dateRejected = if (date == null || editor.dateRejected && date == editor.dateInput) editor.dateRejected else date.length > 10
+            val zoneRejected = if (zone == null || editor.zoneRejected && zone == editor.zoneInput) editor.zoneRejected else zone.length > 128
+            local.copy(eventDateEditor = editor.copy(
+                dateInput = if (date == null || dateRejected) editor.dateInput else date,
+                zoneInput = if (zone == null || zoneRejected) editor.zoneInput else zone,
+                dateRejected = dateRejected, zoneRejected = zoneRejected, preview = null, notice = null,
+                error = if (dateRejected || zoneRejected) "超长输入未接受，请修改对应字段后重新预览。旧预览已失效。" else null))
+        }
     }
     /** A blank field never infers a day/zone; clearing is a separate explicit preview. */
     fun preview(session: Long, clear: Boolean = false) {
         val local = current()
         val editor = local.eventDateEditor?.takeIf { it.session == session && live(it) && source(it) &&
             !it.busy && !it.conflict && local.eventDateWrites[it.entryId] == null } ?: return
+        if (!clear && (editor.dateRejected || editor.zoneRejected)) {
+            update(editor) { it.copy(preview = null, error = "超长输入尚未纠正，不能预览或保存旧日期。请重新编辑对应字段。") }
+            return
+        }
         val snapshot = editor.snapshot ?: return
         if (!local.eventDatesAvailable || local.eventDates[editor.entryId]?.let {
             it.version == snapshot.version && it.date == snapshot.date } != true) return stale(editor)
@@ -109,14 +123,16 @@ class RecordEventDateController internal constructor(
     fun confirm(session: Long, preview: Long) {
         val local = current()
         val editor = local.eventDateEditor?.takeIf { it.session == session && it.preview?.id == preview &&
-            live(it) && source(it) && !it.busy && !it.conflict && local.eventDateWrites[it.entryId] == null } ?: return
+            live(it) && source(it) && !it.busy && !it.conflict && local.eventDateWrites[it.entryId] == null &&
+            (it.preview?.date == null || !it.dateRejected && !it.zoneRejected) } ?: return
         val snapshot = editor.snapshot ?: return
         if (!local.eventDatesAvailable || local.eventDates[editor.entryId]?.let {
             it.version == snapshot.version && it.date == snapshot.date } != true) return stale(editor)
         val write = RecordEventDateWrite(tokens.incrementAndGet(), RecordEventDateMutation(editor.entryId,
             editor.revision, editor.sourceHash, snapshot.version, editor.preview!!.date, UUID.randomUUID().toString(), editor.sourceGeneration))
         publish { if (!live(editor, it) || !source(editor, it) || it.eventDateWrites[editor.entryId] != null ||
-            it.eventDateEditor?.preview?.id != preview) it else it.copy(
+            it.eventDateEditor?.preview?.id != preview || it.eventDateEditor?.let { latest ->
+                latest.preview?.date != null && (latest.dateRejected || latest.zoneRejected) } == true) it else it.copy(
                 eventDateWrites = it.eventDateWrites + (editor.entryId to write),
                 eventDateEditor = it.eventDateEditor?.copy(busy = true, preview = null, error = null, notice = null)) }
         if (owns(write)) submit(editor, write)
@@ -197,7 +213,9 @@ class RecordEventDateController internal constructor(
                     eventDateEditor = if (!live(editor, local)) local.eventDateEditor else local.eventDateEditor?.copy(
                         snapshot = fresh, dateInput = fresh.date?.localDate.orEmpty(), zoneInput = fresh.date?.timeZone.orEmpty(),
                         busy = false, preview = null, conflict = false, error = null,
-                        notice = if (fresh.date == null) "事件日期已清除；记录时间与原文版本未改动。" else "事件日期已保存在本机；未补时刻，记录时间与原文版本未改动。")) }
+                        notice = if (fresh.date == null && local.eventDateEditor?.let { it.dateRejected || it.zoneRejected } == true)
+                            "事件日期已清除；此前超长输入仍未接受，请重新编辑后再补记。记录时间与原文版本未改动。"
+                        else if (fresh.date == null) "事件日期已清除；记录时间与原文版本未改动。" else "事件日期已保存在本机；未补时刻，记录时间与原文版本未改动。")) }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { failed(editor, write, failure is RecordEventDateConflict || failure is RecordEventDateUnavailable) }
         }) failed(editor, write, false)
