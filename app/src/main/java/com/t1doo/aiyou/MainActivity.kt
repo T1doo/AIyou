@@ -1188,7 +1188,8 @@ fun AIyouApp(
                 Box(Modifier.onSizeChanged { navigationHeightPx = it.height }) {
                     NotebookNavigation(if (showSettings) null else selected, onSelect = selectDestination,
                         containerColor = if(notebookHome) com.t1doo.aiyou.designsystem.AIyouColors.notebookMist else com.t1doo.aiyou.designsystem.AIyouColors.surface,
-                        motionAllowed = motionAllowed)
+                        motionAllowed = motionAllowed,
+                        allowReselect = recapRoute || browsingPackage || browsingRecycle)
                 }
             }
         },

@@ -67,6 +67,13 @@ class FactRecapPresentationTest {
         org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
         var observedWeek: (() -> Unit)?=null
         content(preferences) { period, action -> if(period==FactRecapPeriod.WEEK) observedWeek=action }
+        // Reselecting the current bottom tab on a secondary route returns to its root.
+        // Root-tab reselect remains inert; it must not strand this existing return path.
+        open()
+        compose.runOnIdle { assertNotNull(f.local.value.factRecap);assertTrue(f.queue.isEmpty()) }
+        compose.onNodeWithTag("notebook-tab-MEMORIES").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("notebook-review-tools").assertIsDisplayed()
+        compose.runOnIdle { assertNull(f.local.value.factRecap);assertTrue(f.queue.isEmpty()) }
         compose.onNodeWithText("设置").performClick()
         val week=compose.onNodeWithTag("recap-default-week").performScrollTo().assertIsDisplayed().assertIsEnabled()
         val retiredWeek=checkNotNull(observedWeek)

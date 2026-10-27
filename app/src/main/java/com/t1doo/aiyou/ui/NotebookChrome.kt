@@ -72,7 +72,8 @@ fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = 
 
 @Composable
 fun NotebookNavigation(selected: Destination?, onSelect: (Destination) -> Unit,
-    containerColor: Color = AIyouColors.surface, motionAllowed: Boolean = false) {
+    containerColor: Color = AIyouColors.surface, motionAllowed: Boolean = false,
+    allowReselect: Boolean = true) {
     val direction = LocalLayoutDirection.current
     Surface(color = containerColor) {
       Column {
@@ -81,7 +82,7 @@ fun NotebookNavigation(selected: Destination?, onSelect: (Destination) -> Unit,
             .windowInsetsPadding(WindowInsets.navigationBars)
             // Restrict page gestures to navigation: never steal a text-selection/list drag.
             // Replacing the callback cancels the gesture rather than carrying it into a new owner.
-            .pointerInput(selected, onSelect, direction) {
+            .pointerInput(selected, onSelect, direction, allowReselect) {
                 var travel = 0f
                 detectHorizontalDragGestures(onDragStart = { travel = 0f }, onDragCancel = { travel = 0f },
                     onHorizontalDrag = { change, amount -> change.consume(); travel += amount },
@@ -106,7 +107,7 @@ fun NotebookNavigation(selected: Destination?, onSelect: (Destination) -> Unit,
                 Column(Modifier.weight(1f).aiyouFocusOutline()
                     .testTag("notebook-tab-${destination.name}")
                     .selectable(active, interactionSource = interaction, indication = LocalIndication.current,
-                        role = Role.Tab, onClick = { if (!active) onSelect(destination) })
+                        role = Role.Tab, onClick = { if (!active || allowReselect) onSelect(destination) })
                     .heightIn(min = 56.dp).padding(vertical = 4.dp, horizontal = AIyouDimensions.spaceXs)
                     .graphicsLayer { scaleX = scale; scaleY = scale },
                     horizontalAlignment = Alignment.CenterHorizontally,

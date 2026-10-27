@@ -79,13 +79,15 @@ class MobileNavigationPresentationTest {
     @Test @Config(qualifiers="w320dp-h640dp")
     fun doubleFontTabsKeepRealLabelsTouchTargetsAndCancelRetiredGesture() {
         val selected=mutableStateOf<Destination?>(Destination.NOW)
+        val allowReselect=mutableStateOf(false)
         var selections=0
         compose.setContent {
             val density=LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density,2f)) {
                 AIyouTheme { Box(Modifier.fillMaxSize()) {
                     Box(Modifier.align(Alignment.BottomCenter)) {
-                        NotebookNavigation(selected.value,{selected.value=it;selections++},motionAllowed=false)
+                        NotebookNavigation(selected.value,{selected.value=it;selections++},motionAllowed=false,
+                            allowReselect=allowReselect.value)
                     }
                 } }
             }
@@ -100,13 +102,16 @@ class MobileNavigationPresentationTest {
         }
         tab(Destination.NOW).performClick()
         compose.runOnIdle { assertEquals(0,selections) }
+        compose.runOnIdle { allowReselect.value=true }
+        tab(Destination.NOW).performClick()
+        compose.runOnIdle { assertEquals(1,selections);allowReselect.value=false }
         frame("02-double-font-navigation")
         val nav=compose.onNodeWithTag("notebook-navigation")
         nav.performTouchInput { down(center); moveTo(center.copy(x=center.x/2)) }
         compose.runOnIdle { selected.value=null }
         compose.waitForIdle()
         nav.performTouchInput { up() }
-        compose.runOnIdle { assertEquals(0,selections) }
+        compose.runOnIdle { assertEquals(1,selections) }
         for (destination in Destination.entries) tab(destination).assertIsNotSelected()
     }
 }
