@@ -362,7 +362,7 @@ fun LocalRecordsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                                 Column(Modifier.weight(1f)) {
                                     Text("${local.entries.size} 条本机记录", style = MaterialTheme.typography.titleMedium)
-                                    Text("仅本机处理", style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
+                                    com.t1doo.aiyou.ui.LocalProcessingStatus()
                                 }
                                 companion?.invoke()
                             }
