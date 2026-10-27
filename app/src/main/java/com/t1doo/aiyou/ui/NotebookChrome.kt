@@ -42,6 +42,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.t1doo.aiyou.designsystem.AIyouColors
 import com.t1doo.aiyou.designsystem.AIyouDimensions
@@ -120,7 +121,8 @@ fun NotebookNavigation(selected: Destination?, onSelect: (Destination) -> Unit,
                             }
                         }
                     }
-                    Text(destination.label, style = MaterialTheme.typography.bodySmall, color = color,
+                    Text(destination.label, modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall, color = color,
                         fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
                 }
             }

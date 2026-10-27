@@ -119,13 +119,29 @@ class MobileNavigationPresentationTest {
                 } }
             }
         }
+        val labelGeometry=org.json.JSONArray()
         for (destination in Destination.entries) {
             tab(destination).assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
             val layouts=mutableListOf<TextLayoutResult>()
             compose.onNodeWithText(destination.label,useUnmergedTree=true)
                 .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { assertTrue(it(layouts)) }
             assertEquals(2f,layouts.single().layoutInput.density.fontScale,0f)
-            assertFalse(layouts.single().hasVisualOverflow)
+            val layout=layouts.single()
+            labelGeometry.put(JSONObject().put("label",destination.label)
+                .put("fontScale",layout.layoutInput.density.fontScale)
+                .put("constraints",layout.layoutInput.constraints.toString())
+                .put("sizePixels","${layout.size.width}x${layout.size.height}")
+                .put("paragraphWidth",layout.multiParagraph.width)
+                .put("paragraphHeight",layout.multiParagraph.height)
+                .put("widthOverflow",layout.didOverflowWidth).put("heightOverflow",layout.didOverflowHeight)
+                .put("visualOverflow",layout.hasVisualOverflow))
+            val directory=File("build/reports/tests/testDebugUnitTest/mobile-navigation").apply {mkdirs()}
+            File(directory,"navigation-label-layout.json").writeText(JSONObject()
+                .put("source_sha",System.getenv("GITHUB_SHA")?:"local-not-CI")
+                .put("labels",labelGeometry).toString(2))
+            if(layout.hasVisualOverflow) frame("02-double-font-overflow")
+            assertFalse("${destination.label}: constraints=${layout.layoutInput.constraints}, size=${layout.size}, " +
+                "widthOverflow=${layout.didOverflowWidth}, heightOverflow=${layout.didOverflowHeight}",layout.hasVisualOverflow)
         }
         tab(Destination.NOW).performClick()
         compose.runOnIdle { assertEquals(0,selections) }
