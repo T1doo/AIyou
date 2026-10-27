@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import stat
 import struct
 import subprocess
@@ -84,11 +85,62 @@ def sdk_inputs(sdk, jdk):
     if release.get('JAVA_RUNTIME_VERSION') != '17.0.17+10' or 'Adoptium' not in release.get('IMPLEMENTOR', ''):
         raise ValueError('Previously approved Temurin 17.0.17+10 required')
     files = {'javac': jdk / 'bin/javac', 'java': jdk / 'bin/java', 'jdk_modules': jdk / 'lib/modules',
+             'jmod': jdk / 'bin/jmod', 'jlink': jdk / 'bin/jlink', 'jrt_fs': jdk / 'lib/jrt-fs.jar',
+             'android_core': platform / 'core-for-system-modules.jar',
              'jdk_release': jdk / 'release', 'android_jar': platform / 'android.jar',
              'platform_properties': platform / 'source.properties', 'tools_properties': tools / 'source.properties',
              'sdk_license': accepted, 'aapt2': tools / 'aapt2', 'zipalign': tools / 'zipalign',
              'd8': tools / 'lib/d8.jar', 'apksigner': tools / 'lib/apksigner.jar'}
     return files, {name: identity(path) for name, path in files.items()}
+
+
+def android_system_image(files, work, run):
+    """AOSP JdkImageTransformDelegate sequence, using only the existing SDK/JDK.
+
+    The descriptor alone uses --system none with the Android java.base patch.
+    Probe sources compile against the resulting image, never the host java.base.
+    Reference: platform/tools/base JdkImageTransformDelegate.kt, blob ac9dd004.
+    """
+    core = files['android_core']
+    with zipfile.ZipFile(core) as source:
+        entries = source.infolist()
+        names = [e.filename for e in entries]
+        if len(names) != len(set(names)) or len(names) > 100000 or \
+                sum(e.file_size for e in entries) > 128 * 1024 * 1024 or \
+                any(n.startswith('/') or '\\' in n or '..' in n.split('/') for n in names) or \
+                'module-info.class' in names or \
+                not {'java/lang/Object.class', 'java/lang/String.class'}.issubset(names):
+            raise ValueError('Invalid Android core system-module archive')
+        packages = sorted({n.rsplit('/', 1)[0].replace('/', '.') for n in names if n.endswith('.class') and '/' in n})
+        if not packages or any(not re.fullmatch(r'[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*', p, re.ASCII) for p in packages):
+            raise ValueError('Invalid Android core package name')
+        descriptor = work/'module-info.java'
+        descriptor.write_text('module java.base {\n'+''.join(' exports '+p+';\n' for p in packages)+'}\n')
+        descriptor_dir = work/'descriptor'; descriptor_dir.mkdir()
+        run('android-module-descriptor', [files['javac'], '-proc:none', '-implicit:none', '--system', 'none',
+            '--patch-module', 'java.base='+str(core), '-source', '17', '-target', '17', '-d', descriptor_dir, descriptor])
+        descriptor_class = descriptor_dir/'module-info.class'; regular(descriptor_class)
+        modular = work/'android-core-module.jar'
+        with zipfile.ZipFile(modular, 'x', compression=zipfile.ZIP_STORED) as output:
+            output.writestr('module-info.class', descriptor_class.read_bytes())
+            for entry in entries:
+                output.writestr(entry, source.read(entry))
+    jmods = work/'android-jmods'; jmods.mkdir()
+    run('android-jmod', [files['jmod'], 'create', '--module-version', '17.0.17', '--target-platform', 'android',
+        '--class-path', modular, jmods/'java.base.jmod'])
+    image = work/'android-system'
+    run('android-jlink', [files['jlink'], '--module-path', jmods, '--add-modules', 'java.base',
+        '--output', image, '--disable-plugin', 'system-modules'])
+    regular(image/'lib/modules')
+    shutil.copyfile(files['jrt_fs'], image/'lib/jrt-fs.jar')
+    if digest(image/'lib/jrt-fs.jar') != digest(files['jrt_fs']):
+        raise ValueError('JDK image filesystem provider copy changed')
+    return image
+
+
+def probe_javac_args(files, image, classes, sources):
+    return [files['javac'], '-encoding', 'UTF-8', '-proc:none', '-implicit:none', '--system', image,
+            '-source', '17', '-target', '17', '-classpath', files['android_jar'], '-d', classes, *sources]
 
 
 def generate_manifest(raw):
@@ -107,6 +159,8 @@ def generate_manifest(raw):
             providers[0].get(ANDROID+'authorities') != PACKAGE+'.documents' or \
             providers[0].get(ANDROID+'permission') != 'android.permission.MANAGE_DOCUMENTS':
         raise ValueError('Exact existing SAF provider required')
+    # Preserve the original AGP debug variant: the owned evidence collector requires run-as.
+    app.set(ANDROID+'debuggable', 'true')
     root.set('package', PACKAGE); root.set(ANDROID+'versionCode', '1'); root.set(ANDROID+'versionName', VERSION)
     ET.SubElement(root, 'uses-sdk', {ANDROID+'minSdkVersion': '26', ANDROID+'targetSdkVersion': '37'})
     ET.register_namespace('android', ANDROID[1:-1])
@@ -152,7 +206,7 @@ def verify_apk(path, badging, tree):
     if "package: name='"+PACKAGE+"' versionCode='1' versionName='"+VERSION+"'" not in badging or \
             "sdkVersion:'26'" not in badging or "targetSdkVersion:'37'" not in badging or \
             'E: uses-permission' in tree or 'android:testOnly' not in tree or \
-            not re.search(r'android:testOnly\([^)]*\)=\(type 0x12\)0xffffffff', tree) or \
+            not all(re.search(r'android:'+flag+r'\([^)]*\)=\(type 0x12\)0xffffffff', tree) for flag in ['testOnly','debuggable']) or \
             PACKAGE+'.documents' not in tree or 'RecoveryInstrumentation' not in tree or 'FixtureDocuments' not in tree or \
             'E: queries' not in tree:
         raise ValueError('Actual binary manifest identity/permission mismatch')
@@ -265,8 +319,11 @@ def _compile_with_sdk(report, start, deadline):
         with tempfile.TemporaryDirectory(prefix='d08-sdk-', dir=build) as folder:
             work = Path(folder); generated = work/'AndroidManifest.xml'; generated.write_bytes(generate_manifest(MANIFEST.read_bytes()))
             classes = work/'classes'; classes.mkdir(); dex = work/'dex'; dex.mkdir()
-            run('javac-android-only', [files['javac'], '-encoding', 'UTF-8', '-proc:none', '-implicit:none', '--system', 'none', '-source', '17', '-target', '17',
-                '-classpath', files['android_jar'], '-d', classes, *SOURCES])
+            image = android_system_image(files, work, run)
+            for name, path in [('generated_android_modules', image/'lib/modules'), ('generated_jrt_fs', image/'lib/jrt-fs.jar')]:
+                files[name] = path; snapshots[name] = identity(path)
+            report['android_system_image'] = {n: snapshots[n] for n in ['generated_android_modules', 'generated_jrt_fs']}
+            run('javac-android-only', probe_javac_args(files, image, classes, SOURCES))
             bytecode = sorted(classes.rglob('*.class'))
             if not bytecode: raise ValueError('No actual Java classes produced')
             run('d8', [files['java'], '-cp', files['d8'], 'com.android.tools.r8.D8', '--min-api', '26',

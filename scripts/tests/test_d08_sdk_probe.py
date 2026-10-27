@@ -1,7 +1,8 @@
-"""Offline platform-probe build contracts; never runs SDK/device/key operations."""
+"""Offline contracts; one real pinned-JDK synthetic platform test, no SDK/device/key operations."""
 import ast
 import importlib.util
 import json
+import os
 from pathlib import Path
 import struct
 import subprocess
@@ -21,6 +22,7 @@ class SdkProbeTests(unittest.TestCase):
     def test_actual_source_manifest_retains_application_provider_instrumentation_queries(self):
         old = probe.ET.fromstring(probe.MANIFEST.read_bytes())
         new = probe.ET.fromstring(probe.generate_manifest(probe.MANIFEST.read_bytes()))
+        self.assertEqual('true',new.find('application').attrib.pop(probe.ANDROID+'debuggable'))
         for tag in ['application', 'queries', 'instrumentation']:
             self.assertEqual(probe.ET.tostring(old.find(tag)), probe.ET.tostring(new.find(tag)))
         self.assertEqual(new.get('package'), probe.PACKAGE)
@@ -30,6 +32,11 @@ class SdkProbeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             probe.generate_manifest(probe.MANIFEST.read_bytes().replace(b'<queries>',b'<uses-permission android:name="android.permission.INTERNET"/><queries>'))
 
+    def test_generated_probe_keeps_original_debug_build_run_as_capability(self):
+        manifest=probe.ET.fromstring(probe.generate_manifest(probe.MANIFEST.read_bytes()))
+        self.assertEqual('true',manifest.find('application').get(probe.ANDROID+'debuggable'),
+                         'The existing device collector uses run-as; AGP debug formerly injected this bit')
+
     def test_exact_existing_sdk_jdk_and_acceptance_only_missing_or_changed_fail(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d); sdk=root/'sdk'; jdk=root/'jdk'
@@ -37,10 +44,14 @@ class SdkProbeTests(unittest.TestCase):
                 parent.mkdir(parents=True);(parent/'source.properties').write_text('Pkg.Revision='+revision)
             (sdk/'licenses').mkdir();(sdk/'licenses/android-sdk-license').write_text(probe.LICENSE)
             jdk.mkdir();(jdk/'release').write_text('JAVA_RUNTIME_VERSION="17.0.17+10"\nIMPLEMENTOR="Eclipse Adoptium"\n')
-            for f in [jdk/'bin/javac',jdk/'bin/java',jdk/'lib/modules',sdk/'platforms/android-37.0/android.jar',
+            for f in [*[jdk/'bin'/n for n in ['javac','java','jmod','jlink']],jdk/'lib/modules',jdk/'lib/jrt-fs.jar',
+                      sdk/'platforms/android-37.0/android.jar',sdk/'platforms/android-37.0/core-for-system-modules.jar',
                       *[sdk/'build-tools/36.0.0'/n for n in ['aapt2','zipalign','lib/d8.jar','lib/apksigner.jar']]]:
                 f.parent.mkdir(parents=True,exist_ok=True);f.write_bytes(b'synthetic identity; never executed')
-            files, identities=probe.sdk_inputs(sdk,jdk);self.assertEqual(12,len(files));self.assertEqual(12,len(identities))
+            files, identities=probe.sdk_inputs(sdk,jdk);self.assertEqual(16,len(files));self.assertEqual(16,len(identities))
+            core=files['android_core'];original=core.read_bytes();core.unlink()
+            with self.assertRaises(FileNotFoundError):probe.sdk_inputs(sdk,jdk)
+            core.write_bytes(original)
             f=sdk/'licenses/android-sdk-license';before=f.read_bytes();f.write_text('different acceptance')
             with self.assertRaisesRegex(ValueError,'acceptance'):probe.sdk_inputs(sdk,jdk)
             self.assertEqual('different acceptance',f.read_text());f.write_bytes(before)
@@ -134,11 +145,55 @@ class SdkProbeTests(unittest.TestCase):
             self.assertNotIn(forbidden,s)
         strings={n.value for n in ast.walk(ast.parse(s)) if isinstance(n,ast.Constant) and isinstance(n.value,str)}
         self.assertFalse(strings & {'adb','emulator','sdkmanager','keytool','gradlew','setfacl'})
-        self.assertIn("'--system', 'none'",s);self.assertIn("'-classpath', files['android_jar']",s)
+        self.assertIn("'--patch-module', 'java.base='+str(core)",s)
+        self.assertIn("'-classpath', files['android_jar']",s)
         self.assertLess(s.index("run('zipalign'"),s.index("run('sign-existing-job-debug-key'"))
         self.assertLess(s.index("run('sign-existing-job-debug-key'"),s.index("run('verify-probe-signature'"))
         self.assertIn("key = confined(ROOT/'.toolchains/android-user-home/debug.keystore'",s)
-        self.assertNotIn("Path.home",s);self.assertNotIn("mkdir",s[:s.index('def compile_only')])
+        self.assertNotIn("Path.home",s)
+
+    def test_real_pinned_jdk_android_shaped_system_image_excludes_host_api(self):
+        # Deliberately tiny synthetic java.base, not Android SDK evidence. The same
+        # production image builder and final compiler command must admit only it.
+        jdk=Path(os.environ['JAVA_HOME']) if os.environ.get('JAVA_HOME') else ROOT/'.toolchains/jdk-17.0.17+10'
+        self.assertTrue((jdk/'bin/javac').is_file(), 'Existing pinned JDK required; no downloads')
+        release=probe.properties(jdk/'release')
+        self.assertEqual('17.0.17+10',release['JAVA_RUNTIME_VERSION'])
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d); src=root/'src/java/lang';src.mkdir(parents=True)
+            for name,body in [('Object','public Object() {}'),('String',''),('AndroidOnly','')]:
+                (src/(name+'.java')).write_text('package java.lang; public class '+name+' {'+body+'}')
+            # jlink's standard java.base plugin emits java.lang.invoke metadata.
+            invoke=src/'invoke';invoke.mkdir()
+            (invoke/'PlatformMarker.java').write_text('package java.lang.invoke; public class PlatformMarker {}')
+            initial=root/'initial';initial.mkdir()
+            def execute(label,args):
+                result=subprocess.run([str(a) for a in args],capture_output=True,text=True,timeout=30)
+                if result.returncode:raise AssertionError(label+': '+result.stderr+result.stdout)
+                return result.stdout
+            execute('fixture-classes',[jdk/'bin/javac','--system','none','--patch-module','java.base='+str(root/'src'),
+                    '-d',initial,*sorted(src.rglob('*.java'))])
+            core=root/'core-for-system-modules.jar'
+            with probe.zipfile.ZipFile(core,'x') as z:
+                for path in sorted(initial.rglob('*.class')):z.write(path,path.relative_to(initial))
+            files={n:jdk/'bin'/n for n in ['javac','jmod','jlink']}
+            files.update(android_core=core,jrt_fs=jdk/'lib/jrt-fs.jar',android_jar=root/'android.jar')
+            with probe.zipfile.ZipFile(files['android_jar'],'x'):pass
+            work=root/'work';work.mkdir();image=probe.android_system_image(files,work,execute)
+            out=root/'out';out.mkdir();allowed=root/'Allowed.java'
+            allowed.write_text('class Allowed { java.lang.AndroidOnly value; }')
+            args=probe.probe_javac_args(files,image,out,[allowed])
+            self.assertEqual(str(image),str(args[args.index('--system')+1]));self.assertNotIn('none',args)
+            self.assertEqual('17',args[args.index('-target')+1]);self.assertEqual('17',args[args.index('-source')+1])
+            execute('allowed',args);self.assertTrue((out/'Allowed.class').is_file())
+            rejected=root/'Rejected.java';rejected.write_text('class Rejected { java.nio.file.Path hostOnly; }')
+            bad=subprocess.run([str(a) for a in probe.probe_javac_args(files,image,out,[rejected])],capture_output=True,text=True,timeout=30)
+            self.assertNotEqual(0,bad.returncode);self.assertIn('java.nio.file',bad.stderr)
+            self.assertFalse((out/'Rejected.class').exists())
+            # Broken/missing platform content must fail before invoking any tools.
+            with probe.zipfile.ZipFile(core,'w') as z:z.writestr('java/lang/Object.class',b'not-enough')
+            with self.assertRaisesRegex(ValueError,'core system-module'):
+                probe.android_system_image(files,work,lambda *a:self.fail('Invalid core invoked tool'))
 
 
 if __name__=='__main__':unittest.main()
