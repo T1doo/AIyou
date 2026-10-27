@@ -93,3 +93,16 @@ dependencies {
     "screenshotTestImplementation"(libs.compose.ui.tooling)
     "screenshotTestImplementation"(libs.screenshot.validation.api)
 }
+
+// The image comparison worker is separate from the Gradle daemon. Keep the
+// full Preview inventory in one bounded worker rather than exhausting its heap.
+afterEvaluate {
+    tasks.named<org.gradle.api.tasks.testing.Test>("validateDebugScreenshotTest") {
+        maxHeapSize = "1g"
+        maxParallelForks = 1
+        doFirst {
+            check(maxHeapSize == "1g" && maxParallelForks == 1)
+            logger.lifecycle("Preview validation worker: heap=$maxHeapSize, forks=$maxParallelForks")
+        }
+    }
+}
