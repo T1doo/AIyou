@@ -4,11 +4,13 @@ import json
 import re
 import struct
 import xml.etree.ElementTree as ET
+from d08_probe_artifact import (PROBE_SOURCE, PROBE_RUN, PROBE_ARTIFACT, PROBE_ARCHIVE_SHA,
+                                PROBE_SHA, MEMBERS, REPORT_MEMBER, RECEIPT_MEMBER)
 
 SOURCE = "958ab2a08536161d8a0776ef155b6368d7df09c6"
 APK_HASH = "dadce271185cc1ff1e8a577f1986d4b4290fbcb60daf7dd187c7088b5d1b693a"
-BRANCH = "refs/heads/device/d02-kvm-acceptance-20261012"
-MESSAGE = "[d08-recovery] 958ab one isolated SAF round"
+BRANCH = "refs/heads/device/d08-sdk-probe-recovery-20261027"
+MESSAGE = "[d08-recovery] 958ab SDK probe e3ac0d9 one isolated SAF round"
 APP = "com.t1doo.aiyou"
 PROBE = "com.t1doo.aiyou.recoveryprobe"
 METHOD = "freshInstallSafRestoreLookupAndDelete"
@@ -22,6 +24,9 @@ EXPECTED_REQUEST = {
     "artifactDigest": "475285ec3ccd6d16605e6c0fca6051a3cb68ddf9ae29998aa36699d0e22254a4",
     "apkSha256": APK_HASH, "jobMinutes": 35, "driverSeconds": 1920,
     "cleanupSeconds": 120, "attempt": 1, "newTermsAcceptance": False, "realData": False,
+    "probeSourceSha": PROBE_SOURCE, "probeArtifactRun": PROBE_RUN, "probeArtifactId": PROBE_ARTIFACT,
+    "probeArtifactDigest": PROBE_ARCHIVE_SHA, "probeApkSha256": PROBE_SHA,
+    "probeReportSha256": MEMBERS[REPORT_MEMBER][1], "probeReceiptSha256": MEMBERS[RECEIPT_MEMBER][1],
 }
 
 

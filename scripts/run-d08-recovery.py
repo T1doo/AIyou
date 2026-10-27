@@ -23,12 +23,12 @@ import xml.etree.ElementTree as ET
 from d08_kvm_acl import RecoveryKvmAcl
 from d08_recovery_contract import (SOURCE, APK_HASH, APP, PROBE, FILES, EXPECTED_REQUEST,
     admit, check_source_changes, validate_device_result, evidence_frame)
+from d08_probe_artifact import PROBE_SOURCE, PROBE_SHA, verify_probe, fixed_file
 
 ROOT = Path(__file__).resolve().parents[1]
-PROJECT = ROOT / "checks/device-recovery/android"
 REQUEST = ROOT / "checks/device-recovery/request.json"
 APK = ROOT / ".local-evidence/d08-fixed-apk/app-debug.apk"
-HARNESS_DIR = PROJECT / "build/outputs/apk/debug"
+PROBE_DIR = ROOT / ".local-evidence/d08-verified-probe"
 COLLECT_SECONDS = 120
 CLEANUP_SECONDS = 120
 
@@ -98,16 +98,14 @@ def verify_terms(sdk):
             raise RuntimeError("Frozen complete SDK terms differ")
 
 
-def prepare_build():
+def prepare_probe():
     recheck()
+    verify_probe(PROBE_DIR)
+    fixed_file(APK, 27161705, APK_HASH)
     subprocess.run([sys.executable, ROOT / "scripts/check-sdk.py"], cwd=ROOT, check=True)
     sdk = Path(os.environ.get("ANDROID_HOME") or os.environ["ANDROID_SDK_ROOT"])
     verify_terms(sdk)
-    # Same reviewed verification rules, copied only into the isolated ignored build.
-    dest = PROJECT / "gradle/verification-metadata.xml"
-    dest.parent.mkdir(exist_ok=True)
-    if dest.is_symlink(): raise RuntimeError("Refuse metadata symlink")
-    dest.write_bytes((ROOT / "gradle/verification-metadata.xml").read_bytes())
+    print("D08 fixed SDK probe and production APK authenticated; device execution not performed")
 
 
 def package_snapshot(path):
@@ -178,12 +176,9 @@ def instrument_and_collect(instrument, read, save, deadline, report, clock=time.
 
 def execute():
     admitted = recheck()
-    if digest(APK) != APK_HASH or APK.stat().st_size != 27161705:
-        raise RuntimeError("Original 958ab APK bytes absent/different")
-    harnesses = list(HARNESS_DIR.glob("*.apk"))
-    if len(harnesses) != 1 or harnesses[0].is_symlink(): raise RuntimeError("One actual compiled probe APK required")
-    harness = harnesses[0]
-    harness_hash = digest(harness)
+    fixed_file(APK, 27161705, APK_HASH)
+    harness = verify_probe(PROBE_DIR)
+    harness_hash = PROBE_SHA
     if os.uname().machine != "x86_64": raise RuntimeError("Standard Linux x86_64 runner required")
     output = Path(os.environ["RUNNER_TEMP"]) / ("aiyou-d08-" + admitted["run"] + "-1")
     output.mkdir(exist_ok=False)
@@ -197,6 +192,7 @@ def execute():
         original_emit(path, name)
     module.emit_file = emit_text
     report = {"result": "NOT RUN", "productionSha": SOURCE, "harnessSha": admitted["sha"], "run": admitted["run"],
+              "probeBuildSha": PROBE_SOURCE, "probeApkSha256": PROBE_SHA,
               "attempt": 1, "deviceScope": "one owned API35 x86_64 AVD", "newAgreements": 0, "artifactUploads": 0}
     supervisor = module.Supervisor(output, report)
     supervisor.deadline = admitted["deadline"]
@@ -294,7 +290,11 @@ def execute():
             if p.stdout.strip() or p.stderr.strip() or p.returncode not in (0, 1): raise RuntimeError("Existing/unknown package retained")
         remote = "/data/local/tmp/aiyou-d08-" + token
         run([adb, "-s", serial, "shell", "mkdir", remote], "owned-device-directory", env=env)
+        # Authenticate again after SDK/AVD preparation, immediately before use.
+        fixed_file(APK, 27161705, APK_HASH)
+        if verify_probe(PROBE_DIR) != harness: raise RuntimeError("Pinned probe path changed")
         run([adb, "-s", serial, "push", APK, remote + "/app.apk"], "push-fixed-apk", env=env)
+        if verify_probe(PROBE_DIR) != harness: raise RuntimeError("Pinned probe changed before install")
         probe_install_attempted = True
         run([adb, "-s", serial, "install", "-t", harness], "install-own-probe", env=env)
         # Keep the evidence window even when the instrumentation shell itself fails.
@@ -375,13 +375,13 @@ def execute():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("admit", "prepare-build", "execute"))
+    parser.add_argument("mode", choices=("admit", "prepare-probe", "execute"))
     args = parser.parse_args()
     if args.mode == "admit":
         receipt = admission(); p = receipt_path()
         with p.open("x") as f: json.dump(receipt, f)
         print("D08 admitted: exact reviewed request; no device action yet")
-    elif args.mode == "prepare-build": prepare_build()
+    elif args.mode == "prepare-probe": prepare_probe()
     else: execute()
 
 

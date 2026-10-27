@@ -1,8 +1,8 @@
 name: D08 one isolated SAF recovery (execution approval required)
-run-name: D08 fixed 958ab isolated recovery; not D01 acceptance
+run-name: D08 fixed 958ab and verified SDK probe; execution approval required
 'on':
   push:
-    branches: ['device/d02-kvm-acceptance-20261012']
+    branches: ['device/d08-sdk-probe-recovery-20261027']
     paths: ['checks/device-recovery/request.json']
 permissions:
   contents: read
@@ -12,11 +12,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   recovery:
-    if: ${{ github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.event_name == 'push' && github.ref == 'refs/heads/device/d02-kvm-acceptance-20261012' && github.event.head_commit.message == '[d08-recovery] 958ab one isolated SAF round' && github.run_attempt == 1 }}
+    if: ${{ github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.event_name == 'push' && github.ref == 'refs/heads/device/d08-sdk-probe-recovery-20261027' && github.event.head_commit.message == '[d08-recovery] 958ab SDK probe e3ac0d9 one isolated SAF round' && github.run_attempt == 1 }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
-      GRADLE_USER_HOME: ${{ github.workspace }}/.toolchains/gradle-home
       PYTHONUNBUFFERED: '1'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -27,18 +26,23 @@ jobs:
       - name: Require exact reviewed and explicitly approved request before setup
         run: python3 scripts/run-d08-recovery.py admit
       - name: Check fixed admission, receipt and mocked ACL guards before setup
-        run: python3 -m unittest discover -s scripts/tests -p test_d08_recovery.py -v
+        run: |
+          python3 -m unittest discover -s scripts/tests -p test_d08_recovery.py -v
+          python3 -m unittest discover -s scripts/tests -p test_d08_probe_artifact.py -v
       - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
         with:
           distribution: temurin
           java-version: '17.0.17+10'
           check-latest: false
-      - name: Reuse already accepted SDK and strict dependency verification
-        run: |
-          python3 scripts/run-d08-recovery.py prepare-build
-          printf '%s  %s\n' 3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
-      - name: Compile independent platform-only probe, never rebuild production APK
-        run: scripts/gradle.sh -p checks/device-recovery/android --dependency-verification=strict assembleDebug
+      - name: Read only the reviewed SDK probe and its exact producer proofs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          repository: T1doo/AIyou
+          run-id: 40450280096
+          artifact-ids: 12711100888
+          github-token: ${{ github.token }}
+          path: .local-evidence/d08-verified-probe
+          merge-multiple: true
       - name: Read only the immutable successful 958ab APK artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
@@ -48,6 +52,8 @@ jobs:
           github-token: ${{ github.token }}
           path: .local-evidence/d08-fixed-apk
           merge-multiple: true
+      - name: Authenticate both fixed APKs and reuse only matching existing SDK terms
+        run: python3 scripts/run-d08-recovery.py prepare-probe
       - name: One owned KVM AVD and actual production SAF round trip
         run: python3 scripts/run-d08-recovery.py execute
       # No cache/artifact uploads, SDK/APK/DB/key export, dispatch, matrix or rerun.
