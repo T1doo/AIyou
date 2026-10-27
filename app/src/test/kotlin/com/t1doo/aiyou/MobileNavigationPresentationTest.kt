@@ -16,6 +16,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.records.LocalRecordUiState
 import com.t1doo.aiyou.records.ManualTasksUiState
