@@ -1,0 +1,22 @@
+{
+  "kind": "one-isolated-d08-saf-recovery",
+  "executionApproved": true,
+  "productionSha": "958ab2a08536161d8a0776ef155b6368d7df09c6",
+  "artifactRun": 40123738360,
+  "artifactId": 12572840840,
+  "artifactDigest": "475285ec3ccd6d16605e6c0fca6051a3cb68ddf9ae29998aa36699d0e22254a4",
+  "apkSha256": "dadce271185cc1ff1e8a577f1986d4b4290fbcb60daf7dd187c7088b5d1b693a",
+  "jobMinutes": 35,
+  "driverSeconds": 1920,
+  "cleanupSeconds": 120,
+  "attempt": 1,
+  "newTermsAcceptance": false,
+  "realData": false,
+  "probeSourceSha": "e3ac0d9c2311d8bb9a0008df1e5c4421461b991b",
+  "probeArtifactRun": 40450280096,
+  "probeArtifactId": 12711100888,
+  "probeArtifactDigest": "de6255599fe18779ddfc334e8c72258420509e9152b4575749ba254f676237b4",
+  "probeApkSha256": "82bf4c6d3426ed5556fa8d8415451a591806d328e8180ca5e37504fa0e8a4478",
+  "probeReportSha256": "2b2293b0675f1366a0ecc9660e39517cd4ef18f6f7f0851de31c0375292b88b2",
+  "probeReceiptSha256": "121fefbf9f441d52dcdf59a574815888527de59370e5a273f64963d3e9ae33ec"
+}

@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <package android:name="com.t1doo.aiyou" />
+        <intent><action android:name="android.provider.action.PICK_IMAGES" /><data android:mimeType="image/*" /></intent>
+        <intent><action android:name="android.intent.action.OPEN_DOCUMENT" /><category android:name="android.intent.category.OPENABLE" /><data android:mimeType="*/*" /></intent>
+    </queries>
+    <application android:label="AIyou D08 isolated probe" android:testOnly="true"
+        android:allowBackup="false" android:usesCleartextTraffic="false">
+        <provider android:name=".FixtureDocuments" android:authorities="com.t1doo.aiyou.recoveryprobe.documents"
+            android:exported="true" android:grantUriPermissions="true" android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter>
+        </provider>
+    </application>
+    <instrumentation android:name=".RecoveryInstrumentation" android:targetPackage="com.t1doo.aiyou.recoveryprobe"
+        android:functionalTest="true" android:handleProfiling="false" />
+</manifest>
