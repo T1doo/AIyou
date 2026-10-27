@@ -10,6 +10,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.text.TextLayoutResult
@@ -17,6 +18,9 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.records.LocalRecordUiState
+import com.t1doo.aiyou.records.ManualTasksUiState
+import com.t1doo.aiyou.model.ManualTaskSnapshot
+import com.t1doo.aiyou.model.ManualTaskStatus
 import com.t1doo.aiyou.ui.*
 import java.io.File
 import org.json.JSONObject
@@ -48,10 +52,15 @@ class MobileNavigationPresentationTest {
 
     @Test fun productionTabsSwipeOnceAtEdgesAndReturnToUnchangedUnsavedDraftWithoutWrites() {
         val draft="合成未保存草稿🙂，切换页面后仍在。"
+        val tasks=List(24) { index -> ManualTaskSnapshot(
+            "00000000-0000-0000-0000-"+(index+1).toString().padStart(12,'0'),1,
+            "合成待办 ${index+1}",ManualTaskStatus.OPEN,1_700_000_000_000,"UTC",1_700_000_000_000) }
         var writes=0
         compose.setContent { AIyouTheme { AIyouApp(
-            local=LocalRecordUiState(ready=true,opening=false,text=draft),
+            local=LocalRecordUiState(ready=true,opening=false,text=draft,
+                tasks=ManualTasksUiState(supported=true,available=true,items=tasks)),
             onSave={writes++},onDraftChange={writes++},
+            onTaskBegin={writes++},onTaskChange={_,_,_->writes++},
             display=UiPreferencesState(UiPreferences(showCompanion=false,reduceMotion=false),ready=true)) } }
         for (destination in Destination.entries) tab(destination).assertIsDisplayed()
             .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
@@ -62,8 +71,25 @@ class MobileNavigationPresentationTest {
         tab(Destination.MEMORIES).assertIsSelected()
         compose.onNodeWithTag("notebook-navigation").performTouchInput { swipeLeft() }
         tab(Destination.TASKS).assertIsSelected()
+        val target="manual-task-row-"+tasks[8].id
+        compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(target))
+        compose.onNodeWithTag(target).assertIsDisplayed()
+        fun taskPosition()=compose.onNodeWithTag("manual-task-list").fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange].value()
+        val before=taskPosition()
+        assertTrue(before>0f)
         compose.onNodeWithTag("notebook-navigation").performTouchInput { swipeLeft() }
         tab(Destination.TASKS).assertIsSelected()
+        compose.onNodeWithTag("notebook-navigation").performTouchInput { swipeRight() }
+        tab(Destination.MEMORIES).assertIsSelected()
+        compose.onNodeWithTag("notebook-navigation").performTouchInput { swipeLeft() }
+        tab(Destination.TASKS).assertIsSelected()
+        compose.onNodeWithTag(target).assertIsDisplayed()
+        val after=taskPosition()
+        assertEquals(before,after,0f)
+        File("build/reports/tests/testDebugUnitTest/mobile-navigation/task-return.json").writeText(JSONObject()
+            .put("source_sha",System.getenv("GITHUB_SHA")?:"local-not-CI")
+            .put("beforeScrollAxis",before).put("afterScrollAxis",after).put("writes",writes).toString(2))
         compose.onNodeWithTag("notebook-navigation").performTouchInput { swipeRight() }
         tab(Destination.MEMORIES).assertIsSelected()
         val now=tab(Destination.NOW)

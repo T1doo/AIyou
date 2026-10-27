@@ -385,6 +385,7 @@ fun AIyouApp(
     var navigationHeightPx by remember { mutableIntStateOf(0) }
     val nowList = rememberLazyListState()
     val memoriesList = rememberLazyListState()
+    val tasksList = rememberLazyListState()
     val recapList = remember { LazyListState() }
     var recapRoute by remember { mutableStateOf(false) }
     var taskSourceRoute by remember { mutableStateOf(false) }
@@ -1313,6 +1314,7 @@ fun AIyouApp(
             (local.tasks.supported || local.opening || local.error != null)) {
             fun ownsTasks() = ownsNavigation() && selectedName == Destination.TASKS.name && !showSettings && !demo
             com.t1doo.aiyou.records.ManualTasksScreen(local,
+                listState = tasksList,
                 onBegin = { if (ownsTasks()) onTaskBegin() },
                 onEdit = { session, text -> if (ownsTasks()) onTaskEdit(session, text) },
                 onCreate = { session, text -> if (ownsTasks()) onTaskCreate(session, text) },

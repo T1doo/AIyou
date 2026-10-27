@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -53,6 +55,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     onCloseDate: (Long) -> Unit = {}, onSource: (String, Long) -> Unit = { _, _ -> }, clock: Clock = Clock.systemUTC(),
     onProposalOpen:(String,Long)->Unit={_,_->},onProposalRefresh:()->Unit={},
     reminders: TaskReminderController? = null, ownsReminderRoute: () -> Boolean = { true },
+    listState: LazyListState = rememberLazyListState(),
     titles: ManualTaskController? = null, ownsTitleRoute: () -> Boolean = { true }) {
     val tasks = local.tasks
     val storageReady = local.ready && !local.opening && local.error == null
@@ -80,6 +83,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
         val compactHeader = LocalDensity.current.fontScale >= 1.5f || (maxHeight > 0.dp && maxHeight <= 360.dp)
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             LazyColumn(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize().testTag("manual-task-list"),
+                state = listState,
                 contentPadding = PaddingValues(horizontal = margin,
                     vertical = if (compactHeader) AIyouDimensions.spaceSm else AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(if (compactHeader) AIyouDimensions.spaceMd else AIyouDimensions.sectionGap)) {
