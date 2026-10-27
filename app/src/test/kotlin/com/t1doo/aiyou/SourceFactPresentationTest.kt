@@ -144,7 +144,7 @@ class SourceFactPresentationTest {
     private fun confirm() {click("fact-confirm");drain()}
     private fun accept() {click("fact-accept:"+saved!!.id);drain();confirm()}
     private fun backToList(){compose.onNodeWithText("返回列表").assertIsDisplayed().performClick();compose.waitForIdle();compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)}
-    private fun global(){compose.showNotebookToolsFor("facts-open");compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("facts-open"));compose.onNodeWithTag("facts-open").assertIsDisplayed().performClick();drain()}
+    private fun global(){compose.showNotebookToolsFor("facts-open");compose.onNodeWithTag("facts-open").performScrollTo().assertIsDisplayed();compose.onNodeWithTag("facts-open").assertIsDisplayed().performClick();drain()}
     private fun frame(name:String){
         val image=compose.onNodeWithTag("facts-dialog").captureToImage().asAndroidBitmap()
         val file=File("build/reports/tests/testDebugUnitTest/source-facts/$name.png");file.parentFile.mkdirs()

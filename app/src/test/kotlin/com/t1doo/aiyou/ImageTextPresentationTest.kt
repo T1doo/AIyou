@@ -110,7 +110,7 @@ class ImageTextPresentationTest {
         if(compose.onAllNodesWithText("返回附件列表").fetchSemanticsNodes().isNotEmpty()){compose.onNodeWithText("返回附件列表").assertIsDisplayed().performClick();compose.waitForIdle()}
         compose.onNodeWithText("返回原文").assertIsDisplayed().performClick();compose.waitForIdle()
         compose.onNodeWithText("返回列表").assertIsDisplayed().performClick();compose.waitForIdle()
-        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.showNotebookToolsFor("image-texts-open");compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("image-texts-open"));compose.onNodeWithTag("image-texts-open").performClick();drain()
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.showNotebookToolsFor("image-texts-open");compose.onNodeWithTag("image-texts-open").performScrollTo().assertIsDisplayed();compose.onNodeWithTag("image-texts-open").performClick();drain()
     }
     private fun query(text:String){compose.onNodeWithTag("image-text-keyword").performScrollTo().performTextReplacement(text);compose.onNodeWithTag("image-text-count").assertDoesNotExist();click("image-text-search");drain()}
     @Test fun unavailableModelAndAiNoneNeverInferCreateManualReplacementOrChangeOriginal(){

@@ -2,14 +2,13 @@ package com.t1doo.aiyou
 
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.records.*
@@ -20,10 +19,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.shadows.ShadowDialog
 
 /** Actual production list/disclosures. Counts are UI callbacks, not SQL/device evidence. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[35],qualifiers="w360dp-h800dp")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class NotebookToolsPresentationTest {
     @get:Rule val compose=createComposeRule()
     private val local=mutableStateOf(LocalRecordUiState(ready=true,opening=false,
@@ -34,15 +37,32 @@ class NotebookToolsPresentationTest {
     private val through=TextFieldState("2026-10-23")
     private val search=OriginalSearchState(OriginalSearchInput(),OriginalSearchStage.BROWSE)
     private var actions=0
-    private fun content(doubleFont:Boolean=false) { compose.setContent {
-        val d=LocalDensity.current
-        CompositionLocalProvider(LocalDensity provides Density(d.density,if(doubleFont) 2f else 1f)) {
-            AIyouTheme { LocalRecordsScreen(destination.value,local.value,{actions++},{actions++},{actions++},
+    private fun content(doubleFont:Boolean=false) {
+        RuntimeEnvironment.setFontScale(if(doubleFont) 2f else 1f)
+        compose.setContent { AIyouTheme {
+            LocalRecordsScreen(destination.value,local.value,{actions++},{actions++},{actions++},
                 onOpenPreferences={actions++},onBeginExport={actions++},
                 searchState=search,searchQuery=query,searchFrom=from,searchThrough=through,
-                onSearchMode={actions++},onClearSearch={actions++},imageTextBusy=true) }
+                onSearchMode={actions++},onClearSearch={actions++},imageTextBusy=true,
+                motionAllowed=doubleFont)
+        } }
+    }
+    private fun frame(name:String,panel:Boolean=false) {
+        val directory=java.io.File("build/reports/tests/testDebugUnitTest/mobile-navigation").apply { mkdirs() }
+        val node=if(panel) compose.onNodeWithTag("notebook-tools-panel") else compose.onRoot()
+        val image=node.captureToImage().asAndroidBitmap()
+        val configurationScale=compose.runOnIdle {
+            if(panel) checkNotNull(ShadowDialog.getLatestDialog()).context.resources.configuration.fontScale
+            else RuntimeEnvironment.getApplication().resources.configuration.fontScale
         }
-    } }
+        java.io.File(directory,"$name.png").outputStream().use { assertTrue(image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)) }
+        java.io.File(directory,"$name.json").writeText(org.json.JSONObject()
+            .put("source_sha",System.getenv("GITHUB_SHA")?:"local-not-CI")
+            .put("kind",if(panel)"Actual tool panel crop; synthetic Compose UI"else"Synthetic Compose record screen")
+            .put("actions",actions).put("queryUnchanged",query.text.toString()=="合成关键词🙂")
+            .put("configurationFontScale",configurationScale)
+            .put("viewportPixels","${image.width}x${image.height}").toString(2))
+    }
     private fun toggle(tag:String)=compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertIsEnabled()
     private fun unchanged() { compose.runOnIdle {
         assertEquals(0,actions);assertEquals("合成关键词🙂",query.text.toString())
@@ -51,6 +71,7 @@ class NotebookToolsPresentationTest {
 
     @Test fun searchPrecedesCollapsedToolsAndDisclosurePreservesInputsFeedbackAndDisabledActions() {
         content()
+        frame("03-normal-record-tools-closed")
         compose.onNodeWithTag("original-search-query").assertIsDisplayed()
         compose.onNodeWithTag("preferences-open").assertDoesNotExist()
         compose.onNodeWithTag("export-open").assertDoesNotExist()
@@ -58,9 +79,12 @@ class NotebookToolsPresentationTest {
         compose.onNodeWithText("合成回收站反馈").assertExists()
         compose.showNotebookToolsFor("preferences-open");compose.showNotebookToolsFor("export-open");unchanged()
         compose.onNodeWithTag("export-open").performScrollTo().assertIsEnabled()
+        frame("04-normal-management-panel",panel=true)
         compose.runOnIdle {local.value=local.value.copy(saving=true)}
         compose.onNodeWithTag("export-open").assertIsNotEnabled()
-        toggle("notebook-manage-tools").performClick();toggle("notebook-review-tools").performClick();unchanged()
+        compose.onNodeWithTag("notebook-tools-close").performClick()
+        toggle("notebook-review-tools").performClick()
+        compose.onNodeWithTag("notebook-tools-close").performClick();unchanged()
         compose.onNodeWithTag("export-open").assertDoesNotExist()
         compose.onNodeWithTag("preferences-open").assertDoesNotExist()
         compose.showNotebookToolsFor("preferences-open")
@@ -80,7 +104,12 @@ class NotebookToolsPresentationTest {
         button.performSemanticsAction(SemanticsActions.RequestFocus){assertTrue(it())}
         button.assertIsFocused().performKeyInput {pressKey(Key.Enter)}
         compose.onNodeWithTag("preferences-open").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
-        toggle("notebook-review-tools").performClick()
+        compose.runOnIdle { assertEquals(2f,checkNotNull(ShadowDialog.getLatestDialog()).context.resources.configuration.fontScale,0f) }
+        frame("05-double-font-landscape-tools-panel",panel=true)
+        compose.onNodeWithTag("notebook-tools-title").performScrollTo()
+        compose.onNodeWithTag("notebook-tools-panel").performTouchInput { swipeDown() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("notebook-tools-panel").assertDoesNotExist()
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("original-search-query"))
         compose.onNodeWithTag("original-search-query").assertIsDisplayed()
             .performSemanticsAction(SemanticsActions.RequestFocus){assertTrue(it())}

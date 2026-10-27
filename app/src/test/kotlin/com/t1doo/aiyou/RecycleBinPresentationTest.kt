@@ -60,7 +60,7 @@ class RecycleBinPresentationTest {
     private fun browse() {
         // After deleting the visible row, the remembered timeline can keep its
         // header offscreen. Compose that lazy item before looking up its node.
-        compose.showNotebookToolsFor("recycle-open");compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("recycle-open"))
+        compose.showNotebookToolsFor("recycle-open");compose.onNodeWithTag("recycle-open").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("recycle-open").assertIsDisplayed().performClick(); pump()
     }
     @Test fun actualMoveAndExplicitRestoreKeepFullOriginalTagsAndRequireEachConfirmation() {

@@ -9,7 +9,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
@@ -31,6 +31,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -46,6 +49,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
@@ -143,14 +148,69 @@ fun LocalRecordsScreen(
     evidenceQuestion: (@Composable () -> Unit)? = null,
     onOpenImageTexts:(()->Unit)?=null,
     imageTextBusy:Boolean=false,
+    motionAllowed:Boolean=false,
     onQuestionKeywords:(()->Unit)?=null,
     onReduceSearchKeywords:((OriginalSearchState)->Boolean)?=null,
 ) {
     // Presentation only. Never retain a source, query proof or controller in disclosure state.
     var reviewToolsExpanded by remember(destination, local.localSearch, local.unifiedKeywordOwner,
-        local.recordAuthorizationOwner, local.ready) { mutableStateOf(false) }
+        local.recordAuthorizationOwner, local.ready, local.opening, local.error) { mutableStateOf(false) }
     var manageToolsExpanded by remember(destination, local.localSearch, local.unifiedKeywordOwner,
-        local.recordAuthorizationOwner, local.ready) { mutableStateOf(false) }
+        local.recordAuthorizationOwner, local.ready, local.opening, local.error) { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    fun closeTools() { reviewToolsExpanded=false; manageToolsExpanded=false }
+    fun openTools(review: Boolean) {
+        focus.clearFocus(); keyboard?.hide()
+        reviewToolsExpanded=review; manageToolsExpanded=!review
+    }
+    val hasReviewTools = (onOpenImageTexts != null && local.supportsImageTexts) ||
+        (onOpenTranscripts != null && local.supportsAudioTranscripts) ||
+        (onOpenPreferences != null && local.supportsSourcePreferences) ||
+        (onOpenFacts != null && local.supportsSourceFacts) ||
+        ((onOpenMemoryInbox != null || onOpenAcceptedMemories != null) && local.supportsMemoryInbox) ||
+        (onOpenFactRecap != null && local.supportsFactRecaps) || imageTextBusy
+    val hasManageTools = (onBeginRecordPackage != null && local.supportsRecordPackages) ||
+        (onBeginExport != null && local.supportsOriginalExport) ||
+        (onOpenRecycleBin != null && local.supportsRecycleBin)
+    if (destination == Destination.MEMORIES && (reviewToolsExpanded || manageToolsExpanded)) {
+        NotebookToolsPanel(if (reviewToolsExpanded) "找回与审阅" else "资料管理", motionAllowed, ::closeTools) {
+            if (reviewToolsExpanded) {
+                FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                if(onOpenImageTexts!=null && local.supportsImageTexts)TextButton({ closeTools(); onOpenImageTexts() },enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("image-texts-open")){Text("找回图片文字与原图")}
+                if(onOpenTranscripts!=null && local.supportsAudioTranscripts)TextButton({ closeTools(); onOpenTranscripts() },enabled=local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("transcripts-open")){Text("找回人工转写与原音")}
+                if(onOpenFacts!=null && local.supportsSourceFacts)TextButton({ closeTools(); onOpenFacts() },
+                    enabled=local.ready&&!local.opening&&local.error==null,
+                    modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("facts-open")) { Text("普通事实自述与人工审阅") }
+                if (onOpenPreferences != null && local.supportsSourcePreferences) TextButton({ closeTools(); onOpenPreferences() },
+                    enabled = local.ready && !local.opening && local.error == null,
+                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("preferences-open")) { Text("普通偏好自述与人工审阅") }
+                if (onOpenMemoryInbox != null && local.supportsMemoryInbox) TextButton({ closeTools(); onOpenMemoryInbox() },
+                    enabled = local.ready && !local.opening && local.error == null,
+                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("memory-inbox-open")) { Text("待审事件与情绪") }
+                if (onOpenAcceptedMemories != null && local.supportsMemoryInbox) TextButton({ closeTools(); onOpenAcceptedMemories() },
+                    enabled = local.ready && !local.opening && local.error == null,
+                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("memory-accepted-open")) { Text("找回已采纳事件与情绪") }
+                if(onOpenFactRecap!=null && local.supportsFactRecaps) TextButton({ closeTools(); onOpenFactRecap() },
+                    enabled=local.ready && !local.opening && local.error==null,
+                    modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("recap-open")){Text("生成本机日／周回顾")}
+                }
+            } else {
+                FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                if (onBeginRecordPackage != null && local.supportsRecordPackages) TextButton(
+                    onClick = { closeTools(); onBeginRecordPackage() },
+                    enabled = local.ready && !local.opening && local.error == null && !local.saving && !local.savePending,
+                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("package-open")) { Text("加密原文包与恢复") }
+                if (onBeginExport != null && local.supportsOriginalExport) TextButton(onClick = { closeTools(); onBeginExport() }, enabled = local.ready && !local.opening && local.error == null &&
+                    !local.saving && !local.savePending,
+                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("export-open")) { Text("导出原文、待办与草稿") }
+                if (onOpenRecycleBin != null && local.supportsRecycleBin) TextButton(onClick = { closeTools(); onOpenRecycleBin() },
+                    enabled = local.ready && !local.opening && local.error == null && !local.saving && !local.savePending && local.originalExport == null,
+                    modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("recycle-open")) { Text("回收站") }
+                }
+            }
+        }
+    }
     if (destination == Destination.NOW) local.captureDiscard?.let { discard ->
         AlertDialog(
             onDismissRequest = { if (!discard.busy) onCancelCaptureDiscard(discard.requestId) },
@@ -298,68 +358,30 @@ fun LocalRecordsScreen(
                         (onOpenFacts != null && local.supportsSourceFacts) ||
                         ((onOpenMemoryInbox != null || onOpenAcceptedMemories != null) && local.supportsMemoryInbox))) {
                         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
-                            NotebookPageHeader(destination.label, "${local.entries.size} 条本机记录", stackSummary, companion)
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("${local.entries.size} 条本机记录", style = MaterialTheme.typography.titleMedium)
+                                    Text("仅本机处理", style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
+                                }
+                                companion?.invoke()
+                            }
                             if(onOpenUnified!=null && local.unifiedKeywordOwner!=null)FilledTonalButton(onOpenUnified,enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().heightIn(min=AIyouDimensions.minTouchTarget).testTag("unified-open")){Text("统一关键词找回")}
-                            val hasReviewTools = (onOpenImageTexts != null && local.supportsImageTexts) ||
-                                (onOpenTranscripts != null && local.supportsAudioTranscripts) ||
-                                (onOpenPreferences != null && local.supportsSourcePreferences) ||
-                        (onOpenFacts != null && local.supportsSourceFacts) ||
-                                ((onOpenMemoryInbox != null || onOpenAcceptedMemories != null) && local.supportsMemoryInbox) ||
-                                (onOpenFactRecap != null && local.supportsFactRecaps) || imageTextBusy
-                            val hasManageTools = (onBeginRecordPackage != null && local.supportsRecordPackages) ||
-                                (onBeginExport != null && local.supportsOriginalExport) ||
-                                (onOpenRecycleBin != null && local.supportsRecycleBin)
                             FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                                if (hasReviewTools) OutlinedButton(onClick={ reviewToolsExpanded=!reviewToolsExpanded },
+                                if (hasReviewTools) OutlinedButton(onClick={ openTools(true) },
                                     shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget)
                                         .aiyouFocusOutline().testTag("notebook-review-tools")
                                         .semantics { stateDescription=if(reviewToolsExpanded) "已展开" else "已收起" }) {
-                                    Text(if(reviewToolsExpanded) "找回与审阅 · 收起" else "找回与审阅 · 展开")
+                                    Text("找回工具")
                                 }
-                                if (hasManageTools) OutlinedButton(onClick={ manageToolsExpanded=!manageToolsExpanded },
+                                if (hasManageTools) OutlinedButton(onClick={ openTools(false) },
                                     shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget)
                                         .aiyouFocusOutline().testTag("notebook-manage-tools")
                                         .semantics { stateDescription=if(manageToolsExpanded) "已展开" else "已收起" }) {
-                                    Text(if(manageToolsExpanded) "资料管理 · 收起" else "资料管理 · 展开")
+                                    Text("资料管理")
                                 }
                             }
-                            if (hasReviewTools && reviewToolsExpanded) {
-                            FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                            if(onOpenImageTexts!=null && local.supportsImageTexts)TextButton(onOpenImageTexts,enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("image-texts-open")){Text("找回图片文字与原图")}
-                            if(onOpenTranscripts!=null && local.supportsAudioTranscripts)TextButton(onOpenTranscripts,enabled=local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("transcripts-open")){Text("找回人工转写与原音")}
-                            if(onOpenFacts!=null && local.supportsSourceFacts)TextButton(onOpenFacts,
-                                enabled=local.ready&&!local.opening&&local.error==null,
-                                modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("facts-open")) { Text("普通事实自述与人工审阅") }
-                            if (onOpenPreferences != null && local.supportsSourcePreferences) TextButton(onOpenPreferences,
-                                enabled = local.ready && !local.opening && local.error == null,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("preferences-open")) { Text("普通偏好自述与人工审阅") }
-                            if (onOpenMemoryInbox != null && local.supportsMemoryInbox) TextButton(onOpenMemoryInbox,
-                                enabled = local.ready && !local.opening && local.error == null,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("memory-inbox-open")) { Text("待审事件与情绪") }
-                            if (onOpenAcceptedMemories != null && local.supportsMemoryInbox) TextButton(onOpenAcceptedMemories,
-                                enabled = local.ready && !local.opening && local.error == null,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("memory-accepted-open")) { Text("找回已采纳事件与情绪") }
-                            if(onOpenFactRecap!=null && local.supportsFactRecaps) TextButton(onOpenFactRecap,
-                                enabled=local.ready && !local.opening && local.error==null,
-                                modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("recap-open")){Text("生成本机日／周回顾")}
-                            }
-                            }
                             if(imageTextBusy)Text("上一图片提取仍在结束，文字入口等待资源释放。")
-                            if (hasManageTools && manageToolsExpanded) {
-                            HorizontalDivider(color=AIyouColors.outlineDecorative)
-                            FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                            if (onBeginRecordPackage != null && local.supportsRecordPackages) TextButton(
-                                onClick = onBeginRecordPackage,
-                                enabled = local.ready && !local.opening && local.error == null && !local.saving && !local.savePending,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("package-open")) { Text("加密原文包与恢复") }
-                            if (onBeginExport != null && local.supportsOriginalExport) TextButton(onClick = onBeginExport, enabled = local.ready && !local.opening && local.error == null &&
-                                !local.saving && !local.savePending,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("export-open")) { Text("导出原文、待办与草稿") }
-                            if (onOpenRecycleBin != null && local.supportsRecycleBin) TextButton(onClick = onOpenRecycleBin,
-                                enabled = local.ready && !local.opening && local.error == null && !local.saving && !local.savePending && local.originalExport == null,
-                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("recycle-open")) { Text("回收站") }
-                            }
-                            }
                             local.recycleNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                         }
                     } else NotebookPageHeader(destination.label,
@@ -511,5 +533,31 @@ fun LocalRecordsScreen(
                 }
             }
         }
+    }
+}
+
+/** One temporary tool surface, never another copy of the private records route. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NotebookToolsPanel(title: String, motionAllowed: Boolean, onDismiss: () -> Unit,
+    content: @Composable () -> Unit) {
+    if (motionAllowed) {
+        ModalBottomSheet(onDismissRequest = onDismiss,
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = AIyouColors.surface) {
+            Column(Modifier.fillMaxWidth().testTag("notebook-tools-panel").verticalScroll(rememberScrollState()).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(title, Modifier.testTag("notebook-tools-title"), style = MaterialTheme.typography.titleLarge)
+                TextButton(onDismiss, modifier = Modifier.heightIn(min = 48.dp).testTag("notebook-tools-close")) { Text("返回记录列表") }
+                content()
+            }
+        }
+    } else {
+        // Reduced/unknown motion preference: same actions without a sliding surface.
+        AlertDialog(onDismissRequest = onDismiss, modifier = Modifier.testTag("notebook-tools-panel"),
+            title = { Text(title, Modifier.testTag("notebook-tools-title")) },
+            text = { Column(Modifier.verticalScroll(rememberScrollState())) { content() } },
+            confirmButton = { TextButton(onDismiss,
+                modifier = Modifier.heightIn(min = 48.dp).testTag("notebook-tools-close")) { Text("返回记录列表") } })
     }
 }

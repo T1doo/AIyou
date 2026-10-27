@@ -1159,7 +1159,7 @@ fun AIyouApp(
         topBar = {
           Column {
             NotebookAppBar(
-                if (browsingPackage) { if(packageUi?.fullMode==true) "完整备份与恢复" else "加密原文包" } else if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else if(recapRoute) "本机回顾" else "爱忆 AIyou",
+                if (browsingPackage) { if(packageUi?.fullMode==true) "完整备份与恢复" else "加密原文包" } else if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else if(recapRoute) "本机回顾" else if(selected==Destination.MEMORIES) "回忆" else "爱忆 AIyou",
                 if (browsingPackage) { if (settingsPackageRoute) "返回设置" else "返回列表" } else if (viewingPicture) {if(attachmentPanel?.focusImage!=null) "返回原文" else "返回附件列表"} else if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
                 else if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
                 else if (editing != null) "取消编辑" else if(reading && recapRoute) "返回回顾" else if (reading || browsingRecycle) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else if(recapRoute) "返回回忆" else "设置",
@@ -1187,7 +1187,8 @@ fun AIyouApp(
                 DisposableEffect(Unit) { onDispose { navigationHeightPx = 0 } }
                 Box(Modifier.onSizeChanged { navigationHeightPx = it.height }) {
                     NotebookNavigation(if (showSettings) null else selected, onSelect = selectDestination,
-                        containerColor = if(notebookHome) com.t1doo.aiyou.designsystem.AIyouColors.notebookMist else com.t1doo.aiyou.designsystem.AIyouColors.surface)
+                        containerColor = if(notebookHome) com.t1doo.aiyou.designsystem.AIyouColors.notebookMist else com.t1doo.aiyou.designsystem.AIyouColors.surface,
+                        motionAllowed = motionAllowed)
                 }
             }
         },
@@ -1349,7 +1350,7 @@ fun AIyouApp(
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
-                imageTextBusy=imageTextBusy,
+                imageTextBusy=imageTextBusy, motionAllowed=motionAllowed,
                 onOpenUnified=unifiedKeywords?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
                 onOpenImageTexts=imageTexts?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
                 onOpenTranscripts=audioTranscripts?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},

@@ -194,6 +194,9 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.MobileNavigationPresentationTest"] = (
+            "productionTabsSwipeOnceAtEdgesAndReturnToUnchangedUnsavedDraftWithoutWrites",
+            "doubleFontTabsKeepRealLabelsTouchTargetsAndCancelRetiredGesture")
         additional["com.t1doo.aiyou.NotebookToolsPresentationTest"] = (
             "searchPrecedesCollapsedToolsAndDisclosurePreservesInputsFeedbackAndDisabledActions",
             "doubleFontLandscapeKeyboardDisclosureAndSearchRemainReachableWithoutCallingTools")
