@@ -178,8 +178,15 @@ class CompanionDiagnosticTests(unittest.TestCase):
     def test_formal_workflow_bodies_and_budgets_remain_byte_identical(self):
         workflow = (ROOT / '.github/workflows/android.yml').read_text()
         # Authenticate the original bytes without requiring old Git objects in a shallow checkout.
+        sdk_spec = importlib.util.spec_from_file_location('sdk_compile_contract', ROOT / 'scripts/d08_sdk_probe.py')
+        sdk_compile = importlib.util.module_from_spec(sdk_spec); sdk_spec.loader.exec_module(sdk_compile)
+        COMPILE_ONLY_WORKFLOW_STEPS = sdk_compile.COMPILE_ONLY_WORKFLOW_STEPS
+        self.assertEqual('1ff608e73ba75e9fb640c9bad472e63e53ac71438d3f054489a74b501138fad6', hashlib.sha256(COMPILE_ONLY_WORKFLOW_STEPS.encode()).hexdigest())
+        formal = self.formal_workflow()
+        self.assertEqual(1, formal.count(COMPILE_ONLY_WORKFLOW_STEPS))
+        original = formal.replace(COMPILE_ONLY_WORKFLOW_STEPS, '')
         self.assertEqual('b59cc039ff252f218ae6ae91ec449de05fe4cb9ec525e55beb99e01de5107a13',
-                         hashlib.sha256((self.formal_workflow().rstrip('\n') + '\n').encode()).hexdigest())
+                         hashlib.sha256((original.rstrip('\n') + '\n').encode()).hexdigest())
         selector = ("github.event_name == 'push' && github.repository == 'T1doo/AIyou' && "
                     "github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && "
                     "github.event.head_commit.message == '[ui-companion-probe] b438 actual button publication'")

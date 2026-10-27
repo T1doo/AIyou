@@ -334,6 +334,20 @@ jobs:
           retention-days: 14
       - name: Inspect actual merged APK for absent INTERNET permission (device NOT RUN)
         run: python3 scripts/inspect-record-ai-permissions.py
+      - name: Compile and verify the platform-only recovery probe (all device execution NOT RUN)
+        id: sdk_probe
+        if: github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.run_attempt == 1
+        run: timeout --signal=KILL 180s python3 scripts/d08_sdk_probe.py --ci-compile-only
+      - name: Preserve SDK-only probe compilation and failure evidence
+        if: always() && steps.sdk_probe.outcome != 'skipped'
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: recovery-probe
+          outcome: ${{ steps.sdk_probe.outcome }}
+          name: d01-stage-recovery-probe
+          paths: |
+            checks/device-recovery/android/build/reports/sdk-probe-build.json
+            checks/device-recovery/android/build/outputs/apk/debug/recovery-probe-debug.apk
       - name: Independently reproduce the original lazy-node failure and verify the corrected method
         if: github.event_name == 'push' && contains(github.event.head_commit.message, '[ui-lazy-repro]')
         env:
