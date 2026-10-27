@@ -229,6 +229,10 @@ Harmony component notice is copied into the APK or claimed to close the gap.
 
 The pinned Android artifact is now 4.19.1. Its actual Maven Central AAR SHA256 is
 `43fc10cae8f1f1059f0933e8942a1eb328989d13426378597cd4add1b34a34fd`.
+The catalog deliberately retains this reviewed version when lint advertises a
+newer release. The entry-level `NewerVersionAvailable` exception follows the
+original D02 pin policy; all correctness/security lint, `abortOnError` and
+`warningsAsErrors` remain enabled. This is not a security-audit conclusion.
 Real Gradle resolution of all twelve affected configurations regenerated only
 the two SQLCipher lock entries; other locked dependencies are unchanged.
 Actual AAR metadata requires compileSdk36; the existing app uses37. Android

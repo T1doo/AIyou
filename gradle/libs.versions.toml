@@ -8,6 +8,8 @@ screenshot = "0.0.1-alpha16"
 room = "2.8.5"
 ksp = "2.3.12"
 # D02 pins the reviewed 4.19.1 candidate; runtime acceptance stays separate.
+# Upgrading requires renewed native/license evidence; suppress only release-availability advice for this pin.
+#noinspection NewerVersionAvailable
 sqlcipher = "4.19.1"
 #noinspection GradleDependency
 sqlite = "2.7.0"
