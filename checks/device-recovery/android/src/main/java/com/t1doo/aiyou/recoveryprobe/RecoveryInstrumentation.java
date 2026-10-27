@@ -41,6 +41,19 @@ public final class RecoveryInstrumentation extends Instrumentation {
     static final String APK_HASH = "dadce271185cc1ff1e8a577f1986d4b4290fbcb60daf7dd187c7088b5d1b693a";
     static final String APP = "com.t1doo.aiyou";
     static final String TEST_NAME = "freshInstallSafRestoreLookupAndDelete";
+    // Fixed diagnostic identifiers only: never input, exception messages, paths or UI text.
+    private enum AdmissionStage {
+        ARGUMENTS, UI_AUTOMATION, EMULATOR_IDENTITY, PRODUCTION_BYTES,
+        EMPTY_INSTALLATION, EVIDENCE_DIRECTORY, DOCUMENT_HANDLER, IMAGE_HANDLER,
+        SYNTHETIC_FIXTURES, EPHEMERAL_PASSWORD, INSTALL_PRODUCTION, LAUNCH_PRODUCTION,
+        SOURCE_CHECKPOINT;
+
+        private void recordFailure(JSONObject result) {
+            try { result.put("admissionStage", name()); }
+            catch (Exception ignored) { /* terminal still fails */ }
+        }
+    }
+    private AdmissionStage admissionStage = AdmissionStage.ARGUMENTS;
     private final JSONArray trace = new JSONArray();
     private final Set<String> packages = new HashSet<>();
     private UiAutomation ui;
@@ -65,25 +78,38 @@ public final class RecoveryInstrumentation extends Instrumentation {
                 budget < 1000 || budget > 960000 || Build.VERSION.SDK_INT != 35 ||
                 !Arrays.asList(Build.SUPPORTED_ABIS).contains("x86_64")) throw new IllegalStateException("Admission refused");
             deadline = SystemClock.elapsedRealtime() + budget;
+            admissionStage = AdmissionStage.UI_AUTOMATION;
             ui = getUiAutomation();
             AccessibilityServiceInfo service = ui.getServiceInfo();
             service.flags |= AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
             ui.setServiceInfo(service);
+            admissionStage = AdmissionStage.EMULATOR_IDENTITY;
             if (!shell("getprop ro.kernel.qemu").trim().equals("1")) throw new IllegalStateException("Owned emulator only");
+            admissionStage = AdmissionStage.PRODUCTION_BYTES;
             apkPath = "/data/local/tmp/aiyou-d08-" + token + "/app.apk";
             if (!shell("sha256sum " + apkPath).startsWith(APK_HASH + " ")) throw new IllegalStateException("Production bytes differ");
+            admissionStage = AdmissionStage.EMPTY_INSTALLATION;
             if (!shell("pm path " + APP).trim().isEmpty()) throw new IllegalStateException("Existing package retained");
+            admissionStage = AdmissionStage.EVIDENCE_DIRECTORY;
             evidence = new File(getTargetContext().getFilesDir(), "evidence");
             if (!evidence.mkdir()) throw new IllegalStateException("Existing evidence retained");
             packages.add(APP); packages.add(getTargetContext().getPackageName());
+            admissionStage = AdmissionStage.DOCUMENT_HANDLER;
             addSystemHandler(new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"));
+            admissionStage = AdmissionStage.IMAGE_HANDLER;
             addSystemHandler(new Intent(MediaStore.ACTION_PICK_IMAGES).setType("image/*"));
+            admissionStage = AdmissionStage.SYNTHETIC_FIXTURES;
             FixtureDocuments.prepare(getTargetContext(), token);
+            admissionStage = AdmissionStage.EPHEMERAL_PASSWORD;
             byte[] entropy = new byte[24]; new SecureRandom().nextBytes(entropy);
             StringBuilder secret = new StringBuilder();
             for (byte b : entropy) secret.append(String.format(java.util.Locale.ROOT, "%02x", b & 255));
             password = secret.toString().toCharArray(); Arrays.fill(entropy, (byte) 0);
-            install(); launch();
+            admissionStage = AdmissionStage.INSTALL_PRODUCTION;
+            install();
+            admissionStage = AdmissionStage.LAUNCH_PRODUCTION;
+            launch();
+            admissionStage = AdmissionStage.SOURCE_CHECKPOINT;
             checkpoint("create-source");
             setField("写下此刻，也可以只添加附件", FixtureDocuments.ORIGINAL);
             click("添加图片"); pickImage();
@@ -125,6 +151,7 @@ public final class RecoveryInstrumentation extends Instrumentation {
         } catch (Throwable failure) {
             // No exception message, UI dump, input, password, URI grant or app data in public evidence.
             safePut(result, "failureType", failure.getClass().getSimpleName());
+            if ("admission".equals(phase)) admissionStage.recordFailure(result);
         } finally {
             if (password != null) Arrays.fill(password, '\0');
             try { if (ownsApp) uninstallOwned(); }
@@ -144,6 +171,8 @@ public final class RecoveryInstrumentation extends Instrumentation {
             } catch (Throwable failure) { passed = false; }
             Bundle terminal = new Bundle(); terminal.putString("d08_result", passed ? "PASS" : "FAIL");
             terminal.putString("d08_source", PRODUCTION); terminal.putString("d08_token", token);
+            // Early admission failures may precede the evidence directory.
+            if (!passed && "admission".equals(phase)) terminal.putString("d08_admission", admissionStage.name());
             finish(passed ? Activity.RESULT_OK : Activity.RESULT_CANCELED, terminal);
         }
     }

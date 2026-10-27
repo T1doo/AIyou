@@ -275,7 +275,10 @@ class ResultTests(unittest.TestCase):
     def test_extra_terminal_wrong_source_or_skipped_xml_rejected(self):
         terminal, result, xml = result_fixture()
         for value in [terminal + "\nINSTRUMENTATION_CODE: 0", terminal + "\nINSTRUMENTATION_CODE: -1",
-                      terminal.replace(SOURCE, "a" * 40), terminal.replace("d08_result=PASS", "d08_result=FAIL")]:
+                      terminal.replace(SOURCE, "a" * 40), terminal.replace("d08_result=PASS", "d08_result=FAIL"),
+                      terminal + "\nINSTRUMENTATION_RESULT: d08_admission=DOCUMENT_HANDLER",
+                      terminal.replace("d08_result=PASS", "d08_result=FAIL") +
+                      "\nINSTRUMENTATION_RESULT: d08_admission=DOCUMENT_HANDLER"]:
             with self.assertRaises(ValueError): validate_device_result(value, result, xml, "d" * 32)
         with self.assertRaises(ValueError): validate_device_result(terminal, result, xml.replace('skipped="0"', 'skipped="1"'), "d" * 32)
 

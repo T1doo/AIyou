@@ -23,6 +23,32 @@ class JavaProbeTests(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory(); cls.path = Path(cls.temp.name)
         sources = list((ROOT / "checks/device-recovery/android/src/main/java").rglob("*.java"))
         sources += list((ROOT / "checks/device-recovery/host-tests").rglob("*.java"))
+        # Exercise the production enum/serializer without instantiating Instrumentation
+        # or invoking any Android/device operation. Arbitrary text cannot become a stage.
+        diagnostics = cls.path / "AdmissionDiagnosticsHost.java"
+        diagnostics.write_text('''
+import java.lang.reflect.Method;
+import org.json.JSONObject;
+public final class AdmissionDiagnosticsHost {
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public static void main(String[] args) throws Exception {
+        Class<? extends Enum> stages = (Class<? extends Enum>) Class.forName(
+            "com.t1doo.aiyou.recoveryprobe.RecoveryInstrumentation$AdmissionStage");
+        Method record = stages.getDeclaredMethod("recordFailure", JSONObject.class);
+        record.setAccessible(true);
+        for (Object stage : stages.getEnumConstants()) {
+            JSONObject result = new JSONObject();
+            record.invoke(stage, result);
+            System.out.println(result.toString());
+        }
+        try {
+            Enum.valueOf(stages, "synthetic-secret /private/path content://fixture");
+            throw new AssertionError("Arbitrary diagnostic input accepted");
+        } catch (IllegalArgumentException expected) { /* fixed whitelist rejects */ }
+    }
+}
+''')
+        sources.append(diagnostics)
         result = subprocess.run([JAVA / "javac", "-encoding", "UTF-8", "-cp", JAR, "-d", cls.path, *sources], text=True, capture_output=True, timeout=30)
         if result.returncode: raise AssertionError(result.stderr)
 
@@ -66,6 +92,17 @@ class JavaProbeTests(unittest.TestCase):
     def test_actual_verifier_rejects_range_source_substitution_missing_and_duplicate_members(self):
         for kind in ("range", "source", "revision", "hash", "substitute", "missing", "unexpected", "duplicate"):
             with self.subTest(kind=kind): self.assertNotEqual(self.check(kind).returncode, 0)
+
+    def test_real_admission_serializer_emits_only_fixed_stage_names_and_rejects_arbitrary_text(self):
+        result = subprocess.run([JAVA / "java", "-cp", str(self.path) + ":" + str(JAR),
+            "AdmissionDiagnosticsHost"], text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        stages = ["ARGUMENTS", "UI_AUTOMATION", "EMULATOR_IDENTITY", "PRODUCTION_BYTES",
+                  "EMPTY_INSTALLATION", "EVIDENCE_DIRECTORY", "DOCUMENT_HANDLER", "IMAGE_HANDLER",
+                  "SYNTHETIC_FIXTURES", "EPHEMERAL_PASSWORD", "INSTALL_PRODUCTION", "LAUNCH_PRODUCTION",
+                  "SOURCE_CHECKPOINT"]
+        self.assertEqual([{"admissionStage": s} for s in stages],
+                         [json.loads(line) for line in result.stdout.splitlines()])
 
 
 if __name__ == "__main__": unittest.main()
