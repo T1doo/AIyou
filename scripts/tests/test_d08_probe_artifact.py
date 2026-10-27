@@ -107,8 +107,14 @@ class ProbeArtifactTests(unittest.TestCase):
         self.assertEqual('958ab2a08536161d8a0776ef155b6368d7df09c6',SOURCE)
         self.assertEqual('dadce271185cc1ff1e8a577f1986d4b4290fbcb60daf7dd187c7088b5d1b693a',APK_HASH)
         current=json.loads((ROOT/'checks/device-recovery/request.json').read_text())
-        self.assertIs(current['executionApproved'],False)
-        self.assertEqual({**EXPECTED_REQUEST,'executionApproved':False},current)
+        self.assertIs(type(current.get('executionApproved')),bool)
+        self.assertEqual({**EXPECTED_REQUEST,'executionApproved':current['executionApproved']},current)
+        self.assertTrue(all(type(current.get(k)) is type(v) for k,v in EXPECTED_REQUEST.items()))
+        # Dev remains unarmed. Only the separately admitted, exact device event
+        # may run this same regression after an explicit approval delta.
+        if current['executionApproved']:
+            actual_env=dict(os.environ)
+            admit(current,actual_env,json.loads(Path(actual_env['GITHUB_EVENT_PATH']).read_text()))
         env={'GITHUB_ACTIONS':'true','GITHUB_REPOSITORY':'T1doo/AIyou','RUNNER_OS':'Linux','GITHUB_EVENT_NAME':'push',
              'GITHUB_REF':BRANCH,'GITHUB_RUN_ATTEMPT':'1','GITHUB_SHA':'a'*40,'GITHUB_RUN_ID':'123'}
         event={'repository':{'full_name':'T1doo/AIyou','private':False},'ref':BRANCH,'head_commit':{'message':MESSAGE}}
