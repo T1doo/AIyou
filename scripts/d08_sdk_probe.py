@@ -202,14 +202,46 @@ def certificate(text):
     return matches[0]
 
 
-def verify_apk(path, badging, tree):
-    if "package: name='"+PACKAGE+"' versionCode='1' versionName='"+VERSION+"'" not in badging or \
-            "sdkVersion:'26'" not in badging or "targetSdkVersion:'37'" not in badging or \
-            'E: uses-permission' in tree or 'android:testOnly' not in tree or \
-            not all(re.search(r'android:'+flag+r'\([^)]*\)=\(type 0x12\)0xffffffff', tree) for flag in ['testOnly','debuggable']) or \
-            PACKAGE+'.documents' not in tree or 'RecoveryInstrumentation' not in tree or 'FixtureDocuments' not in tree or \
-            'E: queries' not in tree:
+def verify_binary_manifest(badging, tree):
+    # Locked Build Tools 36 aapt2 emits minSdkVersion and decoded XML values.
+    # Bind attributes to their actual element, not a substring on another node.
+    if len(re.findall(r"^package: name='"+re.escape(PACKAGE)+r"' versionCode='1' versionName='"+re.escape(VERSION)+r"'(?: .*)?$",badging,re.M)) != 1 or \
+            badging.splitlines().count("minSdkVersion:'26'") != 1 or \
+            badging.splitlines().count("targetSdkVersion:'37'") != 1:
         raise ValueError('Actual binary manifest identity/permission mismatch')
+    nodes=[];stack=[]
+    for line in tree.splitlines():
+        element=re.fullmatch(r'( *)E: ([\w-]+) \(line=\d+\)',line)
+        attribute=re.fullmatch(r'( *)A: ([^=(]+)(?:\(0x[0-9a-f]+\))?=(.*)',line)
+        if element:
+            indent=len(element[1]);name=element[2]
+            while stack and stack[-1][0]>=indent:stack.pop()
+            node={'path':tuple(n[1]['path'][-1] for n in stack)+(name,), 'attributes':{}}
+            if name.startswith('uses-permission'):raise ValueError('Probe permission declaration forbidden')
+            nodes.append(node);stack.append((indent,node))
+        elif attribute:
+            if not stack or len(attribute[1])<=stack[-1][0] or attribute[2] in stack[-1][1]['attributes']:
+                raise ValueError('Ambiguous binary manifest attribute')
+            stack[-1][1]['attributes'][attribute[2]]=attribute[3]
+        elif line and not re.fullmatch(r' *N: android=http://schemas.android.com/apk/res/android \(line=\d+\)',line):
+            raise ValueError('Unexpected fixed-tool binary manifest output')
+    ns='http://schemas.android.com/apk/res/android:'
+    def require(path,expected):
+        matches=[n for n in nodes if n['path']==tuple(path.split('/'))]
+        if len(matches)!=1 or any(matches[0]['attributes'].get(k)!=v for k,v in expected.items()):
+            raise ValueError('Actual binary manifest element identity/permission mismatch: '+path)
+    def string(value):return json.dumps(value)+' (Raw: '+json.dumps(value)+')'
+    require('manifest',{'package':string(PACKAGE),ns+'versionCode':'1',ns+'versionName':string(VERSION)})
+    require('manifest/queries',{})
+    require('manifest/application',{ns+'testOnly':'true',ns+'debuggable':'true',ns+'allowBackup':'false',ns+'usesCleartextTraffic':'false'})
+    require('manifest/application/provider',{ns+'name':string('.FixtureDocuments'),ns+'authorities':string(PACKAGE+'.documents'),
+        ns+'permission':string('android.permission.MANAGE_DOCUMENTS'),ns+'exported':'true',ns+'grantUriPermissions':'true'})
+    require('manifest/instrumentation',{ns+'name':string('.RecoveryInstrumentation'),ns+'targetPackage':string(PACKAGE)})
+    require('manifest/uses-sdk',{ns+'minSdkVersion':'26',ns+'targetSdkVersion':'37'})
+
+
+def verify_apk(path, badging, tree):
+    verify_binary_manifest(badging, tree)
     with zipfile.ZipFile(path) as z:
         names = z.namelist()
         if len(names) != len(set(names)) or z.testzip() is not None or names.count('classes.dex') != 1 or \

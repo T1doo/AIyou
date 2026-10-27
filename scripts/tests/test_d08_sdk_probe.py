@@ -19,6 +19,34 @@ probe = importlib.util.module_from_spec(spec); spec.loader.exec_module(probe)
 
 
 class SdkProbeTests(unittest.TestCase):
+    def test_actual_aapt36_manifest_output_preserves_all_required_boundaries(self):
+        fixture=ROOT/'scripts/tests/fixtures/d08-sdk-aapt36'
+        badging=(fixture/'probe-badging.txt').read_text()
+        tree=(fixture/'probe-binary-manifest.txt').read_text()
+        self.assertEqual('cb42816482f3075ebfeea166bca7a7331021730d6321aac35ee3ca7f9777026c',hashlib.sha256(badging.encode()).hexdigest())
+        self.assertEqual('6d1eacb82d438f17784b6fdc2263c2fe160739fa5dc7a65bef153036183cbace',hashlib.sha256(tree.encode()).hexdigest())
+        probe.verify_binary_manifest(badging,tree)
+        mutations=[(badging.replace("minSdkVersion:'26'","minSdkVersion:'25'"),tree),
+                   (badging.replace("targetSdkVersion:'37'","targetSdkVersion:'36'"),tree),
+                   (badging.replace("versionName='958ab-one-recovery'","versionName='other'"),tree)]
+        for old,new in [('debuggable(0x0101000f)=true','debuggable(0x0101000f)=false'),
+                        ('testOnly(0x01010272)=true','testOnly(0x01010272)=false'),
+                        ('allowBackup(0x01010280)=false','allowBackup(0x01010280)=true'),
+                        ('usesCleartextTraffic(0x010104ec)=false','usesCleartextTraffic(0x010104ec)=true'),
+                        ('E: queries','E: unexpected'),('.FixtureDocuments','.OtherDocuments'),
+                        ('.RecoveryInstrumentation','.OtherInstrumentation'),
+                        ('recoveryprobe.documents','recoveryprobe.other')]:
+            self.assertIn(old,tree);mutations.append((badging,tree.replace(old,new)))
+        mutations.append((badging,tree+'      E: uses-permission (line=15)\n'))
+        flag='        A: http://schemas.android.com/apk/res/android:testOnly(0x01010272)=true\n'
+        mutations.append((badging,tree.replace(flag,'')))
+        mutations.append((badging,tree.replace(flag,flag+flag)))
+        # A true flag on a different element cannot satisfy the application gate.
+        mutations.append((badging,tree.replace(flag,'').replace('          E: provider (line=9)\n',
+                          '          E: provider (line=9)\n'+'    '+flag)))
+        for b,t in mutations:
+            with self.subTest(b=b[:90],t=t[-100:]),self.assertRaises(ValueError):probe.verify_binary_manifest(b,t)
+
     def test_actual_source_manifest_retains_application_provider_instrumentation_queries(self):
         old = probe.ET.fromstring(probe.MANIFEST.read_bytes())
         new = probe.ET.fromstring(probe.generate_manifest(probe.MANIFEST.read_bytes()))

@@ -1,0 +1,14 @@
+package: name='com.t1doo.aiyou.recoveryprobe' versionCode='1' versionName='958ab-one-recovery' platformBuildVersionName='17' platformBuildVersionCode='37' compileSdkVersion='37' compileSdkVersionCodename='17'
+application: label='AIyou D08 isolated probe' icon=''
+testOnly='-1'
+application-debuggable
+minSdkVersion:'26'
+targetSdkVersion:'37'
+feature-group: label=''
+  uses-feature: name='android.hardware.faketouch'
+  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'
+provides-component:'document-provider'
+supports-screens: 'small' 'normal' 'large' 'xlarge'
+supports-any-density: 'true'
+locales:
+densities:
