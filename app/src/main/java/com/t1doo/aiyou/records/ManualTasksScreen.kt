@@ -56,6 +56,9 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     onProposalOpen:(String,Long)->Unit={_,_->},onProposalRefresh:()->Unit={},
     reminders: TaskReminderController? = null, ownsReminderRoute: () -> Boolean = { true },
     listState: LazyListState = rememberLazyListState(),
+    onCloseInput: (Long, String, ManualTaskDateInput) -> Unit = { session, _, _ -> onClose(session) },
+    onConfirmClose: (Long, ManualTaskEditor) -> Unit = { _, _ -> },
+    onCancelClose: (Long, ManualTaskEditor) -> Unit = { _, _ -> },
     titles: ManualTaskController? = null, ownsTitleRoute: () -> Boolean = { true }) {
     val tasks = local.tasks
     val storageReady = local.ready && !local.opening && local.error == null
@@ -248,7 +251,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
         }
     }
     tasks.editor?.let { editor ->
-        ManualTaskDialog(editor, tasks, storageReady, onEdit, onCreate, onRetry, onClose, onCreationDate)
+        ManualTaskDialog(editor, tasks, storageReady, onEdit, onCreate, onRetry, onCloseInput, onCreationDate, onConfirmClose, onCancelClose)
     }
     tasks.dateEditor?.let { editor -> ManualTaskDateDialog(editor, tasks, storageReady, onEditDate, onSaveDate, onCloseDate, onRetry) }
     if (reminders != null) TaskReminderDialog(local, reminders, ownsReminderRoute)
@@ -258,8 +261,10 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ManualTaskDialog(editor: ManualTaskEditor, tasks: ManualTasksUiState, storageReady: Boolean,
-    onEdit: (Long, String) -> Unit, onCreate: (Long, String) -> Unit, onRetry: () -> Unit, onClose: (Long) -> Unit,
-    onCreationDate: (Long, ManualTaskDateInput) -> Unit) {
+    onEdit: (Long, String) -> Unit, onCreate: (Long, String) -> Unit, onRetry: () -> Unit,
+    onClose: (Long, String, ManualTaskDateInput) -> Unit,
+    onCreationDate: (Long, ManualTaskDateInput) -> Unit,
+    onConfirmClose: (Long, ManualTaskEditor) -> Unit, onCancelClose: (Long, ManualTaskEditor) -> Unit) {
     // No Saver or undo Bundle: unfinished private titles live only in this session.
     val input = remember(editor.session) { TextFieldState(editor.input) }
     val dateFields = remember(editor.session) { TaskDateFields(editor.dateInput) }
@@ -267,8 +272,10 @@ private fun ManualTaskDialog(editor: ManualTaskEditor, tasks: ManualTasksUiState
     SideEffect { observer.input(input) }
     val edit by rememberUpdatedState(onEdit)
     LaunchedEffect(input) { snapshotFlow { input.text.toString() }.collect { edit(editor.session, it) } }
-    val canCreate = storageReady && tasks.available && !tasks.loading && !tasks.busy && tasks.pending == null
-    Dialog(onDismissRequest = { onClose(editor.session) }) {
+    val closing = tasks.closeConfirmation?.takeIf { it === editor }
+    val canCreate = storageReady && tasks.available && !tasks.loading && !tasks.busy && tasks.pending == null && closing == null
+    fun requestClose() { onClose(editor.session, input.text.toString(), dateFields.current()) }
+    Dialog(onDismissRequest = { if (closing != null) onCancelClose(editor.session, closing) else requestClose() }) {
         Surface(shape = MaterialTheme.shapes.large) {
             Column(Modifier.fillMaxWidth().heightIn(max = AIyouDimensions.contentMaxWidth)
                 .verticalScroll(rememberScrollState()).padding(AIyouDimensions.spaceMd),
@@ -290,11 +297,19 @@ private fun ManualTaskDialog(editor: ManualTaskEditor, tasks: ManualTasksUiState
                     modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-task-dialog-retry")) {
                     Text(if (tasks.conflict) "重新读取待办" else if (tasks.pending != null) "重试确认" else "重试读取")
                 }
-                TextButton(onClick = { onClose(editor.session) }, enabled = !tasks.busy,
+                TextButton(onClick = { requestClose() }, enabled = !tasks.busy && closing == null,
                     modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-task-close")) { Text("关闭") }
             }
         }
     }
+    if (closing != null) AlertDialog(
+        onDismissRequest = { onCancelClose(editor.session, closing) },
+        title = { Text("放弃这条待办？") },
+        text = { Text("标题和日期尚未保存。放弃只会清除本次输入，不会创建待办或设置提醒。") },
+        confirmButton = { TextButton(onClick = { onConfirmClose(editor.session, closing) },
+            modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-task-discard")) { Text("放弃输入") } },
+        dismissButton = { TextButton(onClick = { onCancelClose(editor.session, closing) },
+            modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-task-continue")) { Text("继续编辑") } })
 }
 
 internal fun manualTaskDateLabel(task: ManualTaskSnapshot): String {

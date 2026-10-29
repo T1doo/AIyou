@@ -178,6 +178,11 @@ class ManualTaskPresentationTest {
         begin("合成私密输入")
         compose.onNodeWithTag("manual-task-create").performScrollTo().assertIsDisplayed().assertIsEnabled()
         compose.onNodeWithTag("manual-task-close").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithTag("manual-task-continue").assertIsDisplayed().assertIsEnabled().performClick()
+        compose.onNodeWithTag("manual-task-input").performScrollTo().assertTextEquals("合成私密输入")
+        compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
+        compose.onNodeWithTag("manual-task-discard").assertIsDisplayed().assertIsEnabled().performClick()
+        assertNull(state.value.tasks.editor); assertTrue(queued.isEmpty()); assertTrue(persisted.isEmpty())
         val old = callbacks.get()
         compose.onNodeWithText("设置").assertIsDisplayed().performClick()
         compose.onNodeWithText("返回").assertIsDisplayed().performClick()
@@ -194,7 +199,8 @@ class ManualTaskPresentationTest {
         begin("合成未确认私密标题")
         val oldActions = callbacks.get(); val oldInput = input.get()
         compose.runOnIdle { assertPrivate(registry!!.performSave(), listOf("合成未确认私密标题", capture, "合成原文")) }
-        compose.onNodeWithTag("manual-task-close").performScrollTo().performClick(); begin("")
+        compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
+        compose.onNodeWithTag("manual-task-discard").assertIsDisplayed().performClick(); begin("")
         compose.runOnIdle { assertNotSame(oldInput, input.get()); assertFalse(input.get().undoState.canUndo); assertFalse(input.get().undoState.canRedo) }
         compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
         restoration.emulateSavedInstanceStateRestore()
@@ -365,6 +371,8 @@ class ManualTaskPresentationTest {
         compose.onNodeWithTag("manual-task-input").performScrollTo().performTextReplacement("合成未提交标题")
         compose.onNodeWithTag("manual-task-create").performScrollTo().assertIsDisplayed().assertIsEnabled()
         compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
+        compose.onNodeWithTag("manual-task-discard").assertIsDisplayed().assertIsEnabled().performClick()
+        assertNull(state.value.tasks.editor)
         assertEquals(1, persisted.size); assertTrue(queued.isEmpty())
         taskNode("manual-task-reminder-policy").assertTextEquals("提醒需逐条确认，安排不等于送达。")
         taskNode("manual-task-details").performClick()
@@ -420,7 +428,7 @@ class ManualTaskPresentationTest {
                     onTaskClose = controller::close, onTaskCreationDate = controller::editCreationDate,
                     onTaskBeginDate = controller::beginDate, onTaskEditDate = controller::editDate,
                     onTaskSaveDate = controller::saveDate, onTaskCloseDate = controller::closeDate,
-                    taskClock = Clock.fixed(Instant.parse("2026-10-14T01:30:00Z"), ZoneOffset.UTC)) }
+                    manualTasks = controller, taskClock = Clock.fixed(Instant.parse("2026-10-14T01:30:00Z"), ZoneOffset.UTC)) }
             }
         }
     }

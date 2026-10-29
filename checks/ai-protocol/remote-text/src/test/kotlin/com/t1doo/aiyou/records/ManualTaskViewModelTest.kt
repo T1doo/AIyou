@@ -16,6 +16,53 @@ import org.junit.Test
 
 /** Actual VM/controller/queue + product SQL/AEAD. Native Android/SQLCipher is outside this host proof. */
 class ManualTaskViewModelTest {
+    @Test(timeout = 6_000) fun unsavedCreationClosePreservesInputUntilExplicitDiscard(): Unit = Harness().use { h -> runBlocking {
+        h.ready(); val initial = h.begin()
+        h.vm.tasks.edit(initial.session, "合成未保存待办")
+        h.vm.tasks.editCreationDate(initial.session, ManualTaskDateInput("2026-11-01", "", "UTC"))
+        val edited = checkNotNull(h.vm.state.value.tasks.editor)
+        h.vm.tasks.close(initial.session)
+        val first = checkNotNull(h.vm.state.value.tasks.closeConfirmation)
+        assertEquals(edited.input, first.input); assertEquals(edited.dateInput, first.dateInput)
+        assertSame(first, h.vm.state.value.tasks.editor)
+        h.vm.tasks.create(initial.session, "不得绕过关闭确认")
+        assertTrue(h.identities.isEmpty())
+        h.vm.tasks.cancelClose(initial.session, first)
+        assertSame(first, h.vm.state.value.tasks.editor)
+        assertNull(h.vm.state.value.tasks.closeConfirmation)
+        h.vm.tasks.close(initial.session)
+        h.vm.tasks.confirmClose(initial.session, first)
+        assertNotNull(h.vm.state.value.tasks.editor)
+        h.vm.tasks.edit(initial.session, "合成更正输入")
+        h.vm.tasks.confirmClose(initial.session, edited)
+        assertEquals("合成更正输入", h.vm.state.value.tasks.editor!!.input)
+        h.vm.tasks.close(initial.session)
+        val confirmed = checkNotNull(h.vm.state.value.tasks.closeConfirmation)
+        h.vm.tasks.confirmClose(initial.session, confirmed)
+        assertNull(h.vm.state.value.tasks.editor)
+        val next = h.begin()
+        h.vm.tasks.confirmClose(initial.session, confirmed)
+        assertSame(next, h.vm.state.value.tasks.editor)
+        h.vm.tasks.close(next.session); assertNull(h.vm.state.value.tasks.editor)
+        val dateOnly = h.begin()
+        val changed = dateOnly.dateInput.copy(timeZone = "Asia/Shanghai")
+        // No snapshotFlow synchronization: the actual field values must be consumed on close.
+        h.vm.tasks.requestClose(dateOnly.session, "", changed)
+        assertEquals(changed, h.vm.state.value.tasks.editor!!.dateInput)
+        assertNotNull(h.vm.state.value.tasks.closeConfirmation)
+        h.vm.tasks.cancelClose(dateOnly.session, h.vm.state.value.tasks.editor!!)
+        h.vm.tasks.editCreationDate(dateOnly.session, dateOnly.initialDateInput)
+        h.vm.tasks.requestClose(dateOnly.session, "刚输入尚未异步同步", dateOnly.initialDateInput)
+        assertEquals("刚输入尚未异步同步", h.vm.state.value.tasks.editor!!.input)
+        assertNotNull(h.vm.state.value.tasks.closeConfirmation)
+        h.vm.tasks.cancelClose(dateOnly.session, h.vm.state.value.tasks.editor!!)
+        h.failCapture = true; h.vm.changeText("合成存储失败")
+        withTimeout(2_000) { h.vm.state.first { it.error != null } }
+        h.vm.tasks.requestClose(dateOnly.session, "存储失败时的末次输入", dateOnly.initialDateInput)
+        assertEquals("存储失败时的末次输入", h.vm.state.value.tasks.editor!!.input)
+        assertNotNull(h.vm.state.value.tasks.closeConfirmation)
+        assertTrue(h.f.store.snapshots().isEmpty()); assertTrue(h.identities.isEmpty())
+    } }
     @Test(timeout = 6_000) fun failedCreateRetainsInputAndStableIdentityUntilActualCommitReadback(): Unit = Harness().use { h -> runBlocking {
         h.ready(); val editor = h.begin(); h.failWrite = true
         h.vm.tasks.create(editor.session, "合成明确待办🙂")

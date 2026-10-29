@@ -1330,6 +1330,11 @@ fun AIyouApp(
                 onProposalOpen = {id,version -> if(ownsTasks()) taskProposals?.openExisting(id,version)},
                 onProposalRefresh = {if(ownsTasks()) taskProposals?.refresh()},
                 reminders = reminders, ownsReminderRoute = ::ownsTasks,
+                onCloseInput = { session, text, date -> if (ownsTasks()) {
+                    if (manualTasks != null) manualTasks.requestClose(session, text, date) else onTaskClose(session)
+                } },
+                onConfirmClose = { session, expected -> if (ownsTasks()) manualTasks?.confirmClose(session, expected) },
+                onCancelClose = { session, expected -> if (ownsTasks()) manualTasks?.cancelClose(session, expected) },
                 titles = manualTasks, ownsTitleRoute = ::ownsTasks,
                 onSource = { id,version -> if(ownsTasks()) {
                     val token=generation

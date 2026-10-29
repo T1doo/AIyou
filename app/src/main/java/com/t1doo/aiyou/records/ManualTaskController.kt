@@ -9,7 +9,8 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 
-class ManualTaskEditor(val session: Long, val input: String = "", val dateInput: ManualTaskDateInput = ManualTaskDateInput()) {
+class ManualTaskEditor(val session: Long, val input: String = "", val dateInput: ManualTaskDateInput = ManualTaskDateInput(),
+    val initialDateInput: ManualTaskDateInput = dateInput) {
     override fun toString() = "ManualTaskEditor(redacted)"
 }
 class ManualTaskDateEditor(val session: Long, val taskId: String, val version: Long,
@@ -34,14 +35,16 @@ class ManualTasksUiState internal constructor(
     internal val generation: Long = 0,
     val dateEditor: ManualTaskDateEditor? = null,
     val titleEditor: ManualTaskTitleEditor? = null,
+    val closeConfirmation: ManualTaskEditor? = null,
 ) {
     val items = Collections.unmodifiableList(items.toList())
     internal fun copy(supported: Boolean = this.supported, loading: Boolean = this.loading, available: Boolean = this.available,
         items: List<ManualTaskSnapshot> = this.items, editor: ManualTaskEditor? = this.editor, busy: Boolean = this.busy,
         error: String? = this.error, notice: String? = this.notice, conflict: Boolean = this.conflict,
         pending: ManualTaskIntent? = this.pending, generation: Long = this.generation,
-        dateEditor: ManualTaskDateEditor? = this.dateEditor, titleEditor: ManualTaskTitleEditor? = this.titleEditor) =
-        ManualTasksUiState(supported, loading, available, items, editor, busy, error, notice, conflict, pending, generation, dateEditor, titleEditor)
+        dateEditor: ManualTaskDateEditor? = this.dateEditor, titleEditor: ManualTaskTitleEditor? = this.titleEditor,
+        closeConfirmation: ManualTaskEditor? = this.closeConfirmation) =
+        ManualTasksUiState(supported, loading, available, items, editor, busy, error, notice, conflict, pending, generation, dateEditor, titleEditor, closeConfirmation)
     override fun toString() = "ManualTasksUiState(available=$available, busy=$busy, redacted)"
 }
 
@@ -84,20 +87,48 @@ class ManualTaskController internal constructor(
     fun edit(session: Long, input: String) {
         val tasks = current().tasks
         if (!usable() || tasks.editor?.session != session || tasks.busy || tasks.pending != null || input.length > ManualTasks.MAX_RAW_LENGTH) return
-        update { latest -> if (latest.editor?.session == session && !latest.busy && latest.pending == null)
-            latest.copy(editor = ManualTaskEditor(session, input, checkNotNull(latest.editor).dateInput), error = null, notice = null) else latest }
+        update { latest -> if (latest.editor?.session == session && !latest.busy && latest.pending == null && latest.editor.input != input)
+            latest.copy(editor = ManualTaskEditor(session, input, checkNotNull(latest.editor).dateInput, latest.editor.initialDateInput), closeConfirmation = null, error = null, notice = null) else latest }
     }
     fun editCreationDate(session: Long, input: ManualTaskDateInput) {
         if (!usable()) return
         update { state -> val editor = state.editor
-            if (editor?.session != session || state.busy || state.pending != null) state else state.copy(
-                editor = ManualTaskEditor(session, editor.input, input), error = null, notice = null) }
+            if (editor?.session != session || state.busy || state.pending != null || editor.dateInput == input) state else state.copy(
+                editor = ManualTaskEditor(session, editor.input, input, editor.initialDateInput), closeConfirmation = null, error = null, notice = null) }
+    }
+    fun requestClose(session: Long, input: String, date: ManualTaskDateInput) {
+        // Closing must consume the actual fields, not wait for snapshotFlow's next emission.
+        if (disposed || input.length > ManualTasks.MAX_RAW_LENGTH) return
+        // Memory synchronization remains safe during a storage read error; it authorizes no IO.
+        update { state -> val editor = state.editor
+            if (editor?.session != session || state.busy || state.pending != null ||
+                (editor.input == input && editor.dateInput == date)) state
+            else state.copy(editor = ManualTaskEditor(session, input, date, editor.initialDateInput), closeConfirmation = null) }
+        close(session)
     }
     fun close(session: Long) {
         if (disposed) return
-        update { if (it.editor?.session == session && !it.busy) it.copy(editor = null) else it }
+        update { state -> val editor = state.editor
+            if (editor?.session != session || state.busy) state
+            else if (state.pending == null && (editor.input.isNotEmpty() || editor.dateInput != editor.initialDateInput)) {
+                // Each disclosure gets a fresh identity, including reopening after Continue.
+                val confirmation = ManualTaskEditor(session, editor.input, editor.dateInput, editor.initialDateInput)
+                state.copy(editor = confirmation, closeConfirmation = confirmation)
+            }
+            else state.copy(editor = null, closeConfirmation = null) }
+    }
+    fun cancelClose(session: Long, expected: ManualTaskEditor) {
+        if (disposed) return
+        update { if (it.editor === expected && expected.session == session && it.closeConfirmation === expected)
+            it.copy(closeConfirmation = null) else it }
+    }
+    fun confirmClose(session: Long, expected: ManualTaskEditor) {
+        if (disposed) return
+        update { if (it.editor === expected && expected.session == session && it.closeConfirmation === expected &&
+            !it.busy && it.pending == null) it.copy(editor = null, closeConfirmation = null) else it }
     }
     fun create(session: Long, raw: String) {
+        if (current().tasks.closeConfirmation != null) return
         edit(session, raw)
         val tasks = current().tasks
         if (!usable() || reminderBlocksWrite() || tasks.editor?.session != session || !tasks.available || tasks.busy || tasks.loading || tasks.pending != null) return
