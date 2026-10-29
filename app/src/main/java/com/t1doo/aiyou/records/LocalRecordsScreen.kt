@@ -46,6 +46,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalDensity
@@ -153,16 +157,45 @@ fun LocalRecordsScreen(
     onReduceSearchKeywords:((OriginalSearchState)->Boolean)?=null,
 ) {
     // Presentation only. Never retain a source, query proof or controller in disclosure state.
-    var reviewToolsExpanded by remember(destination, local.localSearch, local.unifiedKeywordOwner,
-        local.recordAuthorizationOwner, local.ready, local.opening, local.error) { mutableStateOf(false) }
-    var manageToolsExpanded by remember(destination, local.localSearch, local.unifiedKeywordOwner,
-        local.recordAuthorizationOwner, local.ready, local.opening, local.error) { mutableStateOf(false) }
+    val toolsOwner = remember(destination, local.localSearch, local.unifiedKeywordOwner,
+        local.recordAuthorizationOwner, local.ready, local.opening, local.error) { Any() }
+    var reviewToolsExpanded by remember(toolsOwner) { mutableStateOf(false) }
+    var manageToolsExpanded by remember(toolsOwner) { mutableStateOf(false) }
+    val reviewFocus = remember(toolsOwner) { FocusRequester() }
+    val manageFocus = remember(toolsOwner) { FocusRequester() }
+    val attachedToolButtons = remember(toolsOwner) { booleanArrayOf(false, false) }
+    var reviewFocused by remember(toolsOwner) { mutableStateOf(false) }
+    var manageFocused by remember(toolsOwner) { mutableStateOf(false) }
+    var keyboardOrigin by remember(toolsOwner) { mutableStateOf<Boolean?>(null) }
+    var returnFocus by remember(toolsOwner) { mutableStateOf<Boolean?>(null) }
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
-    fun closeTools() { reviewToolsExpanded=false; manageToolsExpanded=false }
+    fun closeTools() {
+        reviewToolsExpanded=false; manageToolsExpanded=false
+        keyboardOrigin=null; returnFocus=null
+    }
+    fun dismissTools() {
+        if (!reviewToolsExpanded && !manageToolsExpanded) return
+        val origin=keyboardOrigin
+        closeTools()
+        returnFocus=origin
+    }
     fun openTools(review: Boolean) {
+        returnFocus=null
+        keyboardOrigin=if (if (review) reviewFocused else manageFocused) review else null
         focus.clearFocus(); keyboard?.hide()
         reviewToolsExpanded=review; manageToolsExpanded=!review
+    }
+    LaunchedEffect(toolsOwner, returnFocus) {
+        val target=returnFocus ?: return@LaunchedEffect
+        // Let the modal leave its window first. Owner changes cancel this effect;
+        // a recycled list header must not receive a detached focus request.
+        withFrameNanos { }
+        if (returnFocus == target && !reviewToolsExpanded && !manageToolsExpanded &&
+            attachedToolButtons[if(target) 0 else 1]) {
+            (if(target) reviewFocus else manageFocus).requestFocus()
+        }
+        returnFocus=null
     }
     val hasReviewTools = (onOpenImageTexts != null && local.supportsImageTexts) ||
         (onOpenTranscripts != null && local.supportsAudioTranscripts) ||
@@ -174,7 +207,7 @@ fun LocalRecordsScreen(
         (onBeginExport != null && local.supportsOriginalExport) ||
         (onOpenRecycleBin != null && local.supportsRecycleBin)
     if (destination == Destination.MEMORIES && (reviewToolsExpanded || manageToolsExpanded)) {
-        NotebookToolsPanel(if (reviewToolsExpanded) "找回与审阅" else "资料管理", motionAllowed, ::closeTools) {
+        NotebookToolsPanel(if (reviewToolsExpanded) "找回与审阅" else "资料管理", motionAllowed, ::dismissTools) {
             if (reviewToolsExpanded) {
                 FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                 if(onOpenImageTexts!=null && local.supportsImageTexts)TextButton({ closeTools(); onOpenImageTexts() },enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("image-texts-open")){Text("找回图片文字与原图")}
@@ -368,14 +401,20 @@ fun LocalRecordsScreen(
                             }
                             if(onOpenUnified!=null && local.unifiedKeywordOwner!=null)FilledTonalButton(onOpenUnified,enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().heightIn(min=AIyouDimensions.minTouchTarget).testTag("unified-open")){Text("统一关键词找回")}
                             FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                                DisposableEffect(toolsOwner, hasReviewTools, hasManageTools) {
+                                    attachedToolButtons[0]=hasReviewTools; attachedToolButtons[1]=hasManageTools
+                                    onDispose { attachedToolButtons[0]=false; attachedToolButtons[1]=false }
+                                }
                                 if (hasReviewTools) OutlinedButton(onClick={ openTools(true) },
                                     shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget)
+                                        .focusRequester(reviewFocus).onFocusChanged { reviewFocused=it.isFocused }
                                         .aiyouFocusOutline().testTag("notebook-review-tools")
                                         .semantics { stateDescription=if(reviewToolsExpanded) "已展开" else "已收起" }) {
                                     Text("找回工具")
                                 }
                                 if (hasManageTools) OutlinedButton(onClick={ openTools(false) },
                                     shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget)
+                                        .focusRequester(manageFocus).onFocusChanged { manageFocused=it.isFocused }
                                         .aiyouFocusOutline().testTag("notebook-manage-tools")
                                         .semantics { stateDescription=if(manageToolsExpanded) "已展开" else "已收起" }) {
                                     Text("资料管理")

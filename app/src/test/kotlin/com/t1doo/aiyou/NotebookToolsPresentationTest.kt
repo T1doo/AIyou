@@ -64,6 +64,14 @@ class NotebookToolsPresentationTest {
             .put("viewportPixels","${image.width}x${image.height}").toString(2))
     }
     private fun toggle(tag:String)=compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertIsEnabled()
+    private fun keyboardOpen(tag:String) {
+        val button=toggle(tag)
+        val view=(button.fetchSemanticsNode().root as ViewRootForTest).view
+        compose.runOnIdle {assertTrue(view.requestFocusFromTouch())}
+        button.performSemanticsAction(SemanticsActions.RequestFocus){assertTrue(it())}
+        button.assertIsFocused().performKeyInput {pressKey(Key.Enter)}
+        compose.onNodeWithTag("notebook-tools-panel").assertExists()
+    }
     private fun unchanged() { compose.runOnIdle {
         assertEquals(0,actions);assertEquals("合成关键词🙂",query.text.toString())
         assertEquals("2026-10-01",from.text.toString());assertEquals("2026-10-23",through.text.toString())
@@ -83,6 +91,11 @@ class NotebookToolsPresentationTest {
         compose.runOnIdle {local.value=local.value.copy(saving=true)}
         compose.onNodeWithTag("export-open").assertIsNotEnabled()
         compose.onNodeWithTag("notebook-tools-close").performClick()
+        keyboardOpen("notebook-manage-tools")
+        compose.onNodeWithTag("notebook-tools-close").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("notebook-manage-tools").assertIsFocused()
+        unchanged()
         toggle("notebook-review-tools").performClick()
         compose.onNodeWithTag("notebook-tools-close").performClick();unchanged()
         compose.onNodeWithTag("export-open").assertDoesNotExist()
@@ -92,17 +105,16 @@ class NotebookToolsPresentationTest {
         compose.runOnIdle {destination.value=Destination.MEMORIES};compose.waitForIdle()
         compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
         compose.onNodeWithTag("notebook-review-tools").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,"已收起"))
+        compose.onNodeWithTag("notebook-review-tools").assertIsNotFocused()
+        compose.onNodeWithTag("notebook-manage-tools").assertIsNotFocused()
         unchanged()
     }
 
     @Test @Config(qualifiers="w640dp-h320dp-land")
     fun doubleFontLandscapeKeyboardDisclosureAndSearchRemainReachableWithoutCallingTools() {
         content(doubleFont=true)
-        val button=toggle("notebook-review-tools").assertHeightIsAtLeast(48.dp)
-        val view=(button.fetchSemanticsNode().root as ViewRootForTest).view
-        compose.runOnIdle {assertTrue(view.requestFocusFromTouch())};compose.waitForIdle()
-        button.performSemanticsAction(SemanticsActions.RequestFocus){assertTrue(it())}
-        button.assertIsFocused().performKeyInput {pressKey(Key.Enter)}
+        toggle("notebook-review-tools").assertHeightIsAtLeast(48.dp)
+        keyboardOpen("notebook-review-tools")
         compose.onNodeWithTag("preferences-open").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
         compose.runOnIdle { assertEquals(2f,checkNotNull(ShadowDialog.getLatestDialog()).context.resources.configuration.fontScale,0f) }
         frame("05-double-font-landscape-tools-panel",panel=true)
@@ -110,6 +122,7 @@ class NotebookToolsPresentationTest {
         compose.onNodeWithTag("notebook-tools-panel").performTouchInput { swipeDown() }
         compose.waitForIdle()
         compose.onNodeWithTag("notebook-tools-panel").assertDoesNotExist()
+        compose.onNodeWithTag("notebook-review-tools").assertIsFocused()
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("original-search-query"))
         compose.onNodeWithTag("original-search-query").assertIsDisplayed()
             .performSemanticsAction(SemanticsActions.RequestFocus){assertTrue(it())}
