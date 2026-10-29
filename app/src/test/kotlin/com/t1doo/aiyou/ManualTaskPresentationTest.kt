@@ -179,7 +179,7 @@ class ManualTaskPresentationTest {
         compose.onNodeWithTag("manual-task-create").performScrollTo().assertIsDisplayed().assertIsEnabled()
         compose.onNodeWithTag("manual-task-close").performScrollTo().assertIsDisplayed().performClick()
         compose.onNodeWithTag("manual-task-continue").assertIsDisplayed().assertIsEnabled().performClick()
-        compose.onNodeWithTag("manual-task-input").performScrollTo().assertTextEquals("合成私密输入")
+        compose.onNodeWithTag("manual-task-input").performScrollTo().assertTextEquals("待办标题", "合成私密输入")
         compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
         compose.onNodeWithTag("manual-task-discard").assertIsDisplayed().assertIsEnabled().performClick()
         assertNull(state.value.tasks.editor); assertTrue(queued.isEmpty()); assertTrue(persisted.isEmpty())
