@@ -30,6 +30,22 @@ lint 报告更新 Gradle 补丁版本，保留严格门槛。原工具链与历�
 
 资料不代替 checkDebugAarMetadata/assemble/lint；本次只将 Gradle9.8.1 升至9.8.2。
 
+### 2026-10-29 工具链固定与版本提示
+
+`57e326d00aeb4e399a622a51be8a55706d46b1df` 的
+[CI40905646204](https://github.com/T1doo/AIyou/actions/runs/40905646204) 已完成
+388项 Compose 和430项 Preview，最终 lint 报告两条
+`AndroidGradlePluginVersion`：application/library 别名均提示 AGP9.4.1 已有9.5.0。
+这不是本次焦点恢复代码的 API 错误。原失败和报告保留，不重记为通过。
+
+本轮明确保留已固定的 AGP9.4.1，只在版本目录该条目前设置
+`AndroidGradlePluginVersion` 提示例外。该检查的[官方说明](https://googlesamples.github.io/android-custom-lint-rules/checks/AndroidGradlePluginVersion.md.html)
+允许有意保留旧版本；这不构成其安全性或实际设备兼容性的证明。
+不生成 lint baseline、不修改全局严重级别，`abortOnError`、`warningsAsErrors`、
+实际 AAR/API 兼容检查与严格依赖校验保持。所有版本、锁及校验值不变；
+采用新版 AGP 仍需独立的兼容、依赖闭包和许可证复核，不自动下载或升级工具。
+此配置变更的真实 lint/构建结果须由新候选验证，不能继承前述部分通过结果。
+
 ### 2026-10-20 补丁核验
 
 [CI39351479100](https://github.com/T1doo/AIyou/actions/runs/39351479100) 对

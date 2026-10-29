@@ -1,4 +1,7 @@
 [versions]
+# Retain the frozen toolchain; upgrading AGP requires separate compatibility/license review.
+# Suppress only latest-release advice for this exact pin, not source/API/security lint.
+#noinspection AndroidGradlePluginVersion
 agp = "9.4.1"
 kotlin = "2.4.21"
 compose-bom = "2026.09.00"
