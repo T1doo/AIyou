@@ -7,6 +7,9 @@ kotlin = "2.4.21"
 compose-bom = "2026.09.00"
 activity-compose = "1.13.0"
 junit = "4.13.2"
+# Keep the reviewed screenshot plugin and validation API on the same frozen version.
+# Suppress only newer-release advice for this pin; compatibility and checksum checks remain.
+#noinspection GradleDependency
 screenshot = "0.0.1-alpha16"
 room = "2.8.5"
 ksp = "2.3.12"

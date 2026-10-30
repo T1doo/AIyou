@@ -46,6 +46,21 @@ lint 报告更新 Gradle 补丁版本，保留严格门槛。原工具链与历�
 采用新版 AGP 仍需独立的兼容、依赖闭包和许可证复核，不自动下载或升级工具。
 此配置变更的真实 lint/构建结果须由新候选验证，不能继承前述部分通过结果。
 
+### 2026-10-30 截图工具固定与版本提示
+
+`0ee2cff1482b15c66d1989bfd9d4c9d232fb4d8f` 的
+[CI41105586713](https://github.com/T1doo/AIyou/actions/runs/41105586713)
+实际完成388项 Compose 和430项 Preview，最终 app lint 为1 error、0 warning、1 hint。
+唯一错误是 `GradleDependency` 提示截图验证 API 的固定版本
+`0.0.1-alpha16` 已有 `0.0.1-alpha17`；原失败报告保留，整轮不记为通过。
+
+本轮保留共用该版本条目的截图插件和验证 API，仅在 `screenshot` 版本条目前设置
+`GradleDependency` 提示例外。该检查的[官方说明](https://googlesamples.github.io/android-custom-lint-rules/checks/GradleDependency.md.html)
+允许有意保留旧版本，并支持版本目录的逐条提示例外；这不证明固定版本安全或兼容。
+不修改依赖版本、锁、校验值、许可证、全局 lint 严重级别或 baseline；
+`abortOnError`、`warningsAsErrors`、API/AAR 检查、严格依赖校验和截图断言保持。
+升级插件/API 仍须独立兼容及来源复核。本候选的 lint 与完整构建须重新实际验证。
+
 ### 2026-10-20 补丁核验
 
 [CI39351479100](https://github.com/T1doo/AIyou/actions/runs/39351479100) 对
