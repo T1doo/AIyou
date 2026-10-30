@@ -33,8 +33,14 @@ class ManualTagViewModelTest {
         h.f.store.replace(ManualTagMutation(ID, 0, listOf("另一操作"), "concurrent"))
         h.vm.tags.add(e.session, 0, "我的输入")
         val conflict = h.editor { it.conflict && !it.busy }; assertEquals("我的输入", conflict.input)
+        h.vm.tags.edit(e.session, 0, "重读前不得替换")
+        assertSame(conflict.pending, h.vm.state.value.manualTagEditor!!.pending)
+        assertEquals("我的输入", h.vm.state.value.manualTagEditor!!.input)
         h.vm.tags.retry(e.session); val refreshed = h.editor { !it.conflict && it.snapshot?.version == 1L }
         assertEquals("我的输入", refreshed.input); assertEquals(listOf("另一操作"), refreshed.snapshot!!.names)
+        h.vm.tags.edit(e.session, 1, "读取后更正")
+        assertEquals("读取后更正", h.vm.state.value.manualTagEditor!!.input)
+        h.vm.tags.edit(e.session, 1, refreshed.input)
         h.vm.tags.add(e.session, 1, refreshed.input); h.editor { it.notice != null }
         assertEquals(listOf("另一操作", "我的输入"), h.f.store.read(ID).names)
         assertEquals(1, h.vm.state.value.entries.single().currentRevision)
@@ -45,7 +51,19 @@ class ManualTagViewModelTest {
         val failed = h.editor { it.error != null && !it.busy }
         assertEquals("已提交待确认", failed.input); assertNull(failed.notice)
         assertEquals(1L, h.f.store.read(ID).version)
+        val pending = checkNotNull(failed.pending)
+        h.vm.tags.edit(e.session, 0, "不得替换未确认意图")
+        assertSame(pending, h.vm.state.value.manualTagEditor!!.pending)
+        assertEquals("已提交待确认", h.vm.state.value.manualTagEditor!!.input)
+        h.vm.tags.add(e.session, 0, "不得新建请求")
+        h.vm.tags.remove(e.session, 0, "已提交待确认", "不得借移除改写输入")
+        assertSame(pending, h.vm.state.value.manualTagEditor!!.pending)
+        assertEquals(1, h.mutations.size)
+        h.vm.tags.retry(e.session)
+        val unread = h.editor { it.error != null && !it.busy }
+        assertSame(pending, unread.pending); assertEquals("已提交待确认", unread.input)
         h.failReadback = false; h.vm.tags.retry(e.session); h.editor { it.notice != null }
+        assertEquals(3, h.mutations.size); assertEquals(1, h.mutations.distinct().size)
         assertEquals(1L, h.f.store.read(ID).version)
         val entered = CountDownLatch(1); val release = CountDownLatch(1)
         h.holdReadback = { entered.countDown(); check(release.await(1, TimeUnit.SECONDS)) }

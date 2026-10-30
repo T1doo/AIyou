@@ -44,8 +44,12 @@ class ManualTagController internal constructor(
     }
     fun edit(session: Long, version: Long, input: String) {
         val editor = current().manualTagEditor?.takeIf { it.session == session && it.snapshot?.version == version && !it.busy && live(it) } ?: return
-        if (input == editor.input) return
-        update(editor) { it.copy(input = input, notice = null, pending = if (input == it.input) it.pending else null) }
+        // A failed ACK may follow a durable commit. Editing cannot replace that request.
+        if (input == editor.input || editor.pending != null) return
+        update(editor) {
+            if (it.session != session || it.busy || it.snapshot?.version != version || it.pending != null) it
+            else it.copy(input = input, notice = null)
+        }
     }
     fun close(session: Long) {
         if (disposed) return

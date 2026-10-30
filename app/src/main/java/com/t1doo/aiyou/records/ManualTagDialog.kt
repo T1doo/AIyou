@@ -43,10 +43,12 @@ fun ManualTagDialog(editor: ManualTagEditor, onEdit: (Long, Long, String) -> Uni
                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-tag-remove-$index")) { Text("移除") }
                     }
                 }
-                OutlinedTextField(state = input, enabled = sourceAvailable && !editor.busy && editor.snapshot != null,
+                OutlinedTextField(state = input, enabled = sourceAvailable && !editor.busy && editor.snapshot != null &&
+                    editor.pending == null,
                     inputTransformation = InputTransformation.maxLength(160),
                     label = { Text("新增手工标签") }, lineLimits = TextFieldLineLimits.SingleLine,
                     modifier = Modifier.fillMaxWidth().testTag("manual-tag-input"))
+                if (editor.pending != null && !editor.conflict) Text("保存结果待确认，请先重试确认，再修改标签。")
                 TextButton(onClick = { onAdd(editor.session, version, input.text.toString()) },
                     enabled = sourceAvailable && !editor.busy && editor.snapshot != null && editor.pending == null && !editor.conflict,
                     modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-tag-add")) { Text("保存新增标签") }
