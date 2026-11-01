@@ -1373,13 +1373,13 @@ fun AIyouApp(
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
-                onAskQuestion=if(productionQuestions==null)null else {
+                onAskQuestion=if(productionQuestions==null)null else {{
                     if(ownsNavigation()&&selectedName==Destination.NOW.name&&currentLocal?.ready==true&&
                         currentLocal?.opening==false&&currentLocal?.error==null&&currentLocal?.saving==false&&
                         currentLocal?.savePending==false&&currentLocal?.captureDiscard==null) {
                         navigation.advance();clearSearch();selectedName=Destination.MEMORIES.name;evidenceMode=true
                     }
-                },
+                }},
                 imageTextBusy=imageTextBusy, motionAllowed=motionAllowed,
                 onOpenUnified=unifiedKeywords?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
                 onOpenImageTexts=imageTexts?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
