@@ -41,10 +41,22 @@ class ManualAliasEditorControllerTest {
             val pending = h.local.get().manualPeopleEditor!!
             assertFalse(pending.busy); assertNotNull(pending.error); assertEquals("阿林", pending.aliasInput); assertEquals("小林", pending.aliasTarget)
             assertEquals(2L, h.f.people.read(h.id).version)
+            val intent = checkNotNull(pending.pending); val version = checkNotNull(pending.snapshot).version
+            h.controller.editAlias(editor.session, version, "另一别名", "小王")
+            assertSame(intent, h.local.get().manualPeopleEditor!!.pending)
+            assertEquals("阿林", h.local.get().manualPeopleEditor!!.aliasInput)
+            assertEquals("小林", h.local.get().manualPeopleEditor!!.aliasTarget)
+            h.controller.edit(editor.session, version, "未知时替换人物")
+            assertSame(intent, h.local.get().manualPeopleEditor!!.pending)
+            assertEquals("", h.local.get().manualPeopleEditor!!.input)
+            h.controller.saveAlias(editor.session, version, "另一别名", "小王")
+            h.controller.removeAlias(editor.session, version, "阿林")
+            assertEquals(1, h.mutations.size)
             h.f.base.db.afterSql = null; h.controller.retry(editor.session); h.pump()
             assertEquals(2L, h.f.people.read(h.id).version); assertEquals(listOf("小林", "小王"), h.f.people.read(h.id).names)
             assertEquals(listOf(ManualPersonAlias("阿林", "小林")), h.f.people.read(h.id).aliases)
             assertNull(h.local.get().manualPeopleEditor!!.error)
+            assertEquals(listOf(intent.mutationId, intent.mutationId), h.mutations)
         }
     }
 
@@ -76,7 +88,12 @@ class ManualAliasEditorControllerTest {
     private class Harness : AutoCloseable {
         val f = ManualPeopleFixture(); val id = f.base.entry()
         var holdReadback: (() -> Unit)? = null
+        val mutations = mutableListOf<String>()
         val people = object : ManualPeopleRepository by f.people {
+            override fun replace(mutation: ManualPeopleMutation): ManualPeopleSnapshot {
+                mutations += mutation.mutationId
+                return f.people.replace(mutation)
+            }
             override fun snapshots(): Map<String, ManualPeopleSnapshot> {
                 val all = f.people.snapshots(); holdReadback?.invoke(); return all
             }

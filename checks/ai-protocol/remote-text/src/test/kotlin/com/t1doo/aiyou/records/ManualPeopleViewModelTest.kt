@@ -34,8 +34,17 @@ class ManualPeopleViewModelTest {
         h.f.people.replace(h.f.mutation(h.id,listOf("另一手工选择")))
         h.vm.people.add(editor.session,0,"我的称呼")
         val failed=h.editor{it.conflict&&!it.busy};assertEquals("我的称呼",failed.input)
+        val pending=checkNotNull(failed.pending)
+        h.vm.people.edit(editor.session,failed.snapshot!!.version,"冲突时替换输入")
+        h.vm.people.editAlias(editor.session,failed.snapshot.version,"冲突时替换别名","另一手工选择")
+        assertSame(pending,h.vm.state.value.manualPeopleEditor!!.pending)
+        assertEquals("我的称呼",h.vm.state.value.manualPeopleEditor!!.input)
+        assertEquals("",h.vm.state.value.manualPeopleEditor!!.aliasInput)
         h.vm.people.retry(editor.session);val reread=h.editor{!it.conflict&&it.snapshot?.version==1L&&!it.busy}
         assertEquals("我的称呼",reread.input)
+        h.vm.people.edit(editor.session,1,"重新读取后可编辑")
+        assertEquals("重新读取后可编辑",h.vm.state.value.manualPeopleEditor!!.input)
+        h.vm.people.edit(editor.session,1,reread.input)
         h.vm.people.add(editor.session,1,reread.input);h.editor{it.snapshot?.version==2L&&!it.busy}
         assertEquals(listOf("另一手工选择","我的称呼"),h.f.people.read(h.id).names)
         assertEquals(1,h.vm.state.value.entries.single().currentRevision)
@@ -67,9 +76,23 @@ class ManualPeopleViewModelTest {
 
     @Test(timeout=12_000) fun acknowledgedButFailedReadbackUsesSameIntentAndCannotOverwriteLaterWinner(): Unit = Harness().use { h -> runBlocking {
         h.ready();val editor=h.open();h.failReadback=true;h.vm.people.add(editor.session,0,"待确认称呼")
-        h.editor{it.error!=null&&!it.busy};assertEquals(1L,h.f.people.read(h.id).version)
+        val unknown=h.editor{it.error!=null&&!it.busy};assertEquals(1L,h.f.people.read(h.id).version)
+        val pending=checkNotNull(unknown.pending);val version=checkNotNull(unknown.snapshot).version
+        h.vm.people.edit(editor.session,version,"结果未知时替换称呼")
+        assertSame(pending,h.vm.state.value.manualPeopleEditor!!.pending)
+        assertEquals("待确认称呼",h.vm.state.value.manualPeopleEditor!!.input)
+        h.vm.people.editAlias(editor.session,version,"结果未知时替换别名","另一称呼")
+        assertSame(pending,h.vm.state.value.manualPeopleEditor!!.pending)
+        assertEquals("",h.vm.state.value.manualPeopleEditor!!.aliasInput)
+        h.vm.people.add(editor.session,version,"另一称呼")
+        h.vm.people.remove(editor.session,version,"待确认称呼","")
+        assertEquals(1,h.mutations.size)
+        h.vm.people.retry(editor.session)
+        val stillUnknown=h.editor{it.error!=null&&!it.busy}
+        assertSame(pending,stillUnknown.pending);assertEquals("待确认称呼",stillUnknown.input)
         h.failReadback=false;h.vm.people.retry(editor.session);h.editor{it.notice!=null&&!it.busy}
         assertEquals(1L,h.f.people.read(h.id).version);assertEquals(1,h.mutations.distinct().size)
+        assertEquals(listOf(pending.mutationId,pending.mutationId,pending.mutationId),h.mutations)
         h.f.people.replace(h.f.mutation(h.id,listOf("后来明确选择")))
         h.vm.people.add(editor.session,1,"旧编辑回调");h.editor{it.conflict&&!it.busy}
         assertEquals(listOf("后来明确选择"),h.f.people.read(h.id).names)

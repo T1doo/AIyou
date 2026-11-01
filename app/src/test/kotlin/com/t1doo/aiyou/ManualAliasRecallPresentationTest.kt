@@ -93,10 +93,12 @@ class ManualAliasRecallPresentationTest {
 
     @Test fun doubleFontExplicitAliasEditorCreatesChangesAndRevokesWithoutSavingPrivateInputOrChangingNames() {
         var saved = ManualPeopleSnapshot(original.id, 1, listOf("小林", "小王"), 1, OriginalExports.hash(original.originalText), 0)
+        var failWrite = false
         val people = object : ManualPeopleRepository {
             override fun read(entryId: String) = saved
             override fun snapshots() = mapOf(original.id to saved)
             override fun replace(mutation: ManualPeopleMutation): ManualPeopleSnapshot {
+                if (failWrite) throw ManualPeopleStorageFailure()
                 check(mutation.before.version == saved.version && mutation.before.aliases == saved.aliases)
                 saved = ManualPeopleSnapshot(original.id, saved.version + 1, mutation.names, 1, saved.sourceHash, 0, mutation.aliases)
                 return saved
@@ -145,8 +147,28 @@ class ManualAliasRecallPresentationTest {
         field("manual-alias-input", "未提交私密别名"); field("manual-alias-target", "小林")
         compose.runOnIdle { assertFalse(containsPrivateInput(registry!!.performSave(), "未提交私密别名")) }
         field("manual-alias-input", "阿林")
+        failWrite = true
         compose.onNodeWithTag("manual-alias-save").performScrollTo().assertIsDisplayed().performClick()
-        assertTrue(saved.aliases.isEmpty()); pump(); assertEquals(listOf(ManualPersonAlias("阿林", "小林")), saved.aliases)
+        assertTrue(saved.aliases.isEmpty()); pump()
+        val pending = checkNotNull(source.value.manualPeopleEditor!!.pending)
+        listOf("manual-people-input", "manual-alias-input", "manual-alias-target", "manual-alias-save").forEach {
+            compose.onNodeWithTag(it).performScrollTo().assertIsNotEnabled()
+        }
+        compose.runOnIdle {
+            val editor = source.value.manualPeopleEditor!!
+            controller.editAlias(editor.session, editor.snapshot!!.version, "迟到私密别名", "小王")
+        }
+        assertSame(pending, source.value.manualPeopleEditor!!.pending)
+        assertEquals("阿林", source.value.manualPeopleEditor!!.aliasInput)
+        assertEquals("小林", source.value.manualPeopleEditor!!.aliasTarget)
+        compose.onNodeWithTag("manual-people-retry").performScrollTo().assertIsEnabled()
+        compose.onNodeWithTag("manual-people-close").performScrollTo().assertIsEnabled()
+        failWrite = false
+        compose.onNodeWithTag("manual-people-retry").performScrollTo().performClick(); pump()
+        listOf("manual-people-input", "manual-alias-input", "manual-alias-target").forEach {
+            compose.onNodeWithTag(it).performScrollTo().assertIsEnabled()
+        }
+        assertEquals(listOf(ManualPersonAlias("阿林", "小林")), saved.aliases)
         field("manual-alias-input", "阿林"); field("manual-alias-target", "小王")
         compose.onNodeWithTag("manual-alias-save").performScrollTo().performClick(); pump()
         assertEquals(listOf(ManualPersonAlias("阿林", "小王")), saved.aliases)

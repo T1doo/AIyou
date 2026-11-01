@@ -79,7 +79,15 @@ class ManualPeoplePresentationTest {
         compose.onNodeWithTag("manual-people-add").performScrollTo().performClick()
         assertTrue(state.value.manualPeopleEditor!!.busy);assertEquals(listOf("小林"),persisted.getValue("one").names)
         pump();assertInputEquals("我的称呼🙂")
+        compose.onNodeWithTag("manual-people-input").assertIsNotEnabled()
+        compose.onNodeWithTag("manual-people-add").assertIsNotEnabled()
+        compose.onNodeWithTag("manual-people-retry").performScrollTo().assertIsEnabled()
+        val pending=state.value.manualPeopleEditor!!.pending
+        compose.runOnIdle { controller.edit(state.value.manualPeopleEditor!!.session,
+            state.value.manualPeopleEditor!!.snapshot!!.version,"迟到编辑") }
+        assertSame(pending,state.value.manualPeopleEditor!!.pending);assertInputEquals("我的称呼🙂")
         failWrite=false;compose.onNodeWithTag("manual-people-retry").performScrollTo().performClick();pump()
+        compose.onNodeWithTag("manual-people-input").performScrollTo().assertIsEnabled()
         assertEquals(listOf("小林","我的称呼🙂"),persisted.getValue("one").names)
         compose.onNodeWithTag("manual-people-remove-1").performScrollTo().performClick();pump()
         assertEquals(listOf("小林"),persisted.getValue("one").names);assertEquals("合成独立草稿",state.value.text)

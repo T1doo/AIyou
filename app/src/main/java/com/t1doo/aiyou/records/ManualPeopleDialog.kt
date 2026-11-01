@@ -53,10 +53,11 @@ fun ManualPeopleDialog(editor: ManualPeopleEditor, onEdit: (Long, Long, String) 
                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-people-remove-$index")) { Text("移除") }
                     }
                 }
-                OutlinedTextField(state = input, enabled = sourceAvailable && !editor.busy && editor.snapshot != null,
+                OutlinedTextField(state = input, enabled = sourceAvailable && !editor.busy && editor.snapshot != null && editor.pending == null,
                     inputTransformation = InputTransformation.maxLength(160),
                     label = { Text("新增关联人物") }, lineLimits = TextFieldLineLimits.SingleLine,
                     modifier = Modifier.fillMaxWidth().testTag("manual-people-input"))
+                if (editor.pending != null && !editor.conflict) Text("保存结果待确认，请先重试确认，再修改人物或别名。")
                 TextButton(onClick = { onAdd(editor.session, version, input.text.toString()) },
                     enabled = sourceAvailable && !editor.busy && editor.snapshot != null && editor.pending == null && !editor.conflict,
                     modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-people-add")) { Text("保存新增人物名称") }
@@ -73,10 +74,10 @@ fun ManualPeopleDialog(editor: ManualPeopleEditor, onEdit: (Long, Long, String) 
                         enabled = sourceAvailable && !editor.busy && editor.pending == null && !editor.conflict,
                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-alias-remove-$index")) { Text("撤销此别名") }
                 }
-                OutlinedTextField(state = aliasInput, enabled = sourceAvailable && !editor.busy && editor.snapshot != null,
+                OutlinedTextField(state = aliasInput, enabled = sourceAvailable && !editor.busy && editor.snapshot != null && editor.pending == null,
                     inputTransformation = InputTransformation.maxLength(160), label = { Text("别名") }, lineLimits = TextFieldLineLimits.SingleLine,
                     modifier = Modifier.fillMaxWidth().testTag("manual-alias-input"))
-                OutlinedTextField(state = aliasTarget, enabled = sourceAvailable && !editor.busy && editor.snapshot != null,
+                OutlinedTextField(state = aliasTarget, enabled = sourceAvailable && !editor.busy && editor.snapshot != null && editor.pending == null,
                     inputTransformation = InputTransformation.maxLength(160), label = { Text("已关联的原称呼") }, lineLimits = TextFieldLineLimits.SingleLine,
                     modifier = Modifier.fillMaxWidth().testTag("manual-alias-target"))
                 TextButton(onClick = { onAliasSave(editor.session, version, aliasInput.text.toString(), aliasTarget.text.toString()) },

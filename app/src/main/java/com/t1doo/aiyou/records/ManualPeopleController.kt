@@ -73,8 +73,12 @@ class ManualPeopleController internal constructor(
     }
     fun edit(session: Long, version: Long, input: String) {
         val editor = current().manualPeopleEditor?.takeIf { it.session == session && it.snapshot?.version == version && !it.busy && live(it) } ?: return
-        if (input == editor.input) return
-        update(editor) { it.copy(input = input, notice = null, pending = if (input == it.input) it.pending else null) }
+        // A failed ACK may follow a durable commit; editing cannot replace that intent.
+        if (input == editor.input || editor.pending != null) return
+        update(editor) {
+            if (it.session != session || it.snapshot?.version != version || it.busy || it.pending != null) it
+            else it.copy(input = input, notice = null)
+        }
     }
     fun close(session: Long) {
         if (disposed) return
@@ -103,8 +107,11 @@ class ManualPeopleController internal constructor(
     }
     fun editAlias(session: Long, version: Long, alias: String, name: String) {
         val editor = current().manualPeopleEditor?.takeIf { it.session == session && it.snapshot?.version == version && !it.busy && live(it) } ?: return
-        if (alias == editor.aliasInput && name == editor.aliasTarget) return
-        update(editor) { it.copy(aliasInput = alias, aliasTarget = name, notice = null, pending = null) }
+        if ((alias == editor.aliasInput && name == editor.aliasTarget) || editor.pending != null) return
+        update(editor) {
+            if (it.session != session || it.snapshot?.version != version || it.busy || it.pending != null) it
+            else it.copy(aliasInput = alias, aliasTarget = name, notice = null)
+        }
     }
     fun saveAlias(session: Long, version: Long, alias: String, name: String) {
         editAlias(session, version, alias, name)
