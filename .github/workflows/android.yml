@@ -564,9 +564,10 @@ jobs:
           expected = {
               'narrowDoubleFontSeparateMultiSourceReviewAndExactOriginalJump',
               'withdrawUnknownAckHidesResultAndExplicitRetryNeverExecutesAgain',
-              'serviceReplacementRetiresOpenReviewAndDefaultCapabilityNeverOffersSend'}
+              'serviceReplacementRetiresOpenReviewAndDefaultCapabilityNeverOffersSend',
+              'actualProductionQuestionInputAndConnectionAreSeparateFromRecordSavingAndPackageGateCannotBeBypassed'}
           assert {case.get('name') for case in cases} == expected
-          assert int(suite.get('tests', '-1')) == len(cases) == 3
+          assert int(suite.get('tests', '-1')) == len(cases) == 4
           assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
           assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
           assert all(case.get('classname') == 'com.t1doo.aiyou.SelectedQuestionConsentPresentationTest' for case in cases)
@@ -574,7 +575,7 @@ jobs:
           target.mkdir(parents=True, exist_ok=True)
           shutil.copy2(source, target / source.name)
           receipt = {'head_sha': os.environ['GITHUB_SHA'], 'tests': len(cases),
-                     'failures': 0, 'errors': 0, 'skipped': 0, 'mode': 'LOCAL_PROTOCOL_FIXTURE',
+                     'failures': 0, 'errors': 0, 'skipped': 0, 'mode': 'PRODUCTION_BLOCKED_AND_LOCAL_PROTOCOL_FIXTURE',
                      'authority': 'synthetic UI port; persistent authority covered by host SQLite controller tests',
                      'external_model_calls': 0, 'source': 'subset of same full app suite, no second execution',
                      'xml': [{'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}]}
