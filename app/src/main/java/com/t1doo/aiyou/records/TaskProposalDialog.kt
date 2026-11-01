@@ -31,9 +31,14 @@ internal fun TaskProposalDialog(local:LocalRecordUiState,controller:TaskProposal
     LocalTaskProposalObserver.current?.let {observer -> SideEffect {observer.actions(actions)}}
     val maxHeight=with(LocalDensity.current) {LocalWindowInfo.current.containerSize.height.toDp()*0.9f}
     val fields=remember(e.session) {TaskDateFields(e.date)}
+    // Consume the actual fields before close; snapshotFlow may still hold the prior date.
+    val requestClose:()->Unit = {
+        if(canUse()) controller.editDate(e.session,fields.current())
+        controller.close(e.session)
+    }
     val editable=available&&canUse()&&!e.closing&&e.confirmation==null&&e.notice==null&&!e.conflict&&
         (e.pending==null||e.busy&&e.pending is ProposalPending.Write&&e.pending.request.action==com.t1doo.aiyou.domain.TaskProposalAction.SAVE)
-    Dialog(onDismissRequest={controller.close(e.session)},properties=DialogProperties(usePlatformDefaultWidth=false)) {
+    Dialog(onDismissRequest=requestClose,properties=DialogProperties(usePlatformDefaultWidth=false)) {
         CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
             Surface(Modifier.fillMaxWidth().padding(AIyouDimensions.pageNarrow).widthIn(max=AIyouDimensions.contentMaxWidth)
                 .heightIn(max=maxHeight),shape=MaterialTheme.shapes.large) {
@@ -78,7 +83,7 @@ internal fun TaskProposalDialog(local:LocalRecordUiState,controller:TaskProposal
                     if(e.error!=null&&!e.conflict) TextButton(enabled=!e.busy&&canUse(),onClick={if(canUse()) controller.retry(e.session)},
                         modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("task-proposal-retry")) {Text("重试同一请求")}
                     if(e.error!=null) Text("未确认保存的输入可能无法冷恢复；关闭后请从清单核对已保存草稿与正式待办。")
-                    TextButton(enabled=!e.closing,onClick={controller.close(e.session)},modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("task-proposal-close")) {
+                    TextButton(enabled=!e.closing,onClick=requestClose,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("task-proposal-close")) {
                         Text(if(e.closing) "正在核对后关闭…" else if(saveState==TaskProposalSaveState.SAVED||saveState==TaskProposalSaveState.SAVED_SOURCE_UNAVAILABLE)
                             "关闭并保留草稿" else "关闭并核对已保存内容")}
                 }
