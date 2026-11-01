@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.*
@@ -52,11 +53,11 @@ class SelectedQuestionConsentPresentationTest {
     private val records = mutableStateOf(LocalRecordUiState(ready = true, opening = false, entries = entries,
         localSearch = port, localSearchEpoch = 1, selectedQuestionAuthorizationOwner = fixture.authority))
     private val selected = mutableStateOf<SelectedQuestionConsentFixture?>(fixture.capability)
-    @Composable private fun Screen(large: Boolean = false,production:ProductionQuestions?=null,destination:Destination=Destination.MEMORIES) {
+    @Composable private fun Screen(large: Boolean = false,production:ProductionQuestions?=null,destination:Destination=Destination.MEMORIES,mixed:MixedCaptureController?=null) {
         val density = LocalDensity.current
         CompositionLocalProvider(LocalDensity provides if (large) Density(density.density, 2f) else density) {
             AIyouTheme { Box(if (large) Modifier.size(320.dp, 640.dp) else Modifier) {
-                AIyouApp(previewDestination = destination, local = records.value, currentRecords = { records.value },
+                AIyouApp(previewDestination = destination, local = records.value, currentRecords = { records.value },mixedCapture=mixed,
                     selectedQuestionConsentFixture = if(production==null)selected.value else null,productionQuestions=production)
             } }
         }
@@ -166,15 +167,29 @@ class SelectedQuestionConsentPresentationTest {
             override suspend fun revisions(entryId:String)=emptyList<OriginalRevision>()
             override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry {writes.incrementAndGet();error("No revision")}
         }
-        records.value=records.value.copy(text="合成记录草稿，不能变成问题",modelConnectionOwner=catalog,modelCapabilityOwner=profiles)
+        val captureDraft=CaptureDraft("b0b28d6c-d987-4890-8659-5cf9bdf903fb",7,"合成记录草稿，不能变成问题",emptyList())
+        records.value=records.value.copy(text=captureDraft.text,modelConnectionOwner=catalog,modelCapabilityOwner=profiles,
+            supportsMixedCapture=true,mixedCapture=MixedCaptureUiState(draft=captureDraft,text=captureDraft.text))
+        val mixed=MixedCaptureController({records.value},{change->records.value=change(records.value)},
+            {writes.incrementAndGet();error("No capture writes from asking")},{error("No image decode")},Clock.fixed(NOW,ZoneOffset.UTC))
         val ai=ProductionRecordAi({false},Clock.fixed(NOW,ZoneOffset.UTC),{clients.incrementAndGet();error("No client")})
         ai.bindOwner(store)
         val runtime=ProductionQuestions({records.value},{action->runBlocking{action(store)};true},ai,Clock.fixed(NOW,ZoneOffset.UTC))
         runtime.bindOwner(store)
         try {
-            compose.setContent {Screen(true,runtime,Destination.NOW)}
-            compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("问一问"))
-            compose.onNodeWithText("问一问").assertHeightIsAtLeast(48.dp).performClick()
+            compose.setContent {Screen(true,runtime,Destination.NOW,mixed)}
+            reveal("mixed-ask-question").assertHeightIsAtLeast(48.dp)
+            val askBeforeRecomposition=compose.onNodeWithTag("mixed-ask-question").fetchSemanticsNode()
+                .config[SemanticsActions.OnClick].action!!
+            compose.runOnIdle {
+                records.value=records.value.copy(mixedCapture=records.value.mixedCapture!!.copy(uncertainSave=true))
+                askBeforeRecomposition() // Still attached: the same real button before its disabled recomposition.
+            }
+            compose.onNodeWithTag("mixed-list").assertExists()
+            compose.onAllNodesWithTag("original-search-query").assertCountEquals(0)
+            reveal("mixed-ask-question").assertIsNotEnabled()
+            compose.runOnIdle {records.value=records.value.copy(mixedCapture=records.value.mixedCapture!!.copy(uncertainSave=false))}
+            reveal("mixed-ask-question").assertIsEnabled().performClick()
             reveal("original-search-query").performTextReplacement("needle")
             reveal("question-draft").performTextReplacement("这两条合成记录讲了什么？")
             reveal("question-draft").assertTextContains("这两条合成记录讲了什么？")
@@ -190,7 +205,7 @@ class SelectedQuestionConsentPresentationTest {
             reveal("local-evidence-confirm").assertIsEnabled()
             compose.runOnIdle {
                 assertEquals(0,writes.get());assertEquals(0,clients.get());assertEquals(0,fixture.authorizations.get());assertEquals(0,fixture.opened.get())
-                assertEquals("合成记录草稿，不能变成问题",records.value.text)
+                assertEquals("合成记录草稿，不能变成问题",records.value.text);assertSame(captureDraft,records.value.mixedCapture!!.draft)
             }
         } finally {runBlocking{runtime.closeAndJoin()};ai.close()}
     }

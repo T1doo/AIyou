@@ -47,7 +47,8 @@ import kotlinx.coroutines.launch
 fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureController,modifier: Modifier=Modifier,
     listState: LazyListState = rememberLazyListState(), onOpenEntry: (String) -> Unit = {}, selectedEntryId: String? = null,
     defaultPolicyUnavailable: Boolean = false,audio:OriginalAudioController?=null,canImportAudio:()->Boolean={true},
-    companion: (@Composable () -> Unit)? = null,motionAllowed:Boolean=false,compactHeader:Boolean=false) {
+    companion: (@Composable () -> Unit)? = null,motionAllowed:Boolean=false,compactHeader:Boolean=false,
+    onAskQuestion:(()->Unit)?=null) {
     val ui=local.mixedCapture ?: MixedCaptureUiState()
     val playback=audio?.state?.collectAsState()?.value ?: OriginalAudioUi()
     val foreground=audio?.foregroundState?.collectAsState()?.value==true
@@ -122,6 +123,13 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                     Surface(shape=RoundedCornerShape(24.dp),color=AIyouColors.surface,
                         border=BorderStroke(1.dp,paperOutline),shadowElevation=paperElevation) {
                         Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                            if(onAskQuestion!=null) {
+                                Text("记下来 · 保存原始记录",style=MaterialTheme.typography.labelLarge)
+                                TextButton(onClick=onAskQuestion,enabled=editable&&!ui.confirmDiscard,
+                                    modifier=Modifier.fillMaxWidth().heightIn(min=AIyouDimensions.minTouchTarget).testTag("mixed-ask-question")) {
+                                    Text("问一问 · 另选出处与连接")
+                                }
+                            }
                             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                                 Text("此刻手记",Modifier.weight(1f).semantics { heading() },style=MaterialTheme.typography.titleMedium)
                                 Surface(color=AIyouColors.notebookPeach,shape=RoundedCornerShape(8.dp)) {

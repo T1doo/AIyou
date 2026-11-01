@@ -909,6 +909,22 @@ fun AIyouApp(
             selectedName = destination.name; detailEntryId = null; showSettings = false; showLicenses = false
         }
     }
+    val beginQuestion: (() -> Unit)? = productionQuestions?.let { {
+        val latest=searchSource() // Actual VM state, including an explicitly absent owner, before recomposition.
+        val capture=latest?.mixedCapture
+        val draft=capture?.draft
+        val captureReady=latest?.supportsMixedCapture!=true || (capture!=null && draft!=null &&
+            !capture.busy && !capture.uncertainSave && !capture.discardPending && !capture.confirmDiscard &&
+            capture.selection==null && capture.policyChange==null && !draft.discarding &&
+            mixedCapture?.audioCapture?.busy!=true && audioPlayback?.state?.value?.busy!=true)
+        if(ownsNavigation() && selectedName==Destination.NOW.name && latest?.ready==true && !latest.opening &&
+            latest.error==null && !latest.saving && !latest.savePending && latest.captureDiscard==null && captureReady) {
+            val before=navigation.generation
+            selectDestination(Destination.MEMORIES)
+            if(navigation.active && navigation.generation!=before && selectedName==Destination.MEMORIES.name)
+                evidenceMode=true
+        }
+    } }
     LaunchedEffect(reminderNavigation) {
         if(reminderNavigation>0)selectDestination(Destination.TASKS)
     }
@@ -1367,19 +1383,14 @@ fun AIyouApp(
                 listState=nowList,onOpenEntry=openEntry,selectedEntryId=selectedNowId,
                 defaultPolicyUnavailable=!display.ready && display.error!=null,audio=audioPlayback,companion=companion,motionAllowed=motionAllowed,
                 compactHeader=compactNotebookHeader,
+                onAskQuestion=beginQuestion,
                 canImportAudio={ownsNavigation() && selectedName==Destination.NOW.name && !showSettings && !demo && !reading})
         } else if (!demo && local != null && selected != Destination.TASKS) {
             val request = tailReturnRequest?.takeIf { it.destination == selected && it.generation == generation }
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
-                onAskQuestion=if(productionQuestions==null)null else {{
-                    if(ownsNavigation()&&selectedName==Destination.NOW.name&&currentLocal?.ready==true&&
-                        currentLocal?.opening==false&&currentLocal?.error==null&&currentLocal?.saving==false&&
-                        currentLocal?.savePending==false&&currentLocal?.captureDiscard==null) {
-                        navigation.advance();clearSearch();selectedName=Destination.MEMORIES.name;evidenceMode=true
-                    }
-                }},
+                onAskQuestion=beginQuestion,
                 imageTextBusy=imageTextBusy, motionAllowed=motionAllowed,
                 onOpenUnified=unifiedKeywords?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
                 onOpenImageTexts=imageTexts?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
