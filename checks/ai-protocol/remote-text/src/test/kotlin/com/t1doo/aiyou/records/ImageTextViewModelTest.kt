@@ -30,9 +30,20 @@ class ImageTextViewModelTest {
         h.loseAck=true;h.vm.imageTexts.extract(first.session);val unknown=h.ui{it.pending!=null&&it.phase=="UNKNOWN"&&!it.busy}
         assertEquals(1,h.engineCalls.get());assertEquals(1L,h.repo.read(unknown.anchor!!)!!.version)
         h.vm.imageTexts.retry(first.session);var u=h.ui{it.snapshot!=null&&it.pending==null&&!it.busy};assertSame(h.writes[0],h.writes[1]);assertTrue(u.snapshot!!.engine.synthetic)
-        h.vm.imageTexts.edit(first.session,"合成人工纠正");h.vm.imageTexts.save(first.session);u=h.ui{it.snapshot?.history?.size==2&&!it.busy}
+        h.loseAck=true;h.vm.imageTexts.edit(first.session,"合成人工纠正");h.vm.imageTexts.save(first.session)
+        val correction=h.ui{it.pending!=null&&it.phase=="UNKNOWN"&&!it.busy};val correctionIntent=checkNotNull(correction.pending)
+        assertEquals(2,h.repo.read(correction.anchor!!)!!.history.size)
+        h.failRead=true;val reads=h.readCalls.get();h.vm.imageTexts.refresh(first.session)
+        assertSame(correctionIntent,h.value().pending);assertEquals(correction.request,h.value().request)
+        assertEquals(reads,h.readCalls.get())
+        h.vm.imageTexts.edit(first.session,"未知时改写");h.vm.imageTexts.save(first.session);h.vm.imageTexts.delete(first.session)
+        assertEquals("合成人工纠正",h.value().text);assertNull(h.value().deletion);assertEquals(3,h.writes.size)
+        h.vm.imageTexts.retry(first.session);val stillUnknown=h.ui{it.phase=="UNKNOWN"&&!it.busy&&it.request!=correction.request}
+        assertSame(correctionIntent,stillUnknown.pending)
+        h.failRead=false;h.vm.imageTexts.retry(first.session);u=h.ui{it.snapshot?.history?.size==2&&it.pending==null&&!it.busy}
+        assertSame(h.writes[2],h.writes[3]);assertSame(h.writes[2],h.writes[4])
         h.vm.imageTexts.delete(first.session);val cancelled=h.value().deletion!!;h.vm.imageTexts.cancelDelete(first.session,cancelled);h.vm.imageTexts.delete(first.session,cancelled)
-        assertNull(h.value().deletion);assertEquals(3,h.writes.size)
+        assertNull(h.value().deletion);assertEquals(5,h.writes.size)
         h.vm.imageTexts.delete(first.session);h.vm.imageTexts.delete(first.session,h.value().deletion);h.ui{it.snapshot==null&&it.notice!=null&&!it.busy}
         assertTrue(h.repo.search("").items.isEmpty());assertArrayEquals(original,h.f.media.read(h.intent.id));assertEquals(1,h.engineCalls.get())
         val count=h.writes.size;h.vm.imageTexts.close(first.session);h.vm.imageTexts.save(first.session);h.vm.imageTexts.retry(first.session);assertEquals(count,h.writes.size)
@@ -89,7 +100,8 @@ class ImageTextViewModelTest {
     private class Harness(available:Boolean=true,initialPolicy:ProcessingPolicy=ProcessingPolicy.LOCAL_ONLY):AutoCloseable {
         val f=FullFixture();val intent=runBlocking{f.image(f.entry())}.also{if(initialPolicy!=ProcessingPolicy.LOCAL_ONLY)f.db.write("UPDATE entries SET privacyPolicy=? WHERE id=?",initialPolicy.name,it.entryId)};val repo=SqlImageTextRepository(f.gateway,f.key,f.media,f.capture.mutationGate)
         val engineCalls=AtomicInteger();val writes=java.util.Collections.synchronizedList(mutableListOf<ImageTextWrite>())
-        @Volatile var loseAck=false;@Volatile var block=false;@Volatile var lastBytes:ByteArray?=null;@Volatile var cancelled:(()->Boolean)?=null
+        @Volatile var loseAck=false;@Volatile var failRead=false;val readCalls=AtomicInteger()
+        @Volatile var block=false;@Volatile var lastBytes:ByteArray?=null;@Volatile var cancelled:(()->Boolean)?=null
         val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>()
         @Volatile var blockedKeyword:String?=null;@Volatile var blockRead=false
         val searchEntered=CompletableDeferred<Unit>();val searchRelease=CompletableDeferred<Unit>();val readEntered=CompletableDeferred<Unit>();val readRelease=CompletableDeferred<Unit>();val stalePublications=AtomicInteger()
@@ -104,7 +116,7 @@ class ImageTextViewModelTest {
         private val port=object:ImageTextRepository by repo {
             override suspend fun write(request:ImageTextWrite)=repo.write(request).also{writes+=request;if(loseAck){loseAck=false;throw ImageTextUnavailable()}}
             override suspend fun search(keyword:String,cursor:PreferenceCursor?):ImageTextPage {val page=repo.search(keyword,cursor);if(keyword==blockedKeyword){searchEntered.complete(Unit);searchRelease.await()};return page}
-            override suspend fun read(anchor:ImageTextSource):ImageTextSnapshot? {val found=repo.read(anchor);if(blockRead){readEntered.complete(Unit);readRelease.await()};return found}
+            override suspend fun read(anchor:ImageTextSource):ImageTextSnapshot? {readCalls.incrementAndGet();if(failRead)throw ImageTextUnavailable();val found=repo.read(anchor);if(blockRead){readEntered.complete(Unit);readRelease.await()};return found}
             override suspend fun resolve(page:ImageTextPage,item:ImageTextSnapshot?,publish:()->Unit)=repo.resolve(page,item){publish();if(blockedKeyword!=null&&vm.state.value.imageTexts?.page?.keyword==blockedKeyword)stalePublications.incrementAndGet()}
         }
         private val base=SqliteVmEntryRepository(f.db,f.gateway,RemoteTextTransactions(f.gateway)){f.media.close();f.media.awaitIdle();f.gateway.stopAndAwaitIdle();repo.wipeKey()}

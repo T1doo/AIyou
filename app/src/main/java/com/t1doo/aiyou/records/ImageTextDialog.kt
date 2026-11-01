@@ -60,7 +60,7 @@ import com.t1doo.aiyou.model.ImageTextSource
                         TextButton({if(canUse())c.next(u.session)},enabled=editable&&u.page?.next!=null,modifier=Modifier.heightIn(min=48.dp)){Text("下一页")}
                     }
                     if(u.pending!=null)TextButton({if(canUse())c.retry(u.session)},enabled=!u.busy,modifier=Modifier.heightIn(min=48.dp).testTag("image-text-retry")){Text("核对同次保存")}
-                    TextButton({if(canUse())c.refresh(u.session)},enabled=!u.busy,modifier=Modifier.heightIn(min=48.dp).testTag("image-text-refresh")){Text("刷新实际状态")}
+                    TextButton({if(canUse())c.refresh(u.session)},enabled=editable,modifier=Modifier.heightIn(min=48.dp).testTag("image-text-refresh")){Text("刷新实际状态")}
                     TextButton({if(canUse())c.close(u.session)},modifier=Modifier.heightIn(min=48.dp).testTag("image-text-close")){Text("关闭图片文字")}
                 }
             }

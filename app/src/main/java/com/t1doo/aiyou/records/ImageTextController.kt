@@ -140,12 +140,16 @@ class ImageTextController(private val current:()->LocalRecordUiState,
     }}
     fun cancelDelete(session:Long,confirmation:ImageTextWrite){if(owns(session))update(session){if(it.deletion===confirmation)it.copy(deletion=null)else it}}
     fun retry(session:Long){sourceUi{val u=current().imageTexts?:return@sourceUi;if(owns(session)&&!u.busy&&u.pending!=null)load(u,u.pending)}}
-    fun refresh(session:Long){val u=current().imageTexts?:return;if(owns(session)&&!u.busy&&invocation.get()==null)load(u)}
+    fun refresh(session:Long){val u=current().imageTexts?:return;if(owns(session)&&!u.busy&&u.pending==null&&invocation.get()==null)load(u)}
     fun keyword(session:Long,text:String){val u=current().imageTexts?:return;if(!owns(session)||u.selected!=null||u.pending!=null||text.length>256||text==u.keyword)return;cursors.clear();cursors.add(null);update(session){it.copy(keyword=text,request=tokens.incrementAndGet(),items=emptyList(),page=null,cursor=null,canPrevious=false,busy=false,error=null,notice=null)}}
     fun search(session:Long){val u=current().imageTexts?:return;if(!owns(session)||u.selected!=null||u.busy||u.pending!=null)return;try{PreferenceKeywords.validate(u.keyword)}catch(_:Exception){update(session){it.copy(error="关键词最多64字，不能含控制字符或不完整字符。")};return};cursors.clear();cursors.add(null);val n=u.copy(cursor=null,canPrevious=false);update(session){n};load(n)}
     fun next(session:Long,previous:Boolean=false){val u=current().imageTexts?:return;if(!owns(session)||u.selected!=null||u.busy)return;if(previous){if(cursors.size<2)return;cursors.removeAt(cursors.lastIndex)}else cursors.add(u.page?.next?:return);val n=u.copy(cursor=cursors.last(),canPrevious=cursors.size>1);update(session){n};load(n)}
     private fun load(before:ImageTextUi,write:ImageTextWrite?=null){
-        val request=tokens.incrementAndGet();update(before.session){it.copy(request=request,busy=true,phase=if(write==null)"READING"else"COMMITTING",items=emptyList(),page=null,pending=write,deletion=null,error=null,notice=null)}
+        if(before.pending!=null&&write!==before.pending)return // UNKNOWN only admits its exact original intent.
+        val request=tokens.incrementAndGet();update(before.session,before.request){
+            if(it.busy||it.pending!=null&&write!==it.pending)it
+            else it.copy(request=request,busy=true,phase=if(write==null)"READING"else"COMMITTING",items=emptyList(),page=null,pending=write,deletion=null,error=null,notice=null)
+        }
         if(!owns(before.session,request))return
         if(!enqueue{store->if(!owns(before.session,request))return@enqueue;try{
             if(write!=null)settle(store,before.session,request,write)

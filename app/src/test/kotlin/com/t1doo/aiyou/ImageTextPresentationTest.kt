@@ -45,6 +45,7 @@ class ImageTextPresentationTest {
     private val state=mutableStateOf(LocalRecordUiState(ready=true,opening=false,entries=listOf(entry,entryB),supportsImageTexts=true))
     private val queue=ConcurrentLinkedQueue<suspend(EntryRepository)->Unit>();private val gate=CaptureDraftGate()
     private val saved=linkedMapOf<String,ImageTextSnapshot>();private var writes=0;private var engineCalls=0;private var engineEnabled=false
+    private var failWrite=false
     private var lastInput:ByteArray?=null
     private fun anchor(intent:AttachmentIntent):ImageTextSource {
         val e=state.value.entries.single{it.id==intent.entryId&&it.currentRevision==intent.revision}
@@ -54,6 +55,7 @@ class ImageTextPresentationTest {
         override suspend fun preview(intent:AttachmentIntent)=anchor(intent)
         override suspend fun read(anchor:ImageTextSource)=saved[anchor.intent.id].also{check(anchor==this@ImageTextPresentationTest.anchor(anchor.intent))}
         override suspend fun write(request:ImageTextWrite):ImageTextSnapshot? {
+            if(failWrite)throw ImageTextUnavailable()
             val old=saved[request.anchor.intent.id];check(request.anchor==anchor(request.anchor.intent));check(if(old==null)request.expected==null else request.expected?.same(old)==true)
             writes++;if(request.delete){saved.remove(request.anchor.intent.id);return null}
             val history=old?.history.orEmpty()+ImageTextVersion((old?.history?.size?:0)+1,request.extraction?.text?:request.text!!,old!=null,request.at)
@@ -125,7 +127,20 @@ class ImageTextPresentationTest {
         engineEnabled=true;compose.setContent{Screen()};record(entry);viewImage(intent);form(intent)
         val button=compose.onNodeWithTag("image-text-extract").performScrollTo().assertIsDisplayed();assertTrue(button.getUnclippedBoundsInRoot().height>=48.dp)
         extract();assertEquals(1,engineCalls);assertEquals(1,writes)
-        compose.onNodeWithTag("image-text-value").performScrollTo().performTextReplacement("人工纠正甲图文字");click("image-text-save");drain();assertEquals(2,saved[intent.id]!!.history.size)
+        compose.onNodeWithTag("image-text-value").performScrollTo().performTextReplacement("人工纠正甲图文字")
+        failWrite=true;click("image-text-save");drain()
+        val pending=checkNotNull(state.value.imageTexts!!.pending);val request=state.value.imageTexts!!.request
+        listOf("image-text-value","image-text-save","image-text-delete","image-text-refresh").forEach {
+            compose.onNodeWithTag(it).performScrollTo().assertIsNotEnabled()
+        }
+        compose.runOnIdle{controller.refresh(state.value.imageTexts!!.session)}
+        assertSame(pending,state.value.imageTexts!!.pending);assertEquals(request,state.value.imageTexts!!.request);assertTrue(queue.isEmpty())
+        compose.onNodeWithTag("image-text-retry").performScrollTo().assertIsEnabled()
+        compose.onNodeWithTag("image-text-close").performScrollTo().assertIsEnabled()
+        failWrite=false;click("image-text-retry");drain()
+        compose.onNodeWithTag("image-text-value").performScrollTo().assertIsEnabled()
+        compose.onNodeWithTag("image-text-refresh").performScrollTo().assertIsEnabled()
+        assertEquals(2,saved[intent.id]!!.history.size)
         backToSearch();query("甲图首稿");assertTrue(state.value.imageTexts!!.items.isEmpty());query("纠正甲图");click("image-text-source:"+saved[intent.id]!!.id);drain()
         assertEquals(intent,attachments.state.value!!.focusImage);assertEquals(intent.id,attachments.state.value!!.pictureId);compose.onNodeWithTag("attachment-picture").assertIsDisplayed()
         form(intent);click("image-text-delete");click("image-text-delete-cancel");assertEquals(2,writes)
