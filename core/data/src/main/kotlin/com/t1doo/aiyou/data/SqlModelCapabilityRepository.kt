@@ -17,6 +17,14 @@ internal class SqlModelCapabilityRepository(private val database: RecordsSqlData
         Collections.unmodifiableList(sql.query("SELECT configId,generation,probeId,phase,payload FROM model_capability_profiles ORDER BY configId LIMIT 33")
             .map(::read).filter { catalog.capabilityCurrent(sql,it.profile.connection) }.map { it.profile })
     } }
+    /** Uses the caller's real transaction; metadata or a past source grant is not current capability. */
+    internal fun connectionCurrent(sql: RecordsSqlConnection, connection: ProviderConnection, purpose: TextPurpose): Boolean {
+        preflight(sql)
+        if (!catalog.connectionCurrent(sql,connection,purpose)) return false
+        val row = row(sql,connection.providerId) ?: return false
+        return row.phase == "FINISHED" && row.profile.observation.state == CapabilityState.SUPPORTED &&
+            catalog.capabilityCurrent(sql,row.profile.connection) && row.profile.connection.textConnection(purpose) == connection
+    }
     override fun begin(expected: ModelConnectionConfiguration, probeId: String, startedAtMillis: Long): ModelCapabilityProbeTicket = safe { database.transaction { sql ->
         preflight(sql)
         if(!catalog.capabilityCurrent(sql,expected)) throw ModelConnectionConflict()

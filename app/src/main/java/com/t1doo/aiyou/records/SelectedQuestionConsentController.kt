@@ -49,11 +49,16 @@ class SelectedQuestionConsentController internal constructor(
     private val currentFixture: () -> SelectedQuestionConsentFixture?,
     dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val uiDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+    private val remote: ProductionQuestionBinding? = null,
+    private val currentRemote: () -> ProductionQuestionBinding? = { remote },
 ) : AutoCloseable {
     private val lock = Any()
-    private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+    private val lifetime=SupervisorJob()
+    private val scope = CoroutineScope(lifetime + dispatcher)
     @Volatile private var closed = false
-    val available get() = owner != null && fixture != null
+    @Volatile private var uiRetired=false
+    init { require(fixture==null || remote==null);require(remote==null || remote.owner===owner) }
+    val available get() = !closed && !uiRetired && owner != null && (fixture != null || remote?.let {it.isCurrent()&&it.unavailableNotice()==null}==true)
     private val waiting = QuestionConsentState(if (available) QuestionConsentStage.WAITING else QuestionConsentStage.UNAVAILABLE)
     private val mutable = MutableStateFlow(waiting)
     val state = mutable.asStateFlow()
@@ -63,12 +68,12 @@ class SelectedQuestionConsentController internal constructor(
         var review: SelectedQuestionSendReview? = null
         var permit: SelectedQuestionSendPermit? = null
         var receipt: SelectedQuestionSendReceipt? = null
-        var exchange: PersistedLocalQuestionExchange? = null
+        var exchange: SelectedQuestionSendExchange? = null
         var execution: Job? = null
         var observer: Job? = null
     }
     private var run: Run? = null
-    private val cancellations = ArrayList<PersistedLocalQuestionExchange>()
+    private val cancellations = ArrayList<SelectedQuestionSendExchange>()
     private fun stopExecutionLocked(value: Run) {
         value.executionStopped.set(true); value.execution?.cancel()
         value.exchange?.let { cancellations += it }; value.exchange = null
@@ -81,14 +86,15 @@ class SelectedQuestionConsentController internal constructor(
         val pending = synchronized(lock) { cancellations.toList().also { cancellations.clear() } }
         pending.forEach { try { it.cancel() } catch (_: Exception) { } }
     }
-    private fun owns(value: Run) = !closed && run === value && !value.retired.get() && ownsSession() &&
-        currentOwner() === owner && currentFixture() === fixture && currentEvidence() === value.view &&
+    private fun owns(value: Run) = !closed && !uiRetired && run === value && !value.retired.get() && ownsSession() &&
+        currentOwner() === owner && currentFixture() === fixture && currentRemote()===remote &&
+        (remote==null || remote.isCurrent()&&remote.unavailableNotice()==null) && currentEvidence() === value.view &&
         value.view.selection.stage == LocalEvidenceSelectionStage.CONFIRMED
     private fun executionOwned(value: Run) = owns(value) && !value.executionStopped.get()
     private fun now(value: Run, executing: Boolean = false): java.time.Instant {
-        if (closed || value.retired.get() || (executing && value.executionStopped.get())) throw CancellationException()
-        return checkNotNull(fixture).clock.instant().also {
-            if (closed || value.retired.get() || (executing && value.executionStopped.get())) throw CancellationException()
+        if (closed || uiRetired || value.retired.get() || (executing && value.executionStopped.get())) throw CancellationException()
+        return (fixture?.clock ?: checkNotNull(remote).clock).instant().also {
+            if (closed || uiRetired || value.retired.get() || (executing && value.executionStopped.get())) throw CancellationException()
         }
     }
     private fun stateOf(stage: QuestionConsentStage, value: Run) = QuestionConsentState(stage, value.request.id,
@@ -118,9 +124,12 @@ class SelectedQuestionConsentController internal constructor(
                 currentEvidence() !== value || value.stage != LocalEvidenceStage.READY ||
                 value.selection.stage != LocalEvidenceSelectionStage.CONFIRMED) return@synchronized null
             val packet = try { LocalEvidencePacket.reviewed(value) } catch (_: Exception) { return@synchronized null }
-            val f = checkNotNull(fixture)
+            val connection=fixture?.connection ?: checkNotNull(remote).connection
+            val target=SelectedQuestionTarget(connection.protocol,connection.apiRoot,connection.modelId,connection.version)
+            val clock=fixture?.clock ?: checkNotNull(remote).clock
+            val zone=fixture?.questionTimeZone ?: ZoneId.systemDefault().id
             val request = try { SelectedQuestionRequest(UUID.randomUUID().toString(), packet.selectionId, packet.question,
-                f.target, f.clock.millis(), f.questionTimeZone, packet.citations.map {
+                target, clock.millis(), zone, packet.citations.map {
                     SelectedQuestionSource(it.reference, it.capturedAtMillis, it.captureTimeZone, it.policy)
                 }) } catch (_: Exception) { return@synchronized null }
             retireLocked(run)
@@ -128,7 +137,7 @@ class SelectedQuestionConsentController internal constructor(
             scope.launch(start = CoroutineStart.LAZY) {
                 try {
                     if (!inspect(next)) { invalidate(next); return@launch }
-                    val reviewed = checkNotNull(owner).review(request, f.connection, PROMPT_VERSION) { now(next) }
+                    val reviewed = checkNotNull(owner).review(request, connection, PROMPT_VERSION) { now(next) }
                     val accepted = synchronized(lock) {
                         if (!owns(next)) false else { next.review = reviewed; mutable.value = stateOf(QuestionConsentStage.REVIEW, next); true }
                     }
@@ -160,7 +169,9 @@ class SelectedQuestionConsentController internal constructor(
                         }
                     }
                     if (!retained) return@launch
-                    val exchange = PersistedLocalQuestionExchange(owner, permit, checkNotNull(fixture).service) { now(next, true) }
+                    // This clock reads only private volatile retirement/cancellation state. It is
+                    // also checked under SQL/network admission; never acquire a UI/navigation lock there.
+                    val exchange = remote?.newExchange(permit) { now(next,true) } ?: PersistedLocalQuestionExchange(owner, permit, checkNotNull(fixture).service) { now(next, true) }
                     val registered = synchronized(lock) { if (!executionOwned(next)) false else { next.exchange = exchange; true } }
                     if (!registered) { exchange.cancel(); return@launch }
                     val receipt = exchange.execute()
@@ -283,6 +294,11 @@ class SelectedQuestionConsentController internal constructor(
         synchronized(lock) { closed = true; retireLocked(run); run = null; mutable.value = waiting; scope.cancel() }
         drain()
     }
+    /** May run under navigation arbitration: only a volatile write, never SQL/client/monitor work. */
+    internal fun retireUiScope() {uiRetired=true}
+    /** Production VM waits for real SQL, network and non-cancellable cleanup, not merely cancellation. */
+    internal suspend fun closeAndJoin() { close();lifetime.join() }
+    internal fun whenDrained(action:()->Unit) { lifetime.invokeOnCompletion {action()} }
     companion object {
         const val PROMPT_VERSION = "selected-question-protocol-v1"
         private val OBSERVED = setOf(QuestionConsentStage.REVIEW, QuestionConsentStage.AUTHORIZING, QuestionConsentStage.RUNNING,

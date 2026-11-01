@@ -20,3 +20,10 @@ interface SelectedQuestionExchange {
     /** Nonblocking, owned cancellation. A noncooperative late return still cannot publish. */
     fun cancel()
 }
+
+/** One persisted, explicitly reviewed send. Implementations must not infer authority from UI fields. */
+interface SelectedQuestionSendExchange {
+    fun execute(): SelectedQuestionSendReceipt
+    /** Owned nonblocking cancellation; execution owner still drains and cleans pending work. */
+    fun cancel()
+}

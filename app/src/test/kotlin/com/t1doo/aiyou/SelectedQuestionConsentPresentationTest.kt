@@ -16,6 +16,7 @@ import com.t1doo.aiyou.ui.Destination
 import java.time.*
 import java.util.concurrent.atomic.*
 import org.json.*
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -51,12 +52,12 @@ class SelectedQuestionConsentPresentationTest {
     private val records = mutableStateOf(LocalRecordUiState(ready = true, opening = false, entries = entries,
         localSearch = port, localSearchEpoch = 1, selectedQuestionAuthorizationOwner = fixture.authority))
     private val selected = mutableStateOf<SelectedQuestionConsentFixture?>(fixture.capability)
-    @Composable private fun Screen(large: Boolean = false) {
+    @Composable private fun Screen(large: Boolean = false,production:ProductionQuestions?=null,destination:Destination=Destination.MEMORIES) {
         val density = LocalDensity.current
         CompositionLocalProvider(LocalDensity provides if (large) Density(density.density, 2f) else density) {
             AIyouTheme { Box(if (large) Modifier.size(320.dp, 640.dp) else Modifier) {
-                AIyouApp(previewDestination = Destination.MEMORIES, local = records.value, currentRecords = { records.value },
-                    selectedQuestionConsentFixture = selected.value)
+                AIyouApp(previewDestination = destination, local = records.value, currentRecords = { records.value },
+                    selectedQuestionConsentFixture = if(production==null)selected.value else null,productionQuestions=production)
             } }
         }
     }
@@ -132,6 +133,66 @@ class SelectedQuestionConsentPresentationTest {
         reveal("question-consent-unavailable")
         compose.onAllNodesWithTag("question-consent-review").assertCountEquals(0)
         assertEquals(0, fixture.authorizations.get()); assertEquals(0, fixture.opened.get())
+    }
+
+    @Test fun actualProductionQuestionInputAndConnectionAreSeparateFromRecordSavingAndPackageGateCannotBeBypassed() {
+        val config=ModelConnectionConfiguration("synthetic-production",1,ModelConnectionDetails("合成受控连接",
+            "https://production-ui.invalid/custom/v1/",ConnectionProtocol.CHAT_COMPLETIONS,"synthetic-model",
+            setOf(ModelConfigurationPurpose.CONVERSATION)),SecretReference("synthetic-unresolved-reference"))
+        val catalog=object:ModelConnectionCatalog {
+            override fun configurations()=listOf(config)
+            override fun change(request:ModelConnectionChange):ModelConnectionConfiguration?=error("No metadata writes")
+        }
+        val profile=ModelCapabilityProfile(config,"synthetic-prior-probe",1,NOW.toEpochMilli(),
+            TextCapabilityObservation(CapabilityState.SUPPORTED,CapabilityProbeReason.TEXT_STREAM_VERIFIED,NOW.toEpochMilli()))
+        val profiles=object:ModelCapabilityRepository {
+            override fun profiles()=listOf(profile)
+            override fun begin(expected:ModelConnectionConfiguration,probeId:String,startedAtMillis:Long):ModelCapabilityProbeTicket=error("No probe")
+            override fun current(ticket:ModelCapabilityProbeTicket)=false
+            override fun admit(ticket:ModelCapabilityProbeTicket)=false
+            override fun watch(ticket:ModelCapabilityProbeTicket,onRetired:()->Unit):AutoCloseable=error("No probe")
+            override fun finish(ticket:ModelCapabilityProbeTicket,observation:TextCapabilityObservation):ModelCapabilityProfile=error("No probe")
+            override fun confirm(ticket:ModelCapabilityProbeTicket,observation:TextCapabilityObservation):ModelCapabilityProfile?=error("No probe")
+        }
+        val writes=AtomicInteger();val clients=AtomicInteger()
+        val store=object:EntryRepository {
+            override val modelConnections=catalog
+            override val modelCapabilities=profiles
+            override val selectedQuestionAuthorizations=fixture.authority
+            override suspend fun readDraft():TextDraft?=error("No draft IO from questions")
+            override suspend fun updateDraft(text:String):TextDraft {writes.incrementAndGet();error("No draft writes")}
+            override suspend fun saveDraft(expected:TextDraft,capturedAtMillis:Long,captureTimeZone:String):StoredEntry {writes.incrementAndGet();error("No save")}
+            override suspend fun entries()=this@SelectedQuestionConsentPresentationTest.entries
+            override suspend fun revisions(entryId:String)=emptyList<OriginalRevision>()
+            override suspend fun revise(entryId:String,expectedRevision:Int,text:String,createdAtMillis:Long):StoredEntry {writes.incrementAndGet();error("No revision")}
+        }
+        records.value=records.value.copy(text="合成记录草稿，不能变成问题",modelConnectionOwner=catalog,modelCapabilityOwner=profiles)
+        val ai=ProductionRecordAi({false},Clock.fixed(NOW,ZoneOffset.UTC),{clients.incrementAndGet();error("No client")})
+        ai.bindOwner(store)
+        val runtime=ProductionQuestions({records.value},{action->runBlocking{action(store)};true},ai,Clock.fixed(NOW,ZoneOffset.UTC))
+        runtime.bindOwner(store)
+        try {
+            compose.setContent {Screen(true,runtime,Destination.NOW)}
+            compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("问一问"))
+            compose.onNodeWithText("问一问").assertHeightIsAtLeast(48.dp).performClick()
+            reveal("original-search-query").performTextReplacement("needle")
+            reveal("question-draft").performTextReplacement("这两条合成记录讲了什么？")
+            reveal("question-draft").assertTextContains("这两条合成记录讲了什么？")
+            reveal("original-search-query").assertTextContains("needle")
+            reveal("question-select-synthetic-production").assertIsEnabled().assertHeightIsAtLeast(48.dp).performClick()
+            reveal("local-evidence-select-picture").performClick();reveal("local-evidence-select-text").performClick()
+            reveal("local-evidence-confirm").performClick();reveal("local-evidence-confirmed")
+            reveal("question-consent-unavailable").assertTextContains("当前安装包未开放网络发送",substring=true)
+            compose.onAllNodesWithTag("question-consent-review").assertCountEquals(0)
+            compose.onAllNodesWithTag("question-consent-fixture").assertCountEquals(0)
+            reveal("question-draft").performTextReplacement("改问另一个合成问题")
+            compose.onAllNodesWithTag("local-evidence-confirmed").assertCountEquals(0)
+            reveal("local-evidence-confirm").assertIsEnabled()
+            compose.runOnIdle {
+                assertEquals(0,writes.get());assertEquals(0,clients.get());assertEquals(0,fixture.authorizations.get());assertEquals(0,fixture.opened.get())
+                assertEquals("合成记录草稿，不能变成问题",records.value.text)
+            }
+        } finally {runBlocking{runtime.closeAndJoin()};ai.close()}
     }
 
     /** Synthetic metadata/ack port only. Does not replace the product's SQL authority test. */

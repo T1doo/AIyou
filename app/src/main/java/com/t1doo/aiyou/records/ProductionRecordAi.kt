@@ -5,6 +5,8 @@ import com.t1doo.aiyou.ai.OkHttpStreamingTransport
 import com.t1doo.aiyou.domain.EntryRepository
 import com.t1doo.aiyou.domain.ModelCapabilityProbe
 import com.t1doo.aiyou.domain.ModelCapabilityProbeTicket
+import com.t1doo.aiyou.domain.SelectedQuestionSendExchange
+import com.t1doo.aiyou.model.SelectedQuestionSendPermit
 import java.time.Clock
 
 /** One admitted records owner and installation-permission snapshot; source authority stays live.
@@ -17,6 +19,7 @@ internal class ProductionRecordAi(
     private val lock = Any()
     private var owner: EntryRepository? = null
     private var probeTransport: OkHttpStreamingTransport? = null
+    private var questionTransport: OkHttpStreamingTransport? = null
     private var closed = false
 
     fun unavailableNotice(): String? = when {
@@ -71,13 +74,32 @@ internal class ProductionRecordAi(
         }
     }
 
-    /** VM calls only after both AI controllers have drained their real borrowers. Never closes SQL. */
+    /** Only a controller-owned private permit, never a caller-prepared request or credential. */
+    fun openQuestion(records:EntryRepository,permit:SelectedQuestionSendPermit,executionClock:()->java.time.Instant):SelectedQuestionSendExchange {
+        check(unavailableNotice()==null){"Network execution unavailable"}
+        synchronized(lock){check(!closed&&owner===records){"AI records owner changed"}}
+        val services=checkNotNull(records.localModelConnections)
+        val authority=checkNotNull(records.selectedQuestionAuthorizations)
+        val existing=synchronized(lock){questionTransport}
+        val created=if(existing==null)openTransport()else null
+        val transport=try {synchronized(lock){
+            check(!closed&&owner===records)
+            questionTransport ?: checkNotNull(created).also{questionTransport=it}
+        }}catch(failure:Throwable){created?.close();throw failure}
+        if(created!=null&&created!==transport)created.close()
+        check(unavailableNotice()==null){"Network execution unavailable"}
+        return transport.newSelectedQuestionExchange(authority,permit,LocalConnectionSecretResolver(services.secrets),executionClock)
+    }
+
+    /** VM calls only after record, probe and question controllers drain real borrowers. Never closes SQL. */
     override fun close() {
-        val transport = synchronized(lock) {
+        val transports = synchronized(lock) {
             closed = true
             owner = null
-            probeTransport.also { probeTransport = null }
+            listOfNotNull(probeTransport,questionTransport).also { probeTransport = null;questionTransport=null }
         }
-        transport?.close()
+        var failure:Throwable?=null
+        for(transport in transports)try{transport.close()}catch(t:Throwable){if(failure==null)failure=t}
+        failure?.let{throw it}
     }
 }

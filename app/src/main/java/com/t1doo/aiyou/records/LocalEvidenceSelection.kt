@@ -33,7 +33,7 @@ class LocalEvidenceCitation internal constructor(val reference: OriginalTextRefe
     override fun toString() = "LocalEvidenceCitation(redacted)"
 }
 
-/** Local inspection data. No adapter from this type to a network request exists. */
+/** Local inspection data is not sending authority. Production requires a separate authenticated send review. */
 class LocalEvidencePacket private constructor(val selectionId: String, val question: String,
     citations: List<LocalEvidenceCitation>, val textPoints: Int, val textBytes: Int) {
     val citations: List<LocalEvidenceCitation> = Collections.unmodifiableList(ArrayList(citations))
@@ -42,6 +42,7 @@ class LocalEvidencePacket private constructor(val selectionId: String, val quest
     companion object {
         internal fun reviewed(value: LocalEvidenceState): LocalEvidencePacket {
             val question = value.question
+            require(value.questionError==null)
             require(question.isNotBlank() && question.length <= 1024 && LocalCandidates.validUnicode(question))
             val questionPoints = question.codePointCount(0, question.length)
             val questionBytes = question.toByteArray(Charsets.UTF_8).size

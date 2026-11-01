@@ -141,6 +141,7 @@ fun LocalRecordsScreen(
     evidenceMode: Boolean = false,
     evidenceState: LocalEvidenceState = LocalEvidenceState(LocalEvidenceStage.WAITING),
     onEvidenceMode: (Boolean) -> Unit = {},
+    onEvidenceQuestionChange: ((String)->Unit)? = null,
     onOpenEvidence: (LocalEvidenceCard) -> Unit = {},
     onToggleEvidence: (LocalEvidenceCard) -> Unit = {},
     onConfirmEvidence: () -> Unit = {},
@@ -155,6 +156,7 @@ fun LocalRecordsScreen(
     motionAllowed:Boolean=false,
     onQuestionKeywords:(()->Unit)?=null,
     onReduceSearchKeywords:((OriginalSearchState)->Boolean)?=null,
+    onAskQuestion:(()->Unit)?=null,
 ) {
     // Presentation only. Never retain a source, query proof or controller in disclosure state.
     val toolsOwner = remember(destination, local.localSearch, local.unifiedKeywordOwner,
@@ -431,11 +433,13 @@ fun LocalRecordsScreen(
                     CaptureComposer(
                         text = local.text, onTextChange = onDraftChange,
                         onSubmit = if (local.ready && !local.saving && local.captureDiscard == null) onSave else null,
-                        askAvailable = false,
+                        askAvailable = onAskQuestion!=null,
+                        onModeChange={ask->if(ask)onAskQuestion?.invoke()},
                         state = when { local.opening || local.saving -> ComponentState.LOADING
                             !local.ready || local.savePending || local.captureDiscard?.busy == true -> ComponentState.DISABLED
                             else -> ComponentState.NORMAL },
-                        availability = "${local.draftNotice} · 仅本机保存\n提问、图片和录音尚未开放。",
+                        availability = "${local.draftNotice} · 仅本机保存\n"+if(onAskQuestion!=null)
+                            "问一问另选出处与连接，不会把这份记录草稿当问题发送；网络发送仍需安装包资格与本次授权。" else "提问、图片和录音尚未开放。",
                         showUnavailableControls = false,
                         maxTextLength = EncryptedEntryRepository.MAX_TEXT_LENGTH,
                         inputError = local.inputNotice,
@@ -491,7 +495,9 @@ fun LocalRecordsScreen(
                     if (local.localSearch != null) TextButton(onClick = { onEvidenceMode(!evidenceMode) },
                         enabled = local.ready && !local.opening && local.error == null,
                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("local-evidence-mode")) {
-                        Text(if (evidenceMode) "本机出处候选 · 返回原文列表" else "为当前问题选取本机出处候选")
+                        Text(if(onEvidenceQuestionChange!=null) {
+                            if(evidenceMode)"问一问 · 返回原文列表" else "问一问 · 选取本机出处"
+                        } else if (evidenceMode) "本机出处候选 · 返回原文列表" else "为当前问题选取本机出处候选")
                     }
                     if (onlyImages && imageGrid != null) TextButton(onClick = { onImageGridMode(!imageGridMode) },
                         enabled = local.ready && !local.opening && local.error == null,
@@ -523,6 +529,7 @@ fun LocalRecordsScreen(
                 if (evidenceMode) {
                     item("local-evidence-status") {
                         Column {
+                            onEvidenceQuestionChange?.let {EvidenceQuestionInput(evidenceState,it)}
                             LocalEvidenceNotice(evidenceState, onConfirmEvidence)
                             LocalEvidenceAnswerSection(evidenceState, evidenceAnswerState, evidenceAnswerAvailable,
                                 onEvidenceAnswer, onCancelEvidenceAnswer, onOpenAnswerSource)

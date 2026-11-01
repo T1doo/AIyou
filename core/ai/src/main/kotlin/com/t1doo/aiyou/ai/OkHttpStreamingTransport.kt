@@ -11,6 +11,9 @@ import com.t1doo.aiyou.domain.SourceBoundTextSubscription
 import com.t1doo.aiyou.domain.ModelCapabilityProbeTicket
 import com.t1doo.aiyou.domain.ModelCapabilityRepository
 import com.t1doo.aiyou.domain.ModelCapabilityProbeExchange
+import com.t1doo.aiyou.domain.SelectedQuestionAuthorizationRepository
+import com.t1doo.aiyou.domain.SelectedQuestionSendExchange
+import com.t1doo.aiyou.domain.SelectedQuestionSendDenied
 import com.t1doo.aiyou.model.TextCapabilityObservation
 import com.t1doo.aiyou.model.CapabilityProbeReason
 import com.t1doo.aiyou.model.CapabilityState
@@ -24,11 +27,15 @@ import com.t1doo.aiyou.model.SourceCommitDenial
 import com.t1doo.aiyou.model.SourceCommitOutcome
 import com.t1doo.aiyou.model.SourceQueueOutcome
 import com.t1doo.aiyou.model.TextPurpose
+import com.t1doo.aiyou.model.SelectedQuestionSendPermit
+import com.t1doo.aiyou.model.SelectedQuestionSendReceipt
 import java.io.IOException
 import java.io.InterruptedIOException
 import java.time.Instant
 import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import okhttp3.Authenticator
 import okhttp3.Call
 import okhttp3.ConnectionPool
@@ -100,6 +107,110 @@ class OkHttpStreamingTransport private constructor(
         return synchronized(ownerLock) {
             check(!closed) { "HTTP transport is closed" }
             Exchange(protocol, streamLimits, wireRequest).also { exchanges.add(it) }
+        }
+    }
+
+    /** Production factory consumes the private persisted review, not a caller-composed body/gate. */
+    fun newSelectedQuestionExchange(repository: SelectedQuestionAuthorizationRepository,
+        permit: SelectedQuestionSendPermit, secrets: SecretResolver, clock: () -> Instant): SelectedQuestionSendExchange {
+        val exchange=QuestionExchange(repository,permit,secrets,clock)
+        synchronized(ownerLock) { check(!closed);exchanges.add(exchange) }
+        return exchange
+    }
+
+    private class QuestionGate(private val claim: () -> Unit) {
+        fun admit(call: Call) {
+            try { claim() }
+            catch(failure: Throwable) {
+                call.cancel();rethrowFatal(failure)
+                if(failure is CancellationException) throw GuardCancelled()
+                throw GateRejected((failure as? SelectedQuestionSendDenied)?.reason ?: SendDenial.STATE_UNAVAILABLE)
+            }
+        }
+    }
+
+    private inner class QuestionExchange(private val repository: SelectedQuestionAuthorizationRepository,
+        private val permit: SelectedQuestionSendPermit,private val secrets: SecretResolver,
+        private val clock: () -> Instant) : SelectedQuestionSendExchange, OwnedExchange {
+        private val used=AtomicBoolean()
+        private val stopped=AtomicBoolean()
+        private val invalid=AtomicReference<SendDenial?>()
+        private val wire=AtomicReference<StreamingHttpExchange?>()
+        private val sourceWatch=AtomicReference<SourceBoundTextSubscription?>()
+        private val secretWatch=AtomicReference<AutoCloseable?>()
+        private fun active() {
+            if(stopped.get())throw CancellationException()
+            invalid.get()?.let {throw SelectedQuestionSendDenied(it)}
+        }
+        private fun now():Instant { active();return clock().also{active()} }
+        private fun current() {
+            active()
+            if(!secrets.isCurrent(permit.review.connection.secretRef))throw SelectedQuestionSendDenied(SendDenial.SECRET_UNAVAILABLE)
+            repository.check(permit,::now)?.let{throw SelectedQuestionSendDenied(it)}
+            active()
+        }
+        private fun cancelNetwork() {wire.get()?.cancel()}
+        override fun cancel() {
+            stopped.set(true)
+            try {cancelNetwork()}finally {
+                try {sourceWatch.getAndSet(null)?.close()}finally {secretWatch.getAndSet(null)?.close()}
+                synchronized(ownerLock){exchanges.remove(this)}
+            }
+        }
+        override fun execute():SelectedQuestionSendReceipt {
+            check(used.compareAndSet(false,true)){"One question execution only"}
+            var resolved:ResolvedSecret?=null
+            try {
+                active()
+                sourceWatch.set(repository.subscribe(permit,::now){reason->invalid.compareAndSet(null,reason);cancelNetwork()})
+                current()
+                val ref=permit.review.connection.secretRef
+                secretWatch.set(secrets.watch(ref){invalid.compareAndSet(null,SendDenial.SECRET_UNAVAILABLE);cancelNetwork()})
+                current()
+                val prepared=SelectedQuestionCodec.prepare(permit)
+                val protocol=SelectedQuestionCodec.protocol(permit.review.connection.protocol)
+                val validated=validateRequest(protocol,prepared)
+                resolved=secrets.resolve(ref)
+                val value=resolved?.headerValue()?:throw SelectedQuestionSendDenied(SendDenial.SECRET_UNAVAILABLE)
+                current()
+                val request=validated.newBuilder().tag(QuestionGate::class.java,QuestionGate {
+                    current()
+                    repository.admit(permit,::now) // The only admission point, immediately before HTTP write.
+                    current()
+                }).apply {
+                    if(prepared.authentication==AuthenticationKind.BEARER)header("Authorization","Bearer $value") else header("x-api-key",value)
+                }.build()
+                resolved.close();resolved=null
+                val owned=Exchange(protocol,StreamLimits(maxChunkBytes=65536,maxLineChars=65536,maxEventChars=65536,
+                    maxFrames=512,maxTotalBytes=262144,maxTextChars=SelectedQuestionCodec.MAX_REPLY_CHARS),request)
+                wire.set(owned)
+                current()
+                val text=StringBuilder()
+                val outcome=owned.execute {event->
+                    active()
+                    if(event is StreamEvent.TextDelta)text.append(event.text)
+                }
+                current()
+                check(outcome.terminal==StreamEvent.Completed){"Question transmission incomplete"}
+                val reply=SelectedQuestionCodec.parse(permit.review.request,text.toString())
+                current()
+                sourceWatch.getAndSet(null)?.close() // Own COMMITTED transition must not invalidate a pending watch.
+                val receipt=repository.accept(permit,reply,::now)
+                active()
+                if(!secrets.isCurrent(ref))throw SelectedQuestionSendDenied(SendDenial.SECRET_UNAVAILABLE)
+                repository.checkReceipt(receipt,::now)?.let{throw SelectedQuestionSendDenied(it)}
+                active()
+                return receipt
+            } finally {
+                resolved?.close()
+                try {wire.getAndSet(null)?.cancel()}finally {
+                    try {sourceWatch.getAndSet(null)?.close()}finally {
+                        try {secretWatch.getAndSet(null)?.close()}finally {
+                            try {repository.cancelPending(permit)}finally {synchronized(ownerLock){exchanges.remove(this)}}
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -330,6 +441,7 @@ class OkHttpStreamingTransport private constructor(
         override fun intercept(chain: Interceptor.Chain): Response {
             chain.request().tag(GuardContext::class.java)?.admit(chain.call())
             chain.request().tag(CapabilityGate::class.java)?.admit(chain.call())
+            chain.request().tag(QuestionGate::class.java)?.admit(chain.call())
             val response = chain.proceed(chain.request())
             if (response.code in 200..299) return response
             val values = response.headers("Retry-After")

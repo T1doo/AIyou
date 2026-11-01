@@ -214,7 +214,8 @@ for label, folder, minimum in targets:
         additional["com.t1doo.aiyou.SelectedQuestionConsentPresentationTest"] = (
             "narrowDoubleFontSeparateMultiSourceReviewAndExactOriginalJump",
             "withdrawUnknownAckHidesResultAndExplicitRetryNeverExecutesAgain",
-            "serviceReplacementRetiresOpenReviewAndDefaultCapabilityNeverOffersSend")
+            "serviceReplacementRetiresOpenReviewAndDefaultCapabilityNeverOffersSend",
+            "actualProductionQuestionInputAndConnectionAreSeparateFromRecordSavingAndPackageGateCannotBeBypassed")
         additional["com.t1doo.aiyou.StorageUsagePresentationTest"] = (
             "explicitQueryAndRefreshShowCategoriesAndRetiredActualButtonCannotQueryNextVisit",
             "narrowDoubleFontFailureNeverShowsZeroAndExplicitRetryCanConfirmEmptyFiles")

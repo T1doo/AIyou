@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicReference
  */
 class PersistedLocalQuestionExchange(private val repository: SelectedQuestionAuthorizationRepository,
     private val permit: SelectedQuestionSendPermit, private val service: LocalProtocolQuestionService,
-    private val clock: () -> Instant) {
+    private val clock: () -> Instant) : SelectedQuestionSendExchange {
     private val used = AtomicBoolean()
     private val stopped = AtomicBoolean()
     private val invalid = AtomicReference<SendDenial?>()
@@ -23,7 +23,7 @@ class PersistedLocalQuestionExchange(private val repository: SelectedQuestionAut
     init { require(service.target == permit.review.request.target) }
 
     /** Owned nonblocking cancellation only; the IO execution owner cleans persisted unfinished work. */
-    fun cancel() { stopped.set(true); closeOwned() }
+    override fun cancel() { stopped.set(true); closeOwned() }
     private fun closeOwned() {
         try { delegate.getAndSet(null)?.cancel() } finally { watch.getAndSet(null)?.close() }
     }
@@ -37,7 +37,7 @@ class PersistedLocalQuestionExchange(private val repository: SelectedQuestionAut
         repository.check(permit, ::currentTime)?.let { throw SelectedQuestionSendDenied(it) }
         requireActive()
     }
-    fun execute(): SelectedQuestionSendReceipt {
+    override fun execute(): SelectedQuestionSendReceipt {
         check(used.compareAndSet(false, true)) { "One execution only" }
         try {
             requireActive()

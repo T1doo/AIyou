@@ -21,6 +21,31 @@ import org.junit.Test
  * This is not Android Room/SQLCipher/device or a real model/external request test.
  */
 class SelectedQuestionAuthorizationTest {
+    @Test fun strictConnectionGuardFencesReviewAuthorizationAdmissionAcceptanceAndCompletedReceiptWithoutChangingGrants() {
+        for(stage in listOf("review","authorize","check","admit","accept","receipt")) {
+            val current=AtomicBoolean(true);val calls=AtomicInteger()
+            Harness(connectionCurrent={sql,connection->
+                assertNotNull(sql.query("SELECT id FROM entries LIMIT 1").singleOrNull())
+                assertEquals("synthetic-profile",connection.providerId);calls.incrementAndGet();current.get()
+            }).use {h->
+                val review=h.review()
+                val permit=if(stage in listOf("check","admit","accept","receipt"))h.repo.authorizeReviewedSend(review,h.clock) else null
+                if(stage in listOf("accept","receipt"))h.repo.admit(permit!!,h.clock)
+                val receipt=if(stage=="receipt")h.repo.accept(permit!!,h.reply(review.request),h.clock)else null
+                val jobs=h.jobs();val groups=h.groups();val authority=h.authority();val before=calls.get()
+                current.set(false)
+                when(stage) {
+                    "review"->denied {h.review()}
+                    "authorize"->denied {h.repo.authorizeReviewedSend(review,h.clock)}
+                    "check"->assertEquals(SendDenial.CONFIGURATION_CHANGED,h.repo.check(permit!!,h.clock))
+                    "admit"->denied {h.repo.admit(permit!!,h.clock)}
+                    "accept"->denied {h.repo.accept(permit!!,h.reply(review.request),h.clock)}
+                    else->assertEquals(SendDenial.CONFIGURATION_CHANGED,h.repo.checkReceipt(receipt!!,h.clock))
+                }
+                assertTrue(calls.get()>before);assertEquals(jobs,h.jobs());assertEquals(groups,h.groups());assertEquals(authority,h.authority())
+            }
+        }
+    }
     @Test fun explicitSendReviewRequiresExistingConversationGrantsAndNeverElevatesLocalSelection(): Unit = Harness(false).use { h ->
         denied { h.repo.review(h.request(), h.connection, PROMPT, h.clock) }
         assertTrue(h.jobs().isEmpty()); assertTrue(h.groups().isEmpty())
@@ -261,14 +286,15 @@ class SelectedQuestionAuthorizationTest {
         assertNull(h.repo.checkReceipt(receipt, h.clock))
     }
 
-    private class Harness(approved: Boolean = true) : AutoCloseable {
+    internal class Harness(approved: Boolean = true, connectionCurrent: ((RecordsSqlConnection,ProviderConnection)->Boolean)? = null,
+        connectionOverride:ProviderConnection?=null) : AutoCloseable {
         val f = PermanentErasureFixture()
         val ids = listOf(f.entry(text = "选取甲🙂片段 UNSELECTED_PRIVATE_TAIL_A"), f.entry(text = "选取乙🙂片段 UNSELECTED_PRIVATE_TAIL_B"))
         val sources = ids.map { SourceVersion(it, 1) }
-        val connection = ProviderConnection("synthetic-profile", 1, "https://fixture.invalid/custom/v1/", ConnectionProtocol.CHAT_COMPLETIONS,
+        val connection = connectionOverride ?: ProviderConnection("synthetic-profile", 1, "https://fixture.invalid/custom/v1/", ConnectionProtocol.CHAT_COMPLETIONS,
             "synthetic-model", SecretReference("synthetic-unresolved-ref"))
         val raw = RemoteTextTransactions(f.gateway)
-        val repo = SqlSelectedQuestionAuthorizationRepository(f.gateway)
+        val repo = SqlSelectedQuestionAuthorizationRepository(f.gateway,connectionCurrent=connectionCurrent)
         val clock = { NOW }
         init { f.entry(text = "UNSELECTED_OTHER_RECORD"); if (approved) ids.indices.forEach { approve(it) } }
         fun approve(index: Int, purpose: TextPurpose = TextPurpose.CONVERSATION) {

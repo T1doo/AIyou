@@ -10,7 +10,15 @@ import kotlinx.serialization.json.*
 /** Pure protocol adapter, not an authenticated send factory. It never resolves a secret or opens IO. */
 object SelectedQuestionCodec {
     const val MAX_REPLY_CHARS = 32768
-    fun prepare(request: SelectedQuestionRequest): PreparedRequest {
+    fun prepare(request: SelectedQuestionRequest): PreparedRequest = prepare(request, null)
+
+    /** Real send settings come only from the same authenticated permit, never UI protocol knobs. */
+    internal fun prepare(permit: SelectedQuestionSendPermit): PreparedRequest {
+        val c=permit.review.connection
+        require(permit.review.request.target==SelectedQuestionTarget(c.protocol,c.apiRoot,c.modelId,c.version))
+        return prepare(permit.review.request,c)
+    }
+    private fun prepare(request: SelectedQuestionRequest, connection: ProviderConnection?): PreparedRequest {
         val payload = buildJsonObject {
             put("requestId", request.id); put("selectionId", request.selectionId)
             put("question", request.question); put("askedAtMillis", request.askedAtMillis)
@@ -24,7 +32,11 @@ object SelectedQuestionCodec {
         }
         val protocol = protocol(request.target.protocol)
         return ProtocolRequests.prepare(request.target.apiRoot, protocol, TextRequest(request.target.modelId,
-            listOf(TextMessage(MessageRole.USER, payload.toString())), SYSTEM, maxOutputTokens = 4096)).also {
+            listOf(TextMessage(MessageRole.USER, payload.toString())), SYSTEM, maxOutputTokens = 4096,
+            chatTokenBudget=when(connection?.chatBudgetField) {
+                ChatBudgetField.MAX_COMPLETION_TOKENS->ChatTokenBudget.MAX_COMPLETION_TOKENS
+                ChatBudgetField.MAX_TOKENS, null->ChatTokenBudget.MAX_TOKENS
+            },chatUsageSupported=connection?.chatUsageSupported ?: false)).also {
             require(it.bodyJson.toByteArray(Charsets.UTF_8).size <= 32768)
         }
     }

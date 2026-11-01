@@ -197,6 +197,7 @@ class MainActivity : ComponentActivity() {
                 onOpenAiSession = { id, revision -> records.openAiSession(id, revision) },
                 onStartAiSession = records::startAiSession, onStopAiSession = records::stopAiSession,
                 onCloseAiSession = records::closeAiSession,
+                productionQuestions=records.productionQuestions,
                 onOpenTags = records.tags::open, onTagEdit = records.tags::edit, onTagAdd = records.tags::add,
                 favorites = records.favorites, eventDates = records.eventDates,
                 candidates = records.candidates,
@@ -345,7 +346,9 @@ fun AIyouApp(
     onNavigationGenerationChanged:(Long?)->Unit={},
     unifiedKeywords:com.t1doo.aiyou.records.UnifiedKeywordController?=null,
     imageTexts:com.t1doo.aiyou.records.ImageTextController?=null,
+    productionQuestions:com.t1doo.aiyou.records.ProductionQuestions?=null,
 ) {
+    require(productionQuestions==null||selectedQuestionService==null&&selectedQuestionConsentFixture==null)
     val currentUnifiedController by rememberUpdatedState(unifiedKeywords)
     val currentUnifiedState by rememberUpdatedState(local?.unifiedKeyword)
     val currentNavigationCallback by rememberUpdatedState(onNavigationGenerationChanged)
@@ -356,7 +359,8 @@ fun AIyouApp(
     val currentImageTextRecords by rememberUpdatedState(currentRecords)
     val imageTextBusy=imageTexts?.inFlight?.collectAsState()?.value==true
     val questionControllerRef=remember { java.util.concurrent.atomic.AtomicReference<com.t1doo.aiyou.records.QuestionKeywordController?>(null) }
-    val navigation = remember { NavigationOwner{questionControllerRef.get()?.retire();currentUnifiedState?.let{currentUnifiedController?.close(it.session)};(currentImageTextRecords?.invoke()?.imageTexts?:currentImageTextSnapshot)?.let{currentImageTextController?.close(it.session)};currentAudioRouteCallback();currentAttachments?.state?.value?.takeIf{panel->panel.focusedIntent!=null}?.let{panel->currentAttachments?.retireFocusedSource(panel.sessionId)};currentNavigationCallback(it)} }
+    val consentControllerRef=remember { java.util.concurrent.atomic.AtomicReference<com.t1doo.aiyou.records.SelectedQuestionConsentController?>(null) }
+    val navigation = remember { NavigationOwner{consentControllerRef.get()?.retireUiScope();questionControllerRef.get()?.retire();currentUnifiedState?.let{currentUnifiedController?.close(it.session)};(currentImageTextRecords?.invoke()?.imageTexts?:currentImageTextSnapshot)?.let{currentImageTextController?.close(it.session)};currentAudioRouteCallback();currentAttachments?.state?.value?.takeIf{panel->panel.focusedIntent!=null}?.let{panel->currentAttachments?.retireFocusedSource(panel.sessionId)};currentNavigationCallback(it)} }
     DisposableEffect(unifiedKeywords){onDispose{unifiedKeywords?.retire()}}
     DisposableEffect(audioPlayback) { onDispose { audioPlayback?.stop() } }
     DisposableEffect(navigation) { onDispose { navigation.active = false;currentNavigationCallback(null) } }
@@ -468,7 +472,7 @@ fun AIyouApp(
     }
     val questionHelper=remember(search,navigation) { com.t1doo.aiyou.records.QuestionKeywordController(navigation.gate,
         currentBinding=::questionBinding,
-        retireSearch={search.invalidateInput();evidence.clear();searchReturnAnchor=null;searchReturnInput=null;searchReturnSource=null;searchLocation=null},
+        retireSearch={consentControllerRef.get()?.retireUiScope();search.invalidateInput();evidence.clear();searchReturnAnchor=null;searchReturnInput=null;searchReturnSource=null;searchLocation=null},
         commit={request->search.tryChangeInput {
             androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
                 searchMode=OriginalSearchMode.KEYWORDS
@@ -497,8 +501,9 @@ fun AIyouApp(
     SideEffect{questionHelper.sync()}
     questionUi?.let{com.t1doo.aiyou.records.QuestionKeywordDialog(it,questionHelper)}
     fun changeSearchInput(change:()->Unit)=navigation.gate.inputAction(generation,search,
-        {searchRouteAvailable()&&questionHelper.state.value==null}){search.changeInput(change)}
+        {searchRouteAvailable()&&questionHelper.state.value==null}){consentControllerRef.get()?.retireUiScope();search.changeInput(change)}
     fun clearSearch() {
+        consentControllerRef.get()?.retireUiScope()
         unifiedSourceRoute=false;unifiedKeywords?.retire()
         taskSourceRoute=false
         search.clear()
@@ -587,17 +592,23 @@ fun AIyouApp(
     val evidenceQuestionState = evidenceQuestionEmission.let { evidenceQuestions.visible() }
     val currentConsentFixture by rememberUpdatedState(selectedQuestionConsentFixture)
     val consentOwner = searchSource()?.selectedQuestionAuthorizationOwner
-    val questionConsent = remember(evidence, consentOwner, selectedQuestionConsentFixture) {
+    val emptyQuestionDirectory=remember{kotlinx.coroutines.flow.MutableStateFlow(com.t1doo.aiyou.records.QuestionConnectionsState())}
+    val questionDirectory by (productionQuestions?.state?:emptyQuestionDirectory).collectAsState()
+    val remoteQuestion=questionDirectory.selected?.takeIf{it.owner===consentOwner&&productionQuestions?.current(it)==true}
+    val currentRemoteQuestion by rememberUpdatedState(remoteQuestion)
+    val questionConsent = remember(evidence, consentOwner, selectedQuestionConsentFixture,remoteQuestion,generation,evidenceState.selection.id) {
         com.t1doo.aiyou.records.SelectedQuestionConsentController(evidence,
             currentEvidence = { evidence.visible(search.visible(searchSource(), searchInput())) },
-            ownsSession = { evidenceMode && selectedName == Destination.MEMORIES.name && detailEntryId == null &&
+            ownsSession = { ownsNavigation() && evidenceMode && selectedName == Destination.MEMORIES.name && detailEntryId == null &&
                 !recapRoute && !showSettings && !demo && searchSource()?.ready == true && searchSource()?.opening == false &&
                 searchSource()?.originalEdit == null && searchSource()?.originalHistory == null &&
                 searchSource()?.recycleBin?.browsing != true && searchSource()?.recordPackage == null },
             owner = consentOwner, currentOwner = { searchSource()?.selectedQuestionAuthorizationOwner },
-            fixture = selectedQuestionConsentFixture, currentFixture = { currentConsentFixture })
+            fixture = selectedQuestionConsentFixture, currentFixture = { currentConsentFixture },
+            remote=remoteQuestion,currentRemote={currentRemoteQuestion}).also{if(remoteQuestion!=null)productionQuestions?.own(it)}
     }
-    DisposableEffect(questionConsent) { onDispose { questionConsent.close() } }
+    SideEffect{consentControllerRef.set(questionConsent)}
+    DisposableEffect(questionConsent) { onDispose { consentControllerRef.compareAndSet(questionConsent,null);questionConsent.close() } }
     val questionConsentEmission by questionConsent.state.collectAsState()
     val questionConsentState = questionConsentEmission.let { questionConsent.visible() }
     // Read the mode while composing: reading delegated State only inside a stable
@@ -605,6 +616,10 @@ fun AIyouApp(
     val searchEnabled = questionUi == null && selected == Destination.MEMORIES && !recapRoute && !reading && !browsingRecycle &&
         !browsingPackage && !showSettings && !demo && local != null && local.originalEdit == null && local.originalHistory == null
     val evidenceEnabled = evidenceMode && searchEnabled
+    DisposableEffect(productionQuestions,evidenceEnabled) {
+        if(evidenceEnabled)productionQuestions?.open()else productionQuestions?.leave()
+        onDispose {productionQuestions?.leave()}
+    }
     SideEffect {
         if(!showSettings || showLicenses || demo) modelConnections?.leave()
         search.sync(searchEnabled)
@@ -1358,6 +1373,13 @@ fun AIyouApp(
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
+                onAskQuestion=if(productionQuestions==null)null else {
+                    if(ownsNavigation()&&selectedName==Destination.NOW.name&&currentLocal?.ready==true&&
+                        currentLocal?.opening==false&&currentLocal?.error==null&&currentLocal?.saving==false&&
+                        currentLocal?.savePending==false&&currentLocal?.captureDiscard==null) {
+                        navigation.advance();clearSearch();selectedName=Destination.MEMORIES.name;evidenceMode=true
+                    }
+                },
                 imageTextBusy=imageTextBusy, motionAllowed=motionAllowed,
                 onOpenUnified=unifiedKeywords?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
                 onOpenImageTexts=imageTexts?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
@@ -1385,7 +1407,9 @@ fun AIyouApp(
                 searchState = searchState, searchQuery = searchQuery, searchFrom = searchFrom, searchThrough = searchThrough,
                 onBeforeSearchInput = { field ->
                     navigation.gate.inputDecision(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){
-                        search.beforeInputCommit{field===searchQuery||field===searchFrom||field===searchThrough}
+                        search.beforeInputCommit{field===searchQuery||field===searchFrom||field===searchThrough}.also{
+                            if(it)consentControllerRef.get()?.retireUiScope()
+                        }
                     }
                 },
                 onHistoryInputCommitted = {navigation.gate.inputAction(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){search.inputCommitted()}},
@@ -1408,7 +1432,11 @@ fun AIyouApp(
                     }
                 },
                 evidenceQuestion = {
-                    com.t1doo.aiyou.records.LocalEvidenceQuestionSection(evidenceState, evidenceQuestionState,
+                    if(productionQuestions!=null) com.t1doo.aiyou.records.QuestionConnectionsSection(
+                        questionDirectory,questionConsentState.stage,productionQuestions.unavailableNotice(),
+                        onReload={if(ownsNavigation()&&evidenceEnabled)productionQuestions.reload(questionDirectory.session)},
+                        onSelect={configuration->if(ownsNavigation()&&evidenceEnabled)productionQuestions.select(questionDirectory.session,configuration)})
+                    else com.t1doo.aiyou.records.LocalEvidenceQuestionSection(evidenceState, evidenceQuestionState,
                         evidenceQuestions.available, onReview = { evidenceQuestions.review(evidenceState) },
                         onConfirm = { evidenceQuestions.ask(evidenceState, evidenceQuestionState.questionReview) },
                         onCancel = evidenceQuestions::cancel, onOpen = { reference ->
@@ -1424,23 +1452,33 @@ fun AIyouApp(
                             questionConsent.openSource(questionConsentState, reference) { card ->
                                 if (evidence.canOpen(evidenceState, card)) openSearchResultAt(card.hit, card.reference)
                             }
-                        })
+                        },remote=remoteQuestion,production=productionQuestions!=null,
+                        unavailableNotice=productionQuestions?.unavailableNotice())
+                },
+                onEvidenceQuestionChange=if(productionQuestions==null)null else {text->
+                    if(ownsNavigation()&&evidenceEnabled) {
+                        questionConsent.retireUiScope()
+                        evidence.changeQuestion(evidenceState,text)
+                        questionConsent.sync();evidenceAnswers.sync();evidenceQuestions.sync()
+                    }
                 },
                 onEvidenceMode = { value -> if (ownsNavigation() && detailEntryId == null &&
                     selectedName == Destination.MEMORIES.name && !showSettings && !demo) {
+                    questionConsent.retireUiScope()
                     evidence.clear(); evidenceMode = value; if (value) imageGridMode = false
                 } },
                 onOpenEvidence = { card -> if (evidence.canOpen(evidenceState, card)) openSearchResultAt(card.hit, card.reference) },
                 onToggleEvidence = { card -> if (ownsNavigation() && detailEntryId == null &&
-                    selectedName == Destination.MEMORIES.name && !showSettings && !demo && evidenceMode)
-                    evidence.toggle(evidenceState, card) },
+                    selectedName == Destination.MEMORIES.name && !showSettings && !demo && evidenceMode) {
+                    questionConsent.retireUiScope();evidence.toggle(evidenceState, card)
+                } },
                 onConfirmEvidence = { if (ownsNavigation() && detailEntryId == null &&
                     selectedName == Destination.MEMORIES.name && !showSettings && !demo && evidenceMode)
                     evidence.confirm(evidenceState) },
                 onImageGridMode = { value -> if (ownsNavigation() && detailEntryId == null &&
                     selectedName == Destination.MEMORIES.name && !showSettings && !demo && onlyImages) {
                     imageGridMode = value
-                    if (value) { evidence.clear(); evidenceMode = false }
+                    if (value) { questionConsent.retireUiScope();evidence.clear(); evidenceMode = false }
                 } },
                 ownsImageGrid = { ownsNavigation() && detailEntryId == null &&
                     selectedName == Destination.MEMORIES.name && !showSettings && !demo && imageGridMode && onlyImages &&

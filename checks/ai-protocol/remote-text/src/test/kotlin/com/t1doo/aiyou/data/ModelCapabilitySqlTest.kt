@@ -13,6 +13,21 @@ import org.junit.Test
 
 /** Actual checked-in Room13 predecessor and product14 SQL/AEAD cells; host SQLite, not native SQLCipher. */
 class ModelCapabilitySqlTest {
+    @Test fun currentConnectionRequiresVerifiedProfileAndExactAuthenticatedConfigurationInCallerTransaction() {
+        CapabilitySqlFixture().use { f ->
+            val c=f.connection();f.migrate();val connection=c.textConnection(TextPurpose.CONVERSATION)
+            fun current()=f.db.transaction { sql -> f.profiles.connectionCurrent(sql,connection,TextPurpose.CONVERSATION) }
+            assertFalse(current())
+            val first=f.profiles.begin(c,"first",100);assertTrue(f.profiles.admit(first));f.profiles.finish(first,supported())
+            assertTrue(current())
+            assertFalse(f.db.transaction {sql->f.profiles.connectionCurrent(sql,connection.copy(modelId="changed"),TextPurpose.CONVERSATION)})
+            val second=f.profiles.begin(c,"second",100);assertFalse(current())
+            assertTrue(f.profiles.admit(second));f.profiles.finish(second,unsupported());assertFalse(current())
+            val third=f.profiles.begin(c,"third",100);assertTrue(f.profiles.admit(third));f.profiles.finish(third,supported());assertTrue(current())
+            f.catalog.revoke(c,"explicit-key-revoke");assertFalse(current())
+            assertTrue(f.db.read("SELECT * FROM remote_text_jobs").isEmpty())
+        }
+    }
     @Test fun actualThirteenMigrationColdProfilesKeepCompleteBindingAndOriginalConnectionCiphertextUnchanged() {
         CapabilitySqlFixture().use { f ->
             assertEquals(13L,f.db.read("PRAGMA user_version").single().single())

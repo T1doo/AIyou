@@ -10,7 +10,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** Reuses record grants, remote source jobs and local_jobs receipts. No new schema/permission store.
  * Nested product calls share this exact outer SQL transaction. Callbacks never run inside it.
  */
-internal class SqlSelectedQuestionAuthorizationRepository(private val database: RecordsSqlDatabase, private val sourceGate:CaptureDraftGate?=null) :
+internal class SqlSelectedQuestionAuthorizationRepository(private val database: RecordsSqlDatabase, private val sourceGate:CaptureDraftGate?=null,
+    private val connectionCurrent: ((RecordsSqlConnection,ProviderConnection)->Boolean)? = null) :
     SelectedQuestionAuthorizationRepository, AutoCloseable {
     private val access = RemoteTextTransactions(database,captureGate=sourceGate)
     private val records = SqlRecordAuthorizationRepository(database,sourceGate=sourceGate)
@@ -147,6 +148,7 @@ internal class SqlSelectedQuestionAuthorizationRepository(private val database: 
     }
     private fun verifySources(sql: RecordsSqlConnection, review: SelectedQuestionSendReview, clock: () -> Instant) {
         if (review.sessionId != sessionId) deny(SendDenial.QUEUE_INVALIDATED)
+        verifyConnection(sql,review)
         review.request.sources.forEachIndexed { index, source ->
             val current = records.readAuthorization(source.reference.source)
             if (current != review.sources[index]) deny(SendDenial.QUEUE_INVALIDATED)
@@ -167,6 +169,10 @@ internal class SqlSelectedQuestionAuthorizationRepository(private val database: 
         }
         // One final time applies to ALL intervals, so expiry while walking a multi-source set fails closed.
         finalTime(review, clock)
+        verifyConnection(sql,review)
+    }
+    private fun verifyConnection(sql: RecordsSqlConnection, review: SelectedQuestionSendReview) {
+        if (connectionCurrent?.invoke(sql,review.connection) == false) deny(SendDenial.CONFIGURATION_CHANGED)
     }
     private fun finalTime(review: SelectedQuestionSendReview, clock: () -> Instant) {
         val now = live(clock)

@@ -20,10 +20,12 @@ class LocalEvidenceState internal constructor(val stage: LocalEvidenceStage,
     val question: String = "", cards: List<LocalEvidenceCard> = emptyList(), val limited: Boolean = false,
     val message: String? = null, internal val source: OriginalSearchState? = null,
     internal val generation: Long = 0,
-    val selection: LocalEvidenceSelection = LocalEvidenceSelection()) {
+    val selection: LocalEvidenceSelection = LocalEvidenceSelection(), val questionError:String?=null) {
     val cards: List<LocalEvidenceCard> = Collections.unmodifiableList(ArrayList(cards))
     internal fun selecting(selection: LocalEvidenceSelection) = LocalEvidenceState(stage, question, cards, limited,
-        message, source, generation, selection)
+        message, source, generation, selection,questionError)
+    internal fun asking(text:String,error:String?,selection:LocalEvidenceSelection=this.selection)=LocalEvidenceState(
+        stage,text,cards,limited,message,source,generation,selection,error)
     override fun toString() = "LocalEvidenceState(stage=$stage, redacted)"
 }
 
@@ -71,6 +73,9 @@ class LocalEvidenceController internal constructor(
     private val mutable = MutableStateFlow(waiting)
     val state = mutable.asStateFlow()
     private var active = false
+    private var questionDraft:String?=null
+    private var questionDraftError:String?=null
+    private var questionOwner:com.t1doo.aiyou.domain.LocalSearchRepository?=null
     private var closed = false
     private var generation = 0L
     private var job: Job? = null
@@ -106,10 +111,13 @@ class LocalEvidenceController internal constructor(
             resetLocked(); return@synchronized
         }
         if (active && mutable.value.source === source) return@synchronized
+        if(questionOwner!=null&&questionOwner!==source.owner){questionDraft=null;questionDraftError=null}
+        questionOwner=source.owner
         active = true; generation++
         confirmation = null; reviewJob?.cancel(); reviewJob = null
         job?.cancel()
-        val request = LocalEvidenceState(LocalEvidenceStage.RUNNING, source = source, generation = generation)
+        val request = LocalEvidenceState(LocalEvidenceStage.RUNNING, question=questionDraft?:source.input.query,
+            source = source, generation = generation,questionError=questionDraftError)
         mutable.value = request
         job = scope.launch {
             val result = try {
@@ -122,7 +130,7 @@ class LocalEvidenceController internal constructor(
             catch (_: Exception) { LocalEvidenceState(LocalEvidenceStage.FAILED,
                 message = "本机出处暂不可读取，未显示不完整候选。请重试本机读取。", source = source, generation = request.generation) }
             fun publish() = synchronized(lock) {
-                if (mutable.value === request && owns(request)) mutable.value = result
+                if (mutable.value === request && owns(request)) mutable.value = result.asking(questionDraft?:result.question,questionDraftError)
             }
             if (result.stage == LocalEvidenceStage.INVALID || result.stage == LocalEvidenceStage.FAILED) { publish(); return@launch }
             val accepted = try { checkNotNull(source.owner).publishCurrent(checkNotNull(source.proof), ::publish) }
@@ -155,10 +163,22 @@ class LocalEvidenceController internal constructor(
         mutable.value = value.selecting(LocalEvidenceSelection(cards = selected))
     }
 
+    /** Private question draft, independent of retrieval keywords. Editing never queries or saves a record. */
+    fun changeQuestion(value:LocalEvidenceState,text:String)=synchronized(lock) {
+        if(mutable.value!==value||!owns(value)||value.stage!=LocalEvidenceStage.READY)return@synchronized
+        val valid=text.length<=1024&&LocalCandidates.validUnicode(text)&&
+            text.codePointCount(0,text.length)<=MAX_QUESTION_POINTS&&text.toByteArray(Charsets.UTF_8).size<=MAX_QUESTION_BYTES
+        questionDraftError=if(valid)null else "问题超出512码点／2048字节或文字格式无效；本次输入未替换当前问题，请修改后重新确认。"
+        if(valid)questionDraft=text
+        reviewJob?.cancel();reviewJob=null;confirmation=null
+        mutable.value=value.asking(questionDraft?:value.question,questionDraftError,
+            LocalEvidenceSelection(cards=value.selection.cards))
+    }
+
     /** Explicit local review, rechecking every source's private revision/access binding under one SQL lease. */
     fun confirm(value: LocalEvidenceState) = synchronized(lock) {
         if (mutable.value !== value || !owns(value) || value.stage != LocalEvidenceStage.READY ||
-            value.selection.stage != LocalEvidenceSelectionStage.CHOOSING || value.selection.cards.isEmpty()) return@synchronized
+            value.selection.stage != LocalEvidenceSelectionStage.CHOOSING || value.selection.cards.isEmpty()||value.questionError!=null||value.question.isBlank()) return@synchronized
         confirmation = null; reviewJob?.cancel()
         val request = value.selecting(LocalEvidenceSelection(LocalEvidenceSelectionStage.CHECKING,
             value.selection.cards, value.selection.id))
@@ -240,8 +260,8 @@ class LocalEvidenceController internal constructor(
         active = false; generation++; job?.cancel(); job = null
         reviewJob?.cancel(); reviewJob = null; confirmation = null; mutable.value = waiting
     }
-    fun clear() = synchronized(lock) { resetLocked() }
-    override fun close() = synchronized(lock) { closed = true; resetLocked(); scope.cancel() }
+    fun clear() = synchronized(lock) { questionDraft=null;questionDraftError=null;questionOwner=null;resetLocked() }
+    override fun close() = synchronized(lock) { closed = true;questionDraft=null;questionDraftError=null;questionOwner=null;resetLocked(); scope.cancel() }
 
     companion object {
         const val MAX_SOURCES = 5

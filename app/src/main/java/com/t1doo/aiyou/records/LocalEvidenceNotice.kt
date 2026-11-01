@@ -40,7 +40,7 @@ internal fun LocalEvidenceNotice(state: LocalEvidenceState, onConfirm: () -> Uni
                 LocalEvidenceSelectionStage.CHECKING -> StatusNotice("正在核对本次出处", "正在本机检查全部来源的当前版本与参与权限。",
                     state = ComponentState.LOADING)
                 LocalEvidenceSelectionStage.EXPIRED -> StatusNotice("本次确认已失效", "请重新选择并确认。", state = ComponentState.ERROR)
-                LocalEvidenceSelectionStage.CHOOSING -> TextButton(onClick = onConfirm, enabled = selection.cards.isNotEmpty(),
+                LocalEvidenceSelectionStage.CHOOSING -> TextButton(onClick = onConfirm, enabled = selection.cards.isNotEmpty()&&state.questionError==null&&state.question.isNotBlank(),
                     modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("local-evidence-confirm")) {
                     Text("确认本次本机出处")
                 }

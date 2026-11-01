@@ -39,7 +39,8 @@ class EncryptedEntryRepository internal constructor(
     private val dao get() = database.records()
     private val connectionStorage = SqlModelConnectionCatalog(borrowedSql,keyBytes)
     override val modelConnections: com.t1doo.aiyou.domain.ModelConnectionCatalog = connectionStorage
-    override val modelCapabilities: com.t1doo.aiyou.domain.ModelCapabilityRepository = SqlModelCapabilityRepository(borrowedSql,connectionStorage)
+    private val capabilityStorage = SqlModelCapabilityRepository(borrowedSql,connectionStorage)
+    override val modelCapabilities: com.t1doo.aiyou.domain.ModelCapabilityRepository = capabilityStorage
     override val localModelConnections = com.t1doo.aiyou.domain.LocalModelConnectionServices(connectionStorage,
         RemoteTextTransactions(borrowedSql,connectionCurrent=connectionStorage::connectionCurrent,captureGate=sourceGate))
     override val localProcessing: com.t1doo.aiyou.domain.LocalProcessingRepository = SqlLocalProcessingRepository(borrowedSql,sourceGate)
@@ -49,7 +50,8 @@ class EncryptedEntryRepository internal constructor(
     /** Blocking IO; shares the existing encrypted database and never enables remote processing. */
     override val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(borrowedSql,sourceGate)
     override val recordAuthorizations: com.t1doo.aiyou.domain.RecordAuthorizationRepository = SqlRecordAuthorizationRepository(borrowedSql,connectionStorage,modelCapabilities,sourceGate)
-    private val questionAuthorizationStorage = SqlSelectedQuestionAuthorizationRepository(borrowedSql,sourceGate)
+    private val questionAuthorizationStorage = SqlSelectedQuestionAuthorizationRepository(borrowedSql,sourceGate,
+        connectionCurrent={ sql,connection -> capabilityStorage.connectionCurrent(sql,connection,com.t1doo.aiyou.model.TextPurpose.CONVERSATION) })
     override val selectedQuestionAuthorizations: com.t1doo.aiyou.domain.SelectedQuestionAuthorizationRepository
         get() = questionAuthorizationStorage
     private val candidateStorage = SqlLocalCandidateRepository(borrowedSql, keyBytes)

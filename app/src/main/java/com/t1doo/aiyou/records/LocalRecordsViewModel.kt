@@ -291,6 +291,8 @@ class LocalRecordsViewModel internal constructor(
     val modelConnections = ModelConnectionsController(current = { mutableState.value },
         enqueue = { action -> submit(Command.ModelConnections(action)).isSuccess },capabilityProbe=capabilityProbe?:productionAi?.probe,
         probeReady={productionAi?.unavailableNotice()==null})
+    val productionQuestions=productionAi?.let {runtime->ProductionQuestions({mutableState.value},
+        {action->submit(Command.ModelConnections(action)).isSuccess},runtime,clock)}
     val favorites = RecordFavoriteController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.Favorites(action)).isSuccess }, beforeWrite={unifiedObserver?.retire()})
     val eventDates = RecordEventDateController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -534,7 +536,7 @@ class LocalRecordsViewModel internal constructor(
                 ai.markDisposed()
                 attachments.markDisposed()
                 imageGrid.dispose()
-                tags.dispose(); people.dispose(); modelConnections.dispose()
+                tags.dispose(); people.dispose(); modelConnections.dispose();productionQuestions?.markDisposed()
                 favorites.dispose()
                 eventDates.dispose()
                 tasks.dispose()
@@ -547,7 +549,9 @@ class LocalRecordsViewModel internal constructor(
                 recycleBin.dispose()
                 try { withContext(NonCancellable + Dispatchers.IO) {
                     try { try { ai.closeAndJoin() } finally {
-                        try { modelConnections.closeAndJoin() } finally { productionAi?.close() }
+                        try { modelConnections.closeAndJoin() } finally {
+                            try { productionQuestions?.closeAndJoin() } finally { productionAi?.close() }
+                        }
                     } }
                     finally {
                         try { audioPlayback.closeAndJoin();repository?.let { mixedCapture.drainAudioOnIo(it) } }
@@ -1381,6 +1385,7 @@ class LocalRecordsViewModel internal constructor(
             val pending = try { store.editDrafts?.pending() ?: OriginalEditDraftIndex(emptyList()) }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             productionAi?.bindOwner(store)
+            productionQuestions?.bindOwner(store)
             val ownership = storageOwnership ?: RecordsStorageOwnership(store, bindAi?.let { factory ->
                 { factory(store) }
             } ?: productionAi?.let { runtime -> { runtime.openRecord(store) } }).also { storageOwnership = it }
