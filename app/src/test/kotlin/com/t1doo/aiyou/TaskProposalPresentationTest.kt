@@ -7,6 +7,8 @@ import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -117,7 +119,19 @@ class TaskProposalPresentationTest {
         compose.setContent {Screen()};compose.runOnIdle {proposals.initialize(owner)};open();title()
         compose.onNodeWithTag("manual-task-date-input").performScrollTo().performTextReplacement("2026-10-20");drain()
         compose.onNodeWithTag("task-proposal-saved").performScrollTo().assertIsDisplayed();assertTrue(tasks.isEmpty())
-        val id=state.value.taskProposals.editor!!.id;click("task-proposal-close");drain()
+        val id=state.value.taskProposals.editor!!.id
+        val setDate=checkNotNull(compose.onNodeWithTag("manual-task-date-input").fetchSemanticsNode().config[SemanticsActions.SetText].action)
+        val close=checkNotNull(compose.onNodeWithTag("task-proposal-close").performScrollTo().assertIsDisplayed()
+            .assertIsEnabled().fetchSemanticsNode().config[SemanticsActions.OnClick].action)
+        // Both nodes remain attached throughout this single UI event. Do not drain the date flow
+        // before closing: a real last edit can precede snapshotFlow's asynchronous consumption.
+        compose.runOnIdle {
+            assertEquals(state.value.taskProposals.editor!!.epoch,state.value.taskProposals.editor!!.savedEpoch)
+            assertTrue(setDate(AnnotatedString("2026-10-21")))
+            assertEquals("The event must exercise the unsynchronized field boundary","2026-10-20",state.value.taskProposals.editor!!.date.date)
+            assertTrue(close())
+        }
+        drain();assertEquals("Close must retain the last visible date", "2026-10-21",drafts.getValue(id).dateInput.date)
         compose.onNodeWithText("返回列表").performClick();compose.onNodeWithText("待办").performClick()
         compose.runOnIdle {proposals.dispose();proposals=newController();proposals.initialize(owner)}
         taskNode("task-proposal-heading").assertTextEquals("待确认草稿 1")
@@ -125,7 +139,7 @@ class TaskProposalPresentationTest {
         click("task-proposal-prepare");compose.onNodeWithTag("task-proposal-confirm-title").performScrollTo().assertTextEquals("合成人工待确认标题")
         assertTrue(queue.isEmpty());click("task-proposal-cancel-confirm");assertTrue(tasks.isEmpty())
         click("task-proposal-prepare");click("task-proposal-confirm");assertTrue(tasks.isEmpty());drain()
-        assertEquals(1,confirms.size);assertEquals("2026-10-20",tasks.values.single().schedule!!.date.toString());assertNull(tasks.values.single().schedule!!.time)
+        assertEquals(1,confirms.size);assertEquals("2026-10-21",tasks.values.single().schedule!!.date.toString());assertNull(tasks.values.single().schedule!!.time)
         click("task-proposal-close");drain();taskNode("task-proposal-heading").assertTextEquals("待确认草稿 0")
         taskNode("manual-task-row-"+tasks.values.single().id).assertIsDisplayed()
     }
