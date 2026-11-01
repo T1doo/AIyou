@@ -31,6 +31,10 @@ enum class QuestionConsentStage {
     CANCELLED, WITHDRAWING, WITHDRAWN, WITHDRAW_FAILED, BLOCKED, FAILED, STALE,
 }
 
+/** Compose ownership key; a passive/temporary view must not mint a controller on each render. */
+internal fun questionConsentSelectionScope(value:LocalEvidenceState,enabled:Boolean):String? =
+    value.selection.id.takeIf{enabled && value.stage==LocalEvidenceStage.READY}
+
 class QuestionConsentState internal constructor(val stage: QuestionConsentStage, val requestId: String? = null,
     val review: SelectedQuestionSendReview? = null, val receipt: SelectedQuestionSendReceipt? = null) {
     override fun toString() = "QuestionConsentState(stage=$stage, redacted)"

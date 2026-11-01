@@ -16,6 +16,22 @@ import org.junit.Test
 /** Actual persistent authority and host SQLite; only synthetic records and in-memory protocol wire.
  * This is neither Android SQLCipher/device acceptance nor a provider/network test. */
 class SelectedQuestionConsentControllerTest {
+    @Test fun passiveSearchViewsKeepOneConsentScopeWhileRealQuestionEditsReplaceTheReadyScope()=Harness().use {h->
+        h.source.set(OriginalSearchState(OriginalSearchInput(""),OriginalSearchStage.BROWSE))
+        val passive=(1..4).map{h.current()}
+        assertEquals(4,passive.map{it.selection.id}.distinct().size)
+        assertTrue(passive.all{questionConsentSelectionScope(it,false)==null})
+        assertTrue(passive.all{questionConsentSelectionScope(it,true)==null})
+        // Restore a real authenticated source, not a fabricated READY/confirmed view.
+        val input=OriginalSearchInput("needle");val entries=h.f.search.candidates(LocalSearchRequest("")).entries
+        val result=runBlocking{LocalOriginalSearchMatcher.indexed(entries,input,h.owner)}
+        h.source.set(OriginalSearchState(input,result.stage,result.hits,entries=entries,proof=result.proof,owner=h.owner,indexEpoch=h.f.search.epoch()))
+        val view=h.confirm();val scope=questionConsentSelectionScope(view,true)
+        assertEquals(view.selection.id,scope);assertEquals(scope,questionConsentSelectionScope(h.current(),true))
+        h.evidence.changeQuestion(view,"独立合成问题")
+        assertNotEquals(scope,questionConsentSelectionScope(h.current(),true));assertEquals(LocalEvidenceSelectionStage.CHOOSING,h.current().selection.stage)
+        assertNull(questionConsentSelectionScope(h.current(),false));assertTrue(h.jobs().isEmpty());assertEquals(0,h.wire.opened.get())
+    }
     @Test fun localConfirmationAndReadOnlyReviewNeverAuthorizeUntilSeparateExactOneUseConfirmation() = Harness().use { h ->
         val view = h.confirm(); assertTrue(h.jobs().isEmpty()); assertEquals(0, h.wire.opened.get())
         h.ui.review(view); val review = h.await(QuestionConsentStage.REVIEW).review!!

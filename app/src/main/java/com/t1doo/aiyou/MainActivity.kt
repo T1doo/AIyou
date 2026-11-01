@@ -596,7 +596,8 @@ fun AIyouApp(
     val questionDirectory by (productionQuestions?.state?:emptyQuestionDirectory).collectAsState()
     val remoteQuestion=questionDirectory.selected?.takeIf{it.owner===consentOwner&&productionQuestions?.current(it)==true}
     val currentRemoteQuestion by rememberUpdatedState(remoteQuestion)
-    val questionConsent = remember(evidence, consentOwner, selectedQuestionConsentFixture,remoteQuestion,generation,evidenceState.selection.id) {
+    val consentSelectionScope=com.t1doo.aiyou.records.questionConsentSelectionScope(evidenceState,evidenceMode)
+    val questionConsent = remember(evidence, consentOwner, selectedQuestionConsentFixture,remoteQuestion,generation,consentSelectionScope) {
         com.t1doo.aiyou.records.SelectedQuestionConsentController(evidence,
             currentEvidence = { evidence.visible(search.visible(searchSource(), searchInput())) },
             ownsSession = { ownsNavigation() && evidenceMode && selectedName == Destination.MEMORIES.name && detailEntryId == null &&
