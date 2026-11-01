@@ -11,6 +11,8 @@ import com.t1doo.aiyou.records.LocalRecordsViewModel
 import com.t1doo.aiyou.records.AndroidReminderRuntime
 import com.t1doo.aiyou.records.ReminderVmRuntime
 import com.t1doo.aiyou.records.openProductionRecordStore
+import com.t1doo.aiyou.records.ProductionRecordAi
+import android.content.pm.PackageManager
 import java.io.File
 
 internal class AppAccessSession(val id: Long, val owner: ViewModelStoreOwner,
@@ -35,6 +37,7 @@ internal class AppAccessViewModel internal constructor(application: Application,
         }})
 
     private suspend fun prepare(id:Long) {
+        val application = getApplication<Application>()
         current?.let{previous->
             processAppAccessRetirement.register(previous.records.appAccessClosure)
             current=null;runtime=null;previous.owner.viewModelStore.clear()
@@ -45,10 +48,12 @@ internal class AppAccessViewModel internal constructor(application: Application,
         val owner=object:ViewModelStoreOwner{override val viewModelStore=ViewModelStore()}
         var records:LocalRecordsViewModel?=null
         try {
+            val recordNetworkAllowed = application.checkSelfPermission(android.Manifest.permission.INTERNET)==PackageManager.PERMISSION_GRANTED
             val factory=object:ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST") override fun <T:ViewModel> create(modelClass:Class<T>):T {
                     check(modelClass==LocalRecordsViewModel::class.java)
                     return LocalRecordsViewModel(getApplication(),{store},reminderRuntime=port,admittedStore=store,
+                        productionAi=ProductionRecordAi(networkAllowed={recordNetworkAllowed}),
                         audioOutput={ stop -> com.t1doo.aiyou.records.PlatformOriginalAudioOutput(getApplication(),stop) }) as T
                 }
             }

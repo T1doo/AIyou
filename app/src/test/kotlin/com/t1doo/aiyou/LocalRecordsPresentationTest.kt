@@ -81,10 +81,11 @@ class LocalRecordsPresentationTest {
         val state = mutableStateOf(RecordAiUiState(7, SourceVersion("synthetic-source", 1),
             RecordAiPhase.RUNNING, "正在整理，预览尚未保存。", preview = preview))
         val stops = mutableListOf<Long>()
+        val starts = mutableListOf<Long>()
         compose.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
-                AIyouTheme { RecordAiSection(state.value, onStart = {}, onStop = { stops.add(it) }, onClose = {}) }
+                AIyouTheme { RecordAiSection(state.value, onStart = { starts.add(it) }, onStop = { stops.add(it) }, onClose = {}) }
             }
         }
         compose.onNodeWithTag("record-ai-content-status").assertTextEquals("预览 · 尚未保存").assertIsDisplayed()
@@ -105,6 +106,12 @@ class LocalRecordsPresentationTest {
         compose.onAllNodesWithTag("record-ai-content-status").assertCountEquals(0)
         compose.onAllNodesWithText(preview).assertCountEquals(0)
         compose.onAllNodesWithTag("record-ai-stop").assertCountEquals(0)
+        compose.runOnIdle { state.value = state.value.copy(phase=RecordAiPhase.BLOCKED,
+            notice="当前安装包未开放网络发送；原文仍保存在本机，不会发送给模型。") }
+        compose.onNodeWithText("仅此条原文 · 版本 1").assertIsDisplayed()
+        compose.onNodeWithTag("record-ai-start").assertIsNotEnabled()
+        compose.onAllNodesWithTag("record-ai-content-status").assertCountEquals(0)
+        compose.runOnIdle { assertTrue(starts.isEmpty()) }
     }
 
     @Test fun aiStoredAnnotationUsesCandidateHeadingWithoutUnsavedOrPendingLabel() {

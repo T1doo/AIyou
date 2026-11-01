@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 internal class LocalRecordAiController(
     private val currentPolicy: (SourceVersion) -> ProcessingPolicy?,
     private val publish: (RecordAiUiState?) -> Unit,
+    private val executionUnavailable: () -> String? = { null },
 ) {
     private val lock = Any()
     private val lifetime: CompletableJob = SupervisorJob()
@@ -58,15 +59,17 @@ internal class LocalRecordAiController(
     fun open(source: SourceVersion, policy: ProcessingPolicy): Long = synchronized(lock) {
         if (disposed) return 0L
         invalidateLocked(session)
+        val unavailable = executionUnavailable()
         val notice = when {
             policy == ProcessingPolicy.AI_NONE -> "这条原文不参与 AI 处理。"
             policy == ProcessingPolicy.LOCAL_ONLY -> "这条原文仅在本机处理，未授权发送给模型。"
+            unavailable != null -> unavailable
             owner?.openAi == null -> "模型连接尚未开放，当前不会发送原文。"
             firstFatal != null -> "整理暂不可用，原文保存不受影响。"
             currentPolicy(source) == null -> "这份原文版本已不可用，请重新打开当前原文。"
             else -> "仅整理这份已授权原文；预览尚未保存。"
         }
-        val enabled = firstFatal == null && policy == ProcessingPolicy.REMOTE_ALLOWED && owner?.openAi != null &&
+        val enabled = unavailable == null && firstFatal == null && policy == ProcessingPolicy.REMOTE_ALLOWED && owner?.openAi != null &&
             currentPolicy(source) == ProcessingPolicy.REMOTE_ALLOWED
         val next = Session(RecordAiUiState(++ids, source,
             if (enabled) RecordAiPhase.READY else RecordAiPhase.BLOCKED, notice), owner)
@@ -78,6 +81,13 @@ internal class LocalRecordAiController(
     fun start(sessionId: Long) {
         val job = synchronized(lock) {
             val selected = session ?: return
+            executionUnavailable()?.let { notice ->
+                if (selected.live && selected.current.sessionId == sessionId && selected.current.phase == RecordAiPhase.READY) {
+                    selected.current = selected.current.copy(phase=RecordAiPhase.BLOCKED,notice=notice)
+                    publish(selected.current)
+                }
+                return
+            }
             if (disposed || firstFatal != null || !selected.live || selected.current.sessionId != sessionId ||
                 selected.current.phase != RecordAiPhase.READY || selected.owner !== owner ||
                 currentPolicy(selected.current.source) != ProcessingPolicy.REMOTE_ALLOWED) return

@@ -14,7 +14,7 @@ internal interface RecordAiCapability : AutoCloseable {
     override fun close()
 }
 
-/** Production adapter, enabled only by a future explicit model/secret/permission configuration. */
+/** Production adapter; every exchange still requires current source/connection/secret/consent. */
 internal class SourceBoundRecordAiCapability(
     private val transport: OkHttpStreamingTransport,
     private val repository: SourceBoundTextRepository,
@@ -23,7 +23,7 @@ internal class SourceBoundRecordAiCapability(
     private val maxOutputTokens: Int,
 ) : RecordAiCapability {
     companion object {
-        /** Future explicit bindAi uses only coherent local services, never the legacy text port. */
+        /** Production wiring uses only coherent local services, never the legacy text port. */
         fun fromLocalConnections(transport: OkHttpStreamingTransport, records: EntryRepository,
             clock: Clock, maxOutputTokens: Int): SourceBoundRecordAiCapability {
             val local=checkNotNull(records.localModelConnections) { "Local connection services unavailable" }

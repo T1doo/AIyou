@@ -160,7 +160,9 @@ class LocalRecordsViewModel internal constructor(
     private val admittedStore:EntryRepository?=null,
     private val audioOutput:((()->Unit)->OriginalAudioOutput)?=null,
     private val imageTextRecognizer:com.t1doo.aiyou.domain.ImageTextRecognizer=com.t1doo.aiyou.domain.UnavailableImageTextRecognizer,
+    private val productionAi: ProductionRecordAi? = null,
 ) : AndroidViewModel(application) {
+    init { require(productionAi == null || bindAi == null && capabilityProbe == null) { "AI installation must have one owner" } }
     constructor(application: Application) : this(application, { throw IllegalStateException("Records require an admitted foreground owner") })
     private val mutableState = MutableStateFlow(LocalRecordUiState())
     private var unifiedObserver:UnifiedKeywordController?=null
@@ -287,7 +289,8 @@ class LocalRecordsViewModel internal constructor(
     val people = ManualPeopleController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.ManualPeople(action)).isSuccess }, beforeOpen={unifiedObserver?.retire()})
     val modelConnections = ModelConnectionsController(current = { mutableState.value },
-        enqueue = { action -> submit(Command.ModelConnections(action)).isSuccess },capabilityProbe=capabilityProbe)
+        enqueue = { action -> submit(Command.ModelConnections(action)).isSuccess },capabilityProbe=capabilityProbe?:productionAi?.probe,
+        probeReady={productionAi?.unavailableNotice()==null})
     val favorites = RecordFavoriteController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.Favorites(action)).isSuccess }, beforeWrite={unifiedObserver?.retire()})
     val eventDates = RecordEventDateController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -360,6 +363,7 @@ class LocalRecordsViewModel internal constructor(
                 else -> local
             }
         } },
+        executionUnavailable={productionAi?.unavailableNotice()},
     )
     private var persistedDraft: TextDraft? = null
     private var captureDraftMayBeConsumed = false // IO queue only; an unacknowledged delete invalidates save reuse.
@@ -542,7 +546,9 @@ class LocalRecordsViewModel internal constructor(
                 recordPackages.dispose()
                 recycleBin.dispose()
                 try { withContext(NonCancellable + Dispatchers.IO) {
-                    try { try { ai.closeAndJoin() } finally { modelConnections.closeAndJoin() } }
+                    try { try { ai.closeAndJoin() } finally {
+                        try { modelConnections.closeAndJoin() } finally { productionAi?.close() }
+                    } }
                     finally {
                         try { audioPlayback.closeAndJoin();repository?.let { mixedCapture.drainAudioOnIo(it) } }
                         finally {
@@ -1374,9 +1380,10 @@ class LocalRecordsViewModel internal constructor(
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
             val pending = try { store.editDrafts?.pending() ?: OriginalEditDraftIndex(emptyList()) }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
+            productionAi?.bindOwner(store)
             val ownership = storageOwnership ?: RecordsStorageOwnership(store, bindAi?.let { factory ->
                 { factory(store) }
-            }).also { storageOwnership = it }
+            } ?: productionAi?.let { runtime -> { runtime.openRecord(store) } }).also { storageOwnership = it }
             ai.bind(ownership)
             val processingVersions = try { store.localProcessing?.versions() ?: emptyMap() }
                 catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }

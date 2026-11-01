@@ -39,7 +39,7 @@ fun ModelConnectionSettings(controller: ModelConnectionsController, owner: Model
     val ui=emission.let { controller.visible() }
     val session=ui.session
     Text("本机连接配置",style=MaterialTheme.typography.titleMedium)
-    Text("可保存服务、模型、计划用途与本机密钥。能力检查须单独发起；保存不会联网或改变记录的处理范围。当前正式版本尚不可调用。",
+    Text("可保存服务、模型、计划用途与本机密钥。能力检查须单独发起；保存不会联网或改变记录的处理范围。记录发送还需逐条授权并明确开始整理。",
         style=MaterialTheme.typography.bodyMedium)
     Text("连接配置仅留在本机，不进入资料库备份；恢复资料库不会覆盖它。",style=MaterialTheme.typography.bodySmall)
     if(ui.busy) Text("正在读取本机配置…")
@@ -74,7 +74,7 @@ fun ModelConnectionSettings(controller: ModelConnectionsController, owner: Model
                 TextButton(onClick={controller.beginProbe(session,config)},enabled=ui.probeAvailable&&config.secretRef!=null&&
                     ui.editor==null&&ui.secretEditor==null&&ui.probeEditor==null&&!ui.busy&&ui.error==null&&ui.capabilityError==null,
                     modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("model-capability-open-${config.id}")) { Text("检查此连接的文本能力") }
-                if(!ui.probeAvailable) Text("当前版本未开放服务探测与记录发送；可继续本机使用。",style=MaterialTheme.typography.bodySmall)
+                if(!ui.probeAvailable) Text("当前安装包未开放网络发送；固定样本检查和记录发送不可用，可继续本机使用。",style=MaterialTheme.typography.bodySmall)
                 TextButton(onClick={controller.begin(session,config)},enabled=ui.editor==null&&ui.secretEditor==null&&ui.probeEditor==null&&!ui.busy&&ui.error==null,
                     modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("model-config-edit-${config.id}")) { Text("编辑此配置") }
                 TextButton(onClick={controller.beginSecret(session,config)},

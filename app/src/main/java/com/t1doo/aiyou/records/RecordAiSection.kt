@@ -25,6 +25,7 @@ internal fun RecordAiSection(
     Column(Modifier.fillMaxWidth().testTag("record-ai-session"),
         verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         Text(selected.notice, style = MaterialTheme.typography.bodySmall)
+        Text("仅此条原文 · 版本 ${selected.source.revision}", style = MaterialTheme.typography.bodySmall)
         val text = selected.annotation?.candidate?.text ?: selected.preview
         if (text.isNotEmpty()) {
             Column(Modifier.fillMaxWidth().heightIn(max = AIyouDimensions.composerTextMinHeight * 2)

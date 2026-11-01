@@ -4,7 +4,7 @@ import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
 import java.time.Clock
 
-/** No record repository or caller-supplied sample. Installation is explicit; production leaves it absent. */
+/** No record repository or caller-supplied sample. An installed probe still needs an explicit ticket. */
 class FixedTextCapabilityProbe(private val transport: OkHttpStreamingTransport,
     private val profiles: ModelCapabilityRepository, private val secrets: SecretResolver,
     private val clock: Clock) : ModelCapabilityProbe {

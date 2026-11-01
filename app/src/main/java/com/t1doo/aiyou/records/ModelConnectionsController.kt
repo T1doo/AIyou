@@ -52,7 +52,8 @@ data class ModelConnectionsUiState(val session: Long = 0, val busy: Boolean = fa
 class ModelConnectionsController internal constructor(private val current: () -> LocalRecordUiState,
     private val enqueue: (suspend (EntryRepository) -> Unit) -> Boolean,
     private val capabilityProbe: ModelCapabilityProbe? = null, private val clock: java.time.Clock = java.time.Clock.systemUTC(),
-    probeDispatcher: CoroutineDispatcher = Dispatchers.IO) {
+    probeDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val probeReady: () -> Boolean = { true }) {
     private val epochs = AtomicLong()
     private val mutable = MutableStateFlow(ModelConnectionsUiState())
     val state = mutable.asStateFlow()
@@ -105,7 +106,7 @@ class ModelConnectionsController internal constructor(private val current: () ->
         stopProbe()
         capabilityOwner=source.modelCapabilityOwner.takeIf { source.modelConnectionOwner===catalog }
         mutable.value=ModelConnectionsUiState(session,busy=catalog!=null,editor=restored?.copy(),
-            secretEditor=restoredSecret?.copy(),secretsAvailable=vault!=null,probeAvailable=capabilityProbe!=null&&capabilityOwner!=null&&vault!=null)
+            secretEditor=restoredSecret?.copy(),secretsAvailable=vault!=null,probeAvailable=probeReady()&&capabilityProbe!=null&&capabilityOwner!=null&&vault!=null)
         if(live(session)) load(session) else mutable.value=ModelConnectionsUiState(session,error="本机连接配置暂不可读取。")
         return session
     }
@@ -330,7 +331,7 @@ class ModelConnectionsController internal constructor(private val current: () ->
     }
     fun beginProbe(session: Long, rendered: ModelConnectionConfiguration) {
         val ui=mutable.value
-        if(!live(session)||!ui.probeAvailable||ui.busy||ui.error!=null||ui.capabilityError!=null||ui.editor!=null||ui.secretEditor!=null||ui.probeEditor!=null||rendered.secretRef==null||rendered !in ui.configurations) return
+        if(!probeReady()||!live(session)||!ui.probeAvailable||ui.busy||ui.error!=null||ui.capabilityError!=null||ui.editor!=null||ui.secretEditor!=null||ui.probeEditor!=null||rendered.secretRef==null||rendered !in ui.configurations) return
         if(synchronized(probeLock){runningProbe!=null||probeWork.isNotEmpty()}) {
             publish(session){it.copy(notice="上次检查仍在停止，请等待结束后再明确发起；未创建新的请求。")};return
         }
@@ -345,7 +346,7 @@ class ModelConnectionsController internal constructor(private val current: () ->
     /** Short DB begin stays on the records owner; only the one explicitly confirmed sample waits on owned IO. */
     fun runProbe(session: Long, editor: ModelCapabilityProbeEditor) {
         val ui=mutable.value
-        if(!live(session)||!ui.probeAvailable||ui.busy||ui.error!=null||ui.capabilityError!=null||ui.probeEditor!==editor||editor.busy||editor.conflict||editor.pending!=null) return
+        if(!probeReady()||!live(session)||!ui.probeAvailable||ui.busy||ui.error!=null||ui.capabilityError!=null||ui.probeEditor!==editor||editor.busy||editor.conflict||editor.pending!=null) return
         val run=synchronized(probeLock) {
             if(disposed || runningProbe!=null || probeWork.isNotEmpty() || firstProbeFatal!=null) null else ProbeRun(session).also { runningProbe=it }
         }
