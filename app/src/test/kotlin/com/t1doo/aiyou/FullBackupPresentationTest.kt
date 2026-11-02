@@ -165,6 +165,11 @@ class FullBackupPresentationTest {
         compose.onNodeWithText("恢复条件").assertExists();compose.onNodeWithText("恢复口令").assertExists()
         click("full-backup-details")
         for(title in listOf("内容范围","不随备份恢复","容量上限")) compose.onNodeWithText(title).assertExists()
+        compose.onNodeWithText("本机问答历史（含仍有效的回答、出处和删除标记）",substring=true).assertExists()
+        compose.onNodeWithText("本机问答历史不恢复发送授权或自动重发",substring=true).assertExists()
+        compose.onNodeWithText("本机问答历史全部状态和删除标记合计最多128行／4 MiB",substring=true).assertExists()
+        compose.onNodeWithText("不包含模型结果",substring=true).assertDoesNotExist()
+
         compose.runOnIdle {assertTrue(f.queue.isEmpty());assertEquals(0,f.seals);assertEquals(0,f.imports);assertEquals(0,f.picker.launches)}
         click("full-backup-details");compose.onNodeWithText("内容范围").assertDoesNotExist()
         click("full-backup-preview");pump()

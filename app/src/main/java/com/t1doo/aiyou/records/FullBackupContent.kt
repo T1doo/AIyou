@@ -51,15 +51,15 @@ internal fun FullBackupContent(ui:RecordPackageUiState,controller:RecordPackageC
             if(!isHome || detailsExpanded) {
             Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
                 Text("内容范围",Modifier.semantics { heading() },style=MaterialTheme.typography.titleMedium)
-                Text("包含全部记录与回收站、完整修订和原图、收藏、手工人物／标签／事件日期、正式待办及提案、手工记忆及候选确认历史、原音及人工转写版本、图片提取与人工纠正版本、捕获草稿和已保留编辑草稿、完成回执与删除证明。未保存的表单输入不在资料库中。")
+                Text("包含全部记录与回收站、完整修订和原图、收藏、手工人物／标签／事件日期、正式待办及提案、手工记忆及候选确认历史、原音及人工转写版本、图片提取与人工纠正版本、捕获草稿和已保留编辑草稿、完成回执与删除证明、已保存的问题及本机问答历史（含仍有效的回答、出处和删除标记）。未保存的表单输入不在资料库中。")
             }
             Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
                 Text("不随备份恢复",Modifier.semantics { heading() },style=MaterialTheme.typography.titleMedium)
-                Text("不包含模型结果、搜索索引、联网授权、任何密钥、设备锁及显示偏好；不是设备镜像。恢复后保持本机处理，提醒意图保留为已撤销，须重新确认。")
+                Text("不包含其他模型派生结果、搜索索引、联网授权、任何密钥、设备锁及显示偏好；不是设备镜像。本机问答历史不恢复发送授权或自动重发。恢复后保持本机处理，提醒意图保留为已撤销，须重新确认。")
             }
             Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
                 Text("容量上限",Modifier.semantics { heading() },style=MaterialTheme.typography.titleMedium)
-                Text("上限：256 条记录、4096 个修订、256 张 JPEG/PNG 原图；单图16 MiB、原图共64 MiB、资料清单16 MiB，任务／提案与记忆／确认各4096行。超限、损坏或未完成操作会整体拒绝。")
+                Text("上限：256 条记录、4096 个修订、256 张 JPEG/PNG 原图；单图16 MiB、原图共64 MiB、资料清单16 MiB，任务／提案与记忆／确认各4096行；本机问答历史全部状态和删除标记合计最多128行／4 MiB。超限、损坏或未完成操作会整体拒绝。")
             }
             }
         } }
