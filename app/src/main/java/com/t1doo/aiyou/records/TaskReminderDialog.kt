@@ -140,8 +140,8 @@ fun TaskReminderDialog(local: LocalRecordUiState, controller: TaskReminderContro
                     onClick = { if (ownsRoute()) controller.retry() }, modifier = Modifier.testTag("reminder-dialog-retry")) {
                     Text(if (state.conflict) "重新读取待办" else if (state.pending != null) "重试确认" else "重新读取提醒状态")
                 }
-                TextButton(enabled = !state.busy, onClick = actions.close,
-                    modifier = Modifier.heightIn(min = 48.dp).testTag("reminder-close")) { Text("关闭") }
+                TextButton(onClick = actions.close,
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("reminder-close")) { Text(if(state.busy) "关闭并继续浏览" else "关闭") }
             }
         }
     }

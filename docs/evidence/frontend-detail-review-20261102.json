@@ -1,0 +1,74 @@
+{
+  "source_parent": "d05d988fc4ce6af932f4a55ca6d7fb99fc2642cd",
+  "scope": [
+    "separate high-frequency audio progress from live announcements",
+    "dismiss busy reminder editor while preserving exact accepted submission"
+  ],
+  "suites": [
+    {
+      "suite": "com.t1doo.aiyou.records.OriginalAudioControllerTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "9f27efbc2608cddee2c31c434565cc9dd6732aabf8cb79b7d0250e523ad7ebd3"
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.OriginalAudioPresentationTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "0d7256be4c59789a1070721c397a2af9d82efa06dca536b3c321cb26f219fab8"
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.TaskReminderControllerTest",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "3d51af3d3eb1f527cbd7fbd0ec86f86127434bc481dccec8b419205d65d5597b"
+    }
+  ],
+  "total_tests": 34,
+  "command": "python3 scripts/jvm-gradle.py -p checks/ai-protocol :remote-text:test --tests '*OriginalAudioPresentationTest' --tests '*OriginalAudioControllerTest' --tests '*TaskReminderControllerTest' --offline --max-workers=2",
+  "local_build_seconds": 23,
+  "kotlin_syntax_only": {
+    "files": 7,
+    "parse_errors": 0
+  },
+  "new_android_build": false,
+  "new_ci": false,
+  "new_downloads": false,
+  "new_permissions": false,
+  "new_artifact_or_remote_cache_upload": false,
+  "native_audio_or_TalkBack_run": false,
+  "latest_native_validated_source": "908ad0023dd11a2c972d59204487787a2500eb30",
+  "ci_cumulative_unchanged": {
+    "runs": 19,
+    "runner_seconds": 26867
+  },
+  "independent_review": "read-only: no remaining definite P1/P2; existing XML independently read; no extra execution",
+  "production_sources": [
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/ManualTasksScreen.kt",
+      "sha256": "92d7016cbbd682298953f9594518ce3ad133ec31eee742011789680367167a80"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/OriginalAudioPresentation.kt",
+      "sha256": "2ef23195b89f193b578181a9f9d8feb78a7d3093bc97290c811e5fa5363ec297"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/OriginalAudioScreen.kt",
+      "sha256": "ee1e3fe328706205f58f4df2b5995d0d62f487cc778e093769dadf3410bb25c4"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/TaskReminderController.kt",
+      "sha256": "be9c8795db14da286e9e5dd97d682c39703b8daf2ac49dc3fede848314c575d5"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/TaskReminderDialog.kt",
+      "sha256": "72c4e5ce2415b68deb0772c0785b34c8e3d0a9e6ceff06efe383229b7f299c22"
+    }
+  ]
+}

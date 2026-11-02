@@ -12,6 +12,47 @@ import org.junit.Test
 
 /** Actual foreground controller + product SQL/AEAD. No Android alarm or notification is installed. */
 class TaskReminderControllerTest {
+    @Test(timeout=15000)
+    fun closingWhileQueuedKeepsExactSubmissionAndDoesNotReopenTheEditor()=Harness().use {h->
+        val task=h.task("one");h.initialize();val editor=h.begin(task)
+        val before=h.blob(task.id)
+        h.controller.confirm(editor.session)
+        val pending=checkNotNull(h.state.reminders.pending);val generation=h.state.reminders.generation
+        assertTrue(h.state.reminders.busy);assertEquals(1,h.queued.size)
+        h.controller.close(editor.session)
+        assertNull(h.state.reminders.editor);assertSame(pending,h.state.reminders.pending)
+        assertTrue(h.state.reminders.busy);assertEquals(generation,h.state.reminders.generation)
+        assertArrayEquals(before,h.blob(task.id))
+        h.controller.begin(task.id,task.version);h.controller.mode(editor.session,TaskReminderMode.EXACT)
+        h.controller.confirm(editor.session);h.controller.close(editor.session)
+        assertNull(h.state.reminders.editor);assertEquals(1,h.queued.size)
+        h.pump()
+        assertEquals(1,h.requests.size);assertSame(pending.request,h.requests.single())
+        assertNull(h.state.reminders.editor);assertNull(h.state.reminders.pending)
+        assertFalse(h.state.reminders.busy);assertNotNull(h.state.reminders.notice)
+        assertEquals(ManualTaskStatus.OPEN,h.actual.snapshots().single().status)
+        assertEquals("尚未提交合成输入",h.state.text)
+    }
+    @Test(timeout=15000)
+    fun closingDuringCommitKeepsUnknownReadbackRetryIdentityAfterTheDialogIsGone()=Harness().use {h->
+        val task=h.task("one");h.initialize();val editor=h.begin(task)
+        h.controller.confirm(editor.session);val pending=checkNotNull(h.state.reminders.pending)
+        h.afterWrite={
+            assertTrue(h.state.reminders.busy);h.controller.close(editor.session)
+            assertNull(h.state.reminders.editor);assertSame(pending,h.state.reminders.pending)
+            h.failReadback=true
+        }
+        h.pump()
+        assertNull(h.state.reminders.editor);assertSame(pending,h.state.reminders.pending)
+        assertFalse(h.state.reminders.busy);assertNotNull(h.state.reminders.error);assertNull(h.state.reminders.notice)
+        val committed=h.actual.snapshots().single();assertEquals(1L,committed.reminder!!.scheduleVersion)
+        h.afterWrite=null;h.failReadback=false;h.controller.retry();h.pump()
+        assertEquals(2,h.requests.size);assertTrue(h.requests.all {it===pending.request})
+        assertNull(h.state.reminders.editor);assertNull(h.state.reminders.pending);assertNotNull(h.state.reminders.notice)
+        assertEquals(1L,h.actual.snapshots().single().reminder!!.scheduleVersion)
+        assertEquals(1,h.actual.snapshots().size)
+    }
+
     @Test(timeout = 15_000)
     fun unknownUiReadbackRetriesItsOriginalRequestAfterIndependentSystemAck() = Harness().use { h ->
         val task = h.task("one"); h.initialize(); val editor = h.begin(task)

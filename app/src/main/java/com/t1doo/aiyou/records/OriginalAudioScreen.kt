@@ -15,6 +15,8 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 private class WavePickerHandle { var launcher:ActivityResultLauncher<Intent>?=null }
 
@@ -49,22 +51,20 @@ fun WaveFilePicker(audio:ControlledCaptureAudio,ui:CaptureAudioUi,canLaunch:Bool
 
 @Composable
 fun OriginalAudioStatus(controller:OriginalAudioController,modifier:Modifier=Modifier) {
-    val ui by controller.state.collectAsState()
-    if(!ui.busy && ui.error==null)return
-    Column(modifier.fillMaxWidth().padding(8.dp).testTag("audio-playback-status")
-        .semantics { liveRegion=LiveRegionMode.Polite }) {
-        Text(when(ui.phase) {
-            OriginalAudioPhase.IDLE -> ui.error.orEmpty()
-            OriginalAudioPhase.LOADING -> "正在认证原音和来源"
-            OriginalAudioPhase.FOCUS -> "正在准备前台播放"
-            OriginalAudioPhase.PLAYING -> "正在播放原音 · 已播放 ${ui.playedMillis} 毫秒 / ${ui.durationLabel}"
-            OriginalAudioPhase.CLOSING -> "正在关闭播放；请等待实际释放确认"
-            OriginalAudioPhase.CLOSING_UNKNOWN -> ui.error.orEmpty()
-        })
-        if(ui.busy) {
+    // PCM ownership can advance every 10 ms; present only meaningful second/phase changes.
+    val presentation by remember(controller) {
+        controller.state.map(::originalAudioPresentation).distinctUntilChanged()
+    }.collectAsState(initial=originalAudioPresentation(controller.state.value))
+    if(!presentation.visible)return
+    Column(modifier.fillMaxWidth().padding(8.dp).testTag("audio-playback-status")) {
+        Text(presentation.announcement,Modifier.testTag("audio-playback-announcement")
+            .semantics {liveRegion=LiveRegionMode.Polite})
+        // Progress stays readable on focus without announcing it over other content.
+        presentation.progress?.let {Text(it,Modifier.testTag("audio-playback-progress"),style=MaterialTheme.typography.bodySmall)}
+        if(presentation.busy) {
             Text("先停止播放，再编辑、保存或修改附件和范围。",style=MaterialTheme.typography.bodySmall)
             TextButton(onClick=controller::stop,modifier=Modifier.heightIn(min=48.dp).testTag("audio-playback-stop")) {
-                Text(if(ui.phase==OriginalAudioPhase.CLOSING_UNKNOWN) "核对停止同一次播放" else "停止播放")
+                Text(presentation.stopLabel)
             }
         }
     }

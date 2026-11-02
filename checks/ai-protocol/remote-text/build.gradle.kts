@@ -106,6 +106,7 @@ val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
     from("../../../app/src/main/java/com/t1doo/aiyou/records/SourceTaskController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/OriginalReadingLocation.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/OriginalAudioController.kt")
+    from("../../../app/src/main/java/com/t1doo/aiyou/records/OriginalAudioPresentation.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/OriginalAudioOutput.kt")
     listOf("ControlledCaptureAudio.kt", "MixedCaptureController.kt", "CaptureEditorSession.kt", "LocalOriginalSearchController.kt", "LocalOriginalSearchMatcher.kt", "RecordPackageController.kt", "RecordPackageIo.kt", "RecycleBinController.kt", "OriginalExportController.kt", "OriginalExportIo.kt", "ManualTaskController.kt", "ManualTagController.kt", "RecordFavoriteController.kt", "LocalRecordsViewModel.kt", "OriginalEditUiState.kt", "OriginalHistoryUiState.kt",
         "LocalAttachmentController.kt", "PngPayloadValidator.kt", "JpegPayloadValidator.kt",

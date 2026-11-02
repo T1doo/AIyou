@@ -47,6 +47,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/ControlledCaptureAudio.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalReadingLocation.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalAudioController.kt")
+    from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalAudioPresentation.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/OriginalAudioOutput.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/ManualTagController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/ManualPeopleController.kt")

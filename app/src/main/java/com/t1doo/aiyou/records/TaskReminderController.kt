@@ -77,8 +77,9 @@ class TaskReminderController internal constructor(private val current: () -> Loc
         catch (_: IllegalArgumentException) { update { it.copy(error = "时间或待办版本已变化，请重新读取后确认。") }; return }
         submit(ReminderSubmission(session, request))
     }
+    /** Dismiss the view while its exact accepted submission continues on the records lane. */
     fun close(session: Long) {
-        update { if (it.editor?.session == session && !it.busy) it.copy(editor = null) else it }
+        update { if (it.editor?.session == session) it.copy(editor = null) else it }
     }
     fun mayRequestCapability(session:Long):Boolean {
         val local=current();val state=local.reminders

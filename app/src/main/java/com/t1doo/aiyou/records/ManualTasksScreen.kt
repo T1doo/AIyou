@@ -155,6 +155,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                                 enabled=canChoose && tasks.items.any{it==expected},
                                 modifier=Modifier.heightIn(min=48.dp).testTag("manual-task-undo-complete")) { Text("撤销刚才的完成") }
                         }
+                        if(local.reminders.busy) Text("正在保存或核对提醒计划…可以继续浏览。",Modifier.testTag("reminder-pending-status"),style=MaterialTheme.typography.bodySmall)
                         local.reminders.notice?.takeIf { available }?.let { Text(it) }
                         local.reminders.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                         if (local.reminders.supported && local.reminders.error != null) TextButton(enabled = available && !local.reminders.busy,

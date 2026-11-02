@@ -66,7 +66,7 @@
 - 真机、TalkBack、真实中文IME、连续动效、D08/设备/OCR/ASR/联网均未验。
 - 自建集合持久模型是文档明确另列新增范围，不能伪造数量、封面或可用性。
 
-## 已落地的源码（908ad00 已编译/lint/定向回归；新像素仍待复验）
+## 基础版本源码（908ad00 已编译/lint/定向回归；后续本地改进见末节）
 
 - 全局语义浅色、字号/密度与平面内容行，保留真正浮层的12–16dp层级；对比契约5/5通过。
 - 此刻底部单实例轻输入，展开编辑不替换controller或字段；高级附件/策略/取消/UNKNOWN入口集中在一份面板。
@@ -188,3 +188,18 @@ APK本地：/workspace/aiyou-ci-evidence/latest/unpacked/app/build/outputs/apk/d
 原累计17次/7h16m33 + run5零job的1条记录 + run6的674秒 = **19次/7h27m47（26867秒）**。窗口已消费，不再自动执行，原其它CI/storage冻结保持。实际记录见docs/evidence/frontend-day-run6-20261102.json及原ci-ledger，未以新任务归零。
 
 剩余验收：新同视口截图及逐像素复验、全页面全状态交互、真实IME/最大字号/TalkBack/手势/焦点/设备动效。源码编译与定向协议通过不替代这些；cf54截图也不认证908ad00。自建集合模型、录音/ASR/OCR和新增联网仍不在本次已开启功能内。
+
+## 继续改进：播放播报与提醒返回（新源码仅本地验证）
+
+本轮基线d05d988/实际产品源908ad00，起始工作树干净且远端一致。先核原累计19次/7h27m47、四artifact 76,949,894 B/7天及CI/cache/artifact冻结；无新的CI、下载、费用准入或权限变动。已批准DOCX hash仍1c097a61…，本轮按文档的播放可达性与忙对象/返回约定作源码复核，未凭旧图片猜测新外观。
+
+确定修复两项：
+
+- 原音：原OriginalAudioStatus把每约10ms更新的playedMillis置于整块liveRegion中。现用OriginalAudioPresentation把阶段/错误与进度分开；仅稳定状态Text为polite liveRegion，进度可读但不主动播报，整秒显示，Flow distinct避免PCM tick反复刷新同一呈现。毫秒以下片段明确保留实际不足1毫秒，保留同一次停止/释放待核对入口。播放器认证、PCM时间、输出、释放协议均未改。
+- 提醒：原关闭按钮及TaskReminderController.close在busy时都拒绝关闭，慢提交会把阅读/返回困在模态窗。现按确切editor.session只移除编辑面板，保留pending、generation、原请求对象/UUID及队列。列表继续显示提醒忙状态，未知结果仍走原同意图重试；不取消已接纳的提交、不重开已关闭面板、不扩大系统权限或调度资格。
+
+复核了长中文/大字窄屏、触摸目标、主题对比、减少动态和恢复边界；两处新文案均可换行，没有新增固定高/单行截断，动作保持48dp。恢复候选被排除：输入后Undo会推进草稿版本，严格空目标只接受version1默认空槽，不能凭同ID设想清空历史或扩大恢复范围。认可布局、颜色、陪伴动效和既有业务协议不作无证据重改。
+
+本地离线定向测试：OriginalAudioPresentationTest 3、OriginalAudioControllerTest 14、TaskReminderControllerTest 17，共3套件34项，0失败/错误/跳过。新增性质验证101个10ms进度tick只产生两次整秒呈现、阶段/释放错误仍可播报；真实SQL/加密controller验证排队和commit期间关闭保留原请求、未知读回后重试同一对象、不复制调度/不重开editor。既有音频认证/释放测试全组通过。独立只读审查复核源码和现有XML，未见确定P1/P2。Kotlin PSI仅语法检查7文件0错误；证据hash见docs/evidence/frontend-detail-review-20261102.json。
+
+本轮未运行Android编译/lint/Compose/截图/真实音频或TalkBack验收；最新原生195项通过只覆盖908ad00，不认证本轮后续UI接线。实际键盘/焦点、最大字号/窄视口、TalkBack和设备仍待验，不复用cf54图作新证据。所有本地主机耗时不加入GitHub job账，累计仍19次/7h27m47。工作流/准入与artifact/cache上传继续冻结，产品不合main。
