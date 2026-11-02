@@ -15,8 +15,6 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.distinctUntilChanged
 
 private class WavePickerHandle { var launcher:ActivityResultLauncher<Intent>?=null }
 
@@ -50,12 +48,14 @@ fun WaveFilePicker(audio:ControlledCaptureAudio,ui:CaptureAudioUi,canLaunch:Bool
 }
 
 @Composable
-fun OriginalAudioStatus(controller:OriginalAudioController,modifier:Modifier=Modifier) {
+fun OriginalAudioStatus(controller:OriginalAudioController,modifier:Modifier=Modifier)=key(controller) {
     // PCM ownership can advance every 10 ms; present only meaningful second/phase changes.
-    val presentation by remember(controller) {
-        controller.state.map(::originalAudioPresentation).distinctUntilChanged()
-    }.collectAsState(initial=originalAudioPresentation(controller.state.value))
-    if(!presentation.visible)return
+    // Key the subscription and its derived state together when the resource owner changes.
+    val playback=controller.state.collectAsState()
+    val presentation by remember {
+        derivedStateOf(structuralEqualityPolicy()) { originalAudioPresentation(playback.value) }
+    }
+    if(!presentation.visible)return@key
     Column(modifier.fillMaxWidth().padding(8.dp).testTag("audio-playback-status")) {
         Text(presentation.announcement,Modifier.testTag("audio-playback-announcement")
             .semantics {liveRegion=LiveRegionMode.Polite})

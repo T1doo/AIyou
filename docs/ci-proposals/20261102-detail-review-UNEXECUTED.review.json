@@ -1,0 +1,48 @@
+{
+  "source_sha": "ae6669c633d7cbc255e95fb4da6b7ed8fb245e86",
+  "actual_workflow_unchanged_sha256": "596e6a974151dfeb830ffa05b734d51af8d3d43b34a5c362ad92d78e3801656b",
+  "candidate_sha256": "93f7811110d4d0071aefecdf65293d3f988c8236fa33ebd5517cad6c8e38525d",
+  "patch_sha256": "53d342db70dfbdb508192ace598fcf2896748df0324c6340164dddd0ecc47c67",
+  "proposed_run_number": 7,
+  "attempt": 1,
+  "candidate_applied": false,
+  "ci_started": false,
+  "new_inputs_or_actions": false,
+  "host_selector_count": 14,
+  "expected_suites": 28,
+  "expected_tests": 229,
+  "expected_xml": {
+    "domain": {
+      "suites": 12,
+      "tests": 78
+    },
+    "host": {
+      "suites": 14,
+      "tests": 139
+    },
+    "android_targeted": {
+      "suites": 2,
+      "tests": 12
+    }
+  },
+  "cumulative_before": {
+    "runs": 19,
+    "seconds": 26867
+  },
+  "one_proposed_job_max_minutes": 20,
+  "config_limit_projection_only": {
+    "runs": 20,
+    "seconds": 28067
+  },
+  "review": "local YAML/context/Python syntax/static scope checks only; not a CI execution or platform acceptance",
+  "snapshot_phase": "preapproval only; original candidate_applied/ci_started fields describe that time",
+  "later_execution": {
+    "run_id": 41452461459,
+    "workflow_execution_sha": "a828cf5554f347b4a6032b17de08521638f0ac5b",
+    "run_number": 7,
+    "attempt": 1,
+    "conclusion": "failure: StateFlowValueCalledInComposition at OriginalAudioScreen.kt:57",
+    "admission_consumed": true,
+    "evidence": "../evidence/frontend-day-run7-20261102.json"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "source_parent": "a828cf5554f347b4a6032b17de08521638f0ac5b",
+  "product_file": "app/src/main/java/com/t1doo/aiyou/records/OriginalAudioScreen.kt",
+  "product_sha256": "78e9fa1b96af63a67d184ee362bfcae06243fa1b20bb5e1ee15e530712e89f4c",
+  "fix": "key(controller) scopes StateFlow.collectAsState subscription and structurally equal derived Compose State; no direct StateFlow.value read during composition, suppress, or lint config change",
+  "independent_review": "existing authorized readonly reviewer inspected actual diff; no definite P1/P2; collector/owner/equality and unchanged stop/liveRegion/reminder paths reviewed; not Android execution",
+  "command": "timeout --signal=TERM --kill-after=10s 120s python3 scripts/jvm-gradle.py -p checks/ai-protocol :remote-text:test --tests '*OriginalAudioPresentationTest' --tests '*OriginalAudioControllerTest' --tests '*TaskReminderControllerTest' --rerun --offline --max-workers=2",
+  "test_task_executed": true,
+  "gradle_summary": "BUILD SUCCESSFUL in 11s; :remote-text:test executed, 12 prerequisite tasks up-to-date",
+  "preceding_check": "same selectors without --rerun returned UP-TO-DATE; not reported as fresh test execution",
+  "suites": [
+    {
+      "suite": "com.t1doo.aiyou.records.OriginalAudioControllerTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "75cf8436d4917fa0ce3f728ba76fb96d051fe3a2270701f91ca40a4835d75f47"
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.OriginalAudioPresentationTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "cf3842a7e445bbd2d718408f4c60be40dcc35a4ff25738f721729ac56e6d2fe5"
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.TaskReminderControllerTest",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "6a63e555e8a3a7d42543a97d8413a94998c348224a6fa262498b6f65fed541a8"
+    }
+  ],
+  "total_tests": 34,
+  "kotlin_syntax_only": {
+    "files": 1,
+    "parse_errors": 0,
+    "android_type_or_compose_validation": false
+  },
+  "new_android_compile_or_lint": false,
+  "new_ci": false,
+  "new_downloads": false,
+  "new_permissions": false,
+  "artifact_or_cache_upload": false,
+  "native_audio_TalkBack_or_device": false,
+  "cumulative_ci": {
+    "runs": 20,
+    "seconds": 27345
+  },
+  "run7_expected_229_actual_xml": "not retrieved; final report skipped; no domain count inferred"
+}

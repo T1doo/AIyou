@@ -203,3 +203,14 @@ APK本地：/workspace/aiyou-ci-evidence/latest/unpacked/app/build/outputs/apk/d
 本地离线定向测试：OriginalAudioPresentationTest 3、OriginalAudioControllerTest 14、TaskReminderControllerTest 17，共3套件34项，0失败/错误/跳过。新增性质验证101个10ms进度tick只产生两次整秒呈现、阶段/释放错误仍可播报；真实SQL/加密controller验证排队和commit期间关闭保留原请求、未知读回后重试同一对象、不复制调度/不重开editor。既有音频认证/释放测试全组通过。独立只读审查复核源码和现有XML，未见确定P1/P2。Kotlin PSI仅语法检查7文件0错误；证据hash见docs/evidence/frontend-detail-review-20261102.json。
 
 本轮未运行Android编译/lint/Compose/截图/真实音频或TalkBack验收；最新原生195项通过只覆盖908ad00，不认证本轮后续UI接线。实际键盘/焦点、最大字号/窄视口、TalkBack和设备仍待验，不复用cf54图作新证据。所有本地主机耗时不加入GitHub job账，累计仍19次/7h27m47。工作流/准入与artifact/cache上传继续冻结，产品不合main。
+
+
+## run7失败与Compose状态读取修复
+
+精确run7/attempt1 [41452461459](https://github.com/T1doo/AIyou/actions/runs/41452461459)已执行：workflow SHA `a828cf5554f347b4a6032b17de08521638f0ac5b`，实际源码 `ae6669c633d7cbc255e95fb4da6b7ed8fb245e86`。公开性/SDK已有许可/token/schema基线预检通过，Python token契约实际5项通过。checkDebugAarMetadata、compileDebugKotlin、assembleDebug已完成，domain:test任务无失败但未读回XML；lintDebug在OriginalAudioScreen.kt:57报StateFlowValueCalledInComposition（1错误）。后续host139、app12、XML汇总、schema后复核及APK权限检查均未执行；229/28只是预计，不能写为实际通过，也不借旧195认证本轮。
+
+标准ubuntu-24.04单job实际13:22:50Z–13:30:48Z，共478秒（7m58）。原19次26867秒追加为20次27345秒（7h35m45），未归零。artifact API为0项，无cache action/scan/package发布或实际上传动作；平台启动头Cache mode: write是能力元数据，不代表已实际上传。普通日志/状态由平台保存，已有76,949,894B/7天工件未动，账户存储费用未知。run7已消费，没有重跑或run8执行授权。证据与原账见frontend-day-run7-20261102.json、frontend-day-ci-ledger-20261102.json。
+
+父授权继续最小源码修复后，OriginalAudioStatus按key(controller)同时隔离collectAsState订阅及派生状态。StateFlow初值由正式collectAsState取得；derivedStateOf(structuralEqualityPolicy())仅读Compose State，保留投影的结构相等比较，10ms PCM状态改变但整秒/phase/error未变时不传播到UI。组合退出取消收集，owner替换不复用旧订阅/派生闭包。未改投影文案、polite liveRegion、进度、48dp stop/UNKNOWN核对或提醒协议；无suppress、lint baseline或关闭检查。
+
+已授权只读独审检查实际最小diff，未见确定P1/P2。既有三类主机测试先命中缓存，随后仅test task带--rerun在离线120秒上限内实际执行：音频呈现3、实际音频controller14、实际提醒controller17，共3套件34项，0失败/错误/跳过，11秒。1个Kotlin文件PSI语法检查0错误。详见frontend-audio-state-fix-20261102.json。Host与PSI不能证明Compose类型/lint、设备或TalkBack通过；新源码Android验证仍待新的精确方案批准，未触发run8。
