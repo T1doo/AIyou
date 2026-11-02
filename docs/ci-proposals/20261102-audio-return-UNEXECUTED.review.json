@@ -1,0 +1,50 @@
+{
+  "source_sha": "2abfc619ea43e37b93006ba1f90871d50aa6d084",
+  "actual_workflow_unchanged_sha256": "8ee0525a76a9e1b2868c4d66fc82032c6eb3f65ce5c06ece011de97475283a45",
+  "candidate_sha256": "2f9805fa8fe0b5703d50c2ded46dc2164db218dd3697aadc62fe86bbd9808667",
+  "patch_sha256": "50d5a72e2bd215c44d27a482e1a00535c79b6a132f92ed10d66c6502ce31762c",
+  "proposed_run_number": 9,
+  "attempt": 1,
+  "unique_message": "[frontend-once-no-upload-audio-return] 2abfc619ea43e37b93006ba1f90871d50aa6d084",
+  "candidate_applied": false,
+  "ci_started": false,
+  "scope": "compile/DEX/APK/lint/schema/permissions plus mandatory domain tests and token contracts only; not full targeted 229 regression",
+  "scope_reduction": "omit host139 and Android-targeted12 steps; no remaining assertion weakened, lint/build unchanged; full regression still not certified",
+  "expected_suites": 12,
+  "expected_tests": 78,
+  "expected_xml": {
+    "domain": {
+      "suites": 12,
+      "tests": 78
+    }
+  },
+  "python_token_contracts_expected": 5,
+  "cumulative_before": {
+    "runs": 21,
+    "seconds": 27615
+  },
+  "one_proposed_job_max_minutes": 20,
+  "config_limit_projection_only": {
+    "runs": 22,
+    "seconds": 28815
+  },
+  "static_checks": [
+    "YAML trigger/runner/permissions/pins/SDK and execution-scope structure",
+    "embedded Python compile",
+    "git apply --check"
+  ],
+  "review": "local static plan only; no Android build, CI, platform acceptance, or source success claim",
+  "snapshot_phase": "preapproval only; original candidate_applied/ci_started describe preparation time",
+  "later_execution": {
+    "run_id": 41458718832,
+    "workflow_execution_sha": "aec49fe3fad7d0b71f281cd99f01a8a63acf6837",
+    "compiled_source_sha": "2abfc619ea43e37b93006ba1f90871d50aa6d084",
+    "workflow_run_number": 9,
+    "run_attempt": 1,
+    "job_seconds": 527,
+    "run_conclusion": "success",
+    "scope": "minimal compile/DEX/APK/lint/schema/permissions/domain chain; not full targeted 229 regression",
+    "admission_consumed": true,
+    "evidence": "../evidence/frontend-day-run9-20261102.json"
+  }
+}

@@ -1,0 +1,138 @@
+{
+  "run_id": 41458718832,
+  "run_url": "https://github.com/T1doo/AIyou/actions/runs/41458718832",
+  "workflow_run_number": 9,
+  "run_attempt": 1,
+  "workflow_execution_sha": "aec49fe3fad7d0b71f281cd99f01a8a63acf6837",
+  "compiled_source_sha": "2abfc619ea43e37b93006ba1f90871d50aa6d084",
+  "approved_patch_sha256": "50d5a72e2bd215c44d27a482e1a00535c79b6a132f92ed10d66c6502ce31762c",
+  "workflow_sha256": "2f9805fa8fe0b5703d50c2ded46dc2164db218dd3697aadc62fe86bbd9808667",
+  "scope": "minimal compile/DEX/APK/lint/schema/permissions/domain chain; not full targeted 229 regression",
+  "run_conclusion": "success",
+  "job_id": 125321960352,
+  "started_at": "2026-11-02T14:05:59Z",
+  "completed_at": "2026-11-02T14:14:46Z",
+  "job_seconds": 527,
+  "runner_name": "GitHub Actions 1000001372",
+  "labels": [
+    "ubuntu-24.04"
+  ],
+  "xml_counts": [
+    {
+      "group": "domain",
+      "suites": 12,
+      "tests": 78,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "junit_total": 78,
+  "python_token_contracts": {
+    "tests": 5,
+    "result": "PASS"
+  },
+  "permissions": {
+    "status": "PASS",
+    "source_sha": "2abfc619ea43e37b93006ba1f90871d50aa6d084",
+    "app_apk": "app/build/outputs/apk/debug/app-debug.apk",
+    "bytes": 29068330,
+    "sha256": "c784d533cea655b50e94091b1c83621ecab35527f02f0ff2803f0966af1006c3",
+    "permissions": [
+      "android.permission.POST_NOTIFICATIONS",
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+      "android.permission.SCHEDULE_EXACT_ALARM",
+      "com.t1doo.aiyou.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+    ],
+    "internet_permission": false,
+    "source_internet_remove_marker": true,
+    "aapt2": "/usr/local/lib/android/sdk/build-tools/36.0.0/aapt2",
+    "scope": "compiled APK manifest only; device execution NOT RUN"
+  },
+  "artifact_count": 0,
+  "artifact_upload": false,
+  "cache_action_configured": false,
+  "remote_cache_upload_observed": false,
+  "platform_runner_header": "Cache mode: write (capability metadata; not evidence of an executed cache upload)",
+  "publication": false,
+  "github_token_permissions": {
+    "contents": "read",
+    "metadata": "read"
+  },
+  "stages": {
+    "public_source_sdk_tokens_schema_preflight": "PASS",
+    "checkDebugAarMetadata": "PASS",
+    "compileDebugKotlin": "PASS",
+    "dexBuilderDebug": "PASS",
+    "assembleDebug": "PASS",
+    "domain_test_and_actual_xml": "PASS: 12 suites / 78 tests / 0 failure,error,skip",
+    "lintDebug": "PASS",
+    "post_build_schema_verification": "PASS",
+    "compiled_apk_permission_check": "PASS; no INTERNET",
+    "source_diff_check": "PASS",
+    "host_139_tests": "NOT RUN (excluded from approved minimal scope)",
+    "android_targeted_12_tests": "NOT RUN (excluded from approved minimal scope)"
+  },
+  "regression_boundary": "Run7 StateFlow lint issue and run8 DEX failure no longer reproduce on this compiled source; exact original compiler lowering defect not independently isolated. Previous 195 tests apply to source 908ad00; 229/28 full targeted regression has not passed on this source.",
+  "preview_rendered": false,
+  "device_run": false,
+  "TalkBack_or_IME_run": false,
+  "old_history_OOM_group_run": false,
+  "retries": 0,
+  "admission": "consumed; no automatic rerun or next run authorized",
+  "cumulative_runs": 22,
+  "cumulative_job_seconds": 28142,
+  "existing_artifacts": {
+    "bytes": 76949894,
+    "retention_days": 7,
+    "modified": false
+  },
+  "storage_scope": "APK/XML/reports stayed on temporary runner; no new artifact/cache/package upload configured or observed. Ordinary GitHub logs/status persist. Existing artifact/account storage cost unknown.",
+  "steps": [
+    {
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify public repository exact source SDK tokens and schema baseline",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Build and lint temporary native outputs only",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Report actual XML counts to ordinary job log only",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Run actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}

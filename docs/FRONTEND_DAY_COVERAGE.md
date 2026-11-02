@@ -236,3 +236,14 @@ D8正式日志将非法引用定位到OriginalAudioScreenKt.class中的$$$$$NON_
 最小修复只改OriginalAudioStatus：显式块函数内保留key(controller)，收集和structural derived原样保留，用if(presentation.visible)包围内容，去掉key内提前返回；隐藏时仍收集，换owner重新创建订阅/派生状态，退出组合取消。投影文案、liveRegion、进度、停止/UNKNOWN及提醒协议未改；无suppress或工具链/权限变化。独立只读复审未见确定P1/P2。
 
 已有3类主机测试在离线120秒范围仅重新执行test task，10秒，XML实际3套件34项0失败/错误/跳过；所有compile任务UP-TO-DATE，无新增编译，PSI现存parser仅1文件语法0错。证据见frontend-audio-return-fix-20261102.json。没有运行Android class生成、DEX、lint、设备或截图，不能宣称run8构建已修复通过。原run8失败JSON及累计账hash保持不变，仍21次27615秒；下一次精确验收方案只准备待父审，不自动run9。
+
+
+## run9最小编译链通过：2abfc61
+
+父独审批准精确patch 50d5a72e2bd215c44d27a482e1a00535c79b6a132f92ed10d66c6502ce31762c后，仅workflow提交 `aec49fe3fad7d0b71f281cd99f01a8a63acf6837` 触发 [run9/attempt1 41458718832](https://github.com/T1doo/AIyou/actions/runs/41458718832)。执行前public、PR0、在途各0、latest8及补丁/源哈希均核对。实际checkout/编译源码 `2abfc619ea43e37b93006ba1f90871d50aa6d084`，两种SHA已从当轮日志分别读回。单job125321960352全部steps success，使用标准ubuntu-24.04。
+
+预检、已有SDK许可、5项Python token契约、metadata、Kotlin、DEX、APK、领域测试、lint、schema后复核、编译APK权限及源无差异检查均通过。实际最终XML仅domain12套件78项，0失败/错误/跳过；本轮按批准的最小编译链排除host139/app12，不称229/28整体回归通过，也不将旧195移至新源。原run7 StateFlow lint及run8 DEX失败在本源码上未再出现；具体原始compiler lowering缺陷仍未独立复现，未改原失败证据。
+
+临时runner APK实际29,068,330B，SHA256 c784d533cea655b50e94091b1c83621ecab35527f02f0ff2803f0966af1006c3。manifest检查PASS且无INTERNET，只有既有通知、开机、精确提醒及动态receiver权限。未上传/下载/发布APK，只有平台普通日志保留其hash/大小；没有新版图片、设备、IME、TalkBack、OEM提醒、真实音频或旧ShadowTrace OOM通过资格。
+
+API job起止14:05:59Z–14:14:46Z，527秒（8m47）。继承21次27615秒追加为22次28142秒（7h49m02），未重置账。正式artifact API0项，无artifact/cache action/scan/package发布或实际上传动作；Cache mode: write保留为平台能力元数据，不能据此说平台cache写权限被撤销或账户零存储费。旧76,949,894B/7天工件未动。准入已消费，未批准新CI或上传。完整结果见frontend-day-run9-20261102.json及原ci-ledger；latest_success明确标为最小编译链，原195成功的908ad00另保留为历史full-targeted身份。
