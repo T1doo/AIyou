@@ -88,6 +88,9 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
     BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.surface)) {
       val availableHeight=maxHeight
       Column(Modifier.widthIn(max=AIyouDimensions.contentMaxWidth).fillMaxSize().align(Alignment.TopCenter)) {
+        if(!focusEditor && recentIds.any {it !in seenIds}) TextButton(
+            onClick={seenIds=recentIds;scope.launch {listState.scrollToItem(0)}},
+            modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("mixed-new-records")) {Text("有新内容 · 查看今天最近记录")}
         if(!focusEditor) LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("mixed-list"),state=listState,
             contentPadding=PaddingValues(horizontal=16.dp,vertical=8.dp)) {
             item("heading") {
@@ -97,9 +100,6 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                 }
                 if(defaultPolicyUnavailable) CaptureFeedback("设置暂不可读取；新草稿暂用不参与 AI。当前草稿范围不变。",isError=true,
                     modifier=Modifier.testTag("mixed-default-policy-unavailable"))
-            }
-            if(recentIds.any {it !in seenIds}) item("new-records") {
-                TextButton(onClick={seenIds=recentIds;scope.launch {listState.scrollToItem(0)}},modifier=Modifier.heightIn(min=48.dp).testTag("mixed-new-records")) {Text("有新内容 · 查看今天最近记录")}
             }
             item("recent") {
                 Row(Modifier.fillMaxWidth().padding(top=16.dp,bottom=8.dp),verticalAlignment=Alignment.CenterVertically) {

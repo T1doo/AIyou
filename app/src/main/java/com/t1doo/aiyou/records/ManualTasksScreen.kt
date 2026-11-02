@@ -122,10 +122,10 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                             }
                             }
                             if (detailsExpanded) {
-                            if (detailsExpanded) Text("创建不会自动设置提醒", style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.testTag("manual-task-reminder-boundary"))
-                            if (detailsExpanded) Text("提醒需逐条确认，安排不等于送达。", style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.testTag("manual-task-reminder-policy"))
+                                Text("创建不会自动设置提醒", style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.testTag("manual-task-reminder-boundary"))
+                                Text("提醒需逐条确认，安排不等于送达。", style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.testTag("manual-task-reminder-policy"))
 
                                 if (countsReady) Text("未完成 ${tasks.items.count { it.status == ManualTaskStatus.OPEN }} · " +
                                     "已完成 ${tasks.items.count { it.status == ManualTaskStatus.COMPLETED }} · " +

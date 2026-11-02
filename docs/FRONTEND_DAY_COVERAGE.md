@@ -8,54 +8,54 @@
 
 | 页面组 | 实施入口（app/src/main/java/com/t1doo/aiyou/） | 全量合同 | 状态与证据 |
 |---|---|---|---|
-| 首次使用 | ui/AIyouScreens.kt | 离线入口、连接、按需权限 | 待实施/待逐项验证；既有数据合同保留 |
-| 此刻 | records/MixedCaptureScreen.kt | 轻输入、焦点态、原件、草稿、Undo、部分失败/UNKNOWN | 待实施/待逐项验证；既有数据合同保留 |
-| 回忆 | records/LocalRecordsScreen.kt | 连续列表、网格、分类查询、活动条件和锚点 | 待实施/待逐项验证；既有数据合同保留 |
-| 主动回顾 | records/FactRecapScreen.kt | 主动日/周、证据不足 | 待实施/待逐项验证；既有数据合同保留 |
-| 原记录 | records/OriginalReadingScreen.kt; records/LocalAttachmentScreen.kt | 原件优先、源版本、复制、原音 | 待实施/待逐项验证；既有数据合同保留 |
-| 编辑版本 | records/OriginalEditScreen.kt; records/OriginalHistoryScreen.kt | 版本只读、草稿、派生纠正 | 待实施/待逐项验证；既有数据合同保留 |
-| 问一问 | records/LocalEvidenceAnswerSection.kt; records/SelectedQuestionConsentSection.kt | 范围确认、停止、来源失效、无INTERNET | 待实施/待逐项验证；既有数据合同保留 |
-| 两类历史 | records/SavedQuestionsContent.kt; records/ChatHistoryContent.kt | 仅填问题、同UUID重试、历史来源重核 | 待实施/待逐项验证；既有数据合同保留 |
-| 候选 | records/LocalCandidateDialog.kt; records/SourceMemoryInboxDialog.kt | 修改/拒绝/确认独立 | 待实施/待逐项验证；既有数据合同保留 |
-| 正式待办 | records/ManualTasksScreen.kt | 分组、完成/撤销、详情、延后、提醒实际状态 | 待实施/待逐项验证；既有数据合同保留 |
-| 设置连接 | ui/SettingsScreen.kt; ui/ModelConnectionSettings.kt | 字段标签、连接资格、密钥隐藏 | 待实施/待逐项验证；既有数据合同保留 |
-| 隐私与锁 | ui/AppAccessScreen.kt; records/RecordAiSection.kt | 不扩大范围、应用锁 | 待实施/待逐项验证；既有数据合同保留 |
-| 存储与用量 | ui/StorageUsageSection.kt | 原件/派生/缓存、未知用量 | 待实施/待逐项验证；既有数据合同保留 |
-| 数据可带走 | records/OriginalExportScreen.kt; records/RecordPackageScreen.kt; records/FullBackupContent.kt | 严格空库、取消/未知、实际结果 | 待实施/待逐项验证；既有数据合同保留 |
-| 删除回收 | records/RecycleBinScreen.kt | 对象确认、失败/未知、不冒成功 | 待实施/待逐项验证；既有数据合同保留 |
-| 独立陪伴 | ui/Companion.kt; ui/UiPreferences.kt | 既有5角色、独立二级页、静态背景、减少动态/离页停止 | 待实施/待逐项验证；既有数据合同保留 |
+| 首次使用 | ui/AIyouScreens.kt | 离线入口、连接、按需权限 | 沿既有离线入口；共享语义样式已接入，未做首次安装设备验收 |
+| 此刻 | records/MixedCaptureScreen.kt | 轻输入、焦点态、原件、草稿、Undo、部分失败/UNKNOWN | 已改底部单实例输入/细记录行/高级面板；1项真实controller定向测试通过；跨模式光标/Undo未闭环 |
+| 回忆 | records/LocalRecordsScreen.kt | 连续列表、网格、分类查询、活动条件和锚点 | 细行/日期分组/图片筛选缩略已接入；普通时间线缩略、音频快捷筛选未完成；默认浏览Preview待最新复验 |
+| 主动回顾 | records/FactRecapScreen.kt | 主动日/周、证据不足 | 保留主动日/周及不足状态，沿共享样式；未逐状态跑本轮回归 |
+| 原记录 | records/OriginalReadingScreen.kt; records/LocalAttachmentScreen.kt | 原件优先、源版本、复制、原音 | 保留连续正文/原件/复制及源版本；共享样式已接入，原件全部场景未逐验 |
+| 编辑版本 | records/OriginalEditScreen.kt; records/OriginalHistoryScreen.kt | 版本只读、草稿、派生纠正 | 既有原文/派生版本与草稿接线完整保留；共享字号/色彩，未逐状态跑本轮回归 |
+| 问一问 | records/LocalEvidenceAnswerSection.kt; records/SelectedQuestionConsentSection.kt | 范围确认、停止、来源失效、无INTERNET | 细来源样式已接入；无INTERNET已核APK；未运行真实AI/联网 |
+| 两类历史 | records/SavedQuestionsContent.kt; records/ChatHistoryContent.kt | 仅填问题、同UUID重试、历史来源重核 | 已改细列表/时间/核对状态；保留同UUID和失效隐藏，旧回填OOM未重跑 |
+| 候选 | records/LocalCandidateDialog.kt; records/SourceMemoryInboxDialog.kt | 修改/拒绝/确认独立 | 共享平面建议行；确认/拒绝/修订沿原controller；未逐状态跑本轮回归 |
+| 正式待办 | records/ManualTasksScreen.kt | 分组、完成/撤销、详情、延后、提醒实际状态 | 已改复选/详情分离与连续行；分组/提醒摘要在真实Preview；完成撤销缺协议支持 |
+| 设置连接 | ui/SettingsScreen.kt; ui/ModelConnectionSettings.kt | 字段标签、连接资格、密钥隐藏 | 去大卡分组，保留字段标签/资格/隐藏密钥；偏好11项通过，未逐字段验收 |
+| 隐私与锁 | ui/AppAccessScreen.kt; records/RecordAiSection.kt | 不扩大范围、应用锁 | 所有owner/准入/范围逻辑未改；无新增权限，设备锁验收未运行 |
+| 存储与用量 | ui/StorageUsageSection.kt | 原件/派生/缓存、未知用量 | 保留分类/清理与未知边界，沿共享样式；未逐状态跑本轮回归 |
+| 数据可带走 | records/OriginalExportScreen.kt; records/RecordPackageScreen.kt; records/FullBackupContent.kt | 严格空库、取消/未知、实际结果 | 严格空库与取消/UNKNOWN协议保留，未跑D08/恢复设备演练 |
+| 删除回收 | records/RecycleBinScreen.kt | 对象确认、失败/未知、不冒成功 | 保留对象确认/恢复/永久删除及传播；未跑本轮设备删除验收 |
+| 独立陪伴 | ui/Companion.kt; ui/UiPreferences.kt | 既有5角色、独立二级页、静态背景、减少动态/离页停止 | 已改独立全屏二级场景/背景开关/v4兼容；5原PNG实看，生命周期设备验收未运行 |
 
 ## 27个迁移点
 
 | 点 | 实施位置 | 状态 |
 |---|---|---|
-| A01 | AIyouPanel/OriginalReadingScreen | 待核 |
-| A02 | tokens/LocalRecordsScreen | 待核 |
-| A03 | LocalRecordsScreen | 待核 |
-| A04 | LocalOriginalSearchSection | 待核 |
-| A05 | MixedCaptureScreen | 待核 |
-| A06 | MixedCaptureScreen | 待核 |
-| A07 | SourceCitationCard | 待核 |
-| A08 | TaskProposalCard | 待核 |
-| A09 | ManualTasksScreen | 待核 |
-| A10 | LocalAttachmentScreen | 待核 |
-| A11 | OriginalReadingScreen | 待核 |
-| A12 | StatusNotice/输入字段 | 待核 |
-| A13 | NotebookToolsPanel | 待核 |
-| A14 | CompanionEntry | 待核 |
-| A15 | tokens/NotebookChrome | 待核 |
-| A16 | FactRecapScreen | 待核 |
-| A17 | 记录菜单/侧滑 | 待核 |
-| A18 | ManualTasksScreen | 待核 |
-| A19 | 来源与详情展开 | 待核 |
-| A20 | Companion | 待核 |
-| A21 | SourceCitationCard | 待核 |
-| A22 | 候选/版本 | 待核 |
-| A23 | LocalRecordsScreen | 待核 |
-| A24 | Companion静态远景 | 待核 |
-| A25 | Companion减少动态 | 待核 |
-| A26 | DestinationIcon/AttachmentIcon | 待核 |
-| A27 | tokens/OriginalReadingScreen | 待核 |
+| A01 | AIyouPanel/OriginalReadingScreen | 平面阅读面已接入；长原件未逐验 |
+| A02 | tokens/LocalRecordsScreen | 暖桃/强封面已退出；普通列表缩略待补 |
+| A03 | LocalRecordsScreen | 沿真实收藏/标签/月查询；自建集合模型未新增 |
+| A04 | LocalOriginalSearchSection | 查询与筛选控件去卡；活动状态/锚点逻辑保留，未逐验 |
+| A05 | MixedCaptureScreen | 文字入口/轻输入已改；跨模式光标/Undo待补 |
+| A06 | MixedCaptureScreen | 焦点展开与同意图失败重试定向通过；UNKNOWN全状态未验 |
+| A07 | SourceCitationCard | 细引用线已改，来源版本接线保留；全往返未验 |
+| A08 | TaskProposalCard | 共享平面建议行已改，确认协议保留；未逐验 |
+| A09 | ManualTasksScreen | 连续任务/独立复选与详情已改；完成撤销待协议 |
+| A10 | LocalAttachmentScreen | 原音/派生原协议保留；未验设备播放/中断 |
+| A11 | OriginalReadingScreen | 原文/附件在前沿既有实现；未逐验 |
+| A12 | StatusNotice/输入字段 | 共享局部状态与字号已改，异常状态全量未验 |
+| A13 | NotebookToolsPanel | 仅必要浮层保留边界；焦点/手势未逐验 |
+| A14 | CompanionEntry | 48dp小入口与单次反馈沿原协议，未验设备 |
+| A15 | tokens/NotebookChrome | 浅色/单蓝动作/纯底已接入，静态对比5项通过 |
+| A16 | FactRecapScreen | 系统字体/主动回顾沿现有实现；无新手写字体 |
+| A17 | 记录菜单/侧滑 | 未实现记录侧滑窄操作区，普通详情入口保留 |
+| A18 | ManualTasksScreen | 真实状态驱动勾选；自定义单次勾/撤销/设备节奏未完成 |
+| A19 | 来源与详情展开 | 待办原位详情已接入；局部展开节奏未设备验收 |
+| A20 | Companion | 既有5角色实看复用，独立静态场景已改；生命周期实测未验 |
+| A21 | SourceCitationCard | 引用入口/来源版本沿原协议，细行已改；未逐验 |
+| A22 | 候选/版本 | 用户修订/旧来源状态沿原协议，未逐验 |
+| A23 | LocalRecordsScreen | 无叠纸/封面墙，真实查询入口保留；自建集合未新增 |
+| A24 | Companion静态远景 | 原创静态Canvas仅陪伴二级页，未引入光团/纹理 |
+| A25 | Companion减少动态 | 减少动态/后台停止沿原interaction，不启动循环背景；未设备验收 |
+| A26 | DestinationIcon/AttachmentIcon | 既有线性Canvas图标22dp/触区48dp；未TalkBack逐控件验收 |
+| A27 | tokens/OriginalReadingScreen | 正文16/26、标题24/32、元信息13/20；长文全量未验 |
 
 ## 验收边界
 
@@ -92,3 +92,24 @@
 - job10m54s；累计15次 / 6h57m12。无旧OOM组、设备、D08或联网运行。
 - 实看全部12张PNG，确认此刻已移除大封面/卡片/浮动选中底纹；发现回忆/待办重复页标题与过长任务元信息，继续做像素驱动修正。
 - 首轮回忆Preview冻结在Main异步查找的WAITING，而非默认BROWSE；修正fixture为直接给真实LocalRecordsScreen提供显式BROWSE快照。前后都使用同一fixture，不能把这幅图称为搜索/导航已验。
+
+## 组件、状态、主题、动效核对
+
+| 组件 | 实施文件 | 必须保留的状态/行为 | 本轮证据边界 |
+|---|---|---|---|
+| 语义样式 | design/tokens.json、AIyouTheme.kt | 浅色、系统中文字体、大字、对比 | 5项token契约PASS；全页面可访问性未签收 |
+| 记录输入 | MixedCaptureScreen.kt | 读取、空、编辑、焦点、附件、提交、失败、部分失败、UNKNOWN、取消 | 焦点/失败同意图重试1项PASS；其余需逐状态验证 |
+| 记录行与缩略 | Components.kt、RecordThumbnail.kt、LocalRecordsScreen.kt | 原文摘录、日期、当前版图片/坏图、列表锚点 | 原生静态Preview；图片读取复用原认证路径，普通列表缩略未补 |
+| 搜索字段 | LocalOriginalSearchSection.kt | query与活动条件、索引错误、Undo、展开/关闭 | caller状态/owner未改；真实IME和滚动回归未验 |
+| 引用 | SourceCitationCard、ChatHistoryContent.kt | 编号/日期/版本/短摘录/回跳、失效隐藏 | 呈现与旧协议保留，实际AI未执行 |
+| 候选与正式任务 | TaskProposalCard、ManualTasksScreen.kt | 确认/拒绝/修改独立；勾选与详情两个48dp目标 | 静态Preview及领域合同；撤销协议未补 |
+| 提醒元信息 | TaskReminderDialog.kt | 精确/大约、通知拒绝、调度失败、结果未知 | 短摘要保留真实语义；完整值在详情；未设备验收 |
+| 设置字段与偏好 | SettingsScreen.kt、UiPreferences.kt | 标签/帮助/错误、隐藏密钥、读取失败、ACK未知 | v1–v3兼容与v4往返11项PASS；不改Room或发送范围 |
+| 普通内容/局部错误 | AIyouPanel.kt、StatusNotice、CaptureFeedback | 读/空/忙/失败/UNKNOWN分别表达 | 纯底与细分隔，真实状态来源不变；无虚构百分比 |
+| 菜单与浮层 | 既有Dialogs/NotebookToolsPanel | 取消/返回/确认/焦点/忙对象 | 使用平台边界；完整焦点与TalkBack未验 |
+| 底导航 | NotebookChrome.kt | 全宽、中文标签、selected语义、48dp触区 | 取消胶囊选中底、按压缩放；静态Preview |
+| 独立陪伴 | Companion.kt、CompanionInteraction.kt | 5既有身份、一次回应、离页/后台/减少动态、关闭 | 原创静态远景、原PNG未改；不读取记录；真实生命周期未验 |
+
+主题只采用本次批准的完整浅色语义体系；未增加暗色/极光/纸纹分支。动效以原位真实状态和既有有限回应为准，140–200ms拟定节奏未冒充设备实测。
+
+第16次 `41414387198` / `e888efe62184a483666b31f998ced3b34aefd22f`：APK/领域编译成功，lint在ManualTasksScreen.kt:130报告SuspiciousIndentation，未进入后续Preview。已移除外层if内重复if并校正缩进，不关lint、不加baseline。job7m41s，累计16次 / 7h04m53。源审另补回列表外“有新内容”提示，避免滚动时提示不可见；保留主动点按回顶。下一轮仅核这些实际修正。
