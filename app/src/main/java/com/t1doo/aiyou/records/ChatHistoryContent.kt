@@ -15,6 +15,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
@@ -25,7 +29,9 @@ import com.t1doo.aiyou.model.ChatMessageState
 
 /** Reads only repository-authenticated history; no implicit resend or memory conversion. */
 @Composable internal fun ChatHistoryContent(u:ChatHistoryUi,c:ChatHistoryController,
-    canUseQuestion:Boolean=false,beforeDelete:()->Unit={}) {
+    canUseQuestion:Boolean=false,beforeDelete:()->Unit={},canCopy:()->Boolean={false}) {
+    val context=LocalContext.current
+    LaunchedEffect(u.answerCopy) {u.answerCopy?.let {token->c.consumeAnswerCopy(u,token,canCopy){text->copySensitiveText(context,"AIyou回答",text)}}}
     Dialog(onDismissRequest={c.close(u)}) {
         Surface(shape=MaterialTheme.shapes.large) {
             Column(Modifier.widthIn(max=560.dp).fillMaxWidth().verticalScroll(rememberScrollState())
@@ -67,13 +73,15 @@ import com.t1doo.aiyou.model.ChatMessageState
                         Text("当时的模型回答（不等同事实）",Modifier.semantics{heading()})
                         if(reply.noEvidence)Text("当时未获得有依据的回答。")
                         for((i,p) in reply.paragraphs.withIndex()) {
-                            SelectionContainer {Text(p.text,Modifier.fillMaxWidth().testTag("chat-history-answer-$i"))}
+                            Text(p.text,Modifier.fillMaxWidth().testTag("chat-history-answer-$i"))
                         }
+                        if(!reply.noEvidence && reply.paragraphs.isNotEmpty()) TextButton(onClick={c.copyAnswer(u)},enabled=enabled,
+                            modifier=Modifier.heightIn(min=48.dp).testTag("chat-history-copy-answer")) {Text("复制回答与出处")}
                         for((i,citation) in checkNotNull(u.view).citations.withIndex()) {
                             val r=citation.reference
                             Text("[${i+1}] 记录时间："+java.time.Instant.ofEpochMilli(citation.capturedAtMillis).atZone(java.time.ZoneId.of(citation.captureTimeZone)).toString()+
                                 "；来源版本 "+r.source.revision,Modifier.fillMaxWidth())
-                            SelectionContainer {Text(r.quote,Modifier.fillMaxWidth())}
+                            Text(r.quote,Modifier.fillMaxWidth())
                             TextButton(onClick={c.openSource(u,r)},enabled=enabled&&reply.paragraphs.any{r in it.references},
                                 modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("chat-history-source-$i")){Text("查看此出处原文")}
                         }
@@ -83,6 +91,7 @@ import com.t1doo.aiyou.model.ChatMessageState
                     TextButton(onClick={c.reviewDelete(u)},enabled=enabled,
                         modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("chat-history-delete")){Text("删除这条本机历史")}
                 }
+                u.copyNotice?.let {Text(it,Modifier.fillMaxWidth().testTag("chat-history-copy-notice").semantics{liveRegion=LiveRegionMode.Polite})}
                 if(u.confirmation!=null) {
                     Text("确认删除问题与回答？不可撤销；已有备份和曾发送到服务端的内容不会被收回。")
                     Button(onClick={c.confirmDelete(u,beforeDelete)},enabled=!u.busy,

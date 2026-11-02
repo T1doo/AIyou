@@ -53,7 +53,7 @@ val syncProduction = tasks.register<Sync>("syncProduction") {
     from("../../app/src/main/java/com/t1doo/aiyou/records/ModelConnectionsController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/LocalConnectionSecretResolver.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/ProductionRecordAi.kt")
-    listOf("ProductionQuestions.kt","SelectedQuestionConsentController.kt","LocalEvidenceController.kt","LocalEvidenceSelection.kt").forEach {
+    listOf("AnswerCopy.kt","ProductionQuestions.kt","SelectedQuestionConsentController.kt","LocalEvidenceController.kt","LocalEvidenceSelection.kt").forEach {
         from("../../app/src/main/java/com/t1doo/aiyou/records/$it")
     }
     from("../../app/src/main/java/com/t1doo/aiyou/records/RecordFavoriteController.kt")

@@ -4,6 +4,16 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -89,13 +99,21 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     var filtersExpanded by remember(query, from, through) { mutableStateOf(false) }
     val personInput = remember(query, person) { TextFieldState(person.orEmpty()) }
     val personInvalid = remember(query, person) { mutableStateOf(false) }
-    val keepFiltersVisible = from.text.isNotEmpty() || through.text.isNotEmpty() ||
-        mode != OriginalSearchMode.KEYWORDS || dateBasis != com.t1doo.aiyou.model.RecordDateBasis.CAPTURED ||
-        tag != null || person != null || (onCategory==null && (onlyFavorites || onlyImages || onlyAudio)) || !enabled || searchNeedsAttention ||
-        tagsError != null || (indexSupported && (indexBusy || indexError != null)) ||
-        (favoritesSupported && (favoritesLoading || !favoritesAvailable || favoritesError != null)) ||
-        (peopleSupported && (!peopleAvailable || peopleError != null || personInput.text.isNotEmpty() || personInvalid.value))
-    val showFilters = filtersExpanded || keepFiltersVisible
+    val filterFocus=remember(query,from,through) {FocusRequester()}
+    val keyboard=LocalSoftwareKeyboardController.current
+    var returnFilterFocus by remember(query,from,through) {mutableStateOf(false)}
+    fun closeFilters() {filtersExpanded=false;keyboard?.hide();returnFilterFocus=true}
+    LaunchedEffect(filtersExpanded,returnFilterFocus) {
+        if(!filtersExpanded && returnFilterFocus) {withFrameNanos {};filterFocus.requestFocus();returnFilterFocus=false}
+    }
+    val activeFilters=buildList {
+        if(dateBasis==com.t1doo.aiyou.model.RecordDateBasis.EVENT) add("事件日期")
+        if(from.text.isNotEmpty() || through.text.isNotEmpty()) add("${from.text.ifEmpty { "不限开始" }} 至 ${through.text.ifEmpty { "不限结束" }}")
+        tag?.let {add("标签：$it")};person?.let {add("人物：$it")}
+        if(onCategory==null) {if(onlyFavorites)add("收藏");if(onlyImages)add("图片");if(onlyAudio)add("音频")}
+    }
+    val filterErrors=listOfNotNull(tagsError,indexError,favoritesError,peopleError,
+        eventDatesError.takeIf {dateBasis==com.t1doo.aiyou.model.RecordDateBasis.EVENT&&!eventDatesAvailable}).distinct()
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
             fun transform(state: TextFieldState, maximum: Int) =
                 InputTransformation.maxLength(maximum).then {
@@ -157,24 +175,22 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 }
             }
         }
-        Surface(color = AIyouColors.surface) {
-          Column(Modifier.fillMaxWidth(),
-              verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-            TextButton(onClick = { filtersExpanded = !filtersExpanded }, enabled = enabled && !keepFiltersVisible,
-                modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget)
-                    .aiyouFocusOutline().testTag("original-search-filters")
-                    .semantics { stateDescription = if (showFilters) "已展开" else "已收起" }) {
-                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                    Text("筛选与范围", modifier = Modifier.width(IntrinsicSize.Max).semantics { heading() },
-                        style = MaterialTheme.typography.titleMedium, color = AIyouColors.primary)
-                    Text(if (keepFiltersVisible) "已展开" else if (showFilters) "收起" else "展开",
-                        modifier = Modifier.width(IntrinsicSize.Max),
-                        style = MaterialTheme.typography.titleMedium, color = AIyouColors.primary)
-                }
-            }
-            if (!showFilters) Text("日期 · 人物 · 标签", style = MaterialTheme.typography.bodySmall,
-                color = AIyouColors.textSecondary)
-            if (showFilters) {
+        TextButton(onClick={filtersExpanded=true},
+            modifier=Modifier.fillMaxWidth().heightIn(min=AIyouDimensions.minTouchTarget).focusRequester(filterFocus)
+                .testTag("original-search-filters").semantics {stateDescription="打开独立筛选页"}) {
+            Text(if(activeFilters.isEmpty()) "筛选：日期 · 人物 · 标签" else "已选筛选 · ${activeFilters.size} 项",style=MaterialTheme.typography.titleMedium)
+        }
+        if(activeFilters.isNotEmpty()) Text(activeFilters.joinToString(" · "),Modifier.fillMaxWidth().testTag("original-search-active-filters"),
+            style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
+        for(error in filterErrors) Text(error,Modifier.fillMaxWidth(),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
+        if(indexBusy||favoritesLoading) Text("正在核对筛选资料…",style=MaterialTheme.typography.bodySmall)
+        if(searchNeedsAttention) Text("查找条件或本机索引待核对；可打开筛选调整，或在结果提示处重试。",style=MaterialTheme.typography.bodySmall)
+        if(filtersExpanded) Dialog(onDismissRequest=::closeFilters,properties=DialogProperties(usePlatformDefaultWidth=false)) {
+            Surface(color=AIyouColors.surface) {
+                Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(16.dp)
+                    .testTag("original-search-filter-page"),verticalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                    Text("筛选与范围",Modifier.semantics {heading()},style=MaterialTheme.typography.titleLarge)
+                    TextButton(onClick=::closeFilters,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("original-search-filter-done")) {Text("查看结果")}
             Text("关键词可在当前原文、手工标签或你为本条记录确认的别名关系中满足；精确片段只查原文。标签和别名命中只供查找，不构成原文出处。",
                 style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = { onDateBasis(if (dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED)

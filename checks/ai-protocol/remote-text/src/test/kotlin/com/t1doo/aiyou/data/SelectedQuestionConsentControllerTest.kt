@@ -16,6 +16,26 @@ import org.junit.Test
 /** Actual persistent authority and host SQLite; only synthetic records and in-memory protocol wire.
  * This is neither Android SQLCipher/device acceptance nor a provider/network test. */
 class SelectedQuestionConsentControllerTest {
+    @Test fun copyingAReadyAnswerFreshlyChecksProofAndReceiptOutsideAllLocksWithoutResending()=Harness().use {h->
+        val ready=h.execute();val jobs=h.jobs();val done=CountDownLatch(1);val copies=AtomicInteger()
+        h.ui.copyAnswer(ready) {text->
+            h.outsideLocks();assertTrue(text.startsWith("本机演练结果"));assertTrue(text.contains("[1]"))
+            copies.incrementAndGet();done.countDown()
+        }
+        gate(done);assertEquals(1,copies.get());assertEquals(jobs,h.jobs());assertEquals(1,h.wire.executions.get())
+    }
+    @Test fun pendingCopyCannotPublishAfterUiRetirementOrOwnerReplacement() {
+        for(retire in listOf(false,true)) Harness().use {h->
+            val ready=h.execute();val entered=CountDownLatch(1);val release=CountDownLatch(1);val copies=AtomicInteger()
+            h.beforeProof={entered.countDown();gate(release)}
+            h.ui.copyAnswer(ready) {copies.incrementAndGet()}
+            gate(entered)
+            if(retire)h.ui.retireUiScope() else h.currentOwner.set(null)
+            h.ui.sync();release.countDown();runBlocking {h.ui.closeAndJoin()}
+            assertEquals(0,copies.get());assertEquals(1,h.wire.executions.get())
+        }
+    }
+
     @Test fun passiveSearchViewsKeepOneConsentScopeWhileRealQuestionEditsReplaceTheReadyScope()=Harness().use {h->
         h.source.set(OriginalSearchState(OriginalSearchInput(""),OriginalSearchStage.BROWSE))
         val passive=(1..4).map{h.current()}

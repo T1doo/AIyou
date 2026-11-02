@@ -294,6 +294,26 @@ class SelectedQuestionConsentController internal constructor(
             catch (_: Exception) { invalidate(value) }
         }
     }
+    /** Same fresh source/authorization checks as source opening. Clipboard work is a UI consumer,
+     * outside SQL and all monitors, never part of a send or a durable permission. */
+    fun copyAnswer(expected:QuestionConsentState,onCopy:(String)->Unit) {
+        val value=synchronized(lock) {
+            run?.takeIf {owns(it)&&mutable.value===expected&&expected.stage==QuestionConsentStage.READY&&
+                expected.receipt===it.receipt&&it.receipt?.reply?.let {r->!r.noEvidence&&r.paragraphs.isNotEmpty()}==true}
+        } ?: return
+        scope.launch {
+            val receipt=value.receipt ?: return@launch
+            try {
+                if(!inspect(value)) {invalidate(value);return@launch}
+                if(checkNotNull(owner).checkReceipt(receipt){now(value)}!=null) {invalidate(value);return@launch}
+                withContext(uiDispatcher) {
+                    val valid=synchronized(lock) {owns(value)&&mutable.value===expected&&expected.receipt===value.receipt}
+                    if(valid) onCopy(answerCopyText(receipt.reply,if(fixture!=null) "本机演练结果 · 待核对" else "模型回答 · 内容待核对"))
+                }
+            } catch(cancelled:CancellationException) {if(isActive)invalidate(value);throw cancelled}
+            catch(_:Exception) {invalidate(value)}
+        }
+    }
     override fun close() {
         synchronized(lock) { closed = true; retireLocked(run); run = null; mutable.value = waiting; scope.cancel() }
         drain()

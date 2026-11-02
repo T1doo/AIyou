@@ -12,6 +12,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.unit.dp
 import com.t1doo.aiyou.designsystem.*
 import com.t1doo.aiyou.model.OriginalTextReference
@@ -27,10 +31,15 @@ import java.time.ZoneId
     fixture: SelectedQuestionConsentFixture?, available: Boolean, onReview: () -> Unit,
     onConfirm: (SelectedQuestionSendReview) -> Unit, onStop: () -> Unit, onWithdraw: () -> Unit,
     onOpen: (OriginalTextReference) -> Unit, remote:ProductionQuestionBinding?=null,
-    production:Boolean=false,unavailableNotice:String?=null) {
+    production:Boolean=false,unavailableNotice:String?=null,
+    onCopy:((QuestionConsentState,(String)->Unit)->Unit)?=null,canCopy:()->Boolean={false}) {
     require(fixture==null||remote==null)
     val rehearsal=fixture!=null
     if (evidence.stage != LocalEvidenceStage.READY || evidence.selection.stage != LocalEvidenceSelectionStage.CONFIRMED) return
+    val context=LocalContext.current
+    var copyNotice by remember(state.requestId,state.receipt) {mutableStateOf<String?>(null)}
+    var copyPending by remember(state.requestId,state.receipt) {mutableStateOf(false)}
+    var copyGeneration by remember(state.requestId,state.receipt) {mutableLongStateOf(0)}
     var showResult by remember(state.requestId) { mutableStateOf(false) }
     Column(Modifier.testTag("question-consent")) {
         Text("单次发送授权", style = MaterialTheme.typography.titleMedium)
@@ -106,8 +115,18 @@ import java.time.ZoneId
         dismissButton = { TextButton(onStop, Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("question-consent-cancel-review")) { Text("取消审阅") } })
     val reply = state.receipt?.reply
     if (showResult && reply != null && state.stage in setOf(QuestionConsentStage.READY, QuestionConsentStage.NO_EVIDENCE)) AlertDialog(
-        onDismissRequest = { showResult = false }, modifier = Modifier.fillMaxWidth(), title = { Text(if(rehearsal)"本机演练结果 · 待核对"else"模型回答 · 待核对") },
+        onDismissRequest = { showResult = false;copyGeneration++;copyPending=false;copyNotice=null }, modifier = Modifier.fillMaxWidth(), title = { Text(if(rehearsal)"本机演练结果 · 待核对"else"模型回答 · 待核对") },
         text = { Column(Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()).testTag("question-consent-result-scroll")) {
+            if(onCopy!=null && !reply.noEvidence && reply.paragraphs.isNotEmpty()) TextButton(onClick={
+                copyPending=true;copyNotice=null;val attempt=++copyGeneration
+                onCopy(state) {text->
+                    if(attempt==copyGeneration&&showResult&&canCopy()) {
+                        copyNotice=if(copySensitiveText(context,"AIyou回答",text)) "已复制回答与出处" else "复制未完成，请重试"
+                    }
+                    if(attempt==copyGeneration) copyPending=false
+                }
+            },enabled=!copyPending,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("question-consent-copy-answer")) {Text(if(copyPending)"正在核对后复制…" else "复制回答与出处")}
+            copyNotice?.let {Text(it,Modifier.fillMaxWidth().testTag("question-consent-copy-notice").semantics {liveRegion=LiveRegionMode.Polite},style=MaterialTheme.typography.bodySmall)}
             if (reply.noEvidence) Text("当前所选出处不足以形成回答，不能据此断言某件事从未发生。", Modifier.testTag("question-consent-no-evidence"))
             reply.paragraphs.forEachIndexed { index, paragraph ->
                 Text(paragraph.text, Modifier.testTag("question-consent-paragraph-$index"))
@@ -115,11 +134,11 @@ import java.time.ZoneId
                     evidence.selection.cards.singleOrNull { it.reference == reference }?.let { card ->
                         SourceCitationCard(originalMetadata(card.hit.entry), reference.quote, "原始出处 · 版本 ${reference.source.revision}",
                             modifier = Modifier.testTag("question-consent-source-$index-${reference.source.sourceId}"),
-                            onOpen = { showResult = false; onOpen(reference) })
+                            onOpen = { showResult = false;copyGeneration++;copyPending=false;copyNotice=null; onOpen(reference) })
                     }
                 }
             }
         } },
-        confirmButton = { TextButton({ showResult = false }, Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("question-consent-close-result")) { Text("关闭结果") } },
+        confirmButton = { TextButton({ showResult = false;copyGeneration++;copyPending=false;copyNotice=null }, Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("question-consent-close-result")) { Text("关闭结果") } },
         dismissButton = { TextButton(onWithdraw, Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("question-consent-result-withdraw")) { Text("撤回本次授权") } })
 }

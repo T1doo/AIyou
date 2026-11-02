@@ -10,7 +10,7 @@
 |---|---|---|---|
 | 首次使用 | ui/AIyouScreens.kt | 离线入口、连接、按需权限 | 沿既有离线入口；共享语义样式已接入，未做首次安装设备验收 |
 | 此刻 | records/MixedCaptureScreen.kt | 轻输入、焦点态、原件、草稿、Undo、部分失败/UNKNOWN | 已改底部单实例输入/细记录行/高级面板；控制器持有光标/中文组合输入/有界Undo；主机真实controller与editor定向测试通过，真实IME未验 |
-| 回忆 | records/LocalRecordsScreen.kt | 连续列表、网格、分类查询、活动条件和锚点 | 普通时间线双proof缩略、全部/收藏/图片/音频轻标签与单行侧滑已接入；SQL/读取控制器定向测试通过，新接线尚未原生像素复验 |
+| 回忆 | records/LocalRecordsScreen.kt | 连续列表、网格、分类查询、活动条件和锚点 | 普通时间线双proof缩略、四类轻标签、独立筛选面与单行侧滑已接入；SQL/读取控制器定向测试通过，新接线尚未原生像素复验 |
 | 主动回顾 | records/FactRecapScreen.kt | 主动日/周、证据不足 | 保留主动日/周及不足状态，沿共享样式；未逐状态跑本轮回归 |
 | 原记录 | records/OriginalReadingScreen.kt; records/LocalAttachmentScreen.kt | 原件优先、源版本、复制、原音 | 保留连续正文/原件/复制及源版本；共享样式已接入，原件全部场景未逐验 |
 | 编辑版本 | records/OriginalEditScreen.kt; records/OriginalHistoryScreen.kt | 版本只读、草稿、派生纠正 | 既有原文/派生版本与草稿接线完整保留；共享字号/色彩，未逐状态跑本轮回归 |
@@ -32,7 +32,7 @@
 | A01 | AIyouPanel/OriginalReadingScreen | 平面阅读面已接入；长原件未逐验 |
 | A02 | tokens/LocalRecordsScreen | 暖桃/强封面已退出；普通列表当前版双proof缩略已接入，主机测试通过，原生未复验 |
 | A03 | LocalRecordsScreen | 沿真实收藏/标签/月查询；自建集合模型未新增 |
-| A04 | LocalOriginalSearchSection | 查询与筛选控件去卡；活动状态/锚点逻辑保留，未逐验 |
+| A04 | LocalOriginalSearchSection | 查询与轻分类保留；复杂日期/人物/标签进独立筛选面，结果页显示已选摘要；原状态/Undo保留，原生未验 |
 | A05 | MixedCaptureScreen | 文字入口/轻输入已改；CaptureEditorSession按控制器/草稿持有范围/组合状态/Undo，主机测试通过 |
 | A06 | MixedCaptureScreen | 焦点展开与同意图失败重试定向通过；UNKNOWN全状态未验 |
 | A07 | SourceCitationCard | 细引用线已改，来源版本接线保留；全往返未验 |
@@ -45,7 +45,7 @@
 | A14 | CompanionEntry | 48dp小入口与单次反馈沿原协议，未验设备 |
 | A15 | tokens/NotebookChrome | 浅色/单蓝动作/纯底已接入，静态对比5项通过 |
 | A16 | FactRecapScreen | 系统字体/主动回顾沿现有实现；无新手写字体 |
-| A17 | 记录菜单/侧滑 | RecordRowActions横向只揭示窄操作区；普通操作按钮等价；滚动/返回/owner变化收起，设备手势未验 |
+| A17 | 记录菜单/侧滑 | RecordRowActions横向揭示112dp侧边带；普通操作按钮等价；滚动/返回/owner变化收起，设备手势未验 |
 | A18 | ManualTasksScreen | 真实已提交状态驱动单次复选反馈；撤销REOPEN已实现并主机验证，设备节奏未验 |
 | A19 | 来源与详情展开 | 待办原位详情已接入；局部展开节奏未设备验收 |
 | A20 | Companion | 既有5角色实看复用，独立静态场景已改；生命周期实测未验 |
@@ -153,3 +153,11 @@ APK本地：/workspace/aiyou-ci-evidence/latest/unpacked/app/build/outputs/apk/d
 默认不上传。若另获存储批准，候选仅6张当前虚构Preview与指定测试XML，最多32文件（含scope manifest）/6MiB原输入，内ZIP不超过7MiB，外工件提议上限8MiB、1天；禁止APK、重复before、完整报告树、缓存及本地任意日志。收集失败删除的仅是本次本地临时ZIP，不碰GitHub已存在工件。此为提议，不是已恢复批准或存储零费保证。
 
 免费依据仅限GitHub官方所述公开仓库标准runner计算：[Actions billing](https://docs.github.com/en/actions/concepts/billing-and-usage)、[shared storage accounting](https://docs.github.com/en/billing/concepts/product-billing/github-actions)。账户/Packages共享存储配额与实际费用尚未核实，需父确认可验证的剩余额度/无新增费用依据后才能恢复候选执行及独立上传。历史17次/7h16m33、四工件76,949,894B/7天完整保留，无删除或改期。
+
+## 继续补齐的三项文档源码缺口（仍未运行新CI）
+
+1. 文档第4节：复杂日期/人物/标签移入独立全屏筛选面，结果页保留已选条件摘要。query/from/through实际TextFieldState与Undo仍由原owner持有，关闭不清输入、不强制展开；错误留在结果页，面板提供原重试入口，关闭回到触发按钮。
+2. 文档第8节：当前回答复制先inspect及checkReceipt，历史回答先actor内current(view)复核，再生成单次内存token；平台操作在Main且离开SQL/所有monitor后执行。复用敏感剪贴板标记，仅消费者实际成功后显示成功，失败明确可重试。当前结果关闭/换receipt/owner后退休回调；历史换view/来源/owner后拒绝token。回答与引用移除绕过此复核的原生SelectionContainer，问题选择保留。格式带待核对声明、编号与对应原文版本/摘录，未新增请求/发送权限或持久复制模型。
+3. 文档第20节：侧滑从向下展开按钮改为112dp真实右侧带；同一时刻一行，滑动本身不写入。普通“操作”按钮打开同一侧带，所有动作≥48dp；大字时侧带可滚动。滚动/返回/owner改变收起，删除仍进入原对象确认。
+
+主机实际源定向XML更新为11套件105项，0失败/错误/跳过；包含先前81项和两类回答controller整套24项，新增复制用例涵盖成功/失败反馈、单次token、UI退休、owner变化和来源撤回。协议wire/剪贴板consumer为受控合成实现，没有运行真实服务或系统剪贴板。记录见docs/evidence/frontend-day-host-copy-20261102.json。Kotlin PSI语法检查9个变更文件0错误，不能替代Android类型检查。独立只读复审未见确定P1/P2，未构建/执行CI。实际workflow仍是硬冻结版本，原17次/7h16m33账与四工件完全不动；新版截图未生成，不用cf54旧截图证明新源码。

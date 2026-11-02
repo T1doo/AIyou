@@ -1,0 +1,140 @@
+{
+  "source_parent": "2f7b4c4c1f635af4528f1b99823e944268b71bf7",
+  "validation": "actual production controllers/SQL/JCA with synthetic clipboard consumers and protocol wire; not native clipboard or Compose acceptance",
+  "suites": [
+    {
+      "suite": "com.t1doo.aiyou.data.AudioFilterSqlTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "d340a5e5622167c85615c206efeff0506fa2909d844e1ee642883e3de6d7c436"
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.ChatHistoryControllerTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "1ae5a1f6fc384c5f227e4189774d018715c9f7a31ba3c5e99387be5ebd3c43fb"
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.CurrentImageGridControllerTest",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "8695090078cf3858cf821f40baa47628833f4412fd228b25ed6b564dbdfe6b2a"
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.LocalSearchSqlTest",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "4eb66605d8bd5a4a597d882e2a43ca62c879155ebc43e0ddc15772546aee9506"
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.SelectedQuestionConsentControllerTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "6eb0624c2cabd3759db079f7ec4e96608b2cf271c752bcb473a6d59176b3e7aa"
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.SourceTaskSqlTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "c2f304a28f8a903559c19311cd91a194b004b4f904001bcbfacadb3d6d03b076"
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.TaskUndoFullBackupTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "131a9b67eab2db85ed4ad8c6abba1e6a3cea2052e3a23efc75c363830323bbf4"
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.TaskUserReceiptSqlTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "6c79dd47341a818451f32b5cae1761761a7f1fa40ada4c8149fe8e8a86f8a463"
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.CaptureEditorSessionTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "16c961ac1a769bb309752f24073428255a2143b0f32a6917dd3f7eba22f0d693"
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.ManualTaskViewModelTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "a0f5a67e30cf6b884cf6872c116cd0c2cdf1c2bc961f829ccd7cd1a4d2eb9957"
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.MixedCaptureControllerTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "1efadd23138afc97d664424f722453c04c38163e45334037eb23c53f540bb40b"
+    }
+  ],
+  "total_tests": 105,
+  "new_ci": false,
+  "new_artifact_upload": false,
+  "new_android_build": false,
+  "kotlin_syntax_only": {
+    "changed_files": 9,
+    "parse_errors": 0
+  },
+  "production_sources": [
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/MainActivity.kt",
+      "sha256": "60d8b9d14715e281da8c3f569a70b3d2bf7c08067b1062e0b01f4710bc193dc8"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/AnswerCopy.kt",
+      "sha256": "08cc65cf13d2e33dfcb0a4e0e741ca2765020e8c93a658a9e38252868be02771"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/ChatHistoryContent.kt",
+      "sha256": "976b91d62192959e1be30f796798b62b05729adbc30ac4613ff11463601ab217"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/ChatHistoryController.kt",
+      "sha256": "89581cf4d0c65abac870cb46c03f4aa8747671ce98be96426b12ec61c269ef44"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchSection.kt",
+      "sha256": "3aa6b22a778e90df322a9b2f69d560f1f6b5a3e111ab20ac57cac4af0bc5b6eb"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/OriginalReadingScreen.kt",
+      "sha256": "6eb8523825c03ce73c0c632efebaa8d4a78c7cc72214581a9c5e08f4d49cc70c"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/RecordRowActions.kt",
+      "sha256": "8393b0c7aa5a6aa6607932e8d1d7b8e004191c495a7be0ff60713af09ed7b08a"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/SelectedQuestionConsentController.kt",
+      "sha256": "2c862be45cc558adfe62a6c1dd7a9c8c55648d6b7e4b69b86f9b6a96f96238c5"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/SelectedQuestionConsentSection.kt",
+      "sha256": "0e46f95a1cceeea12550492fc254bff432f73694cf611eaa23846e267d62972c"
+    }
+  ]
+}

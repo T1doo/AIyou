@@ -82,13 +82,15 @@ internal fun originalMetadata(entry: StoredEntry): String {
 }
 
 /** Copy occurs only on an explicit user action after the app validates the current ID/revision. */
-internal fun copyOriginal(context: Context, text: String): Boolean {
-    val clip = ClipData.newPlainText("爱忆原文", text)
+internal fun copyOriginal(context: Context, text: String): Boolean = copySensitiveText(context,"爱忆原文",text)
+
+internal fun copySensitiveText(context:Context,label:String,text:String):Boolean {
+    val clip = ClipData.newPlainText(label, text)
     markSensitive(clip)
     return try {
         context.getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
         true
-    } catch (_: SecurityException) {
+    } catch (_: RuntimeException) {
         false
     }
 }

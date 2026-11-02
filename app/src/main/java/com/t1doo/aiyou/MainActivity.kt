@@ -1025,7 +1025,8 @@ fun AIyouApp(
         val historyOwner=local?.chatHistoryOwner
         com.t1doo.aiyou.records.ChatHistoryContent(chatHistoryUi,chatHistory,
             canUseQuestion=evidenceEnabled&&evidenceState.stage==com.t1doo.aiyou.records.LocalEvidenceStage.READY,
-            beforeDelete={questionConsent.retireUiScope()})
+            beforeDelete={questionConsent.retireUiScope()},
+            canCopy={ownsNavigation()&&!showSettings&&!demo&&currentLocal?.chatHistoryOwner===historyOwner&&chatHistory.visible()?.session==chatHistoryUi.session})
         LaunchedEffect(chatHistoryUi.questionUse,chatHistoryUi.jump) {
             navigation.publish(generation) {
                 val latest=currentRecordsProvider?.invoke()?:currentLocal
@@ -1584,7 +1585,8 @@ fun AIyouApp(
                                 if (evidence.canOpen(evidenceState, card)) openSearchResultAt(card.hit, card.reference)
                             }
                         },remote=remoteQuestion,production=productionQuestions!=null,
-                        unavailableNotice=productionQuestions?.unavailableNotice())
+                        unavailableNotice=productionQuestions?.unavailableNotice(),
+                        onCopy=questionConsent::copyAnswer,canCopy={ownsNavigation()&&!showSettings&&!demo&&evidenceEnabled&&questionConsent.visible()===questionConsentState})
                 },
                 onEvidenceQuestionChange=if(productionQuestions==null)null else {text->
                     if(ownsNavigation()&&evidenceEnabled) {

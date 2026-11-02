@@ -98,6 +98,7 @@ val syncVmProduction = tasks.register<Sync>("syncVmProduction") {
     from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalEvidenceSelection.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/LocalEvidenceAnswer.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/SelectedQuestionConsentController.kt")
+    from("../../../app/src/main/java/com/t1doo/aiyou/records/AnswerCopy.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/TaskProposalController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/TaskReminderController.kt")
     from("../../../app/src/main/java/com/t1doo/aiyou/records/FactRecapController.kt")

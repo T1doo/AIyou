@@ -11,6 +11,38 @@ import org.junit.Test
 
 /** Real encrypted SQL history; a controlled records lane, not a device or provider service. */
 class ChatHistoryControllerTest {
+    @Test fun copyAnswerIsOneUseAndReportsActualConsumerSuccessOutsideControllerAndSqlLocks()=Host().use {x->
+        x.answer();x.controller.copyAnswer(x.selected());x.drain()
+        val ready=x.ui();val token=ready.answerCopy!!
+        assertFalse(token.toString().contains(token.text))
+        var copies=0
+        assertFalse(x.controller.consumeAnswerCopy(ready,token,{true}) {text->copies++;assertTrue(text.contains("[1]"));false})
+        assertEquals("复制未完成，请重试",x.ui().copyNotice)
+        assertFalse(x.controller.consumeAnswerCopy(ready,token,{true}) {fail("replayed copy token");true})
+        x.controller.copyAnswer(x.ui());x.drain();val next=x.ui()
+        val lock=x.controller.javaClass.getDeclaredField("lock").apply {isAccessible=true}.get(x.controller)
+        assertTrue(x.controller.consumeAnswerCopy(next,next.answerCopy!!,{true}) {
+            assertFalse(Thread.holdsLock(lock));copies++;true
+        })
+        assertEquals(2,copies);assertEquals("已复制回答与出处",x.ui().copyNotice)
+        assertEquals(1,x.h.history.list().size)
+    }
+    @Test fun revokedSourcesClosedViewsAndRetiredOwnerNeverReachClipboardConsumer() {
+        for(kind in listOf("source-before-read","close-before-read","owner-before-consume","route-before-consume"))Host().use {x->
+            x.answer();val selected=x.selected();x.controller.copyAnswer(selected)
+            when(kind) {
+                "source-before-read"->x.h.withdrawSource(0)
+                "close-before-read"->{x.controller.close(x.ui());x.controller.open()}
+            }
+            x.drain()
+            val u=x.ui();val token=u.answerCopy
+            if(token!=null) {
+                if(kind=="owner-before-consume"){x.local=x.local.copy(chatHistoryOwner=null);x.controller.sync()}
+                assertFalse(x.controller.consumeAnswerCopy(u,token,{kind!="route-before-consume"}) {fail("retired clipboard consumer");true})
+            } else assertTrue(kind in listOf("source-before-read","close-before-read"))
+        }
+    }
+
     private class Host:AutoCloseable {
         val h=SelectedQuestionAuthorizationTest.Harness()
         val base=SqliteVmEntryRepository(h.f.db,h.f.gateway,h.raw){}

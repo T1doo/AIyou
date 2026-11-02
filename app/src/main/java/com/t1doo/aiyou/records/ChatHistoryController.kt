@@ -10,17 +10,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class ChatHistoryQuestionUse internal constructor(internal val text:String) {override fun toString()="ChatHistoryQuestionUse(redacted)"}
+class ChatHistoryAnswerCopy internal constructor(internal val view:ChatMessageView,internal val text:String) {override fun toString()="ChatHistoryAnswerCopy(redacted)"}
 class ChatHistoryJump internal constructor(val location:ChatMessageLocation) {override fun toString()="ChatHistoryJump(redacted)"}
 class ChatHistoryUi internal constructor(val session:Long,items:List<ChatMessage> = emptyList(),
     val available:Boolean=false,val busy:Boolean=false,val selected:ChatMessage?=null,val view:ChatMessageView?=null,
     val error:String?=null,val stale:Boolean=false,val confirmation:DeleteChatMessage?=null,val pending:DeleteChatMessage?=null,
-    val uncertain:Boolean=false,val questionUse:ChatHistoryQuestionUse?=null,val jump:ChatHistoryJump?=null) {
+    val uncertain:Boolean=false,internal val answerCopy:ChatHistoryAnswerCopy?=null,val copyNotice:String?=null,val questionUse:ChatHistoryQuestionUse?=null,val jump:ChatHistoryJump?=null) {
     val items:List<ChatMessage> = Collections.unmodifiableList(ArrayList(items))
     val showEmpty:Boolean get()=available&&!busy&&pending==null&&error==null&&!stale&&items.isEmpty()
     internal fun next(items:List<ChatMessage> = this.items,available:Boolean=this.available,busy:Boolean=this.busy,
         selected:ChatMessage?=this.selected,view:ChatMessageView?=this.view,error:String?=null,stale:Boolean=this.stale,
         confirmation:DeleteChatMessage?=this.confirmation,pending:DeleteChatMessage?=this.pending,uncertain:Boolean=this.uncertain,
-        questionUse:ChatHistoryQuestionUse?=null,jump:ChatHistoryJump?=null)=ChatHistoryUi(session,items,available,busy,selected,view,error,stale,confirmation,pending,uncertain,questionUse,jump)
+        questionUse:ChatHistoryQuestionUse?=null,jump:ChatHistoryJump?=null,answerCopy:ChatHistoryAnswerCopy?=null,copyNotice:String?=null)=ChatHistoryUi(session,items,available,busy,selected,view,error,stale,confirmation,pending,uncertain,answerCopy,copyNotice,questionUse,jump)
     override fun toString()="ChatHistoryUi(redacted)"
 }
 
@@ -133,6 +134,40 @@ class ChatHistoryController internal constructor(private val current:()->LocalRe
             }catch(c:CancellationException){throw c}catch(_:Exception){synchronized(lock){if(owns(s))publish(s,s.ui.next(busy=false,view=null,stale=true,error="历史或出处暂不可核对，本次没有跳转或填入。"))}}
         }
         if(!queued)synchronized(lock){if(owns(s))publish(s,s.ui.next(busy=false,error="操作未能入队；请重试。"))}
+    }
+    /** A fresh private-owner read produces one memory-only UI copy intent. No device API runs on IO. */
+    fun copyAnswer(u:ChatHistoryUi) {
+        val s=synchronized(lock) {session?.takeIf {usable(it,u)&&epoch()==it.epoch&&
+            u.view?.reply?.let {r->!r.noEvidence&&r.paragraphs.isNotEmpty()}==true} ?: return}
+        val view=checkNotNull(u.view)
+        val serial=synchronized(lock) {if(!usable(s,u))return;publish(s,u.next(busy=true));s.serial}
+        val queued=enqueue {store->
+            if(!synchronized(lock){owns(s)&&store.chatHistory===s.owner})return@enqueue
+            try {
+                require(s.owner.current(view))
+                val text=answerCopyText(checkNotNull(view.reply),"当时的模型回答 · 内容待核对")
+                synchronized(lock) {if(owns(s)) {
+                    val valid=s.serial==serial&&epoch()==s.epoch&&s.ui.view===view
+                    publish(s,s.ui.next(busy=false,view=if(valid)view else null,stale=!valid,
+                        answerCopy=if(valid)ChatHistoryAnswerCopy(view,text)else null,
+                        error=if(valid)null else "出处已变化，本次没有复制。"))
+                }}
+            } catch(c:CancellationException) {throw c}
+            catch(_:Exception) {synchronized(lock){if(owns(s))publish(s,s.ui.next(busy=false,view=null,stale=true,error="回答或出处暂不可核对，本次没有复制。"))}}
+        }
+        if(!queued)synchronized(lock){if(owns(s))publish(s,s.ui.next(busy=false,error="复制未能入队，请重试。"))}
+    }
+    /** UI thread only. Consume under the monitor, then call the platform outside every monitor/SQL lease. */
+    fun consumeAnswerCopy(u:ChatHistoryUi,token:ChatHistoryAnswerCopy,allowed:()->Boolean,copy:(String)->Boolean):Boolean {
+        val (s,claimed)=synchronized(lock) {
+            val s=session ?: return false
+            if(!usable(s,u)||epoch()!=s.epoch||u.answerCopy!==token||u.view!==token.view)return false
+            val claimed=u.next();publish(s,claimed);s to claimed
+        }
+        if(!allowed() || !synchronized(lock){usable(s,claimed)&&epoch()==s.epoch})return false
+        val copied=try {copy(token.text)}catch(_:RuntimeException){false}
+        synchronized(lock){if(usable(s,claimed)&&epoch()==s.epoch)publish(s,claimed.next(copyNotice=if(copied)"已复制回答与出处"else"复制未完成，请重试"))}
+        return copied
     }
     /** Navigation -> controller lifecycle. Consumers are memory-only and never run SQL/device/network work. */
     fun consumeQuestion(u:ChatHistoryUi,token:ChatHistoryQuestionUse,apply:(String)->Boolean):Boolean=synchronized(lock){
