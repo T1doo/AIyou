@@ -1,5 +1,7 @@
 package com.t1doo.aiyou
 
+import com.t1doo.aiyou.records.metadataReadingSource
+
 import com.t1doo.aiyou.records.currentTranscriptSource
 import com.t1doo.aiyou.records.canShowTranscriptEditor
 import com.t1doo.aiyou.records.currentImageTextSource
@@ -423,6 +425,7 @@ fun AIyouApp(
     var searchPerson by remember { mutableStateOf<String?>(null) }
     var onlyFavorites by rememberSaveable { mutableStateOf(false) }
     var onlyImages by remember { mutableStateOf(false) }
+    var onlyAudio by remember { mutableStateOf(false) }
     var imageGridMode by remember { mutableStateOf(false) }
     var evidenceMode by remember { mutableStateOf(false) }
     var searchModeGeneration by remember { mutableLongStateOf(0L) }
@@ -438,7 +441,7 @@ fun AIyouApp(
             onlyFavorites,
             if (onlyFavorites && tagsSource?.favoritesAvailable == true) tagsSource.favorites else null,
             searchDateBasis, if (searchDateBasis == com.t1doo.aiyou.model.RecordDateBasis.EVENT && tagsSource?.eventDatesAvailable == true)
-                tagsSource.eventDates else null,onlyImages = onlyImages, person = searchPerson,
+                tagsSource.eventDates else null,onlyImages = onlyImages, onlyAudio=onlyAudio,person = searchPerson,
             peopleSnapshot = if ((searchPerson != null || searchMode == OriginalSearchMode.KEYWORDS && query.isNotBlank()) && tagsSource?.manualPeopleAvailable == true) tagsSource.manualPeople else null)
     }
     val search = remember {
@@ -530,6 +533,7 @@ fun AIyouApp(
         searchDateBasis = com.t1doo.aiyou.model.RecordDateBasis.CAPTURED
         onlyFavorites = false
         onlyImages = false
+        onlyAudio = false
         imageGridMode = false
         evidenceMode = false
         searchModeGeneration++
@@ -1484,6 +1488,20 @@ fun AIyouApp(
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
                 onAskQuestion=beginQuestion,
+                onRowAction={entry,action->
+                    val live=currentLocal
+                    if(ownsNavigation() && selected==Destination.MEMORIES && !reading && !showSettings && !demo && !evidenceMode && search.visible(searchSource(),searchInput())===searchState &&
+                        live!=null && live.recordAuthorizationOwner===local.recordAuthorizationOwner && live.entries===local.entries &&
+                        live.ready && !live.opening && live.error==null && !live.saving && !live.savePending && live.entries.any{it==entry}) {
+                        when(action) {
+                            "favorite" -> local.metadataReadingSource(entry.id,entry.currentRevision)?.let { source ->
+                                local.favorites[entry.id]?.let { snapshot -> favorites?.set(source,snapshot.version,!snapshot.isFavorite) }
+                            }
+                            "edit" -> {openEntry(entry.id);onBeginOriginalEdit(entry.id,entry.currentRevision)}
+                            "delete" -> {openEntry(entry.id);recycleBin?.requestMove(entry.id,entry.currentRevision)}
+                        }
+                    }
+                },
                 imageTextBusy=imageTextBusy, motionAllowed=motionAllowed,
                 onOpenUnified=unifiedKeywords?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
                 onOpenImageTexts=imageTexts?.let{controller->{if(ownsNavigation()&&selected==Destination.MEMORIES&&!reading&&!showSettings&&!demo){navigation.advance();clearSearch();controller.open()}}},
@@ -1525,6 +1543,8 @@ fun AIyouApp(
                 searchPerson = searchPerson, onSearchPerson = { person -> changeSearchInput {searchPerson=person;searchModeGeneration++} }, onRefreshPeople = {navigation.gate.inputAction(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){onRefreshLocalSearch()}},
                 searchTag = searchTag, onSearchTag = { tag -> changeSearchInput {searchTag=tag;searchModeGeneration++} },
                 onlyFavorites = onlyFavorites, onSearchFavorites = { value -> changeSearchInput {onlyFavorites=value;searchModeGeneration++} },
+                onSearchCategory={category->changeSearchInput{onlyFavorites=category=="favorites";onlyImages=category=="images";onlyAudio=category=="audio";imageGridMode=false;searchModeGeneration++}},
+                onlyAudio=onlyAudio,onSearchAudio={value->changeSearchInput{onlyAudio=value;imageGridMode=false;searchModeGeneration++}},
                 onlyImages = onlyImages, onSearchImages = { value -> changeSearchInput {onlyImages=value;imageGridMode=false;searchModeGeneration++} },
                 imageGrid = imageGrid, imageGridMode = imageGridMode,
                 evidenceMode = evidenceMode, evidenceState = evidenceState,
@@ -1592,7 +1612,7 @@ fun AIyouApp(
                     if (value) { questionConsent.retireUiScope();evidence.clear(); evidenceMode = false }
                 } },
                 ownsImageGrid = { ownsNavigation() && detailEntryId == null &&
-                    selectedName == Destination.MEMORIES.name && !showSettings && !demo && !evidenceMode && onlyImages &&
+                    selectedName == Destination.MEMORIES.name && !showSettings && !demo && !evidenceMode &&
                     search.visible(searchSource(), searchInput()) === searchState },
                 onRefreshFavorites = {navigation.gate.inputAction(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){favorites?.refresh()}},
                 searchMode = searchMode,

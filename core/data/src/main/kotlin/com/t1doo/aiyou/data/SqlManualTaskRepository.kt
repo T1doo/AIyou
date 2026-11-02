@@ -85,6 +85,20 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
             }
         }
     }
+    override fun reopen(request:ManualTaskReopen):ManualTaskSnapshot = safely {
+        database.transaction { sql ->
+            val old=row(sql,request.id) ?: throw ManualTaskConflict()
+            val current=old.payload.task
+            val hash=cipher.requestProof(request)
+            replay(old,"REOPEN",request.mutationId,hash)?.let { return@transaction it }
+            if(current.version!=request.expectedVersion || current.status!=ManualTaskStatus.COMPLETED) throw ManualTaskConflict()
+            // Retain date/source and all pending revocation cleanup. Never resurrect an alarm.
+            val next=current.copy(version=Math.addExact(current.version,1),status=ManualTaskStatus.OPEN,
+                updatedAtMillis=maxOf(current.updatedAtMillis,request.requestedAtMillis),reminder=TaskReminders.revoke(current))
+            writeWithin(sql,current,next,request.mutationId,request.requestedAtMillis,"REOPEN",
+                userReceipt=cipher.receipt(next,"REOPEN",request.mutationId,request.expectedVersion,request.requestedAtMillis,hash))
+        }
+    }
     override fun reschedule(request: ManualTaskScheduleMutation): ManualTaskSnapshot = safely {
         database.transaction { sql ->
             val old = row(sql, request.id) ?: throw ManualTaskConflict()
@@ -379,6 +393,7 @@ internal class SqlManualTaskRepository(private val database: RecordsSqlDatabase,
         val hash = when (op) {
             "CREATE" -> cipher.requestProof(ManualTaskCreate(t.id, t.title, t.createdAtMillis, t.creationTimeZone, m, t.schedule), t.sourceReceipt)
             "STATUS" -> cipher.requestProof(ManualTaskMutation(t.id, expected, t.status, at, m))
+            "REOPEN" -> cipher.requestProof(ManualTaskReopen(t.id,expected,at,m))
             "RENAME" -> cipher.requestProof(ManualTaskRename(t.id, expected, t.title, at, m))
             "SET", "POSTPONE", "CLEAR" -> cipher.requestProof(ManualTaskScheduleMutation(t.id, expected, ManualTaskDateOperation.valueOf(op), t.schedule, at, m))
             "REMIND" -> cipher.reminderUserProof(t.id, m, expected, at, checkNotNull(p.reminderRequestProof))

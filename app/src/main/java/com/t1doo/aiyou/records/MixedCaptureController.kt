@@ -35,6 +35,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
     private var pendingSave: Triple<CaptureDraft,Long,String>?=null
     private var pendingDiscard: CaptureDraft?=null // Exact original clear identity; IO actor only.
     private var prepared: Pair<AttachmentIntent,ByteArray>?=null
+    val editor = CaptureEditorSession().also { session -> current().mixedCapture?.let { session.sync(it.draft?.id,it.text) } }
     private val ids=AtomicLong()
     @Volatile private var disposed=false
     @Volatile private var captureGate:CaptureDraftGate?=null
@@ -53,6 +54,20 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
 
     fun refresh() { uiMutation { refreshUnlocked() } }
     fun edit(text: String) { uiMutation { editUnlocked(text) } }
+    /** A late native editable callback is tied to the exact draft displayed by its field. */
+    fun editValue(draftId: String, frame: CaptureEditorFrame) { uiMutation {
+        val u=ui() ?: return@uiMutation
+        if(!editorEditable(u) || u.draft?.id!=draftId || frame.text.length>100000) return@uiMutation
+        if(editor.accept(draftId,frame) && frame.text!=u.text) editUnlocked(frame.text)
+    } }
+    fun undoInput(draftId: String, redo: Boolean = false) { uiMutation {
+        val u=ui() ?: return@uiMutation
+        if(!editorEditable(u) || u.draft?.id!=draftId) return@uiMutation
+        val frame=if(redo) editor.redo(draftId) else editor.undo(draftId)
+        if(frame!=null && frame.text!=u.text) editUnlocked(frame.text)
+    } }
+    private fun editorEditable(u: MixedCaptureUiState) = available() && !u.busy && u.selection==null &&
+        !audioCapture.busy && !u.uncertainSave && !u.discardPending && u.policyChange==null && u.draft?.discarding!=true
     fun changePolicy(draftId: String, version: Long, target: ProcessingPolicy) { uiMutation { changePolicyUnlocked(draftId,version,target) } }
     fun retryPolicy(requestId: Long) { uiMutation { retryPolicyUnlocked(requestId) } }
     fun readCurrentPolicy(requestId: Long) { uiMutation { readCurrentPolicyUnlocked(requestId) } }
@@ -80,7 +95,11 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         return current().entries.asSequence().filter { it.capturedAtMillis >= start && it.capturedAtMillis < end }.take(5).toList()
     }
     private fun update(change:(MixedCaptureUiState)->MixedCaptureUiState)=publish { local ->
-        if(disposed) local else local.copy(mixedCapture=change(local.mixedCapture ?: MixedCaptureUiState()))
+        if(disposed) local else {
+            val next=change(local.mixedCapture ?: MixedCaptureUiState())
+            editor.sync(next.draft?.id,next.text)
+            local.copy(mixedCapture=next)
+        }
     }
     suspend fun initialize(store:EntryRepository) {
         val repo=store.captureRecords ?: return
@@ -123,6 +142,7 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
         if(!clean) return
         val restored=store.captureRecords?.current() ?: return
         publish { local -> if(disposed || local.mixedCapture!==before) local else {
+            editor.sync(restored.id,restored.text)
             local.copy(mixedCapture=before.copy(draft=restored,text=restored.text,error=null))
         } }
         if(ui()?.draft===restored) {
@@ -308,9 +328,9 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
                 val eventDates=readEventDateSource(store)
                 val epoch=store.localSearch?.epoch()
                 val fresh=repo.current();binding=fresh;pendingSave=null;clearPrepared()
-                publish { local ->if(disposed) local else local.copy(entries=entries,manualTags=labels,manualTagsAvailable=store.manualTags!=null,localSearchEpoch=epoch,
+                publish { local ->if(disposed) local else { editor.sync(fresh.id,fresh.text);local.copy(entries=entries,manualTags=labels,manualTagsAvailable=store.manualTags!=null,localSearchEpoch=epoch,
                     mixedCapture=MixedCaptureUiState(draft=fresh,text=fresh.text,supportsProcessingChoice=repo.supportsProcessingChoice,
-                        notice=if(result.deleted) "已核对先前保存；记录已删除，没有恢复。" else "已保存在本机 · 文字和全部图片已持久认证。")).withFavoriteSource(favorites).withEventDateSource(eventDates) }
+                        notice=if(result.deleted) "已核对先前保存；记录已删除，没有恢复。" else "已保存在本机 · 文字和全部图片已持久认证。")).withFavoriteSource(favorites).withEventDateSource(eventDates) } }
                 thumbnails(store)
             } catch(e:CancellationException){throw e} catch(_:Exception){update { it.copy(error="保存结果尚未确认，文字及全部图片保留。请核对同一次保存，不会另建记录。",uncertainSave=pendingSave!=null) }}
             finally { update { it.copy(busy=false) } }
@@ -337,6 +357,6 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
     }
     private fun owns(id: String,request: Long)=available() && ui()?.draft?.id==id && ui()?.selection?.requestId==request
     private fun clearPrepared() { prepared?.second?.fill(0);prepared=null }
-    fun dispose() { audioCapture.retire();disposed=true;publish { it.copy(mixedCapture=null) } }
-    fun disposeOnIo() { disposed=true;clearPrepared();binding=null;pendingSave=null;pendingDiscard=null }
+    fun dispose() { editor.retire();audioCapture.retire();disposed=true;publish { it.copy(mixedCapture=null) } }
+    fun disposeOnIo() { editor.retire();disposed=true;clearPrepared();binding=null;pendingSave=null;pendingDiscard=null }
 }

@@ -147,6 +147,13 @@ class ManualTaskMutation(val id: String, val expectedVersion: Long, val status: 
     override fun toString() = "ManualTaskMutation(redacted)"
 }
 
+/** Explicit undo of an already committed completion; cancellation is never reopenable. */
+class ManualTaskReopen(val id:String,val expectedVersion:Long,val requestedAtMillis:Long,val mutationId:String) {
+    init { ManualTags.identifier(id);ManualTags.identifier(mutationId)
+        require(expectedVersion in 1 until Long.MAX_VALUE && requestedAtMillis>=0) }
+    override fun toString()="ManualTaskReopen(redacted)"
+}
+
 object ManualTasks {
     const val MAX_CODE_POINTS = 240
     const val MAX_RAW_LENGTH = 960

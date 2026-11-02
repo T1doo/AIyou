@@ -14,6 +14,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class MixedCaptureControllerTest {
+    @Test fun nativeSelectionAndUndoSurviveAcknowledgementButNeverCrossDrafts():Unit=runBlocking {
+        Harness().use {h->
+            h.start();val id=h.ui.draft!!.id
+            h.c.editValue(id,CaptureEditorFrame("合成中文😀",2,4));h.drain()
+            assertEquals(CaptureEditorFrame("合成中文😀",2,4),h.c.editor.state.value.frame)
+            h.c.editValue(id,CaptureEditorFrame("合成中文😀",0,2));assertTrue(h.queue.isEmpty())
+            h.c.editValue(id,CaptureEditorFrame("替换中文😀",2,2));h.drain()
+            h.c.undoInput(id);h.drain();assertEquals("合成中文😀",h.ui.text)
+            assertEquals(0,h.c.editor.state.value.frame.start);assertEquals(2,h.c.editor.state.value.frame.end)
+            h.c.save();h.drain();val next=h.ui.draft!!.id
+            assertNotEquals(id,next);assertFalse(h.c.editor.state.value.canUndo)
+            h.c.editValue(id,CaptureEditorFrame("旧回调"));h.c.undoInput(id)
+            assertEquals("",h.ui.text);assertTrue(h.queue.isEmpty())
+        }
+    }
+
     @Test fun incompleteUnicodeAndRejectedQueueDoNotFreezeOrLoseEditableInput():Unit=runBlocking {
         Harness().use { h->
             h.start();h.c.edit("合成\uD83D");h.drain();h.c.save();h.drain()

@@ -8,6 +8,17 @@ import org.junit.Test
 import kotlinx.coroutines.runBlocking
 
 class SourceTaskSqlTest {
+    @Test fun undoCompletionKeepsAuthenticatedSourceAndDateWithoutAnotherCreation():Unit=Harness().use {h->
+        val request=h.request();val created=h.port.create(request)
+        val due=ManualTaskSchedule(LocalDate.of(2026,11,3),null,"Asia/Shanghai")
+        val scheduled=h.tasks.reschedule(ManualTaskScheduleMutation(created.id,created.version,ManualTaskDateOperation.SET,due,60,"date"))
+        val completed=h.tasks.change(ManualTaskMutation(created.id,scheduled.version,ManualTaskStatus.COMPLETED,70,"done"))
+        val undo=ManualTaskReopen(completed.id,completed.version,80,"undo")
+        val open=h.tasks.reopen(undo);h.reopen()
+        assertEquals(open,h.tasks.reopen(undo));assertEquals(created.sourceReceipt,open.sourceReceipt);assertEquals(due,open.schedule)
+        assertEquals(open,h.port.create(request));assertEquals(1,h.tasks.snapshots().size)
+    }
+
     @Test fun actualPermanentErasureRemovesOriginalAndColdReplayKeepsOnlyIndependentManualTask():Unit=runBlocking { PermanentErasureFixture().use { f ->
         val text="合成待删除的原始正文🙂";val id=f.entry(text=text)
         var port=SqlSourceTaskRepository(f.gateway,f.tasks)

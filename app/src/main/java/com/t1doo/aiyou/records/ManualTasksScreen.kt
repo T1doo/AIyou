@@ -62,6 +62,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     onConfirmClose: (Long, ManualTaskEditor) -> Unit = { _, _ -> },
     onCancelClose: (Long, ManualTaskEditor) -> Unit = { _, _ -> },
     titles: ManualTaskController? = null, ownsTitleRoute: () -> Boolean = { true }) {
+    DisposableEffect(titles) {onDispose {titles?.retireCompletionUndo()}}
     val tasks = local.tasks
     val storageReady = local.ready && !local.opening && local.error == null
     val available = storageReady && tasks.available && !tasks.loading
@@ -149,6 +150,11 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                         local.taskSourceNotice?.let { Text(it,modifier=Modifier.testTag("manual-task-source-notice")) }
                         tasks.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                         tasks.notice?.takeIf { available }?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                        tasks.undoCompletion?.let { expected ->
+                            TextButton(onClick={if(ownsTitleRoute()) titles?.undoCompletion(expected)},
+                                enabled=canChoose && tasks.items.any{it==expected},
+                                modifier=Modifier.heightIn(min=48.dp).testTag("manual-task-undo-complete")) { Text("撤销刚才的完成") }
+                        }
                         local.reminders.notice?.takeIf { available }?.let { Text(it) }
                         local.reminders.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                         if (local.reminders.supported && local.reminders.error != null) TextButton(enabled = available && !local.reminders.busy,

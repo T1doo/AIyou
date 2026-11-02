@@ -8,7 +8,7 @@ class LocalSearchRequest(val query: String, val exact: Boolean = false,
     val from: String = "", val through: String = "", val tag: String? = null,
     val onlyFavorites: Boolean = false,
     val dateBasis: com.t1doo.aiyou.model.RecordDateBasis = com.t1doo.aiyou.model.RecordDateBasis.CAPTURED,
-    val onlyImages: Boolean = false, val person: String? = null) {
+    val onlyImages: Boolean = false, val person: String? = null, val onlyAudio: Boolean = false) {
     override fun toString() = "LocalSearchRequest(redacted)"
 }
 
@@ -17,6 +17,7 @@ interface LocalSearchSnapshot {
     val people: Map<String, com.t1doo.aiyou.model.ManualPeopleSnapshot>? get() = null
     /** Present only for a current-version PNG/JPEG lookup; the owner rechecks its private attachment ledger. */
     val currentImageEntryIds: Set<String>? get() = null
+    val currentAudioEntryIds: Set<String>? get() = null
     val eventDates: Map<String, com.t1doo.aiyou.model.RecordEventDateSnapshot>? get() = null
     val favorites: Map<String, com.t1doo.aiyou.model.RecordFavoriteSnapshot>? get() = null
     val epoch: Long

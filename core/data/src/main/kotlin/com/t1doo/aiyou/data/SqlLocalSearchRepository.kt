@@ -24,7 +24,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
     private data class ImageBinding(val id: String, val revision: Int, val mediaType: String,
         val hash: String, val bytes: Long, val state: AttachmentState)
     private data class Binding(val entry: StoredEntry, val hash: String, val tagVersion: Long, val visibility: Long,
-        val images: List<ImageBinding>? = null)
+        val images: List<ImageBinding>? = null, val audio: List<ImageBinding>? = null)
     private inner class Proof(val stamp: Stamp, val runtime: String, val bindings: List<Binding>,
         tagValues: Map<String, ManualTagSnapshot>, override val pending: Boolean,
         override val favorites: Map<String, RecordFavoriteSnapshot>? = null,
@@ -36,7 +36,9 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         val owner = this@SqlLocalSearchRepository
         override val entries = Collections.unmodifiableList(bindings.map { it.entry })
         override val tags = Collections.unmodifiableMap(HashMap(tagValues))
-        override val currentImageEntryIds = if (imageRequest != null)
+        override val currentImageEntryIds = if (imageRequest?.onlyImages == true)
+            Collections.unmodifiableSet(bindings.map { it.entry.id }.toSet()) else null
+        override val currentAudioEntryIds = if (imageRequest?.onlyAudio == true)
             Collections.unmodifiableSet(bindings.map { it.entry.id }.toSet()) else null
         override fun toString() = "LocalSearchSnapshot(redacted)"
     }
@@ -238,8 +240,10 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             val favoriteCondition = if (request.onlyFavorites) " AND e.isFavorite=1" else ""
             val imageCondition = if (request.onlyImages) " AND EXISTS(SELECT 1 FROM attachments p " +
                 "WHERE p.entryId=e.id AND p.revision=e.currentRevision AND p.mediaType IN ('image/png','image/jpeg')"+(if(readyImages)" AND p.state='READY'" else "")+")" else ""
+            val audioCondition = if (request.onlyAudio) " AND EXISTS(SELECT 1 FROM attachments p WHERE p.entryId=e.id AND p.revision=e.currentRevision AND p.mediaType='audio/wav')" else ""
+            val mediaCondition = imageCondition + audioCondition
             val budget = Budget()
-            val aliasIds = if(includeAliasCandidates)aliasCandidates(sql, request, from, through, budget, favoriteCondition, imageCondition,guard)else emptySet()
+            val aliasIds = if(includeAliasCandidates)aliasCandidates(sql, request, from, through, budget, favoriteCondition, mediaCondition,guard)else emptySet()
             val expression = LocalSearchTokenizer.query(request.query, request.exact)
             val condition = if (expression == null || stamp.version != 1 || stamp.profile != profile) "" else
                 " AND (" + valid(stamp.epoch, profile) + "=0 OR e.id IN (SELECT entryId FROM local_search_fts WHERE local_search_fts MATCH ?)" +
@@ -252,7 +256,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             while (true) {
                 guard()
                 val page = sql.query("SELECT e.id,e.capturedAtMillis,e.captureTimeZone" + sourceFrom +
-                    "WHERE " + live + favoriteCondition + imageCondition + condition + " ORDER BY e.id LIMIT 100 OFFSET " + scanned, args)
+                    "WHERE " + live + favoriteCondition + mediaCondition + condition + " ORDER BY e.id LIMIT 100 OFFSET " + scanned, args)
                 if (page.isEmpty()) break
                 for (row in page) {
                     guard()
@@ -272,7 +276,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
                     if (request.person != null && request.person !in checkNotNull(person).names) continue
                     if(!includeAliasCandidates){tag.names.forEach(budget::add);person?.names?.forEach(budget::add)
                         person?.aliases?.forEach { budget.add(it.alias); budget.add(it.name) }}
-                    val bound = read(sql, id, request.onlyImages,guard) ?: throw LocalSearchStale()
+                    val bound = read(sql, id, request.onlyImages,guard,request.onlyAudio) ?: throw LocalSearchStale()
                     budget.add(bound.entry.originalText)
                     bindings += bound
                     labels[id] = tag
@@ -288,7 +292,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
             guard()
             Proof(stamp, profile, Collections.unmodifiableList(bindings.toList()), labels, pending,
                 favoriteValues?.let { Collections.unmodifiableMap(it) },eventValues?.let { Collections.unmodifiableMap(it) },
-                request.takeIf { it.onlyImages },readyImages,includeAliasCandidates, personValues?.let { Collections.unmodifiableMap(it) })
+                request.takeIf { it.onlyImages || it.onlyAudio },readyImages,includeAliasCandidates, personValues?.let { Collections.unmodifiableMap(it) })
         }
     }
 
@@ -321,7 +325,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         var selected: StoredEntry? = null
         for (before in proof.bindings) {
             guard()
-            val current = read(sql, before.entry.id, before.images != null,guard) ?: return false
+            val current = read(sql, before.entry.id, before.images != null,guard,before.audio != null) ?: return false
             if (current != before) return false
             val tag = tags.readWithin(sql, before.entry.id)
             val previousTag = proof.tags[before.entry.id] ?: return false
@@ -345,7 +349,7 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         return true
     }
 
-    private fun read(sql: RecordsSqlConnection, id: String, onlyImages: Boolean = false,guard:()->Unit={}): Binding? {
+    private fun read(sql: RecordsSqlConnection, id: String, onlyImages: Boolean = false,guard:()->Unit={},onlyAudio:Boolean=false): Binding? {
         val rows = sql.query("SELECT e.id,e.currentRevision,r.originalText,r.contentHash,e.capturedAtMillis," +
             "e.captureTimeZone,e.privacyPolicy,COALESCE(t.version,0),COALESCE(a.generation,0)" + sourceFrom +
             "WHERE e.id=? AND " + live, listOf(id))
@@ -355,26 +359,28 @@ internal class SqlLocalSearchRepository(private val database: RecordsSqlDatabase
         val text = row[2] as String; val hash = row[3] as String
         require(text.length <= 100_000 && OriginalExports.hash(text) == hash)
         val revision = Math.toIntExact(row[1] as Long)
-        val images = if (onlyImages) {
+        fun media(types:String):List<ImageBinding>? {
             val rows = sql.query("SELECT id,revision,mediaType,sha256,byteSize,state FROM attachments " +
-                "WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg') ORDER BY id LIMIT 65",listOf(id,revision))
+                "WHERE entryId=? AND revision=? AND mediaType IN ("+types+") ORDER BY id LIMIT 65",listOf(id,revision))
             if (rows.isEmpty()) return null
             if (rows.size > 64) throw LocalSearchTooBroad()
-            rows.map { image ->
+            return rows.map { image ->
                 guard()
                 val imageId = image[0] as String; ManualTags.identifier(imageId)
                 val imageHash = image[3] as String; val bytes = image[4] as Long
-                require(imageHash.matches(Regex("[0-9a-f]{64}")) && bytes in 1..16_777_216)
+                require(imageHash.matches(Regex("[0-9a-f]{64}")) && bytes in 1..(if(image[2]=="audio/wav") LocalPcmAudio.MAX_WAV_BYTES.toLong() else 16_777_216L))
                 ImageBinding(imageId,Math.toIntExact(image[1] as Long),image[2] as String,imageHash,bytes,
                     AttachmentState.valueOf(image[5] as String))
             }
-        } else null
+        }
+        val images=if(onlyImages) media("'image/png','image/jpeg'") ?: return null else null
+        val audio=if(onlyAudio) media("'audio/wav'") ?: return null else null
         require(text.isNotBlank() || sql.query("SELECT id FROM attachments WHERE entryId=? AND revision=? AND mediaType IN ('image/png','image/jpeg','audio/wav') LIMIT 1",listOf(id,row[1])).isNotEmpty())
         val tagVersion = row[7] as Long; val visibility = row[8] as Long
         require(revision > 0 && tagVersion >= 0 && visibility >= 0)
         ZoneId.of(row[5] as String)
         return Binding(StoredEntry(row[0] as String, revision, text, row[4] as Long, row[5] as String,
-            ProcessingPolicy.valueOf(row[6] as String)), hash, tagVersion, visibility,images)
+            ProcessingPolicy.valueOf(row[6] as String)), hash, tagVersion, visibility,images,audio)
     }
 
     private inline fun <T> safely(block: () -> T): T = try { block() }

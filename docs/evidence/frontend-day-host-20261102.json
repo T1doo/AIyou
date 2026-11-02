@@ -1,0 +1,167 @@
+{
+  "source_parent": "cf54f3d9b4781a2fb4402ef86a4aeee8ee8bd482",
+  "validation": "actual controller/SQL/JCA host tests; synthetic ports where native services are needed",
+  "suites": [
+    {
+      "suite": "com.t1doo.aiyou.data.AudioFilterSqlTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "186a414642730b0889b26857ee91caadb6e43a4c9aaccbda95036b70b9a57eb7"
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.CurrentImageGridControllerTest",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "899e3d41e1468722799197323e9e6d656cb0641cb737a5df558a958d50502b42"
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.LocalSearchSqlTest",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "5c622de141c0f2fe1e372d41020c39ce82f5625481d9968518aed06faed3c27f"
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.SourceTaskSqlTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "5b3dc108e2dde8fb4a638a68190713bb5b7bccfa1b26f0c211c5b373197a46d9"
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.TaskUndoFullBackupTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "4c4b16f9e75a453794ce4e74f724b66148f380b629c8bfd79bd842b07b80a270"
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.TaskUserReceiptSqlTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "74cbf8ff933dbba7612c25eceff3b96d579a026da5f365726309ba3e0e02fe08"
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.CaptureEditorSessionTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "a3e6f572e0399cbc0e827163480854afd24f5107784be92e5702a685804584d1"
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.ManualTaskViewModelTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "a0d67fc7d0eb45d4da8e900736975c13cf160d7fce367c65d464a113cdcbb018"
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.MixedCaptureControllerTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "1312b3038abb7dbbed5641af9cab8822ae6cff13b73ddbacad8342ccec2e1eb2"
+    }
+  ],
+  "total_tests": 81,
+  "new_android_build": false,
+  "new_device_run": false,
+  "new_ci": false,
+  "new_artifact_upload": false,
+  "android_blocker": "No SDK with existing accepted licenses; CI frozen by parent",
+  "last_android_success_sha": "cf54f3d9b4781a2fb4402ef86a4aeee8ee8bd482",
+  "production_sources": [
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/MainActivity.kt",
+      "sha256": "1506eb0e512a0715cd73d0da54755783a7e8253141f8cfc4cbb133d599d337cc"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/CaptureEditorSession.kt",
+      "sha256": "577f55df6536ad8f4423dfe21400fdfc4a8ce78a32d7076c4c722d71fdfd7943"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/CurrentImageGridController.kt",
+      "sha256": "2a6cb66862fcbe31015982c1d1271bf1833f0b534a7c6122edae172e64e75cdf"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchController.kt",
+      "sha256": "3123f87fc0993be089369f6a9c3a99a9bc61c8de84c77708b4c1fbdb52ad9c27"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchMatcher.kt",
+      "sha256": "7d98a479dce963c29260aa18c2f96fb965b1fc23be0defb6419a8d82361285a3"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchSection.kt",
+      "sha256": "94ac611c1508ab563e6d8727f088e596b81697c2273c1b5dbd8604fb930b37e2"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/LocalRecordsScreen.kt",
+      "sha256": "7cc90b0547c2772679b4c15fe63d4fc33fa1ae5bf5f866fb5bc31cf5f12f232e"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/LocalRecordsViewModel.kt",
+      "sha256": "0b169b116f3e77afd88cbfa20aa5ef80cb64d4269685043c2194ba47325b1bfc"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/ManualTaskController.kt",
+      "sha256": "91ed9560c1de69a62fa88399e9a36c666a52c1538f4109e136a1dc05e6d25db2"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/ManualTasksScreen.kt",
+      "sha256": "515bdb674775031f399358ca0879b6a0f7cdaa5c3bef8e91bf5fc89fa24ea1c0"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/MixedCaptureController.kt",
+      "sha256": "f160b2e17063dde98d0eb7aaac2e6780c1d68b3ffd85df7371378ba616fb43b6"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/MixedCaptureScreen.kt",
+      "sha256": "0afedb4838f29ed6daa72334aad2feb983d682e462a5af8d07c43a0d6307e909"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/RecordRowActions.kt",
+      "sha256": "994e3505024a7669ba76bfbfb49da428785f23a843ff0e4031f5d0bb89cd12ce"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/RecordThumbnail.kt",
+      "sha256": "5881760ddd89a32bfcbed9f2ef9c861fed7dec73000bb24e89c4eee612bb5be5"
+    },
+    {
+      "path": "core/data/src/main/kotlin/com/t1doo/aiyou/data/ManualTaskCipher.kt",
+      "sha256": "27c975539939fcc358287f9bdd919847fd528269872fc20e5d1ecf819faeb1e2"
+    },
+    {
+      "path": "core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlLocalSearchRepository.kt",
+      "sha256": "27f438a1aad1320d7679b2c604ce3e82ac31c805beb82b497e39e1c90def41fa"
+    },
+    {
+      "path": "core/data/src/main/kotlin/com/t1doo/aiyou/data/SqlManualTaskRepository.kt",
+      "sha256": "ed7c4b4b0f50e2aac564048486ee6e19f5af26de84ea342d91e4b58fc7ef47d0"
+    },
+    {
+      "path": "core/domain/src/main/kotlin/com/t1doo/aiyou/domain/LocalSearchRepository.kt",
+      "sha256": "e03cd5d22eea7ce33af7574e113a003ced9fc6a061384bba0b649177ebbf2c05"
+    },
+    {
+      "path": "core/domain/src/main/kotlin/com/t1doo/aiyou/domain/ManualTaskRepository.kt",
+      "sha256": "8a6e9c32ab220ce1492bdba01e3c65c36f073b332523812f44b7b3969928c566"
+    },
+    {
+      "path": "core/model/src/main/kotlin/com/t1doo/aiyou/model/ManualTasks.kt",
+      "sha256": "037cd56274e60c9e2de487eef8056798ec2d3b0875531b3c848d0f6f0b922606"
+    }
+  ]
+}

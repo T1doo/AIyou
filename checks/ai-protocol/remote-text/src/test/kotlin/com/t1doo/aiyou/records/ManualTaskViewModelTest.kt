@@ -16,6 +16,23 @@ import org.junit.Test
 
 /** Actual VM/controller/queue + product SQL/AEAD. Native Android/SQLCipher is outside this host proof. */
 class ManualTaskViewModelTest {
+    @Test(timeout=6000) fun completionUndoNeedsCommittedSnapshotAndRetirementRejectsOldButton():Unit=Harness().use {h->runBlocking {
+        h.ready();h.f.store.create(ManualTaskSqlTest.create("one","合成撤销任务"))
+        h.vm.tasks.refresh();h.tasks {it.available && it.items.size==1}
+        h.vm.tasks.change("one",1,ManualTaskStatus.COMPLETED)
+        assertNull(h.vm.state.value.tasks.undoCompletion)
+        val completed=h.tasks {it.undoCompletion!=null && !it.busy}.undoCompletion!!
+        h.vm.tasks.undoCompletion(completed)
+        val undone=h.tasks {it.notice!=null && !it.busy && it.items.single().status==ManualTaskStatus.OPEN}
+        assertNull(undone.undoCompletion);assertEquals(3L,undone.items.single().version)
+        h.vm.tasks.undoCompletion(completed)
+        assertEquals(3L,h.f.store.snapshots().single().version)
+        h.vm.tasks.change("one",3,ManualTaskStatus.COMPLETED)
+        val again=h.tasks {it.undoCompletion!=null && !it.busy}.undoCompletion!!
+        h.vm.tasks.retireCompletionUndo();h.vm.tasks.undoCompletion(again)
+        assertEquals(ManualTaskStatus.COMPLETED,h.f.store.snapshots().single().status)
+    }}
+
     @Test(timeout = 6_000) fun unsavedCreationClosePreservesInputUntilExplicitDiscard(): Unit = Harness().use { h -> runBlocking {
         h.ready(); val initial = h.begin()
         h.vm.tasks.edit(initial.session, "合成未保存待办")

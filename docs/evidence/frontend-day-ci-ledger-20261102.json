@@ -1,0 +1,62 @@
+{
+  "prior_runs": 13,
+  "prior_seconds": 24110,
+  "added_jobs": [
+    {
+      "run_id": 41411293236,
+      "job_id": 125164706982,
+      "started_at": "2026-11-02T08:12:05Z",
+      "completed_at": "2026-11-02T08:16:33Z",
+      "seconds": 268,
+      "conclusion": "failure",
+      "runner_name": "GitHub Actions 1000001365",
+      "labels": [
+        "ubuntu-24.04"
+      ]
+    },
+    {
+      "run_id": 41412104521,
+      "job_id": 125167247518,
+      "started_at": "2026-11-02T08:18:38Z",
+      "completed_at": "2026-11-02T08:29:32Z",
+      "seconds": 654,
+      "conclusion": "success",
+      "runner_name": "GitHub Actions 1000001366",
+      "labels": [
+        "ubuntu-24.04"
+      ]
+    },
+    {
+      "run_id": 41414387198,
+      "job_id": 125174569562,
+      "started_at": "2026-11-02T08:37:08Z",
+      "completed_at": "2026-11-02T08:44:49Z",
+      "seconds": 461,
+      "conclusion": "failure",
+      "runner_name": "GitHub Actions 1000001367",
+      "labels": [
+        "ubuntu-24.04"
+      ]
+    },
+    {
+      "run_id": 41415468944,
+      "job_id": 125178114727,
+      "started_at": "2026-11-02T08:46:14Z",
+      "completed_at": "2026-11-02T08:57:54Z",
+      "seconds": 700,
+      "conclusion": "success",
+      "runner_name": "GitHub Actions 1000001368",
+      "labels": [
+        "ubuntu-24.04"
+      ]
+    }
+  ],
+  "added_seconds": 2083,
+  "total_runs": 17,
+  "total_seconds": 26193,
+  "budget_basis": "General delegated bounded free CI; no separately confirmed artifact cap/retention authorization found; freeze received after fourth upload completed.",
+  "artifact_bytes": 76949894,
+  "retention_days": 7,
+  "frozen": true,
+  "latest_success_sha": "cf54f3d9b4781a2fb4402ef86a4aeee8ee8bd482"
+}

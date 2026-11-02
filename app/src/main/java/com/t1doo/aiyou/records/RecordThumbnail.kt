@@ -18,6 +18,6 @@ internal fun RecordThumbnail(tile: ImageGridTile?) {
     Box(Modifier.size(64.dp).clip(MaterialTheme.shapes.small), contentAlignment = Alignment.Center) {
         val picture = tile?.picture as? PlatformAttachmentPicture
         if (picture != null) Image(picture.image, "记录图片预览，打开原文查看原件", Modifier.size(64.dp), contentScale = ContentScale.Crop)
-        else Text(if (tile?.failed == true) "图片暂不可读" else "读取图片…", style = MaterialTheme.typography.bodySmall)
+        // Wrapping failure/status text belongs to the row, outside this fixed image slot.
     }
 }

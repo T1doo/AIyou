@@ -344,7 +344,7 @@ class LocalRecordsViewModel internal constructor(
     val recordPackages = RecordPackageController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = ::enqueuePackageOperation,
         cipher = com.t1doo.aiyou.data.JcaRecordPackageCipher(), clock = clock,
-        beforeRestore={unifiedObserver?.readyImageMutationAccepted()},onFullRestored = { store -> reminderRuntime?.afterRestore();mixedCapture.adoptFullRestore(store);tasks.initialize(store);reminders.initialize(store);taskProposals.initialize(store) },sourceUi=::sourceUi)
+        beforeRestore={unifiedObserver?.readyImageMutationAccepted()},onFullRestored = { store -> reminderRuntime?.afterRestore();mixedCapture.adoptFullRestore(store);tasks.retireCompletionUndo();tasks.initialize(store);reminders.initialize(store);taskProposals.initialize(store) },sourceUi=::sourceUi)
     val recycleBin = RecycleBinController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> enqueueSource({Command.RecycleBin(it)},action) },
         canMove = { attachments.state.value == null },

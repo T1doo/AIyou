@@ -12,6 +12,18 @@ import java.io.InputStream
  * These checks do not execute Android decoding, Compose, Room or SQLCipher.
  */
 class CurrentImageGridControllerTest {
+    @Test fun ordinaryBrowseHasAuthenticatedImagesAndNoImageWithoutDecodingMissingMedia():Unit=Harness(2,browse=true,missingLast=true).use {h->
+        val missing=h.ids.last()
+        h.enter(h.ids);h.drain()
+        assertNotNull(h.controller.visible(h.search).tiles[h.ids.first()]?.picture)
+        val empty=h.controller.visible(h.search).tiles[missing]!!
+        assertTrue(empty.noImage);assertFalse(empty.failed);assertEquals(1,h.decodes)
+        h.controller.clear(h.search)
+        h.f.append(missing)
+        h.enter(h.ids);h.drain()
+        assertFalse(h.controller.visible(h.search).tiles[missing]?.noImage==true)
+    }
+
     @Test fun visibleOnlyUsesResultOrderAndOneCurrentRepresentativeWithoutReadingOffscreen(): Unit = Harness(3).use { h ->
         h.enter(listOf(h.ids[2], h.ids[0])); assertEquals(1, h.queue.size)
         h.drain()
@@ -154,7 +166,7 @@ class CurrentImageGridControllerTest {
         override fun releaseUnpublished() { check(!released); released = true }
     }
 
-    private class Harness(count: Int = 1, attachmentState: String = "READY", healthySecond: Boolean = false) : AutoCloseable {
+    private class Harness(count: Int = 1, attachmentState: String = "READY", healthySecond: Boolean = false,browse:Boolean=false,missingLast:Boolean=false) : AutoCloseable {
         val f = RecordEventDateFixture()
         val ids = (1..count).map { "00000000-0000-4000-8000-${it.toString().padStart(12, '0')}" }
         val rows = linkedMapOf<String, LocalAttachment>()
@@ -198,7 +210,7 @@ class CurrentImageGridControllerTest {
             ids.forEachIndexed { index, id ->
                 f.entry(id, if (index == 0) "" else "合成图片原文")
                 // Two same-version pictures; only the stable smaller ID may be read.
-                for (extra in listOf(1, 0)) {
+                for (extra in (if(missingLast && id==ids.last()) emptyList() else listOf(1, 0))) {
                     val image = "10000000-0000-4000-8000-${(index * 2 + extra).toString().padStart(12, '0')}"
                     val state = if (healthySecond && extra == 1) "READY" else attachmentState
                     val item = LocalAttachment(AttachmentIntent(image, id, 1, "image/png", LocalAttachmentController.hash(payload), payload.size.toLong()), AttachmentState.valueOf(state))
@@ -211,7 +223,7 @@ class CurrentImageGridControllerTest {
             val input = OriginalSearchInput(onlyImages = true)
             val result = runBlocking { LocalOriginalSearchMatcher.indexed(entries, input, f.search) }
             check(result.stage == OriginalSearchStage.READY)
-            search = OriginalSearchState(input, result.stage, result.hits, entries = entries, proof = result.proof,
+            search = OriginalSearchState(if(browse) OriginalSearchInput() else input, if(browse) OriginalSearchStage.BROWSE else result.stage, if(browse) emptyList() else result.hits, entries = entries, proof = if(browse) null else result.proof,
                 owner = f.search, indexEpoch = f.search.epoch())
             local = LocalRecordUiState(ready = true, opening = false, entries = entries, localSearch = f.search, localSearchEpoch = search.indexEpoch)
             controller = CurrentImageGridController({ queue.addLast(it); maxQueued = maxOf(maxQueued, queue.size); true }, {

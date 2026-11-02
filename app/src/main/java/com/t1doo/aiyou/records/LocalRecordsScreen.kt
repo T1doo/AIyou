@@ -89,6 +89,7 @@ fun LocalRecordsScreen(
     listState: LazyListState = rememberLazyListState(),
     selectedEntryId: String? = null,
     onOpenEntry: (String) -> Unit = {},
+    onRowAction:((com.t1doo.aiyou.model.StoredEntry,String)->Unit)?=null,
     tailReturnEntryId: String? = null,
     tailReturnGeneration: Long? = null,
     expectedReturnHeightPx: Int? = null,
@@ -133,7 +134,7 @@ fun LocalRecordsScreen(
     onlyFavorites: Boolean = false,
     onSearchFavorites: (Boolean) -> Unit = {},
     onRefreshFavorites: () -> Unit = {},
-    onlyImages: Boolean = false,
+    onSearchCategory:((String)->Unit)?=null,onlyImages: Boolean = false, onlyAudio:Boolean=false,onSearchAudio:(Boolean)->Unit={},
     onSearchImages: (Boolean) -> Unit = {},
     imageGrid: CurrentImageGridController? = null,
     imageGridMode: Boolean = false,
@@ -268,7 +269,7 @@ fun LocalRecordsScreen(
             } },
         )
     }
-    val requestedSearch = searchState?.input?.let { it.onlyImages || it.onlyFavorites || it.dateBasis == com.t1doo.aiyou.model.RecordDateBasis.EVENT || it.tag != null || it.person != null || it.from.isNotEmpty() || it.through.isNotEmpty() ||
+    val requestedSearch = searchState?.input?.let { it.onlyImages || it.onlyAudio || it.onlyFavorites || it.dateBasis == com.t1doo.aiyou.model.RecordDateBasis.EVENT || it.tag != null || it.person != null || it.from.isNotEmpty() || it.through.isNotEmpty() ||
         (if (it.mode == OriginalSearchMode.EXACT) it.query.isNotEmpty() else it.query.isNotBlank()) } == true
     // Keep the durable index in memory; a restored record immediately reveals its existing edit draft again.
     val visiblePendingEdits = if (local.supportsRecycleBin) local.pendingEdits.filter { draft -> local.entries.any { it.id == draft.entryId } } else local.pendingEdits
@@ -288,9 +289,12 @@ fun LocalRecordsScreen(
         }
         labels
     }
+    var expandedRow by remember(local.recordAuthorizationOwner,local.entries,searchState) {mutableStateOf<String?>(null)}
+    androidx.activity.compose.BackHandler(expandedRow!=null) {expandedRow=null}
+    LaunchedEffect(listState) {snapshotFlow {listState.isScrollInProgress}.collect {if(it) expandedRow=null}}
     val gridEnabled = destination == Destination.MEMORIES && !evidenceMode && onlyImages && imageGridMode && imageGrid != null &&
         searchState?.stage == OriginalSearchStage.READY
-    val listImagesEnabled = destination == Destination.MEMORIES && !evidenceMode && onlyImages && !imageGridMode && imageGrid != null && searchState?.stage == OriginalSearchStage.READY
+    val listImagesEnabled = destination == Destination.MEMORIES && !evidenceMode && !imageGridMode && imageGrid != null && searchState?.stage in setOf(OriginalSearchStage.READY,OriginalSearchStage.BROWSE)
     val columns = if (LocalDensity.current.fontScale >= 1.5f) 1 else 2
     val gridRows = remember(displayedEntries, columns, gridEnabled) { if (gridEnabled) displayedEntries.chunked(columns) else emptyList() }
     val gridEmission = imageGrid?.state?.collectAsState()?.value
@@ -501,7 +505,7 @@ fun LocalRecordsScreen(
                             favoritesSupported = local.supportsFavorites, favoritesAvailable = local.favoritesAvailable,
                             favoritesLoading = local.favoritesLoading, favoritesError = local.favoritesError,
                             onlyFavorites = onlyFavorites, onFavorites = onSearchFavorites, onRefreshFavorites = onRefreshFavorites,
-                            onlyImages = onlyImages, onImages = onSearchImages,
+                            onCategory=onSearchCategory,onlyImages = onlyImages, onImages = onSearchImages,onlyAudio=onlyAudio,onAudio=onSearchAudio,
                             dateBasis = searchDateBasis, onDateBasis = onSearchDateBasis,
                             eventDatesAvailable = local.eventDatesAvailable, eventDatesError = local.eventDatesError,
                             onRefreshEventDates = onRefreshEventDates,onQuestionKeywords=onQuestionKeywords,
@@ -588,14 +592,22 @@ fun LocalRecordsScreen(
                     val preview = remember(entry, hit) { hit?.let { originalSearchPreview(entry, it) } }
                     Column {
                     hit?.let { OriginalSearchTagMatch(it) }
-                    MemoryCard(preview?.text ?: originalPreview(entry.originalText), originalMetadata(entry), policy = entry.policy,
+                    val rowContent:@Composable ()->Unit = { MemoryCard(preview?.text ?: originalPreview(entry.originalText), originalMetadata(entry), policy = entry.policy,
                         modifier = Modifier.testTag("entry-${entry.id}").semantics { selected = entry.id == selectedEntryId }
                             .then(if (entry.id == selectedEntryId) Modifier.border(AIyouDimensions.iconStroke,
                                 AIyouColors.primary, MaterialTheme.shapes.medium) else Modifier),
                         onOpen = { if (hit != null) onOpenSearchResult(hit) else onOpenEntry(entry.id) },
                         highlight = preview?.takeIf { it.highlightEnd > it.highlightStart }?.let {
                             androidx.compose.ui.text.TextRange(it.highlightStart, it.highlightEnd)
-                        }, thumbnail = if (listImagesEnabled) ({ RecordThumbnail(gridTiles[entry.id]) }) else null)
+                        }, thumbnail = if (listImagesEnabled && gridTiles[entry.id]?.picture!=null) ({ RecordThumbnail(gridTiles[entry.id]) }) else null,
+                        attachmentLabel=if(listImagesEnabled && gridTiles[entry.id]?.failed==true) "图片状态暂不可读，打开原文核对或重试读取" else null) }
+                    if(onRowAction!=null && destination==Destination.MEMORIES && !evidenceMode) RecordRowActions(entry.id,expandedRow==entry.id,
+                        enabled=local.ready&&!local.opening&&local.error==null&&!local.saving&&!local.savePending,
+                        favorite=local.favorites[entry.id]?.takeIf{local.favoritesAvailable&&!local.favoritesLoading}?.isFavorite,
+                        favoriteBusy=local.favoriteWrites[entry.id]!=null,
+                        onReveal={expandedRow=entry.id},onClose={expandedRow=null},returnFocus=expandedRow==null&&!listState.isScrollInProgress,
+                        onAction={action->expandedRow=null;onRowAction(entry,action)},content=rowContent)
+                    else rowContent()
                     }
                   }
                 }

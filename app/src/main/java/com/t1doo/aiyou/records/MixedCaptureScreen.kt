@@ -23,6 +23,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.input.key.*
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Brush
@@ -31,6 +35,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
@@ -60,6 +66,10 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
     companion: (@Composable () -> Unit)? = null,motionAllowed:Boolean=false,compactHeader:Boolean=false,
     onAskQuestion:(()->Unit)?=null) {
     val ui=local.mixedCapture ?: MixedCaptureUiState()
+    val editor by controller.editor.state.collectAsState()
+    val frame=editor.frame
+    val fieldValue=TextFieldValue(frame.text,TextRange(frame.start,frame.end),
+        frame.composingStart?.let { TextRange(it,checkNotNull(frame.composingEnd)) })
     val playback=audio?.state?.collectAsState()?.value ?: OriginalAudioUi()
     val foreground=audio?.foregroundState?.collectAsState()?.value==true
     val enabled=local.ready && !local.opening && local.error==null && ui.draft!=null
@@ -72,12 +82,37 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
     var seenIds by remember(controller) { mutableStateOf(recentIds) }
     val scope=rememberCoroutineScope()
     var detailsOpen by remember(controller) { mutableStateOf(false) }
+    val moreFocus=remember(controller) {FocusRequester()}
+    var returnMoreFocus by remember(controller) {mutableStateOf(false)}
+    fun dismissDetails() {detailsOpen=false;returnMoreFocus=true}
+    LaunchedEffect(detailsOpen,returnMoreFocus) {if(!detailsOpen && returnMoreFocus) {withFrameNanos {};moreFocus.requestFocus();returnMoreFocus=false}}
+    var detailsTarget by remember(controller) { mutableStateOf<String?>(null) }
+    val detailsList=rememberLazyListState()
     var focusEditor by remember(controller) { mutableStateOf(false) }
-    // A single TextField stays in the composition with controller-owned text and field-owned
-    // selection and composing region. Focus mode changes allocation, never the input owner.
+    // The controller owns text, selection, composing region and bounded Undo across route changes.
+    // A single TextField stays in the composition within this screen. Focus mode changes allocation, never the input owner.
     val inputScroll=rememberScrollState()
     BackHandler(enabled=focusEditor && !detailsOpen) { focusEditor=false }
-    fun reveal(key:String) { detailsOpen=true }
+    fun reveal(key:String) { detailsTarget=key;detailsOpen=true }
+    val detailKeys=buildList {
+        add("heading")
+        if(enabled && ui.supportsProcessingChoice) add("processing-policy")
+        if(enabled && !ui.discardPending) {
+            add("count");addAll(ui.draft!!.images.map {"draft-image:"+it.intent.id});add("audio")
+        }
+        if(enabled) add("clear")
+        add("status")
+    }
+    LaunchedEffect(detailsOpen,detailsTarget,detailKeys) {
+        val target=detailsTarget ?: return@LaunchedEffect
+        if(!detailsOpen) return@LaunchedEffect
+        val index=detailKeys.indexOf(target)
+        if(index>=0) {
+            snapshotFlow {detailsList.layoutInfo.totalItemsCount}.first {it==detailKeys.size}
+            detailsList.scrollToItem(index)
+            detailsTarget=null
+        }
+    }
     DisposableEffect(controller) { onDispose { controller.cancelSelection() } }
     WaveFilePicker(controller.audioCapture,ui.audio,foreground)
     if(ui.confirmDiscard) AlertDialog(onDismissRequest=controller::cancelDiscard,title={Text(if(ui.discardPending) "清空结果待核对" else "清空这份草稿？")},
@@ -140,10 +175,17 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                 Spacer(Modifier.weight(1f))
                 Text(if(ui.draft?.policy==com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE) "不参与 AI" else "仅本机",style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
             }
-            BasicTextField(value=ui.text,onValueChange=controller::edit,enabled=editable,
+            BasicTextField(value=fieldValue,onValueChange={ value ->
+                    ui.draft?.id?.let {id -> controller.editValue(id,CaptureEditorFrame(value.text,value.selection.start,value.selection.end,
+                        value.composition?.min,value.composition?.max))}
+                },enabled=editable,
                 minLines=if(focusEditor) 5 else 2,maxLines=if(focusEditor) 16 else 3,
                 textStyle=MaterialTheme.typography.bodyLarge.copy(color=AIyouColors.textPrimary),cursorBrush=SolidColor(AIyouColors.primary),
-                modifier=Modifier.fillMaxWidth().padding(vertical=8.dp).testTag("mixed-text")
+                modifier=Modifier.fillMaxWidth().padding(vertical=8.dp).testTag("mixed-text").onPreviewKeyEvent { event ->
+                        val shortcut=(event.isCtrlPressed || event.isMetaPressed) && (event.key==Key.Z || event.key==Key.Y)
+                        if(shortcut && event.type==KeyEventType.KeyDown) ui.draft?.id?.let {controller.undoInput(it,event.key==Key.Y || event.isShiftPressed)}
+                        shortcut
+                    }
                     .semantics {contentDescription="写下此刻，也可以只添加附件"},
                 decorationBox={field->Box {if(ui.text.isEmpty()) Text("想到什么，先记下来…",style=MaterialTheme.typography.bodyLarge,color=AIyouColors.textSecondary);field()}})
             if(ui.draft?.let {it.images.isNotEmpty() || it.audio!=null}==true) TextButton(onClick={reveal("audio")},modifier=Modifier.heightIn(min=48.dp)) {
@@ -162,8 +204,8 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                     modifier=Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp).testTag("mixed-add").semantics {contentDescription="添加图片"}) {AttachmentIcon(false,editable)}
                 TextButton(onClick={controller.audioCapture.startFile(canImportAudio,{audio?.isResumed==true})},
                     enabled=editable&&audio!=null&&ui.draft?.audio==null&&(ui.draft?.images?.size ?: 20)<20,
-                    modifier=Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp).testTag("mixed-audio-import").semantics {contentDescription="导入原音文件，不自动转写"}) {AttachmentIcon(true,editable&&audio!=null)}
-                TextButton(onClick={detailsOpen=true},modifier=Modifier.heightIn(min=48.dp).testTag("mixed-more")){Text("更多")}
+                    modifier=Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp).testTag("mixed-audio-import").semantics {contentDescription="导入原音文件，不自动转写"}) {AttachmentIcon(true,editable&&audio!=null);Text("导入原音")}
+                TextButton(onClick={detailsOpen=true},modifier=Modifier.heightIn(min=48.dp).focusRequester(moreFocus).testTag("mixed-more")){Text("更多")}
                 TextButton(onClick={focusEditor=!focusEditor},modifier=Modifier.heightIn(min=48.dp).testTag("mixed-focus-editor")){Text(if(focusEditor)"收起编辑" else "展开")}
                 TextButton(onClick=controller::save,
                     enabled=enabled&&!ui.busy&&!controller.audioCapture.busy&&!playback.busy&&ui.selection==null&&ui.pendingEdits==0&&!ui.discardPending&&ui.policyChange==null,
@@ -174,10 +216,16 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
         }
       }
     }
-    if(detailsOpen) ModalBottomSheet(onDismissRequest={detailsOpen=false},containerColor=AIyouColors.surface) {
-        LazyColumn(Modifier.fillMaxWidth().testTag("mixed-details"),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    val detailContent:@Composable ()->Unit = {
+        LazyColumn(Modifier.fillMaxWidth().testTag("mixed-details"),state=detailsList,contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             item("heading") {
                 Text("这份草稿",style=MaterialTheme.typography.titleLarge)
+                FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick={ui.draft?.id?.let {controller.undoInput(it)}},enabled=editable&&editor.canUndo,
+                        modifier=Modifier.heightIn(min=48.dp).testTag("mixed-undo")){Text("撤销输入")}
+                    TextButton(onClick={ui.draft?.id?.let {controller.undoInput(it,true)}},enabled=editable&&editor.canRedo,
+                        modifier=Modifier.heightIn(min=48.dp).testTag("mixed-redo")){Text("重做输入")}
+                }
                 Text("图片与原音按现有能力处理；导入不自动转写。",style=MaterialTheme.typography.bodySmall)
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Checkbox(ui.retainJpegMetadata,onCheckedChange=controller::metadata,enabled=editable)
@@ -254,8 +302,14 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                 }
                 TextButton(onClick=controller::refresh,enabled=local.ready&&!ui.busy&&!controller.audioCapture.busy&&!playback.busy&&ui.selection==null,
                     modifier=Modifier.heightIn(min=48.dp).testTag("mixed-refresh")){Text("重新核对加密草稿")}
-                TextButton(onClick={detailsOpen=false},modifier=Modifier.heightIn(min=48.dp)){Text("回到输入")}
+                TextButton(onClick={detailsTarget=null;dismissDetails()},modifier=Modifier.heightIn(min=48.dp)){Text("回到输入")}
             }
+        }
+    }
+    if(detailsOpen) {
+        if(motionAllowed) ModalBottomSheet(onDismissRequest={detailsTarget=null;dismissDetails()},containerColor=AIyouColors.surface) {detailContent()}
+        else Dialog(onDismissRequest={detailsTarget=null;dismissDetails()}) {
+            Surface(color=AIyouColors.surface) {Box(Modifier.fillMaxWidth().heightIn(max=560.dp)){detailContent()}}
         }
     }
 }

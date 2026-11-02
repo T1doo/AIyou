@@ -2,13 +2,15 @@ package com.t1doo.aiyou.records
 
 import com.t1doo.aiyou.domain.AttachmentIntegrityFailure
 import com.t1doo.aiyou.domain.EntryRepository
+import com.t1doo.aiyou.domain.LocalSearchRequest
+import com.t1doo.aiyou.model.StoredEntry
 import com.t1doo.aiyou.model.AttachmentState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /** Memory-only presentation. Neither attachment bytes nor thumbnails are written to disk. */
-class ImageGridTile internal constructor(val picture: AttachmentPicture? = null, val failed: Boolean = false) {
+class ImageGridTile internal constructor(val picture: AttachmentPicture? = null, val failed: Boolean = false, val noImage:Boolean=false) {
     override fun toString() = "ImageGridTile(redacted)"
 }
 
@@ -55,7 +57,8 @@ class CurrentImageGridController(
     /** IDs come from LazyColumn.layoutInfo, in result order; offscreen composition never requests IO. */
     fun sync(search: OriginalSearchState, visibleIds: List<String>, allowed: () -> Boolean) = synchronized(lock) {
         if (disposed) return@synchronized
-        if (!search.input.onlyImages || search.stage != OriginalSearchStage.READY || search.owner == null || search.proof == null) {
+        if (search.stage !in setOf(OriginalSearchStage.READY,OriginalSearchStage.BROWSE) || search.owner == null ||
+            (search.stage==OriginalSearchStage.READY && search.proof==null)) {
             clearLocked(); return@synchronized
         }
         var value = request
@@ -66,7 +69,7 @@ class CurrentImageGridController(
         }
         if (!live(value)) { clearLocked(); return@synchronized }
         val ids = visibleIds.toSet()
-        value.visible = search.hits.asSequence().map { it.entry.id }.filter { it in ids }.take(MAX_VISIBLE_IMAGES).toList()
+        value.visible = (if(search.stage==OriginalSearchStage.BROWSE) search.entries.orEmpty() else search.hits.map {it.entry}).asSequence().map { it.id }.filter { it in ids }.take(MAX_VISIBLE_IMAGES).toList()
         val kept = mutable.value.tiles.filterKeys { it in value.visible }
         if (kept.size != mutable.value.tiles.size) mutable.value = ImageGridState(search, kept)
         scheduleLocked()
@@ -82,9 +85,9 @@ class CurrentImageGridController(
         val value = request ?: return
         if (working || !live(value)) return
         val id = value.visible.firstOrNull { it !in mutable.value.tiles } ?: return
-        val hit = value.search.hits.single { it.entry.id == id }
+        val entry = (if(value.search.stage==OriginalSearchStage.BROWSE) value.search.entries.orEmpty() else value.search.hits.map {it.entry}).single { it.id == id }
         working = true
-        if (!enqueue { repository -> load(repository, value, hit) }) {
+        if (!enqueue { repository -> load(repository, value, entry) }) {
             working = false
             mutable.value = ImageGridState(value.search, mutable.value.tiles + value.visible
                 .filter { it !in mutable.value.tiles }.associateWith { ImageGridTile(failed = true) })
@@ -92,21 +95,37 @@ class CurrentImageGridController(
     }
 
     private fun wanted(value: Request, id: String) = synchronized(lock) { live(value) && id in value.visible }
-    private suspend fun load(repository: EntryRepository, value: Request, hit: OriginalSearchHit) {
-        val id = hit.entry.id
+    private suspend fun load(repository: EntryRepository, value: Request, entry: StoredEntry) {
+        val id = entry.id
         var picture: AttachmentPicture? = null
         var published = false
         try {
             if (!wanted(value, id)) return
             val owner = checkNotNull(value.search.owner)
-            val proof = checkNotNull(value.search.proof)
+            val proof = if(value.search.input.onlyImages) checkNotNull(value.search.proof)
+                else owner.candidates(LocalSearchRequest("",onlyImages=true))
+            require(proof.epoch==value.search.indexEpoch)
+            // Ordinary browsing has no text-search proof. Obtain the same owner's current-original
+            // proof; both the record and complete image-membership proof are leased at publication.
+            val sourceProof=value.search.proof ?: owner.candidates(LocalSearchRequest(""))
+            require(sourceProof.epoch==value.search.indexEpoch)
+            if(entry.id !in checkNotNull(proof.currentImageEntryIds)) {
+                if(value.search.input.onlyImages) throw AttachmentIntegrityFailure()
+                owner.publishCurrent(proof) { owner.resolve(sourceProof,id) { fresh -> synchronized(lock) {
+                    if(fresh==entry && live(value) && id in value.visible) {
+                        mutable.value=ImageGridState(value.search,mutable.value.tiles+(id to ImageGridTile(noImage=true)))
+                        published=true
+                    }
+                } } }
+                return
+            }
             var sourceValid = false
-            if (!owner.resolve(proof, id) { sourceValid = it == hit.entry && wanted(value, id) } || !sourceValid) return
-            if (repository.entries().singleOrNull { it.id == id } != hit.entry || !wanted(value, id)) return
+            if (!owner.resolve(proof, id) { sourceValid = it == entry && wanted(value, id) } || !sourceValid) return
+            if (repository.entries().singleOrNull { it.id == id } != entry || !wanted(value, id)) return
             val store = checkNotNull(repository.attachments)
-            val rows = store.list(id, hit.entry.currentRevision)
+            val rows = store.list(id, entry.currentRevision)
             require(rows.size <= MAX_ASSOCIATIONS && rows.map { it.intent.id }.distinct().size == rows.size &&
-                rows.all { it.intent.entryId == id && it.intent.revision == hit.entry.currentRevision })
+                rows.all { it.intent.entryId == id && it.intent.revision == entry.currentRevision })
             // Stable representative, including a corrupt/failed first image. Never substitute a historical image.
             val item = rows.filter { it.intent.mediaType in LocalAttachmentController.IMAGE_TYPES }.minByOrNull { it.intent.id }
                 ?: throw AttachmentIntegrityFailure()
@@ -121,16 +140,18 @@ class CurrentImageGridController(
             } finally { bytes.fill(0) }
             val decoded = checkNotNull(picture)
             require(decoded.width in 1..MAX_EDGE && decoded.height in 1..MAX_EDGE && decoded.allocationBytes in 1..MAX_TILE_BYTES)
-            if (!wanted(value, id) || repository.entries().singleOrNull { it.id == id } != hit.entry ||
-                store.list(id, hit.entry.currentRevision) != rows) return
+            if (!wanted(value, id) || repository.entries().singleOrNull { it.id == id } != entry ||
+                store.list(id, entry.currentRevision) != rows) return
             // Publication stays inside the existing proof's counted SQL lease, including attachment metadata.
-            val valid = owner.resolve(proof, id) { fresh -> synchronized(lock) {
-                if (fresh == hit.entry && live(value) && id in value.visible) {
+            var sourceAccepted=false
+            val valid = owner.resolve(proof, id) { imageSource ->
+                if(imageSource==entry) sourceAccepted=owner.resolve(sourceProof,id) { fresh -> synchronized(lock) {
+                if (fresh == entry && live(value) && id in value.visible) {
                     mutable.value = ImageGridState(value.search, mutable.value.tiles + (id to ImageGridTile(decoded)))
                     published = true
                 }
-            } }
-            if (!valid && published) synchronized(lock) {
+            } } }
+            if ((!valid || !sourceAccepted) && published) synchronized(lock) {
                 if (request === value) mutable.value = ImageGridState(value.search, mutable.value.tiles - id)
             }
         } catch (cancelled: CancellationException) { throw cancelled }

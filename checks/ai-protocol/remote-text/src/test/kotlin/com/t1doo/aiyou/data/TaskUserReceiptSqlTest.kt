@@ -7,6 +7,34 @@ import org.junit.Test
 
 /** Real SQLite/JCA and cold owners. The driver is controlled; no Android permission or alarm runs. */
 class TaskUserReceiptSqlTest {
+    @Test fun completionUndoHasIndependentReplayRevokesRemindersAndSurvivesPortableRestore():Unit=F().use {f->
+        val scheduled=f.store.changeReminder(TaskReminderMutation(f.create(),TaskReminderMode.APPROXIMATE,60,"reminder"))
+        val complete=f.store.change(ManualTaskMutation(scheduled.id,scheduled.version,ManualTaskStatus.COMPLETED,100,"complete"))
+        val request=ManualTaskReopen(complete.id,complete.version,101,"undo")
+        f.lost {f.store.reopen(request)}
+        assertEquals(1,f.drain());f.reopen()
+        val actual=f.current();val before=f.blob()
+        assertEquals(ManualTaskStatus.OPEN,actual.status)
+        assertEquals(scheduled.schedule,actual.schedule);assertEquals(scheduled.sourceReceipt,actual.sourceReceipt)
+        assertEquals(TaskReminderPhase.REVOKED,actual.reminder!!.phase)
+        assertTrue(actual.reminder!!.commands.isEmpty())
+        assertEquals(actual,f.store.reopen(request));assertArrayEquals(before,f.blob())
+        assertEquals(7,before[0].toInt())
+        assertThrows(ManualTaskConflict::class.java) {f.store.reopen(ManualTaskReopen(request.id,request.expectedVersion,102,"undo"))}
+        assertThrows(IllegalArgumentException::class.java) {ManualTaskMutation(actual.id,actual.version,ManualTaskStatus.OPEN,103,"invalid-status")}
+        val cipher=ManualTaskCipher(LocalCandidateFixture.KEY)
+        try {
+            val mutation=f.local.db.read("SELECT lastMutationId FROM manual_tasks WHERE id='one'").single().single() as String
+            val portable=cipher.portable(actual.id,actual.version,mutation,before,false)
+            val restored=cipher.portable(actual.id,actual.version,mutation,portable,true)
+            val payload=cipher.open(actual.id,actual.version,mutation,restored)
+            assertEquals(actual,payload.task);assertEquals("RESTORE",payload.operation);assertNull(payload.userReceipt)
+        } finally {cipher.wipe()}
+        val cancelled=f.store.change(ManualTaskMutation(actual.id,actual.version,ManualTaskStatus.CANCELLED,104,"cancel"))
+        assertThrows(ManualTaskConflict::class.java) {f.store.reopen(ManualTaskReopen(cancelled.id,cancelled.version,105,"bad-undo"))}
+        assertThrows(ManualTaskConflict::class.java) {f.store.reopen(request)}
+    }
+
     private class F : AutoCloseable {
         val local = LocalCandidateFixture()
         var store = SqlManualTaskRepository(local.gateway, LocalCandidateFixture.KEY)

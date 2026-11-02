@@ -126,7 +126,7 @@ class LocalOriginalSearchController internal constructor(
         }
         val entries = checkNotNull(local).entries
         // Preserve immediate manual browsing when no lookup is requested.
-        if (input.query.isEmpty() && input.from.isEmpty() && input.through.isEmpty() && input.tag == null && input.person == null && !input.onlyFavorites && !input.onlyImages && input.dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED) {
+        if (input.query.isEmpty() && input.from.isEmpty() && input.through.isEmpty() && input.tag == null && input.person == null && !input.onlyFavorites && !input.onlyImages && !input.onlyAudio && input.dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED) {
             val browse = OriginalSearchState(input, OriginalSearchStage.BROWSE, entries = entries, generation = generation,
                 owner = local.localSearch, indexEpoch = local.localSearchEpoch, inputEpoch = inputEpoch)
             cache = browse

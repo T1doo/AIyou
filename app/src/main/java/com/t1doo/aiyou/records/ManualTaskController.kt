@@ -24,6 +24,7 @@ class ManualTaskTitleEditor(val session: Long, val task: ManualTaskSnapshot, val
 internal sealed interface ManualTaskIntent {
     class Create(val session: Long, val request: ManualTaskCreate) : ManualTaskIntent
     class Change(val request: ManualTaskMutation) : ManualTaskIntent
+    class Reopen(val request:ManualTaskReopen):ManualTaskIntent
     class Schedule(val session: Long, val request: ManualTaskScheduleMutation) : ManualTaskIntent
     class Rename(val session: Long, val request: ManualTaskRename) : ManualTaskIntent
 }
@@ -36,6 +37,7 @@ class ManualTasksUiState internal constructor(
     val dateEditor: ManualTaskDateEditor? = null,
     val titleEditor: ManualTaskTitleEditor? = null,
     val closeConfirmation: ManualTaskEditor? = null,
+    val undoCompletion:ManualTaskSnapshot?=null,
 ) {
     val items = Collections.unmodifiableList(items.toList())
     internal fun copy(supported: Boolean = this.supported, loading: Boolean = this.loading, available: Boolean = this.available,
@@ -43,8 +45,8 @@ class ManualTasksUiState internal constructor(
         error: String? = this.error, notice: String? = this.notice, conflict: Boolean = this.conflict,
         pending: ManualTaskIntent? = this.pending, generation: Long = this.generation,
         dateEditor: ManualTaskDateEditor? = this.dateEditor, titleEditor: ManualTaskTitleEditor? = this.titleEditor,
-        closeConfirmation: ManualTaskEditor? = this.closeConfirmation) =
-        ManualTasksUiState(supported, loading, available, items, editor, busy, error, notice, conflict, pending, generation, dateEditor, titleEditor, closeConfirmation)
+        closeConfirmation: ManualTaskEditor? = this.closeConfirmation,undoCompletion:ManualTaskSnapshot?=this.undoCompletion) =
+        ManualTasksUiState(supported, loading, available, items, editor, busy, error, notice, conflict, pending, generation, dateEditor, titleEditor, closeConfirmation,undoCompletion)
     override fun toString() = "ManualTasksUiState(available=$available, busy=$busy, redacted)"
 }
 
@@ -179,6 +181,14 @@ class ManualTaskController internal constructor(
             tasks.items.none { it.id == id && it.version == version && it.status == ManualTaskStatus.OPEN }) return
         submit(ManualTaskIntent.Change(ManualTaskMutation(id, version, status, clock.millis(), UUID.randomUUID().toString())))
     }
+    fun retireCompletionUndo() { update {it.copy(undoCompletion=null)} }
+    fun undoCompletion(expected:ManualTaskSnapshot) {
+        val tasks=current().tasks
+        if(!usable() || reminderBlocksWrite() || !tasks.available || tasks.busy || tasks.loading || tasks.pending!=null ||
+            tasks.editor!=null || tasks.dateEditor!=null || tasks.titleEditor!=null || tasks.undoCompletion!==expected ||
+            expected.status!=ManualTaskStatus.COMPLETED || tasks.items.singleOrNull {it.id==expected.id}!=expected) return
+        submit(ManualTaskIntent.Reopen(ManualTaskReopen(expected.id,expected.version,clock.millis(),UUID.randomUUID().toString())))
+    }
     fun beginTitle(id: String, version: Long) {
         val tasks = current().tasks
         if (!usable() || reminderBlocksWrite() || !tasks.supported || !tasks.available || tasks.loading || tasks.busy ||
@@ -241,7 +251,7 @@ class ManualTaskController internal constructor(
         val tasks = current().tasks
         if (!usable() || !tasks.supported || tasks.loading || tasks.busy || tasks.pending != null && !tasks.conflict) return
         val generation = tasks.generation + 1
-        update { it.copy(loading = true, available = false, items = emptyList(), notice = null, generation = generation) }
+        update { it.copy(loading = true, available = false, items = emptyList(), notice = null, generation = generation,undoCompletion=null) }
         if (!enqueue { load(it, generation) }) failed(null, generation, false)
     }
     private suspend fun load(store: EntryRepository, generation: Long) {
@@ -267,6 +277,7 @@ class ManualTaskController internal constructor(
                 val saved = when (intent) {
                     is ManualTaskIntent.Create -> tasks.create(intent.request)
                     is ManualTaskIntent.Change -> tasks.change(intent.request)
+                    is ManualTaskIntent.Reopen -> tasks.reopen(intent.request)
                     is ManualTaskIntent.Schedule -> tasks.reschedule(intent.request)
                     is ManualTaskIntent.Rename -> tasks.rename(intent.request)
                 }
@@ -275,10 +286,11 @@ class ManualTaskController internal constructor(
                 update { state -> if (state.generation != generation || state.pending !== intent) state else {
                     val editor = state.editor
                     state.copy(items = all, available = true, busy = false, pending = null, conflict = false, error = null,
+                        undoCompletion=if(intent is ManualTaskIntent.Change && saved.status==ManualTaskStatus.COMPLETED) saved else null,
                         editor = if (intent is ManualTaskIntent.Create && editor?.session == intent.session) null else editor,
                         dateEditor = if (intent is ManualTaskIntent.Schedule && state.dateEditor?.session == intent.session) null else state.dateEditor,
                         titleEditor = if (intent is ManualTaskIntent.Rename && state.titleEditor?.session == intent.session) null else state.titleEditor,
-                        notice = if (intent is ManualTaskIntent.Rename) "标题修改已保存在本机" else when (saved.status) {
+                        notice = if(intent is ManualTaskIntent.Reopen) "已撤销完成，提醒保持撤销；如需提醒请重新明确确认" else if (intent is ManualTaskIntent.Rename) "标题修改已保存在本机" else when (saved.status) {
                             ManualTaskStatus.OPEN -> "待办已保存在本机"
                             ManualTaskStatus.COMPLETED -> "待办已完成，状态已保存在本机"
                             ManualTaskStatus.CANCELLED -> "待办已取消，状态已保存在本机"
@@ -295,7 +307,7 @@ class ManualTaskController internal constructor(
                 else if (intent == null) "待办读取失败，加密数据与输入已保留，请重试读取。"
                 else "待办保存状态待确认，输入已保留，请重试确认。")
     }
-    fun dispose() { disposed = true }
+    fun dispose() { retireCompletionUndo();disposed = true }
     private fun dateError(reason: ManualTaskDateError) = when (reason) {
         ManualTaskDateError.DATE -> "日期请用有效的 YYYY-MM-DD，输入已保留。"
         ManualTaskDateError.TIME_WITHOUT_DATE -> "请先填写日期；没有日期不能设置时刻。"

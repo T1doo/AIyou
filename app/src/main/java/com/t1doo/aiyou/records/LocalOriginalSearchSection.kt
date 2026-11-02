@@ -32,6 +32,10 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.input.key.Key
@@ -76,7 +80,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     onDateBasis: (com.t1doo.aiyou.model.RecordDateBasis) -> Unit = {},
     eventDatesAvailable: Boolean = true, eventDatesError: String? = null,
     onRefreshEventDates: () -> Unit = {}, onlyImages: Boolean = false,
-    onImages: (Boolean) -> Unit = {}, person: String? = null, peopleSupported: Boolean = false,
+    onCategory:((String)->Unit)?=null,onImages: (Boolean) -> Unit = {}, onlyAudio:Boolean=false,onAudio:(Boolean)->Unit={}, person: String? = null, peopleSupported: Boolean = false,
     peopleAvailable: Boolean = false, peopleError: String? = null, onPerson: (String?) -> Unit = {},
     onRefreshPeople: () -> Unit = {},onQuestionKeywords:(()->Unit)?=null,
     searchNeedsAttention: Boolean = false) {
@@ -87,7 +91,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     val personInvalid = remember(query, person) { mutableStateOf(false) }
     val keepFiltersVisible = from.text.isNotEmpty() || through.text.isNotEmpty() ||
         mode != OriginalSearchMode.KEYWORDS || dateBasis != com.t1doo.aiyou.model.RecordDateBasis.CAPTURED ||
-        tag != null || person != null || onlyFavorites || onlyImages || !enabled || searchNeedsAttention ||
+        tag != null || person != null || (onCategory==null && (onlyFavorites || onlyImages || onlyAudio)) || !enabled || searchNeedsAttention ||
         tagsError != null || (indexSupported && (indexBusy || indexError != null)) ||
         (favoritesSupported && (favoritesLoading || !favoritesAvailable || favoritesError != null)) ||
         (peopleSupported && (!peopleAvailable || peopleError != null || personInput.text.isNotEmpty() || personInvalid.value))
@@ -143,6 +147,16 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
             }
           }
         }
+        onCategory?.let { choose ->
+            FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                for((key,label) in listOf("all" to "全部","favorites" to "收藏","images" to "图片","audio" to "音频")) {
+                    val selectedCategory=when(key) {"favorites"->onlyFavorites;"images"->onlyImages;"audio"->onlyAudio;else->!onlyFavorites&&!onlyImages&&!onlyAudio}
+                    TextButton(onClick={choose(key)},enabled=enabled&&(key!="favorites"||onlyFavorites||favoritesAvailable&&!favoritesLoading),
+                        modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("original-category-"+key)
+                            .semantics {selected=selectedCategory}.drawBehind {if(selectedCategory) drawLine(AIyouColors.primary,Offset(0f,size.height),Offset(size.width,size.height),2.dp.toPx())}) {Text(label)}
+                }
+            }
+        }
         Surface(color = AIyouColors.surface) {
           Column(Modifier.fillMaxWidth(),
               verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
@@ -158,7 +172,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                         style = MaterialTheme.typography.titleMedium, color = AIyouColors.primary)
                 }
             }
-            if (!showFilters) Text("日期 · 人物 · 标签 · 收藏 · 图片", style = MaterialTheme.typography.bodySmall,
+            if (!showFilters) Text("日期 · 人物 · 标签", style = MaterialTheme.typography.bodySmall,
                 color = AIyouColors.textSecondary)
             if (showFilters) {
             Text("关键词可在当前原文、手工标签或你为本条记录确认的别名关系中满足；精确片段只查原文。标签和别名命中只供查找，不构成原文出处。",
@@ -205,7 +219,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
             }
             tagsError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             if (favoritesSupported) {
-                TextButton(onClick = { onFavorites(!onlyFavorites) },
+                if(onCategory==null) TextButton(onClick = { onFavorites(!onlyFavorites) },
                     enabled = enabled && (onlyFavorites || (favoritesAvailable && !favoritesLoading)),
                     modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-favorites")) {
                     Text(if (onlyFavorites) "仅收藏 · 切换全部记录" else "仅看收藏记录")
@@ -215,15 +229,18 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 if (!favoritesAvailable) TextButton(onClick = onRefreshFavorites, enabled = enabled && !favoritesLoading,
                     modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-favorites-retry")) { Text("重试读取收藏") }
             }
-            TextButton(onClick = { onImages(!onlyImages) }, enabled = enabled,
+            if(onCategory==null) TextButton(onClick={onAudio(!onlyAudio)},enabled=enabled,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("original-search-audio")) {
+                Text(if(onlyAudio) "仅当前版本含原音 · 切换全部记录" else "仅看当前版本含原音记录")
+            }
+            if(onCategory==null) TextButton(onClick = { onImages(!onlyImages) }, enabled = enabled,
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-images")) {
                 Text(if (onlyImages) "仅当前版本含图片 · 切换全部记录" else "仅看当前版本含图片记录")
             }
             Text("图片筛选只看当前版本的 PNG/JPEG 附件关联；不识别图片文字，历史版本有图不计入。",
                 style = MaterialTheme.typography.bodySmall)
             Text(if (dateBasis == com.t1doo.aiyou.model.RecordDateBasis.CAPTURED)
-                "记录日期按捕获时区，包含起止两天。关键词、日期、手工标签、收藏与图片条件同时满足；只在本机查找，不使用 AI。"
-                else "事件日期按手填的日历日期与 IANA 时区，包含起止两天。未补记不匹配，不回落记录日期；与关键词、手工标签、收藏和图片条件同时满足。",
+                "记录日期按捕获时区，包含起止两天。关键词、日期、手工标签、收藏与附件条件同时满足；只在本机查找，不使用 AI。"
+                else "事件日期按手填的日历日期与 IANA 时区，包含起止两天。未补记不匹配，不回落记录日期；与关键词、手工标签、收藏和附件条件同时满足。",
                 style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onClear, enabled = enabled,
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-clear")) { Text("清空查找条件") }
