@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -14,6 +17,7 @@ import com.t1doo.aiyou.domain.*
 import com.t1doo.aiyou.model.*
 import com.t1doo.aiyou.records.*
 import com.t1doo.aiyou.ui.Destination
+import java.io.File
 import java.time.*
 import java.util.concurrent.atomic.*
 import org.json.*
@@ -219,11 +223,13 @@ class SelectedQuestionConsentPresentationTest {
             System.err.println("QUESTION_HISTORY_PHASE opened")
             val savedRow=compose.onNodeWithTag("saved-question-${saved.id}")
             System.err.println("QUESTION_HISTORY_PHASE before-fetch")
-            savedRow.fetchSemanticsNode()
+            val savedNode=savedRow.fetchSemanticsNode()
             System.err.println("QUESTION_HISTORY_PHASE after-fetch")
+            sampleHistoryScroll("before-scroll",savedNode)
             System.err.println("QUESTION_HISTORY_PHASE before-scroll")
             savedRow.performScrollTo()
             System.err.println("QUESTION_HISTORY_PHASE after-scroll")
+            sampleHistoryScroll("after-scroll",savedNode)
             System.err.println("QUESTION_HISTORY_PHASE before-display")
             savedRow.assertIsDisplayed()
             System.err.println("QUESTION_HISTORY_PHASE after-display")
@@ -247,6 +253,29 @@ class SelectedQuestionConsentPresentationTest {
                 assertEquals("合成记录草稿，不能变成问题",records.value.text);assertSame(captureDraft,records.value.mixedCapture!!.draft)
             }
         } finally {history.dispose();runBlocking{runtime.closeAndJoin()};ai.close()}
+    }
+
+    /** Bounded read-only numeric geometry; no extra fetch, idle, scroll or callback is introduced. */
+    private fun sampleHistoryScroll(stage:String,node:SemanticsNode) {
+        val result=JSONObject().put("source_sha",System.getenv("GITHUB_SHA")?:"local-not-CI").put("stage",stage)
+        try {
+            fun bounds(n:SemanticsNode)=JSONObject().put("left",n.boundsInRoot.left).put("top",n.boundsInRoot.top)
+                .put("right",n.boundsInRoot.right).put("bottom",n.boundsInRoot.bottom)
+                .put("x",n.positionInRoot.x).put("y",n.positionInRoot.y).put("width",n.size.width).put("height",n.size.height)
+            result.put("target",bounds(node))
+            var parent=node.parent;var depth=0
+            while(parent!=null&&depth<32&&!parent.config.contains(SemanticsActions.ScrollBy)){parent=parent.parent;depth++}
+            result.put("ancestorDepth",depth).put("scrollAncestorFound",parent!=null&&parent.config.contains(SemanticsActions.ScrollBy))
+            parent?.takeIf{it.config.contains(SemanticsActions.ScrollBy)}?.let{scroll->
+                result.put("viewport",bounds(scroll))
+                for((name,key) in listOf("vertical" to SemanticsProperties.VerticalScrollAxisRange,"horizontal" to SemanticsProperties.HorizontalScrollAxisRange)) {
+                    scroll.config.getOrNull(key)?.let{axis->result.put(name,JSONObject().put("value",axis.value()).put("maxValue",axis.maxValue()).put("reverse",axis.reverseScrolling))}
+                }
+            }
+            result.put("status","OBSERVED")
+        } catch(error:Exception) {result.put("status","UNAVAILABLE").put("errorType",error.javaClass.simpleName)}
+        val file=File("build/reports/tests/testDebugUnitTest/saved-question-handoff/$stage.json")
+        file.parentFile.mkdirs();file.writeText(result.toString(2))
     }
 
     /** Synthetic metadata/ack port only. Does not replace the product's SQL authority test. */
