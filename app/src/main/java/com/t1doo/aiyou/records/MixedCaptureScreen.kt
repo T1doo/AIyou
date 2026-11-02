@@ -86,6 +86,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
         confirmButton={TextButton(onClick=controller::confirmDiscard,enabled=!ui.busy,modifier=Modifier.heightIn(min=48.dp).testTag("mixed-discard-confirm")){Text(if(ui.discardPending) "核对同一次清空" else "确认清空草稿")}},
         dismissButton={TextButton(onClick=controller::cancelDiscard,enabled=!ui.busy){Text(if(ui.discardPending) "稍后核对" else "继续编辑")}})
     BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.surface)) {
+      val availableHeight=maxHeight
       Column(Modifier.widthIn(max=AIyouDimensions.contentMaxWidth).fillMaxSize().align(Alignment.TopCenter)) {
         if(!focusEditor) LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("mixed-list"),state=listState,
             contentPadding=PaddingValues(horizontal=16.dp,vertical=8.dp)) {
@@ -123,7 +124,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
         HorizontalDivider(color=AIyouColors.outlineDecorative)
         // Scrolling belongs to the constrained composer, not an extra IME inset. At large text
         // every action remains reachable; focus editing can use the complete available height.
-        Column(Modifier.fillMaxWidth().heightIn(max=if(focusEditor) maxHeight else maxHeight*.65f)
+        Column(Modifier.fillMaxWidth().heightIn(max=if(focusEditor) availableHeight else availableHeight*.65f)
             .verticalScroll(inputScroll).padding(horizontal=16.dp,vertical=4.dp).testTag("mixed-composer"),
             verticalArrangement=Arrangement.spacedBy(4.dp)) {
             if(!enabled) {

@@ -116,8 +116,8 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 // a platform legacy fallback cannot insert a literal z/y.
                 history
             }
-        Surface(color = AIyouColors.primaryContainer, shape = MaterialTheme.shapes.large) {
-          Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
+        Surface(color = AIyouColors.surface) {
+          Column(Modifier.fillMaxWidth(),
               verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
             Text("本机原文查找", style = MaterialTheme.typography.titleMedium,
                 color = AIyouColors.primary, modifier = Modifier.semantics { heading() })
@@ -143,9 +143,8 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
             }
           }
         }
-        Surface(color = AIyouColors.surface, shape = MaterialTheme.shapes.large,
-            border = BorderStroke(AIyouDimensions.borderWidth, AIyouColors.outlineDecorative)) {
-          Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd),
+        Surface(color = AIyouColors.surface) {
+          Column(Modifier.fillMaxWidth(),
               verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
             TextButton(onClick = { filtersExpanded = !filtersExpanded }, enabled = enabled && !keepFiltersVisible,
                 modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget)

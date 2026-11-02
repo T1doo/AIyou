@@ -58,6 +58,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
@@ -276,6 +277,17 @@ fun LocalRecordsScreen(
     val displayedEntries = if (destination == Destination.NOW) local.entries.take(5)
         else if (evidenceMode) evidenceState.cards.map { it.hit.entry }
         else if (filtered) searchState?.hits?.map { it.entry }.orEmpty() else local.entries
+    val recordGroups = remember(displayedEntries) {
+        val labels = linkedMapOf<String, String>()
+        var previous: String? = null
+        for (entry in displayedEntries) {
+            val date = java.time.Instant.ofEpochMilli(entry.capturedAtMillis).atZone(java.time.ZoneId.of(entry.captureTimeZone)).toLocalDate()
+            val label = "${date.year}年${date.monthValue}月${date.dayOfMonth}日"
+            if (label != previous) labels[entry.id] = label
+            previous = label
+        }
+        labels
+    }
     val gridEnabled = destination == Destination.MEMORIES && !evidenceMode && onlyImages && imageGridMode && imageGrid != null &&
         searchState?.stage == OriginalSearchStage.READY
     val listImagesEnabled = destination == Destination.MEMORIES && !evidenceMode && onlyImages && !imageGridMode && imageGrid != null && searchState?.stage == OriginalSearchStage.READY
@@ -315,7 +327,11 @@ fun LocalRecordsScreen(
         if (destination == Destination.NOW) add("recent")
         if (local.ready && local.entries.isEmpty()) add("empty")
         if (evidenceMode) add("local-evidence-status")
-        addAll(if (gridEnabled) gridRows.map { it.first().id } else displayedEntries.map { it.id })
+        if (gridEnabled) addAll(gridRows.map { it.first().id })
+        else for (entry in displayedEntries) {
+            if (!evidenceMode && destination == Destination.MEMORIES && entry.id in recordGroups) add("record-group:"+entry.id)
+            add(entry.id)
+        }
     }
     LaunchedEffect(searchReturnAnchor, searchState, evidenceState, attachedViewport, contentKeys, returnViewportReady, expectedReturnHeightPx) {
         val anchor = searchReturnAnchor ?: return@LaunchedEffect
@@ -563,7 +579,11 @@ fun LocalRecordsScreen(
                         }
                         if (row.size < columns) Spacer(Modifier.weight(1f))
                     }
-                } else items(displayedEntries, key = { it.id }) { entry ->
+                } else for (entry in displayedEntries) {
+                  if (destination == Destination.MEMORIES && entry.id in recordGroups) item("record-group:"+entry.id) {
+                    Text(checkNotNull(recordGroups[entry.id]),Modifier.padding(top=AIyouDimensions.spaceLg).semantics {heading()},style=MaterialTheme.typography.titleMedium)
+                  }
+                  item(entry.id) {
                     val hit = if (filtered) searchHits[entry.id] else null
                     val preview = remember(entry, hit) { hit?.let { originalSearchPreview(entry, it) } }
                     Column {
@@ -577,6 +597,7 @@ fun LocalRecordsScreen(
                             androidx.compose.ui.text.TextRange(it.highlightStart, it.highlightEnd)
                         }, thumbnail = if (listImagesEnabled) ({ RecordThumbnail(gridTiles[entry.id]) }) else null)
                     }
+                  }
                 }
             }
         }

@@ -30,7 +30,7 @@ import com.t1doo.aiyou.designsystem.AIyouDimensions
         Surface(shape=MaterialTheme.shapes.large) {
             Column(Modifier.widthIn(max=560.dp).fillMaxWidth().verticalScroll(rememberScrollState())
                 .testTag("saved-questions-scroll").padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                Text("已保存的问题",Modifier.semantics { heading() },style=MaterialTheme.typography.titleLarge)
+                Text("问题收藏",Modifier.semantics { heading() },style=MaterialTheme.typography.titleLarge)
                 Text("只保存你写的问题，不含回答、出处选择或发送授权；不会自动成为原文、稳定事实或待办。")
                 if(u.busy)Text("正在确认本机存储…",Modifier.testTag("saved-questions-busy"))
                 u.error?.let { Text(it,Modifier.testTag("saved-questions-error"),color=MaterialTheme.colorScheme.error) }
@@ -41,12 +41,18 @@ import com.t1doo.aiyou.designsystem.AIyouDimensions
                     val codePoints=checkNotNull(item.question).codePoints().limit(40).toArray()
                     TextButton(onClick={c.select(u,item)},enabled=editable,
                         modifier=Modifier.fillMaxWidth().heightIn(min=AIyouDimensions.minTouchTarget).testTag("saved-question-${item.id}")) {
-                        Text("编辑："+String(codePoints,0,codePoints.size))
+                        Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                            Text(String(codePoints,0,codePoints.size),style=MaterialTheme.typography.titleMedium)
+                            Text("修改于 "+java.time.Instant.ofEpochMilli(item.updatedAtMillis).atZone(java.time.ZoneId.systemDefault())
+                                .format(java.time.format.DateTimeFormatter.ofPattern("M月d日 HH:mm"))+" · 编辑问题",
+                                style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
+                    androidx.compose.material3.HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
                 }
                 Text(if(u.selected==null)"新问题" else "编辑已保存的问题",Modifier.semantics { heading() })
                 OutlinedTextField(value=u.text,onValueChange={c.edit(u,it)},enabled=editable,
-                    modifier=Modifier.fillMaxWidth().testTag("saved-question-input"),minLines=2,maxLines=6,
+                    label={Text("问题正文")},modifier=Modifier.fillMaxWidth().testTag("saved-question-input"),minLines=2,maxLines=6,
                     isError=u.rejectedInput,supportingText={Text("最多512码点／2048字节。确认保存才写入；删除不提供撤销，已有备份不会被收回。")})
                 if(u.pending!=null) {
                     Text("这次操作的结果尚未确认。关闭会保留当前输入和同一次重试意图，不能另建请求。")

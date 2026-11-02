@@ -30,7 +30,7 @@ import com.t1doo.aiyou.model.ChatMessageState
         Surface(shape=MaterialTheme.shapes.large) {
             Column(Modifier.widthIn(max=560.dp).fillMaxWidth().verticalScroll(rememberScrollState())
                 .testTag("chat-history-scroll").padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                Text("本机问答历史",Modifier.semantics{heading()},style=MaterialTheme.typography.titleLarge)
+                Text("回答历史",Modifier.semantics{heading()},style=MaterialTheme.typography.titleLarge)
                 Text("保存你确认发送的问题与已接纳的回答，不自动成为原文、稳定事实或待办，也不会自动重发。出处失效时隐藏回答，问题仍保留。")
                 if(u.busy)Text("正在核对本机历史…",Modifier.testTag("chat-history-busy"))
                 u.error?.let{Text(it,Modifier.testTag("chat-history-error"),color=MaterialTheme.colorScheme.error)}
@@ -39,14 +39,25 @@ import com.t1doo.aiyou.model.ChatMessageState
                 for(item in u.items) {
                     TextButton(onClick={c.select(u,item)},enabled=enabled,
                         modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("chat-history-item-${item.id}")) {
-                        Text(checkNotNull(item.question)+" · "+when(item.state){
-                            ChatMessageState.PENDING->"未接纳回答，不自动恢复发送"
-                            ChatMessageState.ANSWERED->"已保存回答"
-                            ChatMessageState.CANCELLED->"发送已取消"
-                            ChatMessageState.INVALIDATED->"出处已变化，回答已退休"
-                            ChatMessageState.DELETED->"已删除"
-                        })
+                        Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                            Text(checkNotNull(item.question),style=MaterialTheme.typography.titleMedium)
+                            Text(java.time.Instant.ofEpochMilli(item.createdAtMillis).atZone(java.time.ZoneId.systemDefault())
+                                .format(java.time.format.DateTimeFormatter.ofPattern("M月d日 HH:mm")),style=MaterialTheme.typography.bodySmall)
+                            Text(when {
+                                u.busy && u.selected?.id==item.id -> "正在核对来源"
+                                u.stale -> "来源待重新核对 · 回答已隐藏"
+                                item.state==ChatMessageState.ANSWERED && u.selected?.id==item.id && u.view?.reply!=null -> "来源已核对"
+                                else -> when(item.state) {
+                                    ChatMessageState.PENDING -> "未接纳回答，不自动恢复发送"
+                                    ChatMessageState.ANSWERED -> "已保存回答 · 打开后核对来源"
+                                    ChatMessageState.CANCELLED -> "发送已取消"
+                                    ChatMessageState.INVALIDATED -> "来源失效 · 回答已隐藏"
+                                    ChatMessageState.DELETED -> "已删除"
+                                }
+                            },style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
+                    androidx.compose.material3.HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
                 }
                 u.selected?.let {item->
                     Text("问题",Modifier.semantics{heading()})
@@ -60,7 +71,7 @@ import com.t1doo.aiyou.model.ChatMessageState
                         }
                         for((i,citation) in checkNotNull(u.view).citations.withIndex()) {
                             val r=citation.reference
-                            Text("记录时间："+java.time.Instant.ofEpochMilli(citation.capturedAtMillis).atZone(java.time.ZoneId.of(citation.captureTimeZone)).toString()+
+                            Text("[${i+1}] 记录时间："+java.time.Instant.ofEpochMilli(citation.capturedAtMillis).atZone(java.time.ZoneId.of(citation.captureTimeZone)).toString()+
                                 "；来源版本 "+r.source.revision,Modifier.fillMaxWidth())
                             SelectionContainer {Text(r.quote,Modifier.fillMaxWidth())}
                             TextButton(onClick={c.openSource(u,r)},enabled=enabled&&reply.paragraphs.any{r in it.references},
