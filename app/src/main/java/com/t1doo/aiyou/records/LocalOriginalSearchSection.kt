@@ -85,7 +85,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     var filtersExpanded by remember(query, from, through) { mutableStateOf(false) }
     val personInput = remember(query, person) { TextFieldState(person.orEmpty()) }
     val personInvalid = remember(query, person) { mutableStateOf(false) }
-    val keepFiltersVisible = query.text.isNotEmpty() || from.text.isNotEmpty() || through.text.isNotEmpty() ||
+    val keepFiltersVisible = from.text.isNotEmpty() || through.text.isNotEmpty() ||
         mode != OriginalSearchMode.KEYWORDS || dateBasis != com.t1doo.aiyou.model.RecordDateBasis.CAPTURED ||
         tag != null || person != null || onlyFavorites || onlyImages || !enabled || searchNeedsAttention ||
         tagsError != null || (indexSupported && (indexBusy || indexError != null)) ||

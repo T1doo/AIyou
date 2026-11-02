@@ -444,7 +444,7 @@ fun LocalRecordsScreen(
                         }
                     } else NotebookPageHeader(destination.label,
                         if (destination == Destination.MEMORIES) "${local.entries.size} 条本机记录" else "随手记下一点生活",
-                        stackSummary, companion)
+                        stackSummary, companion, showTitle = false)
                 }
                 if (destination == Destination.NOW) item("composer") {
                     CaptureComposer(

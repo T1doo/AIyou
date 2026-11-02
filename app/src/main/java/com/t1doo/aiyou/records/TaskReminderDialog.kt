@@ -45,6 +45,29 @@ internal fun taskReminderLabel(reminder: TaskReminderSnapshot): String =
     TaskReminderPhase.TIME_PASSED -> "时间已过 · 未重新安排，通知结果未核实"
 }
 
+/** Short row metadata; full precision, permission and scheduling details remain in disclosure. */
+internal fun compactTaskReminderLabel(r: TaskReminderSnapshot): String =
+    (if(r.mode==TaskReminderMode.EXACT) "精确 · " else "大约 · ") + when(r.phase) {
+        TaskReminderPhase.PENDING -> "安排待核对"
+        TaskReminderPhase.SCHEDULED -> "已安排 · 送达未验证"
+        TaskReminderPhase.REVOKED -> if(r.commands.isEmpty()) "已撤销" else "已撤销 · 系统撤销待核对"
+        TaskReminderPhase.TRIGGER_ACCEPTED -> "触发已核对 · 送达未验证"
+        TaskReminderPhase.PLATFORM_UNAVAILABLE -> "系统调度不可用 · 不会通知"
+        TaskReminderPhase.NOTIFICATION_REQUIRED -> "通知未授权"
+        TaskReminderPhase.NOTIFICATION_DENIED -> "通知授权已拒绝"
+        TaskReminderPhase.CHANNEL_DISABLED -> "通知渠道已关闭"
+        TaskReminderPhase.EXACT_REQUIRED -> "精确提醒未授权"
+        TaskReminderPhase.EXACT_DENIED -> "精确提醒授权已拒绝"
+        TaskReminderPhase.FAILED -> "安排结果待核对"
+        TaskReminderPhase.TRIGGER_BLOCKED -> "触发受阻 · 未发布"
+        TaskReminderPhase.DELIVERY_BLOCKED -> "发布受阻 · 未发布"
+        TaskReminderPhase.POSTING, TaskReminderPhase.POST_UNKNOWN -> "通知结果待核对"
+        TaskReminderPhase.NOTIFICATION_POSTED -> "发布已返回 · 送达未验证"
+        TaskReminderPhase.POST_FAILED -> "通知发布失败"
+        TaskReminderPhase.TRIGGER_UNDELIVERED -> "未发布 · 不自动补发"
+        TaskReminderPhase.TIME_PASSED -> "时间已过 · 结果未核实"
+    }
+
 @Composable
 fun TaskReminderDialog(local: LocalRecordUiState, controller: TaskReminderController, ownsRoute: () -> Boolean) {
     val editor = local.reminders.editor ?: return

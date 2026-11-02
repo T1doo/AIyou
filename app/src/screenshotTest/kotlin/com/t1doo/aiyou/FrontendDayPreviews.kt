@@ -1,5 +1,16 @@
 package com.t1doo.aiyou
 
+import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.ui.Modifier
+import com.t1doo.aiyou.records.LocalRecordsScreen
+import com.t1doo.aiyou.records.OriginalSearchInput
+import com.t1doo.aiyou.records.OriginalSearchStage
+import com.t1doo.aiyou.records.OriginalSearchState
+import com.t1doo.aiyou.ui.NotebookAppBar
+import com.t1doo.aiyou.ui.NotebookNavigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.tooling.preview.Preview
@@ -46,8 +57,18 @@ fun FrontendDayMemories() {
     val local=remember {LocalRecordUiState(ready=true,opening=false,entries=listOf(
         StoredEntry("synthetic-reading-1",1,"把旅行照片做成一本小册子。\n今天把旧照片重新看了一遍，想把几个小故事收在一起。",1793586600000,"UTC",ProcessingPolicy.LOCAL_ONLY),
         StoredEntry("synthetic-reading-2",1,"想再读的两句话。慢慢来，也是一种认真。",1793500200000,"UTC",ProcessingPolicy.AI_NONE)))}
-    AIyouTheme {AIyouApp(previewDestination=Destination.MEMORIES,local=local,
-        display=UiPreferencesState(UiPreferences(showCompanion=false,reduceMotion=true),ready=true))}
+    val query=remember {TextFieldState()}
+    val from=remember {TextFieldState()}
+    val through=remember {TextFieldState()}
+    val browse=remember(local) {OriginalSearchState(OriginalSearchInput(),OriginalSearchStage.BROWSE,entries=local.entries)}
+    // Explicit ready snapshot: Layoutlib does not drive Main's asynchronous search owner.
+    // This proves the actual list presentation, not search or navigation correctness.
+    AIyouTheme {Scaffold(topBar={NotebookAppBar("回忆","设置") {}},
+        bottomBar={NotebookNavigation(Destination.MEMORIES,{})}) {padding->
+        LocalRecordsScreen(Destination.MEMORIES,local,{},{},{},
+            modifier=Modifier.padding(padding).consumeWindowInsets(padding),
+            searchState=browse,searchQuery=query,searchFrom=from,searchThrough=through)
+    }}
 }
 
 @PreviewTest

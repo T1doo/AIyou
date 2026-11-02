@@ -96,25 +96,21 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                     if (compactHeader) Row(Modifier.fillMaxWidth().testTag("manual-task-compact-header"),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
-                            Text("待办", Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
                             LocalProcessingStatus()
                         }
                         companion?.invoke()
-                    } else NotebookPageHeader("待办", "由你明确创建的正式任务", stacked, companion)
+                    } else NotebookPageHeader("待办", "由你明确创建的正式任务", stacked, companion, showTitle = false)
                 }
                 item("create") {
                     Surface(color = AIyouColors.surface, contentColor = AIyouColors.textPrimary) {
                         Column(Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                            FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm),verticalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
                             TextButton(onClick = onBegin, enabled = canChoose,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
                                     .testTag("manual-task-begin")) { Text("创建待办") }
-                            if (detailsExpanded) Text("创建不会自动设置提醒", style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.testTag("manual-task-reminder-boundary"))
-                            if (detailsExpanded) Text("提醒需逐条确认，安排不等于送达。", style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.testTag("manual-task-reminder-policy"))
                             Text(if (countsReady) "正式待办 ${tasks.items.size}" else "正式待办 · 待核对",
-                                style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("manual-task-total"))
+                                style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("manual-task-total").align(Alignment.CenterVertically))
                             if (proposals.supported) Text(if (proposalsReady)
                                 "待确认草稿 ${proposals.items.count { it.proposal.state == TaskProposalState.DRAFT }} · 单独计数"
                                 else "待确认草稿 · 待核对", style = MaterialTheme.typography.bodySmall,
@@ -122,9 +118,15 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                             TextButton(onClick = { detailsExpanded = !detailsExpanded },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-task-details")
                                     .semantics { stateDescription = if (detailsExpanded) "已展开" else "已收起" }) {
-                                Text(if (detailsExpanded) "收起说明" else "计数与提醒说明")
+                                Text(if (detailsExpanded) "收起说明" else "说明")
+                            }
                             }
                             if (detailsExpanded) {
+                            if (detailsExpanded) Text("创建不会自动设置提醒", style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.testTag("manual-task-reminder-boundary"))
+                            if (detailsExpanded) Text("提醒需逐条确认，安排不等于送达。", style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.testTag("manual-task-reminder-policy"))
+
                                 if (countsReady) Text("未完成 ${tasks.items.count { it.status == ManualTaskStatus.OPEN }} · " +
                                     "已完成 ${tasks.items.count { it.status == ManualTaskStatus.COMPLETED }} · " +
                                     "已取消 ${tasks.items.count { it.status == ManualTaskStatus.CANCELLED }}",
@@ -155,7 +157,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                             enabled = !tasks.busy && !tasks.loading, modifier = Modifier.testTag("manual-task-retry")) {
                             Text(if (tasks.conflict) "重新读取待办" else if (tasks.pending != null) "重试确认" else "重试读取")
                         }
-                        if (available && !tasks.busy && tasks.pending == null) TextButton(onClick = onRefresh,
+                        if (available && !tasks.busy && tasks.pending == null && detailsExpanded) TextButton(onClick = onRefresh,
                             modifier = Modifier.testTag("manual-task-refresh")) { Text("重新读取待办") }
                     }
                 }
@@ -189,13 +191,16 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                                             .heightIn(min=48.dp).padding(vertical=AIyouDimensions.spaceXs),verticalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
                                             Text(task.title, style = MaterialTheme.typography.bodyLarge,
                                                 color=if(task.status==ManualTaskStatus.COMPLETED)AIyouColors.textSecondary else AIyouColors.textPrimary)
-                                            Text(manualTaskDateLabel(task), style = MaterialTheme.typography.bodySmall,
+                                            Text(task.schedule?.let { it.date.toString() + (it.time?.let {time->" "+time} ?: " · 仅日期") } ?: "未设时间",
+                                                style = MaterialTheme.typography.bodySmall,
                                                 color=AIyouColors.textSecondary,modifier = Modifier.testTag("manual-task-date-" + task.id))
-                                            task.reminder?.let { Text(taskReminderLabel(it), Modifier.testTag("reminder-status-" + task.id),style=MaterialTheme.typography.bodySmall) }
+                                            task.reminder?.let { Text(compactTaskReminderLabel(it), Modifier.testTag("reminder-status-" + task.id),style=MaterialTheme.typography.bodySmall) }
                                             Text(if(rowExpanded)"收起详情" else "详情与操作",style=MaterialTheme.typography.labelSmall,color=AIyouColors.primary)
                                         }
                                     }
                                     if(rowExpanded) {
+                                    Text(manualTaskDateLabel(task),style=MaterialTheme.typography.bodySmall)
+                                    task.reminder?.let { Text(taskReminderLabel(it),style=MaterialTheme.typography.bodySmall) }
                                     task.sourceReceipt?.let { receipt ->
                                         Text("由原文摘录创建 · 人工确认 · 原文版本 " + receipt.binding.source.revision)
                                         TextButton(enabled=canChoose,onClick={onSource(task.id,task.version)},
