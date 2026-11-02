@@ -190,7 +190,7 @@ class SelectedQuestionAuthorizationTest {
         val receipt = h.repo.accept(permit, h.reply(review.request), h.clock)
         h.repo.close(); assertNotNull(h.repo.checkReceipt(receipt, h.clock)); denied { h.repo.authorizeReviewedSend(review, h.clock) }
         h.f.reopen()
-        val reopened = SqlSelectedQuestionAuthorizationRepository(h.f.gateway)
+        val reopened = SqlSelectedQuestionAuthorizationRepository(h.f.gateway,SqlChatHistoryRepository(h.f.gateway,ManualTagSqlTest.KEY))
         try {
             assertNotNull(reopened.checkReceipt(receipt, h.clock)); assertNotNull(reopened.check(permit, h.clock))
             denied { reopened.authorizeReviewedSend(review, h.clock) }; denied { reopened.withdraw(permit) }
@@ -227,7 +227,7 @@ class SelectedQuestionAuthorizationTest {
                 return result
             }
         }
-        val repo = SqlSelectedQuestionAuthorizationRepository(uncertain)
+        val repo = SqlSelectedQuestionAuthorizationRepository(uncertain,SqlChatHistoryRepository(uncertain,ManualTagSqlTest.KEY))
         try {
             val first = repo.review(h.request(), h.connection, PROMPT, h.clock)
             lose.set(true); denied { repo.authorizeReviewedSend(first, h.clock) }
@@ -294,7 +294,8 @@ class SelectedQuestionAuthorizationTest {
         val connection = connectionOverride ?: ProviderConnection("synthetic-profile", 1, "https://fixture.invalid/custom/v1/", ConnectionProtocol.CHAT_COMPLETIONS,
             "synthetic-model", SecretReference("synthetic-unresolved-ref"))
         val raw = RemoteTextTransactions(f.gateway)
-        val repo = SqlSelectedQuestionAuthorizationRepository(f.gateway,connectionCurrent=connectionCurrent)
+        val history=chatHistoryFixture(f.gateway)
+        val repo = SqlSelectedQuestionAuthorizationRepository(f.gateway,history,connectionCurrent=connectionCurrent)
         val clock = { NOW }
         init { f.entry(text = "UNSELECTED_OTHER_RECORD"); if (approved) ids.indices.forEach { approve(it) } }
         fun approve(index: Int, purpose: TextPurpose = TextPurpose.CONVERSATION) {

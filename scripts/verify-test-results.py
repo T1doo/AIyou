@@ -194,6 +194,9 @@ for label, folder, minimum in targets:
             "historicalReadFailureAndCorruptionPreserveCiphertextAndNeverEnableRepairImport",
             "actualViewModelSaveEditColdHistoryReadKeepsCurrentWriteGateAndBothInputs")
     if label == "Compose JVM interaction":
+        additional["com.t1doo.aiyou.ChatHistoryPresentationTest"] = (
+            "actualSettingsHistoryReadsAnswerAndDeletesOnlyAfterReviewWithoutEntryWrites",
+            "actualDoubleFontUnknownDeletionKeepsExactIntentAcrossCloseAndReadCannotClaimEmpty")
         additional["com.t1doo.aiyou.SavedQuestionsPresentationTest"] = (
             "actualSettingsEntrySavesEditsDeletesOnlyAfterConfirmationAndReopensWithoutEntryWrites",
             "actualDoubleFontUnknownNeverShowsFalseEmptyAndKeepsSameIntentAcrossClose")

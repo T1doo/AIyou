@@ -143,6 +143,7 @@ data class LocalRecordUiState(
     val reminders: TaskRemindersUiState = TaskRemindersUiState(),
     val selectedQuestionAuthorizationOwner: com.t1doo.aiyou.domain.SelectedQuestionAuthorizationRepository? = null,
     val savedQuestionOwner:com.t1doo.aiyou.domain.SavedQuestionRepository? = null,
+    val chatHistoryOwner:com.t1doo.aiyou.domain.ChatHistoryRepository? = null,
 )
 
 /** All draft writes and saves share one queue, preserving edits around a save boundary. */
@@ -179,6 +180,8 @@ class LocalRecordsViewModel internal constructor(
     private val initialOpen = kotlinx.coroutines.CompletableDeferred<Unit>()
     internal suspend fun awaitInitialOpen() = initialOpen.await()
 
+    private var chatHistoryObserver:ChatHistoryController?=null
+
     private fun submit(command: Command): kotlinx.coroutines.channels.ChannelResult<Unit> = synchronized(appAccessGuard) {
         appAccessCommands.incrementAndGet()
         if(command is Command.RecordPackage)audioBlockedPackageCommands.incrementAndGet()
@@ -188,6 +191,8 @@ class LocalRecordsViewModel internal constructor(
             if(command is Command.RecordPackage)audioBlockedPackageCommands.decrementAndGet()
             mutableAppAccessIdle.value = appAccessCommands.decrementAndGet() == 0 && !audioPlayback.busy
         }
+        if(result.isSuccess&&(command is Command.Revise||command is Command.LocalProcessing||
+            command is Command.RecycleBin||command is Command.RecordPackage))chatHistoryObserver?.retireSources()
         result
     }
     private class CapturePermit(val gate:com.t1doo.aiyou.domain.CaptureDraftGate,
@@ -298,6 +303,8 @@ class LocalRecordsViewModel internal constructor(
         {mutableState.value.savedQuestionOwner},
         {action->submit(Command.SavedQuestions(action)).isSuccess},clock,
         {mutableState.value.let {it.ready&&!it.opening&&it.error==null}})
+    val chatHistory=ChatHistoryController({mutableState.value},
+        {action->submit(Command.ChatHistory(action)).isSuccess},clock).also{chatHistoryObserver=it}
     val favorites = RecordFavoriteController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.Favorites(action)).isSuccess }, beforeWrite={unifiedObserver?.retire()})
     val eventDates = RecordEventDateController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -498,6 +505,7 @@ class LocalRecordsViewModel internal constructor(
                             }
                             is Command.LocalCandidates -> command.action(checkNotNull(repository))
                             is Command.SavedQuestions -> command.action(checkNotNull(repository))
+                            is Command.ChatHistory -> command.action(checkNotNull(repository))
                             is Command.MemoryInbox -> command.action(checkNotNull(repository))
                             is Command.OriginalExport -> command.action(checkNotNull(repository))
                             is Command.RecordPackage -> {
@@ -544,6 +552,7 @@ class LocalRecordsViewModel internal constructor(
                 imageGrid.dispose()
                 tags.dispose(); people.dispose(); modelConnections.dispose();productionQuestions?.markDisposed()
                 savedQuestions.dispose()
+                chatHistory.dispose()
                 favorites.dispose()
                 eventDates.dispose()
                 tasks.dispose()
@@ -1408,6 +1417,7 @@ class LocalRecordsViewModel internal constructor(
                 recordAuthorizationOwner = store.recordAuthorizations,
                 selectedQuestionAuthorizationOwner = store.selectedQuestionAuthorizations,
                 savedQuestionOwner = store.savedQuestions,
+                chatHistoryOwner = store.chatHistory,
                 localProcessingVersions = processingVersions.orEmpty(), localProcessingAvailable = processingVersions != null,
                 supportsFactRecaps = store.factRecaps != null,
                 supportsMixedCapture = store.captureRecords != null,
@@ -1512,6 +1522,7 @@ class LocalRecordsViewModel internal constructor(
     }
     /** Retires memory-only authority before a policy write or after observing a generation change. */
     private fun retireDerived(id: String) {
+        chatHistoryObserver?.retireSources()
         taskProposals.invalidateSource(id)
         sourceTasks.invalidateSource(id)
         mutableState.value.candidates?.takeIf { it.source.sourceId == id }?.let { candidates.close(it.session) }
@@ -1544,6 +1555,7 @@ class LocalRecordsViewModel internal constructor(
                 recordAuthorizationOwner = store.recordAuthorizations,
                 selectedQuestionAuthorizationOwner = store.selectedQuestionAuthorizations,
                 savedQuestionOwner = store.savedQuestions,
+                chatHistoryOwner = store.chatHistory,
                 localProcessing = if (stale && !panel.busy && panel.pending == null && panel.pendingWithdrawal == null && panel.pendingAuthorization == null) panel.copy(
                     snapshot = null, authorization = null, confirmation = null, withdrawalConfirmation = null, connectionReview = null, authorizationConfirmation = null,
                     notice = null, error = "处理范围已变化，请关闭后从当前原文重新打开。") else panel)
@@ -1593,6 +1605,7 @@ class LocalRecordsViewModel internal constructor(
         imageGrid.dispose()
         tags.dispose(); people.dispose(); modelConnections.dispose()
         savedQuestions.dispose()
+        chatHistory.dispose()
         favorites.dispose()
         eventDates.dispose()
         tasks.dispose()
@@ -1629,6 +1642,7 @@ class LocalRecordsViewModel internal constructor(
         data class MemoryInbox(val action: suspend (EntryRepository) -> Unit) : Command
         data class LocalCandidates(val action: suspend (EntryRepository) -> Unit) : Command
         data class SavedQuestions(val action:suspend (EntryRepository)->Unit) : Command
+        data class ChatHistory(val action:suspend (EntryRepository)->Unit) : Command
         data class ManualPeople(val action: suspend (EntryRepository) -> Unit) : Command
         data class ModelConnections(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualTags(val action: suspend (EntryRepository) -> Unit) : Command

@@ -224,7 +224,8 @@ class SelectedQuestionConsentControllerTest {
         val ids = (1..2).map { "61000000-0000-4000-8000-${it.toString().padStart(12, '0')}" }
         val source = AtomicReference<OriginalSearchState>()
         val session = AtomicBoolean(true); val time = AtomicReference(NOW)
-        val repo = SqlSelectedQuestionAuthorizationRepository(f.gateway)
+        val history=chatHistoryFixture(f.gateway)
+        val repo = SqlSelectedQuestionAuthorizationRepository(f.gateway,history)
         @Volatile var delegate: SelectedQuestionAuthorizationRepository = repo
         @Volatile var beforeProof: () -> Unit = {}
         val owner = object : LocalSearchRepository by f.search {

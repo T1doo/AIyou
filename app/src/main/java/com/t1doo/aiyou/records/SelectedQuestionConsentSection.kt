@@ -98,7 +98,7 @@ import java.time.ZoneId
                     }
                 }
                 Text(if(rehearsal)"仅内存假传输，不发送给外部服务。真实发送接入后，撤回不能追回服务商已收到的数据或费用。不会保存问题或回答为事实、任务或答案缓存。"
-                    else"本次请求可能产生服务商费用；撤回不能追回服务商已收到的数据或费用。不会自动将问题或回答保存为事实、任务或答案缓存。")
+                    else"本次请求可能产生服务商费用；撤回不能追回服务商已收到的数据或费用。确认后会保留本机问答历史；回答和出处失效时退休，用户问题仍保留。历史不会自动成为原文、稳定事实或待办，也不会自动重发。")
             }
         },
         confirmButton = { TextButton({ onConfirm(review) }, Modifier.heightIn(min = AIyouDimensions.minTouchTarget)

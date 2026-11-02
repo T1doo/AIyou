@@ -185,7 +185,7 @@ class CompanionDiagnosticTests(unittest.TestCase):
         formal = self.formal_workflow()
         self.assertEqual(1, formal.count(COMPILE_ONLY_WORKFLOW_STEPS))
         original = formal.replace(COMPILE_ONLY_WORKFLOW_STEPS, '')
-        self.assertEqual('e9cf947f8715d3aa0f5dee9c3f56e3de3c1eac5ba56ab10e8c1465c504e6b29c',
+        self.assertEqual('a5f081b9d191f51385b4184ad0f3c0ed59451740242c0ad1d14a0236cc243036',
                          hashlib.sha256((original.rstrip('\n') + '\n').encode()).hexdigest())
         selector = ("github.event_name == 'push' && github.repository == 'T1doo/AIyou' && "
                     "github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && "

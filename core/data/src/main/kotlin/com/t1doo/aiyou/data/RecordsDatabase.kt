@@ -43,10 +43,18 @@ internal interface RecordsDao {
     ManualTaskEntity::class, LocalSearchFtsEntity::class, LocalSearchDocumentEntity::class,
     LocalSearchEpochEntity::class, PermanentErasureEntity::class, RecordPackageReceiptEntity::class,
     OwnedFileCreationEntity::class, LocalCandidateBatchEntity::class, RecordEventDateEntity::class, ManualPeopleEntity::class,
-    ModelConfigurationEntity::class, ModelCapabilityEntity::class, ReminderRuntimeMetaEntity::class, SavedQuestionEntity::class], version = 16, exportSchema = true)
+    ModelConfigurationEntity::class, ModelCapabilityEntity::class, ReminderRuntimeMetaEntity::class, SavedQuestionEntity::class,
+    ChatMessageEntity::class,ChatMessageSourceEntity::class], version = 17, exportSchema = true)
 internal abstract class RecordsDatabase : RoomDatabase() {
     abstract fun records(): RecordsDao
 }
+
+internal val recordsMigration16To17=object:Migration(16,17) {
+    override fun migrate(db:SupportSQLiteDatabase) {
+        ChatMessageSqlSchema.migration16To17.forEach(db::execSQL);installChatMessageGuards(db)
+    }
+}
+internal fun installChatMessageGuards(db:SupportSQLiteDatabase) {ChatMessageSqlSchema.guards.forEach(db::execSQL)}
 
 internal val recordsMigration15To16 = object : Migration(15,16) {
     override fun migrate(db:SupportSQLiteDatabase) {

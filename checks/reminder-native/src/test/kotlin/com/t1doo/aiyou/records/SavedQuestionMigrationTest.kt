@@ -23,7 +23,7 @@ import org.robolectric.annotation.Config
 class SavedQuestionMigrationTest {
     @Test fun realRoom15To16PreservesOriginalAndBothColdContractsThenReopensQuestion() {
         val app=RuntimeEnvironment.getApplication(); val name="synthetic-question-"+UUID.randomUUID()+".db"
-        val old=contract(15); val current=contract(16);val key=ByteArray(32) { (it+7).toByte() }
+        val old=contract(15); val current=contract(17);val key=ByteArray(32) { (it+7).toByte() }
         var room:RecordsDatabase?=null
         try {
             val helper=FrameworkSQLiteOpenHelperFactory().create(SupportSQLiteOpenHelper.Configuration.builder(app).name(name)
@@ -52,14 +52,14 @@ class SavedQuestionMigrationTest {
                 validateExistingReminderSchema(SupportRecordsSqlConnection(db),old)
             }
             fun open():RecordsDatabase = Room.databaseBuilder(app,RecordsDatabase::class.java,name)
-                .addMigrations(recordsMigration15To16).allowMainThreadQueries()
+                .addMigrations(recordsMigration15To16,recordsMigration16To17).allowMainThreadQueries()
                 .addCallback(object:RoomDatabase.Callback() {
-                    override fun onCreate(db:SupportSQLiteDatabase) {installSavedQuestionGuards(db)}
-                    override fun onOpen(db:SupportSQLiteDatabase) {installSavedQuestionGuards(db)}
+                    override fun onCreate(db:SupportSQLiteDatabase) {installSavedQuestionGuards(db);installChatMessageGuards(db)}
+                    override fun onOpen(db:SupportSQLiteDatabase) {installSavedQuestionGuards(db);installChatMessageGuards(db)}
                 }).build().also {it.openHelper.writableDatabase}
             val first=open();room=first
             val sql=SupportRecordsSqlConnection(first.openHelper.writableDatabase)
-            assertEquals(16L,sql.query("PRAGMA user_version").single().single())
+            assertEquals(17L,sql.query("PRAGMA user_version").single().single())
             validateExistingReminderSchema(sql,current)
             assertThrows(Exception::class.java) {validateExistingReminderSchema(sql,old)}
             assertEquals(listOf("合成原文"),sql.query("SELECT originalText FROM entry_revisions").single())

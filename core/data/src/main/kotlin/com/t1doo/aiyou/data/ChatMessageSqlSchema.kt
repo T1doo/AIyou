@@ -1,0 +1,24 @@
+package com.t1doo.aiyou.data
+
+internal object ChatMessageSqlSchema {
+    const val columns="id,version,originProof,resultHash,createdAtMillis,updatedAtMillis,state,lastMutationId,question,answer"
+    const val sourceColumns="messageId,ordinal,entryId,sourceRevision,sourceHash,generation"
+    val migration16To17=listOf(
+        "CREATE TABLE chat_messages (id TEXT NOT NULL PRIMARY KEY, version INTEGER NOT NULL, originProof TEXT NOT NULL, resultHash TEXT NOT NULL, createdAtMillis INTEGER NOT NULL, updatedAtMillis INTEGER NOT NULL, state TEXT NOT NULL, lastMutationId TEXT NOT NULL, question BLOB NOT NULL, answer BLOB NOT NULL)",
+        "CREATE TABLE chat_message_sources (messageId TEXT NOT NULL, ordinal INTEGER NOT NULL, entryId TEXT NOT NULL, sourceRevision INTEGER NOT NULL, sourceHash TEXT NOT NULL, generation INTEGER NOT NULL, PRIMARY KEY(messageId,ordinal), FOREIGN KEY(messageId) REFERENCES chat_messages(id) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(entryId) REFERENCES entries(id) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        "CREATE INDEX index_chat_message_sources_entryId ON chat_message_sources(entryId)",
+    )
+    private fun retire(selector:String)="UPDATE chat_messages SET state='INVALIDATED',answer=X'',version=CASE WHEN version<9223372036854775807 THEN version+1 ELSE version END,lastMutationId='SOURCE_INVALIDATED' WHERE id IN (SELECT messageId FROM chat_message_sources WHERE entryId="+selector+") AND state IN ('PENDING','ANSWERED');"
+    val guards=listOf(
+        "CREATE TRIGGER IF NOT EXISTS chat_source_changed AFTER UPDATE ON entries WHEN OLD.currentRevision IS NOT NEW.currentRevision OR OLD.privacyPolicy IS NOT NEW.privacyPolicy OR OLD.capturedAtMillis IS NOT NEW.capturedAtMillis OR OLD.captureTimeZone IS NOT NEW.captureTimeZone BEGIN "+retire("NEW.id")+" END",
+        "CREATE TRIGGER IF NOT EXISTS chat_source_erased BEFORE DELETE ON entries BEGIN "+retire("OLD.id")+" END",
+        "CREATE TRIGGER IF NOT EXISTS chat_access_inserted AFTER INSERT ON remote_source_access BEGIN "+retire("NEW.entryId")+" END",
+        "CREATE TRIGGER IF NOT EXISTS chat_access_changed AFTER UPDATE ON remote_source_access WHEN OLD.generation IS NOT NEW.generation OR OLD.deleted IS NOT NEW.deleted OR OLD.connection IS NOT NEW.connection OR OLD.consent IS NOT NEW.consent BEGIN "+retire("NEW.entryId")+" END",
+        "CREATE TRIGGER IF NOT EXISTS chat_access_deleted AFTER DELETE ON remote_source_access BEGIN "+retire("OLD.entryId")+" END",
+        "CREATE TRIGGER IF NOT EXISTS chat_source_index_update BEFORE UPDATE ON chat_message_sources BEGIN SELECT RAISE(ABORT,'Immutable chat source'); END",
+        "CREATE TRIGGER IF NOT EXISTS chat_source_index_deleted BEFORE DELETE ON chat_message_sources BEGIN UPDATE chat_messages SET state='INVALIDATED',answer=X'',version=CASE WHEN version<9223372036854775807 THEN version+1 ELSE version END,lastMutationId='SOURCE_INVALIDATED' WHERE id=OLD.messageId AND state IN ('PENDING','ANSWERED'); END",
+        "CREATE TRIGGER IF NOT EXISTS chat_insert BEFORE INSERT ON chat_messages WHEN NEW.version<1 OR NEW.id!=NEW.originProof OR length(NEW.id)!=64 OR length(NEW.resultHash) NOT IN (0,64) OR NEW.createdAtMillis<0 OR NEW.updatedAtMillis<NEW.createdAtMillis OR NEW.state NOT IN ('PENDING','ANSWERED','CANCELLED','INVALIDATED','DELETED') OR length(NEW.question)<29 OR length(NEW.question)>8192 OR length(NEW.answer)>65536 OR (NEW.state IN ('PENDING','ANSWERED') AND length(NEW.answer)<29) OR (NEW.state NOT IN ('PENDING','ANSWERED') AND length(NEW.answer)!=0) OR (SELECT count(*) FROM chat_messages)>=128 BEGIN SELECT RAISE(ABORT,'Invalid chat message'); END",
+        "CREATE TRIGGER IF NOT EXISTS chat_update BEFORE UPDATE ON chat_messages WHEN NEW.id IS NOT OLD.id OR NEW.originProof IS NOT OLD.originProof OR NEW.createdAtMillis IS NOT OLD.createdAtMillis OR NEW.updatedAtMillis<OLD.updatedAtMillis OR NOT (OLD.version<9223372036854775807 AND NEW.version=OLD.version+1 OR OLD.version=9223372036854775807 AND NEW.version=OLD.version AND NEW.state='INVALIDATED' AND length(NEW.answer)=0) OR NOT (OLD.state='PENDING' AND NEW.state IN ('ANSWERED','CANCELLED','INVALIDATED','DELETED') OR OLD.state='ANSWERED' AND NEW.state IN ('CANCELLED','INVALIDATED','DELETED') OR OLD.state IN ('CANCELLED','INVALIDATED') AND NEW.state='DELETED') OR (OLD.resultHash!='' AND NEW.resultHash IS NOT OLD.resultHash) OR length(NEW.resultHash) NOT IN (0,64) OR length(NEW.question)<29 OR length(NEW.question)>8192 OR length(NEW.answer)>65536 OR (NEW.state='ANSWERED' AND length(NEW.answer)<29) OR (NEW.state!='ANSWERED' AND length(NEW.answer)!=0) BEGIN SELECT RAISE(ABORT,'Invalid chat transition'); END",
+        "CREATE TRIGGER IF NOT EXISTS chat_delete BEFORE DELETE ON chat_messages BEGIN SELECT RAISE(ABORT,'Chat tombstone required'); END",
+    )
+}

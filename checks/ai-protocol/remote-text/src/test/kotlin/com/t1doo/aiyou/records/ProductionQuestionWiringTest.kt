@@ -35,7 +35,7 @@ class ProductionQuestionWiringTest {
             assertEquals(listOf("CANCELLED","CANCELLED"),h.jobs());assertNull(controller.visible().receipt)
         }}
     }
-    @Test(timeout=30_000) fun explicitFreeQuestionAndTwoSourceReviewUseProductionExchangeWithoutSavingAQuestionOrAnswer():Unit=runBlocking {
+    @Test(timeout=30_000) fun explicitFreeQuestionAndTwoSourceReviewUseProductionExchangeWithAtomicAnswerHistoryWithoutEntryWrites():Unit=runBlocking {
         Harness().use { h ->
             h.ready();h.probe();h.directory()
             assertEquals(1,h.wire.serverA.requestCount);assertEquals(1,h.clients.get())
@@ -54,6 +54,17 @@ class ProductionQuestionWiringTest {
             assertEquals(h.originals,h.rows("entry_revisions"));assertEquals(h.draft,h.rows("capture_draft"))
             assertTrue(h.rows("text_annotations").isEmpty());assertTrue(h.rows("manual_tasks").isEmpty())
             assertNull(h.authority.checkReceipt(ready.receipt!!){h.clock.instant()})
+            assertSame(h.history,h.vm.state.value.chatHistoryOwner)
+            h.vm.chatHistory.open()
+            val history=withTimeout(4_000){h.vm.chatHistory.state.first{it?.available==true&&!it.busy}}!!
+            assertEquals(1,history.items.size);assertEquals(view.question,history.items.single().question)
+            h.vm.chatHistory.select(history,history.items.single())
+            val opened=withTimeout(4_000){h.vm.chatHistory.state.first{it?.view!=null&&!it.busy}}!!
+            assertEquals(ready.receipt.reply.paragraphs.single().text,opened.view!!.reply!!.paragraphs.single().text)
+            assertEquals(review.request.sources.map{it.reference},opened.view.citations.map{it.reference})
+            h.vm.chatHistory.close(opened)
+            assertEquals(2,h.wire.serverA.requestCount) // History read cannot replay the send.
+
             val opens=AtomicInteger();controller.openSource(ready,ready.receipt.reply.paragraphs.single().references.first()){opens.incrementAndGet()}
             withTimeout(3_000){while(opens.get()==0)delay(5)};assertEquals(1,opens.get())
             // A new question immediately retires the old review/answer, without another search or send.
@@ -105,6 +116,7 @@ class ProductionQuestionWiringTest {
         val clock=Clock.fixed(Instant.parse("2026-10-19T13:00:00Z"),ZoneOffset.UTC)
         val catalog:SqlModelConnectionCatalog;val profiles:SqlModelCapabilityRepository
         val config:ModelConnectionConfiguration;val authority:SqlSelectedQuestionAuthorizationRepository
+        val history:SqlChatHistoryRepository
         val clients=AtomicInteger();val secretReads=AtomicInteger()
         val afterReview=AtomicReference<()->Unit>({})
         val beforeResolve=AtomicReference<()->Unit>({})
@@ -127,7 +139,8 @@ class ProductionQuestionWiringTest {
             val changed=catalog.change(ModelConnectionChange("connection",0,"create",ModelConnectionDetails("合成问答连接",
                 wire.records.connectionA.apiRoot,ConnectionProtocol.CHAT_COMPLETIONS,"synthetic-model",setOf(ModelConfigurationPurpose.CONVERSATION))))!!
             config=catalog.apply(catalog.prepare(changed,"synthetic-key",ConnectionSecretVaultTest.material()))
-            authority=SqlSelectedQuestionAuthorizationRepository(f.gateway,connectionCurrent={sql,c->profiles.connectionCurrent(sql,c,TextPurpose.CONVERSATION)})
+            history=chatHistoryFixture(f.gateway)
+            authority=SqlSelectedQuestionAuthorizationRepository(f.gateway,history,connectionCurrent={sql,c->profiles.connectionCurrent(sql,c,TextPurpose.CONVERSATION)})
             val observed=object:SelectedQuestionAuthorizationRepository by authority {
                 override fun review(request:SelectedQuestionRequest,connection:ProviderConnection,promptVersion:String,clock:()->Instant)=
                     authority.review(request,connection,promptVersion,clock).also{afterReview.get().invoke()}
@@ -142,6 +155,7 @@ class ProductionQuestionWiringTest {
                 override val modelConnections=catalog
                 override val modelCapabilities=profiles
                 override val selectedQuestionAuthorizations=observed
+                override val chatHistory=history
                 override val recordAuthorizations=SqlRecordAuthorizationRepository(f.gateway,catalog,profiles)
                 override val localProcessing=SqlLocalProcessingRepository(f.gateway)
                 override val localSearch=f.search

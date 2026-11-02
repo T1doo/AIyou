@@ -79,7 +79,7 @@ class SavedQuestionDiagnosticTests(unittest.TestCase):
             self.assertIn(expected, workflow)
         for forbidden in ('continue-on-error', 'sdkmanager', 'sudo', 'secrets.', 'needs:', ':app:assembleDebug', 'ScreenshotTest'):
             self.assertNotIn(forbidden, workflow)
-        self.assertEqual('9697616c2bf12d3ba103dbcd939d82d36b95a102056d3a53f51f85659a50905e',
+        self.assertEqual('296d16beb5b3275e0fe604d1d4a93e0e5cffe721c7c9dcd0ebb863093ca3b094',
                          hashlib.sha256((ROOT / '.github/workflows/android.yml').read_bytes()).hexdigest())
         self.assertFalse(probe.REF.removeprefix('refs/heads/').startswith('codex/'))
         self.assertEqual(8 * 1024 * 1024, probe.MAX_ARTIFACT)

@@ -510,6 +510,7 @@ internal class FullFixture(seed:Int=1):AutoCloseable {
         db=PythonSqliteDatabase(root.resolve("records.sqlite"),bridge,true,12)
         db.transaction { sql ->
             sql.execute(SavedQuestionSqlSchema.create);SavedQuestionSqlSchema.guards.forEach { sql.execute(it) }
+            ChatMessageSqlSchema.migration16To17.forEach {sql.execute(it)};ChatMessageSqlSchema.guards.forEach {sql.execute(it)}
             sql.execute("INSERT INTO local_search_epoch VALUES(1,0,1,'UNKNOWN')")
             (RemoteTextSqlSchema.guards+LocalSearchSqlSchema.guards+PermanentErasureSqlSchema.guards+RecordFavoriteSqlSchema.guards+
                 RecordEventDateSqlSchema.guards+LocalCandidateSqlSchema.guards+ManualPeopleSqlSchema.guards).forEach { sql.execute(it) }

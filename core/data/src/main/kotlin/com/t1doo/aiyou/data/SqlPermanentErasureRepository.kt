@@ -143,6 +143,8 @@ internal class SqlPermanentErasureRepository(private val database: RecordsSqlDat
         check(sql.query("SELECT id FROM entries WHERE id=?",listOf(id)).isEmpty())
         if (hasCandidates(sql)) check(sql.query("SELECT entryId FROM local_candidate_batches WHERE entryId=? LIMIT 1",listOf(id)).isEmpty())
         if (hasPeople(sql)) check(sql.query("SELECT entryId FROM entry_manual_people WHERE entryId=? LIMIT 1", listOf(id)).isEmpty())
+        if(sql.query("SELECT name FROM sqlite_master WHERE type='table' AND name='chat_message_sources'").isNotEmpty())
+            check(sql.query("SELECT entryId FROM chat_message_sources WHERE entryId=? LIMIT 1",listOf(id)).isEmpty())
         for (table in listOf("entry_revisions","attachments","entry_manual_tags","remote_source_access","local_jobs","text_annotations","remote_text_jobs","local_search_fts","local_search_documents","owned_file_creations"))
             check(sql.query("SELECT entryId FROM $table WHERE entryId=? LIMIT 1",listOf(id)).isEmpty())
         check(sql.query("SELECT id FROM record_package_receipts WHERE operation='PACKAGE_ORIGIN' AND entryId=?",listOf(id)).isEmpty())

@@ -50,7 +50,9 @@ class EncryptedEntryRepository internal constructor(
     /** Blocking IO; shares the existing encrypted database and never enables remote processing. */
     override val sourceBoundText: RoomSourceBoundTextRepository = RoomSourceBoundTextRepository(borrowedSql,sourceGate)
     override val recordAuthorizations: com.t1doo.aiyou.domain.RecordAuthorizationRepository = SqlRecordAuthorizationRepository(borrowedSql,connectionStorage,modelCapabilities,sourceGate)
-    private val questionAuthorizationStorage = SqlSelectedQuestionAuthorizationRepository(borrowedSql,sourceGate,
+    private val chatStorage=SqlChatHistoryRepository(borrowedSql,keyBytes,sourceGate)
+    override val chatHistory:com.t1doo.aiyou.domain.ChatHistoryRepository get()=chatStorage
+    private val questionAuthorizationStorage = SqlSelectedQuestionAuthorizationRepository(borrowedSql,chatStorage,sourceGate,
         connectionCurrent={ sql,connection -> capabilityStorage.connectionCurrent(sql,connection,com.t1doo.aiyou.model.TextPurpose.CONVERSATION) })
     override val selectedQuestionAuthorizations: com.t1doo.aiyou.domain.SelectedQuestionAuthorizationRepository
         get() = questionAuthorizationStorage
@@ -205,8 +207,8 @@ class EncryptedEntryRepository internal constructor(
     }
 
     private val lifetime = DrainingRecordsStorage(borrowedSql,attachmentStorage,originalEditStorage,
-        { database.close() }, { reminderStores.close();questionStorage.wipeKey();tagStorage.wipeKey(); peopleStorage.wipeKey(); proposalStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); preferenceStorage.wipeKey(); factStorage.wipeKey();transcriptStorage.wipeKey();imageTextStorage.wipeKey(); keyBytes.fill(0) })
-    override fun close() { sourceGate.retire();connectionStorage.close(); questionAuthorizationStorage.close(); lifetime.close() }
+        { database.close() }, { reminderStores.close();chatStorage.wipeKey();questionStorage.wipeKey();tagStorage.wipeKey(); peopleStorage.wipeKey(); proposalStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); preferenceStorage.wipeKey(); factStorage.wipeKey();transcriptStorage.wipeKey();imageTextStorage.wipeKey(); keyBytes.fill(0) })
+    override fun close() { sourceGate.retire();connectionStorage.close(); questionAuthorizationStorage.close();chatStorage.close(); lifetime.close() }
     override fun awaitClosed() { close(); lifetime.awaitClosed() }
     /** Known external IO owner convenience, including native cold-reopen fixtures. */
     fun closeAndAwait() { close(); awaitClosed() }
@@ -280,10 +282,11 @@ class EncryptedEntryRepository internal constructor(
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
                 val created = Room.databaseBuilder(context.applicationContext, RecordsDatabase::class.java, file.absolutePath)
                 .openHelperFactory(SupportOpenHelperFactory(key))
-                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7, recordsMigration7To8, recordsMigration8To9, recordsMigration9To10, recordsMigration10To11, recordsMigration11To12, recordsMigration12To13, recordsMigration13To14, recordsMigration14To15, recordsMigration15To16)
+                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7, recordsMigration7To8, recordsMigration8To9, recordsMigration9To10, recordsMigration10To11, recordsMigration11To12, recordsMigration12To13, recordsMigration13To14, recordsMigration14To15, recordsMigration15To16,recordsMigration16To17)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
+                        installChatMessageGuards(db)
                         installSavedQuestionGuards(db)
                         installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db)
                         installManualTagGuard(db); installManualTaskGuard(db)
@@ -294,6 +297,7 @@ class EncryptedEntryRepository internal constructor(
                         installRecordEventDateGuards(db); installManualPeopleGuards(db); installModelConnectionGuards(db); installModelCapabilityGuards(db)
                     }
                     override fun onOpen(db: SupportSQLiteDatabase) {
+                        installChatMessageGuards(db)
                         installSavedQuestionGuards(db)
                         installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db)
                         installManualTagGuard(db); installManualTaskGuard(db); installLocalSearchGuards(db); installPermanentErasureGuards(db)

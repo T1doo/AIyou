@@ -37,7 +37,7 @@ jobs:
       - name: Capture unchanged schema guards
         id: schema_capture
         run: |
-          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question; do
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question chat-message; do
             python3 "scripts/verify-$kind-schema.py" --capture
           done
       - name: Run only the exact three methods within one command budget
@@ -55,7 +55,7 @@ jobs:
         id: schema_verify
         if: always() && steps.schema_capture.outcome == 'success' && steps.methods.outcome != 'skipped'
         run: |
-          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question; do
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question chat-message; do
             python3 "scripts/verify-$kind-schema.py" --verify
           done
           git diff --exit-code

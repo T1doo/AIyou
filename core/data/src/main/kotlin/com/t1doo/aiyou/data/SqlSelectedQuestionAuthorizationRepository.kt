@@ -10,7 +10,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** Reuses record grants, remote source jobs and local_jobs receipts. No new schema/permission store.
  * Nested product calls share this exact outer SQL transaction. Callbacks never run inside it.
  */
-internal class SqlSelectedQuestionAuthorizationRepository(private val database: RecordsSqlDatabase, private val sourceGate:CaptureDraftGate?=null,
+internal class SqlSelectedQuestionAuthorizationRepository(private val database: RecordsSqlDatabase,
+    private val history:SqlChatHistoryRepository,private val sourceGate:CaptureDraftGate?=null,
     private val connectionCurrent: ((RecordsSqlConnection,ProviderConnection)->Boolean)? = null) :
     SelectedQuestionAuthorizationRepository, AutoCloseable {
     private val access = RemoteTextTransactions(database,captureGate=sourceGate)
@@ -36,6 +37,7 @@ internal class SqlSelectedQuestionAuthorizationRepository(private val database: 
             verifySources(sql, review, clock)
             val proof = SelectedQuestionSendProof.review(review)
             if (group(sql, review) != null) deny(SendDenial.ALREADY_SENT)
+            history.reserveWithin(sql,review,live(clock).toEpochMilli())
             val ids = review.sources.map { source ->
                 // Failure on any member throws past the OUTER transaction: no partial authorization.
                 when (val outcome = access.queue(RemoteSendIntent(source.binding.source, TextPurpose.CONVERSATION),
@@ -80,6 +82,7 @@ internal class SqlSelectedQuestionAuthorizationRepository(private val database: 
         }
         val proof = verify(sql, permit, setOf("ADMITTED"), clock)
         verifySources(sql, permit.review, clock)
+        history.acceptWithin(sql,permit.review,reply,result,live(clock).toEpochMilli())
         permit.memberIds.forEach { member ->
             check(sql.execute("UPDATE remote_text_jobs SET state='COMMITTED' WHERE id=? AND state='ADMITTED'", listOf(member)) == 1)
         }
@@ -111,6 +114,7 @@ internal class SqlSelectedQuestionAuthorizationRepository(private val database: 
                 member(sql, permit, index, member, proof)
                 sql.execute("UPDATE remote_text_jobs SET state='CANCELLED' WHERE id=? AND state IN ('QUEUED','ADMITTED')", listOf(member))
             }
+            history.cancelWithin(sql,review,includeCommitted)
             transition(sql, review, old, state("CANCELLED", proof))
         }
     }
@@ -124,6 +128,7 @@ internal class SqlSelectedQuestionAuthorizationRepository(private val database: 
         if (statuses.none { stored == state(it, proof, if (it == "COMMITTED") resultHash else null) })
             deny(if (stored?.startsWith(state("ADMITTED", proof)) == true || stored?.startsWith(state("COMMITTED", proof)) == true)
                 SendDenial.ALREADY_SENT else SendDenial.QUEUE_INVALIDATED)
+        history.verifyWithin(sql,review,"COMMITTED" in statuses,resultHash)
         permit.memberIds.forEachIndexed { index, member ->
             val status = member(sql, permit, index, member, proof)
             if (status !in statuses) deny(SendDenial.QUEUE_INVALIDATED)

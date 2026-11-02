@@ -83,6 +83,7 @@ import com.t1doo.aiyou.records.OpenSourceLicenses
 import com.t1doo.aiyou.records.OriginalReadingScreen
 import com.t1doo.aiyou.records.LocalAttachmentController
 import com.t1doo.aiyou.records.AttachmentHistoryOwner
+import com.t1doo.aiyou.records.canUseChatLocation
 import com.t1doo.aiyou.records.hasRecordAccess
 import com.t1doo.aiyou.records.LocalAttachmentScreen
 import com.t1doo.aiyou.records.AttachmentUiState
@@ -201,6 +202,7 @@ class MainActivity : ComponentActivity() {
                 onCloseAiSession = records::closeAiSession,
                 productionQuestions=records.productionQuestions,
                 savedQuestions=records.savedQuestions,
+                chatHistory=records.chatHistory,
                 onOpenTags = records.tags::open, onTagEdit = records.tags::edit, onTagAdd = records.tags::add,
                 favorites = records.favorites, eventDates = records.eventDates,
                 candidates = records.candidates,
@@ -351,6 +353,7 @@ fun AIyouApp(
     imageTexts:com.t1doo.aiyou.records.ImageTextController?=null,
     productionQuestions:com.t1doo.aiyou.records.ProductionQuestions?=null,
     savedQuestions:com.t1doo.aiyou.records.SavedQuestionsController?=null,
+    chatHistory:com.t1doo.aiyou.records.ChatHistoryController?=null,
 ) {
     require(productionQuestions==null||selectedQuestionService==null&&selectedQuestionConsentFixture==null)
     val currentUnifiedController by rememberUpdatedState(unifiedKeywords)
@@ -400,6 +403,9 @@ fun AIyouApp(
     // This bit only makes a restored private source route fail closed; no source proof enters Bundle.
     var inboxSourceRoute by rememberSaveable { mutableStateOf(false) }
     var unifiedSourceRoute by remember { mutableStateOf(false) }
+    var chatSourceReturn by remember { mutableStateOf<Pair<Boolean,String>?>(null) }
+    var chatSourceProof by remember {mutableStateOf<com.t1doo.aiyou.domain.ChatMessageLocation?>(null)}
+    var chatSourceOwner by remember {mutableStateOf<com.t1doo.aiyou.domain.ChatHistoryRepository?>(null)}
     DisposableEffect(sourceFacts) { onDispose { sourceFacts?.retire() } }
     DisposableEffect(sourcePreferences) { onDispose { currentRecords?.invoke()?.sourcePreferences?.let { sourcePreferences?.close(it.session) } } }
     DisposableEffect(memoryInbox) { onDispose { currentRecords?.invoke()?.memoryInbox?.let { memoryInbox?.close(it.session) } } }
@@ -548,7 +554,8 @@ fun AIyouApp(
     var imageSourceAnchor by remember { mutableStateOf<com.t1doo.aiyou.model.ImageTextSource?>(null) }
     val lostImageSource=imageSourceAnchor?.let{local?.currentImageTextSource(it)!=true}==true
     val lostAudioSource=audioSourceAnchor?.let{local?.currentTranscriptSource(it)!=true}==true || observedAttachmentPanel?.let{it.transcriptSource&&(audioSourceReference==null||it.transcriptReference!==audioSourceReference)}==true
-    val lostInboxSource = inboxSourceRoute && detailEntryId != null && (searchLocation == null && audioSourceAnchor==null && imageSourceAnchor==null || lostAudioSource || lostImageSource)
+    val lostChatSource=chatSourceProof?.let{proof->local?.canUseChatLocation(chatSourceOwner,proof)!=true}==true
+    val lostInboxSource = inboxSourceRoute && detailEntryId != null && (searchLocation == null && audioSourceAnchor==null && imageSourceAnchor==null || lostAudioSource || lostImageSource || lostChatSource)
     LaunchedEffect(inboxSourceRoute,detailEntryId){if(!inboxSourceRoute||detailEntryId!=audioSourceAnchor?.intent?.entryId){audioSourceAnchor=null;audioSourceReference=null}}
     LaunchedEffect(inboxSourceRoute,detailEntryId){if(!inboxSourceRoute||detailEntryId!=imageSourceAnchor?.intent?.entryId)imageSourceAnchor=null}
     LaunchedEffect(lostInboxSource) {
@@ -562,6 +569,7 @@ fun AIyouApp(
             sourceFacts?.retire()
             (currentRecordsProvider?.invoke() ?: currentLocal)?.sourceMemories?.let { sourceMemories?.close(it.session) }
             detailEntryId = null; inboxSourceRoute = false
+            chatSourceReturn=null;chatSourceProof=null;chatSourceOwner=null
             unifiedSourceRoute=false;unifiedKeywords?.retire()
         }
     }
@@ -602,6 +610,10 @@ fun AIyouApp(
     val savedQuestionEmission by (savedQuestions?.state?:emptySavedQuestions).collectAsState()
     val savedQuestionUi=savedQuestionEmission?.takeIf {it===savedQuestions?.visible()}
     SideEffect {savedQuestions?.sync()}
+    val emptyChatHistory=remember{kotlinx.coroutines.flow.MutableStateFlow<com.t1doo.aiyou.records.ChatHistoryUi?>(null)}
+    val chatHistoryEmission by (chatHistory?.state?:emptyChatHistory).collectAsState()
+    val chatHistoryUi=chatHistoryEmission?.takeIf{it===chatHistory?.visible()}
+    SideEffect {chatHistory?.sync()}
     val remoteQuestion=questionDirectory.selected?.takeIf{it.owner===consentOwner&&productionQuestions?.current(it)==true}
     val currentRemoteQuestion by rememberUpdatedState(remoteQuestion)
     val consentSelectionScope=com.t1doo.aiyou.records.questionConsentSelectionScope(evidenceState,evidenceMode)
@@ -768,6 +780,11 @@ fun AIyouApp(
                 if(unifiedSourceRoute){unifiedSourceRoute=false;tailReturnRequest=null;unifiedKeywords?.resume()}
                 inboxSourceRoute = false
                 searchLocation = null
+                chatSourceReturn?.let{back->
+                    chatSourceReturn=null;chatSourceProof=null;chatSourceOwner=null
+                    tailReturnRequest=null;showSettings=back.first;selectedName=back.second
+                    chatHistory?.open()
+                }
                 if(recapRoute) { tailReturnRequest=null;factRecaps?.validate() }
                 if (readerFromSearch && origin == Destination.MEMORIES) {
                     search.sync(true)
@@ -924,6 +941,7 @@ fun AIyouApp(
             currentLocal?.recycleBin?.let { recycleBin?.close(it.session) }
             currentLocal?.recordPackage?.let { recordPackages?.close(it.session) }
             settingsBackupReturn = null
+            chatSourceReturn=null;chatSourceProof=null;chatSourceOwner=null
             currentLocal?.eventDateEditor?.let { eventDates?.close(it.session) }
             factRecaps?.close();recapRoute=false
             clearSearch()
@@ -999,6 +1017,49 @@ fun AIyouApp(
         }
     }
     val openSearchResult: (com.t1doo.aiyou.records.OriginalSearchHit) -> Unit = { openSearchResultAt(it) }
+    if(chatHistoryUi!=null&&chatHistory!=null&&!demo) {
+        val historyOwner=local?.chatHistoryOwner
+        com.t1doo.aiyou.records.ChatHistoryContent(chatHistoryUi,chatHistory,
+            canUseQuestion=evidenceEnabled&&evidenceState.stage==com.t1doo.aiyou.records.LocalEvidenceStage.READY,
+            beforeDelete={questionConsent.retireUiScope()})
+        LaunchedEffect(chatHistoryUi.questionUse,chatHistoryUi.jump) {
+            navigation.publish(generation) {
+                val latest=currentRecordsProvider?.invoke()?:currentLocal
+                if(ownsNavigation()&&latest!=null&&latest.ready&&!latest.opening&&latest.error==null&&
+                    latest.chatHistoryOwner===historyOwner) {
+                    chatHistoryUi.questionUse?.let{token->
+                        if(evidenceEnabled&&evidence.state.value===evidenceState&&
+                            evidenceState.stage==com.t1doo.aiyou.records.LocalEvidenceStage.READY)
+                            chatHistory.consumeQuestion(chatHistoryUi,token){text->
+                                questionConsent.retireUiScope();evidence.changeQuestion(evidenceState,text)
+                                questionConsent.sync();evidenceAnswers.sync();evidenceQuestions.sync()
+                                evidence.state.value.question==text
+                            }
+                    }
+                    chatHistoryUi.jump?.let{token->
+                        val proof=token.location;val ref=proof.reference
+                        val entry=latest.entries.singleOrNull{it.id==ref.source.sourceId&&it.currentRevision.toLong()==ref.source.revision}
+                        if(!reading&&latest.originalEdit==null&&latest.originalHistory==null&&entry!=null&&
+                            latest.canUseChatLocation(historyOwner,proof)) {
+                            chatHistory.consumeSource(chatHistoryUi,token){location->
+                                chatSourceReturn=showSettings to selectedName
+                                chatSourceProof=location;chatSourceOwner=historyOwner
+                                questionConsent.retireUiScope();navigation.advance();search.pause()
+                                readerFromSearch=false;tailReturnRequest=null;recapRoute=false;taskSourceRoute=false
+                                audioSourceAnchor=null;audioSourceReference=null;imageSourceAnchor=null
+                                searchLocation=com.t1doo.aiyou.records.OriginalReadingLocation(entry.id,entry.currentRevision,
+                                    com.t1doo.aiyou.model.OriginalExports.hash(entry.originalText),location.reference.start,location.reference.end)
+                                selectedName=Destination.MEMORIES.name;showSettings=false
+                                unifiedSourceRoute=false;inboxSourceRoute=true;detailEntryId=entry.id
+                                true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     LocalOriginalSearchObserver.current?.let { observer ->
         val observedEvidenceMode = evidenceEnabled
         val observedEvidenceStage = evidenceState.stage
@@ -1263,10 +1324,14 @@ fun AIyouApp(
                 fullBackupUnavailable = if (canOpenSettingsBackup()) null else if (demo)
                     "虚构示例不提供资料库操作。" else "本机资料暂未就绪或当前操作尚未结束，请核对后重试。",
                 appAccessSection = appAccessSettings,
-                savedQuestionsSection = if(savedQuestions==null||demo)null else ({
-                    TextButton(onClick={if(ownsNavigation()&&showSettings&&currentLocal?.let {it.ready&&!it.opening&&it.error==null}==true)savedQuestions.open()},
+                savedQuestionsSection = if((savedQuestions==null&&chatHistory==null)||demo)null else ({
+                    if(savedQuestions!=null)TextButton(onClick={if(ownsNavigation()&&showSettings&&currentLocal?.let {it.ready&&!it.opening&&it.error==null}==true)savedQuestions.open()},
                         enabled=local?.let {it.ready&&!it.opening&&it.error==null&&it.savedQuestionOwner!=null}==true,
                         modifier=Modifier.heightIn(min=48.dp).testTag("settings-saved-questions")) {Text("已保存的问题（仅本机）")}
+                    if(chatHistory!=null)TextButton(onClick={if(ownsNavigation()&&showSettings)chatHistory.open()},
+                        enabled=local?.let{it.ready&&!it.opening&&it.error==null&&it.chatHistoryOwner!=null}==true,
+                        modifier=Modifier.heightIn(min=48.dp).testTag("settings-chat-history")){Text("本机问答历史")}
+
                 }),
                 modelConnectionSection = if(modelConnections==null || demo) null else ({
                     com.t1doo.aiyou.ui.ModelConnectionSettings(modelConnections,local?.modelConnectionOwner,
@@ -1471,6 +1536,9 @@ fun AIyouApp(
                     }
                 },
                 evidenceQuestion = {
+                    if(chatHistory!=null&&!demo)TextButton(onClick={if(ownsNavigation()&&evidenceEnabled)chatHistory.open()},
+                        enabled=evidenceEnabled&&local?.chatHistoryOwner!=null,
+                        modifier=Modifier.heightIn(min=48.dp).testTag("question-open-chat-history")){Text("本机问答历史")}
                     if(savedQuestions!=null&&!demo)TextButton(onClick={
                         if(ownsNavigation()&&evidenceEnabled&&evidenceState.questionError==null)savedQuestions.open(evidenceState.question)
                     },enabled=evidenceState.stage==com.t1doo.aiyou.records.LocalEvidenceStage.READY&&evidenceState.questionError==null,

@@ -29,7 +29,7 @@ object ExistingReminderStore {
                 db=opened
                 opened.setForeignKeyConstraintsEnabled(true)
                 val version=SupportRecordsSqlConnection(opened).query("PRAGMA user_version").single().single() as Long
-                require(version in 15L..16L)
+                require(version in 15L..17L)
                 val contract=app.assets.open("reminder-schema-v$version.json").use{JSONObject(it.readBytes().toString(Charsets.UTF_8)).getJSONObject("database")}
                 validateExistingReminderSchema(SupportRecordsSqlConnection(opened),contract)
                 val raw=object:RecordsSqlDatabase {
@@ -65,7 +65,7 @@ object ExistingReminderStore {
 
 /** Metadata only: no original/task row scans, no migration or guard repair on the cold path. */
 internal fun validateExistingReminderSchema(sql:RecordsSqlConnection,contract:JSONObject) {
-    require(contract.getInt("version") in 15..16 && sql.query("PRAGMA user_version").single().single()==contract.getInt("version").toLong())
+    require(contract.getInt("version") in 15..17 && sql.query("PRAGMA user_version").single().single()==contract.getInt("version").toLong())
     val hash=contract.getString("identityHash");require(hash.matches(Regex("[a-f0-9]{32}")))
     require(sql.query("SELECT identity_hash FROM room_master_table WHERE id=42").single().single()==hash)
     val entities=contract.getJSONArray("entities")

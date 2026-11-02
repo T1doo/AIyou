@@ -17,7 +17,7 @@ class SavedQuestionFullBackupTest {
             assertEquals(1225,bytes.size)
             assertEquals("b4add1daf9f1a80e71cd4f128f22728eb1b11ce2ebc79578d89918acfc5e6f30",packageHex(packageHash(bytes)))
             val decoded=FullBackupCodec.decode(bytes)
-            try { assertEquals(8,decoded.version);assertEquals(14,decoded.tables.size);assertTrue(decoded.tables[13].isEmpty()) }
+            try { assertEquals(8,decoded.version);assertEquals(16,decoded.tables.size);assertTrue(decoded.tables.drop(13).all {it.isEmpty()}) }
             finally { decoded.release() }
         } finally { bytes.fill(0);d.release() }
     }
