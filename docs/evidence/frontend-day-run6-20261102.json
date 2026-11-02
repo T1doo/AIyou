@@ -1,0 +1,125 @@
+{
+  "run_id": 41427828677,
+  "workflow_run_number": 6,
+  "run_attempt": 1,
+  "workflow_execution_sha": "328ca761a86115cc1a3f1cc7d4a933208c443414",
+  "compiled_source_sha": "908ad0023dd11a2c972d59204487787a2500eb30",
+  "run_conclusion": "success",
+  "job_id": 125218642126,
+  "started_at": "2026-11-02T10:19:18Z",
+  "completed_at": "2026-11-02T10:30:32Z",
+  "job_seconds": 674,
+  "runner_name": "GitHub Actions 1000001369",
+  "labels": [
+    "ubuntu-24.04"
+  ],
+  "xml_counts": [
+    {
+      "group": "domain",
+      "suites": 12,
+      "tests": 78,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "host",
+      "suites": 11,
+      "tests": 105,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "android_targeted",
+      "suites": 2,
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "junit_total": 195,
+  "permissions": {
+    "status": "PASS",
+    "source_sha": "908ad0023dd11a2c972d59204487787a2500eb30",
+    "app_apk": "app/build/outputs/apk/debug/app-debug.apk",
+    "bytes": 29051946,
+    "sha256": "6b5e76346e5411250ba13649d5824cc73fc97e53a12be9c6ab2b2927c5fd6073",
+    "permissions": [
+      "android.permission.POST_NOTIFICATIONS",
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+      "android.permission.SCHEDULE_EXACT_ALARM",
+      "com.t1doo.aiyou.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+    ],
+    "internet_permission": false,
+    "source_internet_remove_marker": true,
+    "aapt2": "/usr/local/lib/android/sdk/build-tools/36.0.0/aapt2",
+    "scope": "compiled APK manifest only; device execution NOT RUN"
+  },
+  "artifact_count": 0,
+  "remote_cache_write": false,
+  "publication": false,
+  "preview_rendered": false,
+  "device_run": false,
+  "old_history_OOM_group_run": false,
+  "cumulative_runs": 19,
+  "cumulative_job_seconds": 26867,
+  "steps": [
+    {
+      "name": "Set up job",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "name": "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "name": "Run actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "name": "Verify public repository exact source SDK tokens and schema baseline",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "name": "Build and lint temporary native outputs only",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "name": "Verify current draft attachments completion source and copy protocols on host",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "name": "Verify preference migration and targeted composer regression",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "name": "Report actual XML counts to ordinary job log only",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "name": "Post Run actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "name": "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success",
+      "status": "completed"
+    }
+  ]
+}

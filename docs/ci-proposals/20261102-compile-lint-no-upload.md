@@ -1,4 +1,6 @@
-# 待父核准的一次编译 / lint / 定向回归
+# 待父核准的一次编译 / lint / 定向回归（历史提案）
+
+后续状态：此原方案获批准后在run5发生零job的context校验失败；父再精确批准环境修正及run6，run6已success。此文件保留原提案/hash与当时预算边界，不作为新的执行授权；正式结果见docs/evidence/frontend-day-run6-20261102.json及20261102-run5-startup-failure.md。
 
 状态：仅准备与只读核验。真实 `.github/workflows/frontend-day.yml` 仍保留字面量 `false` 硬冻结；本目录不在 Actions 执行路径内，未创建 run、上传产物、写远端缓存或发布 APK/package。
 

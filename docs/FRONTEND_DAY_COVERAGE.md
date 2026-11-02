@@ -19,7 +19,7 @@
 | 候选 | records/LocalCandidateDialog.kt; records/SourceMemoryInboxDialog.kt | 修改/拒绝/确认独立 | 共享平面建议行；确认/拒绝/修订沿原controller；未逐状态跑本轮回归 |
 | 正式待办 | records/ManualTasksScreen.kt | 分组、完成/撤销、详情、延后、提醒实际状态 | 已改复选/详情分离与连续行；分组/提醒摘要在cf54原生Preview；新增已提交完成的独立REOPEN协议及会话撤销，主机SQL/回执/备份测试通过 |
 | 设置连接 | ui/SettingsScreen.kt; ui/ModelConnectionSettings.kt | 字段标签、连接资格、密钥隐藏 | 去大卡分组，保留字段标签/资格/隐藏密钥；偏好11项通过，未逐字段验收 |
-| 隐私与锁 | ui/AppAccessScreen.kt; records/RecordAiSection.kt | 不扩大范围、应用锁 | 所有owner/准入/范围逻辑未改；无新增权限，设备锁验收未运行 |
+| 隐私与锁 | ui/AppAccessScreen.kt; records/RecordAiSection.kt | 不扩大范围、应用锁 | 隐私授权/应用锁准入与发送范围未扩大；无新增权限，设备锁验收未运行 |
 | 存储与用量 | ui/StorageUsageSection.kt | 原件/派生/缓存、未知用量 | 保留分类/清理与未知边界，沿共享样式；未逐状态跑本轮回归 |
 | 数据可带走 | records/OriginalExportScreen.kt; records/RecordPackageScreen.kt; records/FullBackupContent.kt | 严格空库、取消/未知、实际结果 | 严格空库与取消/UNKNOWN协议保留，未跑D08/恢复设备演练 |
 | 删除回收 | records/RecycleBinScreen.kt | 对象确认、失败/未知、不冒成功 | 保留对象确认/恢复/永久删除及传播；未跑本轮设备删除验收 |
@@ -66,7 +66,7 @@
 - 真机、TalkBack、真实中文IME、连续动效、D08/设备/OCR/ASR/联网均未验。
 - 自建集合持久模型是文档明确另列新增范围，不能伪造数量、封面或可用性。
 
-## 已落地的源码（尚待 Android 复验）
+## 已落地的源码（908ad00 已编译/lint/定向回归；新像素仍待复验）
 
 - 全局语义浅色、字号/密度与平面内容行，保留真正浮层的12–16dp层级；对比契约5/5通过。
 - 此刻底部单实例轻输入，展开编辑不替换controller或字段；高级附件/策略/取消/UNKNOWN入口集中在一份面板。
@@ -78,7 +78,7 @@
 
 ## 尚未完成的验收，不能称全文已实现
 
-- 本轮新普通列表缩略、音频轻标签、侧滑菜单、草稿光标/Undo及待办撤销已有真实源码与主机协议验证；Android编译/lint/同视口新截图仍未跑，cf54通过不能覆盖这些后续diff。
+- 本轮新普通列表缩略、音频轻标签、侧滑菜单、草稿光标/Undo及待办撤销已有真实源码与主机协议验证；908ad00 Android编译/lint及定向回归现已通过；同视口新截图仍未跑，cf54图片不能覆盖这些后续diff。
 - 全页面逐状态交互、真实中文IME、320dp最大字号、TalkBack、真实键盘、原生焦点/手势、连续动效仍需实际验证。
 - 自建集合持久模型为文档另列新增范围，未伪造模型、计数或可用性。
 - 麦克风录音、ASR/OCR及联网不因前端日开启；已有原音文件导入和播放继续使用原能力。
@@ -113,9 +113,9 @@
 
 第16次 `41414387198` / `e888efe62184a483666b31f998ced3b34aefd22f`：APK/领域编译成功，lint在ManualTasksScreen.kt:130报告SuspiciousIndentation，未进入后续Preview。已移除外层if内重复if并校正缩进，不关lint、不加baseline。job7m41s，累计16次 / 7h04m53。源审另补回列表外“有新内容”提示，避免滚动时提示不可见；保留主动点按回顶。下一轮仅核这些实际修正。
 
-## 最新通过结果与父冻结（本地记录，未再上传）
+## cf54通过结果与当时父冻结（历史记录）
 
-最新正式验证：41415468944，执行SHA cf54f3d9b4781a2fb4402ef86a4aeee8ee8bd482。metadata/APK/domain/lint、全部schema guards与APK无INTERNET检查通过；XML为78领域+11偏好+1实际此刻controller测试，另6项原生Preview生成，零失败/错误/跳过。基线另生成6幅，共12幅PNG逐张实看，同视口尺寸和各自hash已核。普通360dp与320dp/2倍字号，均为虚构数据Compose Preview，非设备。新版已无重复页标题，三主入口呈连续内容与底部轻输入；未因此把未覆盖状态标为完成。
+当时正式验证：41415468944，执行SHA cf54f3d9b4781a2fb4402ef86a4aeee8ee8bd482。metadata/APK/domain/lint、全部schema guards与APK无INTERNET检查通过；XML为78领域+11偏好+1实际此刻controller测试，另6项原生Preview生成，零失败/错误/跳过。基线另生成6幅，共12幅PNG逐张实看，同视口尺寸和各自hash已核。普通360dp与320dp/2倍字号，均为虚构数据Compose Preview，非设备。新版已无重复页标题，三主入口呈连续内容与底部轻输入；未因此把未覆盖状态标为完成。
 
 APK本地：/workspace/aiyou-ci-evidence/latest/unpacked/app/build/outputs/apk/debug/app-debug.apk；SHA256 cc47499cc35f518fa26959ab7cb06e07bbe9a3680953c43d89a74f4f7e359b94。
 工件13127851856，26,245,410 B，ZIP SHA256 422a25d7285d8bb7a6a73e99c85fa0ccee5f647732c344f8869703c9b5b22c6b，7天，2026-11-09T08:57:47Z到期。最新工件范围：前后PNG、app reports/test-results、domain test XML、debug APK、生成schema核对记录。已完成的本地逐像素/校验报告在 /workspace/aiyou-ci-evidence/latest/verified-local-review.json。
@@ -133,6 +133,8 @@ APK本地：/workspace/aiyou-ci-evidence/latest/unpacked/app/build/outputs/apk/d
 
 ## 冻结期间继续完成的源码与独立审查
 
+本节为2f7b4c4时的实施及81项主机验证快照；后续908ad00与run6的195项结果见末节。
+
 - 普通时间线：CurrentImageGridController继续使用原记录IO队列，绑定当前搜索对象、entries引用、owner和epoch，最多12个256px缩略。当前图片集合proof和原搜索来源proof在发布租约内双重复核；无图片与坏图/未知分开，坏首图不换其他图。失败文字移到可换行的记录行，64dp图片槽不裁字。
 - 音频分类：LocalSearchRequest/OriginalSearchInput新增onlyAudio，用当前revision的audio/wav附件ledger构造与完整重核proof；不读转写、历史版本不计。全部/收藏/图片/音频为轻标签，复杂日期/人物/标签条件仍保留。
 - 侧滑：RecordRowActions仅横向揭示一行操作区；普通操作按钮暴露同一组收藏、编辑、移入回收站。删除进入既有对象确认；滚动、返回、来源变化退休展开状态。关闭恢复焦点，滚动和跨行展开不抢焦点；Main再次核导航/原搜索对象/entries与owner。
@@ -146,7 +148,7 @@ APK本地：/workspace/aiyou-ci-evidence/latest/unpacked/app/build/outputs/apk/d
 
 最终XML：9套件81项，0失败/错误/跳过。范围为4编辑会话、8实际图文控制器、15真实缩略控制器+SQL proof、10用户回执、13实际待办VM、9来源待办、20本地查找SQL、1音频筛选、1跨密钥完整备份。SQLite为主机driver，非Android SQLCipher/Room/设备。先前缓存/直连依赖失败没有算通过；改用仓库既有jvm-gradle.py代理配置后补齐锁定依赖，测试初轮发现两个fixture/计数假设错误，修正后最终通过；未修改原断言以掩盖产品失败。Kotlin PSI语法解析26个变更文件0错误，仅语法而非Android类型检查。token契约5项、候选证据收集上限2项Python测试通过。
 
-## 待恢复批准的精确候选上限（未执行）
+## 最初上传候选的历史快照（未获上传批准；后续仅run6无上传验证）
 
 `.github/workflows/frontend-day.yml`仅workflow_dispatch，无push/PR触发；execute和upload输入默认false，job还由字面量false硬冻结。恢复需审阅源码并精确指定单次SHA，run_attempt必须1，只准公开T1doo/AIyou标准ubuntu-24.04。候选至多1次job、timeout20分钟；失败即停，不自动重跑，不跑旧OOM组，不生成重复基线。
 
@@ -154,10 +156,35 @@ APK本地：/workspace/aiyou-ci-evidence/latest/unpacked/app/build/outputs/apk/d
 
 免费依据仅限GitHub官方所述公开仓库标准runner计算：[Actions billing](https://docs.github.com/en/actions/concepts/billing-and-usage)、[shared storage accounting](https://docs.github.com/en/billing/concepts/product-billing/github-actions)。账户/Packages共享存储配额与实际费用尚未核实，需父确认可验证的剩余额度/无新增费用依据后才能恢复候选执行及独立上传。历史17次/7h16m33、四工件76,949,894B/7天完整保留，无删除或改期。
 
-## 继续补齐的三项文档源码缺口（仍未运行新CI）
+## 三项源码缺口补齐时的历史快照（随后由run6验证）
 
 1. 文档第4节：复杂日期/人物/标签移入独立全屏筛选面，结果页保留已选条件摘要。query/from/through实际TextFieldState与Undo仍由原owner持有，关闭不清输入、不强制展开；错误留在结果页，面板提供原重试入口，关闭回到触发按钮。
 2. 文档第8节：当前回答复制先inspect及checkReceipt，历史回答先actor内current(view)复核，再生成单次内存token；平台操作在Main且离开SQL/所有monitor后执行。复用敏感剪贴板标记，仅消费者实际成功后显示成功，失败明确可重试。当前结果关闭/换receipt/owner后退休回调；历史换view/来源/owner后拒绝token。回答与引用移除绕过此复核的原生SelectionContainer，问题选择保留。格式带待核对声明、编号与对应原文版本/摘录，未新增请求/发送权限或持久复制模型。
 3. 文档第20节：侧滑从向下展开按钮改为112dp真实右侧带；同一时刻一行，滑动本身不写入。普通“操作”按钮打开同一侧带，所有动作≥48dp；大字时侧带可滚动。滚动/返回/owner改变收起，删除仍进入原对象确认。
 
 主机实际源定向XML更新为11套件105项，0失败/错误/跳过；包含先前81项和两类回答controller整套24项，新增复制用例涵盖成功/失败反馈、单次token、UI退休、owner变化和来源撤回。协议wire/剪贴板consumer为受控合成实现，没有运行真实服务或系统剪贴板。记录见docs/evidence/frontend-day-host-copy-20261102.json。Kotlin PSI语法检查9个变更文件0错误，不能替代Android类型检查。独立只读复审未见确定P1/P2，未构建/执行CI。实际workflow仍是硬冻结版本，原17次/7h16m33账与四工件完全不动；新版截图未生成，不用cf54旧截图证明新源码。
+
+## 修正后单次无上传验证：908ad00已通过
+
+正式run [41427828677](https://github.com/T1doo/AIyou/actions/runs/41427828677)，workflow编号6、attempt1，最终success。执行workflow SHA `328ca761a86115cc1a3f1cc7d4a933208c443414`，实际checkout/编译源码 `908ad0023dd11a2c972d59204487787a2500eb30`；preflight日志已实际打印并核对这两个身份。328ca76相对908ad00仅workflow、提案说明与必要核账，产品文件无差异。此前run5（0807b4b，41426641264）只在workflow解析失败：0 job/0 runner秒/0 artifact，不能称应用测试失败；漏检job.env runner上下文后，经父明确批准一次修正，仍无第三次执行授权。
+
+本轮标准ubuntu-24.04单job125218642126，API实际起止2026-11-02T10:19:18Z–10:30:32Z，11m14s（674秒），在20分钟上限内。checkout/JDK/公开性与source/SDK/token/schema预检、metadata/APK/领域/lint、schema复核、编译APK权限检查、host定向协议、Android定向偏好与输入回归、实际XML汇总、post步骤全部success。
+
+从真实job日志读回最终XML结果：
+
+| 类别 | 套件 | 测试 | 失败 | 错误 | 跳过 |
+|---|---:|---:|---:|---:|---:|
+| domain | 12 | 78 | 0 | 0 | 0 |
+| host（真实controller/SQL/JCA，合成wire与剪贴板consumer） | 11 | 105 | 0 | 0 | 0 |
+| Android定向（UiPreferences + 此刻focus/失败同意图重试） | 2 | 12 | 0 | 0 | 0 |
+| 合计 | 25 | 195 | 0 | 0 | 0 |
+
+以上195现为实际XML读数，不再只是计划数；另5项Python token契约通过。不是全app UI回归或真实设备证明。没有运行旧问题回填ShadowTrace OOM组、Preview/基线截图、设备/IME/TalkBack/D08/模型下载/OCR/ASR/真实AI或联网。
+
+实际临时APK：29,051,946 B，SHA256 `6b5e76346e5411250ba13649d5824cc73fc97e53a12be9c6ab2b2927c5fd6073`；manifest检查PASS且无INTERNET，只含原POST_NOTIFICATIONS、RECEIVE_BOOT_COMPLETED、SCHEDULE_EXACT_ALARM及动态receiver权限。APK和报告只留临时runner，未上传/发布；不要把本机旧cf54 APK路径冒充这个新APK。
+
+正式artifact API为0项。未配置cache action，实际命令禁build/configuration cache及scan，未发布package/Release或更改权限。四个原artifact仍76,949,894B/7天，未删/改期；不推定原artifact或整个账户storage零费。
+
+原累计17次/7h16m33 + run5零job的1条记录 + run6的674秒 = **19次/7h27m47（26867秒）**。窗口已消费，不再自动执行，原其它CI/storage冻结保持。实际记录见docs/evidence/frontend-day-run6-20261102.json及原ci-ledger，未以新任务归零。
+
+剩余验收：新同视口截图及逐像素复验、全页面全状态交互、真实IME/最大字号/TalkBack/手势/焦点/设备动效。源码编译与定向协议通过不替代这些；cf54截图也不认证908ad00。自建集合模型、录音/ASR/OCR和新增联网仍不在本次已开启功能内。

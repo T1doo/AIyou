@@ -49,16 +49,31 @@
       "labels": [
         "ubuntu-24.04"
       ]
+    },
+    {
+      "run_id": 41427828677,
+      "job_id": 125218642126,
+      "started_at": "2026-11-02T10:19:18Z",
+      "completed_at": "2026-11-02T10:30:32Z",
+      "seconds": 674,
+      "conclusion": "success",
+      "runner_name": "GitHub Actions 1000001369",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "workflow_execution_sha": "328ca761a86115cc1a3f1cc7d4a933208c443414",
+      "compiled_source_sha": "908ad0023dd11a2c972d59204487787a2500eb30",
+      "artifact_count": 0
     }
   ],
-  "added_seconds": 2083,
-  "total_runs": 18,
-  "total_seconds": 26193,
-  "budget_basis": "Exact parent-approved one-shot no-upload run consumed at workflow validation; no runner job executed. No retry or new storage authorization.",
+  "added_seconds": 2757,
+  "total_runs": 19,
+  "total_seconds": 26867,
+  "budget_basis": "Original 13-run ledger + four earlier jobs + run5 zero-job workflow validation failure + exact parent-approved run6 context correction. Run6 consumed 674 runner seconds; no artifact/cache/package write or publication; all other CI/storage remains frozen.",
   "artifact_bytes": 76949894,
   "retention_days": 7,
   "frozen": true,
-  "latest_success_sha": "cf54f3d9b4781a2fb4402ef86a4aeee8ee8bd482",
+  "latest_success_sha": "328ca761a86115cc1a3f1cc7d4a933208c443414",
   "startup_validation_runs": [
     {
       "run_id": 41426641264,
@@ -93,7 +108,7 @@
       "approval_window": "consumed; no new execution authorized"
     }
   ],
-  "added_runner_job_seconds_after_17": 0,
+  "added_runner_job_seconds_after_17": 674,
   "one_shot_context_correction": {
     "approval": "parent explicitly approved one correction after run5 parser failure; no third execution",
     "expected_workflow_run_number": 6,
@@ -103,6 +118,10 @@
     "artifact_upload": false,
     "remote_cache_write": false,
     "publication": false,
-    "new_permissions": false
-  }
+    "new_permissions": false,
+    "status": "completed successfully; admission consumed; no third execution",
+    "run_id": 41427828677,
+    "job_seconds": 674
+  },
+  "latest_success_source_sha": "908ad0023dd11a2c972d59204487787a2500eb30"
 }

@@ -1,0 +1,21 @@
+--- a/.github/workflows/frontend-day.yml
++++ b/.github/workflows/frontend-day.yml
+@@ -17,8 +17,6 @@
+     timeout-minutes: 20
+     env:
+       AIYOU_CI_ANDROID_DAEMON: 'true'
+-      GRADLE_USER_HOME: ${{ runner.temp }}/aiyou-gradle-no-persist
+-      ANDROID_USER_HOME: ${{ runner.temp }}/aiyou-android-user-no-persist
+     steps:
+       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+         with:
+@@ -40,6 +38,9 @@
+           with urllib.request.urlopen(request, timeout=20) as response:
+               repository = json.load(response)
+           assert repository['full_name'] == 'T1doo/AIyou' and repository['private'] is False and repository['visibility'] == 'public'
++          with open(os.environ['GITHUB_ENV'], 'a') as runtime_env:
++              runtime_env.write('GRADLE_USER_HOME=' + os.path.join(os.environ['RUNNER_TEMP'], 'aiyou-gradle-no-persist') + '\n')
++              runtime_env.write('ANDROID_USER_HOME=' + os.path.join(os.environ['RUNNER_TEMP'], 'aiyou-android-user-no-persist') + '\n')
+           print(json.dumps({'source_sha': source, 'workflow_execution_sha': os.environ['GITHUB_SHA'], 'run_number': os.environ['GITHUB_RUN_NUMBER'], 'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'runner_label': 'ubuntu-24.04', 'publication': False, 'artifact_upload': False, 'remote_cache_write': False}))
+           PY
+           python3 scripts/check-sdk.py

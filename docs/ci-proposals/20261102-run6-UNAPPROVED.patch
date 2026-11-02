@@ -1,0 +1,27 @@
+--- a/.github/workflows/frontend-day.yml
++++ b/.github/workflows/frontend-day.yml
+@@ -12,13 +12,11 @@
+ 
+ jobs:
+   review:
+-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/frontend/day-20261102' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.run_number == 5 && github.run_attempt == 1 && github.event.head_commit.message == '[frontend-once-no-upload] 908ad0023dd11a2c972d59204487787a2500eb30' }}
++    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/frontend/day-20261102' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.run_number == 6 && github.run_attempt == 1 && github.event.head_commit.message == '[frontend-once-no-upload-context-fix] 908ad0023dd11a2c972d59204487787a2500eb30' }}
+     runs-on: ubuntu-24.04
+     timeout-minutes: 20
+     env:
+       AIYOU_CI_ANDROID_DAEMON: 'true'
+-      GRADLE_USER_HOME: ${{ runner.temp }}/aiyou-gradle-no-persist
+-      ANDROID_USER_HOME: ${{ runner.temp }}/aiyou-android-user-no-persist
+     steps:
+       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+         with:
+@@ -40,6 +38,9 @@
+           with urllib.request.urlopen(request, timeout=20) as response:
+               repository = json.load(response)
+           assert repository['full_name'] == 'T1doo/AIyou' and repository['private'] is False and repository['visibility'] == 'public'
++          with open(os.environ['GITHUB_ENV'], 'a') as runtime_env:
++              runtime_env.write('GRADLE_USER_HOME=' + os.path.join(os.environ['RUNNER_TEMP'], 'aiyou-gradle-no-persist') + '\n')
++              runtime_env.write('ANDROID_USER_HOME=' + os.path.join(os.environ['RUNNER_TEMP'], 'aiyou-android-user-no-persist') + '\n')
+           print(json.dumps({'source_sha': source, 'workflow_execution_sha': os.environ['GITHUB_SHA'], 'run_number': os.environ['GITHUB_RUN_NUMBER'], 'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'runner_label': 'ubuntu-24.04', 'publication': False, 'artifact_upload': False, 'remote_cache_write': False}))
+           PY
+           python3 scripts/check-sdk.py
