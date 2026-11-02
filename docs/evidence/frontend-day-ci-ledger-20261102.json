@@ -52,11 +52,57 @@
     }
   ],
   "added_seconds": 2083,
-  "total_runs": 17,
+  "total_runs": 18,
   "total_seconds": 26193,
-  "budget_basis": "General delegated bounded free CI; no separately confirmed artifact cap/retention authorization found; freeze received after fourth upload completed.",
+  "budget_basis": "Exact parent-approved one-shot no-upload run consumed at workflow validation; no runner job executed. No retry or new storage authorization.",
   "artifact_bytes": 76949894,
   "retention_days": 7,
   "frozen": true,
-  "latest_success_sha": "cf54f3d9b4781a2fb4402ef86a4aeee8ee8bd482"
+  "latest_success_sha": "cf54f3d9b4781a2fb4402ef86a4aeee8ee8bd482",
+  "startup_validation_runs": [
+    {
+      "run_id": 41426641264,
+      "run_number": 5,
+      "run_attempt": 1,
+      "workflow_execution_sha": "0807b4b74b0ac377fc022f6856653eb054e0aae4",
+      "configured_source_sha": "908ad0023dd11a2c972d59204487787a2500eb30",
+      "source_checkout_executed": false,
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-11-02T10:10:31Z",
+      "updated_at": "2026-11-02T10:10:31Z",
+      "runner_jobs": 0,
+      "runner_job_seconds": 0,
+      "artifacts": 0,
+      "cache_write": false,
+      "publication": false,
+      "failure_phase": "workflow validation before runner allocation",
+      "annotation": "Invalid workflow file: job env lines 20/21 use unsupported runner.temp expression context",
+      "stages": {
+        "checkout": "NOT RUN",
+        "public-source-SDK-token-schema-preflight": "NOT RUN",
+        "Android-build-domain-lint-permissions": "NOT RUN",
+        "host-105-tests": "NOT RUN",
+        "Android-targeted-12-tests": "NOT RUN",
+        "actual-XML-counts": "NOT RUN"
+      },
+      "planned_JUnit_tests": 195,
+      "actual_CI_JUnit_tests": 0,
+      "run_url": "https://github.com/T1doo/AIyou/actions/runs/41426641264",
+      "retries": 0,
+      "approval_window": "consumed; no new execution authorized"
+    }
+  ],
+  "added_runner_job_seconds_after_17": 0,
+  "one_shot_context_correction": {
+    "approval": "parent explicitly approved one correction after run5 parser failure; no third execution",
+    "expected_workflow_run_number": 6,
+    "attempt": 1,
+    "source_sha": "908ad0023dd11a2c972d59204487787a2500eb30",
+    "timeout_minutes": 20,
+    "artifact_upload": false,
+    "remote_cache_write": false,
+    "publication": false,
+    "new_permissions": false
+  }
 }
