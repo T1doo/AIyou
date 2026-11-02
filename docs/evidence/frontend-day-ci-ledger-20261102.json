@@ -79,12 +79,27 @@
       "artifact_count": 0,
       "seconds": 478,
       "conclusion": "failure"
+    },
+    {
+      "run_id": 41455962724,
+      "job_id": 125312578680,
+      "started_at": "2026-11-02T13:47:07Z",
+      "completed_at": "2026-11-02T13:51:37Z",
+      "runner_name": "GitHub Actions 1000001371",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "workflow_execution_sha": "00d36fdb3ffeaa93fb58bb9a819d8390e85bb1e6",
+      "compiled_source_sha": "e33ff67afaedabeb34f8aa0f1e298b702e250a38",
+      "artifact_count": 0,
+      "seconds": 270,
+      "conclusion": "failure"
     }
   ],
-  "added_seconds": 3235,
-  "total_runs": 20,
-  "total_seconds": 27345,
-  "budget_basis": "Original 13-run ledger + four earlier jobs + run5 zero-job workflow validation failure + exact parent-approved run6 context correction. Run6 consumed 674 runner seconds; no artifact/cache/package write or publication; all other CI/storage remains frozen. Parent separately approved exact run7/attempt1, source ae6669c633d7cbc255e95fb4da6b7ed8fb245e86 and patch 53d342db70dfbdb508192ace598fcf2896748df0324c6340164dddd0ecc47c67. This consumed 478 runner seconds and failed lint; no retry authorized. Existing 19-run baseline preserved.",
+  "added_seconds": 3505,
+  "total_runs": 21,
+  "total_seconds": 27615,
+  "budget_basis": "Original 13-run ledger + four earlier jobs + run5 zero-job workflow validation failure + exact parent-approved run6 context correction. Run6 consumed 674 runner seconds; no artifact/cache/package write or publication; all other CI/storage remains frozen. Parent separately approved exact run7/attempt1, source ae6669c633d7cbc255e95fb4da6b7ed8fb245e86 and patch 53d342db70dfbdb508192ace598fcf2896748df0324c6340164dddd0ecc47c67. This consumed 478 runner seconds and failed lint; no retry authorized. Existing 19-run baseline preserved. Parent separately approved exact run8/attempt1 for e33ff67afaedabeb34f8aa0f1e298b702e250a38 and patch 475c82a0a73c22f7a3a39f645992121aa9e6c06fe50073a8d77e4b3efdc50f6d. Actual 270 seconds; DEX conversion failed before APK/lint/host/app/XML reporting. No retry authorized; original baseline retained.",
   "artifact_bytes": 76949894,
   "retention_days": 7,
   "frozen": true,
@@ -123,7 +138,7 @@
       "approval_window": "consumed; no new execution authorized"
     }
   ],
-  "added_runner_job_seconds_after_17": 1152,
+  "added_runner_job_seconds_after_17": 1422,
   "one_shot_context_correction": {
     "approval": "parent explicitly approved one correction after run5 parser failure; no third execution",
     "expected_workflow_run_number": 6,
@@ -139,8 +154,8 @@
     "job_seconds": 674
   },
   "latest_success_source_sha": "908ad0023dd11a2c972d59204487787a2500eb30",
-  "latest_attempt_sha": "a828cf5554f347b4a6032b17de08521638f0ac5b",
-  "latest_attempt_source_sha": "ae6669c633d7cbc255e95fb4da6b7ed8fb245e86",
+  "latest_attempt_sha": "00d36fdb3ffeaa93fb58bb9a819d8390e85bb1e6",
+  "latest_attempt_source_sha": "e33ff67afaedabeb34f8aa0f1e298b702e250a38",
   "one_shot_detail_review": {
     "run_id": 41452461459,
     "workflow_run_number": 7,
@@ -148,6 +163,17 @@
     "workflow_execution_sha": "a828cf5554f347b4a6032b17de08521638f0ac5b",
     "compiled_source_sha": "ae6669c633d7cbc255e95fb4da6b7ed8fb245e86",
     "job_seconds": 478,
+    "run_conclusion": "failure",
+    "artifact_count": 0,
+    "admission": "consumed; no automatic rerun or next run authorized"
+  },
+  "one_shot_audio_state": {
+    "run_id": 41455962724,
+    "workflow_run_number": 8,
+    "run_attempt": 1,
+    "workflow_execution_sha": "00d36fdb3ffeaa93fb58bb9a819d8390e85bb1e6",
+    "compiled_source_sha": "e33ff67afaedabeb34f8aa0f1e298b702e250a38",
+    "job_seconds": 270,
     "run_conclusion": "failure",
     "artifact_count": 0,
     "admission": "consumed; no automatic rerun or next run authorized"

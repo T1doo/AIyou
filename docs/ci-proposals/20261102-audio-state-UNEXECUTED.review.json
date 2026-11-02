@@ -1,0 +1,57 @@
+{
+  "source_sha": "e33ff67afaedabeb34f8aa0f1e298b702e250a38",
+  "actual_workflow_unchanged_sha256": "93f7811110d4d0071aefecdf65293d3f988c8236fa33ebd5517cad6c8e38525d",
+  "candidate_sha256": "8ee0525a76a9e1b2868c4d66fc82032c6eb3f65ce5c06ece011de97475283a45",
+  "patch_sha256": "475c82a0a73c22f7a3a39f645992121aa9e6c06fe50073a8d77e4b3efdc50f6d",
+  "proposed_run_number": 8,
+  "attempt": 1,
+  "unique_message": "[frontend-once-no-upload-audio-state] e33ff67afaedabeb34f8aa0f1e298b702e250a38",
+  "candidate_applied": false,
+  "ci_started": false,
+  "new_inputs_or_actions": false,
+  "host_selector_count": 14,
+  "expected_suites": 28,
+  "expected_tests": 229,
+  "expected_xml": {
+    "domain": {
+      "suites": 12,
+      "tests": 78
+    },
+    "host": {
+      "suites": 14,
+      "tests": 139
+    },
+    "android_targeted": {
+      "suites": 2,
+      "tests": 12
+    }
+  },
+  "cumulative_before": {
+    "runs": 20,
+    "seconds": 27345
+  },
+  "one_proposed_job_max_minutes": 20,
+  "config_limit_projection_only": {
+    "runs": 21,
+    "seconds": 28545
+  },
+  "static_checks": [
+    "YAML structure and exact identity/runner/permissions/pins",
+    "unchanged execution commands and no-upload scope",
+    "embedded Python compile",
+    "git apply --check"
+  ],
+  "review": "local static checks only; no CI execution or platform acceptance; compile/lint still unverified after source fix",
+  "snapshot_phase": "preapproval only; original candidate_applied/ci_started describe preparation time",
+  "later_execution": {
+    "run_id": 41455962724,
+    "workflow_execution_sha": "00d36fdb3ffeaa93fb58bb9a819d8390e85bb1e6",
+    "source_sha": "e33ff67afaedabeb34f8aa0f1e298b702e250a38",
+    "run_number": 8,
+    "attempt": 1,
+    "job_seconds": 270,
+    "conclusion": "failure at :app:dexBuilderDebug; D8 NON_LOCAL_RETURN marker in OriginalAudioScreenKt.class",
+    "admission_consumed": true,
+    "evidence": "../evidence/frontend-day-run8-20261102.json"
+  }
+}

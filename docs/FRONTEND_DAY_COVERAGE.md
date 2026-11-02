@@ -214,3 +214,14 @@ APK本地：/workspace/aiyou-ci-evidence/latest/unpacked/app/build/outputs/apk/d
 父授权继续最小源码修复后，OriginalAudioStatus按key(controller)同时隔离collectAsState订阅及派生状态。StateFlow初值由正式collectAsState取得；derivedStateOf(structuralEqualityPolicy())仅读Compose State，保留投影的结构相等比较，10ms PCM状态改变但整秒/phase/error未变时不传播到UI。组合退出取消收集，owner替换不复用旧订阅/派生闭包。未改投影文案、polite liveRegion、进度、48dp stop/UNKNOWN核对或提醒协议；无suppress、lint baseline或关闭检查。
 
 已授权只读独审检查实际最小diff，未见确定P1/P2。既有三类主机测试先命中缓存，随后仅test task带--rerun在离线120秒上限内实际执行：音频呈现3、实际音频controller14、实际提醒controller17，共3套件34项，0失败/错误/跳过，11秒。1个Kotlin文件PSI语法检查0错误。详见frontend-audio-state-fix-20261102.json。Host与PSI不能证明Compose类型/lint、设备或TalkBack通过；新源码Android验证仍待新的精确方案批准，未触发run8。
+
+
+## run8终态：DEX转换失败，后续验收未执行
+
+父独审后批准精确patch 475c82a0a73c22f7a3a39f645992121aa9e6c06fe50073a8d77e4b3efdc50f6d，仅workflow提交 `00d36fdb3ffeaa93fb58bb9a819d8390e85bb1e6` 触发 [run8/attempt1 41455962724](https://github.com/T1doo/AIyou/actions/runs/41455962724)。实际checkout/编译源码 `e33ff67afaedabeb34f8aa0f1e298b702e250a38`，日志已分别核对身份。执行前公开、PR0、在途各0、latest7及源/补丁哈希均符合；没有调整编号或增加执行范围。
+
+public/source/已有SDK许可/token/schema基线预检通过，Python token契约实际5项通过；metadata和Kotlin编译完成。:app:dexBuilderDebug失败，D8/R8_9.4.24明确指向OriginalAudioScreenKt.class：Method name '<anonymous>' in class '$$$$$NON_LOCAL_RETURN$$$$$' cannot be represented in dex format。失败产物定位已明确，但具体触发尚未独立隔离，不宣称只是环境或已修复。没有在此轮修改源码或重跑。
+
+assembleDebug未完成；lintDebug未运行，不能认证run7的lint已通过。domain:test任务执行且无任务失败，但没有读回XML数量；host139、Android定向12、XML汇总、schema后复核与APK权限检查均未执行。229项/28套件仍为预计，不挪用旧195项或本地34项。无新的APK hash、截图或设备结果；旧ShadowTrace OOM组没有运行。
+
+标准ubuntu-24.04单job125312578680实际13:47:07Z–13:51:37Z，270秒（4m30）。原20次27345秒追加为21次27615秒（7h40m15），窗口已消费，未批准自动重跑/下一轮。artifact API0项，无artifact/cache action、远端cache写入或package发布动作。启动Cache mode: write为平台能力元数据；普通日志/状态仍持久，既有76,949,894B/7天工件未删改，不推断账户存储零费。完整结果见frontend-day-run8-20261102.json及原累计账。
