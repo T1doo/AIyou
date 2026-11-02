@@ -73,6 +73,7 @@ fun SettingsScreen(
     modelConnectionSection: (@Composable () -> Unit)? = null,
     onOpenFullBackup: (() -> Unit)? = null,
     fullBackupUnavailable: String? = null,
+    savedQuestionsSection:(@Composable ()->Unit)? = null,
 ) {
     val owner = remember { AtomicBoolean(true) }
     DisposableEffect(owner) { onDispose { owner.set(false) } }
@@ -107,6 +108,7 @@ fun SettingsScreen(
                             modifier = Modifier.testTag("settings-backup-boundary"))
                     }
                 }
+                savedQuestionsSection?.invoke()
                 SettingsGroup("陪伴与显示") {
             Text("一只安静的水豚，陪你记下一点生活。", modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyMedium.copy(lineBreak = LineBreak.Heading), color = AIyouColors.textSecondary)

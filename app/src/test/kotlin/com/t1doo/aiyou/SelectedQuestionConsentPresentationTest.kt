@@ -34,11 +34,13 @@ class SelectedQuestionConsentPresentationTest {
     private val entries = listOf("picture", "text").mapIndexed { i, id ->
         StoredEntry(id, 1, "needle 合成摘录${i + 1}🙂", 5 + i.toLong(), "UTC", ProcessingPolicy.REMOTE_ALLOWED)
     }
+    private val searchCalls=AtomicInteger()
     private val port = object : LocalSearchRepository {
         override fun batch() = LocalSearchProgress(0, false, 1)
         override fun rebuild() = 1L
         override fun epoch() = 1L
         override fun candidates(request: LocalSearchRequest) = object : LocalSearchSnapshot {
+            init {searchCalls.incrementAndGet()}
             override val epoch = 1L
             override val entries = this@SelectedQuestionConsentPresentationTest.entries
             override val tags = entries.associate { it.id to ManualTagSnapshot(it.id, 0, emptyList()) }
@@ -53,12 +55,12 @@ class SelectedQuestionConsentPresentationTest {
     private val records = mutableStateOf(LocalRecordUiState(ready = true, opening = false, entries = entries,
         localSearch = port, localSearchEpoch = 1, selectedQuestionAuthorizationOwner = fixture.authority))
     private val selected = mutableStateOf<SelectedQuestionConsentFixture?>(fixture.capability)
-    @Composable private fun Screen(large: Boolean = false,production:ProductionQuestions?=null,destination:Destination=Destination.MEMORIES,mixed:MixedCaptureController?=null) {
+    @Composable private fun Screen(large: Boolean = false,production:ProductionQuestions?=null,destination:Destination=Destination.MEMORIES,mixed:MixedCaptureController?=null,history:SavedQuestionsController?=null) {
         val density = LocalDensity.current
         CompositionLocalProvider(LocalDensity provides if (large) Density(density.density, 2f) else density) {
             AIyouTheme { Box(if (large) Modifier.size(320.dp, 640.dp) else Modifier) {
                 AIyouApp(previewDestination = destination, local = records.value, currentRecords = { records.value },mixedCapture=mixed,
-                    selectedQuestionConsentFixture = if(production==null)selected.value else null,productionQuestions=production)
+                    selectedQuestionConsentFixture = if(production==null)selected.value else null,productionQuestions=production,savedQuestions=history)
             } }
         }
     }
@@ -156,7 +158,14 @@ class SelectedQuestionConsentPresentationTest {
             override fun confirm(ticket:ModelCapabilityProbeTicket,observation:TextCapabilityObservation):ModelCapabilityProfile?=error("No probe")
         }
         val writes=AtomicInteger();val clients=AtomicInteger()
+        val saved=SavedQuestion(java.util.UUID.randomUUID().toString(),1,5,5,"从本机历史重新填入的合成问题")
+        val historyPort=object:SavedQuestionRepository {
+            override fun read(id:String)=saved.takeIf {it.id==id}
+            override fun list()=listOf(saved)
+            override fun save(request:SaveQuestion):SavedQuestion=error("Filling a question must not write history")
+        }
         val store=object:EntryRepository {
+            override val savedQuestions=historyPort
             override val modelConnections=catalog
             override val modelCapabilities=profiles
             override val selectedQuestionAuthorizations=fixture.authority
@@ -169,6 +178,7 @@ class SelectedQuestionConsentPresentationTest {
         }
         val captureDraft=CaptureDraft("b0b28d6c-d987-4890-8659-5cf9bdf903fb",7,"合成记录草稿，不能变成问题",emptyList())
         records.value=records.value.copy(text=captureDraft.text,modelConnectionOwner=catalog,modelCapabilityOwner=profiles,
+            savedQuestionOwner=historyPort,
             supportsMixedCapture=true,mixedCapture=MixedCaptureUiState(draft=captureDraft,text=captureDraft.text))
         val mixed=MixedCaptureController({records.value},{change->records.value=change(records.value)},
             {writes.incrementAndGet();error("No capture writes from asking")},{error("No image decode")},Clock.fixed(NOW,ZoneOffset.UTC))
@@ -176,8 +186,9 @@ class SelectedQuestionConsentPresentationTest {
         ai.bindOwner(store)
         val runtime=ProductionQuestions({records.value},{action->runBlocking{action(store)};true},ai,Clock.fixed(NOW,ZoneOffset.UTC))
         runtime.bindOwner(store)
+        val history=SavedQuestionsController({historyPort},{action->runBlocking {action(store)};true},Clock.fixed(NOW,ZoneOffset.UTC))
         try {
-            compose.setContent {Screen(true,runtime,Destination.NOW,mixed)}
+            compose.setContent {Screen(true,runtime,Destination.NOW,mixed,history)}
             reveal("mixed-ask-question").assertHeightIsAtLeast(48.dp)
             val askBeforeRecomposition=compose.onNodeWithTag("mixed-ask-question").fetchSemanticsNode()
                 .config[SemanticsActions.OnClick].action!!
@@ -200,6 +211,15 @@ class SelectedQuestionConsentPresentationTest {
             reveal("question-consent-unavailable").assertTextContains("当前安装包未开放网络发送",substring=true)
             compose.onAllNodesWithTag("question-consent-review").assertCountEquals(0)
             compose.onAllNodesWithTag("question-consent-fixture").assertCountEquals(0)
+            val previousQueries=searchCalls.get()
+            reveal("question-save-or-open-history").performClick()
+            compose.onNodeWithTag("saved-question-${saved.id}").performScrollTo().assertIsDisplayed().performClick()
+            compose.onNodeWithTag("saved-question-confirm-switch").performScrollTo().performClick()
+            compose.onNodeWithTag("saved-question-use").performScrollTo().assertIsDisplayed().performClick()
+            reveal("question-draft").assertTextContains(saved.question!!)
+            reveal("original-search-query").assertTextContains("needle")
+            assertEquals(previousQueries,searchCalls.get())
+            compose.onAllNodesWithTag("local-evidence-confirmed").assertCountEquals(0)
             reveal("question-draft").performTextReplacement("改问另一个合成问题")
             compose.onAllNodesWithTag("local-evidence-confirmed").assertCountEquals(0)
             reveal("local-evidence-confirm").assertIsEnabled()
@@ -207,7 +227,7 @@ class SelectedQuestionConsentPresentationTest {
                 assertEquals(0,writes.get());assertEquals(0,clients.get());assertEquals(0,fixture.authorizations.get());assertEquals(0,fixture.opened.get())
                 assertEquals("合成记录草稿，不能变成问题",records.value.text);assertSame(captureDraft,records.value.mixedCapture!!.draft)
             }
-        } finally {runBlocking{runtime.closeAndJoin()};ai.close()}
+        } finally {history.dispose();runBlocking{runtime.closeAndJoin()};ai.close()}
     }
 
     /** Synthetic metadata/ack port only. Does not replace the product's SQL authority test. */

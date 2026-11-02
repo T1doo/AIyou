@@ -17,6 +17,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -60,6 +61,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 import com.t1doo.aiyou.designsystem.AIyouTheme
 import com.t1doo.aiyou.designsystem.ComponentState
@@ -198,6 +200,7 @@ class MainActivity : ComponentActivity() {
                 onStartAiSession = records::startAiSession, onStopAiSession = records::stopAiSession,
                 onCloseAiSession = records::closeAiSession,
                 productionQuestions=records.productionQuestions,
+                savedQuestions=records.savedQuestions,
                 onOpenTags = records.tags::open, onTagEdit = records.tags::edit, onTagAdd = records.tags::add,
                 favorites = records.favorites, eventDates = records.eventDates,
                 candidates = records.candidates,
@@ -347,6 +350,7 @@ fun AIyouApp(
     unifiedKeywords:com.t1doo.aiyou.records.UnifiedKeywordController?=null,
     imageTexts:com.t1doo.aiyou.records.ImageTextController?=null,
     productionQuestions:com.t1doo.aiyou.records.ProductionQuestions?=null,
+    savedQuestions:com.t1doo.aiyou.records.SavedQuestionsController?=null,
 ) {
     require(productionQuestions==null||selectedQuestionService==null&&selectedQuestionConsentFixture==null)
     val currentUnifiedController by rememberUpdatedState(unifiedKeywords)
@@ -594,6 +598,10 @@ fun AIyouApp(
     val consentOwner = searchSource()?.selectedQuestionAuthorizationOwner
     val emptyQuestionDirectory=remember{kotlinx.coroutines.flow.MutableStateFlow(com.t1doo.aiyou.records.QuestionConnectionsState())}
     val questionDirectory by (productionQuestions?.state?:emptyQuestionDirectory).collectAsState()
+    val emptySavedQuestions=remember {kotlinx.coroutines.flow.MutableStateFlow<com.t1doo.aiyou.records.SavedQuestionsUi?>(null)}
+    val savedQuestionEmission by (savedQuestions?.state?:emptySavedQuestions).collectAsState()
+    val savedQuestionUi=savedQuestionEmission?.takeIf {it===savedQuestions?.visible()}
+    SideEffect {savedQuestions?.sync()}
     val remoteQuestion=questionDirectory.selected?.takeIf{it.owner===consentOwner&&productionQuestions?.current(it)==true}
     val currentRemoteQuestion by rememberUpdatedState(remoteQuestion)
     val consentSelectionScope=com.t1doo.aiyou.records.questionConsentSelectionScope(evidenceState,evidenceMode)
@@ -617,6 +625,20 @@ fun AIyouApp(
     val searchEnabled = questionUi == null && selected == Destination.MEMORIES && !recapRoute && !reading && !browsingRecycle &&
         !browsingPackage && !showSettings && !demo && local != null && local.originalEdit == null && local.originalHistory == null
     val evidenceEnabled = evidenceMode && searchEnabled
+    if(savedQuestionUi!=null&&savedQuestions!=null&&!demo) {
+        val questionOwner=local?.savedQuestionOwner
+        com.t1doo.aiyou.records.SavedQuestionsContent(savedQuestionUi,savedQuestions,
+            onUse=if(!evidenceEnabled||evidenceState.stage!=com.t1doo.aiyou.records.LocalEvidenceStage.READY)null else ({
+                val text=savedQuestions.questionForUse(savedQuestionUi)
+                if(text!=null&&ownsNavigation()&&evidenceEnabled&&evidence.state.value===evidenceState&&
+                    searchSource()?.let {it.ready&&!it.opening&&it.error==null&&it.savedQuestionOwner===questionOwner}==true) {
+                    questionConsent.retireUiScope()
+                    evidence.changeQuestion(evidenceState,text) // Existing private source gate clears old confirmation.
+                    questionConsent.sync();evidenceAnswers.sync();evidenceQuestions.sync()
+                    if(evidence.state.value!==evidenceState&&evidence.state.value.question==text)savedQuestions.close(savedQuestionUi)
+                }
+            }))
+    }
     DisposableEffect(productionQuestions,evidenceEnabled) {
         if(evidenceEnabled)productionQuestions?.open()else productionQuestions?.leave()
         onDispose {productionQuestions?.leave()}
@@ -1241,6 +1263,11 @@ fun AIyouApp(
                 fullBackupUnavailable = if (canOpenSettingsBackup()) null else if (demo)
                     "虚构示例不提供资料库操作。" else "本机资料暂未就绪或当前操作尚未结束，请核对后重试。",
                 appAccessSection = appAccessSettings,
+                savedQuestionsSection = if(savedQuestions==null||demo)null else ({
+                    TextButton(onClick={if(ownsNavigation()&&showSettings&&currentLocal?.let {it.ready&&!it.opening&&it.error==null}==true)savedQuestions.open()},
+                        enabled=local?.let {it.ready&&!it.opening&&it.error==null&&it.savedQuestionOwner!=null}==true,
+                        modifier=Modifier.heightIn(min=48.dp).testTag("settings-saved-questions")) {Text("已保存的问题（仅本机）")}
+                }),
                 modelConnectionSection = if(modelConnections==null || demo) null else ({
                     com.t1doo.aiyou.ui.ModelConnectionSettings(modelConnections,local?.modelConnectionOwner,
                         local?.ready==true && !local.opening && local.error==null, local?.modelSecretOwner, local?.modelCapabilityOwner)
@@ -1444,6 +1471,10 @@ fun AIyouApp(
                     }
                 },
                 evidenceQuestion = {
+                    if(savedQuestions!=null&&!demo)TextButton(onClick={
+                        if(ownsNavigation()&&evidenceEnabled&&evidenceState.questionError==null)savedQuestions.open(evidenceState.question)
+                    },enabled=evidenceState.stage==com.t1doo.aiyou.records.LocalEvidenceStage.READY&&evidenceState.questionError==null,
+                        modifier=Modifier.heightIn(min=48.dp).testTag("question-save-or-open-history")) {Text("保存这个问题／已保存的问题")}
                     if(productionQuestions!=null) com.t1doo.aiyou.records.QuestionConnectionsSection(
                         questionDirectory,questionConsentState.stage,productionQuestions.unavailableNotice(),
                         onReload={if(ownsNavigation()&&evidenceEnabled)productionQuestions.reload(questionDirectory.session)},

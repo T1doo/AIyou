@@ -128,7 +128,7 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
             }
         }
     }
-    private fun operation(data:FullBackupData)=when(data.version) { 8 -> OP;9 -> "FULL_BACKUP_IMPORT_V9";10 -> "FULL_BACKUP_IMPORT_V10";11 -> "FULL_BACKUP_IMPORT_V11";12 -> "FULL_BACKUP_IMPORT_V12";13 -> "FULL_BACKUP_IMPORT_V13";14 -> "FULL_BACKUP_IMPORT_V14";else -> error("Unknown full version") }
+    private fun operation(data:FullBackupData)=when(data.version) { 8 -> OP;9 -> "FULL_BACKUP_IMPORT_V9";10 -> "FULL_BACKUP_IMPORT_V10";11 -> "FULL_BACKUP_IMPORT_V11";12 -> "FULL_BACKUP_IMPORT_V12";13 -> "FULL_BACKUP_IMPORT_V13";14 -> "FULL_BACKUP_IMPORT_V14";15 -> "FULL_BACKUP_IMPORT_V15";else -> error("Unknown full version") }
     private fun verifyRestored(expected:FullBackupData,actual:FullBackupData) {
         // Logical rows are keyed sets. SQL BINARY and the edit store have different sort orders,
         // while authenticated image frames retain their explicit document order throughout IO.
@@ -201,7 +201,7 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
         mediaPackages.validatePortableLedger(data)
         data.tables[12].forEach { row -> when(row[3]) {
             "PACKAGE_MEDIA_INTENT" -> mediaPackages.validateCompletedForFullBackup(row)
-            OP,"FULL_BACKUP_IMPORT_V9","FULL_BACKUP_IMPORT_V10","FULL_BACKUP_IMPORT_V11","FULL_BACKUP_IMPORT_V12","FULL_BACKUP_IMPORT_V13","FULL_BACKUP_IMPORT_V14" -> { RecordPackages.uuid(row[1] as String);require(row[0]==PREFIX+row[1] && row[2]==(if(row[3]==OP) 8L else if(row[3]=="FULL_BACKUP_IMPORT_V9") 9L else if(row[3]=="FULL_BACKUP_IMPORT_V10") 10L else if(row[3]=="FULL_BACKUP_IMPORT_V11") 11L else if(row[3]=="FULL_BACKUP_IMPORT_V12") 12L else if(row[3]=="FULL_BACKUP_IMPORT_V13") 13L else 14L) && (row[4] as String).matches(Regex("DONE:[0-9a-f]{64}"))) }
+            OP,"FULL_BACKUP_IMPORT_V9","FULL_BACKUP_IMPORT_V10","FULL_BACKUP_IMPORT_V11","FULL_BACKUP_IMPORT_V12","FULL_BACKUP_IMPORT_V13","FULL_BACKUP_IMPORT_V14","FULL_BACKUP_IMPORT_V15" -> { RecordPackages.uuid(row[1] as String);require(row[0]==PREFIX+row[1] && row[2]==(if(row[3]==OP) 8L else if(row[3]=="FULL_BACKUP_IMPORT_V9") 9L else if(row[3]=="FULL_BACKUP_IMPORT_V10") 10L else if(row[3]=="FULL_BACKUP_IMPORT_V11") 11L else if(row[3]=="FULL_BACKUP_IMPORT_V12") 12L else if(row[3]=="FULL_BACKUP_IMPORT_V13") 13L else if(row[3]=="FULL_BACKUP_IMPORT_V14") 14L else 15L) && (row[4] as String).matches(Regex("DONE:[0-9a-f]{64}"))) }
             "CAPTURE_SAVED","CAPTURE_DISCARDED" -> {
                 RecordPackages.uuid(row[1] as String)
                 require(row[0]==(row[3] as String)+":"+row[1] && row[2]==1L)
@@ -266,6 +266,8 @@ internal class SqlFullBackupRepository(private val database:RecordsSqlDatabase,p
 
 /** Purpose-specific existing codecs authenticate before a portable payload is included or installed. */
 private class FullBackupCells(database:RecordsSqlDatabase,key:ByteArray):AutoCloseable {
+    private val savedQuestions=SavedQuestionCipher(key)
+    private val savedQuestionRows=SqlSavedQuestionRepository(database,key)
     private val tags=ManualTagCipher(key)
     private val people=ManualTagCipher(key,ManualLabelPurpose.PEOPLE)
     private val tasks=ManualTaskCipher(key)
@@ -305,11 +307,12 @@ private class FullBackupCells(database:RecordsSqlDatabase,key:ByteArray):AutoClo
         preferences.validatePortableGraph(retained);facts.validatePortableGraph(factRows);transcripts.validatePortable(data);imageTexts.validatePortable(data)
         } finally { (retained+factRows).forEach { it.first.filterIsInstance<ByteArray>().forEach { bytes -> bytes.fill(0) } } }
     }
-    fun validateWithin(sql:RecordsSqlConnection) { candidates.validateFullWithin(sql);memories.validateFullWithin(sql);preferences.validateFullWithin(sql);facts.validateFullWithin(sql);transcripts.validateFullWithin(sql);imageTexts.validateFullWithin(sql) }
+    fun validateWithin(sql:RecordsSqlConnection) { savedQuestionRows.validateWithin(sql);candidates.validateFullWithin(sql);memories.validateFullWithin(sql);preferences.validateFullWithin(sql);facts.validateFullWithin(sql);transcripts.validateFullWithin(sql);imageTexts.validateFullWithin(sql) }
     fun transform(table:String,row:List<Any?>,restoring:Boolean):List<Any?> {
-        val index=when(table) { "entry_manual_tags","entry_manual_people","manual_tasks" -> 3;"local_candidate_batches" -> 10;else -> return row }
+        val index=when(table) { "saved_questions" -> 6;"entry_manual_tags","entry_manual_people","manual_tasks" -> 3;"local_candidate_batches" -> 10;else -> return row }
         val bytes=row[index] as ByteArray
         val value=when(table) {
+            "saved_questions" -> savedQuestions.portable(row,restoring)
             "entry_manual_tags" -> tags.portable(row[0] as String,row[1] as Long,row[2] as String,bytes,restoring)
             "entry_manual_people" -> people.portable(row[0] as String,row[1] as Long,row[2] as String,bytes,restoring)
             "manual_tasks" -> if((row[0] as String).startsWith(TaskProposals.PREFIX)) proposals.portable((row[0] as String).removePrefix(TaskProposals.PREFIX),row[1] as Long,row[2] as String,bytes,restoring)
@@ -318,5 +321,5 @@ private class FullBackupCells(database:RecordsSqlDatabase,key:ByteArray):AutoClo
         }
         return row.toMutableList().also { it[index]=value }
     }
-    override fun close() { tags.wipe();people.wipe();tasks.wipe();proposals.wipe();candidates.wipeKey();memories.wipeKey();preferences.wipeKey();facts.wipeKey();transcripts.wipeKey();imageTexts.wipeKey() }
+    override fun close() { savedQuestions.wipe();savedQuestionRows.wipeKey();tags.wipe();people.wipe();tasks.wipe();proposals.wipe();candidates.wipeKey();memories.wipeKey();preferences.wipeKey();facts.wipeKey();transcripts.wipeKey();imageTexts.wipeKey() }
 }

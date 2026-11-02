@@ -7,6 +7,8 @@ import com.t1doo.aiyou.model.OriginalEditDraft
 
 /** Successful completion means a durable transaction, never an optimistic UI insert. */
 interface EntryRepository {
+    /** Explicit local question drafts, independent of source authorization and derived results. */
+    val savedQuestions: SavedQuestionRepository? get() = null
     /** Non-secret local configuration only; it confers no send authority. */
     val modelConnections: ModelConnectionCatalog? get() = null
     /** Local capability observations only; neither a probe client nor record send authority. */

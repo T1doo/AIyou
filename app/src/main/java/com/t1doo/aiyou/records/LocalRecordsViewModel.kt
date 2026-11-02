@@ -142,6 +142,7 @@ data class LocalRecordUiState(
     val localIndexError: String? = null,
     val reminders: TaskRemindersUiState = TaskRemindersUiState(),
     val selectedQuestionAuthorizationOwner: com.t1doo.aiyou.domain.SelectedQuestionAuthorizationRepository? = null,
+    val savedQuestionOwner:com.t1doo.aiyou.domain.SavedQuestionRepository? = null,
 )
 
 /** All draft writes and saves share one queue, preserving edits around a save boundary. */
@@ -293,6 +294,10 @@ class LocalRecordsViewModel internal constructor(
         probeReady={productionAi?.unavailableNotice()==null})
     val productionQuestions=productionAi?.let {runtime->ProductionQuestions({mutableState.value},
         {action->submit(Command.ModelConnections(action)).isSuccess},runtime,clock)}
+    val savedQuestions=SavedQuestionsController(
+        {mutableState.value.savedQuestionOwner},
+        {action->submit(Command.SavedQuestions(action)).isSuccess},clock,
+        {mutableState.value.let {it.ready&&!it.opening&&it.error==null}})
     val favorites = RecordFavoriteController(current = { mutableState.value }, publish = { change -> update(change) },
         enqueue = { action -> submit(Command.Favorites(action)).isSuccess }, beforeWrite={unifiedObserver?.retire()})
     val eventDates = RecordEventDateController(current = { mutableState.value }, publish = { change -> update(change) },
@@ -492,6 +497,7 @@ class LocalRecordsViewModel internal constructor(
                                 catch(c:CancellationException){throw c}catch(_:Exception){reminders.runtimeUnavailable()}
                             }
                             is Command.LocalCandidates -> command.action(checkNotNull(repository))
+                            is Command.SavedQuestions -> command.action(checkNotNull(repository))
                             is Command.MemoryInbox -> command.action(checkNotNull(repository))
                             is Command.OriginalExport -> command.action(checkNotNull(repository))
                             is Command.RecordPackage -> {
@@ -537,6 +543,7 @@ class LocalRecordsViewModel internal constructor(
                 attachments.markDisposed()
                 imageGrid.dispose()
                 tags.dispose(); people.dispose(); modelConnections.dispose();productionQuestions?.markDisposed()
+                savedQuestions.dispose()
                 favorites.dispose()
                 eventDates.dispose()
                 tasks.dispose()
@@ -1400,6 +1407,7 @@ class LocalRecordsViewModel internal constructor(
                 supportsLocalProcessing = store.localProcessing != null,
                 recordAuthorizationOwner = store.recordAuthorizations,
                 selectedQuestionAuthorizationOwner = store.selectedQuestionAuthorizations,
+                savedQuestionOwner = store.savedQuestions,
                 localProcessingVersions = processingVersions.orEmpty(), localProcessingAvailable = processingVersions != null,
                 supportsFactRecaps = store.factRecaps != null,
                 supportsMixedCapture = store.captureRecords != null,
@@ -1535,6 +1543,7 @@ class LocalRecordsViewModel internal constructor(
             local.copy(entries = entries ?: local.entries, localProcessingVersions = versions.orEmpty(), localProcessingAvailable = versions != null,
                 recordAuthorizationOwner = store.recordAuthorizations,
                 selectedQuestionAuthorizationOwner = store.selectedQuestionAuthorizations,
+                savedQuestionOwner = store.savedQuestions,
                 localProcessing = if (stale && !panel.busy && panel.pending == null && panel.pendingWithdrawal == null && panel.pendingAuthorization == null) panel.copy(
                     snapshot = null, authorization = null, confirmation = null, withdrawalConfirmation = null, connectionReview = null, authorizationConfirmation = null,
                     notice = null, error = "处理范围已变化，请关闭后从当前原文重新打开。") else panel)
@@ -1583,6 +1592,7 @@ class LocalRecordsViewModel internal constructor(
         attachments.markDisposed()
         imageGrid.dispose()
         tags.dispose(); people.dispose(); modelConnections.dispose()
+        savedQuestions.dispose()
         favorites.dispose()
         eventDates.dispose()
         tasks.dispose()
@@ -1618,6 +1628,7 @@ class LocalRecordsViewModel internal constructor(
         data class ManualTasks(val action: suspend (EntryRepository) -> Unit) : Command
         data class MemoryInbox(val action: suspend (EntryRepository) -> Unit) : Command
         data class LocalCandidates(val action: suspend (EntryRepository) -> Unit) : Command
+        data class SavedQuestions(val action:suspend (EntryRepository)->Unit) : Command
         data class ManualPeople(val action: suspend (EntryRepository) -> Unit) : Command
         data class ModelConnections(val action: suspend (EntryRepository) -> Unit) : Command
         data class ManualTags(val action: suspend (EntryRepository) -> Unit) : Command

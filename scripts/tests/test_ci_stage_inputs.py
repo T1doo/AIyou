@@ -38,7 +38,7 @@ class StageInputTests(unittest.TestCase):
             schema = Path(folder) / "schema"
             protocol = Path(folder) / "protocol"
             env = {"GITHUB_SHA": "1" * 40, "GITHUB_RUN_ID": "123", "GITHUB_RUN_ATTEMPT": "2"}
-            files = ["core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/%d.json" % n for n in range(11, 15)] + inputs.SCHEMA_EXTRAS
+            files = ["core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/%d.json" % n for n in sorted(set(inputs.SCHEMA_METADATA.values()))] + inputs.SCHEMA_EXTRAS
             raw = {}
             for name in files:
                 raw[name] = ("synthetic checkout " + name).encode()
@@ -47,7 +47,7 @@ class StageInputTests(unittest.TestCase):
                     p.parent.mkdir(parents=True, exist_ok=True)
                     p.write_bytes(raw[name])
             for name, version in inputs.SCHEMA_METADATA.items():
-                digest = hashlib.sha256(raw[files[version - 11]]).hexdigest()
+                digest = hashlib.sha256(raw["core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/%d.json" % version]).hexdigest()
                 save(schema / name, {"head": env["GITHUB_SHA"], "mode": "CHECKED_IN", "expected_sha256": digest, "generated_sha256": digest})
             for base, stage in ((schema, "schema"), (protocol, "protocol")):
                 save(base / ("build/ci-stage-evidence/%s/receipt.json" % stage),

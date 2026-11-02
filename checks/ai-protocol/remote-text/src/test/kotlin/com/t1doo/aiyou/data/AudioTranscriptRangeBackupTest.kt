@@ -211,8 +211,8 @@ class AudioTranscriptRangeBackupTest {
         require(version in 11..13)
         val metadata=PackageWriter(FullBackupCodec.MAX_METADATA).use {w->
             fun text(s:String) {w.i32(s.length);val b=ByteArray(s.length*2);try{s.forEachIndexed{n,c->b[n*2]=(c.code ushr 8).toByte();b[n*2+1]=c.code.toByte()};w.raw(b)}finally{b.fill(0)}}
-            w.string("AIyou-logical-full-v$version",32);w.i32(version);w.i32(1);w.string(d.id,36);w.i64(d.created);w.i32(d.tables.size)
-            FullBackupTables.specs.forEachIndexed {n,spec->
+            w.string("AIyou-logical-full-v$version",32);w.i32(version);w.i32(1);w.string(d.id,36);w.i64(d.created);w.i32(13)
+            FullBackupTables.specs.take(13).forEachIndexed {n,spec->
                 w.string(spec.name,64);w.string(spec.columns,512);w.i32(d.tables[n].size)
                 d.tables[n].forEach {row->row.forEach {v->when(v) {
                     null->w.i32(0)

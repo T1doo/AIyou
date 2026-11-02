@@ -46,7 +46,7 @@ jobs:
           printf '%s  %s\n' \
             3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 \
             gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
-      - name: Generate actual Room v15 runtime export with unchanged predecessors and native fixtures
+      - name: Generate actual Room v16 export with unchanged predecessors and runtime fixtures
         id: room_schema
         run: |
           python3 scripts/check-sdk.py
@@ -61,6 +61,7 @@ jobs:
           python3 scripts/verify-model-configuration-schema.py --capture
           python3 scripts/verify-model-capability-schema.py --capture
           python3 scripts/verify-reminder-runtime-schema.py --capture
+          python3 scripts/verify-saved-question-schema.py --capture
           scripts/gradle.sh :core:data:kspDebugKotlin
           python3 scripts/verify-manual-tag-schema.py --verify
           python3 scripts/verify-manual-task-schema.py --verify
@@ -73,6 +74,7 @@ jobs:
           python3 scripts/verify-model-configuration-schema.py --verify
           python3 scripts/verify-model-capability-schema.py --verify
           python3 scripts/verify-reminder-runtime-schema.py --verify
+          python3 scripts/verify-saved-question-schema.py --verify
       - name: Preserve exact generated D02 schema and lock bytes
         if: always()
         run: python3 scripts/export-d02-generated-state.py
@@ -90,10 +92,12 @@ jobs:
             core/data/src/androidTest/assets/records-schema-v12.json
             core/data/src/androidTest/assets/records-schema-v13.json
             core/data/src/androidTest/assets/records-schema-v14.json
+            core/data/src/main/assets/reminder-schema-v16.json
             .local-evidence/f05-event-date/schema-generation.json
             .local-evidence/f05-manual-people/schema-generation.json
             .local-evidence/d04-model-configuration/schema-generation.json
             .local-evidence/d04-model-capability/schema-generation.json
+            .local-evidence/saved-questions/schema-generation.json
             app/gradle.lockfile
             core/data/gradle.lockfile
             core/domain/gradle.lockfile
@@ -832,7 +836,7 @@ jobs:
       - name: Capture all current schema guards
         id: schema_capture
         run: |
-          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime; do
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question; do
             python3 "scripts/verify-$kind-schema.py" --capture
           done
       - name: Run only the fixed actual companion method
@@ -846,7 +850,7 @@ jobs:
         id: schema_verify
         if: always() && steps.schema_capture.outcome == 'success' && steps.method.outcome != 'skipped'
         run: |
-          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime; do
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question; do
             python3 "scripts/verify-$kind-schema.py" --verify
           done
           git diff --exit-code
@@ -896,7 +900,7 @@ jobs:
       - name: Capture all current schema guards
         id: schema_capture
         run: |
-          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime; do
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question; do
             python3 "scripts/verify-$kind-schema.py" --capture
           done
       - name: Run only the fixed actual memory heading method
@@ -910,7 +914,7 @@ jobs:
         id: schema_verify
         if: always() && steps.schema_capture.outcome == 'success' && steps.method.outcome != 'skipped'
         run: |
-          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime; do
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question; do
             python3 "scripts/verify-$kind-schema.py" --verify
           done
           git diff --exit-code

@@ -55,6 +55,8 @@ class EncryptedEntryRepository internal constructor(
     override val selectedQuestionAuthorizations: com.t1doo.aiyou.domain.SelectedQuestionAuthorizationRepository
         get() = questionAuthorizationStorage
     private val candidateStorage = SqlLocalCandidateRepository(borrowedSql, keyBytes)
+    private val questionStorage = SqlSavedQuestionRepository(borrowedSql,keyBytes)
+    override val savedQuestions:com.t1doo.aiyou.domain.SavedQuestionRepository get()=questionStorage
     override val localCandidates: com.t1doo.aiyou.domain.LocalCandidateRepository get() = candidateStorage
     private val tagStorage = SqlManualTagRepository(borrowedSql, keyBytes)
     private val peopleStorage = SqlManualPeopleRepository(borrowedSql, keyBytes)
@@ -203,7 +205,7 @@ class EncryptedEntryRepository internal constructor(
     }
 
     private val lifetime = DrainingRecordsStorage(borrowedSql,attachmentStorage,originalEditStorage,
-        { database.close() }, { reminderStores.close();tagStorage.wipeKey(); peopleStorage.wipeKey(); proposalStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); preferenceStorage.wipeKey(); factStorage.wipeKey();transcriptStorage.wipeKey();imageTextStorage.wipeKey(); keyBytes.fill(0) })
+        { database.close() }, { reminderStores.close();questionStorage.wipeKey();tagStorage.wipeKey(); peopleStorage.wipeKey(); proposalStorage.wipeKey(); candidateStorage.wipeKey(); sourceMemoryStorage.wipeKey(); preferenceStorage.wipeKey(); factStorage.wipeKey();transcriptStorage.wipeKey();imageTextStorage.wipeKey(); keyBytes.fill(0) })
     override fun close() { sourceGate.retire();connectionStorage.close(); questionAuthorizationStorage.close(); lifetime.close() }
     override fun awaitClosed() { close(); lifetime.awaitClosed() }
     /** Known external IO owner convenience, including native cold-reopen fixtures. */
@@ -278,10 +280,11 @@ class EncryptedEntryRepository internal constructor(
                 check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true)
                 val created = Room.databaseBuilder(context.applicationContext, RecordsDatabase::class.java, file.absolutePath)
                 .openHelperFactory(SupportOpenHelperFactory(key))
-                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7, recordsMigration7To8, recordsMigration8To9, recordsMigration9To10, recordsMigration10To11, recordsMigration11To12, recordsMigration12To13, recordsMigration13To14, recordsMigration14To15)
+                .addMigrations(recordsMigration1To2, recordsMigration2To3, recordsMigration3To4, recordsMigration4To5, recordsMigration5To6, recordsMigration6To7, recordsMigration7To8, recordsMigration8To9, recordsMigration9To10, recordsMigration10To11, recordsMigration11To12, recordsMigration12To13, recordsMigration13To14, recordsMigration14To15, recordsMigration15To16)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
+                        installSavedQuestionGuards(db)
                         installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db)
                         installManualTagGuard(db); installManualTaskGuard(db)
                         db.execSQL("INSERT INTO local_search_epoch(slot,epoch,tokenizerVersion,tokenizerProfile) VALUES(1,0,1,'UNKNOWN')")
@@ -291,6 +294,7 @@ class EncryptedEntryRepository internal constructor(
                         installRecordEventDateGuards(db); installManualPeopleGuards(db); installModelConnectionGuards(db); installModelCapabilityGuards(db)
                     }
                     override fun onOpen(db: SupportSQLiteDatabase) {
+                        installSavedQuestionGuards(db)
                         installRevisionGuard(db); installAttachmentGuard(db); installRemoteTextGuards(db)
                         installManualTagGuard(db); installManualTaskGuard(db); installLocalSearchGuards(db); installPermanentErasureGuards(db)
                         installRecordFavoriteGuards(db)

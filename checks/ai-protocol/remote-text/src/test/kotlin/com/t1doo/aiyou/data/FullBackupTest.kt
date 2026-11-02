@@ -449,11 +449,11 @@ class FullBackupTest {
     internal fun uncheckedAuthenticatedNoImages(d:FullBackupData,version:Int=8):ByteArray {
         require(version in 8..12 && d.media.isEmpty())
         val marker=uuid()
-        val tables=d.tables.mapIndexed { i,rows -> if(i==12 && version>=9 && d.version!=version)rows+listOf(listOf("FULL_BACKUP:"+marker,marker,version.toLong(),"FULL_BACKUP_IMPORT_V"+version,"DONE:"+"0".repeat(64)))else rows }
+        val tables=d.tables.take(13).mapIndexed { i,rows -> if(i==12 && version>=9 && d.version!=version)rows+listOf(listOf("FULL_BACKUP:"+marker,marker,version.toLong(),"FULL_BACKUP_IMPORT_V"+version,"DONE:"+"0".repeat(64)))else rows }
         val metadata=PackageWriter(FullBackupCodec.MAX_METADATA).use { w ->
             fun text(value:String) { w.i32(value.length);val bytes=ByteArray(value.length*2);value.forEachIndexed { i,c ->bytes[2*i]=(c.code ushr 8).toByte();bytes[2*i+1]=c.code.toByte() };w.raw(bytes);bytes.fill(0) }
             w.string("AIyou-logical-full-v"+version,32);w.i32(version);w.i32(1);w.string(d.id,36);w.i64(d.created);w.i32(tables.size)
-            FullBackupTables.specs.forEachIndexed { index,spec ->
+            FullBackupTables.specs.take(13).forEachIndexed { index,spec ->
                 w.string(spec.name,64);w.string(spec.columns,512);w.i32(tables[index].size)
                 tables[index].forEach { row ->row.forEach { cell ->when(cell) {
                     null->w.i32(0)
@@ -509,6 +509,7 @@ internal class FullFixture(seed:Int=1):AutoCloseable {
         javaClass.getResourceAsStream("/sqlite_bridge.py").use { Files.copy(checkNotNull(it),bridge) }
         db=PythonSqliteDatabase(root.resolve("records.sqlite"),bridge,true,12)
         db.transaction { sql ->
+            sql.execute(SavedQuestionSqlSchema.create);SavedQuestionSqlSchema.guards.forEach { sql.execute(it) }
             sql.execute("INSERT INTO local_search_epoch VALUES(1,0,1,'UNKNOWN')")
             (RemoteTextSqlSchema.guards+LocalSearchSqlSchema.guards+PermanentErasureSqlSchema.guards+RecordFavoriteSqlSchema.guards+
                 RecordEventDateSqlSchema.guards+LocalCandidateSqlSchema.guards+ManualPeopleSqlSchema.guards).forEach { sql.execute(it) }

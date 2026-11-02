@@ -24,28 +24,31 @@ internal object FullBackupTables {
         BackupTableSpec("local_jobs","id,entryId,sourceRevision,operation,state",16384),
         BackupTableSpec("permanent_erasure_receipts","entryId,sourceRevision,generation,mutationId,phase,plan,packageProof",4096),
         BackupTableSpec("record_package_receipts","id,entryId,sourceRevision,operation,state",16384),
+        BackupTableSpec("saved_questions",SavedQuestionSqlSchema.columns,SavedQuestions.MAX_RETAINED),
     )
     // s=text, l=integer, b=portable bytes, ?=nullable text, n=required NULL (never remote authority).
-    val kinds=listOf("sllssll?l","slssl","sllnn","sslssls","slsb","slsb","slsl??","slsb","sslslllsslb","lsls","sslss","sllssss","sslss")
+    val kinds=listOf("sllssll?l","slssl","sllnn","sslssls","slsb","slsb","slsl??","slsb","sslslllsslb","lsls","sslss","sllssss","sslss","slsllsb")
     val excluded=setOf("remote_text_jobs","text_annotations","local_search_fts","local_search_documents","local_search_epoch","owned_file_creations","model_configurations","model_capability_profiles","reminder_runtime_meta")
     val receipts=setOf("PACKAGE_ORIGIN","PACKAGE_RESTORE","PACKAGE_TASK_RESTORE","PACKAGE_MEDIA_INTENT",
-        "CAPTURE_CURRENT","CAPTURE_SAVED","CAPTURE_DISCARDED","CAPTURE_REMOVED","FULL_BACKUP_IMPORT_V8","FULL_BACKUP_IMPORT_V9","FULL_BACKUP_IMPORT_V10","FULL_BACKUP_IMPORT_V11","FULL_BACKUP_IMPORT_V12","FULL_BACKUP_IMPORT_V13","FULL_BACKUP_IMPORT_V14")
+        "CAPTURE_CURRENT","CAPTURE_SAVED","CAPTURE_DISCARDED","CAPTURE_REMOVED","FULL_BACKUP_IMPORT_V8","FULL_BACKUP_IMPORT_V9","FULL_BACKUP_IMPORT_V10","FULL_BACKUP_IMPORT_V11","FULL_BACKUP_IMPORT_V12","FULL_BACKUP_IMPORT_V13","FULL_BACKUP_IMPORT_V14","FULL_BACKUP_IMPORT_V15")
     val retainedJobs=setOf("ORIGINAL_EDIT_COMMIT","PACKAGE_ORIGIN","PACKAGE_RESTORE")
     val excludedJobs=setOf("LOCAL_INDEX","LOCAL_TAG_HINTS","LOCAL_SUMMARY","LOCAL_EXCERPTS","RECORD_AUTHORIZATION_V1","SELECTED_QUESTION_SEND_V1")
 }
 internal data class FullBackupSourceProof(val source:SourceVersion,val hash:String,val generation:Long,val original:String,
     val captured:Long,val zone:String,val policy:ProcessingPolicy,val deleted:Boolean)
-internal class FullBackupData(val id:String,val created:Long,val tables:List<List<List<Any?>>>,
+internal class FullBackupData(val id:String,val created:Long,tables:List<List<List<Any?>>>,
     val images:List<RecordPackageImage>,val edits:List<OriginalEditDraft>,val capture:CaptureDraft?,
     val audios:List<RecordPackageAudio> = emptyList()) : FullBackupSnapshot {
+    // Old v8–v14 logical documents retain their exact 13-table wire layout.
+    val tables:List<List<List<Any?>>> = if(tables.size==13) tables+listOf(emptyList()) else tables
     val media:List<RecordPackageAttachment> get()=images+audios
-    val version:Int get()=if(tables[8].any {it[5]==6L} || tables[12].any {it[3]=="FULL_BACKUP_IMPORT_V14"}) 14 else if(tables[12].any {it[3]=="FULL_BACKUP_IMPORT_V13"} || tables[8].any {it[5]==4L && (it[10] as ByteArray).isNotEmpty() && TranscriptEncoding.portableVersion(it[10] as ByteArray)==2}) 13 else if(tables[8].any {it[5]==5L} || tables[12].any {it[3]=="FULL_BACKUP_IMPORT_V12"}) 12 else if(tables[8].any {it[5]==4L} || tables[12].any {it[3]=="FULL_BACKUP_IMPORT_V11"}) 11 else if(tables[8].any { it[5]==3L } || tables[12].any { it[3]=="FULL_BACKUP_IMPORT_V10" }) 10 else if(audios.isNotEmpty() || capture?.audio!=null || tables[12].any { it[3]=="FULL_BACKUP_IMPORT_V9" }) 9 else 8
+    val version:Int get()=if(tables[13].isNotEmpty() || tables[12].any {it[3]=="FULL_BACKUP_IMPORT_V15"}) 15 else if(tables[8].any {it[5]==6L} || tables[12].any {it[3]=="FULL_BACKUP_IMPORT_V14"}) 14 else if(tables[12].any {it[3]=="FULL_BACKUP_IMPORT_V13"} || tables[8].any {it[5]==4L && (it[10] as ByteArray).isNotEmpty() && TranscriptEncoding.portableVersion(it[10] as ByteArray)==2}) 13 else if(tables[8].any {it[5]==5L} || tables[12].any {it[3]=="FULL_BACKUP_IMPORT_V12"}) 12 else if(tables[8].any {it[5]==4L} || tables[12].any {it[3]=="FULL_BACKUP_IMPORT_V11"}) 11 else if(tables[8].any { it[5]==3L } || tables[12].any { it[3]=="FULL_BACKUP_IMPORT_V10" }) 10 else if(audios.isNotEmpty() || capture?.audio!=null || tables[12].any { it[3]=="FULL_BACKUP_IMPORT_V9" }) 9 else 8
     private var released=false
     override val summary:FullBackupSummary
         get() { check(!released)
             return FullBackupSummary(id,created,tables[0].size,tables[2].count { it[2]==1L },tables[1].size,
                 images.size,images.sumOf { it.byteSize },edits.count { it.state==OriginalEditDraftState.ACTIVE },
-                tables[7].size,tables[8].size,(if(capture!=null) 1 else 0)+tables[9].size,tables[11].size,audios.size,audios.sumOf { it.byteSize })
+                tables[7].size,tables[8].size,(if(capture!=null) 1 else 0)+tables[9].size,tables[11].size,audios.size,audios.sumOf { it.byteSize },tables[13].size)
         }
     fun checkLive() { check(!released) }
     override fun release() { if(!released) { released=true;tables.flatten().flatten().filterIsInstance<ByteArray>().forEach { it.fill(0) } } }
@@ -70,8 +73,9 @@ internal object FullBackupCodec {
         data.checkLive();validate(data);val version=data.version
         return PackageWriter(MAX_METADATA).use { w ->
             w.string("AIyou-logical-full-v"+version,32);w.i32(version);w.i32(1)
-            w.string(data.id,36);w.i64(data.created);w.i32(FullBackupTables.specs.size)
-            FullBackupTables.specs.forEachIndexed { index,spec ->
+            val specs=FullBackupTables.specs.take(if(version>=15) 14 else 13)
+            w.string(data.id,36);w.i64(data.created);w.i32(specs.size)
+            specs.forEachIndexed { index,spec ->
                 w.string(spec.name,64);w.string(spec.columns,512)
                 val rows=data.tables[index];w.i32(rows.size)
                 rows.forEach { row -> row.forEach { cell -> when(cell) {
@@ -98,9 +102,10 @@ internal object FullBackupCodec {
         val allocated=mutableListOf<ByteArray>()
         try {
             val r=PackageReader(bytes)
-            val name=r.string(32);val version=r.i32();require(version in setOf(8,9,10,11,12,13,14) && name=="AIyou-logical-full-v"+version && r.i32()==1)
-            val id=r.string(36);val at=r.i64();require(r.i32()==FullBackupTables.specs.size)
-            val tables=FullBackupTables.specs.map { spec ->
+            val name=r.string(32);val version=r.i32();require(version in 8..15 && name=="AIyou-logical-full-v"+version && r.i32()==1)
+            val specs=FullBackupTables.specs.take(if(version>=15) 14 else 13)
+            val id=r.string(36);val at=r.i64();require(r.i32()==specs.size)
+            val tables=specs.map { spec ->
                 require(r.string(64)==spec.name && r.string(512)==spec.columns)
                 List(r.count(spec.maximum)) { List(spec.names.size) { when(r.i32()) {
                     0 -> null
@@ -143,6 +148,13 @@ internal object FullBackupCodec {
             require(keys.distinct().size==keys.size)
         }
         val version=d.version
+        d.tables[13].forEach { row ->
+            SavedQuestions.id(row[0] as String);SavedQuestions.id(row[2] as String)
+            require((row[1] as Long)>0 && (row[3] as Long)>=0 && (row[4] as Long)>=(row[3] as Long) &&
+                row[5] in setOf("ACTIVE","DELETED") && (row[6] as ByteArray).size in 1..4096)
+            require(row[5]!="DELETED" || (row[1] as Long)>=2)
+        }
+        require(d.tables[13].map {it[2]}.distinct().size==d.tables[13].size)
         val entries=d.tables[0].associateBy { it[0] as String }
         entries.values.forEach { e ->
             ManualTags.identifier(e[0] as String);require(e[4] in setOf("LOCAL_ONLY","AI_NONE"))

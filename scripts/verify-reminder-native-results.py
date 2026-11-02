@@ -57,9 +57,9 @@ elif not sys.argv[1:]:
             assert not any(case.find(k) is not None for k in ['failure', 'error', 'skipped'])
             actual.setdefault(case.get('classname'), set()).add(case.get('name'))
     assert actual == cases, (actual, cases)
-    export = root / 'core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/15.json'
-    generated = project / 'build/actual-room-export/com.t1doo.aiyou.data.RecordsDatabase/15.json'
-    assert export.read_bytes() == generated.read_bytes(), 'Host KSP differs from actual committed Room v15'
+    export = root / 'core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/16.json'
+    generated = project / 'build/actual-room-export/com.t1doo.aiyou.data.RecordsDatabase/16.json'
+    assert export.read_bytes() == generated.read_bytes(), 'Host KSP differs from actual committed Room v16'
     result = {'sha': state['sha'], 'fingerprint': state['fingerprint'], 'tests': sum(map(len, actual.values())),
               'classes': {k: len(v) for k, v in actual.items()}, 'device_permissions_alarms_notifications': 'NOT RUN',
               'sqlcipher_native_runtime': 'NOT RUN', 'unused_activity_and_resource_symbols': 'controlled shells'}

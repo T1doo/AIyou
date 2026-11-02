@@ -13,8 +13,10 @@ SCHEMA_METADATA = {
     ".local-evidence/f05-manual-people/schema-generation.json": 12,
     ".local-evidence/d04-model-configuration/schema-generation.json": 13,
     ".local-evidence/d04-model-capability/schema-generation.json": 14,
+    ".local-evidence/saved-questions/schema-generation.json": 16,
 }
 SCHEMA_EXTRAS = ["core/data/src/androidTest/assets/records-schema-v%d.json" % n for n in range(11, 15)] + [
+    "core/data/src/main/assets/reminder-schema-v16.json",
     "app/gradle.lockfile", "core/data/gradle.lockfile", "core/domain/gradle.lockfile", "core/designsystem/gradle.lockfile"]
 BACKUP_XML = {
     "TEST-com.t1doo.aiyou.data.FullBackupTest.xml": ("com.t1doo.aiyou.data.FullBackupTest", 18),

@@ -6,6 +6,8 @@ dependencyLocking { lockAllConfigurations() }
 // Compile the actual product sources, never an independently copied ViewModel.
 val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
+    from("../../app/src/main/java/com/t1doo/aiyou/records/SavedQuestionsController.kt")
+    from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SavedQuestionSqlSchema.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SourceMemoryCapacity.kt")
     listOf("ReminderOperationBridge.kt","ReminderVmRuntime.kt","ReminderNativeEngine.kt","ReminderProcessOwner.kt","ReminderClickNavigation.kt").forEach {
         from("../../app/src/main/java/com/t1doo/aiyou/records/$it")
