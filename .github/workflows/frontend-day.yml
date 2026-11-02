@@ -1,7 +1,7 @@
 name: AIyou frontend day bounded review
 
-# PROPOSAL ONLY. This file is outside .github/workflows and cannot execute.
-# Apply only after parent approval; the exact message and next run number admit one job.
+# One exact parent-reviewed admission; this is not a reusable CI window.
+# The pinned source SHA intentionally differs from the workflow execution SHA.
 on:
   push:
     branches: ['frontend/day-20261102']
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   review:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/frontend/day-20261102' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.run_number == 7 && github.run_attempt == 1 && github.event.head_commit.message == '[frontend-once-no-upload-detail-review] ae6669c633d7cbc255e95fb4da6b7ed8fb245e86' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/frontend/day-20261102' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.run_number == 8 && github.run_attempt == 1 && github.event.head_commit.message == '[frontend-once-no-upload-audio-state] e33ff67afaedabeb34f8aa0f1e298b702e250a38' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: ae6669c633d7cbc255e95fb4da6b7ed8fb245e86
+          ref: e33ff67afaedabeb34f8aa0f1e298b702e250a38
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
@@ -33,7 +33,7 @@ jobs:
           python3 - <<'PY'
           import json, os, subprocess, urllib.request
           source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
-          assert source == 'ae6669c633d7cbc255e95fb4da6b7ed8fb245e86'
+          assert source == 'e33ff67afaedabeb34f8aa0f1e298b702e250a38'
           request = urllib.request.Request('https://api.github.com/repos/T1doo/AIyou', headers={'Accept': 'application/vnd.github+json'})
           with urllib.request.urlopen(request, timeout=20) as response:
               repository = json.load(response)
