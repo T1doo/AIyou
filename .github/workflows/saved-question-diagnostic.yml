@@ -1,0 +1,75 @@
+name: DISABLED - three saved-question UI diagnostics (not acceptance)
+
+'on':
+  push:
+    branches: ['diagnostic/saved-question-ui-20261102']
+
+permissions:
+  contents: read
+
+jobs:
+  fixed-three-methods:
+    # A later explicit review must enable BOTH this gate and the script gate.
+    if: ${{ false && github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/diagnostic/saved-question-ui-20261102' && github.event.head_commit.message == '[saved-question-diagnostic] 9a43845 fixed three UI methods' && github.run_attempt == 1 }}
+    name: DIAGNOSTIC ONLY - exactly three UI methods, no D01 or device claim
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    concurrency:
+      group: aiyou-fixed-saved-question-ui
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require fixed source and approved attempt before setup
+        run: python3 scripts/diagnose-saved-questions.py --admit
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Verify existing wrapper and accepted SDK without installation
+        run: |
+          printf '%s  %s\n' 3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
+          python3 scripts/check-sdk.py
+      - name: Capture unchanged schema guards
+        id: schema_capture
+        run: |
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question; do
+            python3 "scripts/verify-$kind-schema.py" --capture
+          done
+      - name: Run only the exact three methods within one command budget
+        id: methods
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: |
+          set -o pipefail
+          timeout --signal=TERM --kill-after=10s 540s scripts/gradle.sh :app:testDebugUnitTest \
+            --tests 'com.t1doo.aiyou.SelectedQuestionConsentPresentationTest.actualProductionQuestionInputAndConnectionAreSeparateFromRecordSavingAndPackageGateCannotBeBypassed' \
+            --tests 'com.t1doo.aiyou.SavedQuestionsPresentationTest.actualSettingsEntrySavesEditsDeletesOnlyAfterConfirmationAndReopensWithoutEntryWrites' \
+            --tests 'com.t1doo.aiyou.SavedQuestionsPresentationTest.actualDoubleFontUnknownNeverShowsFalseEmptyAndKeepsSameIntentAcrossClose' \
+            2>&1 | tee build/saved-question-diagnostic/gradle.log
+      - name: Check schemas and tracked sources after execution
+        id: schema_verify
+        if: always() && steps.schema_capture.outcome == 'success' && steps.methods.outcome != 'skipped'
+        run: |
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question; do
+            python3 "scripts/verify-$kind-schema.py" --verify
+          done
+          git diff --exit-code
+      - name: Preserve exact fresh cases and bounded evidence; failures remain failures
+        if: always()
+        env:
+          TARGET_OUTCOME: ${{ steps.methods.outcome }}
+          SCHEMA_OUTCOME: ${{ steps.schema_verify.outcome }}
+        run: python3 scripts/diagnose-saved-questions.py --collect
+      - name: Archive bounded raw evidence (8 MiB cap) for seven days, not acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: saved-question-three-methods-DIAGNOSTIC-ONLY
+          path: build/saved-question-diagnostic/evidence/
+          if-no-files-found: error
+          retention-days: 7

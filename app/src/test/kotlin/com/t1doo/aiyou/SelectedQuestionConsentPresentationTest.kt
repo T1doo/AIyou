@@ -65,11 +65,14 @@ class SelectedQuestionConsentPresentationTest {
         }
     }
     private fun reveal(tag: String): SemanticsNodeInteraction {
+        System.err.println("QUESTION_UI_REVEAL before tag=$tag")
         compose.waitUntil(5_000) {
             try { compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag(tag)); true }
             catch (_: AssertionError) { false }
         }
-        return compose.onNodeWithTag(tag).assertIsDisplayed()
+        return compose.onNodeWithTag(tag).assertIsDisplayed().also {
+            System.err.println("QUESTION_UI_REVEAL after tag=$tag")
+        }
     }
     private fun select() {
         reveal("original-search-query").performTextReplacement("needle")
@@ -213,9 +216,13 @@ class SelectedQuestionConsentPresentationTest {
             compose.onAllNodesWithTag("question-consent-fixture").assertCountEquals(0)
             val previousQueries=searchCalls.get()
             reveal("question-save-or-open-history").performClick()
+            System.err.println("QUESTION_HISTORY_PHASE opened")
             compose.onNodeWithTag("saved-question-${saved.id}").performScrollTo().assertIsDisplayed().performClick()
+            System.err.println("QUESTION_HISTORY_PHASE selected")
             compose.onNodeWithTag("saved-question-confirm-switch").performScrollTo().performClick()
+            System.err.println("QUESTION_HISTORY_PHASE switched")
             compose.onNodeWithTag("saved-question-use").performScrollTo().assertIsDisplayed().performClick()
+            System.err.println("QUESTION_HISTORY_PHASE use-clicked")
             reveal("question-draft").assertTextContains(saved.question!!)
             reveal("original-search-query").assertTextContains("needle")
             assertEquals(previousQueries,searchCalls.get())

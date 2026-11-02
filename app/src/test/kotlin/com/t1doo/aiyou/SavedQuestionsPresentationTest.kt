@@ -24,11 +24,13 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 
 /** Production root/settings/real history controller/Dialog; only storage is a declared synthetic port. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[35],qualifiers="w320dp-h1000dp")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SavedQuestionsPresentationTest {
     @get:Rule val compose=createComposeRule()
     private val f=Fixture()
@@ -83,6 +85,11 @@ class SavedQuestionsPresentationTest {
     }
     private fun frame(name:String) {
         val image=compose.onNodeWithTag("saved-questions-scroll").captureToImage().asAndroidBitmap()
+        val pixels=IntArray(image.width*image.height)
+        image.getPixels(pixels,0,image.width,0,0,image.width,image.height)
+        val visibleColor=pixels.firstOrNull {(it ushr 24)!=0}
+        assertNotNull("A captured production form must contain visible pixels",visibleColor)
+        assertTrue("A captured production form must contain content, not a uniform background",pixels.any {(it ushr 24)!=0&&it!=visibleColor})
         val file=File("build/reports/tests/testDebugUnitTest/saved-questions/$name.png");file.parentFile.mkdirs()
         file.outputStream().use {check(image.compress(Bitmap.CompressFormat.PNG,100,it))}
     }
