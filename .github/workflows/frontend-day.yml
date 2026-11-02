@@ -1,0 +1,71 @@
+name: AIyou frontend day bounded review
+
+on:
+  push:
+    branches: ['frontend/day-20261102']
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    if: github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.event.head_commit.message == '[frontend-day] validate approved design' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      AIYOU_CI_ANDROID_DAEMON: 'true'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Verify existing SDK, tokens and unchanged history baseline
+        run: |
+          python3 scripts/check-sdk.py
+          python3 scripts/generate-tokens.py --check
+          python3 -m unittest scripts.tests.test_design_tokens -v
+          git merge-base --is-ancestor 385463c5b168b0c66721a998e0c4b9f0b03c38f4 HEAD
+          for script in scripts/verify-*-schema.py; do python3 "$script" --capture; done
+      - name: Build and lint actual native application
+        run: |
+          timeout --signal=TERM --kill-after=10s 720s scripts/gradle.sh :app:checkDebugAarMetadata :app:assembleDebug :core:domain:test :app:lintDebug
+          for script in scripts/verify-*-schema.py; do python3 "$script" --verify; done
+          python3 scripts/inspect-record-ai-permissions.py
+      - name: Verify display preference migration without history OOM group
+        run: timeout --signal=TERM --kill-after=10s 180s scripts/gradle.sh :app:testDebugUnitTest --tests 'com.t1doo.aiyou.UiPreferencesTest' --tests 'com.t1doo.aiyou.MixedCapturePresentationTest.frontendDayFocusKeepsDraftAndFailedSaveRetriesTheSameRecord'
+      - name: Render actual current UI with fixed synthetic data
+        run: |
+          timeout --signal=TERM --kill-after=10s 300s scripts/gradle.sh :app:updateDebugScreenshotTest --tests '*FrontendDay*'
+          mkdir -p build/frontend-day/after
+          cp -R app/src/screenshotTestDebug/reference/. build/frontend-day/after/
+          cp app/src/screenshotTest/kotlin/com/t1doo/aiyou/FrontendDayPreviews.kt /tmp/FrontendDayPreviews.kt
+          git diff --exit-code -- app/src/main core/designsystem/src/main core/data/src/main
+      - name: Render same viewport and data against preserved handoff source
+        run: |
+          git worktree add --detach /tmp/aiyou-before 385463c5b168b0c66721a998e0c4b9f0b03c38f4
+          cp /tmp/FrontendDayPreviews.kt /tmp/aiyou-before/app/src/screenshotTest/kotlin/com/t1doo/aiyou/
+          export AIYOU_TOOLCHAIN_ROOT="$GITHUB_WORKSPACE/.toolchains"
+          cd /tmp/aiyou-before
+          for script in scripts/verify-*-schema.py; do python3 "$script" --capture; done
+          timeout --signal=TERM --kill-after=10s 300s scripts/gradle.sh :app:updateDebugScreenshotTest --tests '*FrontendDay*'
+          mkdir -p "$GITHUB_WORKSPACE/build/frontend-day/before"
+          cp -R app/src/screenshotTestDebug/reference/. "$GITHUB_WORKSPACE/build/frontend-day/before/"
+      - name: Preserve actual reports including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: frontend-day-native-evidence
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            build/frontend-day/
+            app/build/reports/
+            app/build/test-results/
+            core/domain/build/test-results/
+            app/build/outputs/apk/debug/app-debug.apk
+            .local-evidence/

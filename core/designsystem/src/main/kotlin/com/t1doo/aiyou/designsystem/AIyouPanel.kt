@@ -21,17 +21,18 @@ fun AIyouPanel(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
+        shape = androidx.compose.ui.graphics.RectangleShape,
         color = AIyouColors.surface,
         contentColor = AIyouColors.textPrimary,
-        border = BorderStroke(AIyouDimensions.borderWidth, AIyouColors.outlineDecorative),
         tonalElevation = AIyouDimensions.panelElevation,
         shadowElevation = AIyouDimensions.panelElevation,
     ) {
         Column(
             Modifier.padding(contentPadding),
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm),
-            content = content,
-        )
+        ) {
+            content()
+            androidx.compose.material3.HorizontalDivider(color = AIyouColors.outlineDecorative)
+        }
     }
 }

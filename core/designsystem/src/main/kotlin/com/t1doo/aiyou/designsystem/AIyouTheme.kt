@@ -72,7 +72,7 @@ private val supporting = TextStyle(
     lineHeight = AIyouTypeScale.supportingLineHeight,
 )
 
-/** Fixed light notebook palette; system fonts and sp retain user font scaling. */
+/** Approved continuous light reading palette; system fonts and sp retain user font scaling. */
 @Composable
 fun AIyouTheme(content: @Composable () -> Unit) {
     MaterialTheme(
@@ -89,7 +89,8 @@ fun AIyouTheme(content: @Composable () -> Unit) {
         shapes = Shapes(
             small = RoundedCornerShape(AIyouDimensions.spaceSm),
             medium = RoundedCornerShape(AIyouDimensions.cardRadius),
-            large = RoundedCornerShape(AIyouDimensions.composerRadius),
+            large = RoundedCornerShape(AIyouDimensions.spaceLg),
+            extraLarge = RoundedCornerShape(AIyouDimensions.spaceLg),
         ),
         content = content,
     )

@@ -63,7 +63,7 @@ fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = 
             } else Text(title, Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
             TextButton(onClick = onAction, enabled = actionEnabled,
                 shape = MaterialTheme.shapes.medium,
-                colors = ButtonDefaults.textButtonColors(containerColor = AIyouColors.surfaceMuted),
+                colors = ButtonDefaults.textButtonColors(containerColor = Color.Transparent),
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).aiyouFocusOutline()) {
                 Text(actionLabel, style = MaterialTheme.typography.labelLarge)
             }
@@ -101,9 +101,9 @@ fun NotebookNavigation(selected: Destination?, onSelect: (Destination) -> Unit,
                 val color = if (active) AIyouColors.primary else AIyouColors.textSecondary
                 val interaction = remember(destination) { MutableInteractionSource() }
                 val pressed by interaction.collectIsPressedAsState()
-                val scale by animateFloatAsState(if (pressed && motionAllowed) .96f else 1f,
+                val scale by animateFloatAsState(1f,
                     animationSpec = tween(if (motionAllowed) 110 else 0), label = "navigation-press")
-                val indicator by animateColorAsState(if (active) AIyouColors.primaryContainer else containerColor,
+                val indicator by animateColorAsState(containerColor,
                     animationSpec = tween(if (motionAllowed) 160 else 0), label = "navigation-selection")
                 Column(Modifier.weight(1f).aiyouFocusOutline()
                     .testTag("notebook-tab-${destination.name}")

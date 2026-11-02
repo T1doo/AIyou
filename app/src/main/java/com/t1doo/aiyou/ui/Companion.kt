@@ -13,6 +13,20 @@ import android.provider.Settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -133,7 +147,7 @@ fun CompanionEntry(
 }
 
 @Composable
-fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotAssetProvider = LuluMascotAssets) {
+fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotAssetProvider = LuluMascotAssets, sceneVisible: Boolean = true) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val interaction = remember(lifecycle) { CompanionInteraction() }
     var ui by remember(interaction) { mutableStateOf(interaction.snapshot) }
@@ -176,12 +190,22 @@ fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotA
     }
     val motion = if (motionAllowed && ui.foreground && ui.run != null) movement.value else 0f
     LocalCompanionInteractionObserver.current?.let { observer -> SideEffect { observer(ui, motion, actions) } }
-    AlertDialog(onDismissRequest = actions.close, containerColor = AIyouColors.surface,
-        title = { Text("安静陪你一会儿") },
-        text = {
-            Column(Modifier.testTag("companion-scroll").verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
-                val poseAvailable = assets.interactionArtwork(ui.pose, Modifier.size(112.dp).testTag("companion-interaction-artwork"), Modifier.graphicsLayer {
+    Dialog(onDismissRequest = actions.close, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+      Surface(Modifier.fillMaxSize(), color=AIyouColors.surface) {
+        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())
+            .testTag("companion-scroll"),verticalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal=16.dp),verticalAlignment=Alignment.CenterVertically) {
+                Text("噜噜",Modifier.weight(1f),style=MaterialTheme.typography.headlineMedium)
+                TextButton(onClick=actions.close,modifier=Modifier.heightIn(min=48.dp).testTag("companion-return")) {Text("回到此刻")}
+            }
+            Box(Modifier.fillMaxWidth().heightIn(min=240.dp).testTag("companion-static-scene"),contentAlignment=Alignment.BottomCenter) {
+                if(sceneVisible) Canvas(Modifier.matchParentSize().background(AIyouColors.companionSky)) {
+                    // Original static landscape, no texture, particle or continuous animator.
+                    val far=Path().apply {moveTo(0f,size.height*.62f);cubicTo(size.width*.35f,size.height*.42f,size.width*.7f,size.height*.76f,size.width,size.height*.65f);lineTo(size.width,size.height);lineTo(0f,size.height);close()}
+                    val near=Path().apply {moveTo(0f,size.height*.84f);quadraticTo(size.width*.5f,size.height*.66f,size.width,size.height*.87f);lineTo(size.width,size.height);lineTo(0f,size.height);close()}
+                    drawPath(far,AIyouColors.companionFar);drawPath(near,AIyouColors.companionNear)
+                }
+                val poseAvailable = assets.interactionArtwork(ui.pose, Modifier.size(152.dp).testTag("companion-interaction-artwork"), Modifier.graphicsLayer {
                     when (ui.pose) {
                         CompanionPose.Greeting -> rotationZ = motion * 6f
                         CompanionPose.Encouraging -> { translationY = -motion * 4.dp.toPx(); scaleX = 1f + motion * .04f; scaleY = scaleX }
@@ -190,6 +214,11 @@ fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotA
                         CompanionPose.Idle -> Unit
                     }
                 })
+                if (!poseAvailable)
+                    Text("当前动作插画暂不可用，正在显示静态占位。", Modifier.testTag("companion-artwork-fallback"),
+                        style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+            }
+            Column(Modifier.fillMaxWidth().padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 Text(when (ui.feedback) {
                     CompanionPose.Greeting -> "你好，慢慢记录就好。"
                     CompanionPose.Encouraging -> "按自己的节奏来，小小一步也很好。"
@@ -199,19 +228,23 @@ fun CompanionDialog(onClose: () -> Unit, motionAllowed: Boolean, assets: MascotA
                 }, Modifier.testTag("companion-feedback").semantics { liveRegion = LiveRegionMode.Polite },
                     style = MaterialTheme.typography.bodyLarge)
                 Text("本地小互动，不读取或修改你的记录。", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-                if (!poseAvailable)
-                    Text("当前动作插画暂不可用，正在显示静态占位。", Modifier.testTag("companion-artwork-fallback"),
-                        style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-                FilledTonalButton(onClick = actions.greet, enabled = ui.foreground && ui.run == null && !ui.retired,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-greet")) { Text("打个招呼") }
-                OutlinedButton(onClick = actions.encourage, enabled = ui.foreground && ui.run == null && !ui.retired,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-encourage")) { Text("给我一点鼓励") }
-                OutlinedButton(onClick = actions.think, enabled = ui.foreground && ui.run == null && !ui.retired,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-think")) { Text("一起想一想") }
-                OutlinedButton(onClick = actions.yawn, enabled = ui.foreground && ui.run == null && !ui.retired,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-yawn")) { Text("打个哈欠") }
+                FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = actions.greet, enabled = ui.foreground && ui.run == null && !ui.retired,
+                    modifier = Modifier.heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-greet")) { Text("打个招呼") }
+                TextButton(onClick = actions.encourage, enabled = ui.foreground && ui.run == null && !ui.retired,
+                    modifier = Modifier.heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-encourage")) { Text("给我一点鼓励") }
+                TextButton(onClick = actions.think, enabled = ui.foreground && ui.run == null && !ui.retired,
+                    modifier = Modifier.heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-think")) { Text("一起想一想") }
+                TextButton(onClick = actions.yawn, enabled = ui.foreground && ui.run == null && !ui.retired,
+                    modifier = Modifier.heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-yawn")) { Text("打个哈欠") }
                 TextButton(onClick = actions.quiet, enabled = ui.foreground && !ui.retired,
                     modifier = Modifier.heightIn(min = 48.dp).aiyouFocusOutline().testTag("companion-quiet")) { Text("安静陪伴") }
+                }
+                HorizontalDivider(color=AIyouColors.outlineDecorative)
+                Text(if(sceneVisible)"静态场景已开启，可在设置中单独关闭。" else "静态场景已关闭。",style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
+                TextButton(onClick=actions.close,modifier=Modifier.heightIn(min=48.dp).aiyouFocusOutline()) {Text("关闭陪伴面板")}
             }
-        }, confirmButton = { TextButton(onClick = actions.close, modifier = Modifier.heightIn(min = 48.dp).aiyouFocusOutline()) { Text("关闭陪伴面板") } })
+        }
+      }
+    }
 }

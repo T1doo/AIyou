@@ -6,29 +6,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 object AIyouColors {
-    val background = Color(0xFFFFF8F0)
-    val surface = Color(0xFFFFFDFA)
-    val surfaceMuted = Color(0xFFFFF0E0)
-    val textPrimary = Color(0xFF30231C)
-    val textSecondary = Color(0xFF6B5141)
-    val primary = Color(0xFFA63E00)
+    val background = Color(0xFFFFFFFF)
+    val surface = Color(0xFFFFFFFF)
+    val surfaceMuted = Color(0xFFF6F7F9)
+    val textPrimary = Color(0xFF20242A)
+    val textSecondary = Color(0xFF6A717B)
+    val primary = Color(0xFF285EAD)
     val onPrimary = Color(0xFFFFFFFF)
-    val accentDecorative = Color(0xFFFFD4AA)
-    val primaryContainer = Color(0xFFFFE3C5)
-    val outlineDecorative = Color(0xFFE9D7C5)
-    val outlineFunctional = Color(0xFF997052)
-    val success = Color(0xFF476852)
-    val error = Color(0xFFA64237)
+    val accentDecorative = Color(0xFFEAF1FB)
+    val primaryContainer = Color(0xFFF1F5FC)
+    val outlineDecorative = Color(0xFFE3E6EA)
+    val outlineFunctional = Color(0xFF727B87)
+    val success = Color(0xFF376A52)
+    val error = Color(0xFFAC3935)
     val companionBody = Color(0xFFC7A47D)
     val companionFace = Color(0xFFE8D2B3)
     val companionShade = Color(0xFF9D7857)
     val companionInk = Color(0xFF513E32)
-    val errorContainer = Color(0xFFFFF1EF)
-    val successContainer = Color(0xFFEDF6F0)
-    val notebookSky = Color(0xFFFFF0DF)
-    val notebookMist = Color(0xFFFFF8F0)
-    val notebookLilac = Color(0xFFFFEBCF)
-    val notebookPeach = Color(0xFFFFDBB8)
+    val errorContainer = Color(0xFFFFF5F4)
+    val successContainer = Color(0xFFF2F8F4)
+    val notebookSky = Color(0xFFFFFFFF)
+    val notebookMist = Color(0xFFFFFFFF)
+    val notebookLilac = Color(0xFFF6F7F9)
+    val notebookPeach = Color(0xFFF6F7F9)
+    val companionSky = Color(0xFFE8EEF1)
+    val companionFar = Color(0xFFD8E1DF)
+    val companionNear = Color(0xFFC5D2CE)
 }
 
 object AIyouDimensions {
@@ -36,11 +39,11 @@ object AIyouDimensions {
     val spaceSm = 8.dp
     val spaceMd = 12.dp
     val spaceLg = 16.dp
-    val pageNarrow = 20.dp
-    val pageWide = 24.dp
-    val cardRadius = 20.dp
-    val composerRadius = 24.dp
-    val sectionGap = 20.dp
+    val pageNarrow = 16.dp
+    val pageWide = 20.dp
+    val cardRadius = 8.dp
+    val composerRadius = 8.dp
+    val sectionGap = 12.dp
     val composerTextMinHeight = 64.dp
     val navigationIconSize = 22.dp
     val iconStroke = 1.5.dp
@@ -54,12 +57,12 @@ object AIyouDimensions {
 }
 
 object AIyouTypeScale {
-    val titleSize = 28.sp
-    val titleLineHeight = 36.sp
-    val sectionSize = 20.sp
-    val sectionLineHeight = 28.sp
+    val titleSize = 24.sp
+    val titleLineHeight = 32.sp
+    val sectionSize = 18.sp
+    val sectionLineHeight = 26.sp
     val bodySize = 16.sp
     val bodyLineHeight = 26.sp
-    val supportingSize = 14.sp
-    val supportingLineHeight = 22.sp
+    val supportingSize = 13.sp
+    val supportingLineHeight = 20.sp
 }

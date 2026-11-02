@@ -1,6 +1,9 @@
 package com.t1doo.aiyou.designsystem
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -78,10 +81,9 @@ fun PrivacyChip(
     Surface(
         modifier = modifier,
         color = AIyouColors.surfaceMuted,
-        shape = privacyContentShape,
-        border = BorderStroke(AIyouDimensions.spaceXs / 4, AIyouColors.outlineFunctional),
+        shape = RectangleShape,
     ) {
-        Column(Modifier.padding(horizontal = AIyouDimensions.spaceMd, vertical = AIyouDimensions.spaceSm)) {
+        Column(Modifier.padding(vertical = AIyouDimensions.spaceXs)) {
             Text(
                 when (policy) {
                     ProcessingPolicy.AI_NONE -> "不参与 AI"
@@ -107,6 +109,7 @@ fun MemoryCard(
     state: ComponentState = ComponentState.NORMAL,
     onOpen: (() -> Unit)? = null,
     highlight: TextRange? = null,
+    thumbnail: (@Composable () -> Unit)? = null,
 ) {
     val preview = remember(originalText, highlight) {
         buildAnnotatedString {
@@ -120,36 +123,28 @@ fun MemoryCard(
             }
         }
     }
-    ComponentCard(modifier, padding = AIyouDimensions.spaceMd) {
+    Column(modifier.fillMaxWidth().then(if (onOpen != null) Modifier.clickable(onClickLabel = "阅读全文", onClick = onOpen) else Modifier)
+        .padding(vertical = AIyouDimensions.spaceMd), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         if (state == ComponentState.EMPTY) {
             Text("还没有记录", style = MaterialTheme.typography.titleMedium)
-            Text("保存记录后，原文、附件和 AI 派生内容会分别显示。", style = MaterialTheme.typography.bodyMedium)
-            StateFeedback(state)
-            return@ComponentCard
+            Text("直接在下方写下第一句。", style = MaterialTheme.typography.bodySmall)
+            return@Column
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-            Text(capturedAt, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
-            Text(if (policy == ProcessingPolicy.LOCAL_ONLY) "原文 · 仅本机" else "原文", style = MaterialTheme.typography.bodySmall, color = AIyouColors.primary)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd), verticalAlignment = Alignment.Top) {
+            Text(preview, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
+                maxLines = if (onOpen != null) 3 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
+            thumbnail?.invoke()
         }
-        if (onOpen != null) Text("原文预览", style = MaterialTheme.typography.labelMedium, color = AIyouColors.textSecondary)
-        Text(preview, style = MaterialTheme.typography.bodyLarge,
-            maxLines = if (onOpen != null) 4 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
-        onOpen?.let { open ->
-            TextButton(onClick = open, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)) { Text("阅读全文") }
-        }
-        attachmentLabel?.let {
-            Surface(modifier = Modifier.fillMaxWidth(), color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.small) {
-                Text(it, Modifier.fillMaxWidth().padding(AIyouDimensions.spaceLg), style = MaterialTheme.typography.bodySmall)
-            }
-        }
+        attachmentLabel?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary) }
+        Text(capturedAt, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
         if (policy != ProcessingPolicy.LOCAL_ONLY) PrivacyChip(policy)
         annotation?.let {
             Text("AI 派生 · $it", Modifier.fillMaxWidth().drawBehind {
-                drawLine(AIyouColors.accentDecorative, Offset.Zero, Offset(0f, size.height), AIyouDimensions.iconStroke.toPx())
-            }.padding(start = AIyouDimensions.spaceMd),
-                style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+                drawLine(AIyouColors.outlineFunctional, Offset.Zero, Offset(0f, size.height), AIyouDimensions.iconStroke.toPx())
+            }.padding(start = AIyouDimensions.spaceMd), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
         }
         StateFeedback(state)
+        HorizontalDivider(color = AIyouColors.outlineDecorative)
     }
 }
 
@@ -172,7 +167,7 @@ fun CaptureComposer(
 ) {
     val canEdit = state != ComponentState.DISABLED && state != ComponentState.LOADING
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-        Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = AIyouColors.surfaceMuted) {
+        Surface(Modifier.fillMaxWidth(), shape = RectangleShape, color = AIyouColors.surface) {
             Column(
                 Modifier.padding(AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs),
@@ -267,8 +262,8 @@ fun CaptureComposer(
 
 @Composable
 private fun ComposerMode(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
-    Surface(modifier, color = if (selected) AIyouColors.surface else AIyouColors.surfaceMuted,
-        shape = MaterialTheme.shapes.small) {
+    Surface(modifier.drawBehind { if (selected) drawLine(AIyouColors.primary, Offset(0f, size.height), Offset(size.width, size.height), AIyouDimensions.focusRingWidth.toPx()) }, color = AIyouColors.surface,
+        shape = RectangleShape) {
         TextButton(onClick = onClick, enabled = enabled,
             colors = ButtonDefaults.textButtonColors(disabledContentColor = AIyouColors.textSecondary),
             modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget).semantics {
@@ -303,8 +298,8 @@ fun SourceCitationCard(
     onOpen: (() -> Unit)? = null,
     state: ComponentState = ComponentState.NORMAL,
 ) {
-    ComponentCard(modifier) {
-        Text("来源 · $date", style = MaterialTheme.typography.titleMedium)
+    ComponentCard(modifier.drawBehind { drawLine(AIyouColors.outlineFunctional, Offset.Zero, Offset(0f, size.height), AIyouDimensions.iconStroke.toPx()) }) {
+        Text("来源 · $date", style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
         Text(revisionLabel, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
         Text(quote, style = MaterialTheme.typography.bodyLarge)
         TextButton(

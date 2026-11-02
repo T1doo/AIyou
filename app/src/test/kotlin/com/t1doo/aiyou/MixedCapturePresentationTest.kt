@@ -65,6 +65,25 @@ class MixedCapturePresentationTest {
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag(tag))
         return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
     }
+    @Test fun frontendDayFocusKeepsDraftAndFailedSaveRetriesTheSameRecord() {
+        val scale=mutableStateOf(1f)
+        content(fontScale=scale)
+        compose.onNodeWithTag("mixed-text").performTextInput("合成中文草稿：保留原来的记录。")
+        drain()
+        val original=f.ui.draft!!
+        compose.onNodeWithTag("mixed-focus-editor").performScrollTo().performClick()
+        compose.onNodeWithTag("mixed-text").assertTextContains(original.text)
+        compose.onNodeWithTag("mixed-focus-editor").performScrollTo().performClick()
+        compose.onNodeWithTag("mixed-text").assertTextContains(original.text)
+        compose.runOnIdle {assertEquals(original.id,f.ui.draft!!.id);assertEquals(0,f.saves);f.failSave=true}
+        compose.onNodeWithTag("mixed-save").performScrollTo().performClick();drain()
+        compose.runOnIdle {assertEquals(original.id,f.ui.draft!!.id);assertEquals(original.text,f.ui.text);assertEquals(0,f.saves)}
+        compose.runOnIdle {f.failSave=false}
+        compose.onNodeWithTag("mixed-save").performScrollTo().performClick();drain()
+        compose.runOnIdle {assertEquals(1,f.saves);assertEquals(original.id,f.local.value.entries.single().id)
+            assertEquals(original.text,f.local.value.entries.single().originalText)}
+    }
+
     @Test fun narrowPreSaveRangeDefaultsLocalAndRetiredActualChoiceCannotAffectReturnedDraft() {
         content()
         f.failTextWrite=true

@@ -1266,7 +1266,7 @@ fun AIyouApp(
         val companion: (@Composable () -> Unit)? = if (companionVisible) ({
             CompanionEntry(if (companionSaved) MascotState.Saved else MascotState.Idle,
                 companionPulse, motionAllowed, onOpen = { companionPanel = true },
-                artworkSize = if(selected==Destination.NOW && local?.supportsMixedCapture==true && !compactNotebookHeader) 96.dp else 56.dp,
+                artworkSize = 48.dp,
                 containerColor = if(selected==Destination.NOW && local?.supportsMixedCapture==true)
                     androidx.compose.ui.graphics.Color.Transparent else com.t1doo.aiyou.designsystem.AIyouColors.surface)
         }) else null
@@ -1275,7 +1275,7 @@ fun AIyouApp(
         topBar = {
           Column {
             NotebookAppBar(
-                if (browsingPackage) { if(packageUi?.fullMode==true) "完整备份与恢复" else "加密原文包" } else if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else if(recapRoute) "本机回顾" else if(selected==Destination.MEMORIES) "回忆" else "爱忆 AIyou",
+                if (browsingPackage) { if(packageUi?.fullMode==true) "完整备份与恢复" else "加密原文包" } else if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else if(recapRoute) "本机回顾" else if(selected==Destination.MEMORIES) "回忆" else selected.label,
                 if (browsingPackage) { if (settingsPackageRoute) "返回设置" else "返回列表" } else if (viewingPicture) {if(attachmentPanel?.focusImage!=null) "返回原文" else "返回附件列表"} else if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
                 else if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
                 else if (editing != null) "取消编辑" else if(reading && recapRoute) "返回回顾" else if (reading || browsingRecycle) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else if(recapRoute) "返回回忆" else "设置",
@@ -1592,7 +1592,7 @@ fun AIyouApp(
                     if (value) { questionConsent.retireUiScope();evidence.clear(); evidenceMode = false }
                 } },
                 ownsImageGrid = { ownsNavigation() && detailEntryId == null &&
-                    selectedName == Destination.MEMORIES.name && !showSettings && !demo && imageGridMode && onlyImages &&
+                    selectedName == Destination.MEMORIES.name && !showSettings && !demo && !evidenceMode && onlyImages &&
                     search.visible(searchSource(), searchInput()) === searchState },
                 onRefreshFavorites = {navigation.gate.inputAction(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){favorites?.refresh()}},
                 searchMode = searchMode,
@@ -1646,7 +1646,7 @@ fun AIyouApp(
             }
         }
     }
-    if (companionVisible && companionPanel) CompanionDialog(onClose = { companionPanel = false }, motionAllowed = motionAllowed)
+    if (companionVisible && companionPanel) CompanionDialog(onClose = { companionPanel = false }, motionAllowed = motionAllowed, sceneVisible = display.preferences.showCompanionScene)
     discardEditSession?.let { sessionId ->
         if (editing?.sessionId == sessionId && editing.canCancel) {
             AlertDialog(onDismissRequest = { if (ownsEdit(sessionId)) discardEditSession = null },

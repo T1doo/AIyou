@@ -94,14 +94,14 @@ fun SettingsScreen(
             Column(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize()
                 .verticalScroll(rememberScrollState()).testTag("settings-scroll").padding(margin),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
-                Surface(color = AIyouColors.primaryContainer, shape = MaterialTheme.shapes.large,
+                Surface(color = AIyouColors.surface,
                     modifier = Modifier.fillMaxWidth().testTag("settings-data-safety")) {
                     Column(Modifier.padding(AIyouDimensions.spaceMd),
                         verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                         Text("资料与安全", style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.semantics { heading() })
-                        Button(onClick = openBackup, enabled = onOpenFullBackup != null && fullBackupUnavailable == null,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget)
+                        TextButton(onClick = openBackup, enabled = onOpenFullBackup != null && fullBackupUnavailable == null,
+                            modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
                                 .testTag("settings-full-backup")) { Text("完整备份与恢复") }
                         Text(fullBackupUnavailable ?: "仅打开操作首页，备份和恢复都需另行确认。",
                             style = MaterialTheme.typography.bodySmall, color = AIyouColors.textPrimary,
@@ -115,6 +115,10 @@ fun SettingsScreen(
                     PreferenceSwitch("显示陪伴伙伴", "可随时关闭，不影响记录。", display.preferences.showCompanion,
                         display.ready && !display.busy && !display.saveUnconfirmed, "companion-switch") {
                         change { value -> value.copy(showCompanion = it) }
+                    }
+                    PreferenceSwitch("陪伴静态场景", "只在独立陪伴页显示，可单独关闭。", display.preferences.showCompanionScene,
+                        display.ready && !display.busy && !display.saveUnconfirmed, "companion-scene-switch") {
+                        change { value -> value.copy(showCompanionScene = it) }
                     }
                     PreferenceSwitch("减少动效", "使用静态反馈，减少装饰动画。", display.preferences.reduceMotion,
                         display.ready && !display.busy && !display.saveUnconfirmed, "motion-switch") {
@@ -213,14 +217,14 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
-    Surface(color = AIyouColors.surface, shape = MaterialTheme.shapes.large,
-        border = BorderStroke(AIyouDimensions.borderWidth, AIyouColors.outlineDecorative),
+    Surface(color = AIyouColors.surface,
         modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(AIyouDimensions.spaceLg),
+        Column(Modifier.padding(vertical = AIyouDimensions.spaceSm),
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
             Text(title, Modifier.fillMaxWidth().semantics { heading() },
-                color = AIyouColors.primary, style = MaterialTheme.typography.titleLarge)
+                color = AIyouColors.textSecondary, style = MaterialTheme.typography.titleSmall)
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) { content() }
+            androidx.compose.material3.HorizontalDivider(color = AIyouColors.outlineDecorative)
         }
     }
 }
@@ -228,7 +232,7 @@ private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
 @Composable
 private fun PreferenceSwitch(title: String, detail: String, checked: Boolean, enabled: Boolean, tag: String, onChange: (Boolean) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget).testTag(tag)
-        .background(AIyouColors.surfaceMuted, MaterialTheme.shapes.medium).aiyouFocusOutline()
+        .aiyouFocusOutline()
         .toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
         .padding(AIyouDimensions.spaceMd)) {
         val stackControl = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f

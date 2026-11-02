@@ -25,6 +25,27 @@ import android.os.Looper
 class UiPreferencesTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    @Test fun scenePreferenceMigratesV3WithoutChangingCapturePolicyOrWritingOnRead() {
+        for (policy in listOf(ProcessingPolicy.LOCAL_ONLY, ProcessingPolicy.AI_NONE)) {
+            val file = File(temporary.newFolder(), "preferences")
+            val legacy = "AIyou display v3\nfalse\ntrue\nWEEK\n${policy.name}\n"
+            file.writeText(legacy)
+            val storage = FileUiPreferences(file)
+            val before = storage.read()
+            assertEquals(policy, before.defaultCapturePolicy)
+            assertEquals(legacy, file.readText())
+            for (scene in listOf(false, true)) {
+                storage.write(before.copy(showCompanionScene=scene))
+                assertEquals(before.copy(showCompanionScene=scene), FileUiPreferences(file).read())
+                assertEquals(policy, storage.newCapturePolicy())
+            }
+        }
+        val bad = File(temporary.newFolder(), "preferences").apply {
+            writeText("AIyou display v4\ntrue\nfalse\nDAY\nREMOTE_ALLOWED\ntrue\n")
+        }
+        assertEquals(ProcessingPolicy.AI_NONE, FileUiPreferences(bad).newCapturePolicy())
+    }
+
     @Test fun legacyDefaultsStayLocalAndExplicitNoneSurvivesNewFileAndViewModelOwners() {
         for (period in FactRecapPeriod.entries) {
             val file = File(temporary.newFolder(), "preferences")

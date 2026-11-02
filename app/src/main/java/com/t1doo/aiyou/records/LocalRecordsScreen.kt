@@ -278,23 +278,24 @@ fun LocalRecordsScreen(
         else if (filtered) searchState?.hits?.map { it.entry }.orEmpty() else local.entries
     val gridEnabled = destination == Destination.MEMORIES && !evidenceMode && onlyImages && imageGridMode && imageGrid != null &&
         searchState?.stage == OriginalSearchStage.READY
+    val listImagesEnabled = destination == Destination.MEMORIES && !evidenceMode && onlyImages && !imageGridMode && imageGrid != null && searchState?.stage == OriginalSearchStage.READY
     val columns = if (LocalDensity.current.fontScale >= 1.5f) 1 else 2
     val gridRows = remember(displayedEntries, columns, gridEnabled) { if (gridEnabled) displayedEntries.chunked(columns) else emptyList() }
     val gridEmission = imageGrid?.state?.collectAsState()?.value
     val gridTiles = gridEmission?.let { searchState?.let { imageGrid?.visible(it)?.tiles } }.orEmpty()
-    DisposableEffect(imageGrid, searchState, gridEnabled) {
+    DisposableEffect(imageGrid, searchState, gridEnabled, listImagesEnabled) {
         onDispose { searchState?.let { imageGrid?.clear(it) } }
     }
-    LaunchedEffect(imageGrid, searchState, gridEnabled, listState, gridRows) {
+    LaunchedEffect(imageGrid, searchState, gridEnabled, listImagesEnabled, listState, gridRows) {
         val controller = imageGrid ?: return@LaunchedEffect
         val owner = searchState ?: return@LaunchedEffect
-        if (!gridEnabled) { controller.clear(owner); return@LaunchedEffect }
+        if (!gridEnabled && !listImagesEnabled) { controller.clear(owner); return@LaunchedEffect }
         snapshotFlow {
             val layout = listState.layoutInfo
             layout.visibleItemsInfo.filter { it.offset + it.size > layout.viewportStartOffset && it.offset < layout.viewportEndOffset }
                 .map { it.key }.toSet()
         }.collect { keys ->
-            controller.sync(owner, gridRows.filter { it.first().id in keys }.flatten().map { it.id }, ownsImageGrid)
+            controller.sync(owner, if (gridEnabled) gridRows.filter { it.first().id in keys }.flatten().map { it.id } else displayedEntries.filter {it.id in keys}.map {it.id}, ownsImageGrid)
         }
     }
     var attachedViewport by remember { mutableStateOf(IntSize.Zero) }
@@ -401,21 +402,21 @@ fun LocalRecordsScreen(
                                 }
                                 companion?.invoke()
                             }
-                            if(onOpenUnified!=null && local.unifiedKeywordOwner!=null)FilledTonalButton(onOpenUnified,enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().heightIn(min=AIyouDimensions.minTouchTarget).testTag("unified-open")){Text("统一关键词找回")}
+                            if(onOpenUnified!=null && local.unifiedKeywordOwner!=null)TextButton(onOpenUnified,enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,shape=MaterialTheme.shapes.small,modifier=Modifier.fillMaxWidth().heightIn(min=AIyouDimensions.minTouchTarget).testTag("unified-open")){Text("统一关键词找回")}
                             FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                                 DisposableEffect(toolsOwner, hasReviewTools, hasManageTools) {
                                     attachedToolButtons[0]=hasReviewTools; attachedToolButtons[1]=hasManageTools
                                     onDispose { attachedToolButtons[0]=false; attachedToolButtons[1]=false }
                                 }
                                 if (hasReviewTools) OutlinedButton(onClick={ openTools(true) },
-                                    shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget)
+                                    shape=MaterialTheme.shapes.small,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget)
                                         .focusRequester(reviewFocus).onFocusChanged { reviewFocused=it.isFocused }
                                         .aiyouFocusOutline().testTag("notebook-review-tools")
                                         .semantics { stateDescription=if(reviewToolsExpanded) "已展开" else "已收起" }) {
                                     Text("找回工具")
                                 }
                                 if (hasManageTools) OutlinedButton(onClick={ openTools(false) },
-                                    shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget)
+                                    shape=MaterialTheme.shapes.small,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget)
                                         .focusRequester(manageFocus).onFocusChanged { manageFocused=it.isFocused }
                                         .aiyouFocusOutline().testTag("notebook-manage-tools")
                                         .semantics { stateDescription=if(manageToolsExpanded) "已展开" else "已收起" }) {
@@ -574,7 +575,7 @@ fun LocalRecordsScreen(
                         onOpen = { if (hit != null) onOpenSearchResult(hit) else onOpenEntry(entry.id) },
                         highlight = preview?.takeIf { it.highlightEnd > it.highlightStart }?.let {
                             androidx.compose.ui.text.TextRange(it.highlightStart, it.highlightEnd)
-                        })
+                        }, thumbnail = if (listImagesEnabled) ({ RecordThumbnail(gridTiles[entry.id]) }) else null)
                     }
                 }
             }

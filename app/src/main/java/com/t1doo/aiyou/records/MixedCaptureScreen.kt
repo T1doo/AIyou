@@ -1,6 +1,15 @@
 package com.t1doo.aiyou.records
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.t1doo.aiyou.designsystem.AttachmentIcon
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -43,6 +52,7 @@ import com.t1doo.aiyou.model.CaptureImageState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureController,modifier: Modifier=Modifier,
     listState: LazyListState = rememberLazyListState(), onOpenEntry: (String) -> Unit = {}, selectedEntryId: String? = null,
@@ -61,27 +71,13 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
     val recentIds=recent.map { it.id }
     var seenIds by remember(controller) { mutableStateOf(recentIds) }
     val scope=rememberCoroutineScope()
-    val showReturnToInput by remember(listState) { derivedStateOf { listState.firstVisibleItemIndex>1 } }
-    var inputFocused by remember(controller) { mutableStateOf(false) }
-    val paperOutline by animateColorAsState(if(inputFocused) AIyouColors.primary else AIyouColors.outlineDecorative,
-        animationSpec=tween(if(motionAllowed) 160 else 0),label="notebook-input-outline")
-    val paperElevation by animateDpAsState(if(inputFocused) 4.dp else 1.dp,
-        animationSpec=tween(if(motionAllowed) 160 else 0),label="notebook-input-elevation")
-    val saveInteraction=remember(controller) { MutableInteractionSource() }
-    val savePressed by saveInteraction.collectIsPressedAsState()
-    val saveScale by animateFloatAsState(if(savePressed && motionAllowed) .98f else 1f,
-        animationSpec=tween(if(motionAllowed) 100 else 0),label="notebook-save-press")
-    val leadingKeys=buildList {
-        add("heading");add(if(enabled) "composer" else "unavailable");add("recent")
-        if(local.ready && !local.opening && local.error==null && recent.isEmpty()) add("recent-empty")
-        addAll(recent.map { "record:"+it.id })
-        if(enabled && ui.supportsProcessingChoice) add("processing-policy")
-        if(enabled && !ui.discardPending) {add("count");addAll(ui.draft!!.images.map {"draft-image:"+it.intent.id});add("audio")}
-    }
-    fun reveal(key:String) {
-        val index=leadingKeys.indexOf(key)
-        if(index>=0) scope.launch {if(motionAllowed) listState.animateScrollToItem(index) else listState.scrollToItem(index)}
-    }
+    var detailsOpen by remember(controller) { mutableStateOf(false) }
+    var focusEditor by remember(controller) { mutableStateOf(false) }
+    // A single TextField stays in the composition with controller-owned text and field-owned
+    // selection and composing region. Focus mode changes allocation, never the input owner.
+    val inputScroll=rememberScrollState()
+    BackHandler(enabled=focusEditor && !detailsOpen) { focusEditor=false }
+    fun reveal(key:String) { detailsOpen=true }
     DisposableEffect(controller) { onDispose { controller.cancelSelection() } }
     WaveFilePicker(controller.audioCapture,ui.audio,foreground)
     if(ui.confirmDiscard) AlertDialog(onDismissRequest=controller::cancelDiscard,title={Text(if(ui.discardPending) "清空结果待核对" else "清空这份草稿？")},
@@ -89,129 +85,102 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
             else "将清理这份草稿的文字、图片和原音。已保存的记录保持不变。")},
         confirmButton={TextButton(onClick=controller::confirmDiscard,enabled=!ui.busy,modifier=Modifier.heightIn(min=48.dp).testTag("mixed-discard-confirm")){Text(if(ui.discardPending) "核对同一次清空" else "确认清空草稿")}},
         dismissButton={TextButton(onClick=controller::cancelDiscard,enabled=!ui.busy){Text(if(ui.discardPending) "稍后核对" else "继续编辑")}})
-    Column(modifier.fillMaxSize().background(Brush.verticalGradient(listOf(AIyouColors.notebookSky,AIyouColors.notebookMist))),horizontalAlignment=Alignment.CenterHorizontally) {
-        if(recentIds.any { it !in seenIds }) TextButton(onClick={seenIds=recentIds;reveal("recent")},
-            modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("mixed-new-records")) { Text("有新内容 · 查看今天最近记录") }
-        LazyColumn(Modifier.weight(1f).widthIn(max=AIyouDimensions.contentMaxWidth).fillMaxWidth()
-            .padding(horizontal=16.dp).testTag("mixed-list"),state=listState,
-            contentPadding=PaddingValues(top=8.dp,bottom=24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+    BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.surface)) {
+      Column(Modifier.widthIn(max=AIyouDimensions.contentMaxWidth).fillMaxSize().align(Alignment.TopCenter)) {
+        if(!focusEditor) LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("mixed-list"),state=listState,
+            contentPadding=PaddingValues(horizontal=16.dp,vertical=8.dp)) {
             item("heading") {
-                Surface(modifier=Modifier.testTag("mixed-notebook-heading"),shape=RoundedCornerShape(28.dp),color=Color.Transparent) {
-                    Box(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(AIyouColors.accentDecorative,AIyouColors.primaryContainer,AIyouColors.notebookLilac)))
-                        .drawBehind { drawCircle(AIyouColors.surface.copy(alpha=.28f),90.dp.toPx(),Offset(size.width-58.dp.toPx(),50.dp.toPx())) }) {
-                        Row(Modifier.fillMaxWidth().padding(if(compactHeader) PaddingValues(horizontal=16.dp,vertical=8.dp) else PaddingValues(16.dp)),
-                            horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-                            if(compactHeader) {
-                                Text("${day.date.monthValue}月${day.date.dayOfMonth}日",modifier=Modifier.weight(1f).semantics { heading() },
-                                    style=MaterialTheme.typography.labelMedium,color=AIyouColors.primary)
-                            } else Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                                Text("今天 · ${day.date.monthValue}月${day.date.dayOfMonth}日",style=MaterialTheme.typography.labelMedium,color=AIyouColors.primary)
-                                Text("生活的小片刻",style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
-                                Text("都值得被记住",style=MaterialTheme.typography.bodySmall,color=AIyouColors.textPrimary)
-                            }
-                            companion?.invoke()
-                        }
-                    }
+                Row(Modifier.fillMaxWidth().testTag("mixed-notebook-heading"),verticalAlignment=Alignment.CenterVertically) {
+                    Text("${day.date.monthValue}月${day.date.dayOfMonth}日",Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
+                    companion?.invoke()
                 }
-                if(defaultPolicyUnavailable) Text("设置暂不可读取；以后新建的草稿暂用不参与 AI。当前草稿范围保持不变，仍可逐稿选择。",
-                    modifier=Modifier.padding(top=8.dp).testTag("mixed-default-policy-unavailable"),color=AIyouColors.error) }
-            if(!enabled) item("unavailable") {
-                CaptureFeedback(local.error ?: ui.error ?: "正在读取加密草稿。",isError=local.error!=null || ui.error!=null)
-                TextButton(onClick=controller::refresh,enabled=local.ready,modifier=Modifier.heightIn(min=48.dp)){Text("重试读取草稿")} }
-            else {
-                item("composer") {
-                    Surface(shape=RoundedCornerShape(24.dp),color=AIyouColors.surface,
-                        border=BorderStroke(1.dp,paperOutline),shadowElevation=paperElevation) {
-                        Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                            if(onAskQuestion!=null) {
-                                Text("记下来 · 保存原始记录",style=MaterialTheme.typography.labelLarge)
-                                TextButton(onClick=onAskQuestion,enabled=editable&&!ui.confirmDiscard,
-                                    modifier=Modifier.fillMaxWidth().heightIn(min=AIyouDimensions.minTouchTarget).testTag("mixed-ask-question")) {
-                                    Text("问一问 · 另选出处与连接")
-                                }
-                            }
-                            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                                Text("此刻手记",Modifier.weight(1f).semantics { heading() },style=MaterialTheme.typography.titleMedium)
-                                Surface(color=AIyouColors.notebookPeach,shape=RoundedCornerShape(8.dp)) {
-                                    val attachments=ui.draft!!.images.size+(if(ui.draft.audio==null) 0 else 1)
-                                    Text(if(attachments==0) "草稿" else "$attachments 个附件",Modifier.padding(horizontal=8.dp,vertical=4.dp),style=MaterialTheme.typography.labelMedium)
-                                }
-                            }
-                            TextField(value=ui.text,onValueChange=controller::edit,enabled=editable,
-                                placeholder={Text("此刻有什么想留下的？\n也可以只添加图片或原音。")},minLines=2,maxLines=8,
-                                textStyle=MaterialTheme.typography.bodyLarge,shape=RoundedCornerShape(12.dp),
-                                colors=TextFieldDefaults.colors(focusedContainerColor=AIyouColors.surface,
-                                    unfocusedContainerColor=AIyouColors.surface,disabledContainerColor=AIyouColors.surfaceMuted,
-                                    unfocusedIndicatorColor=AIyouColors.outlineFunctional),
-                                modifier=Modifier.fillMaxWidth().onFocusChanged { inputFocused=it.hasFocus }.testTag("mixed-text")
-                                    .semantics { contentDescription="写下此刻，也可以只添加附件" })
-                            if(!ui.discardPending) {
-                                Row(verticalAlignment=Alignment.CenterVertically) {
-                                    Checkbox(ui.retainJpegMetadata,onCheckedChange=controller::metadata,enabled=editable)
-                                    Text("保留 JPEG 拍摄资料",style=MaterialTheme.typography.bodySmall)
-                                }
-                                FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(onClick={controller.select()},enabled=editable && ui.pendingEdits==0,
-                                        shape=RoundedCornerShape(12.dp),modifier=Modifier.heightIn(min=48.dp).testTag("mixed-add")){Text("添加图片")}
-                                    if(ui.draft!!.audio==null) OutlinedButton(onClick={controller.audioCapture.startFile(canImportAudio,{audio?.isResumed==true})},
-                                        enabled=editable && audio!=null && ui.draft.images.size<20,
-                                        shape=RoundedCornerShape(12.dp),modifier=Modifier.heightIn(min=48.dp).testTag("mixed-audio-import")){Text("导入原音文件")}
-                                    else TextButton(onClick={reveal("audio")},modifier=Modifier.heightIn(min=48.dp)){Text("查看草稿原音")}
-                                }
-                                Text("图片 / WAV 原音 · 不自动转写",style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
-                                if(controller.audioCapture.busy || ui.audio.error!=null) {
-                                    CaptureFeedback(ui.audio.error ?: when(ui.audio.phase) {
-                                        CaptureAudioPhase.PICKING -> "等待选择原音；尚未保存这条记录"
-                                        CaptureAudioPhase.IMPORTING -> "正在读取和检查原音文件"
-                                        CaptureAudioPhase.UNKNOWN -> "原音结果待核对，当前草稿仍冻结"
-                                        else -> "正在准备或确认原音"
-                                    },isError=ui.audio.error!=null,modifier=Modifier.testTag("mixed-audio-summary"))
-                                    TextButton(onClick={reveal("audio")},modifier=Modifier.heightIn(min=48.dp)
-                                        .testTag("mixed-audio-status")) {Text("查看本次原音处理")}
-                                }
-                            }
-                            if(ui.supportsProcessingChoice) FlowRow(Modifier.fillMaxWidth(),
-                                horizontalArrangement=Arrangement.SpaceBetween,verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                                Text(if(ui.policyChange!=null) "处理范围待核对" else if(ui.draft!!.policy==com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE)
-                                    "不参与 AI · 仅作手账" else "仅本机处理 · 不发远端",
-                                    Modifier.width(IntrinsicSize.Max).align(Alignment.CenterVertically),style=MaterialTheme.typography.bodySmall.copy(lineBreak=LineBreak.Heading),
-                                    color=if(ui.policyChange!=null) AIyouColors.error else AIyouColors.primary)
-                                TextButton(onClick={reveal("processing-policy")},modifier=Modifier.heightIn(min=48.dp).testTag("mixed-policy-details")){Text("范围详情")}
-                            }
-                            if(ui.discardPending) CaptureFeedback("清空前内容仅供核对。请核对同一次清空后继续记录；也可稍后回来核对。",modifier=Modifier.testTag("mixed-discard-pending"))
-                            if(ui.busy || ui.pendingEdits>0 || ui.selection?.phase in setOf(AttachmentImportPhase.PREPARING,AttachmentImportPhase.SAVING)) CaptureFeedback("正在保存或核对本机数据，请稍候。")
-                            ui.error?.let { CaptureFeedback(it,isError=true,modifier=Modifier.testTag("mixed-error")) }
-                            ui.notice?.let { CaptureFeedback(it,modifier=Modifier.testTag("mixed-notice")) }
-                            Button(onClick=controller::save,enabled=enabled && !ui.busy && !controller.audioCapture.busy && !playback.busy && ui.selection==null && ui.pendingEdits==0 && !ui.discardPending && ui.policyChange==null,
-                                interactionSource=saveInteraction,
-                                shape=RoundedCornerShape(16.dp),contentPadding=PaddingValues(horizontal=20.dp,vertical=14.dp),
-                                modifier=Modifier.fillMaxWidth().heightIn(min=52.dp).graphicsLayer {scaleX=saveScale;scaleY=saveScale}
-                                    .testTag("mixed-save")){Text(if(ui.uncertainSave) "核对同一次保存" else "保存这条记录")}
-                        }
-                    }
-                }
+                if(defaultPolicyUnavailable) CaptureFeedback("设置暂不可读取；新草稿暂用不参与 AI。当前草稿范围不变。",isError=true,
+                    modifier=Modifier.testTag("mixed-default-policy-unavailable"))
+            }
+            if(recentIds.any {it !in seenIds}) item("new-records") {
+                TextButton(onClick={seenIds=recentIds;scope.launch {listState.scrollToItem(0)}},modifier=Modifier.heightIn(min=48.dp).testTag("mixed-new-records")) {Text("有新内容 · 查看今天最近记录")}
             }
             item("recent") {
-                Text("今天最近记录",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() })
-                if(recent.isNotEmpty()) Text("按记录时间显示最近 5 条；更多记录可到回忆查看。",Modifier.padding(top=4.dp),
-                    style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary) }
-            if(local.ready && !local.opening && local.error==null && recent.isEmpty()) item("recent-empty") {
-                Text("今天还没有记录。写下第一笔，就会出现在这里。",Modifier.padding(vertical=8.dp),
-                    style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary) }
-            items(recent,key={"record:"+it.id}) { entry ->
-                Surface(Modifier.fillMaxWidth().animateItem(fadeInSpec=if(motionAllowed) tween(180) else null,
-                    placementSpec=if(motionAllowed) tween(220) else null,fadeOutSpec=null)
-                    .testTag("entry-${entry.id}").semantics { selected=entry.id==selectedEntryId },
-                    color=AIyouColors.surface,shape=RoundedCornerShape(20.dp),shadowElevation=1.dp) {
-                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                    Text(originalMetadata(entry),style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
-                    Text(if(entry.policy==com.t1doo.aiyou.model.ProcessingPolicy.LOCAL_ONLY) "原文 · 仅本机" else "原文",
-                        style=MaterialTheme.typography.labelMedium,color=AIyouColors.primary)
-                    Text(originalPreview(entry.originalText),style=MaterialTheme.typography.bodyLarge,maxLines=4,overflow=TextOverflow.Ellipsis)
-                    if(entry.policy!=com.t1doo.aiyou.model.ProcessingPolicy.LOCAL_ONLY) PrivacyChip(entry.policy)
-                    TextButton(onClick={if(enabled && !ui.busy && ui.selection==null) onOpenEntry(entry.id)},
-                        modifier=Modifier.heightIn(min=48.dp)) { Text("阅读全文") }
+                Row(Modifier.fillMaxWidth().padding(top=16.dp,bottom=8.dp),verticalAlignment=Alignment.CenterVertically) {
+                    Text("今天",Modifier.weight(1f).semantics {heading()},style=MaterialTheme.typography.titleMedium)
+                    Text("${recent.size} 条最近记录",style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
                 }
+            }
+            if(local.ready && !local.opening && local.error==null && recent.isEmpty()) item("recent-empty") {
+                Text("今天还没有记录。直接在下方写下第一句。",Modifier.padding(vertical=16.dp),style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
+            }
+            items(recent,key={"record:"+it.id}) {entry ->
+                Column(Modifier.fillMaxWidth().testTag("entry-${entry.id}").semantics {selected=entry.id==selectedEntryId}
+                    .clickable(enabled=enabled && !ui.busy && ui.selection==null,onClickLabel="阅读全文") {onOpenEntry(entry.id)}
+                    .padding(vertical=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Text(originalPreview(entry.originalText),style=MaterialTheme.typography.bodyLarge,maxLines=3,overflow=TextOverflow.Ellipsis)
+                    Text(originalMetadata(entry),style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
+                    if(entry.policy!=com.t1doo.aiyou.model.ProcessingPolicy.LOCAL_ONLY) PrivacyChip(entry.policy)
+                    HorizontalDivider(color=AIyouColors.outlineDecorative)
+                }
+            }
+        }
+        HorizontalDivider(color=AIyouColors.outlineDecorative)
+        // Scrolling belongs to the constrained composer, not an extra IME inset. At large text
+        // every action remains reachable; focus editing can use the complete available height.
+        Column(Modifier.fillMaxWidth().heightIn(max=if(focusEditor) maxHeight else maxHeight*.65f)
+            .verticalScroll(inputScroll).padding(horizontal=16.dp,vertical=4.dp).testTag("mixed-composer"),
+            verticalArrangement=Arrangement.spacedBy(4.dp)) {
+            if(!enabled) {
+                CaptureFeedback(local.error ?: ui.error ?: "正在读取加密草稿。",isError=local.error!=null || ui.error!=null)
+                TextButton(onClick=controller::refresh,enabled=local.ready,modifier=Modifier.heightIn(min=48.dp)){Text("重试读取草稿")}
+            }
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                Text("记下来",Modifier.heightIn(min=48.dp).wrapContentHeight().drawBehind {
+                    drawLine(AIyouColors.primary,Offset(0f,size.height),Offset(size.width,size.height),2.dp.toPx())
+                },style=MaterialTheme.typography.labelLarge,color=AIyouColors.textPrimary)
+                if(onAskQuestion!=null) TextButton(onClick=onAskQuestion,enabled=editable&&!ui.confirmDiscard,
+                    modifier=Modifier.heightIn(min=48.dp).testTag("mixed-ask-question")){Text("问一问")}
+                Spacer(Modifier.weight(1f))
+                Text(if(ui.draft?.policy==com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE) "不参与 AI" else "仅本机",style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
+            }
+            BasicTextField(value=ui.text,onValueChange=controller::edit,enabled=editable,
+                minLines=if(focusEditor) 5 else 2,maxLines=if(focusEditor) 16 else 3,
+                textStyle=MaterialTheme.typography.bodyLarge.copy(color=AIyouColors.textPrimary),cursorBrush=SolidColor(AIyouColors.primary),
+                modifier=Modifier.fillMaxWidth().padding(vertical=8.dp).testTag("mixed-text")
+                    .semantics {contentDescription="写下此刻，也可以只添加附件"},
+                decorationBox={field->Box {if(ui.text.isEmpty()) Text("想到什么，先记下来…",style=MaterialTheme.typography.bodyLarge,color=AIyouColors.textSecondary);field()}})
+            if(ui.draft?.let {it.images.isNotEmpty() || it.audio!=null}==true) TextButton(onClick={reveal("audio")},modifier=Modifier.heightIn(min=48.dp)) {
+                Text("${ui.draft!!.images.size} 张图片"+if(ui.draft.audio!=null) " · 原音附件" else " · 查看附件")
+            }
+            if(ui.discardPending) CaptureFeedback("清空结果待核对。保留同一次意图，不另建草稿。",modifier=Modifier.testTag("mixed-discard-pending"))
+            if(ui.busy || ui.pendingEdits>0) CaptureFeedback("正在保存或核对本机数据，请稍候。")
+            ui.error?.let {CaptureFeedback(it,isError=true,modifier=Modifier.testTag("mixed-error"))}
+            ui.notice?.let {CaptureFeedback(it,modifier=Modifier.testTag("mixed-notice"))}
+            if(controller.audioCapture.busy || ui.audio.error!=null) {
+                CaptureFeedback(ui.audio.error ?: "正在处理原音，尚未保存记录。",isError=ui.audio.error!=null,modifier=Modifier.testTag("mixed-audio-summary"))
+                TextButton(onClick={reveal("audio")},modifier=Modifier.heightIn(min=48.dp).testTag("mixed-audio-status")){Text("查看本次原音处理")}
+            }
+            FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick={controller.select()},enabled=editable&&ui.pendingEdits==0,
+                    modifier=Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp).testTag("mixed-add").semantics {contentDescription="添加图片"}) {AttachmentIcon(false,editable)}
+                TextButton(onClick={controller.audioCapture.startFile(canImportAudio,{audio?.isResumed==true})},
+                    enabled=editable&&audio!=null&&ui.draft?.audio==null&&(ui.draft?.images?.size ?: 20)<20,
+                    modifier=Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp).testTag("mixed-audio-import").semantics {contentDescription="导入原音文件，不自动转写"}) {AttachmentIcon(true,editable&&audio!=null)}
+                TextButton(onClick={detailsOpen=true},modifier=Modifier.heightIn(min=48.dp).testTag("mixed-more")){Text("更多")}
+                TextButton(onClick={focusEditor=!focusEditor},modifier=Modifier.heightIn(min=48.dp).testTag("mixed-focus-editor")){Text(if(focusEditor)"收起编辑" else "展开")}
+                TextButton(onClick=controller::save,
+                    enabled=enabled&&!ui.busy&&!controller.audioCapture.busy&&!playback.busy&&ui.selection==null&&ui.pendingEdits==0&&!ui.discardPending&&ui.policyChange==null,
+                    modifier=Modifier.widthIn(min=96.dp).heightIn(min=48.dp).testTag("mixed-save")) {
+                    Text(if(ui.uncertainSave) "核对保存" else if(ui.busy) "保存中" else "保存",style=MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+      }
+    }
+    if(detailsOpen) ModalBottomSheet(onDismissRequest={detailsOpen=false},containerColor=AIyouColors.surface) {
+        LazyColumn(Modifier.fillMaxWidth().testTag("mixed-details"),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            item("heading") {
+                Text("这份草稿",style=MaterialTheme.typography.titleLarge)
+                Text("图片与原音按现有能力处理；导入不自动转写。",style=MaterialTheme.typography.bodySmall)
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Checkbox(ui.retainJpegMetadata,onCheckedChange=controller::metadata,enabled=editable)
+                    Text("保留 JPEG 拍摄资料",style=MaterialTheme.typography.bodySmall)
                 }
             }
             if(enabled) {
@@ -277,31 +246,22 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                     modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("mixed-clear")){Text(if(ui.discardPending) "核对同一次清空" else "清空草稿")}}
             }
             item("status") {
-                if(!enabled) {
-                if(ui.discardPending) Text("清空前内容仅供核对。请核对同一次清空后继续记录；也可稍后回来核对。",modifier=Modifier.testTag("mixed-discard-pending"))
-                if(ui.busy || ui.pendingEdits>0 || ui.selection?.phase in setOf(AttachmentImportPhase.PREPARING,AttachmentImportPhase.SAVING)) CaptureFeedback("正在保存或核对本机数据，请稍候。")
-                ui.error?.let { CaptureFeedback(it,isError=true,modifier=Modifier.testTag("mixed-error")) }
-                ui.notice?.let { CaptureFeedback(it,modifier=Modifier.testTag("mixed-notice")) }
-                }
                 ui.selection?.let { selection ->
                     if(selection.phase==AttachmentImportPhase.FAILED) TextButton(onClick=controller::retryImage,modifier=Modifier.heightIn(min=48.dp)){Text("重试确认图片")}
                     TextButton(onClick=controller::cancelSelection,enabled=selection.phase!=AttachmentImportPhase.SAVING,
                         modifier=Modifier.heightIn(min=48.dp).testTag("mixed-cancel-picture")){Text("取消本次选择")}
                 }
-                TextButton(onClick=controller::refresh,enabled=local.ready && !ui.busy && !controller.audioCapture.busy && !playback.busy && ui.selection==null,
+                TextButton(onClick=controller::refresh,enabled=local.ready&&!ui.busy&&!controller.audioCapture.busy&&!playback.busy&&ui.selection==null,
                     modifier=Modifier.heightIn(min=48.dp).testTag("mixed-refresh")){Text("重新核对加密草稿")}
+                TextButton(onClick={detailsOpen=false},modifier=Modifier.heightIn(min=48.dp)){Text("回到输入")}
             }
         }
-        if(enabled && showReturnToInput) FilledTonalButton(onClick={reveal("composer")},
-            shape=RoundedCornerShape(16.dp),modifier=Modifier.padding(horizontal=16.dp,vertical=8.dp).fillMaxWidth().heightIn(min=48.dp)
-                .testTag("mixed-jump-composer")) { Text(if(ui.discardPending) "回到清空核对" else "回到输入") }
     }
 }
 
-/** State text is supplied by the controller; no progress estimate or optimistic success. */
+/** State remains tied to its actual operation; no optimistic success or invented progress. */
 @Composable
 private fun CaptureFeedback(text:String,modifier:Modifier=Modifier,isError:Boolean=false) {
-    Text(text,modifier.fillMaxWidth().background(if(isError) AIyouColors.errorContainer else AIyouColors.surfaceMuted,
-        RoundedCornerShape(12.dp)).padding(16.dp).semantics { liveRegion=LiveRegionMode.Polite },
-        style=MaterialTheme.typography.bodyMedium,color=if(isError) AIyouColors.error else AIyouColors.textPrimary)
+    Text(text,modifier.fillMaxWidth().padding(vertical=4.dp).semantics {liveRegion=LiveRegionMode.Polite},
+        style=MaterialTheme.typography.bodySmall,color=if(isError)AIyouColors.error else AIyouColors.textSecondary)
 }

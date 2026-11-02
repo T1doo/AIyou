@@ -20,7 +20,8 @@ import kotlinx.coroutines.withContext
 /** Device defaults only; never records, consent, credentials or keys. */
 data class UiPreferences(val showCompanion: Boolean = true, val reduceMotion: Boolean = false,
     val defaultRecapPeriod: FactRecapPeriod = FactRecapPeriod.DAY,
-    val defaultCapturePolicy: ProcessingPolicy = ProcessingPolicy.LOCAL_ONLY) {
+    val defaultCapturePolicy: ProcessingPolicy = ProcessingPolicy.LOCAL_ONLY,
+    val showCompanionScene: Boolean = true) {
     init { require(defaultCapturePolicy in setOf(ProcessingPolicy.LOCAL_ONLY, ProcessingPolicy.AI_NONE)) }
 }
 
@@ -55,7 +56,11 @@ internal class FileUiPreferences(private val file: File) : UiPreferencesStorage 
                 if (value == "AIyou display v2\n$companion\n$motion\n${period.name}\n") return@synchronized candidate
                 for (policy in listOf(ProcessingPolicy.LOCAL_ONLY, ProcessingPolicy.AI_NONE)) {
                     val configured = candidate.copy(defaultCapturePolicy = policy)
-                    if (value == encode(configured)) return@synchronized configured
+                    if (value == encodeV3(configured)) return@synchronized configured
+                    for (scene in listOf(false, true)) {
+                        val display = configured.copy(showCompanionScene = scene)
+                        if (value == encode(display)) return@synchronized display
+                    }
                 }
             }
         }
@@ -83,7 +88,9 @@ internal class FileUiPreferences(private val file: File) : UiPreferencesStorage 
         if (read() != value) throw IOException("UI preferences not confirmed")
     }
 
-    private fun encode(value: UiPreferences) = "AIyou display v3\n${value.showCompanion}\n${value.reduceMotion}\n${value.defaultRecapPeriod.name}\n${value.defaultCapturePolicy.name}\n"
+    private fun encodeV3(value: UiPreferences) = "AIyou display v3\n${value.showCompanion}\n${value.reduceMotion}\n${value.defaultRecapPeriod.name}\n${value.defaultCapturePolicy.name}\n"
+
+    private fun encode(value: UiPreferences) = "AIyou display v4\n${value.showCompanion}\n${value.reduceMotion}\n${value.defaultRecapPeriod.name}\n${value.defaultCapturePolicy.name}\n${value.showCompanionScene}\n"
 
     // AtomicFile readers may recover .bak, so they share the complete write/readback boundary.
     // No SQL or UI callbacks run while this lock is held.

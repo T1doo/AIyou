@@ -1,6 +1,7 @@
 package com.t1doo.aiyou.records
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,6 +19,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.window.Dialog
@@ -89,7 +91,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                 state = listState,
                 contentPadding = PaddingValues(horizontal = margin,
                     vertical = if (compactHeader) AIyouDimensions.spaceSm else AIyouDimensions.spaceMd),
-                verticalArrangement = Arrangement.spacedBy(if (compactHeader) AIyouDimensions.spaceMd else AIyouDimensions.sectionGap)) {
+                verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
                 item("header") {
                     if (compactHeader) Row(Modifier.fillMaxWidth().testTag("manual-task-compact-header"),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
@@ -101,16 +103,15 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                     } else NotebookPageHeader("待办", "由你明确创建的正式任务", stacked, companion)
                 }
                 item("create") {
-                    Surface(color = AIyouColors.primaryContainer, contentColor = AIyouColors.textPrimary,
-                        shape = RoundedCornerShape(AIyouDimensions.cardRadius)) {
-                        Column(Modifier.fillMaxWidth().padding(if (compactHeader) AIyouDimensions.spaceMd else AIyouDimensions.spaceLg),
+                    Surface(color = AIyouColors.surface, contentColor = AIyouColors.textPrimary) {
+                        Column(Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                            Button(onClick = onBegin, enabled = canChoose,
-                                modifier = Modifier.fillMaxWidth().heightIn(min = AIyouDimensions.minTouchTarget)
+                            TextButton(onClick = onBegin, enabled = canChoose,
+                                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
                                     .testTag("manual-task-begin")) { Text("创建待办") }
-                            Text("创建不会自动设置提醒", style = MaterialTheme.typography.bodySmall,
+                            if (detailsExpanded) Text("创建不会自动设置提醒", style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.testTag("manual-task-reminder-boundary"))
-                            Text("提醒需逐条确认，安排不等于送达。", style = MaterialTheme.typography.bodySmall,
+                            if (detailsExpanded) Text("提醒需逐条确认，安排不等于送达。", style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.testTag("manual-task-reminder-policy"))
                             Text(if (countsReady) "正式待办 ${tasks.items.size}" else "正式待办 · 待核对",
                                 style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("manual-task-total"))
@@ -167,21 +168,34 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                             .sortedWith(compareBy<ManualTaskSnapshot> { it.schedule?.date }.thenBy { it.schedule?.time }.thenBy { it.id })
                         if (group.isEmpty()) continue
                         item("heading-" + bucket) {
-                            Surface(color = AIyouColors.surfaceMuted, shape = MaterialTheme.shapes.small) {
+                            Surface(color = AIyouColors.surface) {
                                 Text(title + " " + group.size, style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd)
-                                        .testTag("manual-task-heading-" + bucket))
+                                    modifier = Modifier.fillMaxWidth().padding(top=AIyouDimensions.spaceLg,bottom=AIyouDimensions.spaceSm)
+                                        .testTag("manual-task-heading-" + bucket).semantics { heading() })
                             }
                         }
                         items(group, key = { "task-" + it.id }) { task ->
-                            Surface(color = AIyouColors.surface, shape = MaterialTheme.shapes.medium,
-                                border = BorderStroke(AIyouDimensions.borderWidth, AIyouColors.outlineDecorative)) {
-                                Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd).testTag("manual-task-row-" + task.id),
+                            var rowExpanded by remember(task.id) { mutableStateOf(false) }
+                            Surface(color = AIyouColors.surface) {
+                                Column(Modifier.fillMaxWidth().padding(vertical=AIyouDimensions.spaceSm).testTag("manual-task-row-" + task.id),
                                     verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                                    Text(task.title, style = MaterialTheme.typography.bodyLarge)
-                                    Text(manualTaskDateLabel(task), style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.testTag("manual-task-date-" + task.id))
-                                    task.reminder?.let { Text(taskReminderLabel(it), Modifier.testTag("reminder-status-" + task.id)) }
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment=Alignment.Top) {
+                                        Checkbox(checked=task.status==ManualTaskStatus.COMPLETED,
+                                            onCheckedChange={if(task.status==ManualTaskStatus.OPEN) onChange(task.id,task.version,ManualTaskStatus.COMPLETED)},
+                                            enabled=canChoose&&task.status==ManualTaskStatus.OPEN,
+                                            modifier=Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp)
+                                                .testTag("manual-task-check-"+task.id).semantics {contentDescription=task.title})
+                                        Column(Modifier.weight(1f).clickable(onClickLabel="待办详情") {rowExpanded=!rowExpanded}
+                                            .heightIn(min=48.dp).padding(vertical=AIyouDimensions.spaceXs),verticalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
+                                            Text(task.title, style = MaterialTheme.typography.bodyLarge,
+                                                color=if(task.status==ManualTaskStatus.COMPLETED)AIyouColors.textSecondary else AIyouColors.textPrimary)
+                                            Text(manualTaskDateLabel(task), style = MaterialTheme.typography.bodySmall,
+                                                color=AIyouColors.textSecondary,modifier = Modifier.testTag("manual-task-date-" + task.id))
+                                            task.reminder?.let { Text(taskReminderLabel(it), Modifier.testTag("reminder-status-" + task.id),style=MaterialTheme.typography.bodySmall) }
+                                            Text(if(rowExpanded)"收起详情" else "详情与操作",style=MaterialTheme.typography.labelSmall,color=AIyouColors.primary)
+                                        }
+                                    }
+                                    if(rowExpanded) {
                                     task.sourceReceipt?.let { receipt ->
                                         Text("由原文摘录创建 · 人工确认 · 原文版本 " + receipt.binding.source.revision)
                                         TextButton(enabled=canChoose,onClick={onSource(task.id,task.version)},
@@ -213,6 +227,8 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                                         TextButton(onClick = { onChange(task.id, task.version, ManualTaskStatus.CANCELLED) }, enabled = canChoose,
                                             modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-task-cancel-" + task.id)) { Text("取消待办") }
                                     }
+                                    }
+                                    HorizontalDivider(color=AIyouColors.outlineDecorative)
                                 }
                             }
                         }
@@ -234,7 +250,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                         if(drafts.isEmpty()) item("proposal-empty") {Text("没有待确认草稿；可从原文摘录主动发起。")}
                         items(drafts,key={"proposal-"+it.proposal.id}) {item ->
                             val p=item.proposal
-                            Surface(color=AIyouColors.surfaceMuted,shape=MaterialTheme.shapes.medium) {Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd).testTag("task-proposal-row-"+p.id),
+                            Surface(color=AIyouColors.surface) {Column(Modifier.fillMaxWidth().padding(AIyouDimensions.spaceMd).testTag("task-proposal-row-"+p.id),
                                 verticalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                                 Text(p.titleInput.ifEmpty {"尚未填写标题"})
                                 Text("人工待确认 · 原文版本 "+p.binding.source.revision+" · "+p.dateInput.date.ifEmpty {"未设日期"})
