@@ -1,4 +1,4 @@
-name: DISABLED - three saved-question UI diagnostics (not acceptance)
+name: Three saved-question UI diagnostics (not acceptance)
 
 'on':
   push:
@@ -9,8 +9,8 @@ permissions:
 
 jobs:
   fixed-three-methods:
-    # A later explicit review must enable BOTH this gate and the script gate.
-    if: ${{ false && github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/diagnostic/saved-question-ui-20261102' && github.event.head_commit.message == '[saved-question-diagnostic] 9a43845 fixed three UI methods' && github.run_attempt == 1 }}
+    # One reviewed exact push only. Other branches/messages/events and reruns do not enter.
+    if: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/diagnostic/saved-question-ui-20261102' && github.event.head_commit.message == '[saved-question-diagnostic] 9a43845 fixed three UI methods' && github.run_attempt == 1 }}
     name: DIAGNOSTIC ONLY - exactly three UI methods, no D01 or device claim
     runs-on: ubuntu-24.04
     timeout-minutes: 12
@@ -65,11 +65,11 @@ jobs:
           TARGET_OUTCOME: ${{ steps.methods.outcome }}
           SCHEMA_OUTCOME: ${{ steps.schema_verify.outcome }}
         run: python3 scripts/diagnose-saved-questions.py --collect
-      - name: Archive bounded raw evidence (8 MiB cap) for seven days, not acceptance evidence
+      - name: Archive bounded raw evidence (8 MiB cap) for one day, not acceptance evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: saved-question-three-methods-DIAGNOSTIC-ONLY
           path: build/saved-question-diagnostic/evidence/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1

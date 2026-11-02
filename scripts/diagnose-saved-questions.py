@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Default-disabled fixed three-method diagnosis. Never full/device acceptance."""
+"""One reviewed fixed three-method diagnosis. Never full/device acceptance."""
 import argparse
 import hashlib
 import json
@@ -11,7 +11,7 @@ import time
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
-EXECUTION_APPROVED = False
+EXECUTION_APPROVED = True
 BASE = '9a43845a6542d7829d557a2dce00921ea15f1742'
 REF = 'refs/heads/diagnostic/saved-question-ui-20261102'
 MESSAGE = '[saved-question-diagnostic] 9a43845 fixed three UI methods'

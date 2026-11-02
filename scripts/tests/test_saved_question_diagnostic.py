@@ -48,8 +48,9 @@ class SavedQuestionDiagnosticTests(unittest.TestCase):
         with patch.object(probe, 'git', return_value='1' * 40), patch.object(probe, 'source_contract'):
             return probe.collect(root, env or self.env())
 
-    def test_default_disabled_and_only_exact_public_attempt1_request(self):
-        with self.assertRaises(ValueError):
+    def test_reviewed_enable_still_requires_exact_public_attempt1_request(self):
+        self.assertTrue(probe.EXECUTION_APPROVED)
+        with patch.object(probe, 'EXECUTION_APPROVED', False), self.assertRaises(ValueError):
             probe.request(self.env(), self.event())
         with patch.object(probe, 'EXECUTION_APPROVED', True):
             probe.request(self.env(), self.event())
@@ -62,19 +63,20 @@ class SavedQuestionDiagnosticTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     probe.request(self.env(), event)
 
-    def test_fixed_three_filters_default_off_budgets_and_existing_workflow_unchanged(self):
+    def test_fixed_three_filters_budgets_and_existing_workflow_unchanged(self):
         workflow = (ROOT / probe.WORKFLOW).read_text()
         self.assertIn("branches: ['" + probe.REF.removeprefix('refs/heads/') + "']", workflow)
         self.assertNotIn('workflow_dispatch', workflow)
         self.assertNotIn('pull_request:', workflow)
-        self.assertIn('if: ${{ false &&', workflow)
+        self.assertIn("if: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou'", workflow)
+        self.assertNotIn('if: ${{ false &&', workflow)
         self.assertIn('github.run_attempt == 1', workflow)
         self.assertIn(probe.MESSAGE, workflow)
         self.assertEqual(3, workflow.count('--tests '))
         for name, method in probe.CASES:
             self.assertIn("--tests '" + name + '.' + method + "'", workflow)
         for expected in ('runs-on: ubuntu-24.04', 'timeout-minutes: 12', '540s scripts/gradle.sh',
-                         '--kill-after=10s', 'retention-days: 7', 'persist-credentials: false', 'contents: read'):
+                         '--kill-after=10s', 'retention-days: 1', 'persist-credentials: false', 'contents: read'):
             self.assertIn(expected, workflow)
         for forbidden in ('continue-on-error', 'sdkmanager', 'sudo', 'secrets.', 'needs:', ':app:assembleDebug', 'ScreenshotTest'):
             self.assertNotIn(forbidden, workflow)
