@@ -1,4 +1,4 @@
-name: Three saved-question UI diagnostics (not acceptance)
+name: DISABLED - consumed saved-question UI diagnostic
 
 'on':
   push:
@@ -9,8 +9,8 @@ permissions:
 
 jobs:
   fixed-three-methods:
-    # One reviewed exact push only. Other branches/messages/events and reruns do not enter.
-    if: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/diagnostic/saved-question-ui-20261102' && github.event.head_commit.message == '[saved-question-diagnostic] 9a43845 fixed three UI methods' && github.run_attempt == 1 }}
+    # The approved attempt is consumed. Any further run requires another exact-source review.
+    if: ${{ false && github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/diagnostic/saved-question-ui-20261102' && github.event.head_commit.message == '[saved-question-diagnostic] 9a43845 fixed three UI methods' && github.run_attempt == 1 }}
     name: DIAGNOSTIC ONLY - exactly three UI methods, no D01 or device claim
     runs-on: ubuntu-24.04
     timeout-minutes: 12

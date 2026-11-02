@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One reviewed fixed three-method diagnosis. Never full/device acceptance."""
+"""Consumed fixed diagnosis, now disabled. Never full/device acceptance."""
 import argparse
 import hashlib
 import json
@@ -11,13 +11,13 @@ import time
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
-EXECUTION_APPROVED = True
+EXECUTION_APPROVED = False
 BASE = '9a43845a6542d7829d557a2dce00921ea15f1742'
 REF = 'refs/heads/diagnostic/saved-question-ui-20261102'
 MESSAGE = '[saved-question-diagnostic] 9a43845 fixed three UI methods'
 WORKFLOW = '.github/workflows/saved-question-diagnostic.yml'
 SOURCES = {
-    'app/src/test/kotlin/com/t1doo/aiyou/SelectedQuestionConsentPresentationTest.kt': '1951003c1598ef6d3afe69cd0c59633ac68aec74226b7453f9a62dd883b5b18f',
+    'app/src/test/kotlin/com/t1doo/aiyou/SelectedQuestionConsentPresentationTest.kt': '2a39d75ea46545aade4678340ae3d98960fccc87d400bc83b4457322f6f939f7',
     'app/src/test/kotlin/com/t1doo/aiyou/SavedQuestionsPresentationTest.kt': '8c716d9b5a41198dd820d9ba09eec206f415ee37b859e7faa0e335c01fab0442',
 }
 CASES = {

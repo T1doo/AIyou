@@ -48,8 +48,8 @@ class SavedQuestionDiagnosticTests(unittest.TestCase):
         with patch.object(probe, 'git', return_value='1' * 40), patch.object(probe, 'source_contract'):
             return probe.collect(root, env or self.env())
 
-    def test_reviewed_enable_still_requires_exact_public_attempt1_request(self):
-        self.assertTrue(probe.EXECUTION_APPROVED)
+    def test_consumed_run_is_disabled_and_only_exact_public_attempt1_could_admit(self):
+        self.assertFalse(probe.EXECUTION_APPROVED)
         with patch.object(probe, 'EXECUTION_APPROVED', False), self.assertRaises(ValueError):
             probe.request(self.env(), self.event())
         with patch.object(probe, 'EXECUTION_APPROVED', True):
@@ -68,8 +68,7 @@ class SavedQuestionDiagnosticTests(unittest.TestCase):
         self.assertIn("branches: ['" + probe.REF.removeprefix('refs/heads/') + "']", workflow)
         self.assertNotIn('workflow_dispatch', workflow)
         self.assertNotIn('pull_request:', workflow)
-        self.assertIn("if: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou'", workflow)
-        self.assertNotIn('if: ${{ false &&', workflow)
+        self.assertIn("if: ${{ false && github.event_name == 'push' && github.repository == 'T1doo/AIyou'", workflow)
         self.assertIn('github.run_attempt == 1', workflow)
         self.assertIn(probe.MESSAGE, workflow)
         self.assertEqual(3, workflow.count('--tests '))
