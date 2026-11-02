@@ -1,0 +1,103 @@
+{
+  "source_parent": "dc6324ffbef6685f1bf3abcf7ae3c3a03e7abffa",
+  "product_file": "app/src/main/java/com/t1doo/aiyou/records/OriginalAudioScreen.kt",
+  "product_sha256": "6001da1667d5e390c83f7312ee5a3d93cde7d16a5cd8d1ce1d39e8cb7ee7d70f",
+  "diagnosis": {
+    "direct_observed_failure": "run8 D8 rejected OriginalAudioScreenKt.class reference $$$$$NON_LOCAL_RETURN$$$$$.<anonymous>; invalid method name cannot be represented in DEX",
+    "failed_run_id": 41455962724,
+    "failed_source_sha": "e33ff67afaedabeb34f8aa0f1e298b702e250a38",
+    "recent_full_success_source_sha": "908ad0023dd11a2c972d59204487787a2500eb30",
+    "recent_apk_completed_source_sha": "ae6669c633d7cbc255e95fb4da6b7ed8fb245e86 (run7 lint failed afterward)",
+    "source_comparison": "ae to e33 only product difference was OriginalAudioStatus: new expression-body key(controller), return@key and derived Compose State collection. WaveFilePicker unchanged; no returns inside remember/derived blocks. Earlier APK-completed source used ordinary block-function return outside key.",
+    "local_failed_class_available": false,
+    "local_android_build_directory_available": false,
+    "cached_compiler_version": "2.4.21",
+    "cached_compiler_sha256": "ef19419c765e7ac8404465fa026ca8fc4dbb8a822de0fc79aa53c8dce29f1d02",
+    "readonly_inspection": "existing JDK17 javap -p -c on cached compiler; no compilation, SDK init, or download",
+    "compiler_bytecode_observations": [
+      {
+        "class": "org.jetbrains.kotlin.codegen.inline.InlineCodegenUtilsKt",
+        "method": "generateGlobalReturnFlag(InstructionAdapter, String labelName)",
+        "instructions": [
+          "ldc $$$$$NON_LOCAL_RETURN$$$$$",
+          "aload labelName",
+          "ldc ()V",
+          "InstructionAdapter.invokestatic(owner, name, descriptor, false)"
+        ]
+      },
+      {
+        "class": "org.jetbrains.kotlin.codegen.inline.InlineCodegenUtilsKt",
+        "method": "getMarkedReturnLabelOrNull(AbstractInsnNode)",
+        "instructions": [
+          "compare previous MethodInsnNode.owner to $$$$$NON_LOCAL_RETURN$$$$$",
+          "return previous MethodInsnNode.name on match"
+        ]
+      }
+    ],
+    "conclusion_scope": "Direct invalid-bytecode cause is a compiler inline-return marker reaching D8. Source correlation identifies the newly introduced inline early-return path; the exact compiler/Compose lowering pass was not independently isolated. return@key is a source-level labelled local return; the marker name alone does not prove illegal non-local source code.",
+    "not_claimed": [
+      "toolchain bug reproduced in isolation",
+      "original failed class disassembled locally",
+      "new DEX/lint success"
+    ]
+  },
+  "fix": "explicit Unit block-body function, key(controller) unchanged, positive if(presentation.visible) wraps content, no early return within key; collection remains outside visibility conditional",
+  "unchanged": [
+    "collectAsState subscription and keyed ownership",
+    "derivedStateOf structural equality and projection function",
+    "announcement/progress/liveRegion/stop/UNKNOWN",
+    "audio resource controller and reminder close protocol",
+    "dependencies and toolchain",
+    "lint strictness and workflow"
+  ],
+  "independent_review": "authorized read-only actual-diff review: no definite P1/P2; confirms hidden collection/owner replacement/projection and action paths preserved; no Android validation",
+  "command": "timeout --signal=TERM --kill-after=10s 120s python3 scripts/jvm-gradle.py -p checks/ai-protocol :remote-text:test --tests '*OriginalAudioPresentationTest' --tests '*OriginalAudioControllerTest' --tests '*TaskReminderControllerTest' --rerun --offline --max-workers=2",
+  "gradle_summary": "BUILD SUCCESSFUL in 10s; only :remote-text:test executed; all compile tasks UP-TO-DATE",
+  "suites": [
+    {
+      "suite": "com.t1doo.aiyou.records.OriginalAudioControllerTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "b0fed6aa83396ba66b596efb2d6a4265766bf7aa8b38972b74dfc8a1a4b25368"
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.OriginalAudioPresentationTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "4cc8f40b4b68dd430760b17a400731bb04fb3ed5381f39a40d019da4b259dec0"
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.TaskReminderControllerTest",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "9fdba0ca973b5ee71ffee6579384ea90ba00cbf91ff741e01e62a6f0434eab58"
+    }
+  ],
+  "total_tests": 34,
+  "kotlin_syntax_only": {
+    "files": 1,
+    "parse_errors": 0,
+    "compiler_or_compose_verification": false
+  },
+  "new_compilation_tasks_executed": false,
+  "new_android_build": false,
+  "new_ci": false,
+  "new_downloads": false,
+  "new_permissions": false,
+  "artifact_or_cache_upload": false,
+  "device_or_screenshot": false,
+  "cumulative_ci": {
+    "runs": 21,
+    "seconds": 27615
+  },
+  "immutable_failure_evidence": {
+    "docs/evidence/frontend-day-run8-20261102.json": "c68ba1ce85b73ac343eae90ceb444368d7bb17fb2542f1e7ea7b0e73d1fd6a85",
+    "docs/evidence/frontend-day-ci-ledger-20261102.json": "614f9fd13c948f6839f2fb7d368f3b69c189e062068edc72d8a1dd9756f1306c"
+  }
+}

@@ -225,3 +225,14 @@ public/source/已有SDK许可/token/schema基线预检通过，Python token契�
 assembleDebug未完成；lintDebug未运行，不能认证run7的lint已通过。domain:test任务执行且无任务失败，但没有读回XML数量；host139、Android定向12、XML汇总、schema后复核与APK权限检查均未执行。229项/28套件仍为预计，不挪用旧195项或本地34项。无新的APK hash、截图或设备结果；旧ShadowTrace OOM组没有运行。
 
 标准ubuntu-24.04单job125312578680实际13:47:07Z–13:51:37Z，270秒（4m30）。原20次27345秒追加为21次27615秒（7h40m15），窗口已消费，未批准自动重跑/下一轮。artifact API0项，无artifact/cache action、远端cache写入或package发布动作。启动Cache mode: write为平台能力元数据；普通日志/状态仍持久，既有76,949,894B/7天工件未删改，不推断账户存储零费。完整结果见frontend-day-run8-20261102.json及原累计账。
+
+
+## run8后源码诊断与无提前返回重构（未新编译）
+
+D8正式日志将非法引用定位到OriginalAudioScreenKt.class中的$$$$$NON_LOCAL_RETURN$$$$$.<anonymous>。对比已完成APK的ae源码至e33，唯一产品差异是OriginalAudioStatus新增expression-body key(controller)、return@key及派生Compose State；WaveFilePicker和其普通函数返回未改，remember/derived块中无return。本地没有app/build或失败class，不能冒称已反汇编失败产物。
+
+只读用现存JDK javap检查锁定Kotlin2.4.21 compiler jar：InlineCodegenUtilsKt.generateGlobalReturnFlag实际生成owner为$$$$$NON_LOCAL_RETURN$$$$$、name为labelName、descriptor为()V的invokestatic；getMarkedReturnLabelOrNull按该owner识别返回标记。可确认直接失败因内联返回标记进入D8；新key提前返回是源码相关路径，但具体Kotlin/Compose lowering pass未独立隔离。return@key在源码语义上是lambda带标签的局部返回，不能仅凭标记名说源代码非法非局部返回，也不臆断环境问题或已复现工具链bug。
+
+最小修复只改OriginalAudioStatus：显式块函数内保留key(controller)，收集和structural derived原样保留，用if(presentation.visible)包围内容，去掉key内提前返回；隐藏时仍收集，换owner重新创建订阅/派生状态，退出组合取消。投影文案、liveRegion、进度、停止/UNKNOWN及提醒协议未改；无suppress或工具链/权限变化。独立只读复审未见确定P1/P2。
+
+已有3类主机测试在离线120秒范围仅重新执行test task，10秒，XML实际3套件34项0失败/错误/跳过；所有compile任务UP-TO-DATE，无新增编译，PSI现存parser仅1文件语法0错。证据见frontend-audio-return-fix-20261102.json。没有运行Android class生成、DEX、lint、设备或截图，不能宣称run8构建已修复通过。原run8失败JSON及累计账hash保持不变，仍21次27615秒；下一次精确验收方案只准备待父审，不自动run9。

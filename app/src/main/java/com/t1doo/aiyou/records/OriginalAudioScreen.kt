@@ -48,23 +48,26 @@ fun WaveFilePicker(audio:ControlledCaptureAudio,ui:CaptureAudioUi,canLaunch:Bool
 }
 
 @Composable
-fun OriginalAudioStatus(controller:OriginalAudioController,modifier:Modifier=Modifier)=key(controller) {
-    // PCM ownership can advance every 10 ms; present only meaningful second/phase changes.
-    // Key the subscription and its derived state together when the resource owner changes.
-    val playback=controller.state.collectAsState()
-    val presentation by remember {
-        derivedStateOf(structuralEqualityPolicy()) { originalAudioPresentation(playback.value) }
-    }
-    if(!presentation.visible)return@key
-    Column(modifier.fillMaxWidth().padding(8.dp).testTag("audio-playback-status")) {
-        Text(presentation.announcement,Modifier.testTag("audio-playback-announcement")
-            .semantics {liveRegion=LiveRegionMode.Polite})
-        // Progress stays readable on focus without announcing it over other content.
-        presentation.progress?.let {Text(it,Modifier.testTag("audio-playback-progress"),style=MaterialTheme.typography.bodySmall)}
-        if(presentation.busy) {
-            Text("先停止播放，再编辑、保存或修改附件和范围。",style=MaterialTheme.typography.bodySmall)
-            TextButton(onClick=controller::stop,modifier=Modifier.heightIn(min=48.dp).testTag("audio-playback-stop")) {
-                Text(presentation.stopLabel)
+fun OriginalAudioStatus(controller:OriginalAudioController,modifier:Modifier=Modifier) {
+    key(controller) {
+        // PCM ownership can advance every 10 ms; present only meaningful second/phase changes.
+        // Keep collection alive while hidden, scoped to this resource owner, without an inline return.
+        val playback=controller.state.collectAsState()
+        val presentation by remember {
+            derivedStateOf(structuralEqualityPolicy()) { originalAudioPresentation(playback.value) }
+        }
+        if(presentation.visible) {
+            Column(modifier.fillMaxWidth().padding(8.dp).testTag("audio-playback-status")) {
+                Text(presentation.announcement,Modifier.testTag("audio-playback-announcement")
+                    .semantics {liveRegion=LiveRegionMode.Polite})
+                // Progress stays readable on focus without announcing it over other content.
+                presentation.progress?.let {Text(it,Modifier.testTag("audio-playback-progress"),style=MaterialTheme.typography.bodySmall)}
+                if(presentation.busy) {
+                    Text("先停止播放，再编辑、保存或修改附件和范围。",style=MaterialTheme.typography.bodySmall)
+                    TextButton(onClick=controller::stop,modifier=Modifier.heightIn(min=48.dp).testTag("audio-playback-stop")) {
+                        Text(presentation.stopLabel)
+                    }
+                }
             }
         }
     }
