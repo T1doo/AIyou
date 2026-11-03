@@ -56,17 +56,24 @@ fun OriginalAudioStatus(controller:OriginalAudioController,modifier:Modifier=Mod
         val presentation by remember {
             derivedStateOf(structuralEqualityPolicy()) { originalAudioPresentation(playback.value) }
         }
-        if(presentation.visible) {
-            Column(modifier.fillMaxWidth().padding(8.dp).testTag("audio-playback-status")) {
-                Text(presentation.announcement,Modifier.testTag("audio-playback-announcement")
-                    .semantics {liveRegion=LiveRegionMode.Polite})
-                // Progress stays readable on focus without announcing it over other content.
-                presentation.progress?.let {Text(it,Modifier.testTag("audio-playback-progress"),style=MaterialTheme.typography.bodySmall)}
-                if(presentation.busy) {
-                    Text("先停止播放，再编辑、保存或修改附件和范围。",style=MaterialTheme.typography.bodySmall)
-                    TextButton(onClick=controller::stop,modifier=Modifier.heightIn(min=48.dp).testTag("audio-playback-stop")) {
-                        Text(presentation.stopLabel)
-                    }
+        OriginalAudioStatusContent(presentation,controller::stop,modifier)
+    }
+}
+
+/** The same renderer serves the live subscription and synthetic Preview snapshots. */
+@Composable
+internal fun OriginalAudioStatusContent(presentation:OriginalAudioPresentation,onStop:()->Unit,
+    modifier:Modifier=Modifier) {
+    if(presentation.visible) {
+        Column(modifier.fillMaxWidth().padding(8.dp).testTag("audio-playback-status")) {
+            Text(presentation.announcement,Modifier.testTag("audio-playback-announcement")
+                .semantics {liveRegion=LiveRegionMode.Polite})
+            // Progress stays readable on focus without announcing it over other content.
+            presentation.progress?.let {Text(it,Modifier.testTag("audio-playback-progress"),style=MaterialTheme.typography.bodySmall)}
+            if(presentation.busy) {
+                Text("先停止播放，再编辑、保存或修改附件和范围。",style=MaterialTheme.typography.bodySmall)
+                TextButton(onClick=onStop,modifier=Modifier.heightIn(min=48.dp).testTag("audio-playback-stop")) {
+                    Text(presentation.stopLabel)
                 }
             }
         }

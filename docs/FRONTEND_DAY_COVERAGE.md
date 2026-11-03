@@ -260,3 +260,16 @@ API job起止14:05:59Z–14:14:46Z，527秒（8m47）。继承21次27615秒追�
 本地离线既有SourceTaskSqlTest9 + TaskReminderControllerTest17实际执行，共2套件26项0失败/错误/跳过，10秒；所有compile任务UP-TO-DATE。测试覆盖真实SQL来源/版本/erasure与原提醒幂等生命周期，不编译或实测这处Compose enabled接线。新环境没有旧临时ParseKotlin class，调用报ClassNotFoundException，未声称PSI/类型检查通过，没有为此新下载或重建检查器。新Android编译/lint/画面均未运行。
 
 当前画面路径仍受CI/artifact/图片存储冻结阻断，未重启已拒浏览器或绕sandbox。现存cf54f3d9的320dp/200%待办图已查看，仅为历史布局上下文，不能认证本源码或此busy入口；设计图也不是产品截图。本轮无新CI/下载/上传/设备/电脑操作，原22次28142秒(7h49m02)及既有工件完整保留。证据见frontend-source-read-reachability-20261103.json。剩余最小恢复条件是明确允许同SHA截图所需执行及正式零新增计费的像素交付通道；未恢复前不宣称前端全部验收完成。
+
+
+## 补两类视觉验收入口：生产呈现接口与4个未渲染Preview
+
+父独审后明确授权在59796c0基线上补最小生产presentation seam。OriginalAudioStatus的原Column抽为internal OriginalAudioStatusContent，原wrapper仍在key(controller)内collectAsState与structural derived，隐藏时不停止收集，stop直接controller::stop；相同liveRegion、进度、48dp按钮及UNKNOWN标签仍由同一renderer呈现，不增加状态注入或资源/认证权限。
+
+ManualTasksScreen将行展开Boolean提升到ManualTaskDisclosureState：只存id/Boolean，按opaque owner identity及ready重建，外来owner state拒用；默认初始折叠，行离开/移除时forget，未进入SavedState。Preview可供给同owner合成展开状态，不改canReadSource、pending目标id锁、canChoose、导航/版本/来源或原队列。无Preview专判、反射或业务状态注入。
+
+新增FrontendDayStatePreviews.kt两方法四注解：AudioPlaying使用真实投影与renderer，360x240/100%、320x420/200%；ReminderPending使用真实ManualTasksScreen，360x800/100%、320x1000/200%。后者是A有已接纳提醒pending、B展开来源的合成snapshot，list初始index2指真实busy状态行，B仅日期先排、A定时后排；所有点击/stop/source回调noop，不执行来源读取或调度。画布只是未来渲染范围，不代表已看到完整控件或完成交互。
+
+一次针对实际生产diff/fixture的独立只读审查未见确定P1/P2或构造参数问题。仅git diff空白检查、注解清单和文件不变性等静态核验；没有Android/Kotlin编译、PSI、测试、截图/CI/下载/上传，不拿run9或旧主机测试证明新源码。owner/行dispose实际重组、stop、原音状态切换、来源往返与真实IME/TalkBack仍未验。
+
+原FrontendDay6张不动，加4张仅未来候选共10。collect-frontend-evidence.py仍拒绝超过6张，旧8MiB提案、工作流与冻结均未改变；10张执行/收集器/像素交付须另审，不能静默沿用旧计划。原22次28142秒账字节不动，产品不合main。完整范围、hash与未验清单见frontend-state-preview-seams-20261103.json。

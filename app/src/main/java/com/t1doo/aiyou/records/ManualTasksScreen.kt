@@ -45,6 +45,30 @@ fun interface ManualTasksObserver {
 }
 val LocalManualTasksObserver = staticCompositionLocalOf<ManualTasksObserver> { ManualTasksObserver {} }
 
+/** In-memory disclosure only: no task snapshots, source receipts, input or SavedState. */
+@Stable
+class ManualTaskDisclosureState internal constructor(private val owner: Any?, private val ready: Boolean,
+    initiallyExpanded: Set<String>) {
+    private val rows = initiallyExpanded.associateWith { mutableStateOf(true) }.toMutableMap()
+    internal fun owns(local: LocalRecordUiState) = owner === local.recordAuthorizationOwner && ready == local.ready
+    internal fun stateFor(id: String): MutableState<Boolean> = rows.getOrPut(id) { mutableStateOf(false) }
+    fun setExpanded(id: String, expanded: Boolean) { stateFor(id).value = expanded }
+    internal fun forget(id: String) { rows.remove(id) }
+    override fun toString() = "ManualTaskDisclosureState(redacted)"
+}
+
+private class TaskDisclosureOwnerKey(private val owner: Any?) {
+    override fun equals(other: Any?) = other is TaskDisclosureOwnerKey && owner === other.owner
+    override fun hashCode() = System.identityHashCode(owner)
+}
+
+@Composable
+fun rememberManualTaskDisclosureState(local: LocalRecordUiState,
+    initiallyExpanded: Set<String> = emptySet()): ManualTaskDisclosureState =
+    remember(TaskDisclosureOwnerKey(local.recordAuthorizationOwner), local.ready) {
+        ManualTaskDisclosureState(local.recordAuthorizationOwner, local.ready, initiallyExpanded)
+    }
+
 @Composable
 fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (Long, String) -> Unit,
     onCreate: (Long, String) -> Unit, onChange: (String, Long, ManualTaskStatus) -> Unit,
@@ -61,8 +85,11 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     onCloseInput: (Long, String, ManualTaskDateInput) -> Unit = { session, _, _ -> onClose(session) },
     onConfirmClose: (Long, ManualTaskEditor) -> Unit = { _, _ -> },
     onCancelClose: (Long, ManualTaskEditor) -> Unit = { _, _ -> },
-    titles: ManualTaskController? = null, ownsTitleRoute: () -> Boolean = { true }) {
+    titles: ManualTaskController? = null, ownsTitleRoute: () -> Boolean = { true },
+    rowDisclosureState: ManualTaskDisclosureState? = null) {
     DisposableEffect(titles) {onDispose {titles?.retireCompletionUndo()}}
+    val defaultDisclosure = rememberManualTaskDisclosureState(local)
+    val disclosure = rowDisclosureState?.takeIf { it.owns(local) } ?: defaultDisclosure
     val tasks = local.tasks
     val storageReady = local.ready && !local.opening && local.error == null
     val available = storageReady && tasks.available && !tasks.loading
@@ -186,7 +213,8 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                             }
                         }
                         items(group, key = { "task-" + it.id }) { task ->
-                            var rowExpanded by remember(task.id) { mutableStateOf(false) }
+                            var rowExpanded by disclosure.stateFor(task.id)
+                            DisposableEffect(disclosure, task.id) { onDispose { disclosure.forget(task.id) } }
                             Surface(color = AIyouColors.surface) {
                                 Column(Modifier.fillMaxWidth().padding(vertical=AIyouDimensions.spaceSm).testTag("manual-task-row-" + task.id),
                                     verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {

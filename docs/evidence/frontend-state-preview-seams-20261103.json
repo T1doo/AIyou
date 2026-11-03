@@ -1,0 +1,121 @@
+{
+  "source_parent": "59796c0c760bd496baea62af9cc19cf87a309f12",
+  "authorization": "parent explicitly approved smallest production presentation seams and synthetic Preview fixtures; static checks only, no compile/test/render/CI/upload execution",
+  "production_interfaces": {
+    "audio": "OriginalAudioStatusContent(presentation,onStop,modifier) is the extracted original Column; live wrapper retains key(controller), collectAsState and structurally equal derived state, directly binds controller::stop and keeps collecting while hidden",
+    "task_rows": "ManualTaskDisclosureState stores only id/Boolean values plus opaque owner identity and ready key; helper recreates for identity/ready, foreign supplied state is rejected, default starts empty; row disposal forgets its value, preserving nonpersistent offscreen/task lifetime",
+    "guards": "canReadSource, pending target id check, canChoose, Main owner/navigation guards and SourceTaskController/SQL untouched"
+  },
+  "sources": [
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/OriginalAudioScreen.kt",
+      "sha256": "6a23e2be158d118125b5f2c5aed2d9e86bbcf6ec6a5e355f53177ced302a7653"
+    },
+    {
+      "path": "app/src/main/java/com/t1doo/aiyou/records/ManualTasksScreen.kt",
+      "sha256": "1d9c774c9b66d3f519fe227aa34edab1a72a91eb1224d65b8e1c165511cbce61"
+    },
+    {
+      "path": "app/src/screenshotTest/kotlin/com/t1doo/aiyou/FrontendDayStatePreviews.kt",
+      "sha256": "e987aa0b07b5d22814565cc85ccb8030ab3c140df93ac1b547c1904ef56c2565"
+    }
+  ],
+  "unchanged": [
+    {
+      "path": "scripts/collect-frontend-evidence.py",
+      "sha256": "71c799ec1afc054c9ef626380d3e15af5c53f75b391709fc4daf4e0b2446bbab"
+    },
+    {
+      "path": ".github/workflows/frontend-day.yml",
+      "sha256": "2f9805fa8fe0b5703d50c2ded46dc2164db218dd3697aadc62fe86bbd9808667"
+    },
+    {
+      "path": "docs/evidence/frontend-day-ci-ledger-20261102.json",
+      "sha256": "963f7a41ae25dcdee7ec743ad33466d1eca7fc373acffa8c88c0f504fc515ef7"
+    },
+    {
+      "path": "gradle/libs.versions.toml",
+      "sha256": "23380d2d4102d07ca684e5c8413ce88bd3a038f95c8c2f96c445fb0bf4a1a10d"
+    },
+    {
+      "path": "app/build.gradle.kts",
+      "sha256": "450e167be81beecdaedc9b7ef26b92097be9bff390370f1bf67024596781de68"
+    },
+    {
+      "path": "app/src/screenshotTest/kotlin/com/t1doo/aiyou/FrontendDayPreviews.kt",
+      "sha256": "1c1b3ceb3f63936a02f91404b5ef4767842cfa1ac5c3a06dad14a4140753e985"
+    }
+  ],
+  "fixtures": [
+    {
+      "method": "FrontendDayAudioPlaying",
+      "width_dp": 360,
+      "height_dp": 240,
+      "font_scale": 1,
+      "locale": "zh-rCN"
+    },
+    {
+      "method": "FrontendDayAudioPlaying",
+      "width_dp": 320,
+      "height_dp": 420,
+      "font_scale": 2,
+      "locale": "zh-rCN"
+    },
+    {
+      "method": "FrontendDayReminderPending",
+      "width_dp": 360,
+      "height_dp": 800,
+      "font_scale": 1,
+      "locale": "zh-rCN"
+    },
+    {
+      "method": "FrontendDayReminderPending",
+      "width_dp": 320,
+      "height_dp": 1000,
+      "font_scale": 2,
+      "locale": "zh-rCN"
+    }
+  ],
+  "synthetic_state": {
+    "audio": "PLAYING presentation projected from OriginalAudioUi(12345ms total,4321ms played,544415 samples); no controller or native audio IO; stop callback noop",
+    "reminders": "busy=true with accepted pending request for synthetic task A; editor absent; task B expanded through owned disclosure state, date-only B sorts before timed A; source receipts refer to separate synthetic originals; all action callbacks noop; existing list index2 starts at real state row",
+    "path_limit": "Button visibility/eligibility uses real ManualTasksScreen; no source navigation, write, scheduler, permission request or click is executed"
+  },
+  "future_render_inventory_only": {
+    "original": 6,
+    "added": 4,
+    "candidate_total": 10,
+    "rendered_this_turn": 0,
+    "collector_limit_unchanged": 6,
+    "collector_would_refuse_unreviewed_total": true,
+    "eight_MiB_proposal_or_upload_approval_changed": false
+  },
+  "static_validation": [
+    "git diff --check passed",
+    "source annotation inventory 4 new / 10 candidate frames",
+    "existing Main caller uses named arguments; default expansion behavior reviewed",
+    "workflow/collector/dependencies/budget files compared byte-for-byte to HEAD"
+  ],
+  "independent_readonly_review": "existing authorized reviewer inspected actual production diff and fixtures, found no definite P1/P2 or constructor mismatch; verified owner/hidden collector/stop/guards; no runtime execution",
+  "android_compile": "NOT RUN",
+  "kotlin_or_psi_compile": "NOT RUN",
+  "tests": "NOT RUN; no old host or run9 results used to certify these sources",
+  "preview_render": "NOT RUN",
+  "pixel_visibility": "NOT VERIFIED",
+  "interaction_limitations": [
+    "actual owner replacement/row disposal recomposition untested",
+    "stop callback execution and phase transitions untested",
+    "source navigation/version authentication/queue completion untested",
+    "IME/focus/Back/TalkBack/device behavior untested"
+  ],
+  "new_dependencies": false,
+  "new_permissions": false,
+  "new_downloads": false,
+  "new_ci": false,
+  "new_uploads": false,
+  "main_changed": false,
+  "cumulative_ci": {
+    "runs": 22,
+    "seconds": 28142
+  }
+}
