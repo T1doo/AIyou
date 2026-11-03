@@ -68,6 +68,8 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     val available = storageReady && tasks.available && !tasks.loading
     val canWrite = available && !tasks.busy && tasks.pending == null && !local.reminders.busy && local.reminders.pending == null
     val canChoose = canWrite && tasks.editor == null && tasks.dateEditor == null && tasks.titleEditor == null && local.reminders.editor == null
+    val canReadSource = available && !tasks.busy && tasks.pending == null &&
+        tasks.editor == null && tasks.dateEditor == null && tasks.titleEditor == null && local.reminders.editor == null
     val countsReady = available && !tasks.busy && tasks.pending == null && tasks.error == null
     val proposals = local.taskProposals
     val proposalsReady = storageReady && proposals.available && !proposals.loading && proposals.error == null &&
@@ -210,7 +212,8 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                                     task.reminder?.let { Text(taskReminderLabel(it),style=MaterialTheme.typography.bodySmall) }
                                     task.sourceReceipt?.let { receipt ->
                                         Text("由原文摘录创建 · 人工确认 · 原文版本 " + receipt.binding.source.revision)
-                                        TextButton(enabled=canChoose,onClick={onSource(task.id,task.version)},
+                                        TextButton(enabled=canReadSource && local.reminders.pending?.request?.task?.id != task.id,
+                                            onClick={onSource(task.id,task.version)},
                                             modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("manual-task-source-"+task.id)) { Text("查看来源原文") }
                                     }
                                     if (task.status == ManualTaskStatus.OPEN) FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {

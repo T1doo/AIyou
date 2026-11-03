@@ -247,3 +247,16 @@ D8正式日志将非法引用定位到OriginalAudioScreenKt.class中的$$$$$NON_
 临时runner APK实际29,068,330B，SHA256 c784d533cea655b50e94091b1c83621ecab35527f02f0ff2803f0966af1006c3。manifest检查PASS且无INTERNET，只有既有通知、开机、精确提醒及动态receiver权限。未上传/下载/发布APK，只有平台普通日志保留其hash/大小；没有新版图片、设备、IME、TalkBack、OEM提醒、真实音频或旧ShadowTrace OOM通过资格。
 
 API job起止14:05:59Z–14:14:46Z，527秒（8m47）。继承21次27615秒追加为22次28142秒（7h49m02），未重置账。正式artifact API0项，无artifact/cache action/scan/package发布或实际上传动作；Cache mode: write保留为平台能力元数据，不能据此说平台cache写权限被撤销或账户零存储费。旧76,949,894B/7天工件未动。准入已消费，未批准新CI或上传。完整结果见frontend-day-run9-20261102.json及原ci-ledger；latest_success明确标为最小编译链，原195成功的908ad00另保留为历史full-targeted身份。
+
+
+## 今晚收口：提醒后台提交时，其他待办来源可达
+
+本轮起点本地/实时远端均fabf1ab46854d610bdac4fbfbb888cc86da2fbba、工作树干净；origin tracking仍2f7b4c4导致显示ahead13，但这些提交实时远端已有，不是13笔未推。DOCX version1 hash1c097a61…再次核对，参照第10节图21的来源回读、第20节图34的“只锁正在提交的对象，不锁整页阅读与返回”、第21节图35局部状态及第24节可达性；已查看原图35(word/media/image36.png)。
+
+明确缺陷：ManualTasksScreen的“查看来源原文”沿用了canChoose写门禁，提醒A提交中/UNKNOWN且面板关闭后，其他待办B的来源入口也被全局禁用。原SourceTaskController.locate其实允许只读请求，保留精确任务版本、来源hash/删除与erasure复核；Main保持ownsTasks和navigation generation，失败展示原notice，不跳其他正文。
+
+最小修复只拆出读取门禁：本机与tasks可用、tasks写入/UNKNOWN及所有editor门禁仍保留，pending提醒目标A按id继续锁，B可点击既有来源回读。写操作canChoose未放宽，不新增请求种类、权限或网络。B仍排在同records IO队列，A阻塞时不保证立即或并发完成。一次针对新diff的只读复审未见确定P1/P2，未重复已闭合审查凑成果。
+
+本地离线既有SourceTaskSqlTest9 + TaskReminderControllerTest17实际执行，共2套件26项0失败/错误/跳过，10秒；所有compile任务UP-TO-DATE。测试覆盖真实SQL来源/版本/erasure与原提醒幂等生命周期，不编译或实测这处Compose enabled接线。新环境没有旧临时ParseKotlin class，调用报ClassNotFoundException，未声称PSI/类型检查通过，没有为此新下载或重建检查器。新Android编译/lint/画面均未运行。
+
+当前画面路径仍受CI/artifact/图片存储冻结阻断，未重启已拒浏览器或绕sandbox。现存cf54f3d9的320dp/200%待办图已查看，仅为历史布局上下文，不能认证本源码或此busy入口；设计图也不是产品截图。本轮无新CI/下载/上传/设备/电脑操作，原22次28142秒(7h49m02)及既有工件完整保留。证据见frontend-source-read-reachability-20261103.json。剩余最小恢复条件是明确允许同SHA截图所需执行及正式零新增计费的像素交付通道；未恢复前不宣称前端全部验收完成。

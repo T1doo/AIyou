@@ -1,0 +1,89 @@
+{
+  "source_parent": "fabf1ab46854d610bdac4fbfbb888cc86da2fbba",
+  "scope": "Allow another task source to be read during an accepted reminder operation, while keeping the reminder target and all writes locked",
+  "document": {
+    "path": "docs/design/AIyou前端设计修改方案.docx",
+    "version": 1,
+    "sha256": "1c097a6180b91878a2eb7ce46660db8e144c17446f80544b8e0c7f178e877ce8",
+    "locations": [
+      "section10 figure21: retain task source rereading",
+      "section20 figure34: busy locks current object, not page reading/return",
+      "section21 figure35: distinct real busy/unknown/recovery states",
+      "section24: reachable actions and exact object boundaries"
+    ],
+    "viewed_original_figure": {
+      "figure": 35,
+      "docx_media": "word/media/image36.png",
+      "sha256": "c0a8bfc520a247130d53f50e703f3aed7d6a6353e14d4a248c1a4a347b94321e"
+    }
+  },
+  "defect_evidence": [
+    "ManualTasksScreen canChoose includes reminder global busy/pending and was also used for read-only source button",
+    "SourceTaskController.locate already admits reads with exact task id/version and authenticated SQL source checks",
+    "Main onSource preserves ownsTasks/navigation generation; failed reads surface taskSourceNotice instead of redirecting"
+  ],
+  "fix": "Separate read eligibility, retain storage/tasks busy+pending/editor guards; keep pending reminder target task disabled by id; original canChoose write eligibility untouched",
+  "product_file": "app/src/main/java/com/t1doo/aiyou/records/ManualTasksScreen.kt",
+  "product_sha256": "b21ea90601d2221e7ef4fa8cc1f86984e62fe8c021e4086fe594658e6e535ef2",
+  "independent_review": "authorized existing readonly reviewer inspected exact diff and route/controller/SQL checks; no definite P1/P2; same IO queue means no promise of immediate/concurrent read completion",
+  "command": "timeout --signal=TERM --kill-after=10s 120s python3 scripts/jvm-gradle.py -p checks/ai-protocol :remote-text:test --tests '*SourceTaskSqlTest' --tests '*TaskReminderControllerTest' --offline --max-workers=2",
+  "test_task_executed": true,
+  "gradle_summary": "BUILD SUCCESSFUL in 10s; 1 test task executed, 12 prerequisite tasks up-to-date",
+  "suites": [
+    {
+      "suite": "com.t1doo.aiyou.data.SourceTaskSqlTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "b4c2678f40ad887c0adec31c38a4467a876ce95a3741477e11acaa845f598e56"
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.TaskReminderControllerTest",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "bcd66f08e07d467f4614c1a556f535cd553e92ffb724532c040c861bc16a0e9b"
+    }
+  ],
+  "total_tests": 26,
+  "test_scope": "Existing real SQL source/version/erasure checks and reminder exact-request lifecycle; these host tests do not compile or exercise the changed Compose enabled property",
+  "kotlin_syntax_check": "NOT RUN: prior temporary ParseKotlin class absent in resumed environment; invocation returned ClassNotFoundException; no syntax/type pass claimed",
+  "current_native_compile_or_lint": "NOT RUN; last native success only certifies source2abfc619ea43e37b93006ba1f90871d50aa6d084",
+  "visual_evidence": {
+    "current_source_image_check": "NOT RUN: no authorized current image generation/delivery route; CI/artifact/image storage freeze remains",
+    "historical_frame_viewed": {
+      "source_sha": "cf54f3d9b4781a2fb4402ef86a4aeee8ee8bd482",
+      "file": "FrontendDayTasks_待办320大字_dff8a660_0.png",
+      "viewport_dp": [
+        320,
+        1000
+      ],
+      "font_scale": 2,
+      "pixels": [
+        840,
+        2625
+      ],
+      "png_sha256": "50ab65d13dcb096f1013f13874b57e7679d4bca20afad83bba53a0b733871d78",
+      "scope": "historical task layout context only; does not show this source-button busy state or certify current source"
+    }
+  },
+  "new_ci": false,
+  "new_downloads": false,
+  "new_permissions": false,
+  "new_artifact_cache_or_image_upload": false,
+  "browser_restart_or_sandbox_bypass": false,
+  "device_or_user_computer_access": false,
+  "cumulative_ci": {
+    "runs": 22,
+    "seconds": 28142
+  },
+  "ledger_unchanged_sha256": "963f7a41ae25dcdee7ec743ad33466d1eca7fc373acffa8c88c0f504fc515ef7",
+  "remaining": [
+    "new source Android compile/lint",
+    "actual current-source screenshots including reminder-pending/source rows",
+    "real IME/focus/Back/TalkBack/max-font/gesture device verification",
+    "full229 regression and old ShadowTrace OOM remain uncertified"
+  ]
+}
