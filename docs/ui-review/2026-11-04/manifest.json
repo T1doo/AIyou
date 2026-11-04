@@ -1,0 +1,211 @@
+{
+  "source_sha": "3f3c7c8cf0ea5f2c9116730b2a85948daec924c1",
+  "generated_at_utc": "2026-11-04T16:04:02.248684+00:00",
+  "review_stage": "2026-11-04 frontend redesign",
+  "prototype": "Fresh browser captures from source; not Android",
+  "android": "Reused, hash-verified native captures; see android/capture.json",
+  "total_images": 20,
+  "bytes": 8261357,
+  "entries": [
+    {
+      "file": "android/00-overview.png",
+      "bytes": 183782,
+      "sha256": "7ad070e1049fda3af40128b3631e1facf06780a16a2642197d69d08840823adb",
+      "pixels": [
+        1250,
+        1100
+      ],
+      "kind": "overview contact sheet"
+    },
+    {
+      "file": "android/01-now.png",
+      "bytes": 127590,
+      "sha256": "b1947fd3aa404f3241a07148c51ff65602acc879d171af94e3bdbe675f7f5220",
+      "pixels": [
+        1080,
+        2400
+      ],
+      "kind": "actual Android emulator"
+    },
+    {
+      "file": "android/02-memories.png",
+      "bytes": 183998,
+      "sha256": "0d7b82a876e43190afd51a5088106161cf708166f76a98283acba499806efde8",
+      "pixels": [
+        1080,
+        2400
+      ],
+      "kind": "actual Android emulator"
+    },
+    {
+      "file": "android/03-tasks.png",
+      "bytes": 209076,
+      "sha256": "9d8213ffc8eb590d194368b4a2550574bf8d954e8a2bcfb19b45da0458a57030",
+      "pixels": [
+        1080,
+        2400
+      ],
+      "kind": "actual Android emulator"
+    },
+    {
+      "file": "android/04-audio-playing.png",
+      "bytes": 287779,
+      "sha256": "3281aa1c2bd6dd60102caaccb0bb2a153f556f91b90df47405b7202d42f8ebef",
+      "pixels": [
+        1080,
+        2400
+      ],
+      "kind": "actual Android emulator"
+    },
+    {
+      "file": "android/05-keyboard.png",
+      "bytes": 172680,
+      "sha256": "e9afb386f5af276d74e117b7c35861de0e9765b571df11f37e686c043d9921b0",
+      "pixels": [
+        1080,
+        2400
+      ],
+      "kind": "actual Android emulator"
+    },
+    {
+      "file": "android/06-backup-home.png",
+      "bytes": 292397,
+      "sha256": "29a039ac5dc1e3662b958dd824fe93f8307c5b43283ee4ba34b609eddc07bb77",
+      "pixels": [
+        1080,
+        2400
+      ],
+      "kind": "actual Android emulator"
+    },
+    {
+      "file": "prototype/00-overview.png",
+      "bytes": 500901,
+      "sha256": "edf8af3bf79bc34f3e546fd0edc3fa42d64ad3a1787feef983486968e59f11c6",
+      "pixels": [
+        1250,
+        1100
+      ],
+      "kind": "overview contact sheet"
+    },
+    {
+      "file": "prototype/01-now-blue.png",
+      "bytes": 589557,
+      "sha256": "f97e143c4933e8edd57ca92a8fbb39477c3d2dbb22b58480bbd7e77d6753a167",
+      "pixels": [
+        780,
+        1688
+      ],
+      "kind": "browser prototype"
+    },
+    {
+      "file": "prototype/02-memories-blue.png",
+      "bytes": 715206,
+      "sha256": "3fbfcd6ec2ebdacf1c02d1c779b54c007eec37cb72a25fd2719f7f6ac4936fc9",
+      "pixels": [
+        780,
+        1688
+      ],
+      "kind": "browser prototype"
+    },
+    {
+      "file": "prototype/03-tasks-blue.png",
+      "bytes": 722027,
+      "sha256": "ada560dfda84a21d94c6a858a6e66e2b4b442e929d5e68c32b545084ca1e2af1",
+      "pixels": [
+        780,
+        1688
+      ],
+      "kind": "browser prototype"
+    },
+    {
+      "file": "prototype/04-now-sunset.png",
+      "bytes": 596475,
+      "sha256": "0b64aa7d2a956221661c68ef90fcd343e1d57a3d630beec95801a176039b15b9",
+      "pixels": [
+        780,
+        1688
+      ],
+      "kind": "browser prototype"
+    },
+    {
+      "file": "prototype/05-now-night.png",
+      "bytes": 599931,
+      "sha256": "42fdbb96e16cae75afe79530747abd22b1edc4e657a5a25a5b944509d6011ece",
+      "pixels": [
+        780,
+        1688
+      ],
+      "kind": "browser prototype"
+    },
+    {
+      "file": "prototype/06-memories-night.png",
+      "bytes": 699893,
+      "sha256": "1ea532ebf0049847d705add87ea4d5c7c50d038c9396ff3a07bf6f741231c249",
+      "pixels": [
+        780,
+        1688
+      ],
+      "kind": "browser prototype"
+    },
+    {
+      "file": "prototype/07-tasks-night.png",
+      "bytes": 727778,
+      "sha256": "4d76806d01898326b33995e8aa447f06f19f59f15c6221f24c52d5ae62adef84",
+      "pixels": [
+        780,
+        1688
+      ],
+      "kind": "browser prototype"
+    },
+    {
+      "file": "prototype/08-appearance-picker.png",
+      "bytes": 380590,
+      "sha256": "96f9e3284a43e1b3df36faac0409a4e59a29c606de76cc823291eac82265edf2",
+      "pixels": [
+        780,
+        1688
+      ],
+      "kind": "browser prototype"
+    },
+    {
+      "file": "prototype/09-record-editor.png",
+      "bytes": 261418,
+      "sha256": "e92cf231e061c488f94aaa79cde7b308361e18c367fc9e68d85cd4ba33390027",
+      "pixels": [
+        780,
+        1688
+      ],
+      "kind": "browser prototype"
+    },
+    {
+      "file": "prototype/10-memory-filters.png",
+      "bytes": 274110,
+      "sha256": "73c9c54faf381b5b6d6b0c5c99331f413cf87c8a8ee5109c7bb80a095aaf6618",
+      "pixels": [
+        780,
+        1688
+      ],
+      "kind": "browser prototype"
+    },
+    {
+      "file": "prototype/11-task-editor.png",
+      "bytes": 229148,
+      "sha256": "69501689adf35d13a9049d1e9796903a24c8f388c2413c491a23e4bc523a89bf",
+      "pixels": [
+        780,
+        1688
+      ],
+      "kind": "browser prototype"
+    },
+    {
+      "file": "prototype/12-now-narrow-320.png",
+      "bytes": 507021,
+      "sha256": "e9a05e49c4f2386d028be765e883aa949f2aa6d0c90ab7c676f3cb00ea980c17",
+      "pixels": [
+        640,
+        1688
+      ],
+      "kind": "browser prototype"
+    }
+  ]
+}

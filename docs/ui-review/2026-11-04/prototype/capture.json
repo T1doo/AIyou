@@ -1,0 +1,129 @@
+{
+  "renderer": "Chromium / Playwright",
+  "animations": "Frozen only during PNG capture; static pictures do not prove motion quality",
+  "content": "Synthetic demo records; Lulu text placeholder; no private reference image supplied",
+  "entries": [
+    {
+      "file": "01-now-blue.png",
+      "kind": "browser-prototype",
+      "page": "now",
+      "theme": "blue",
+      "cssWidth": 390,
+      "cssHeight": 844,
+      "deviceScaleFactor": 2,
+      "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "file": "02-memories-blue.png",
+      "kind": "browser-prototype",
+      "page": "memories",
+      "theme": "blue",
+      "cssWidth": 390,
+      "cssHeight": 844,
+      "deviceScaleFactor": 2,
+      "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "file": "03-tasks-blue.png",
+      "kind": "browser-prototype",
+      "page": "tasks",
+      "theme": "blue",
+      "cssWidth": 390,
+      "cssHeight": 844,
+      "deviceScaleFactor": 2,
+      "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "file": "04-now-sunset.png",
+      "kind": "browser-prototype",
+      "page": "now",
+      "theme": "sunset",
+      "cssWidth": 390,
+      "cssHeight": 844,
+      "deviceScaleFactor": 2,
+      "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "file": "05-now-night.png",
+      "kind": "browser-prototype",
+      "page": "now",
+      "theme": "night",
+      "cssWidth": 390,
+      "cssHeight": 844,
+      "deviceScaleFactor": 2,
+      "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "file": "06-memories-night.png",
+      "kind": "browser-prototype",
+      "page": "memories",
+      "theme": "night",
+      "cssWidth": 390,
+      "cssHeight": 844,
+      "deviceScaleFactor": 2,
+      "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "file": "07-tasks-night.png",
+      "kind": "browser-prototype",
+      "page": "tasks",
+      "theme": "night",
+      "cssWidth": 390,
+      "cssHeight": 844,
+      "deviceScaleFactor": 2,
+      "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "file": "08-appearance-picker.png",
+      "kind": "browser-prototype",
+      "page": "appearance",
+      "theme": "night",
+      "cssWidth": 390,
+      "cssHeight": 844,
+      "deviceScaleFactor": 2,
+      "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "file": "09-record-editor.png",
+      "kind": "browser-prototype",
+      "page": "record-editor",
+      "theme": "blue",
+      "keyboard": "No Android IME in this browser capture",
+      "cssWidth": 390,
+      "cssHeight": 844,
+      "deviceScaleFactor": 2,
+      "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "file": "10-memory-filters.png",
+      "kind": "browser-prototype",
+      "page": "filters",
+      "theme": "blue",
+      "cssWidth": 390,
+      "cssHeight": 844,
+      "deviceScaleFactor": 2,
+      "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "file": "11-task-editor.png",
+      "kind": "browser-prototype",
+      "page": "task-editor",
+      "theme": "blue",
+      "cssWidth": 390,
+      "cssHeight": 844,
+      "deviceScaleFactor": 2,
+      "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+    },
+    {
+      "file": "12-now-narrow-320.png",
+      "kind": "browser-prototype",
+      "page": "now",
+      "theme": "blue",
+      "cssWidth": 320,
+      "cssHeight": 844,
+      "deviceScaleFactor": 2,
+      "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+    }
+  ],
+  "consoleErrors": []
+}

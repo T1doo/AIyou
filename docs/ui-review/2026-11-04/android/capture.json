@@ -1,0 +1,91 @@
+{
+  "native_source_commit": "3c38b0e4dc1149cd244d1c722d66813ca3da2f91",
+  "native_source_hash_mismatches": [],
+  "captured_this_turn": false,
+  "entries": [
+    {
+      "file": "docs\\ui-review\\2026-11-04\\android\\01-now.png",
+      "sha256": "b1947fd3aa404f3241a07148c51ff65602acc879d171af94e3bdbe675f7f5220",
+      "original": ".local-evidence\\android-ui-20261104\\emulator-now-delivery.png",
+      "kind": "actual Android Emulator capture",
+      "capture_session": "2026-11-04",
+      "api": 35,
+      "pixel_size": [
+        1080,
+        2400
+      ],
+      "content": "Synthetic English records/tasks and generated PCM tone",
+      "apk_binding": "8b5b780a16db9474c0915704a93bd8d16818e43de8d3cebbf80987cd66234f74"
+    },
+    {
+      "file": "docs\\ui-review\\2026-11-04\\android\\02-memories.png",
+      "sha256": "0d7b82a876e43190afd51a5088106161cf708166f76a98283acba499806efde8",
+      "original": ".local-evidence\\android-ui-20261104\\emulator-memories-delivery.png",
+      "kind": "actual Android Emulator capture",
+      "capture_session": "2026-11-04",
+      "api": 35,
+      "pixel_size": [
+        1080,
+        2400
+      ],
+      "content": "Synthetic English records/tasks and generated PCM tone",
+      "apk_binding": "8b5b780a16db9474c0915704a93bd8d16818e43de8d3cebbf80987cd66234f74"
+    },
+    {
+      "file": "docs\\ui-review\\2026-11-04\\android\\03-tasks.png",
+      "sha256": "9d8213ffc8eb590d194368b4a2550574bf8d954e8a2bcfb19b45da0458a57030",
+      "original": ".local-evidence\\android-ui-20261104\\emulator-tasks-delivery.png",
+      "kind": "actual Android Emulator capture",
+      "capture_session": "2026-11-04",
+      "api": 35,
+      "pixel_size": [
+        1080,
+        2400
+      ],
+      "content": "Synthetic English records/tasks and generated PCM tone",
+      "apk_binding": "8b5b780a16db9474c0915704a93bd8d16818e43de8d3cebbf80987cd66234f74"
+    },
+    {
+      "file": "docs\\ui-review\\2026-11-04\\android\\04-audio-playing.png",
+      "sha256": "3281aa1c2bd6dd60102caaccb0bb2a153f556f91b90df47405b7202d42f8ebef",
+      "original": ".local-evidence\\android-ui-20261104\\emulator-audio-final-playing.png",
+      "kind": "actual Android Emulator capture",
+      "capture_session": "2026-11-04",
+      "api": 35,
+      "pixel_size": [
+        1080,
+        2400
+      ],
+      "content": "Synthetic English records/tasks and generated PCM tone",
+      "apk_binding": "Intermediate capture in same native test session; individual exact APK hash not recorded"
+    },
+    {
+      "file": "docs\\ui-review\\2026-11-04\\android\\05-keyboard.png",
+      "sha256": "e9afb386f5af276d74e117b7c35861de0e9765b571df11f37e686c043d9921b0",
+      "original": ".local-evidence\\android-ui-20261104\\emulator-keyboard-final.png",
+      "kind": "actual Android Emulator capture",
+      "capture_session": "2026-11-04",
+      "api": 35,
+      "pixel_size": [
+        1080,
+        2400
+      ],
+      "content": "Synthetic English records/tasks and generated PCM tone",
+      "apk_binding": "Intermediate capture in same native test session; individual exact APK hash not recorded"
+    },
+    {
+      "file": "docs\\ui-review\\2026-11-04\\android\\06-backup-home.png",
+      "sha256": "29a039ac5dc1e3662b958dd824fe93f8307c5b43283ee4ba34b609eddc07bb77",
+      "original": ".local-evidence\\android-ui-20261104\\emulator-backup-delivery.png",
+      "kind": "actual Android Emulator capture",
+      "capture_session": "2026-11-04",
+      "api": 35,
+      "pixel_size": [
+        1080,
+        2400
+      ],
+      "content": "Synthetic English records/tasks and generated PCM tone",
+      "apk_binding": "8b5b780a16db9474c0915704a93bd8d16818e43de8d3cebbf80987cd66234f74"
+    }
+  ]
+}
