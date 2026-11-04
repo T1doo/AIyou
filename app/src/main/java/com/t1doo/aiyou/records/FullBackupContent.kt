@@ -28,8 +28,10 @@ internal fun FullBackupContent(ui:RecordPackageUiState,controller:RecordPackageC
         item { Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Text("完整资料库备份",Modifier.semantics { heading() },style=MaterialTheme.typography.headlineSmall)
             if(available && ui.phase in setOf(RecordPackagePhase.HOME,RecordPackagePhase.DONE,RecordPackagePhase.FAILED,RecordPackagePhase.CANCELLED)) {
-                Button(onClick={if(ownsRoute()) controller.prepareFull(ui.session)},Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("full-backup-preview"),shape=RoundedCornerShape(16.dp)) { Text("核对完整备份范围") }
-                OutlinedButton(onClick={if(ownsRoute()) controller.chooseRestore(ui.session)},enabled=pickerAvailable,shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("full-backup-open")) { Text("选择完整备份恢复") }
+                FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick={if(ownsRoute()) controller.prepareFull(ui.session)},Modifier.heightIn(min=48.dp).testTag("full-backup-preview")) { Text("核对完整备份范围") }
+                    TextButton(onClick={if(ownsRoute()) controller.chooseRestore(ui.session)},enabled=pickerAvailable,modifier=Modifier.heightIn(min=48.dp).testTag("full-backup-open")) { Text("选择完整备份恢复") }
+                }
                 HorizontalDivider(color=AIyouColors.outlineDecorative)
             }
             Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {

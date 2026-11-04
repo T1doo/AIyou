@@ -144,7 +144,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                             if (proposals.supported) Text(if (proposalsReady)
                                 "待确认草稿 ${proposals.items.count { it.proposal.state == TaskProposalState.DRAFT }} · 单独计数"
                                 else "待确认草稿 · 待核对", style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.testTag("manual-task-draft-summary"))
+                                modifier = Modifier.testTag("manual-task-draft-summary").align(Alignment.CenterVertically))
                             TextButton(onClick = { detailsExpanded = !detailsExpanded },
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("manual-task-details")
                                     .semantics { stateDescription = if (detailsExpanded) "已展开" else "已收起" }) {
@@ -237,7 +237,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                                     }
                                     if(rowExpanded) {
                                     Text(manualTaskDateLabel(task),style=MaterialTheme.typography.bodySmall)
-                                    task.reminder?.let { Text(taskReminderLabel(it),style=MaterialTheme.typography.bodySmall) }
+                                    task.reminder?.let { Text(taskReminderLabel(it),Modifier.testTag("reminder-detail-status-"+task.id),style=MaterialTheme.typography.bodySmall) }
                                     task.sourceReceipt?.let { receipt ->
                                         Text("由原文摘录创建 · 人工确认 · 原文版本 " + receipt.binding.source.revision)
                                         TextButton(enabled=canReadSource && local.reminders.pending?.request?.task?.id != task.id,

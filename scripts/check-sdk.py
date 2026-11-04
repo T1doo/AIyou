@@ -14,8 +14,11 @@ if not license_file.is_file() or not license_file.read_text().strip():
 # SDK repository metadata uses android-sdk-license for both pinned packages.
 # This is the SHA-1 after Android's TrimStringAdapter normalization, not a
 # hash of the raw XML text. Only read an existing record; never create one.
-expected_license_hash = "24333f8a63b6825ea9c5514f83c2829b004d1fee"
-if expected_license_hash not in license_file.read_text().splitlines():
+accepted_license_hashes = {
+    "24333f8a63b6825ea9c5514f83c2829b004d1fee",  # Previously reviewed SDK terms.
+    "9002c006f4b8d9a16e715a9fa4df30ddb8abf9d9",  # Official 2026-04-28 terms.
+}
+if not accepted_license_hashes.intersection(license_file.read_text().splitlines()):
     raise SystemExit("No matching existing SDK terms acceptance; see docs/BUILD.md.")
 
 required = {

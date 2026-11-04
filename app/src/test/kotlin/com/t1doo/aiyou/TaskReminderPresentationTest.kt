@@ -241,13 +241,44 @@ class TaskReminderPresentationTest {
         for ((phase, label) in expected) {
             taskNode("reminder-status-synthetic-" + phase.name.lowercase()).assertTextEquals(label)
             taskNode("manual-task-date-synthetic-" + phase.name.lowercase())
-                .assertTextEquals("手工创建 · 2026-10-20 15:00 · 偏移 Z · UTC")
+                .assertTextEquals("2026-10-20 15:00")
+            compose.onNode(hasText("手工创建 · 2026-10-20 15:00 · 偏移 Z · UTC") and
+                hasAnyAncestor(hasTestTag("manual-task-row-synthetic-"+phase.name.lowercase())))
+                .performScrollTo().assertIsDisplayed()
         }
         compose.runOnIdle {
             assertEquals(before, persisted); assertTrue(requests.isEmpty()); assertTrue(acknowledgements.isEmpty())
             assertTrue(queue.isEmpty()); assertEquals(capture, state.value.text)
         }
         compose.onAllNodesWithText("没有系统提醒", substring = true).assertCountEquals(0)
+    }
+
+    @Test fun pendingReminderKeepsOtherSourceReadableAndTargetLocked() {
+        val entry=state.value.entries.single()
+        val receipt=SourceTaskReceipt(TaskSourceBinding(SourceVersion(entry.id,1),
+            OriginalExports.hash(entry.originalText),1,0,entry.originalText.codePointCount(0,entry.originalText.length)),
+            OriginalExports.hash("synthetic-source-receipt"))
+        val a=task("synthetic-pending-a","合成提交 A").copy(sourceReceipt=receipt)
+        val b=task("synthetic-readable-b","合成来源 B").copy(sourceReceipt=receipt)
+        val local=state.value.copy(tasks=ManualTasksUiState(supported=true,available=true,items=listOf(a,b)),
+            reminders=TaskRemindersUiState(supported=true,busy=true,pending=ReminderSubmission(1,
+                TaskReminderMutation(a,TaskReminderMode.APPROXIMATE,clock.millis(),"00000000-0000-0000-0000-000000000001"))))
+        val reads=mutableListOf<Pair<String,Long>>()
+        compose.setContent { AIyouTheme {
+            ManualTasksScreen(local,onBegin={},onEdit={_,_->},onCreate={_,_->},onChange={_,_,_->},
+                onRetry={},onRefresh={},onClose={_ ->},onRecordsRetry={},clock=clock,
+                onSource={id,version->reads.add(id to version)})
+        } }
+        fun source(id:String):SemanticsNodeInteraction {
+            val row="manual-task-row-"+id
+            compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(row))
+            compose.onNode(hasText("详情与操作") and hasAnyAncestor(hasTestTag(row))).performScrollTo().performClick()
+            compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag("manual-task-source-"+id))
+            return compose.onNodeWithTag("manual-task-source-"+id).performScrollTo().assertIsDisplayed()
+        }
+        source(b.id).assertIsEnabled().performClick()
+        source(a.id).assertIsNotEnabled()
+        compose.runOnIdle { assertEquals(listOf(b.id to b.version),reads);assertTrue(requests.isEmpty()) }
     }
 
     private fun task(id: String, title: String) = ManualTaskSnapshot(id, 1, title, ManualTaskStatus.OPEN, 1, "UTC", 1, schedule)
@@ -269,8 +300,27 @@ class TaskReminderPresentationTest {
         compose.runOnIdle { assertTrue(state.value.reminders.supported) }
     }
     private fun taskNode(tag: String): SemanticsNodeInteraction {
-        compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(tag))
-        return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
+        if(tag.startsWith("manual-task-date-")) {
+            val row="manual-task-row-"+tag.removePrefix("manual-task-date-")
+            compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(row))
+            return compose.onNodeWithTag(tag,useUnmergedTree=true).performScrollTo().assertIsDisplayed()
+        }
+        if(tag=="manual-task-reminder-boundary") {
+            compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag("manual-task-details"))
+            compose.onNodeWithTag("manual-task-details").performScrollTo().performClick()
+        }
+        val detailPrefix=listOf("reminder-open-","reminder-cancel-","reminder-status-").firstOrNull {tag.startsWith(it)}
+        if(detailPrefix!=null) {
+            val id=tag.removePrefix(detailPrefix)
+            val row="manual-task-row-"+id
+            compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(row))
+            val expand=hasText("详情与操作") and hasAnyAncestor(hasTestTag(row))
+            if(compose.onAllNodes(expand).fetchSemanticsNodes().isNotEmpty())
+                compose.onNode(expand).performScrollTo().performClick()
+        }
+        val actualTag=if(tag.startsWith("reminder-status-"))tag.replaceFirst("reminder-status-","reminder-detail-status-") else tag
+        compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(actualTag))
+        return compose.onNodeWithTag(actualTag).performScrollTo().assertIsDisplayed()
     }
     private fun dialogNode(tag: String) = compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
     private fun clickDialog(tag: String) { dialogNode(tag).assertIsEnabled().performClick() }

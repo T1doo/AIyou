@@ -199,14 +199,15 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                 CaptureFeedback(ui.audio.error ?: "正在处理原音，尚未保存记录。",isError=ui.audio.error!=null,modifier=Modifier.testTag("mixed-audio-summary"))
                 TextButton(onClick={reveal("audio")},modifier=Modifier.heightIn(min=48.dp).testTag("mixed-audio-status")){Text("查看本次原音处理")}
             }
-            FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick={controller.select()},enabled=editable&&ui.pendingEdits==0,
+            FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp,Alignment.End),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                IconButton(onClick={controller.select()},enabled=editable&&ui.pendingEdits==0,
                     modifier=Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp).testTag("mixed-add").semantics {contentDescription="添加图片"}) {AttachmentIcon(false,editable)}
-                TextButton(onClick={controller.audioCapture.startFile(canImportAudio,{audio?.isResumed==true})},
+                IconButton(onClick={controller.audioCapture.startFile(canImportAudio,{audio?.isResumed==true})},
                     enabled=editable&&audio!=null&&ui.draft?.audio==null&&(ui.draft?.images?.size ?: 20)<20,
-                    modifier=Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp).testTag("mixed-audio-import").semantics {contentDescription="导入原音文件，不自动转写"}) {AttachmentIcon(true,editable&&audio!=null);Text("导入原音")}
-                TextButton(onClick={detailsOpen=true},modifier=Modifier.heightIn(min=48.dp).focusRequester(moreFocus).testTag("mixed-more")){Text("更多")}
-                TextButton(onClick={focusEditor=!focusEditor},modifier=Modifier.heightIn(min=48.dp).testTag("mixed-focus-editor")){Text(if(focusEditor)"收起编辑" else "展开")}
+                    modifier=Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp).testTag("mixed-audio-import").semantics {contentDescription="导入原音文件，不自动转写"}) {AttachmentIcon(true,editable&&audio!=null)}
+                TextButton(onClick={detailsOpen=true},contentPadding=PaddingValues(horizontal=8.dp),modifier=Modifier.heightIn(min=48.dp).focusRequester(moreFocus).testTag("mixed-more")){Text("更多")}
+                TextButton(onClick={focusEditor=!focusEditor},contentPadding=PaddingValues(horizontal=8.dp),modifier=Modifier.heightIn(min=48.dp).testTag("mixed-focus-editor")
+                    .semantics {contentDescription=if(focusEditor)"收起编辑区域" else "展开编辑区域"}){Text(if(focusEditor)"收起" else "展开")}
                 TextButton(onClick=controller::save,
                     enabled=enabled&&!ui.busy&&!controller.audioCapture.busy&&!playback.busy&&ui.selection==null&&ui.pendingEdits==0&&!ui.discardPending&&ui.policyChange==null,
                     modifier=Modifier.widthIn(min=96.dp).heightIn(min=48.dp).testTag("mixed-save")) {
@@ -262,6 +263,10 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                             val item=draft.audio
                             if(item!=null) {
                                 Text("${item.intent.byteSize} 字节 · 原音未转写 · "+if(item.state==com.t1doo.aiyou.model.CaptureAudioState.READY) "已加入本机草稿" else "保存状态待处理")
+                                // The global playback controls sit behind this modal window.
+                                // Keep the same actual renderer and stop action reachable beside the audio.
+                                if(audio!=null) OriginalAudioStatusContent(originalAudioPresentation(playback),audio::stop,
+                                    tagPrefix="mixed-audio-playback")
                                 if(item.state==com.t1doo.aiyou.model.CaptureAudioState.READY && audio!=null)
                                     TextButton(onClick={audio.playDraft()},enabled=editable,
                                         modifier=Modifier.heightIn(min=48.dp).testTag("mixed-audio-play")) { Text("播放草稿原音") }

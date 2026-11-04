@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -141,8 +142,12 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
         Surface(color = AIyouColors.surface) {
           Column(Modifier.fillMaxWidth(),
               verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-            Text("本机原文查找", style = MaterialTheme.typography.titleMedium,
-                color = AIyouColors.primary, modifier = Modifier.semantics { heading() })
+            FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                Text("本机原文查找", style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.heightIn(min=AIyouDimensions.minTouchTarget).wrapContentHeight().semantics { heading() })
+                if(indexSupported)onQuestionKeywords?.let{open->TextButton(onClick=open,enabled=enabled,
+                    modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).aiyouFocusOutline().testTag("question-keyword-open")){Text("从问题里选词")}}
+            }
             // The actual editable/Undo object is the caller's memory-only state.
             key(query) { CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
             OutlinedTextField(state = query,
@@ -157,8 +162,6 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 inputTransformation = transform(query, 100_000),
                 keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, capitalization = KeyboardCapitalization.None))
             } }
-            if(indexSupported)onQuestionKeywords?.let{open->TextButton(onClick=open,enabled=enabled,
-                modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).aiyouFocusOutline().testTag("question-keyword-open")){Text("从问题里选词")}}
             TextButton(onClick = onMode, enabled = enabled,
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-mode")) {
                 Text(if (mode == OriginalSearchMode.EXACT) "精确片段 · 区分大小写和空白" else "关键词 · 全部包含，忽略大小写")

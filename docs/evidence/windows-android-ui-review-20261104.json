@@ -1,0 +1,433 @@
+{
+  "date": "2026-11-04",
+  "base_sha": "517571d6bc87ea0f2f2b23ea77b1ba24c3c283ef",
+  "scope": "D-drive Windows Android toolchain and native UI review; not full D09 acceptance",
+  "toolchain": {
+    "root": "D:/AndroidDev",
+    "jdk": "Temurin 17.0.17+10",
+    "gradle": "9.8.2",
+    "platform": "android-37.0 revision 2",
+    "build_tools": "36.0.0",
+    "command_line_tools": "19.0",
+    "platform_tools": "37.0.1",
+    "emulator": "37.2.13 build 16740729",
+    "system_image": "android-35 default x86_64 revision 2",
+    "avd": "AIyou_API35",
+    "acceleration": "Actual emulator -accel-check: WHPX installed and usable; boot completed",
+    "autostart_created": false,
+    "gradle_persistent_daemon": false,
+    "kotlin_compilation": "in-process",
+    "license": "User explicitly accepted official 2026-04-28 Android SDK terms; canonical SHA1 9002c006f4b8d9a16e715a9fa4df30ddb8abf9d9",
+    "c_drive_files": "Observed .android/adbkey 1732 B, adbkey.pub 723 B, analytics.settings 127 B; emulator console token 16 B. No SDK, AVD or Gradle cache on C."
+  },
+  "checks": {
+    "compose_targeted": {
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "name": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.MixedCapturePresentationTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.NotebookToolsPresentationTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.OriginalAudioPresentationTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.TaskReminderPresentationTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "domain": {
+      "tests": 78,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "name": "com.t1doo.aiyou.domain.AudioSampleRangeTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.domain.CurrentSendAuthorityTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.domain.ExcerptResponseParserTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.domain.FactRecapRangeTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.domain.RecordEventDatesTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.domain.RemoteProcessingRuleTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.domain.SourceMemoryRulesTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.domain.SourceTagRulesTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.domain.SourceTasksTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.domain.TaskProposalsTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.domain.TaskRemindersTest",
+          "tests": 22,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.t1doo.aiyou.domain.UnifiedCaptureRangeTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "preview": {
+      "tests": 0,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": []
+    },
+    "python_sdk_and_tokens": {
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "required_build": "PASS: final-build.log BUILD SUCCESSFUL; checkDebugAarMetadata, assembleDebug, core:domain:test, lintDebug, validateDebugScreenshotTest",
+    "lint": {
+      "errors": 0,
+      "warnings": 0,
+      "hints": 1,
+      "existing_hint": "MainActivity AutoboxingStateCreation"
+    }
+  },
+  "design_comparison": [
+    {
+      "reference": "DOCX sections 2-3, figure 4/8",
+      "page": "Now",
+      "change": "48 dp image/audio controls, short expand/collapse label, stable-width save in one normal-phone toolbar",
+      "evidence": "Actual 360 dp emulator; normal and expanded toolbar assertions; 200% existing focus test"
+    },
+    {
+      "reference": "DOCX section 4, figure 9",
+      "page": "Memories",
+      "change": "Unified lookup/review/manage share one plain action row; question helper shares heading row; search input state retained",
+      "evidence": "Actual emulator screenshot; modal filter focus and state identity test"
+    },
+    {
+      "reference": "DOCX sections 9-10/20-21",
+      "page": "Tasks",
+      "change": "Aligned summary baseline; full reminder status stays in expanded details",
+      "evidence": "Actual created task; five reminder Compose tests including pending A / readable B callback eligibility. Does not prove B IO completes while A blocks."
+    },
+    {
+      "reference": "DOCX section 6, figure 12/13",
+      "page": "Draft audio",
+      "change": "Actual playback status/progress/stop inside modal; previous-save notice cleared when a new audio import starts",
+      "evidence": "Synthetic 12 s 44.1 kHz mono PCM imported through real DocumentsUI; native emulator PLAYING and stop; Compose save/read/play/return and removal regression"
+    },
+    {
+      "reference": "DOCX sections 13-14, figure 26/27",
+      "page": "Settings and backup home",
+      "change": "Backup actions use a short plain row rather than two full-width rounded buttons; strict restore admission unchanged",
+      "evidence": "Actual settings/backup home read-only inspection; no real backup/restore attempt"
+    }
+  ],
+  "device": {
+    "kind": "Actual Android Emulator; not physical phone",
+    "api": 35,
+    "resolution": "1080x2400 px, 480 dpi; nominal 360x800 dp including system bars",
+    "data": "Synthetic English records/tasks and generated PCM tone only",
+    "verified": [
+      "APK install and launch",
+      "local record save and read",
+      "manual task creation",
+      "system DocumentsUI PCM import",
+      "native playback progress and stop",
+      "modal return",
+      "default emulator IME edit/back",
+      "cross-tab draft and attachment preservation",
+      "settings and backup home opening"
+    ],
+    "not_verified": [
+      "Physical phone",
+      "Real Chinese IME composing region and candidate selection",
+      "TalkBack speech/focus traversal",
+      "OEM reminder delivery and exact alarm behavior",
+      "Persistent reminder-pending screenshot on device",
+      "Real microphone interruption",
+      "Backup and fresh-install restore",
+      "Permanent erasure propagation",
+      "16 KB devices",
+      "Performance/FPS and games while developer tools run",
+      "All pages/all failure and UNKNOWN states"
+    ]
+  },
+  "original_documents": {
+    "docs\\design\\AIyou前端设计修改方案.docx": "1c097a6180b91878a2eb7ce46660db8e144c17446f80544b8e0c7f178e877ce8",
+    "docs\\AIyou_Product_Architecture.docx": "2d28784231148af980512bd87115bb1c1d243be0c3825f61b441934f76727c94"
+  },
+  "historical_failures": "Preserved locally in .local-evidence/android-ui-20261104: initial lint update advice; obsolete UI test selectors and test-import corrections. No failed run counted as PASS.",
+  "apk": {
+    "path": "app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "bytes": 31533557,
+    "sha256": "8b5b780a16db9474c0915704a93bd8d16818e43de8d3cebbf80987cd66234f74",
+    "kind": "debug; not release signed"
+  },
+  "screenshots": {
+    "emulator-now-delivery": {
+      "path": ".local-evidence\\android-ui-20261104\\emulator-now-delivery.png",
+      "sha256": "b1947fd3aa404f3241a07148c51ff65602acc879d171af94e3bdbe675f7f5220",
+      "pixels": [
+        1080,
+        2400
+      ],
+      "kind": "Actual emulator screenshot; synthetic test data"
+    },
+    "emulator-memories-delivery": {
+      "path": ".local-evidence\\android-ui-20261104\\emulator-memories-delivery.png",
+      "sha256": "0d7b82a876e43190afd51a5088106161cf708166f76a98283acba499806efde8",
+      "pixels": [
+        1080,
+        2400
+      ],
+      "kind": "Actual emulator screenshot; synthetic test data"
+    },
+    "emulator-tasks-delivery": {
+      "path": ".local-evidence\\android-ui-20261104\\emulator-tasks-delivery.png",
+      "sha256": "9d8213ffc8eb590d194368b4a2550574bf8d954e8a2bcfb19b45da0458a57030",
+      "pixels": [
+        1080,
+        2400
+      ],
+      "kind": "Actual emulator screenshot; synthetic test data"
+    },
+    "emulator-backup-delivery": {
+      "path": ".local-evidence\\android-ui-20261104\\emulator-backup-delivery.png",
+      "sha256": "29a039ac5dc1e3662b958dd824fe93f8307c5b43283ee4ba34b609eddc07bb77",
+      "pixels": [
+        1080,
+        2400
+      ],
+      "kind": "Actual emulator screenshot; synthetic test data"
+    },
+    "emulator-audio-final-playing": {
+      "path": ".local-evidence\\android-ui-20261104\\emulator-audio-final-playing.png",
+      "sha256": "3281aa1c2bd6dd60102caaccb0bb2a153f556f91b90df47405b7202d42f8ebef",
+      "pixels": [
+        1080,
+        2400
+      ],
+      "kind": "Actual emulator screenshot; synthetic test data"
+    },
+    "emulator-keyboard-final": {
+      "path": ".local-evidence\\android-ui-20261104\\emulator-keyboard-final.png",
+      "sha256": "e9afb386f5af276d74e117b7c35861de0e9765b571df11f37e686c043d9921b0",
+      "pixels": [
+        1080,
+        2400
+      ],
+      "kind": "Actual emulator screenshot; synthetic test data"
+    },
+    "emulator-draft-return-final": {
+      "path": ".local-evidence\\android-ui-20261104\\emulator-draft-return-final.png",
+      "sha256": "0bcf613514fd97435f2da3ba3e7f5c9a1e8e3b6ae2d1f598c97440481c4d73c4",
+      "pixels": [
+        1080,
+        2400
+      ],
+      "kind": "Actual emulator screenshot; synthetic test data"
+    }
+  },
+  "previews": [
+    {
+      "path": "app\\src\\screenshotTestDebug\\reference\\com\\t1doo\\aiyou\\FrontendDayPreviewsKt\\FrontendDayMemories_回忆320大字_6f1d30d8_0.png",
+      "sha256": "fa3f0a9c1938696d83836e4943500c96da19f2eba953e2c33d627aa795ab4c17",
+      "pixels": [
+        840,
+        2625
+      ],
+      "kind": "Synthetic Layoutlib render; not emulator or phone evidence"
+    },
+    {
+      "path": "app\\src\\screenshotTestDebug\\reference\\com\\t1doo\\aiyou\\FrontendDayPreviewsKt\\FrontendDayMemories_回忆360_63257d19_0.png",
+      "sha256": "385eb33ebc32fd5763f405049effa8f0f581372d4b946fd38561ab8721d0bfe4",
+      "pixels": [
+        945,
+        2100
+      ],
+      "kind": "Synthetic Layoutlib render; not emulator or phone evidence"
+    },
+    {
+      "path": "app\\src\\screenshotTestDebug\\reference\\com\\t1doo\\aiyou\\FrontendDayPreviewsKt\\FrontendDayNow_此刻320大字_c51e20ee_0.png",
+      "sha256": "e369ffa34aaca4cf70cce27c430e927ec3ff4e07b6384cc3ddc1242f1eaa27fc",
+      "pixels": [
+        840,
+        2625
+      ],
+      "kind": "Synthetic Layoutlib render; not emulator or phone evidence"
+    },
+    {
+      "path": "app\\src\\screenshotTestDebug\\reference\\com\\t1doo\\aiyou\\FrontendDayPreviewsKt\\FrontendDayNow_此刻360_c2f7dc64_0.png",
+      "sha256": "8ad91566c0f84701918c0f17dd83e3fbccb82aa3b694adb94eeaaa0a42f579b0",
+      "pixels": [
+        945,
+        2100
+      ],
+      "kind": "Synthetic Layoutlib render; not emulator or phone evidence"
+    },
+    {
+      "path": "app\\src\\screenshotTestDebug\\reference\\com\\t1doo\\aiyou\\FrontendDayPreviewsKt\\FrontendDayTasks_待办320大字_dff8a660_0.png",
+      "sha256": "50ab65d13dcb096f1013f13874b57e7679d4bca20afad83bba53a0b733871d78",
+      "pixels": [
+        840,
+        2625
+      ],
+      "kind": "Synthetic Layoutlib render; not emulator or phone evidence"
+    },
+    {
+      "path": "app\\src\\screenshotTestDebug\\reference\\com\\t1doo\\aiyou\\FrontendDayPreviewsKt\\FrontendDayTasks_待办360_0c830d7e_0.png",
+      "sha256": "767b6c6bf8893120bcbb54a7cb2997404f15b70179322e34ed08752b287776f7",
+      "pixels": [
+        945,
+        2100
+      ],
+      "kind": "Synthetic Layoutlib render; not emulator or phone evidence"
+    },
+    {
+      "path": "app\\src\\screenshotTestDebug\\reference\\com\\t1doo\\aiyou\\FrontendDayStatePreviewsKt\\FrontendDayAudioPlaying_原音播放320大字_9f6129cb_0.png",
+      "sha256": "b218a602dd73f0529662ad9335fc67890b5d473f2140610fc0f2ab8f9f8f480f",
+      "pixels": [
+        840,
+        1103
+      ],
+      "kind": "Synthetic Layoutlib render; not emulator or phone evidence"
+    },
+    {
+      "path": "app\\src\\screenshotTestDebug\\reference\\com\\t1doo\\aiyou\\FrontendDayStatePreviewsKt\\FrontendDayAudioPlaying_原音播放360_bdaf6bbe_0.png",
+      "sha256": "bee870e9b9e0feb0ff0f2d9723fdecae4a4eb6e616b79b78fe063714b6078166",
+      "pixels": [
+        945,
+        630
+      ],
+      "kind": "Synthetic Layoutlib render; not emulator or phone evidence"
+    },
+    {
+      "path": "app\\src\\screenshotTestDebug\\reference\\com\\t1doo\\aiyou\\FrontendDayStatePreviewsKt\\FrontendDayReminderPending_提醒提交320大字_aa554bd8_0.png",
+      "sha256": "caad6ad1fc9302a49d23177650dddbde9f06d38c8458549cea7d55af3bcc0984",
+      "pixels": [
+        840,
+        2625
+      ],
+      "kind": "Synthetic Layoutlib render; not emulator or phone evidence"
+    },
+    {
+      "path": "app\\src\\screenshotTestDebug\\reference\\com\\t1doo\\aiyou\\FrontendDayStatePreviewsKt\\FrontendDayReminderPending_提醒提交360_fdb25564_0.png",
+      "sha256": "1b414e7c051f46689a23eacee4a749e4bbc9ff54bfa4acf76638d178ec8e01cb",
+      "pixels": [
+        945,
+        2100
+      ],
+      "kind": "Synthetic Layoutlib render; not emulator or phone evidence"
+    }
+  ],
+  "background_cleanup": {
+    "emulator": "guest shut down via adb emu kill",
+    "adb": "server stopped",
+    "gradle": "Gradle --stop acknowledged one daemon stopped",
+    "initial_kotlin_daemon": "PID and parent/command verified, then stopped",
+    "final_D_AndroidDev_process_probe": "No remaining processes found",
+    "verified_at": "2026-11-04T19:03:28.006420+08:00"
+  },
+  "source_file_sha256": {
+    "app/src/main/java/com/t1doo/aiyou/records/FullBackupContent.kt": "a1d370f977c8736d6d17b823529ffd57cb32c80cf9447f203a12a868d5209ae8",
+    "app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchSection.kt": "a249dca5add49a78b0a38808a23ca94ce98384b462710eed0639db0fdece45c5",
+    "app/src/main/java/com/t1doo/aiyou/records/LocalRecordsScreen.kt": "c8681a64d65e650f52e402544338a119c8ba7662fa1e0b09d84b5ff1a6147186",
+    "app/src/main/java/com/t1doo/aiyou/records/ManualTasksScreen.kt": "3ac362c27b8972d4779025dd714e35600ddbda14cb5ee8593576d012f14dff0f",
+    "app/src/main/java/com/t1doo/aiyou/records/MixedCaptureController.kt": "18aa8aab7c9a2433a8086a2e776f592d307fcfbd4afa0a21be1ff3d82c50f5c1",
+    "app/src/main/java/com/t1doo/aiyou/records/MixedCaptureScreen.kt": "9abcaf7df6397e77ea8be4b643995bb7d95902fe5036a690830ca57b9b04496e",
+    "app/src/main/java/com/t1doo/aiyou/records/OriginalAudioScreen.kt": "d75e2aa2111dddea6aab1cce95b86858ff622d7aeb34aa14d7542b8124b24614",
+    "app/src/test/kotlin/com/t1doo/aiyou/LocalOriginalSearchPresentationTest.kt": "c896f2cc80f3ea5b8e17c83ee6940bf03d2b19faa7739a4fc17a84bbb227b246",
+    "app/src/test/kotlin/com/t1doo/aiyou/MixedCapturePresentationTest.kt": "6472b69c2805f8771f72779614949133398af89047dfdc5a5c92eb58e34428af",
+    "app/src/test/kotlin/com/t1doo/aiyou/OriginalAudioPresentationTest.kt": "4de36ea47133cefa3d792bf6836a279e50f7d06e2b255afd8ebee2fe116c21eb",
+    "app/src/test/kotlin/com/t1doo/aiyou/TaskReminderPresentationTest.kt": "812964ab9e2e4f8b26cb878db19bfd9728a84bf0c213890fb718d78b21c7b5af",
+    "gradle/libs.versions.toml": "737e36289257cc6fdbc7f5daf216c2c09d5ba843364c14b6aba33ed6f9abe142",
+    "scripts/check-sdk.py": "114c60b50507daf1c0dc62a5f10ddf0fc666b6d703089bb47b0977b9c32f5c6c"
+  }
+}

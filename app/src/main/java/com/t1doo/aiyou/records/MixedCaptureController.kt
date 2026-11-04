@@ -41,7 +41,8 @@ class MixedCaptureController internal constructor(private val current: () -> Loc
     @Volatile private var captureGate:CaptureDraftGate?=null
     val audioCapture=ControlledCaptureAudio(::ui,{ availableIgnoringFreeze() && canStartAudio() && current().recordPackage==null && current().recycleBin==null },
         enqueue,{binding},{ actual -> binding=actual;update { it.copy(draft=actual,text=actual.text) } },
-        { value -> update { it.copy(audio=value) } })
+        { value -> update { it.copy(audio=value,
+            notice=if(value.phase==CaptureAudioPhase.PREPARING) null else it.notice) } })
     private fun uiMutation(action:()->Unit) { val gate=captureGate;if(gate==null) action() else gate.uiMutation(action) }
     private fun enqueueMutation(action:suspend(EntryRepository)->Unit):Boolean {
         val gate=captureGate ?: return enqueue(action)

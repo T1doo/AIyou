@@ -32,6 +32,8 @@ android-test-runner = "1.7.0"
 android-test-junit = "1.3.0"
 robolectric = "4.17"
 # Official Robolectric 4.17 DefaultSdkProvider: API35, Java17, preinstrumented i7.
+# Retain the provider's exact offline SDK pin; suppress only update advice for this artifact.
+#noinspection NewerVersionAvailable
 robolectric-sdk = "15-robolectric-13954326-i7"
 
 [libraries]

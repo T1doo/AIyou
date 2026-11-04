@@ -62,7 +62,8 @@ class OriginalAudioPresentationTest {
         }
     }
     private fun click(tag:String) {
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag(tag))
+        if(compose.onAllNodesWithTag("mixed-details").fetchSemanticsNodes().isNotEmpty())
+            compose.onNodeWithTag("mixed-details").performScrollToNode(hasTestTag(tag))
         compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertIsEnabled().performClick()
     }
     private fun drain()=compose.runOnIdle { runBlocking {
@@ -70,11 +71,17 @@ class OriginalAudioPresentationTest {
         f.local.value=f.local.value.copy(localProcessingVersions=checkNotNull(f.store.localProcessing).versions())
     } }
     private fun importWave() {
+        compose.runOnIdle {
+            f.local.value=f.local.value.copy(mixedCapture=f.local.value.mixedCapture!!.copy(notice="先前记录已保存在本机"))
+        }
         click("mixed-audio-import");drain();compose.waitForIdle()
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-audio-summary"))
+        compose.runOnIdle { assertNull(f.local.value.mixedCapture!!.notice) }
+        compose.onNodeWithTag("mixed-audio-summary").performScrollTo()
         compose.onNodeWithTag("mixed-audio-summary").assertIsDisplayed()
-            .assertTextEquals("等待选择原音；尚未保存这条记录")
+            .assertTextEquals("正在处理原音，尚未保存记录。")
         click("mixed-audio-status")
+        compose.onNodeWithTag("mixed-details").performScrollToNode(hasText("等待选择原音；尚未保存这条记录"))
+        compose.onNodeWithText("等待选择原音；尚未保存这条记录").assertIsDisplayed()
         compose.onNodeWithTag("mixed-audio-cancel").performScrollTo().assertIsDisplayed()
             .assertHeightIsAtLeast(48.dp).assertIsEnabled()
         compose.runOnIdle {
@@ -94,13 +101,16 @@ class OriginalAudioPresentationTest {
     @Test fun narrowActualUiImportsExplicitSyntheticFilePlaysStopsAndSavesOnceThenPlaysExactSavedAttachment() {
         content();importWave();click("mixed-audio-play");drain()
         compose.waitUntil(5000) { f.player.state.value.phase==OriginalAudioPhase.PLAYING }
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-save"))
         compose.onNodeWithTag("mixed-save").assertIsNotEnabled()
-        compose.onNodeWithTag("audio-playback-stop").assertHeightIsAtLeast(48.dp).performClick()
-        compose.waitUntil(5000) { !f.player.busy };click("mixed-save");drain()
+        compose.onNodeWithTag("mixed-details").performScrollToNode(hasTestTag("mixed-audio-playback-stop"))
+        compose.onNodeWithTag("mixed-audio-playback-stop").assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
+        compose.waitUntil(5000) { !f.player.busy }
+        compose.onNodeWithTag("mixed-details").performScrollToNode(hasText("回到输入"))
+        compose.onNodeWithText("回到输入").performScrollTo().performClick()
+        click("mixed-save");drain()
         val id=compose.runOnIdle { assertEquals(1,f.saves);f.local.value.entries.single().id }
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("entry-$id"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-$id"))).performScrollTo().performClick()
+        compose.onNodeWithTag("entry-$id").performScrollTo().performClick()
         compose.onNodeWithText("附件记录 · 无文字正文；请打开附件查看原始素材。").assertExists()
         compose.onNodeWithText("查看附件").assertIsDisplayed().assertIsEnabled().performClick();drain()
         val attachment=f.saved.single().intent.id
@@ -113,6 +123,8 @@ class OriginalAudioPresentationTest {
     @Test fun actualDraftRemoveDoesNotChangeTextAndNoAudioIsSavedAfterRemoval() {
         content();importWave();click("mixed-audio-remove");drain()
         compose.runOnIdle { assertNull(f.local.value.mixedCapture!!.draft!!.audio);assertEquals("",f.local.value.mixedCapture!!.text) }
+        compose.onNodeWithTag("mixed-details").performScrollToNode(hasText("回到输入"))
+        compose.onNodeWithText("回到输入").performScrollTo().performClick()
         click("mixed-save");drain();compose.runOnIdle { assertEquals(0,f.saves);assertNotNull(f.local.value.mixedCapture!!.error) }
     }
     @After fun close() { runBlocking { f.player.stop();f.player.closeAndJoin();f.c.drainAudioOnIo(f.store) };f.c.dispose();f.c.disposeOnIo() }

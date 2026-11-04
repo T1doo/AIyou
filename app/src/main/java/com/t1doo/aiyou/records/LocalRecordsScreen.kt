@@ -422,20 +422,20 @@ fun LocalRecordsScreen(
                                 }
                                 companion?.invoke()
                             }
-                            if(onOpenUnified!=null && local.unifiedKeywordOwner!=null)TextButton(onOpenUnified,enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,shape=MaterialTheme.shapes.small,modifier=Modifier.fillMaxWidth().heightIn(min=AIyouDimensions.minTouchTarget).testTag("unified-open")){Text("统一关键词找回")}
                             FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                                if(onOpenUnified!=null && local.unifiedKeywordOwner!=null)TextButton(onOpenUnified,enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,contentPadding=PaddingValues(horizontal=8.dp),shape=MaterialTheme.shapes.small,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("unified-open")){Text("统一关键词找回")}
                                 DisposableEffect(toolsOwner, hasReviewTools, hasManageTools) {
                                     attachedToolButtons[0]=hasReviewTools; attachedToolButtons[1]=hasManageTools
                                     onDispose { attachedToolButtons[0]=false; attachedToolButtons[1]=false }
                                 }
-                                if (hasReviewTools) OutlinedButton(onClick={ openTools(true) },
+                                if (hasReviewTools) TextButton(onClick={ openTools(true) },contentPadding=PaddingValues(horizontal=8.dp),
                                     shape=MaterialTheme.shapes.small,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget)
                                         .focusRequester(reviewFocus).onFocusChanged { reviewFocused=it.isFocused }
                                         .aiyouFocusOutline().testTag("notebook-review-tools")
                                         .semantics { stateDescription=if(reviewToolsExpanded) "已展开" else "已收起" }) {
                                     Text("找回工具")
                                 }
-                                if (hasManageTools) OutlinedButton(onClick={ openTools(false) },
+                                if (hasManageTools) TextButton(onClick={ openTools(false) },contentPadding=PaddingValues(horizontal=8.dp),
                                     shape=MaterialTheme.shapes.small,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget)
                                         .focusRequester(manageFocus).onFocusChanged { manageFocused=it.isFocused }
                                         .aiyouFocusOutline().testTag("notebook-manage-tools")

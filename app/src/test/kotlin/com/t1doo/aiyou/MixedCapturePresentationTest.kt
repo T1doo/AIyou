@@ -56,7 +56,7 @@ class MixedCapturePresentationTest {
     private fun click(tag:String) { compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag(tag));compose.onNodeWithTag(tag).assertIsDisplayed().assertIsEnabled().performClick() }
     private fun openRecent(id:String) {
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("entry-$id"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-$id")))
+        compose.onNodeWithTag("entry-$id")
             .performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
     }
     private fun drain(){compose.runOnIdle { runBlocking { while(f.queue.isNotEmpty())f.queue.removeFirst()(f.store) } }}
@@ -65,6 +65,23 @@ class MixedCapturePresentationTest {
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag(tag))
         return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
     }
+    @Test @Config(qualifiers="w360dp-h800dp")
+    fun ordinaryPhoneKeepsSaveBesideAttachmentToolsInBothEditorModes() {
+        content(fontScale=mutableStateOf(1f))
+        fun checkToolbar() {
+            val tags=listOf("mixed-add","mixed-audio-import","mixed-more","mixed-focus-editor","mixed-save")
+            val bounds=tags.map { tag -> compose.onNodeWithTag(tag).assertIsDisplayed()
+                .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp).getUnclippedBoundsInRoot() }
+            assertTrue("Save must stay in the same toolbar row", bounds.all { kotlin.math.abs((it.top-bounds.first().top).value)<1f })
+            bounds.zipWithNext().forEach { (left,right) -> assertTrue("Touch targets must not overlap",left.right<=right.left) }
+            assertTrue(bounds.last().right<=360.dp)
+        }
+        checkToolbar()
+        compose.onNodeWithTag("mixed-focus-editor").performClick()
+        checkToolbar()
+        compose.runOnIdle { assertEquals(0,f.saves) }
+    }
+
     @Test fun frontendDayFocusKeepsDraftAndFailedSaveRetriesTheSameRecord() {
         val scale=mutableStateOf(1f)
         content(fontScale=scale)
