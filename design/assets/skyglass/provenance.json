@@ -1,0 +1,9 @@
+{
+  "asset": "sky-garden.png",
+  "delivery_asset": "sky-garden.webp",
+  "tool": "built-in image_gen",
+  "purpose": "Original ambient background artwork for the AIyou Skyglass design proposal",
+  "prompt": "Premium mobile application ambient background artwork, portrait 9:16 composition. A beautifully art-directed miniature dreamy coastal sky garden at blue hour in polished soft 3D illustration, clean elegant and gently playful rather than busy. Rich periwinkle and cerulean sky blending into pale icy blue and pearl lavender, warm peach sunlight illuminating soft volumetric clouds, a few tiny translucent glass bubbles with physically convincing refractions. Bottom fifth: distant rolling translucent blue hills, small sculptural pearlescent cloud forms, one tiny apricot-colored flower on a low glass pedestal at bottom right. Top third: beautiful open blue sky and softly lit cloud edge drifting in from upper right. Middle half deliberately calm and light, low-frequency subtle pale blue/lilac lighting to support dark readable mobile UI text and frosted glass panels later. Sophisticated cinematic ambient occlusion, soft natural shadows, restrained bloom, tactile matte and frosted glass materials with meticulous highlights, museum-quality art direction, soft focus background depth. No characters, no text, no UI, no screens, no icons, no charts, no buttons, no giant central orb, no stock gradient mesh, no paper noise. Colorful but airy and uncluttered.",
+  "processing": "Original generated PNG preserved. Delivery WebP resized to height 1280 with sharp, quality 84. No semantic editing.",
+  "character_status": "No Lulu character appears in this background. Character generation remains a separate unapproved study."
+}

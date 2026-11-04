@@ -1,0 +1,59 @@
+{
+  "date": "2026-11-04",
+  "status": "interactive design proposal; not implemented in the Android application",
+  "figma": {
+    "url": "https://www.figma.com/design/TbjrVEh0GLxs97p6zZYTuO",
+    "account": "T1doo",
+    "screenIds": ["4:29", "4:69", "4:109", "4:154", "4:184"],
+    "screens": ["此刻", "回忆", "待办", "记录编辑", "陪伴场景"],
+    "editable": "Native text, auto-layout frames, reusable card/button components, color variables and text/effect styles. Background and reference character images are raster assets.",
+    "limitation": "Starter MCP tool-call quota reached during final refinements. Native navigation icon replacement and complete final visual QA remain unfinished. Do not treat cloud design as final."
+  },
+  "direction": {
+    "palette": "cerulean blue with periwinkle, peach and pale lavender accents",
+    "materials": "AI-generated sky art, readable frosted surfaces, thin highlights and restrained soft shadows",
+    "content": "Compact controls; records and tasks are primary; advanced controls use progressive disclosure",
+    "character": "Cute, playful, warm companion. All generated character candidates remain unapproved. Use user-provided original references to correct identity; expressions, actions and clothing can vary. Rejected sheets are not application assets."
+  },
+  "skill": {
+    "name": "ui-ux-pro-max",
+    "path": "C:/Users/Lenovo/.codex/skills/ui-ux-pro-max/SKILL.md",
+    "design_system_search": "First query matched Airline and was rejected; one narrower retry returned a general landing-page fallback and was not persisted as the product design system.",
+    "verified_matches": ["style: glassmorphism", "ux: cancellable state transitions", "stack: jetpack-compose animation APIs"],
+    "applied": ["Distinct enter/exit timings", "Interruptible state transitions", "Reduced-motion support", "Readable surfaces over artwork", "Small visual controls with expanded touch areas", "WebP delivery assets", "Prevent duplicate save clicks in the prototype", "Explicit focus return and dialog keyboard containment"]
+  },
+  "motion": {
+    "button_feedback_ms": 150,
+    "page_transition_ms": 270,
+    "navigation_indicator_ms": 320,
+    "sheet_enter_ms": 380,
+    "sheet_exit_ms": 200,
+    "card_response_ms": 480,
+    "background_drift_seconds": 18,
+    "controls": "Reduced-motion and background-tab pause; pause background drift while editing; button alternative to dragging."
+  },
+  "prototype_checks": {
+    "rapid_navigation": "PASS: final selected page matches last action",
+    "drag_dismiss": "PASS",
+    "reduced_motion": "PASS: background animation becomes none",
+    "content_horizontal_overflow": "PASS at host widths 320, 375 and 740px; decorative background intentionally bleeds inside a clipped phone frame",
+    "record_demo": "PASS: local demo entry added",
+    "task_demo": "PASS: local completed state toggles",
+    "search_demo": "PASS: visible results filtered",
+    "console_errors": 0,
+    "not_run": ["Android implementation", "Physical-device motion/performance", "TalkBack", "Full dynamic-type validation", "Independent dark-theme verification", "Final character animation approval"]
+  },
+  "private_local_artifacts": {
+    "prototype": ".local-evidence/design-refresh/aiyou-skyglass.fragment.html",
+    "standalone_preview": ".local-evidence/design-refresh/skyglass-preview.html",
+    "qa": ".local-evidence/design-refresh/motion-qa.json",
+    "character_candidates": ".local-evidence/design-refresh/lulu-candidates/",
+    "note": "Private user reference screenshots are not included in tracked product assets."
+  },
+  "references": [
+    "https://www.appetiteui.com/docs/screens-tasks",
+    "https://blog.duolingo.com/duolingo-art-intern-animation-case-study/",
+    "https://www.sina.cn/media/5053429838",
+    "https://www.chinalicensingexpo.com/cn/product/1849"
+  ]
+}
