@@ -1,0 +1,74 @@
+{
+  "status": "Revised interactive design proposal; Android implementation and Figma sync not performed in this revision",
+  "adopted": [
+    "Distinct structures for Now, Memories and Tasks",
+    "Compact Now welcome area and anchored composer",
+    "Date groups instead of repeated date columns",
+    "Necessary timing merged with playback or task row",
+    "Smaller navigation indicator behind icons",
+    "Theme-specific glass surfaces and text",
+    "Empty submit disabled",
+    "Focus restoration without scrolling the entire phone frame",
+    "Slower background motion; pause while editing or scrolling"
+  ],
+  "retained": [
+    "Natural landscape artwork",
+    "Three selectable themes",
+    "Static, drift and changing-light background modes",
+    "Companion entry and original user reference pending approved character artwork"
+  ],
+  "not_applied": [
+    "No unconditional removal of the audio filter or reminder status",
+    "No arbitrary global card radius increase",
+    "No assumption that all native IME, TalkBack or performance behavior has been verified"
+  ],
+  "qa": {
+    "checks": [
+      "composer anchored above navigation",
+      "empty save disabled and typed entry added",
+      "date groups and combined filters",
+      "date selection and completion retained",
+      "task entry creates a local demo item",
+      "sheet bottom and focus return",
+      "system reduced motion",
+      "three pages at 320, 375, 740 without horizontal overflow",
+      "browser 200 percent text layout at 320px; not Android dynamic type"
+    ],
+    "consoleErrors": []
+  },
+  "theme_qa": {
+    "checks": "PASS",
+    "results": [
+      {
+        "theme": "blue",
+        "ink": "rgb(35, 59, 97)",
+        "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+      },
+      {
+        "theme": "sunset",
+        "ink": "rgb(81, 54, 68)",
+        "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+      },
+      {
+        "theme": "night",
+        "ink": "rgb(240, 241, 255)",
+        "font": "\"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+      },
+      {
+        "mode": "still",
+        "artAnimation": "none"
+      },
+      {
+        "mode": "glow",
+        "artAnimation": "none"
+      },
+      {
+        "mode": "drift",
+        "artAnimation": "sky-art-drift"
+      }
+    ],
+    "consoleErrors": []
+  },
+  "build": "node scripts/build-skyglass-prototype.cjs --out <fragment.html> [--reference <private-reference.webp>]",
+  "private_references": "Optional reference image is embedded only when explicitly supplied to the builder. User screenshots are not tracked."
+}

@@ -1,0 +1,46 @@
+{
+  "tool": "built-in image_gen",
+  "direction": "Natural landscapes only; glass is confined to UI surfaces.",
+  "processing": "Original PNG retained; WebP resize to height 1280, quality 86 via sharp.",
+  "assets": {
+    "blue": {
+      "prompt": "Edit this portrait mobile background into a refined NATURAL LANDSCAPE ONLY. Preserve the accepted vivid blue sky, pale lavender atmosphere and peach-lit clouds. Remove ALL glass platforms, pedestals, artificial sculptures, display flowers, glass bubbles, balls and decorative props. Replace their footprints naturally with a quiet shoreline, gently lapping water and a few believable natural rocks. Retain the original overall composition and color mood, with calm low-detail open middle space for an app interface to be overlaid later. Beautiful atmospheric environment art, natural landscape with delicate soft lighting and rich but restful color. No glass material, no plastic, no display objects, no flowers on pedestals, no buildings, no people or animals, no UI, no text, no logos. Background should feel like a place in nature, not a product display or miniature set. All glass effects belong in future UI layers, NEVER in this background image.",
+      "files": {
+        "png": {
+          "bytes": 1642143,
+          "sha256": "0f4fc463f9d67b0802d4f3b7df4e6427c8c1f253365db7ea163436c85f8c137f"
+        },
+        "webp": {
+          "bytes": 43614,
+          "sha256": "d19877fe3750b74d21da17ca5157d1a3aa20472e86a2de208aa749eb693c31ac"
+        }
+      }
+    },
+    "sunset": {
+      "prompt": "Edit this portrait mobile background into a refined NATURAL LANDSCAPE ONLY. Preserve the peach/rose sunset sky, warm sun, still sea and distant mauve islands. Remove ALL glass platforms, pedestals, artificial sculptures, display flowers, glass bubbles, balls and decorative props. Replace their footprints naturally with a quiet shoreline, gently lapping water and a few believable natural rocks. Retain the original overall composition and color mood, with calm low-detail open middle space for an app interface to be overlaid later. Beautiful atmospheric environment art, natural landscape with delicate soft lighting and rich but restful color. No glass material, no plastic, no display objects, no flowers on pedestals, no buildings, no people or animals, no UI, no text, no logos. Background should feel like a place in nature, not a product display or miniature set. All glass effects belong in future UI layers, NEVER in this background image.",
+      "files": {
+        "png": {
+          "bytes": 1695111,
+          "sha256": "1004e846c5d3f626c76fedf7eec1d7938908c9e161a1452127d700586c47d392"
+        },
+        "webp": {
+          "bytes": 53282,
+          "sha256": "821dce915e5fd6f9e88fdd019cfd616f514a4235041bbacdff305e64034e349b"
+        }
+      }
+    },
+    "night": {
+      "prompt": "Edit this portrait mobile background into a refined NATURAL LANDSCAPE ONLY. Preserve the dark indigo/violet sky, small crescent moon, sparse stars, lavender clouds and moonlit sea. Middle must remain dark for white UI text. Remove ALL glass platforms, pedestals, artificial sculptures, display flowers, glass bubbles, balls and decorative props. Replace their footprints naturally with a quiet shoreline, gently lapping water and a few believable natural rocks. Retain the original overall composition and color mood, with calm low-detail open middle space for an app interface to be overlaid later. Beautiful atmospheric environment art, natural landscape with delicate soft lighting and rich but restful color. No glass material, no plastic, no display objects, no flowers on pedestals, no buildings, no people or animals, no UI, no text, no logos. Background should feel like a place in nature, not a product display or miniature set. All glass effects belong in future UI layers, NEVER in this background image.",
+      "files": {
+        "png": {
+          "bytes": 1704726,
+          "sha256": "08382fe6f5a6bfcab9245284123f9fc92f49abfe4d49eec2e038f4bfaee32f06"
+        },
+        "webp": {
+          "bytes": 47938,
+          "sha256": "0caad3d076c599cd484f6b3a8e364b170afc638fe3f35da3dd9c51ea92b3cc3a"
+        }
+      }
+    }
+  }
+}

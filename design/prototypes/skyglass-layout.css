@@ -1,0 +1,66 @@
+/* Content-first revision. Surface and landscape choices remain shared. */
+#ay-sky .phone{height:844px;min-height:0;display:flex;flex-direction:column;overflow:clip}
+#ay-sky .status,#ay-sky header,#ay-sky nav{flex-shrink:0}
+#ay-sky header{padding:8px 18px 7px;min-height:58px}
+#ay-sky .brand{font-size:22px;font-weight:600}
+#ay-sky .content{min-height:0;flex:1;display:flex;flex-direction:column;padding:10px 18px 14px}
+#ay-sky .welcome-strip{min-height:96px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;margin-bottom:12px;padding:12px 13px;background:color-mix(in srgb,var(--card-fill) 70%,transparent);border:1px solid var(--card-edge);border-radius:13px;backdrop-filter:blur(16px)}
+#ay-sky .welcome-date{font-size:13px;line-height:20px;color:var(--muted);margin:0 0 5px}
+#ay-sky .welcome-strip h1{font-size:21px;line-height:30px;letter-spacing:0;margin:0;font-weight:500;white-space:normal}
+#ay-sky .welcome-strip .lulu-ref{position:relative;inset:auto;width:64px;height:68px;min-width:64px;border:0;border-radius:12px;box-shadow:none;transform:none;background-color:transparent}
+#ay-sky .feed,#ay-sky .memory-list,#ay-sky .task-list{margin:0;min-height:0;flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--tint) transparent;overscroll-behavior:contain;padding:1px 1px 8px}
+#ay-sky .section-line{margin:9px 0 12px;padding:0 2px}
+#ay-sky .section-line h2,#ay-sky .date-group{font-size:17px;line-height:26px;font-weight:500}
+#ay-sky .entry{padding:16px;margin:0 0 12px;border-radius:14px}
+#ay-sky .entry h2,#ay-sky .memory h2,#ay-sky .task .title{font-size:16px;line-height:24px;font-weight:500}
+#ay-sky .entry p,#ay-sky .memory p{font-size:15px;line-height:26px;font-weight:400}
+#ay-sky .composer{margin:10px 0 0;flex-shrink:0;border-color:color-mix(in srgb,var(--accent) 25%,var(--card-edge));background:var(--panel)}
+#ay-sky .composer>button{padding:6px 0 12px;min-height:48px;font-size:16px;line-height:26px}
+#ay-sky .composer:focus-within{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 28%,transparent)}
+#ay-sky .composer-foot .edit-entry{background:none;color:var(--accent);padding:10px;min-width:48px;min-height:48px;box-shadow:none}
+#ay-sky .composer-tools{gap:8px}
+#ay-sky .search-region{flex-shrink:0}
+#ay-sky .search{margin:2px 0 6px;padding:5px 10px;min-height:52px}
+#ay-sky .search-actions{display:none;gap:10px;margin:2px 0 4px}
+#ay-sky .search-region:focus-within .search-actions,#ay-sky .search-region.has-query .search-actions{display:flex}
+#ay-sky .search-actions button{display:flex;align-items:center;gap:7px;color:var(--accent);font-size:13px;min-height:44px}
+#ay-sky .filterline{justify-content:flex-start;gap:12px;margin:0 0 10px;flex-shrink:0}
+#ay-sky .filterline button{padding:8px 12px;font-size:14px}
+#ay-sky .date-group{color:var(--ink);margin:14px 2px 12px;font-size:15px}
+#ay-sky .date-group:first-child{margin-top:5px}
+#ay-sky .memory{padding:15px;margin:0 0 11px;display:block}
+#ay-sky .memory .copy{width:100%}
+#ay-sky .memory-open{padding:0;text-align:left;min-height:0;display:block;width:100%}
+#ay-sky .record-time{display:block;color:var(--muted);font-size:13px;line-height:20px;margin-top:8px}
+#ay-sky .audio-row .time{font-size:13px}
+#ay-sky .empty-search{font-size:15px;color:var(--muted);padding:20px 2px}
+#ay-sky .empty-search[hidden]{display:none}
+#ay-sky .week{flex-shrink:0;margin:2px 0 14px;gap:1px;padding:8px 4px}
+#ay-sky .week .day{min-width:0;min-height:64px;padding:7px 0;font-size:16px;border-radius:8px}
+#ay-sky .day small{font-size:12px;margin-bottom:5px}
+#ay-sky .task{padding:12px 14px;gap:8px;align-items:center;min-height:72px}
+#ay-sky .task-copy{padding:0;flex:1;min-width:0;min-height:44px;text-align:left;display:flex;flex-direction:column;justify-content:center;gap:4px}
+#ay-sky .task-time{font-size:13px;line-height:20px;color:var(--muted);display:flex;gap:8px;align-items:center}
+#ay-sky .task-time svg{width:14px!important;height:14px!important}
+#ay-sky .upcoming{margin-top:24px}
+#ay-sky .suggestion{width:100%;font-size:14px;margin-top:20px;padding:10px 12px;min-height:48px;border:1px solid var(--card-edge);background:var(--tint)}
+#ay-sky .add-task{flex-shrink:0;align-self:flex-end;margin:12px 0 0;min-height:46px;gap:7px;padding:9px 15px;background:var(--card-fill);border:1px solid var(--card-edge);border-radius:12px;box-shadow:0 4px 12px var(--theme-shadow);font-size:14px;color:var(--accent);backdrop-filter:blur(18px)}
+#ay-sky nav{padding:6px 18px 19px;min-height:80px}
+#ay-sky nav button{gap:4px;padding:7px 4px;font-size:12px;line-height:18px}
+#ay-sky nav:before{left:0;top:7px;width:44px;height:30px;border:0;box-shadow:none;border-radius:10px;transform:translateX(var(--nav-x,50px));transition:transform .22s cubic-bezier(.2,.8,.2,1);background:var(--tint)}
+#ay-sky .sheet{margin:0!important;bottom:0!important;padding-bottom:25px;transition-duration:.28s}
+#ay-sky .sheet.leaving{transition-duration:.18s}
+#ay-sky .content.enter{animation:content-arrive .2s ease-out}
+@keyframes content-arrive{from{opacity:.35;transform:translateY(3px)}to{opacity:1;transform:none}}
+#ay-sky .sky-art{transition:opacity .45s ease}
+#ay-sky .phone[data-motion=drift] .sky-art.is-active{animation-duration:36s}
+#ay-sky .phone[data-motion=glow]:before{animation-duration:32s}
+#ay-sky .phone{--card-fill:#f2f7ffdd;--card-edge:#ffffff85}
+#ay-sky .phone[data-theme=sunset]{--card-fill:#fff2ecdf;--card-edge:#fff8f29c}
+#ay-sky .phone[data-theme=night]{--card-fill:#222c4ce8;--card-edge:#a3b0d633}
+@media(max-width:370px){#ay-sky .content{padding:8px 14px 12px}#ay-sky .welcome-strip{padding:10px;min-height:92px}#ay-sky .welcome-strip h1{font-size:20px}#ay-sky .welcome-strip .lulu-ref{width:56px;height:64px;min-width:56px}#ay-sky .entry{padding:14px}#ay-sky .filterline{gap:5px}}
+#ay-sky .solid:disabled{opacity:.45;box-shadow:none;cursor:default}
+#ay-sky .composer>button{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;text-align:left}
+@media(prefers-reduced-motion:reduce){#ay-sky nav:before{transition:none!important}}
+#ay-sky .phone:has(input:focus) .sky-art,#ay-sky .phone:has(input:focus):before,#ay-sky .phone.reading-motion .sky-art,#ay-sky .phone.reading-motion:before{animation-play-state:paused!important}
+@media(prefers-reduced-motion:reduce){#ay-sky nav:before{transition:none!important}}
