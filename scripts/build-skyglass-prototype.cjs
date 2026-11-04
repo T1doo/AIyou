@@ -46,6 +46,12 @@ html=html.replace('0:00 / 0:12','0:12');
 html=html.replaceAll('lastFocus?.focus()','lastFocus?.focus({preventScroll:true})').replaceAll("sheet.querySelector('textarea,input,button')?.focus()","sheet.querySelector('textarea,input,button')?.focus({preventScroll:true})");
 
 html=html.replace("switch(b.dataset.action)",`if(b.dataset.action==='new-task'){modal('添加待办','<textarea aria-label="待办标题" placeholder="想做些什么？"></textarea><div class="settings-row">日期<span>11 月 '+state.selectedDay+' 日</span></div>','<button class="solid" data-action="save-task">添加</button>');return}if(b.dataset.action==='save-task'){const field=sheet.querySelector('textarea'),value=field.value.trim();if(!value)return;b.disabled=true;state.extraTasks??=[];state.extraTasks.push({id:'demo-'+Date.now(),title:value,day:state.selectedDay});close();render();toast('已加入演示待办');return}if(b.dataset.action==='task-detail'&&b.closest('.task')){const row=b.closest('.task');modal('待办详情','<h2>'+safe(row.querySelector('.title').textContent)+'</h2><div class="settings-row">时间<span>'+safe(row.querySelector('.task-time')?.textContent||'未设时刻')+'</span></div><div class="options"><button data-action="close">返回列表</button></div>');return}switch(b.dataset.action)`);
+
+html=html.replace('function stop(){',fs.readFileSync('design/prototypes/skyglass-polish.js','utf8')+'\nfunction stop(){');
+html=html.replace('</style>',fs.readFileSync('design/prototypes/skyglass-polish.css','utf8')+'\n</style>');
+html=html.replace("if(b.dataset.action==='new-task'){","if(handlePolishAction(b))return;if(b.dataset.action==='new-task'){");
+html=html.replace("function close(){","function close(){rememberPanelDraft();");
+html=html.replace("lastFocus=document.activeElement;sheet.innerHTML=","lastFocus=document.activeElement;sheet.dataset.panel=title==='记下此刻'?'record':'other';sheet.innerHTML=");
 if(Buffer.byteLength(html)>1000000)throw Error('oversize');
 if(!reference)html=html.replace('</style>',"#ay-sky .lulu-ref:after{content:'噜噜';color:var(--accent);font-size:16px}#ay-sky .ref-large{display:none}</style>");
 fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,html);

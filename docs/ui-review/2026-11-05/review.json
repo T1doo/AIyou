@@ -1,0 +1,63 @@
+{
+  "date": "2026-11-05",
+  "scope": "Interactive HTML design prototype only; synthetic records; no approved Lulu asset included",
+  "sourceBase": "f0b8b37062e4d4c04f2860dcb67fc8cd8a877b3c",
+  "validation": {
+    "browser": "PASS",
+    "checks": [
+      "record draft retained, resize removed, attachment action subdued",
+      "filter cancel/apply/reset and independent favorite+audio selection",
+      "compact task editor retains cancelled input; submitted draft clears once",
+      "three themes; reduced-motion override preserves prior background choice"
+    ],
+    "consoleErrors": [],
+    "narrowLayout": "PASS: content scrollWidth <= clientWidth on all three pages at 352px and 407px host viewports",
+    "androidBuild": "NOT RUN: this change only affects the HTML design prototype and its browser QA scripts",
+    "androidEmulator": "NOT RUN for this change",
+    "physicalDeviceImeTalkBackPerformance": "NOT RUN"
+  },
+  "changes": [
+    "Consistent primary completion buttons and subdued attachment toolbar",
+    "Compact task editor, cancel preserves draft, successful submit clears it",
+    "Staged date/person/tag filters; reset retains search; favorites independent from media type",
+    "Smaller welcome area; stronger body text; layered reading, welcome and editing surfaces",
+    "Visible motion selection; reduced-motion pause retains preference",
+    "Search tools remain stable after focus to avoid losing pointer clicks"
+  ],
+  "limitations": [
+    "Prototype interaction data are in-memory examples, not native persistence",
+    "Audio playback is a UI state demonstration, not an audio engine",
+    "These screenshots cannot validate animation quality, Android keyboard, TalkBack or device performance",
+    "Historical review pack dated 2026-11-04 remains unchanged"
+  ],
+  "screenshots": [
+    {
+      "file": "appearance.png",
+      "sha256": "64628694531f9573c28a5723578c3582a9ca3ab20d9cd7ea754f464478347dba"
+    },
+    {
+      "file": "filters.png",
+      "sha256": "31d745954ed1914db3aeb59ee4a187445d6ee8e1de39dd2415258d86d110b524"
+    },
+    {
+      "file": "now-blue.png",
+      "sha256": "bc6440631f44e8c74e8e5e989f6dc1d53e0c0327b2bbfb61d6416e3ee19f2e06"
+    },
+    {
+      "file": "now-night.png",
+      "sha256": "c56f2263f4d8939eac325d95617c34475d7f06bc6267cc42b60ae2226308d5a3"
+    },
+    {
+      "file": "now-sunset.png",
+      "sha256": "eebd087fafc971d7bebf87a9df9ca9df74e0ad3e2870cc73aef4914c55ca015c"
+    },
+    {
+      "file": "record-editor.png",
+      "sha256": "9e64ad8c0b33fe33bcb4796b7656a1887b8049d450ef3f85a963bcc416f48eee"
+    },
+    {
+      "file": "task-editor.png",
+      "sha256": "4cf9e9f8ed94e80802b37b43134a466c0257b656120273531c472d192a99fa76"
+    }
+  ]
+}
