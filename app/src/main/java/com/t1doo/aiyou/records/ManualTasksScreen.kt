@@ -88,7 +88,8 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     onCancelClose: (Long, ManualTaskEditor) -> Unit = { _, _ -> },
     titles: ManualTaskController? = null, ownsTitleRoute: () -> Boolean = { true },
     rowDisclosureState: ManualTaskDisclosureState? = null,
-    appearance: SkyglassAppearance? = null) {
+    appearance: SkyglassAppearance? = null,
+    onKeepInput: ((Long, String, ManualTaskDateInput) -> Unit)? = null) {
     OptionalSkyglassTheme(appearance) {
     val glass=if(appearance!=null) LocalSkyglassPalette.current else null
     DisposableEffect(titles) {onDispose {titles?.retireCompletionUndo()}}
@@ -319,11 +320,11 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
             }
             if(glass!=null) Button(onClick=onBegin,enabled=canChoose,shape=RoundedCornerShape(10.dp),
                 colors=ButtonDefaults.buttonColors(containerColor=glass.primary,contentColor=androidx.compose.ui.graphics.Color.White),
-                modifier=Modifier.align(Alignment.BottomEnd).padding(margin).heightIn(min=48.dp).testTag("manual-task-begin")) {Text("添加待办")}
+                modifier=Modifier.align(Alignment.BottomEnd).padding(margin).heightIn(min=48.dp).testTag("manual-task-begin")) {Text(if(tasks.creationDraft!=null) "继续编辑" else "添加待办")}
         }
     }
     tasks.editor?.let { editor ->
-        ManualTaskDialog(editor, tasks, storageReady, onEdit, onCreate, onRetry, onCloseInput, onCreationDate, onConfirmClose, onCancelClose)
+        ManualTaskDialog(editor, tasks, storageReady, onEdit, onCreate, onRetry, onCloseInput, onCreationDate, onConfirmClose, onCancelClose,onKeepInput)
     }
     tasks.dateEditor?.let { editor -> ManualTaskDateDialog(editor, tasks, storageReady, onEditDate, onSaveDate, onCloseDate, onRetry) }
     if (reminders != null) TaskReminderDialog(local, reminders, ownsReminderRoute)
@@ -337,7 +338,8 @@ private fun ManualTaskDialog(editor: ManualTaskEditor, tasks: ManualTasksUiState
     onEdit: (Long, String) -> Unit, onCreate: (Long, String) -> Unit, onRetry: () -> Unit,
     onClose: (Long, String, ManualTaskDateInput) -> Unit,
     onCreationDate: (Long, ManualTaskDateInput) -> Unit,
-    onConfirmClose: (Long, ManualTaskEditor) -> Unit, onCancelClose: (Long, ManualTaskEditor) -> Unit) {
+    onConfirmClose: (Long, ManualTaskEditor) -> Unit, onCancelClose: (Long, ManualTaskEditor) -> Unit,
+    onKeepInput: ((Long, String, ManualTaskDateInput) -> Unit)? = null) {
     // No Saver or undo Bundle: unfinished private titles live only in this session.
     val input = remember(editor.session) { TextFieldState(editor.input) }
     val dateFields = remember(editor.session) { TaskDateFields(editor.dateInput) }
@@ -349,7 +351,10 @@ private fun ManualTaskDialog(editor: ManualTaskEditor, tasks: ManualTasksUiState
     LaunchedEffect(input) { snapshotFlow { input.text.toString() }.collect { edit(editor.session, it) } }
     val closing = tasks.closeConfirmation?.takeIf { it === editor }
     val canCreate = storageReady && tasks.available && !tasks.loading && !tasks.busy && tasks.pending == null && closing == null
-    fun requestClose() { onClose(editor.session, input.text.toString(), dateFields.current()) }
+    fun requestClose() {
+        if(themed && onKeepInput!=null && tasks.pending==null) onKeepInput(editor.session,input.text.toString(),dateFields.current())
+        else onClose(editor.session, input.text.toString(), dateFields.current())
+    }
     Dialog(onDismissRequest = { if (closing != null) onCancelClose(editor.session, closing) else requestClose() }) {
         Surface(shape = MaterialTheme.shapes.large) {
             Column(Modifier.fillMaxWidth().heightIn(max = AIyouDimensions.contentMaxWidth)
@@ -372,6 +377,9 @@ private fun ManualTaskDialog(editor: ManualTaskEditor, tasks: ManualTasksUiState
                 }
                 if(!themed || datesExpanded) TaskDateFieldsView(dateFields, storageReady && !tasks.busy && tasks.pending == null,
                     onChanged = { onCreationDate(editor.session, it) })
+                if(themed && onKeepInput!=null && (input.text.isNotEmpty() || dateFields.current()!=editor.initialDateInput))
+                    TextButton(onClick={onClose(editor.session,input.text.toString(),dateFields.current())},enabled=!tasks.busy&&tasks.pending==null&&closing==null,
+                        modifier=Modifier.heightIn(min=48.dp).testTag("manual-task-discard-request")){Text("放弃输入")}
                 if (tasks.busy) Text("正在保存，尚未确认…")
                 if (!storageReady) Text("本机存储暂不可读取。输入已保留，恢复读取后再操作。")
                 tasks.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }

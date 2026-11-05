@@ -1473,6 +1473,9 @@ fun AIyouApp(
                 onCloseInput = { session, text, date -> if (ownsTasks()) {
                     if (manualTasks != null) manualTasks.requestClose(session, text, date) else onTaskClose(session)
                 } },
+                onKeepInput = manualTasks?.let { controller -> { session, text, date ->
+                    if(ownsTasks()) controller.keepCreation(session,text,date)
+                } },
                 onConfirmClose = { session, expected -> if (ownsTasks()) manualTasks?.confirmClose(session, expected) },
                 onCancelClose = { session, expected -> if (ownsTasks()) manualTasks?.cancelClose(session, expected) },
                 titles = manualTasks, ownsTitleRoute = ::ownsTasks,

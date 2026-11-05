@@ -109,6 +109,79 @@ class ManualTaskPresentationTest {
         override fun callbacks(actions: ManualTaskCallbacks) { callbacks.set(actions) }
         override fun input(state: TextFieldState) { input.set(state) }
     }
+    @Test fun closingCreationKeepsSessionDraftAcrossTabsAndReopeningRetiresOldCallbacks() {
+        content();begin("合成待办草稿保留")
+        compose.onNodeWithTag("manual-task-date-disclosure").performScrollTo().performClick()
+        compose.onNodeWithTag("manual-task-date-input").performScrollTo().performTextReplacement("2026-12-01")
+        compose.onNodeWithTag("manual-task-time-input").performScrollTo().performTextReplacement("09:30")
+        compose.onNodeWithTag("manual-task-zone-input").performScrollTo().performTextReplacement("Asia/Shanghai")
+        val oldSession=state.value.tasks.editor!!.session
+        val oldActions=callbacks.get()
+        compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertNull(state.value.tasks.editor);assertEquals("合成待办草稿保留",state.value.tasks.creationDraft!!.input)
+            assertEquals("2026-12-01",state.value.tasks.creationDraft!!.dateInput.date)
+            assertTrue(queued.isEmpty());assertTrue(persisted.isEmpty())
+            assertPrivate(checkNotNull(registry).performSave(),listOf("合成待办草稿保留","2026-12-01","09:30"))
+        }
+        compose.onNodeWithText("回忆").performClick();compose.onNodeWithText("待办").performClick()
+        begin("")
+        val resumed=state.value.tasks.editor!!
+        assertNotEquals(oldSession,resumed.session)
+        compose.onNodeWithTag("manual-task-input").assertTextContains("合成待办草稿保留")
+        compose.onNodeWithTag("manual-task-time-input").performScrollTo().assertTextContains("09:30")
+        compose.runOnIdle {
+            oldActions.create(oldSession,"stale callback")
+            controller.keepCreation(oldSession,"stale close",ManualTaskDateInput())
+            assertTrue(queued.isEmpty());assertEquals(resumed.session,state.value.tasks.editor!!.session)
+        }
+        compose.onNodeWithTag("manual-task-create").performScrollTo().performClick()
+        compose.runOnIdle {
+            controller.keepCreation(resumed.session,"must not park pending",ManualTaskDateInput())
+            assertNotNull(state.value.tasks.editor);assertNull(state.value.tasks.creationDraft)
+        }
+        pump()
+        compose.runOnIdle {
+            assertEquals(1,persisted.size);assertNull(state.value.tasks.editor);assertNull(state.value.tasks.creationDraft)
+            assertEquals("2026-12-01",persisted.values.single().schedule!!.date.toString())
+            assertNull(persisted.values.single().reminder);assertEquals(capture,state.value.text)
+        }
+    }
+
+    @Test fun closingUnconfirmedCreateRetainsOriginalRequestInsteadOfParkingAnotherDraft() {
+        content();begin("合成保存结果待确认")
+        failRead=true
+        compose.onNodeWithTag("manual-task-create").performScrollTo().performClick();pump()
+        assertEquals(1,persisted.size)
+        val pending=state.value.tasks.pending
+        assertNotNull(pending)
+        compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertNull(state.value.tasks.editor);assertNull(state.value.tasks.creationDraft)
+            assertSame(pending,state.value.tasks.pending)
+        }
+        taskNode("manual-task-begin").assertIsNotEnabled()
+        failRead=false;taskNode("manual-task-retry").performClick();pump()
+        compose.runOnIdle {assertEquals(1,persisted.size);assertEquals(1,identities.distinct().size);assertNull(state.value.tasks.pending)}
+        begin("");assertEquals("",editable())
+    }
+
+    @Test fun explicitDiscardAndOwnerDisposalRemoveRetainedCreationDraft() {
+        content();begin("合成明确丢弃")
+        compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
+        begin("")
+        compose.onNodeWithTag("manual-task-discard-request").performScrollTo().performClick()
+        compose.onNodeWithTag("manual-task-discard").performClick()
+        compose.runOnIdle { assertNull(state.value.tasks.editor);assertNull(state.value.tasks.creationDraft);assertTrue(queued.isEmpty()) }
+        begin("合成会话关闭")
+        compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertNotNull(state.value.tasks.creationDraft)
+            controller.dispose();controller.begin()
+            assertNull(state.value.tasks.creationDraft);assertNull(state.value.tasks.editor);assertTrue(persisted.isEmpty())
+        }
+    }
+
     @Test fun explicitCreateWaitsForAckKeepsFailedInputThenCompletesAndCancelsOnlyConfirmedTasks() {
         content()
         taskNode("manual-task-total").assertTextEquals("正式待办 0")

@@ -38,6 +38,7 @@ class ManualTasksUiState internal constructor(
     val titleEditor: ManualTaskTitleEditor? = null,
     val closeConfirmation: ManualTaskEditor? = null,
     val undoCompletion:ManualTaskSnapshot?=null,
+    val creationDraft: ManualTaskEditor? = null,
 ) {
     val items = Collections.unmodifiableList(items.toList())
     internal fun copy(supported: Boolean = this.supported, loading: Boolean = this.loading, available: Boolean = this.available,
@@ -45,8 +46,9 @@ class ManualTasksUiState internal constructor(
         error: String? = this.error, notice: String? = this.notice, conflict: Boolean = this.conflict,
         pending: ManualTaskIntent? = this.pending, generation: Long = this.generation,
         dateEditor: ManualTaskDateEditor? = this.dateEditor, titleEditor: ManualTaskTitleEditor? = this.titleEditor,
-        closeConfirmation: ManualTaskEditor? = this.closeConfirmation,undoCompletion:ManualTaskSnapshot?=this.undoCompletion) =
-        ManualTasksUiState(supported, loading, available, items, editor, busy, error, notice, conflict, pending, generation, dateEditor, titleEditor, closeConfirmation,undoCompletion)
+        closeConfirmation: ManualTaskEditor? = this.closeConfirmation,undoCompletion:ManualTaskSnapshot?=this.undoCompletion,
+        creationDraft: ManualTaskEditor? = this.creationDraft) =
+        ManualTasksUiState(supported, loading, available, items, editor, busy, error, notice, conflict, pending, generation, dateEditor, titleEditor, closeConfirmation,undoCompletion,creationDraft)
     override fun toString() = "ManualTasksUiState(available=$available, busy=$busy, redacted)"
 }
 
@@ -83,8 +85,21 @@ class ManualTaskController internal constructor(
     fun begin() {
         val tasks = current().tasks
         if (!usable() || reminderBlocksWrite() || !tasks.supported || !tasks.available || tasks.loading || tasks.busy || tasks.pending != null || tasks.editor != null || tasks.dateEditor != null || tasks.titleEditor != null) return
-        val editor = ManualTaskEditor(sessions.incrementAndGet(), dateInput = ManualTaskDateInput(timeZone = timeZone()))
-        update { it.copy(editor = editor, error = null, notice = null, conflict = false) }
+        val retained = tasks.creationDraft
+        val editor = if(retained == null) ManualTaskEditor(sessions.incrementAndGet(), dateInput = ManualTaskDateInput(timeZone = timeZone()))
+            else ManualTaskEditor(sessions.incrementAndGet(),retained.input,retained.dateInput,retained.initialDateInput)
+        update { it.copy(editor = editor, creationDraft = null, error = null, notice = null, conflict = false) }
+    }
+    /** Hide without discarding. Same admitted memory owner only; never serialize private input. */
+    fun keepCreation(session: Long, input: String, date: ManualTaskDateInput) {
+        if(disposed || input.length > ManualTasks.MAX_RAW_LENGTH) return
+        update { state ->
+            val editor=state.editor
+            if(editor?.session!=session || state.busy || state.pending!=null || state.closeConfirmation!=null) state
+            else state.copy(editor=null,closeConfirmation=null,
+                creationDraft=if(input.isEmpty() && date==editor.initialDateInput) null
+                    else ManualTaskEditor(session,input,date,editor.initialDateInput))
+        }
     }
     fun edit(session: Long, input: String) {
         val tasks = current().tasks
@@ -307,7 +322,7 @@ class ManualTaskController internal constructor(
                 else if (intent == null) "待办读取失败，加密数据与输入已保留，请重试读取。"
                 else "待办保存状态待确认，输入已保留，请重试确认。")
     }
-    fun dispose() { retireCompletionUndo();disposed = true }
+    fun dispose() { retireCompletionUndo();update {it.copy(creationDraft=null)};disposed = true }
     private fun dateError(reason: ManualTaskDateError) = when (reason) {
         ManualTaskDateError.DATE -> "日期请用有效的 YYYY-MM-DD，输入已保留。"
         ManualTaskDateError.TIME_WITHOUT_DATE -> "请先填写日期；没有日期不能设置时刻。"

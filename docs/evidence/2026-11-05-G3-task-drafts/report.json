@@ -1,0 +1,37 @@
+{
+  "batch": "G3 UI-04 creation draft",
+  "status": "TARGETED_PASS_SESSION_ONLY",
+  "source_parent": "5953e043650a19eec975d1181e8ad549c957de43",
+  "behavior": [
+    "Close consumes actual current title and date fields, parks only an unsubmitted draft in the admitted records owner",
+    "Continue editing allocates a fresh editor session; stale callbacks cannot edit/submit/close it",
+    "Explicit discard still requires the existing identity-bound confirmation",
+    "Busy or pending submissions cannot be parked as new drafts",
+    "Closing an unconfirmed creation retains the original pending request; retry does not create a second identity",
+    "Successful create and owner disposal remove parked draft; no private draft is serialized in Bundle/logs"
+  ],
+  "checks": {
+    "android_required_checks": "PASS build.log; final APK and lint PASS verified.log",
+    "targeted_ui": [
+      {
+        "name": "com.t1doo.aiyou.ManualTaskPresentationTest",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      }
+    ],
+    "device": "API35 emulator: Draft_keep_demo and date2026-12-01 restored after close and Memories/Tasks tab round trip; no task submitted in this device check"
+  },
+  "scope_limits": [
+    "Only current admitted memory owner; process death/restart recovery NOT implemented or claimed",
+    "Older close-confirmation UI tests still require explicit-discard navigation migration; full suite not claimed",
+    "Full CI frozen diagnostics and remaining G3-G7 gates still open",
+    "Chinese IME/TalkBack/performance NOT RUN"
+  ],
+  "apk": {
+    "path": "E:\\Github\\AIyou\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "sha256": "208affeef82e4d57b294b83b3c5e23db14b46d56e11367028a549bc1847b74b0"
+  },
+  "cleanup": "Owned emulator and adb closed"
+}

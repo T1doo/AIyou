@@ -1,7 +1,7 @@
 {
   "plan": "docs/plans/AIyou-Codex-Plan-20261105/backlog.json",
   "goal": "G0–G7 native migration and evidence-based acceptance",
-  "current_batch": "G3 tasks theme and compact creation editor connected; actual create/complete/undo validated; full parity and calendar still in progress",
+  "current_batch": "G3 task creation draft close/reopen implemented in admitted memory owner; cross-process persistence and complete UI regression still pending",
   "tasks": [
     {
       "id": "AUD-01",
@@ -134,7 +134,8 @@
     "docs/evidence/2026-11-05-G2-fidelity/report.json",
     "docs/evidence/2026-11-05-G3-search/report.json",
     "docs/evidence/2026-11-05-G3-filters/report.json",
-    "docs/evidence/2026-11-05-G3-tasks/report.json"
+    "docs/evidence/2026-11-05-G3-tasks/report.json",
+    "docs/evidence/2026-11-05-G3-task-drafts/report.json"
   ],
   "stop_after_each_batch": "Commit and report evidence; continue next dependent batch under active user-requested goal unless an explicit approval or hard blocker applies"
 }
