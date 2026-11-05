@@ -1,0 +1,51 @@
+[
+  {
+    "suite": "com.t1doo.aiyou.KeywordReductionPresentationTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "suite": "com.t1doo.aiyou.LocalRecordsPresentationTest",
+    "tests": 9,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "suite": "com.t1doo.aiyou.MixedNotebookPresentationTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "suite": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+    "tests": 1,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "suite": "com.t1doo.aiyou.SourceFactPresentationTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "suite": "com.t1doo.aiyou.SourceTaskPresentationTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "suite": "com.t1doo.aiyou.UnavailableControlsInteractionTest",
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+]

@@ -170,7 +170,7 @@ class OriginalEditRecoveryPresentationTest {
         val capture = repo.capture
         start(repo)
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-original"))
-        compose.onNodeWithText("阅读全文").performClick()
+        compose.onNodeWithTag("entry-original").assertIsDisplayed().performClick()
         compose.originalToolText("历史版本").performScrollTo().performClick()
         compose.waitUntil(5000) { vm.state.value.originalHistory?.loading == false }
         compose.onNodeWithTag("history-list").performScrollToNode(hasText("阅读版本 1"))

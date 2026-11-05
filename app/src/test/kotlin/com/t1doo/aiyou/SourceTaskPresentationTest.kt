@@ -117,6 +117,7 @@ class SourceTaskPresentationTest {
         compose.onNodeWithText("返回列表").performClick()
         compose.onNodeWithText("待办").assertIsDisplayed().performClick()
         val sourceTag="manual-task-source-"+task!!.id
+        compose.showManualTaskDetails(task!!.id)
         compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(sourceTag))
         compose.onNodeWithTag(sourceTag).performScrollTo().assertIsDisplayed().assertIsEnabled().performClick();drain()
         compose.onNodeWithTag("original-text").assertTextEquals(original)

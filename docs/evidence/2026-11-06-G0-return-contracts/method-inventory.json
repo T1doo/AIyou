@@ -1,0 +1,84 @@
+{
+  "base_sha": "39225e99d018e4ccfb420014c046a8077dfb38fa",
+  "unchanged": true,
+  "files": [
+    {
+      "path": "app/src/test/kotlin/com/t1doo/aiyou/KeywordReductionPresentationTest.kt",
+      "tests": [
+        "realAppRequiresRemovalAndConfirmationPreservesDatesThenOpensExactOriginal",
+        "cancelRequeriesWholeOldTupleAndRestorationRetiresWithoutSavingWords",
+        "landscapeDoubleFontScrollFocusAndEnterConfirmExplicitRemainingTerms"
+      ]
+    },
+    {
+      "path": "app/src/test/kotlin/com/t1doo/aiyou/LocalRecordsPresentationTest.kt",
+      "tests": [
+        "aiCommitConfirmationUsesPendingLabelAndStoppedSnapshotHidesPreviewAtLargeFont",
+        "aiStoredAnnotationUsesCandidateHeadingWithoutUnsavedOrPendingLabel",
+        "productionCaptureAndMemoriesStayCenteredAndBoundedOnWideScreens",
+        "storageFailureUsesItsOwnRetryAndDoesNotMarkValidInputInvalid",
+        "pendingSaveKeepsDraftLockedAndRetryAvailableWithoutClaimingSuccess",
+        "inputFeedbackIsAnnouncedAndClearsOnAcceptedEditWithoutLosingFocus",
+        "narrowLargeFontProductionFormKeepsSaveReachableWithoutPlaceholderButtons",
+        "narrowLargeFontSaveFailureRetryScrollsIntoViewAndPreservesPendingDraft",
+        "narrowLargeFontReadFailureRetryScrollsIntoViewAndPreservesKnownDraft"
+      ]
+    },
+    {
+      "path": "app/src/test/kotlin/com/t1doo/aiyou/MixedNotebookPresentationTest.kt",
+      "tests": [
+        "realNotebookUsesBundledLuluOnlyWhenPreferenceIsReadyAndVisibleWithoutWritingRecords",
+        "emptyLandscapeDoubleFontHasReachableStartAndFocusedComposerWithoutWriting",
+        "coldRegularFontLandscapeStartsCompactAndRetainsDraftAcrossReadOnlyActions"
+      ]
+    },
+    {
+      "path": "app/src/test/kotlin/com/t1doo/aiyou/NotebookToolActions.kt",
+      "tests": []
+    },
+    {
+      "path": "app/src/test/kotlin/com/t1doo/aiyou/OriginalEditRecoveryPresentationTest.kt",
+      "tests": [
+        "aiNoneColdDraftRecoveryAllowsExplicitManualSaveWithoutChangingPolicy",
+        "aiNoneHistoryRouteCreatesOnlyAnExplicitNewVersionAndKeepsNoInferencePolicy",
+        "narrowLargeFontExplicitKeepReturnsToOriginalAndResumesWithoutFormalWrite",
+        "explicitKeepConfirmationFailureStaysInEditorAndVisibleRetryThenReturns",
+        "narrowLargeFontColdRecoveryCorrectionAndSaveKeepCaptureAndImmutableOriginals",
+        "missingSourceRecoveryRetainsTextAndExplicitDiscardCannotResurrectIt",
+        "actualCipherWriteFailureRemainsVisibleAndCorrectedRetryPreservesCompleteInput",
+        "partialIndexWarningIsVisibleAndHealthyRecoveryRemainsUsableWithoutShowingDamagedText",
+        "wrongKeyIndexHasExplicitVisibleErrorAndNoRecoveryButtons",
+        "globalIndexFailureDisablesExistingButtonsAndVisibleRetryRestoresHealthyRecovery"
+      ]
+    },
+    {
+      "path": "app/src/test/kotlin/com/t1doo/aiyou/SourceFactPresentationTest.kt",
+      "tests": [
+        "explicitCandidateSeparateAcceptanceCorrectionAndRevocationReachExactOriginalAndUnifiedFact",
+        "actualPlatformDoubleFontKeepsEndpointRejectionStickyAndUnknownSameIntentFrozen",
+        "acceptedWriteSurvivesQueryRetirementAndActualRootRecompositionWhileActorIsBlocked",
+        "realCloseAndOwnerReplacementRejectQueuedOldConfirmationWithoutNewOwnerPublication"
+      ]
+    },
+    {
+      "path": "app/src/test/kotlin/com/t1doo/aiyou/SourceTaskPresentationTest.kt",
+      "tests": [
+        "narrowDoubleFontLiteralFlowRequiresSeparateConfirmationAndJumpsToExactOriginal",
+        "unknownReadbackHasNoSuccessAndRetriesSameRequestWithoutDuplicatingTask",
+        "sourceReadFailureAndRevisionRefreshHideQuoteAndConfirmationButRetainInput",
+        "cancelledRestoredAndNavigatedConfirmationsCannotReusePrivateSourceOrInput"
+      ]
+    },
+    {
+      "path": "app/src/test/kotlin/com/t1doo/aiyou/UnavailableControlsInteractionTest.kt",
+      "tests": [
+        "unopenedCapabilitiesAreDisabledWhileActualSaveStillWorks",
+        "implementedButBusyCapabilitiesRejectTouchesWithoutUnopenedLabels",
+        "unopenedSearchRejectsFocusAndEditingAndFiltersHaveNoClickAction",
+        "integratedReadyLocalScreenRetainsRealDraftAndSaveCallbacks",
+        "offlineLicenseRouteAndReturnToLocalMemoriesSurviveIntegration",
+        "narrowLargeFontKeepsFullUnavailableLabelsAndStaticFilterSemantics"
+      ]
+    }
+  ]
+}

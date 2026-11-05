@@ -141,7 +141,7 @@ class LocalRecordsPresentationTest {
         val rootCenter = compose.onRoot().fetchSemanticsNode().boundsInRoot.center.x
         assertEquals(rootCenter, field.fetchSemanticsNode().boundsInRoot.center.x, 1f)
         compose.onNodeWithText("回忆").performClick()
-        val summary = compose.onNodeWithText("0 条本机记录")
+        val summary = compose.onNodeWithTag("original-search-query").assertIsDisplayed().assertIsEnabled()
         assertTrue(summary.getUnclippedBoundsInRoot().width <= AIyouDimensions.contentMaxWidth)
         assertEquals(rootCenter, summary.fetchSemanticsNode().boundsInRoot.center.x, 1f)
     }

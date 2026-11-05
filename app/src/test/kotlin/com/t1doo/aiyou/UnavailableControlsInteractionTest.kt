@@ -135,7 +135,7 @@ class UnavailableControlsInteractionTest {
         compose.onNodeWithText("开源许可与声明 · 离线文本").assertIsDisplayed()
         compose.onNodeWithText("返回设置").performClick()
         compose.onNodeWithText("回忆").performClick()
-        compose.onNodeWithText("0 条本机记录").assertIsDisplayed()
+        compose.onNodeWithText("还没有回忆").assertIsDisplayed()
         compose.onNodeWithTag("original-search-query").assertIsEnabled()
     }
 

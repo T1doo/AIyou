@@ -263,7 +263,7 @@ class SourceFactPresentationTest {
         assertEquals(FactReview.PROPOSED,saved!!.review!!.review);assertEquals(FactReview.ACCEPTED,saved!!.reviews.first().priorReview);accept()
         click("fact-source:"+saved!!.id);drain();compose.onNodeWithTag("original-text").assertTextEquals(entry.originalText)
         assertNull(state.value.sourceFacts);val text=compose.onNodeWithTag("original-text").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].single();assertTrue(text.spanStyles.isNotEmpty())
-        backToList();compose.onNodeWithTag("unified-open").performScrollTo().performClick();compose.waitForIdle()
+        backToList();compose.showNotebookToolsFor("unified-open");compose.onNodeWithTag("unified-open").performScrollTo().performClick();compose.waitForIdle()
         compose.onNodeWithTag("unified-query").performTextReplacement("合成办公物品");compose.onNodeWithTag("unified-scope").performScrollTo().performClick()
         compose.onNodeWithTag("unified-scope:FACT").performScrollTo().performClick();compose.onNodeWithTag("unified-results").performScrollToIndex(2)
         compose.runOnIdle{assertSame(queryPort,owner.unifiedKeywords)}

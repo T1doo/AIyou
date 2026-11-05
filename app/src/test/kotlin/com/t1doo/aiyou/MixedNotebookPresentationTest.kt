@@ -55,8 +55,8 @@ class MixedNotebookPresentationTest {
             }
         }
         compose.onNodeWithTag("mixed-list").assertExists()
-        compose.onNodeWithText("生活的小片刻").assertIsDisplayed()
-        assertCompanionSize(96f)
+        compose.onNodeWithText("今天，慢慢记。").assertIsDisplayed()
+        assertCompanionSize(48f)
         compose.onNodeWithTag("companion-entry").assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
         compose.onNodeWithText("打个招呼").performClick()
         compose.onNodeWithText("你好，慢慢记录就好。").assertIsDisplayed()
@@ -67,21 +67,21 @@ class MixedNotebookPresentationTest {
         compose.onNodeWithTag("companion-entry").assertDoesNotExist()
         compose.runOnIdle { display.value=UiPreferencesState(UiPreferences(reduceMotion=true),ready=true) }
         compose.onNodeWithTag("companion-entry").assertIsDisplayed()
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").performScrollTo()
         compose.onNodeWithTag("mixed-text").assertIsDisplayed().assertIsEnabled()
         compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
         compose.runOnIdle { fontScale.value=2f }
         compose.onNodeWithTag("mixed-list").performScrollToIndex(0)
-        compose.onNodeWithText("生活的小片刻").assertDoesNotExist()
+        compose.onNodeWithText("今天，慢慢记。").assertDoesNotExist()
         val compactHeading=compose.onNodeWithTag("mixed-notebook-heading").assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue(compactHeading.bottom-compactHeading.top<=88.dp)
-        assertCompanionSize(56f)
+        assertCompanionSize(48f)
         compose.onNodeWithTag("companion-entry").assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
         compose.onNodeWithText("关闭陪伴面板").performClick()
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-policy-details"))
-        val rangeAction=compose.onNodeWithTag("mixed-policy-details").performScrollTo().assertIsDisplayed()
-            .assertIsEnabled().assertHeightIsAtLeast(48.dp).getUnclippedBoundsInRoot()
-        val summaryNode=compose.onNodeWithText("仅本机处理 · 不发远端").assertIsDisplayed()
+        openPolicyDetails()
+        val rangeAction=compose.onNodeWithTag("mixed-policy-LOCAL_ONLY").assertIsDisplayed()
+            .assertIsEnabled().assertIsSelected().assertHeightIsAtLeast(48.dp).getUnclippedBoundsInRoot()
+        val summaryNode=compose.onNodeWithText("只影响这份尚未保存的记录；已有记录保持不变。两种范围都禁止发送到远端。").assertIsDisplayed()
         val rangeSummary=summaryNode.getUnclippedBoundsInRoot()
         assertTrue("At200% the full range summary precedes its wrapped action",rangeSummary.bottom<=rangeAction.top)
         val layouts=mutableListOf<TextLayoutResult>()
@@ -93,7 +93,7 @@ class MixedNotebookPresentationTest {
             "summary=$rangeSummary, action=$rangeAction",layout.hasVisualOverflow)
         val lastLine=layout.layoutInput.text.text.substring(layout.getLineStart(layout.lineCount-1),layout.getLineEnd(layout.lineCount-1,visibleEnd=true)).trim()
         assertTrue("The narrow200% summary must not leave one character alone",lastLine.codePointCount(0,lastLine.length)>1)
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        returnToComposer()
         compose.onNodeWithTag("mixed-text").assertIsDisplayed().assertIsEnabled()
         compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
     }
@@ -115,21 +115,21 @@ class MixedNotebookPresentationTest {
         }
         val compactHeading=compose.onNodeWithTag("mixed-notebook-heading").assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue(compactHeading.bottom-compactHeading.top<=88.dp)
-        compose.onNodeWithTag("mixed-jump-composer").assertDoesNotExist()
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-policy-details"))
-        compose.onNodeWithTag("mixed-policy-details").assertIsDisplayed().performClick()
-        compose.onNodeWithTag("mixed-jump-composer").assertIsDisplayed().assertIsEnabled()
-            .assertHeightIsAtLeast(48.dp).assertTextEquals("回到输入").performClick()
+        openPolicyDetails()
+        compose.onNodeWithTag("mixed-policy-LOCAL_ONLY").assertIsDisplayed().assertIsSelected().assertHeightIsAtLeast(48.dp)
+        returnToComposer()
+        compose.onNodeWithTag("mixed-focus-editor").performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
         compose.onNodeWithTag("mixed-text").performScrollTo().assertIsDisplayed().assertIsEnabled()
             .performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
         compose.onNodeWithTag("mixed-text").assertIsFocused()
         compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
         compose.runOnIdle { fontScale.value=1f }
+        compose.onNodeWithTag("mixed-focus-editor").performScrollTo().performClick()
         compose.onNodeWithTag("mixed-list").performScrollToIndex(0)
-        compose.onNodeWithText("生活的小片刻").assertDoesNotExist()
+        compose.onNodeWithText("今天，慢慢记。").assertDoesNotExist()
         val regularFontHeading=compose.onNodeWithTag("mixed-notebook-heading").assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue(regularFontHeading.bottom-regularFontHeading.top<=88.dp)
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").performScrollTo()
         compose.onNodeWithTag("mixed-text").assertIsDisplayed().assertIsEnabled()
         compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
     }
@@ -149,26 +149,38 @@ class MixedNotebookPresentationTest {
                     display=UiPreferencesState(UiPreferences(reduceMotion=true),ready=true)) }
             }
         }
-        compose.onNodeWithText("生活的小片刻").assertDoesNotExist()
+        compose.onNodeWithText("今天，慢慢记。").assertDoesNotExist()
         val heading=compose.onNodeWithTag("mixed-notebook-heading").assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue(heading.bottom-heading.top<=88.dp)
-        assertCompanionSize(56f)
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        assertCompanionSize(48f)
         compose.onNodeWithTag("mixed-text").performScrollTo().assertIsDisplayed().assertTextEquals(text)
         compose.onNodeWithTag("mixed-list").performScrollToIndex(0)
         compose.onNodeWithTag("companion-entry").performClick()
         compose.onNodeWithText("关闭陪伴面板").performClick()
         compose.onNodeWithText("设置").performClick()
         compose.onNodeWithText("返回").performClick()
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-policy-details"))
-        compose.onNodeWithTag("mixed-policy-details").assertIsDisplayed().performClick()
-        compose.onNodeWithTag("mixed-jump-composer").assertIsDisplayed().assertIsEnabled().performClick()
+        openPolicyDetails()
+        compose.onNodeWithTag("mixed-policy-LOCAL_ONLY").assertIsSelected()
+        returnToComposer()
+        compose.onNodeWithTag("mixed-focus-editor").performScrollTo().assertIsDisplayed().performClick()
         compose.onNodeWithTag("mixed-text").performScrollTo().assertIsDisplayed().assertTextEquals(text)
             .performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
         compose.onNodeWithTag("mixed-text").assertIsFocused()
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-save"))
+        compose.onNodeWithTag("mixed-save").performScrollTo()
         compose.onNodeWithTag("mixed-save").assertIsDisplayed().assertIsEnabled().assertHeightIsAtLeast(48.dp)
         compose.runOnIdle { assertEquals(0,writes);assertSame(draft,local.mixedCapture!!.draft);assertTrue(local.entries.isEmpty()) }
+    }
+
+    private fun openPolicyDetails() {
+        compose.onNodeWithTag("mixed-more").performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
+        compose.onNodeWithTag("mixed-details").performScrollToNode(hasTestTag("mixed-policy-LOCAL_ONLY"))
+    }
+
+    private fun returnToComposer() {
+        compose.onNodeWithTag("mixed-details").performScrollToNode(hasText("回到输入"))
+        compose.onNodeWithText("回到输入").assertIsDisplayed().assertIsEnabled().assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithTag("mixed-details").assertDoesNotExist()
+        compose.onNodeWithTag("mixed-text").performScrollTo()
     }
 
     private fun assertCompanionSize(expectedDp:Float) {

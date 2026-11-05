@@ -86,13 +86,17 @@ class KeywordReductionPresentationTest {
         }
         if(restoration==null)compose.setContent(body)else restoration.setContent(body)
     }
-    private fun field(tag:String,value:String){compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag(tag));compose.onNodeWithTag(tag).performScrollTo().performTextReplacement(value)}
+    private fun field(tag:String,value:String){
+        if(tag in setOf("original-search-from","original-search-through")) compose.showOriginalSearchFilters()
+        else compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag(tag))
+        compose.onNodeWithTag(tag).performScrollTo().performTextReplacement(value)
+    }
     private fun click(tag:String){compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick()}
     private fun ready(query:String,previous:OriginalSearchState?=null){compose.waitUntil(10000){observed.get()?.let{it!==previous&&it.stage==OriginalSearchStage.READY&&it.input.query==query}==true}}
     private fun openReduction(){compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("keyword-reduction-open"));click("keyword-reduction-open");compose.onNodeWithTag("keyword-reduction-original").assertExists()}
 
     @Test fun realAppRequiresRemovalAndConfirmationPreservesDatesThenOpensExactOriginal(){
-        content();compose.showOriginalSearchFilters();field("original-search-from","2026-10-10");field("original-search-through","2026-10-10");field("original-search-query","蓝绳 悬挂");ready("蓝绳 悬挂")
+        content();compose.showOriginalSearchFilters();field("original-search-from","2026-10-10");field("original-search-through","2026-10-10");compose.applyOriginalSearchFilters();field("original-search-query","蓝绳 悬挂");ready("蓝绳 悬挂")
         assertTrue(observed.get().hits.isEmpty());val before=reads.get();openReduction()
         compose.onNodeWithTag("keyword-reduction-original").assertTextEquals("蓝绳 悬挂")
         compose.onNodeWithTag("keyword-reduction-confirm").performScrollTo().assertIsNotEnabled();assertEquals(before,reads.get())

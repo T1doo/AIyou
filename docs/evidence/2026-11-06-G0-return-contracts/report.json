@@ -1,0 +1,528 @@
+{
+  "task_ids": [
+    "CORE-01",
+    "UX-03",
+    "UI-03",
+    "UI-04",
+    "UI-05"
+  ],
+  "scope": "G0 regression recovery; full tasks remain IN_PROGRESS",
+  "base_sha": "39225e99d018e4ccfb420014c046a8077dfb38fa",
+  "branch": "codex/g2-native-skyglass-20261105",
+  "production_sources_changed": false,
+  "source_sha256_lf_normalized": {
+    "app/src/test/kotlin/com/t1doo/aiyou/KeywordReductionPresentationTest.kt": "35d9b3994d571dbc2f8a6b27d31e81708c4c34a63bdf37648f5e70e263e078dc",
+    "app/src/test/kotlin/com/t1doo/aiyou/LocalRecordsPresentationTest.kt": "14364c8d3efce325c2141d5656d51dcd5992e70b001b93e8b07461f2d0371513",
+    "app/src/test/kotlin/com/t1doo/aiyou/MixedNotebookPresentationTest.kt": "b51158ecc6343b4ca60788d431559c6e4aef04af49b919aba516583b4aa5d552",
+    "app/src/test/kotlin/com/t1doo/aiyou/NotebookToolActions.kt": "222e23bc88ff67ca1f56b5376c3a75b7edce5be2c85a74831b57e954a8afc23c",
+    "app/src/test/kotlin/com/t1doo/aiyou/OriginalEditRecoveryPresentationTest.kt": "86a1119ca0fc223e8377a5d0b2ac847d7e1a675cfc46767c1edd6bed9d6e58c5",
+    "app/src/test/kotlin/com/t1doo/aiyou/SourceFactPresentationTest.kt": "cbc45210b183e660e1df5de57fc73d8fa4cdaef1f6f3600e201ae15ff60ff29b",
+    "app/src/test/kotlin/com/t1doo/aiyou/SourceTaskPresentationTest.kt": "f1c0c47b23d1d68e72bc8616315206eca22ba5c07effb36986926c881c88fd90",
+    "app/src/test/kotlin/com/t1doo/aiyou/UnavailableControlsInteractionTest.kt": "01fdf9be5e9197826bb51d472136fd9427224834b151359b31966e054df3d53d"
+  },
+  "test_method_inventory_unchanged": true,
+  "test_methods_retained": 39,
+  "targeted": {
+    "tests": 30,
+    "passed": 29,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0,
+    "exit_code": 1,
+    "single_method_failure": "OriginalEditRecoveryPresentationTest.aiNoneHistoryRouteCreatesOnlyAnExplicitNewVersionAndKeepsNoInferencePolicy",
+    "failure_kind": "Windows directory FileChannel.open in EncryptedOriginalEditStore.syncDirectory raises AccessDeniedException after updated UI entry succeeds"
+  },
+  "apk": {
+    "path": "app/build/outputs/apk/debug/app-debug.apk",
+    "bytes": 32066479,
+    "sha256": "417c1080d88c4c24e728862151f0781b30a6583f0d5f321f7d92372e8db4ac7c"
+  },
+  "device": {
+    "status": "NOT_RUN",
+    "reason": "No production sources changed; no new device claim"
+  },
+  "current_preview": {
+    "status": "NOT_RUN",
+    "reason": "No product/Preview changes; historical 444 result belongs to its older SHA"
+  },
+  "ci": {
+    "base_sha_associated_runs": 0,
+    "cli_dispatch": "FAIL HTTP 401",
+    "credential_reuse_attempt": "Rejected before execution by automatic approval; no credentials read or transferred",
+    "workflow_modified": false
+  },
+  "remaining": [
+    "Current candidate Linux CI",
+    "Windows directory sync and preference persistence cases",
+    "Secondary-page visual consistency, full IME/TalkBack/OEM/16KB/performance acceptance",
+    "Backup new-install restore/device acceptance; real model/OCR/ASR not enabled"
+  ],
+  "full_windows": {
+    "counts": {
+      "tests": 413,
+      "failures": 19,
+      "errors": 0,
+      "skipped": 0
+    },
+    "passed": 394,
+    "exit_code": 1,
+    "failures": [
+      {
+        "class": "com.t1doo.aiyou.AppAccessPreferenceTest",
+        "method": "confirmedSettingSurvivesNewInstancesAndStaleWriterCannotDisableIt",
+        "message": "java.io.IOException: App access preference not confirmed",
+        "first_frames": [
+          "java.io.IOException: App access preference not confirmed",
+          "\tat com.t1doo.aiyou.ui.FileAppAccessPreference.write(FileAppAccessPreference.kt:55)",
+          "\tat com.t1doo.aiyou.AppAccessPreferenceTest.confirmedSettingSurvivesNewInstancesAndStaleWriterCannotDisableIt(AppAccessPreferenceTest.kt:37)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)",
+          "\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)",
+          "\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)",
+          "\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)",
+          "\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)",
+          "\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)",
+          "\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)",
+          "\tat org.junit.rules.ExternalResource$1.evaluate(ExternalResource.java:54)",
+          "\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)",
+          "\tat org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:542)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.FactRecapPresentationTest",
+        "method": "actualSettingsPersistWeekAndOpenedRangeKeepsItsOwnChoiceBeforeExplicitGeneration",
+        "message": "java.lang.AssertionError: Failed to assert the following: (Selected = 'true')\nSemantics of the node:\nNode #3078 at (l=16.0, t=1091.0, r=304.0, b=1139.0)px, Tag: 'recap-default-week'\nRole = 'RadioButton'\nSelected = 'false'\nText = '[所在周（周一开始）]'\n[Disabled]\nActions = [ClearTextSubstitution, GetTextLayoutResult, OnClick, SetTextSubstitution, ShowTextSubstitution]\nMergeDescendants = 'true'\nHas 5 siblings\nSelector used: (TestTag = 'recap-default-week')\n",
+        "first_frames": [
+          "java.lang.AssertionError: Failed to assert the following: (Selected = 'true')",
+          "Semantics of the node:",
+          "Node #3078 at (l=16.0, t=1091.0, r=304.0, b=1139.0)px, Tag: 'recap-default-week'",
+          "Role = 'RadioButton'",
+          "Selected = 'false'",
+          "Text = '[所在周（周一开始）]'",
+          "[Disabled]",
+          "Actions = [ClearTextSubstitution, GetTextLayoutResult, OnClick, SetTextSubstitution, ShowTextSubstitution]",
+          "MergeDescendants = 'true'",
+          "Has 5 siblings",
+          "Selector used: (TestTag = 'recap-default-week')",
+          "",
+          "\tat androidx.compose.ui.test.AssertionsKt.assert(Assertions.kt:293)",
+          "\tat androidx.compose.ui.test.AssertionsKt.assert$default(Assertions.kt:283)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+        "method": "aiNoneHistoryRouteCreatesOnlyAnExplicitNewVersionAndKeepsNoInferencePolicy",
+        "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+        "first_frames": [
+          "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+          "\tat java.base/sun.nio.fs.WindowsException.translateToIOException(WindowsException.java:89)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:103)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:108)",
+          "\tat java.base/sun.nio.fs.WindowsFileSystemProvider.newFileChannel(WindowsFileSystemProvider.java:121)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:298)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:357)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.syncDirectory(EncryptedOriginalEditStore.kt:356)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.access$syncDirectory(EncryptedOriginalEditStore.kt:341)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invokeSuspend(EncryptedOriginalEditStore.kt:283)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invokeSuspend(ErasureFileProtocol.kt:100)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invoke(ErasureFileProtocol.kt)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+        "method": "wrongKeyIndexHasExplicitVisibleErrorAndNoRecoveryButtons",
+        "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+        "first_frames": [
+          "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+          "\tat java.base/sun.nio.fs.WindowsException.translateToIOException(WindowsException.java:89)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:103)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:108)",
+          "\tat java.base/sun.nio.fs.WindowsFileSystemProvider.newFileChannel(WindowsFileSystemProvider.java:121)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:298)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:357)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.syncDirectory(EncryptedOriginalEditStore.kt:356)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.access$syncDirectory(EncryptedOriginalEditStore.kt:341)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invokeSuspend(EncryptedOriginalEditStore.kt:283)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invokeSuspend(ErasureFileProtocol.kt:100)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invoke(ErasureFileProtocol.kt)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+        "method": "globalIndexFailureDisablesExistingButtonsAndVisibleRetryRestoresHealthyRecovery",
+        "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+        "first_frames": [
+          "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+          "\tat java.base/sun.nio.fs.WindowsException.translateToIOException(WindowsException.java:89)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:103)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:108)",
+          "\tat java.base/sun.nio.fs.WindowsFileSystemProvider.newFileChannel(WindowsFileSystemProvider.java:121)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:298)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:357)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.syncDirectory(EncryptedOriginalEditStore.kt:356)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.access$syncDirectory(EncryptedOriginalEditStore.kt:341)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invokeSuspend(EncryptedOriginalEditStore.kt:283)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invokeSuspend(ErasureFileProtocol.kt:100)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invoke(ErasureFileProtocol.kt)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+        "method": "aiNoneColdDraftRecoveryAllowsExplicitManualSaveWithoutChangingPolicy",
+        "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+        "first_frames": [
+          "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+          "\tat java.base/sun.nio.fs.WindowsException.translateToIOException(WindowsException.java:89)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:103)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:108)",
+          "\tat java.base/sun.nio.fs.WindowsFileSystemProvider.newFileChannel(WindowsFileSystemProvider.java:121)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:298)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:357)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.syncDirectory(EncryptedOriginalEditStore.kt:356)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.access$syncDirectory(EncryptedOriginalEditStore.kt:341)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invokeSuspend(EncryptedOriginalEditStore.kt:283)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invokeSuspend(ErasureFileProtocol.kt:100)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invoke(ErasureFileProtocol.kt)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+        "method": "narrowLargeFontColdRecoveryCorrectionAndSaveKeepCaptureAndImmutableOriginals",
+        "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+        "first_frames": [
+          "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+          "\tat java.base/sun.nio.fs.WindowsException.translateToIOException(WindowsException.java:89)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:103)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:108)",
+          "\tat java.base/sun.nio.fs.WindowsFileSystemProvider.newFileChannel(WindowsFileSystemProvider.java:121)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:298)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:357)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.syncDirectory(EncryptedOriginalEditStore.kt:356)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.access$syncDirectory(EncryptedOriginalEditStore.kt:341)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invokeSuspend(EncryptedOriginalEditStore.kt:283)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invokeSuspend(ErasureFileProtocol.kt:100)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invoke(ErasureFileProtocol.kt)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+        "method": "explicitKeepConfirmationFailureStaysInEditorAndVisibleRetryThenReturns",
+        "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+        "first_frames": [
+          "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+          "\tat java.base/sun.nio.fs.WindowsException.translateToIOException(WindowsException.java:89)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:103)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:108)",
+          "\tat java.base/sun.nio.fs.WindowsFileSystemProvider.newFileChannel(WindowsFileSystemProvider.java:121)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:298)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:357)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.syncDirectory(EncryptedOriginalEditStore.kt:356)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.access$syncDirectory(EncryptedOriginalEditStore.kt:341)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invokeSuspend(EncryptedOriginalEditStore.kt:283)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invokeSuspend(ErasureFileProtocol.kt:100)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invoke(ErasureFileProtocol.kt)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+        "method": "narrowLargeFontExplicitKeepReturnsToOriginalAndResumesWithoutFormalWrite",
+        "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+        "first_frames": [
+          "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+          "\tat java.base/sun.nio.fs.WindowsException.translateToIOException(WindowsException.java:89)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:103)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:108)",
+          "\tat java.base/sun.nio.fs.WindowsFileSystemProvider.newFileChannel(WindowsFileSystemProvider.java:121)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:298)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:357)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.syncDirectory(EncryptedOriginalEditStore.kt:356)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.access$syncDirectory(EncryptedOriginalEditStore.kt:341)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invokeSuspend(EncryptedOriginalEditStore.kt:283)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invokeSuspend(ErasureFileProtocol.kt:100)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invoke(ErasureFileProtocol.kt)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+        "method": "missingSourceRecoveryRetainsTextAndExplicitDiscardCannotResurrectIt",
+        "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+        "first_frames": [
+          "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+          "\tat java.base/sun.nio.fs.WindowsException.translateToIOException(WindowsException.java:89)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:103)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:108)",
+          "\tat java.base/sun.nio.fs.WindowsFileSystemProvider.newFileChannel(WindowsFileSystemProvider.java:121)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:298)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:357)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.syncDirectory(EncryptedOriginalEditStore.kt:356)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.access$syncDirectory(EncryptedOriginalEditStore.kt:341)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invokeSuspend(EncryptedOriginalEditStore.kt:283)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invokeSuspend(ErasureFileProtocol.kt:100)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invoke(ErasureFileProtocol.kt)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+        "method": "actualCipherWriteFailureRemainsVisibleAndCorrectedRetryPreservesCompleteInput",
+        "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+        "first_frames": [
+          "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+          "\tat java.base/sun.nio.fs.WindowsException.translateToIOException(WindowsException.java:89)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:103)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:108)",
+          "\tat java.base/sun.nio.fs.WindowsFileSystemProvider.newFileChannel(WindowsFileSystemProvider.java:121)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:298)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:357)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.syncDirectory(EncryptedOriginalEditStore.kt:356)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.access$syncDirectory(EncryptedOriginalEditStore.kt:341)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invokeSuspend(EncryptedOriginalEditStore.kt:283)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invokeSuspend(ErasureFileProtocol.kt:100)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invoke(ErasureFileProtocol.kt)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+        "method": "partialIndexWarningIsVisibleAndHealthyRecoveryRemainsUsableWithoutShowingDamagedText",
+        "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+        "first_frames": [
+          "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp",
+          "\tat java.base/sun.nio.fs.WindowsException.translateToIOException(WindowsException.java:89)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:103)",
+          "\tat java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:108)",
+          "\tat java.base/sun.nio.fs.WindowsFileSystemProvider.newFileChannel(WindowsFileSystemProvider.java:121)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:298)",
+          "\tat java.base/java.nio.channels.FileChannel.open(FileChannel.java:357)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.syncDirectory(EncryptedOriginalEditStore.kt:356)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$Companion.access$syncDirectory(EncryptedOriginalEditStore.kt:341)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invokeSuspend(EncryptedOriginalEditStore.kt:283)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.EncryptedOriginalEditStore$locked$2.invoke(EncryptedOriginalEditStore.kt)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invokeSuspend(ErasureFileProtocol.kt:100)",
+          "\tat com.t1doo.aiyou.data.ErasureFileProtocolKt$trackedFileOperation$2.invoke(ErasureFileProtocol.kt)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.SkyglassPreferencesTest",
+        "method": "platformAtomicFileReplacementIsVisibleToReadback",
+        "message": "org.junit.ComparisonFailure: Platform AtomicFile replacement must be confirmed expected:<synthetic-[second]> but was:<synthetic-[first]>",
+        "first_frames": [
+          "org.junit.ComparisonFailure: Platform AtomicFile replacement must be confirmed expected:<synthetic-[second]> but was:<synthetic-[first]>",
+          "\tat org.junit.Assert.assertEquals(Assert.java:117)",
+          "\tat com.t1doo.aiyou.SkyglassPreferencesTest.platformAtomicFileReplacementIsVisibleToReadback(SkyglassPreferencesTest.kt:29)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)",
+          "\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)",
+          "\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)",
+          "\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)",
+          "\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)",
+          "\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)",
+          "\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)",
+          "\tat org.junit.rules.ExternalResource$1.evaluate(ExternalResource.java:54)",
+          "\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)",
+          "\tat org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:542)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.SkyglassPreferencesTest",
+        "method": "legacyV4ReadIsUntouchedAndEveryThemeMotionPairSurvivesColdRead",
+        "message": "java.io.IOException: UI preferences not confirmed",
+        "first_frames": [
+          "java.io.IOException: UI preferences not confirmed",
+          "\tat com.t1doo.aiyou.ui.FileUiPreferences.write(UiPreferences.kt:96)",
+          "\tat com.t1doo.aiyou.SkyglassPreferencesTest.legacyV4ReadIsUntouchedAndEveryThemeMotionPairSurvivesColdRead(SkyglassPreferencesTest.kt:44)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)",
+          "\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)",
+          "\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)",
+          "\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)",
+          "\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)",
+          "\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)",
+          "\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)",
+          "\tat org.junit.rules.ExternalResource$1.evaluate(ExternalResource.java:54)",
+          "\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)",
+          "\tat org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:542)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.UiPreferencesTest",
+        "method": "legacyDefaultsStayLocalAndExplicitNoneSurvivesNewFileAndViewModelOwners",
+        "message": "java.io.IOException: UI preferences not confirmed",
+        "first_frames": [
+          "java.io.IOException: UI preferences not confirmed",
+          "\tat com.t1doo.aiyou.ui.FileUiPreferences.write(UiPreferences.kt:96)",
+          "\tat com.t1doo.aiyou.UiPreferencesTest.legacyDefaultsStayLocalAndExplicitNoneSurvivesNewFileAndViewModelOwners(UiPreferencesTest.kt:58)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)",
+          "\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)",
+          "\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)",
+          "\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)",
+          "\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)",
+          "\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)",
+          "\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)",
+          "\tat org.junit.rules.ExternalResource$1.evaluate(ExternalResource.java:54)",
+          "\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)",
+          "\tat org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:542)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.UiPreferencesTest",
+        "method": "confirmedRecapWeekSurvivesNewStorageAndViewModelAndKeepsDisplayChoices",
+        "message": "java.lang.AssertionError: expected:<UiPreferences(showCompanion=true, reduceMotion=true, defaultRecapPeriod=WEEK, defaultCapturePolicy=LOCAL_ONLY, showCompanionScene=true, appearance=BLUE, backgroundMotion=DRIFT)> but was:<UiPreferences(showCompanion=false, reduceMotion=true, defaultRecapPeriod=WEEK, defaultCapturePolicy=LOCAL_ONLY, showCompanionScene=true, appearance=BLUE, backgroundMotion=DRIFT)>",
+        "first_frames": [
+          "java.lang.AssertionError: expected:<UiPreferences(showCompanion=true, reduceMotion=true, defaultRecapPeriod=WEEK, defaultCapturePolicy=LOCAL_ONLY, showCompanionScene=true, appearance=BLUE, backgroundMotion=DRIFT)> but was:<UiPreferences(showCompanion=false, reduceMotion=true, defaultRecapPeriod=WEEK, defaultCapturePolicy=LOCAL_ONLY, showCompanionScene=true, appearance=BLUE, backgroundMotion=DRIFT)>",
+          "\tat org.junit.Assert.fail(Assert.java:89)",
+          "\tat org.junit.Assert.failNotEquals(Assert.java:835)",
+          "\tat org.junit.Assert.assertEquals(Assert.java:120)",
+          "\tat org.junit.Assert.assertEquals(Assert.java:146)",
+          "\tat com.t1doo.aiyou.UiPreferencesTest.confirmedRecapWeekSurvivesNewStorageAndViewModelAndKeepsDisplayChoices(UiPreferencesTest.kt:123)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)",
+          "\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)",
+          "\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)",
+          "\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)",
+          "\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)",
+          "\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)",
+          "\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.UiPreferencesTest",
+        "method": "lostDefaultWriteAcknowledgementShowsUnconfirmedAndRetriesOnlyTheSamePreference",
+        "message": "java.lang.AssertionError: expected:<LOCAL_ONLY> but was:<AI_NONE>",
+        "first_frames": [
+          "java.lang.AssertionError: expected:<LOCAL_ONLY> but was:<AI_NONE>",
+          "\tat org.junit.Assert.fail(Assert.java:89)",
+          "\tat org.junit.Assert.failNotEquals(Assert.java:835)",
+          "\tat org.junit.Assert.assertEquals(Assert.java:120)",
+          "\tat org.junit.Assert.assertEquals(Assert.java:146)",
+          "\tat com.t1doo.aiyou.UiPreferencesTest.lostDefaultWriteAcknowledgementShowsUnconfirmedAndRetriesOnlyTheSamePreference(UiPreferencesTest.kt:102)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)",
+          "\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)",
+          "\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)",
+          "\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)",
+          "\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)",
+          "\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)",
+          "\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.UiPreferencesTest",
+        "method": "legacyDisplayBytesDefaultToDayAndAreUntouchedUntilExplicitPreferenceSave",
+        "message": "java.io.IOException: UI preferences not confirmed",
+        "first_frames": [
+          "java.io.IOException: UI preferences not confirmed",
+          "\tat com.t1doo.aiyou.ui.FileUiPreferences.write(UiPreferences.kt:96)",
+          "\tat com.t1doo.aiyou.UiPreferencesTest.legacyDisplayBytesDefaultToDayAndAreUntouchedUntilExplicitPreferenceSave(UiPreferencesTest.kt:135)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)",
+          "\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)",
+          "\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)",
+          "\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)",
+          "\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)",
+          "\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)",
+          "\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)",
+          "\tat org.junit.rules.ExternalResource$1.evaluate(ExternalResource.java:54)",
+          "\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)",
+          "\tat org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:542)"
+        ]
+      },
+      {
+        "class": "com.t1doo.aiyou.UiPreferencesTest",
+        "method": "scenePreferenceMigratesV3WithoutChangingCapturePolicyOrWritingOnRead",
+        "message": "java.io.IOException: UI preferences not confirmed",
+        "first_frames": [
+          "java.io.IOException: UI preferences not confirmed",
+          "\tat com.t1doo.aiyou.ui.FileUiPreferences.write(UiPreferences.kt:96)",
+          "\tat com.t1doo.aiyou.UiPreferencesTest.scenePreferenceMigratesV3WithoutChangingCapturePolicyOrWritingOnRead(UiPreferencesTest.kt:38)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)",
+          "\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)",
+          "\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)",
+          "\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)",
+          "\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)",
+          "\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)",
+          "\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)",
+          "\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)",
+          "\tat org.junit.rules.ExternalResource$1.evaluate(ExternalResource.java:54)",
+          "\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)",
+          "\tat org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:542)"
+        ]
+      }
+    ],
+    "previous_failure_count": 27,
+    "previous_failures_now_passing": [
+      [
+        "com.t1doo.aiyou.KeywordReductionPresentationTest",
+        "realAppRequiresRemovalAndConfirmationPreservesDatesThenOpensExactOriginal"
+      ],
+      [
+        "com.t1doo.aiyou.LocalRecordsPresentationTest",
+        "productionCaptureAndMemoriesStayCenteredAndBoundedOnWideScreens"
+      ],
+      [
+        "com.t1doo.aiyou.MixedNotebookPresentationTest",
+        "coldRegularFontLandscapeStartsCompactAndRetainsDraftAcrossReadOnlyActions"
+      ],
+      [
+        "com.t1doo.aiyou.MixedNotebookPresentationTest",
+        "emptyLandscapeDoubleFontHasReachableStartAndFocusedComposerWithoutWriting"
+      ],
+      [
+        "com.t1doo.aiyou.MixedNotebookPresentationTest",
+        "realNotebookUsesBundledLuluOnlyWhenPreferenceIsReadyAndVisibleWithoutWritingRecords"
+      ],
+      [
+        "com.t1doo.aiyou.SourceFactPresentationTest",
+        "explicitCandidateSeparateAcceptanceCorrectionAndRevocationReachExactOriginalAndUnifiedFact"
+      ],
+      [
+        "com.t1doo.aiyou.SourceTaskPresentationTest",
+        "narrowDoubleFontLiteralFlowRequiresSeparateConfirmationAndJumpsToExactOriginal"
+      ],
+      [
+        "com.t1doo.aiyou.UnavailableControlsInteractionTest",
+        "offlineLicenseRouteAndReturnToLocalMemoriesSurviveIntegration"
+      ]
+    ],
+    "new_failure_methods": [],
+    "note": "The historical-version method remains failing but now reaches the same Windows directory sync limitation as other recovery cases; no failing method skipped."
+  },
+  "required_checks": {
+    "status": "PASS",
+    "exit_code": 0,
+    "command": "./gradlew.bat --no-daemon --offline :app:checkDebugAarMetadata :app:assembleDebug :core:domain:test :app:lintDebug --console=plain",
+    "note": "AAR/assemble/domain UP-TO-DATE; lintDebug executed using up-to-date analysis/report. Cached XML inspected; domain tests were not reexecuted in this invocation.",
+    "domain_xml_counts": {
+      "tests": 78,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lint_issue_severities": [
+      "Hint"
+    ]
+  },
+  "archives": {
+    "full-windows-results.zip": "acdc33581b6236f3cfc3fabfec02229a5a61fb59c59362d0664c4a08537e5fc3",
+    "required-checks.zip": "29120b1d014529a473eebf13d1dfbddc30b7e62ca872b72646fb7948890dffea",
+    "targeted-results.zip": "ec2666f49cd852da01491b730d615ffc11e7e4c90535e871236c76cc5d349ce4"
+  }
+}
