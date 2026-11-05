@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.MixedCapturePresentationTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-05T11:19:50.777Z" hostname="runnervm7aw5e" time="12.798">
+  <properties/>
+  <testcase name="failedSaveRetainsTextAndImagesAndPrivateComposerNeverEntersSavedState" classname="com.t1doo.aiyou.MixedCapturePresentationTest" time="7.443"/>
+  <testcase name="frontendDayFocusKeepsDraftAndFailedSaveRetriesTheSameRecord" classname="com.t1doo.aiyou.MixedCapturePresentationTest" time="0.428"/>
+  <testcase name="newSaveWhileComposerIsScrolledOnlyOffersExplicitJumpAndReaderReturnKeepsNextDraft" classname="com.t1doo.aiyou.MixedCapturePresentationTest" time="0.444"/>
+  <testcase name="ordinaryPhoneKeepsSaveBesideAttachmentToolsInBothEditorModes" classname="com.t1doo.aiyou.MixedCapturePresentationTest" time="0.17"/>
+  <testcase name="removingLastImageRejectsEmptyRecordAndCancelKeepsDraftAndRetiresPicker" classname="com.t1doo.aiyou.MixedCapturePresentationTest" time="0.635"/>
+  <testcase name="viewportAndFontChangesPreserveDraftAndRangeThenSaveOnlyOnExplicitAction" classname="com.t1doo.aiyou.MixedCapturePresentationTest" time="0.733"/>
+  <testcase name="narrowLostRangeAckKeepsPendingChoiceDisablesSaveAndRetriesExactTransition" classname="com.t1doo.aiyou.MixedCapturePresentationTest" time="0.494"/>
+  <testcase name="narrowPreSaveRangeDefaultsLocalAndRetiredActualChoiceCannotAffectReturnedDraft" classname="com.t1doo.aiyou.MixedCapturePresentationTest" time="0.614"/>
+  <testcase name="lostClearAckHasReachableSameClearRetryAndCannotPromiseContinuedEditingBeforeVerification" classname="com.t1doo.aiyou.MixedCapturePresentationTest" time="0.578"/>
+  <testcase name="actualNowPurePictureHasThumbnailCountRemovalAndSeparateDurableSaveAtLargeFont" classname="com.t1doo.aiyou.MixedCapturePresentationTest" time="0.312"/>
+  <testcase name="explicitReadAfterFailedRangeWriteDoesNotResendAndRetiresOldRetryHandler" classname="com.t1doo.aiyou.MixedCapturePresentationTest" time="0.264"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

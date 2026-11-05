@@ -1,7 +1,7 @@
 {
   "plan": "docs/plans/AIyou-Codex-Plan-20261105/backlog.json",
   "goal": "G0–G7 native migration and evidence-based acceptance",
-  "current_batch": "Full UI baseline409/252fail recorded; 37 real-record group tests now PASS after locator adaptation; full rerun next",
+  "current_batch": "Full409 rerun after navigation adaptation:303 pass/106fail, same inventory and no skips; Linux host and444 Preview PASS; Android inventory verifier stale9vs11 still open",
   "tasks": [
     {
       "id": "AUD-01",
@@ -120,7 +120,7 @@
     }
   ],
   "holds": [
-    "Linux CI42014671336 host contracts passed; Android/Preview still running at last query. Local full UI recovery ongoing.",
+    "Linux CI42014671336 host and444 Preview passed. Android stopped on exact-target inventory expected9 vs actual11 passing cases; update with strict inventory audit, not disabled checks.",
     "Windows directory fsync limitation remains locally; same cross-key backup test PASS on Linux CI 41986956370, XML verified. Android new-install recovery still NOT RUN.",
     "No device/IME/TalkBack/performance acceptance inferred from design or JVM tests",
     "Theme replacement and restart PASS on API35 emulator; Windows Robolectric AtomicFile failure retained as host-specific evidence."
@@ -137,7 +137,8 @@
     "docs/evidence/2026-11-05-G3-tasks/report.json",
     "docs/evidence/2026-11-05-G3-task-drafts/report.json",
     "docs/evidence/2026-11-05-G0-diagnostics/report.json",
-    "docs/evidence/2026-11-05-G0-full-ui/report.json"
+    "docs/evidence/2026-11-05-G0-full-ui/report.json",
+    "docs/evidence/2026-11-05-G0-full-ui-after/report.json"
   ],
   "stop_after_each_batch": "Commit and report evidence; continue next dependent batch under active user-requested goal unless an explicit approval or hard blocker applies"
 }
