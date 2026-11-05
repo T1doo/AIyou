@@ -1,0 +1,92 @@
+{
+  "batch": "G1",
+  "source_sha": "758f3902c800e4e5aefd48d41e25833f73d7bc64",
+  "tasks": {
+    "UX-01": "SPECIFICATION_COMPLETE",
+    "UX-02": "SPECIFICATION_COMPLETE_NATIVE_VALIDATION_PENDING",
+    "UX-03": "SPECIFICATION_COMPLETE_NATIVE_VALIDATION_PENDING"
+  },
+  "inspected_images": [
+    {
+      "path": "docs/ui-review/2026-11-05/appearance.png",
+      "sha256": "64628694531f9573c28a5723578c3582a9ca3ab20d9cd7ea754f464478347dba",
+      "viewed": "Latest seven opened during G0 in this conversation; old home/narrow opened in G1"
+    },
+    {
+      "path": "docs/ui-review/2026-11-05/filters.png",
+      "sha256": "31d745954ed1914db3aeb59ee4a187445d6ee8e1de39dd2415258d86d110b524",
+      "viewed": "Latest seven opened during G0 in this conversation; old home/narrow opened in G1"
+    },
+    {
+      "path": "docs/ui-review/2026-11-05/now-blue.png",
+      "sha256": "bc6440631f44e8c74e8e5e989f6dc1d53e0c0327b2bbfb61d6416e3ee19f2e06",
+      "viewed": "Latest seven opened during G0 in this conversation; old home/narrow opened in G1"
+    },
+    {
+      "path": "docs/ui-review/2026-11-05/now-night.png",
+      "sha256": "c56f2263f4d8939eac325d95617c34475d7f06bc6267cc42b60ae2226308d5a3",
+      "viewed": "Latest seven opened during G0 in this conversation; old home/narrow opened in G1"
+    },
+    {
+      "path": "docs/ui-review/2026-11-05/now-sunset.png",
+      "sha256": "eebd087fafc971d7bebf87a9df9ca9df74e0ad3e2870cc73aef4914c55ca015c",
+      "viewed": "Latest seven opened during G0 in this conversation; old home/narrow opened in G1"
+    },
+    {
+      "path": "docs/ui-review/2026-11-05/record-editor.png",
+      "sha256": "9e64ad8c0b33fe33bcb4796b7656a1887b8049d450ef3f85a963bcc416f48eee",
+      "viewed": "Latest seven opened during G0 in this conversation; old home/narrow opened in G1"
+    },
+    {
+      "path": "docs/ui-review/2026-11-05/task-editor.png",
+      "sha256": "4cf9e9f8ed94e80802b37b43134a466c0257b656120273531c472d192a99fa76",
+      "viewed": "Latest seven opened during G0 in this conversation; old home/narrow opened in G1"
+    },
+    {
+      "path": "docs/ui-review/2026-11-04/prototype/01-now-blue.png",
+      "sha256": "f97e143c4933e8edd57ca92a8fbb39477c3d2dbb22b58480bbd7e77d6753a167",
+      "viewed": "Latest seven opened during G0 in this conversation; old home/narrow opened in G1"
+    },
+    {
+      "path": "docs/ui-review/2026-11-04/prototype/02-memories-blue.png",
+      "sha256": "3fbfcd6ec2ebdacf1c02d1c779b54c007eec37cb72a25fd2719f7f6ac4936fc9",
+      "viewed": "Latest seven opened during G0 in this conversation; old home/narrow opened in G1"
+    },
+    {
+      "path": "docs/ui-review/2026-11-04/prototype/03-tasks-blue.png",
+      "sha256": "ada560dfda84a21d94c6a858a6e66e2b4b442e929d5e68c32b545084ca1e2af1",
+      "viewed": "Latest seven opened during G0 in this conversation; old home/narrow opened in G1"
+    },
+    {
+      "path": "docs/ui-review/2026-11-04/prototype/12-now-narrow-320.png",
+      "sha256": "e9a05e49c4f2386d028be765e883aa949f2aa6d0c90ab7c676f3cb00ea980c17",
+      "viewed": "Latest seven opened during G0 in this conversation; old home/narrow opened in G1"
+    }
+  ],
+  "findings": [
+    "Preserve three natural scenes; do not paint glass props into scenery",
+    "Latest record editor has one emphasized save and adjacent light attachment tools",
+    "Latest task editor is compact; do not copy old large text-area layout",
+    "Latest filters separate Reset from primary Apply; functional draft semantics required natively",
+    "Native theme remains legacy white and display prefs v4 lack theme/motion mode; G2 must migrate both",
+    "Old 320 CSS-width image is design reference, not native 320dp or 2x-font acceptance",
+    "Lulu remains text placeholder in prototype; no new art accepted"
+  ],
+  "preserved_regressions": [
+    "cancel keeps record/task draft",
+    "filter draft/apply/reset boundaries",
+    "favorites and media compose",
+    "readable body and differentiated surfaces",
+    "reduced motion remembers prior mode",
+    "search tools stable across focus"
+  ],
+  "native_migration": false,
+  "validation": {
+    "json_and_references": "PASS",
+    "opaque_token_pairs": "See opaque-token-contrast.json; not composited image certification",
+    "native_build": "NOT RUN: specifications only; unchanged product sources from G0",
+    "native_screenshots_ime_talkback": "NOT RUN",
+    "figma": "NOT RUN; existing quota limitation is not a gate"
+  },
+  "next": "G2 UI-01 foundation then UI-02 real capture/save/detail/return; retain all controller owners and regression tests"
+}

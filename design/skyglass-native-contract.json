@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "batch": "G1",
+  "status": "DESIGN_SPECIFICATION_NOT_NATIVE_IMPLEMENTATION",
+  "sourceBaseline": "758f3902c800e4e5aefd48d41e25833f73d7bc64",
+  "precedence": ["Current explicit user decisions", "2026-11-05 execution plan and G1 contracts", "867f86ed prototype and inspected screenshots", "Original product invariants", "Earlier visual drafts"],
+  "preserve": ["Natural sky, cloud, sea and mountain scenery", "Blue, sunset and night themes", "Small companion slot", "Now, memories and tasks navigation", "Original records, versions, sources, privacy and confirmation boundaries"],
+  "supersedesVisualOnly": "The continuous-white description in design/tokens.json is the legacy native baseline. Original design documents remain unchanged. This specification does not change product processing, storage or authorization rules.",
+  "implementationMap": {
+    "legacyTokens": "design/tokens.json",
+    "generatedOutput": "core/designsystem/src/main/kotlin/com/t1doo/aiyou/designsystem/AIyouTokens.kt",
+    "themeEntry": "core/designsystem/src/main/kotlin/com/t1doo/aiyou/designsystem/AIyouTheme.kt",
+    "preferences": "app/src/main/java/com/t1doo/aiyou/ui/UiPreferences.kt",
+    "strategy": "G2 introduces theme-scoped semantic colors and surfaces. Do not manually edit generated legacy tokens or globally rename every business call site. Migrate one connected route at a time; leave legacy compatibility available until parity is proven.",
+    "preferencesMigration": "Add theme and background mode to versioned non-sensitive display preferences; preserve existing v1-v4 reads, companion, reduceMotion, recap and capture policy. Unknown/corrupt data must not broaden processing. Theme write failure must remain visible. No record text or credentials enter this file."
+  },
+  "geometryDp": {"page":20,"pageNarrow":16,"narrowBelow":360,"spaceUnit":4,"cardRadius":14,"inputRadius":14,"sheetTopRadius":24,"icon":22,"navigationIcon":23,"touchTargetMin":48,"functionalOutline":1,"focusOutline":2,"companionVisible":48},
+  "geometryRules": ["Values are starting points, not fixed text-container heights", "Task rows grow with title and reminder state", "Record editor grows with content and available IME-safe height", "Task editor starts compact; date follows title", "Long content scrolls inside an owned route without losing navigation context", "At 2x fonts reflow controls instead of scaling the whole phone"],
+  "typography": {
+    "family":"Android system sans serif; no downloaded font",
+    "unit":"sp with system font scaling",
+    "pageTitle":{"size":22,"lineHeight":28,"weight":600},
+    "welcome":{"size":17,"lineHeight":25,"weight":500},
+    "recordTitle":{"size":16,"lineHeight":24,"weight":500},
+    "body":{"size":16,"lineHeight":26,"weight":400},
+    "group":{"size":15,"lineHeight":22,"weight":500},
+    "supporting":{"size":13,"lineHeight":20,"weight":400},
+    "navigation":{"size":12,"lineHeight":18,"weight":500}
+  },
+  "themeCandidates": {
+    "blue":{"label":"晴空蓝","asset":"design/assets/nature-themes/blue.webp","textPrimary":"#233B61","textBody":"#344E70","textSecondary":"#526987","primary":"#3866C3","onPrimary":"#FFFFFF","selected":"#3569D4","tint":"#E6EDFC","input":"#F7FAFF","sheet":"#F7FAFF","readingStops":["#EDF5FFD9","#F0EFFFDA"],"welcome":"#F2F7FF6F","navigation":"#F7FAFFDB","functionalOutline":"#526987","error":"#AC3935","success":"#376A52"},
+    "sunset":{"label":"桃色晚霞","asset":"design/assets/nature-themes/sunset.webp","textPrimary":"#513644","textBody":"#664657","textSecondary":"#775967","primary":"#994363","onPrimary":"#FFFFFF","selected":"#9A4264","tint":"#F9E5EB","input":"#FFF6F4","sheet":"#FFF6F4","readingStops":["#FFF4EADA","#F9EDF1DB"],"welcome":"#FFF2EC70","navigation":"#FFF5F0DF","functionalOutline":"#775967","error":"#A43139","success":"#376A52"},
+    "night":{"label":"星夜紫","asset":"design/assets/nature-themes/night.webp","textPrimary":"#F0F1FF","textBody":"#E0E7F7","textSecondary":"#BEC7E3","primary":"#5969B8","onPrimary":"#FFFFFF","selected":"#BFCBFF","tint":"#3A426B","input":"#252B4C","sheet":"#252B4C","readingStops":["#27324EE0","#302B50D9"],"welcome":"#222C4C74","navigation":"#202644ED","functionalOutline":"#BEC7E3","error":"#FFB4AB","success":"#98D9B4"}
+  },
+  "colorEncoding":"Hex uses RRGGBB or RRGGBBAA (CSS alpha last); explicitly convert to Compose ARGB. Candidates require composed-pixel checks before native acceptance.",
+  "surfacePolicy": {
+    "welcome":"Most translucent; no heavy shadow; backdrop text must remain readable. Strengthen local scrim when needed.",
+    "reading":"Stable low-frequency gradient fill; sharp text above scenery; no moving highlight crossing glyphs.",
+    "input":"Opaque theme-colored fill for sustained editing and error feedback.",
+    "sheet":"Opaque theme-colored fill; only underlying content is dimmed; keyboard never blurs.",
+    "navigation":"Stable theme fill plus safe system inset; labels always visible.",
+    "api26to30":"Shared scenery plus tinted gradient surfaces; no runtime blur required; retain theme rather than white fallback.",
+    "api31plus":"Use the same reliable baseline initially. Any optional blur applies to an isolated background image layer, never the composited text/control tree; profiling is required before enabling expensive sampling.",
+    "sceneryFailure":"Theme-colored low-frequency gradient with readable foreground; recording remains usable."
+  },
+  "components": {
+    "completion":{"normal":"Primary fill and onPrimary text; one per panel","busy":"Preserve label/context, disable repeat submission, announce saving","failure":"Keep input and offer retry; no success toast","disabled":"Noninteractive semantics, not merely reduced alpha"},
+    "tool":{"normal":"Unfilled icon; 48dp target; photos and audio adjacent","pressed":"Small tint response without moving neighbors","label":"Accessible action name; no redundant visible helper text"},
+    "filter":{"normal":"Media type and favorites are separate dimensions","selected":"Label plus selected semantics; do not rely on color alone","apply":"Only Apply commits draft filters; Reset does not erase search"},
+    "task":{"normal":"Checkbox and title/detail targets separate","busy":"Do not hide task before repository acknowledgement","complete":"Stable completed state only after successful mutation","failure":"Restore or retain prior state and explain failure","reminder":"Scheduled, restricted, failed and unscheduled remain distinct"},
+    "audio":{"normal":"Actual duration and position from playback state","unavailable":"No enabled play action for missing/corrupt source","waveform":"Use real measured data or honest progress bar; no fabricated wave evidence"},
+    "navigation":{"selected":"Small selection container plus label and selected semantics","repeat":"Latest selection wins; no queued page animations","return":"Per-route scroll and ownership preserved"},
+    "companion":{"fallback":"Neutral slot or approved static asset only","trigger":"Explicit tap or actual save success","reduced":"Static response","data":"No record reading or task creation"}
+  },
+  "motion": {
+    "pressMs":90,"releaseMs":140,"navigationMs":200,"sheetEnterMs":280,"sheetExitMs":180,"themeMs":300,"environmentPeriodMs":36000,
+    "pressScaleMin":0.985,
+    "preferences":["still","drift","glow"],
+    "actualPlayback":"Resume only when foreground, route eligible, no editing/scrolling and neither app nor system reduces motion. Preserve selected preference when paused.",
+    "interruption":"Retarget current animation; do not queue transitions or delay business actions.",
+    "reduced":"No continuous background animation, spatial slide or bounce; immediate state or brief non-spatial fade.",
+    "performance":"No repeated whole-screen blur per card; no animation-driven database writes; actual 60/120Hz device evidence remains required."
+  },
+  "verification": {
+    "contrast":"Measure final composited pixels for text >=4.5:1 and essential controls/state >=3:1, separately from decorative borders. Check scenery extremes, sheet, pressed/selected and low-API fallback. Alpha candidates are not pre-certified.",
+    "widthDp":[320,360,390,412],"fontScale":[1.0,1.3,1.5,2.0],
+    "riskCombination":"320dp + 2x fonts + long Chinese text; all themes for core routes; do not claim all Cartesian combinations without executing them.",
+    "nativeEvidence":"Candidate APK hash, API, viewport/fontScale, scenario and screenshot per check; browser captures are design references only."
+  },
+  "references":["https://developer.android.com/develop/ui/compose/graphics/images/customize","https://developer.android.com/develop/ui/compose/system/insets-ui","https://developer.android.com/develop/ui/compose/accessibility/api-defaults"]
+}

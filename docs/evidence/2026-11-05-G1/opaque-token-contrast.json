@@ -1,0 +1,65 @@
+[
+  {
+    "theme": "blue",
+    "foreground": "textBody",
+    "background": "input",
+    "ratio": 8.128,
+    "scope": "Opaque token pair only; not final screenshot acceptance"
+  },
+  {
+    "theme": "blue",
+    "foreground": "textSecondary",
+    "background": "sheet",
+    "ratio": 5.383,
+    "scope": "Opaque token pair only; not final screenshot acceptance"
+  },
+  {
+    "theme": "blue",
+    "foreground": "onPrimary",
+    "background": "primary",
+    "ratio": 5.445,
+    "scope": "Opaque token pair only; not final screenshot acceptance"
+  },
+  {
+    "theme": "sunset",
+    "foreground": "textBody",
+    "background": "input",
+    "ratio": 7.655,
+    "scope": "Opaque token pair only; not final screenshot acceptance"
+  },
+  {
+    "theme": "sunset",
+    "foreground": "textSecondary",
+    "background": "sheet",
+    "ratio": 5.79,
+    "scope": "Opaque token pair only; not final screenshot acceptance"
+  },
+  {
+    "theme": "sunset",
+    "foreground": "onPrimary",
+    "background": "primary",
+    "ratio": 6.292,
+    "scope": "Opaque token pair only; not final screenshot acceptance"
+  },
+  {
+    "theme": "night",
+    "foreground": "textBody",
+    "background": "input",
+    "ratio": 11.084,
+    "scope": "Opaque token pair only; not final screenshot acceptance"
+  },
+  {
+    "theme": "night",
+    "foreground": "textSecondary",
+    "background": "sheet",
+    "ratio": 8.157,
+    "scope": "Opaque token pair only; not final screenshot acceptance"
+  },
+  {
+    "theme": "night",
+    "foreground": "onPrimary",
+    "background": "primary",
+    "ratio": 5.075,
+    "scope": "Opaque token pair only; not final screenshot acceptance"
+  }
+]

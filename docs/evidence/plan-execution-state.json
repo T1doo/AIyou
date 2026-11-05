@@ -1,0 +1,132 @@
+{
+  "plan": "docs/plans/AIyou-Codex-Plan-20261105/backlog.json",
+  "goal": "G0–G7 native migration and evidence-based acceptance",
+  "current_batch": "G1 specification complete; G2 next",
+  "tasks": [
+    {
+      "id": "AUD-01",
+      "batch": "G0",
+      "status": "STATIC_INVENTORY_COMPLETE"
+    },
+    {
+      "id": "CORE-01",
+      "batch": "G0",
+      "status": "LOCAL_BASELINE_PASS_CI_PENDING"
+    },
+    {
+      "id": "UX-01",
+      "batch": "G1",
+      "status": "PASS_SPECIFICATION"
+    },
+    {
+      "id": "UX-02",
+      "batch": "G1",
+      "status": "PASS_SPECIFICATION"
+    },
+    {
+      "id": "UX-03",
+      "batch": "G1",
+      "status": "PASS_SPECIFICATION"
+    },
+    {
+      "id": "UI-01",
+      "batch": "G2",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "UI-02",
+      "batch": "G2",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "UI-03",
+      "batch": "G3",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "UI-04",
+      "batch": "G3",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "UI-05",
+      "batch": "G3",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "UI-06",
+      "batch": "G3",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "UI-07",
+      "batch": "G6",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "CORE-02",
+      "batch": "G4",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "CORE-03",
+      "batch": "G4",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "CORE-04",
+      "batch": "G4",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "CORE-05",
+      "batch": "G4",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "CORE-06",
+      "batch": "G5",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "CORE-07",
+      "batch": "G5",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "CORE-08",
+      "batch": "G5",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "QA-01",
+      "batch": "G6",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "QA-02",
+      "batch": "G6",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "QA-03",
+      "batch": "G6",
+      "status": "PLANNED_NOT_EXECUTED"
+    },
+    {
+      "id": "REL-01",
+      "batch": "G7",
+      "status": "PLANNED_NOT_EXECUTED"
+    }
+  ],
+  "holds": [
+    "G0 full CI 41986956370 still in progress at last check",
+    "Windows directory fsync blocks extra full-backup execution; preserve failure and verify on Linux/Android",
+    "No device/IME/TalkBack/performance acceptance inferred from design or JVM tests"
+  ],
+  "evidence": [
+    "docs/evidence/2026-11-05-G0/report.json",
+    "docs/evidence/2026-11-05-G1/review.json"
+  ],
+  "stop_after_each_batch": "Commit and report evidence; continue next dependent batch under active user-requested goal unless an explicit approval or hard blocker applies"
+}
