@@ -1,0 +1,18 @@
+{
+  "batch": "G0 remaining native UI regressions",
+  "base_sha": "a4a419a1ba35afef7874b84aa77faf1bc501079f",
+  "source": "app/src/test/kotlin/com/t1doo/aiyou/UnifiedKeywordPresentationTest.kt",
+  "source_sha256_lf_normalized": "cbb6e67d55d1018b6ad4ae6e34c7655f783b51c4faa5824bccf2bdca843e03a6",
+  "command": "./gradlew.bat --no-daemon --offline :app:testDebugUnitTest --tests '*UnifiedKeywordPresentationTest' --console=plain",
+  "exit_code": 0,
+  "tests": 18,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "all_18_test_bodies_unchanged": true,
+  "change": "open helper follows real More disclosure before unified keyword entry; keeps displayed/enabled guards",
+  "production_code_changed": false,
+  "full_ui_current": "NOT RUN yet; targeted result only",
+  "device": "NOT RUN",
+  "archive_sha256": "11e1e3e5b81bf8170bb900491a9bf477addc19e6ced81ac0c20b2c625a3b3587"
+}

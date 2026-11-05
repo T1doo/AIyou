@@ -45,7 +45,16 @@ class UnifiedKeywordPresentationTest {
         if(restore==null)compose.setContent(body)else restore.setContent(body)
     }
     private fun drain(){repeat(2){compose.runOnIdle{runBlocking{while(f.queue.isNotEmpty())f.queue.removeFirst()(f.store)}};compose.waitForIdle()}}
-    private fun open(){compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.onNodeWithTag("unified-open").performScrollTo().performClick();compose.waitForIdle()}
+    private fun open(){
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+        if(compose.onAllNodesWithTag("unified-open").fetchSemanticsNodes().isEmpty()){
+            compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("memory-tools-disclosure"))
+            compose.onNodeWithTag("memory-tools-disclosure").performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
+        }
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("unified-open"))
+        compose.onNodeWithTag("unified-open").performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
+        compose.waitForIdle()
+    }
     private fun query(value:String){compose.onNodeWithTag("unified-results").performScrollToIndex(0)
         compose.onNodeWithTag("unified-query").performScrollTo().performTextReplacement(value)
         compose.onNodeWithTag("unified-results").performScrollToIndex(2)
