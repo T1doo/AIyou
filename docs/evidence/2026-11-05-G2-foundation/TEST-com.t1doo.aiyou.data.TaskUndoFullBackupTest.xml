@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.data.TaskUndoFullBackupTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-05T07:35:25.766Z" hostname="runnervm7aw5e" time="0.526">
+  <properties/>
+  <testcase name="realCrossKeyFullBackupRestoresReopenedTaskAndRetiresUndoReceipt" classname="com.t1doo.aiyou.data.TaskUndoFullBackupTest" time="0.526"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

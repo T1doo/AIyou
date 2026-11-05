@@ -1,0 +1,66 @@
+{
+  "batch": "G2",
+  "task": "UI-01",
+  "status": "IN_PROGRESS",
+  "scope": "Opt-in native Compose foundation; not yet wired to production routes or preferences",
+  "source_parent": "23711fe7d0c1ef9cfa0fa6286366d91d6fb528a4",
+  "source_files": {
+    "core/designsystem/src/main/kotlin/com/t1doo/aiyou/designsystem/SkyglassTheme.kt": "5937867c13a700f26be8ba02779911b200cc60d24ec91c37211cac698cdb2eec",
+    "core/designsystem/src/test/kotlin/com/t1doo/aiyou/designsystem/SkyglassThemeTest.kt": "a8433965f8c7d7e1c7a634a52884d140ced66ec83fa76afd8d44b71852b34845"
+  },
+  "checks": {
+    "wrapper_command": "--no-daemon --offline :core:designsystem:testDebugUnitTest --tests *SkyglassThemeTest :app:checkDebugAarMetadata :app:assembleDebug :core:domain:test :app:lintDebug",
+    "exit_code": 0,
+    "theme_tests": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "previews": "Four source Preview entry points compiled; rendering NOT RUN",
+    "device": "NOT RUN",
+    "lint": "PASS"
+  },
+  "apk": {
+    "path": "E:\\Github\\AIyou\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "sha256": "7f915c484164c3cc2ba9e8ab2e60fa5d0e5680671789ed8376859e1c1712c8f5"
+  },
+  "next": [
+    "Versioned theme and motion preferences with legacy read tests",
+    "Shared real landscape resources and production Now route integration",
+    "Render four new previews and inspect before enabling new route",
+    "Real save/detail/back regression; no prototype data"
+  ],
+  "g0_linux": {
+    "run": 41986956370,
+    "sha": "758f3902c800e4e5aefd48d41e25833f73d7bc64",
+    "protocol_step": "success observed in workflow steps",
+    "artifact": 13396968165,
+    "artifact_digest": "02a3e3345a426050282da53e0ace41889806ea780ed01e8326de653e0eef06b2",
+    "full_ci": "still running; not a full pass",
+    "verified_results": [
+      {
+        "module": "core:ai",
+        "tests": 178,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "core:domain",
+        "tests": 78,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "remote-text",
+        "tests": 1559,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "backup_test": "PASS: TaskUndoFullBackupTest 1 test, 0 failures/errors/skips; Linux host only"
+  }
+}

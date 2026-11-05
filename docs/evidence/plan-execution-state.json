@@ -1,7 +1,7 @@
 {
   "plan": "docs/plans/AIyou-Codex-Plan-20261105/backlog.json",
   "goal": "G0–G7 native migration and evidence-based acceptance",
-  "current_batch": "G1 specification complete; G2 next",
+  "current_batch": "G2 UI-01 in progress; opt-in native foundation compiled and tested",
   "tasks": [
     {
       "id": "AUD-01",
@@ -31,7 +31,7 @@
     {
       "id": "UI-01",
       "batch": "G2",
-      "status": "PLANNED_NOT_EXECUTED"
+      "status": "IN_PROGRESS"
     },
     {
       "id": "UI-02",
@@ -121,12 +121,13 @@
   ],
   "holds": [
     "G0 full CI 41986956370 still in progress at last check",
-    "Windows directory fsync blocks extra full-backup execution; preserve failure and verify on Linux/Android",
+    "Windows directory fsync limitation remains locally; same cross-key backup test PASS on Linux CI 41986956370, XML verified. Android new-install recovery still NOT RUN.",
     "No device/IME/TalkBack/performance acceptance inferred from design or JVM tests"
   ],
   "evidence": [
     "docs/evidence/2026-11-05-G0/report.json",
-    "docs/evidence/2026-11-05-G1/review.json"
+    "docs/evidence/2026-11-05-G1/review.json",
+    "docs/evidence/2026-11-05-G2-foundation/report.json"
   ],
   "stop_after_each_batch": "Commit and report evidence; continue next dependent batch under active user-requested goal unless an explicit approval or hard blocker applies"
 }
