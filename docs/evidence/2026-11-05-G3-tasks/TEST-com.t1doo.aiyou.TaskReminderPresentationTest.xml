@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.TaskReminderPresentationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:17:08.319Z" hostname="LAPTOP-USISIS19" time="6.577">
+  <properties/>
+  <testcase name="pendingReminderKeepsOtherSourceReadableAndTargetLocked" classname="com.t1doo.aiyou.TaskReminderPresentationTest" time="6.085"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

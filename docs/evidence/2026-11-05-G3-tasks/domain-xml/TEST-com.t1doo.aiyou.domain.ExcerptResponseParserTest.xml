@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.domain.ExcerptResponseParserTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:23:19.682Z" hostname="LAPTOP-USISIS19" time="0.086">
+  <properties/>
+  <testcase name="nestedDuplicateFieldsAndModelReviewStatesAreRejected" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.038"/>
+  <testcase name="itemCountDuplicateProposalAndQuoteBoundsAreEnforced" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.01"/>
+  <testcase name="integerGrammarRejectsNegativeFractionExponentLeadingZeroAndOverflow" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.002"/>
+  <testcase name="everySourceRevisionHashRangeAndQuoteMustMatchTheActualOriginal" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.019"/>
+  <testcase name="missingUnknownAndDuplicateRootFieldsAreRejected" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.001"/>
+  <testcase name="referencesUseCodePointsWithoutNormalizationOrUtf16Offsets" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.003"/>
+  <testcase name="proposalCollectionsAreFrozenAndDiagnosticsAreRedacted" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.002"/>
+  <testcase name="codeFencesTrailingDocumentsAndRootArraysCannotBecomeCandidates" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.001"/>
+  <testcase name="rawAndEscapedLoneSurrogatesAndInvalidEscapesAreRejected" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.001"/>
+  <testcase name="conservativeRuleRetainsNegationQuotationHypothesisAndPlansLiterally" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.003"/>
+  <testcase name="responseAndSourceIdentityBoundsAreEnforced" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.001"/>
+  <testcase name="schemaRuleAndProvenanceMustMatchTheLocalContract" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.001"/>
+  <testcase name="wrongScalarNullAndCollectionTypesFailClosed" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.0"/>
+  <testcase name="ruleIsBoundedAndSkipsOnlyLeadingWhitespaceWithoutInventingContent" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.002"/>
+  <testcase name="validBoundedJsonPreservesExactUnicodeAndEscapedQuotation" classname="com.t1doo.aiyou.domain.ExcerptResponseParserTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

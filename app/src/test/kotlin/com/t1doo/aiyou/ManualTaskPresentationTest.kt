@@ -405,6 +405,20 @@ class ManualTaskPresentationTest {
     }
 
     private fun taskNode(tag: String): SemanticsNodeInteraction {
+        if(tag=="manual-task-begin") return compose.onNodeWithTag(tag).assertIsDisplayed()
+        val list=compose.onNodeWithTag("manual-task-list")
+        if(tag in setOf("manual-task-total","manual-task-draft-summary","manual-task-reminder-boundary","manual-task-reminder-policy","manual-task-details-copy")) {
+            list.performScrollToNode(hasTestTag("manual-task-details"))
+            val disclosure=compose.onNodeWithTag("manual-task-details")
+            if(disclosure.fetchSemanticsNode().config[SemanticsProperties.StateDescription]=="已收起") disclosure.performClick()
+        }
+        val prefix=listOf("manual-task-complete-","manual-task-cancel-","manual-task-date-open-","manual-task-postpone-","manual-task-clear-").firstOrNull {tag.startsWith(it)}
+        if(prefix!=null) {
+            val row="manual-task-row-"+tag.removePrefix(prefix)
+            list.performScrollToNode(hasTestTag(row))
+            if(compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty())
+                compose.onNode(hasClickAction() and hasAnyAncestor(hasTestTag(row)) and !hasTestTag("manual-task-check-"+tag.removePrefix(prefix))).performScrollTo().performClick()
+        }
         // Lazy items outside the viewport have no node until the list finds and composes them.
         compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(tag))
         return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()

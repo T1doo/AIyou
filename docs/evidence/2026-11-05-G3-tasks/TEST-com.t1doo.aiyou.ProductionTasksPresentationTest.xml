@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.ProductionTasksPresentationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:16:55.930Z" hostname="LAPTOP-USISIS19" time="7.995">
+  <properties/>
+  <testcase name="shortNarrowDoubleFontTasksScrollAndSettingsReturnWithoutChangingDraft" classname="com.t1doo.aiyou.ProductionTasksPresentationTest" time="6.808"/>
+  <testcase name="localRecordsNeverBecomeTasksAndUnopenedCompletionIsExplicit" classname="com.t1doo.aiyou.ProductionTasksPresentationTest" time="0.348"/>
+  <testcase name="shortLandscapeKeepsTaskStatusNavigationAndSettingsReachable" classname="com.t1doo.aiyou.ProductionTasksPresentationTest" time="0.352"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

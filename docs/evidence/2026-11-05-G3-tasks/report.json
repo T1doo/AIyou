@@ -1,0 +1,58 @@
+{
+  "batch": "G3 UI-04",
+  "status": "IN_PROGRESS",
+  "source_parent": "205b6fdaa5985ed5b5c1d50ceb21e5dcaf823428",
+  "changes": [
+    "Existing manual task screen opts into Skyglass themes and shared landscape/chrome",
+    "Compact task rows; redundant no-time labels and empty normal draft section hidden, retained under More",
+    "Add task control docked above bottom navigation with reserved list padding",
+    "Task editor uses compact header/title; date/time controls expand on request; existing controller and close confirmation retained",
+    "Checkbox completion and title disclosure remain separate actions"
+  ],
+  "checks": {
+    "targeted_ui": [
+      {
+        "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "com.t1doo.aiyou.ProductionTasksPresentationTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "com.t1doo.aiyou.TaskReminderPresentationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "domain": {
+      "tests": 78,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "android_assemble_lint": "PASS editor-final.log",
+    "aar_metadata_domain": "See domain-check.log",
+    "device": "API35 emulator, actual synthetic Evening_walk_demo created, marked complete and undone; no reminder was scheduled",
+    "ime": "LatinIME only"
+  },
+  "apk": {
+    "path": "E:\\Github\\AIyou\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "sha256": "3dd60dcc46553272d8e2e209ea0135b72b6798cdae2f53f2f1b0bd68f969caa3"
+  },
+  "remaining": [
+    "Week/calendar selection from approved design not implemented in this slice",
+    "Creation close/discard policy still existing controller behavior; full cancel-and-reopen draft requirement needs separate work",
+    "Full task date, source, all-theme, large-font and accessibility matrix not closed",
+    "Full CI frozen diagnostics remain unresolved; no whole-product pass claim"
+  ],
+  "cleanup": "Owned emulator and adb closed"
+}

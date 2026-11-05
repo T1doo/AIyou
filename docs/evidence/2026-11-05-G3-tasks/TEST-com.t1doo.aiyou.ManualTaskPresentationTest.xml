@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.ManualTaskPresentationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:16:44.063Z" hostname="LAPTOP-USISIS19" time="7.914">
+  <properties/>
+  <testcase name="explicitCreateWaitsForAckKeepsFailedInputThenCompletesAndCancelsOnlyConfirmedTasks" classname="com.t1doo.aiyou.ManualTaskPresentationTest" time="7.411"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

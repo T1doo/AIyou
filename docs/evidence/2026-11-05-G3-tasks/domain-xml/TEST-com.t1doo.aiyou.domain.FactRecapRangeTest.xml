@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.domain.FactRecapRangeTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:23:19.771Z" hostname="LAPTOP-USISIS19" time="0.009">
+  <properties/>
+  <testcase name="weekStartsMondayAndHandlesYearBoundary" classname="com.t1doo.aiyou.domain.FactRecapRangeTest" time="0.003"/>
+  <testcase name="invalidZoneAndOutOfBoundDatesRejectWithoutGuessing" classname="com.t1doo.aiyou.domain.FactRecapRangeTest" time="0.003"/>
+  <testcase name="springAndAutumnDaysAreTwentyThreeAndTwentyFiveHours" classname="com.t1doo.aiyou.domain.FactRecapRangeTest" time="0.002"/>
+  <testcase name="skippedCivilDayHasAnHonestEmptyInstantRange" classname="com.t1doo.aiyou.domain.FactRecapRangeTest" time="0.0"/>
+  <testcase name="midnightIsHalfOpenAndSelectedZoneControlsRecordedDay" classname="com.t1doo.aiyou.domain.FactRecapRangeTest" time="0.001"/>
+  <testcase name="dstWeeksUseCalendarDaysInsteadOfFixedHours" classname="com.t1doo.aiyou.domain.FactRecapRangeTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

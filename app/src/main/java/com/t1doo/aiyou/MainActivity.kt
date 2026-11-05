@@ -1263,14 +1263,14 @@ fun AIyouApp(
 
     val notebookHome=selected==Destination.NOW && local?.supportsMixedCapture==true && !showSettings && !showLicenses &&
         !reading && !recapRoute && !browsingPackage && !browsingRecycle && history==null && editing==null && attachmentPanel==null
-    val skyglassHome = notebookHome || (selected==Destination.MEMORIES && local!=null && !demo && !showSettings && !showLicenses &&
+    val skyglassHome = notebookHome || ((selected==Destination.MEMORIES || selected==Destination.TASKS && local?.tasks?.supported==true) && local!=null && !demo && !showSettings && !showLicenses &&
         !reading && !recapRoute && !browsingPackage && !browsingRecycle && history==null && editing==null && attachmentPanel==null && !evidenceMode)
     // maxHeight is the IME-padded whole Scaffold allocation, including its top/bottom bars.
     com.t1doo.aiyou.ui.SkyglassSystemBars(skyglassHome && display.preferences.appearance == com.t1doo.aiyou.designsystem.SkyglassAppearance.NIGHT)
     var captureEditing by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
     if (skyglassHome) com.t1doo.aiyou.ui.SkyglassScene(display.preferences.appearance, display.preferences.backgroundMotion,
-        motionAllowed && !imeVisible && !captureEditing && !(if(selected==Destination.NOW)nowList else memoriesList).isScrollInProgress, Modifier.fillMaxSize())
+        motionAllowed && !imeVisible && !captureEditing && !(when(selected){Destination.NOW->nowList;Destination.MEMORIES->memoriesList;Destination.TASKS->tasksList}).isScrollInProgress, Modifier.fillMaxSize())
     // Decide during this first constrained composition; reader measurement remains separate.
     BoxWithConstraints(Modifier.imePadding().fillMaxSize(),propagateMinConstraints=true) {
         val compactNotebookHeader = LocalDensity.current.fontScale >= 1.5f ||
@@ -1288,7 +1288,7 @@ fun AIyouApp(
         topBar = {
           Column {
             NotebookAppBar(
-                if (browsingPackage) { if(packageUi?.fullMode==true) "完整备份与恢复" else "加密原文包" } else if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else if(recapRoute) "本机回顾" else if(selected==Destination.MEMORIES) "回忆" else if(skyglassHome) "爱忆" else selected.label,
+                if (browsingPackage) { if(packageUi?.fullMode==true) "完整备份与恢复" else "加密原文包" } else if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else if(recapRoute) "本机回顾" else if(selected==Destination.MEMORIES) "回忆" else if(notebookHome) "爱忆" else selected.label,
                 if (browsingPackage) { if (settingsPackageRoute) "返回设置" else "返回列表" } else if (viewingPicture) {if(attachmentPanel?.focusImage!=null) "返回原文" else "返回附件列表"} else if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
                 else if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
                 else if (editing != null) "取消编辑" else if(reading && recapRoute) "返回回顾" else if (reading || browsingRecycle) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else if(recapRoute) "返回回忆" else "设置",
@@ -1453,6 +1453,7 @@ fun AIyouApp(
             (local.tasks.supported || local.opening || local.error != null)) {
             fun ownsTasks() = ownsNavigation() && selectedName == Destination.TASKS.name && !showSettings && !demo
             com.t1doo.aiyou.records.ManualTasksScreen(local,
+                appearance=if(skyglassHome)display.preferences.appearance else null,
                 listState = tasksList,
                 onBegin = { if (ownsTasks()) onTaskBegin() },
                 onEdit = { session, text -> if (ownsTasks()) onTaskEdit(session, text) },

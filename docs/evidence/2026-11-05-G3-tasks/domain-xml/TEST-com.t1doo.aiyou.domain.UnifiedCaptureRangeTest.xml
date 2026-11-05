@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.domain.UnifiedCaptureRangeTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:23:20.027Z" hostname="LAPTOP-USISIS19" time="0.043">
+  <properties/>
+  <testcase name="skippedCalendarDayAndExtremeInputDatesDoNotInventInstantsOrOverflow" classname="com.t1doo.aiyou.domain.UnifiedCaptureRangeTest" time="0.039"/>
+  <testcase name="inclusiveCalendarDaysHaveAnExclusiveNextDayInstantWithNoFixed24HourAssumption" classname="com.t1doo.aiyou.domain.UnifiedCaptureRangeTest" time="0.0"/>
+  <testcase name="sameInstantUsesSavedZoneAndNeverTheSystemZone" classname="com.t1doo.aiyou.domain.UnifiedCaptureRangeTest" time="0.001"/>
+  <testcase name="strictFourDigitDatesEmptyEndsAndConstructedValuesHaveOneContract" classname="com.t1doo.aiyou.domain.UnifiedCaptureRangeTest" time="0.003"/>
+  <testcase name="malformedSavedZoneFailsEvenWhenUnboundedRatherThanFallingBack" classname="com.t1doo.aiyou.domain.UnifiedCaptureRangeTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

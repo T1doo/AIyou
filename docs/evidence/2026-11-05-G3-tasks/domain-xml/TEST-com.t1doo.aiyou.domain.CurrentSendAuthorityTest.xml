@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.domain.CurrentSendAuthorityTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:23:19.596Z" hostname="LAPTOP-USISIS19" time="0.082">
+  <properties/>
+  <testcase name="defaultStateAndBothRestrictivePoliciesDeny" classname="com.t1doo.aiyou.domain.CurrentSendAuthorityTest" time="0.009"/>
+  <testcase name="grantMustMatchSourcePurposeAndCompleteConfiguration" classname="com.t1doo.aiyou.domain.CurrentSendAuthorityTest" time="0.001"/>
+  <testcase name="invalidationPublishesBeforeCancellationCallbackAndDoesNotHoldStateLock" classname="com.t1doo.aiyou.domain.CurrentSendAuthorityTest" time="0.029"/>
+  <testcase name="consentExpiresExactlyAtBoundaryAndCannotStartInFuture" classname="com.t1doo.aiyou.domain.CurrentSendAuthorityTest" time="0.001"/>
+  <testcase name="publicJvmMetadataConstructorsCannotForgeIssuedTicketOrReceipt" classname="com.t1doo.aiyou.domain.CurrentSendAuthorityTest" time="0.02"/>
+  <testcase name="switchingAwayAndBackCannotReviveQueuedRequest" classname="com.t1doo.aiyou.domain.CurrentSendAuthorityTest" time="0.002"/>
+  <testcase name="metadataDiagnosticsExcludeSyntheticPrivateIdentifiers" classname="com.t1doo.aiyou.domain.CurrentSendAuthorityTest" time="0.013"/>
+  <testcase name="completedReceiptRequiresCurrentVersionsAndCannotSurviveRevocation" classname="com.t1doo.aiyou.domain.CurrentSendAuthorityTest" time="0.001"/>
+  <testcase name="concurrentClaimsConsumeOnlyOnceAndFinishedPermitCannotFinishTwice" classname="com.t1doo.aiyou.domain.CurrentSendAuthorityTest" time="0.004"/>
+  <testcase name="claimIsOneUseAndForeignAuthorityCannotAdmitTicket" classname="com.t1doo.aiyou.domain.CurrentSendAuthorityTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

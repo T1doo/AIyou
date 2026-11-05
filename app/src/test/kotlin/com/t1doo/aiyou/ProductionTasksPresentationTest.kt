@@ -80,7 +80,9 @@ class ProductionTasksPresentationTest {
         compose.onNodeWithText("今天 · 正式任务 0").performScrollTo().assertIsDisplayed()
         assertUnavailableWithoutFakeActions()
         tab(Destination.MEMORIES).performClick()
-        compose.onNodeWithText("1 条本机记录").assertIsDisplayed()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-synthetic-task-boundary"))
+        compose.onNodeWithTag("entry-synthetic-task-boundary").assertIsDisplayed()
+            .assertTextContains("合成原文：想做旅行册，不是正式任务")
         tab(Destination.NOW).performClick()
         compose.onNodeWithContentDescription("此刻，想记下什么").assertTextEquals(draft)
         compose.runOnIdle { assertEquals(0, saves); assertEquals(0, edits) }

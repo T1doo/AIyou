@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.domain.SourceTagRulesTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:23:19.832Z" hostname="LAPTOP-USISIS19" time="0.034">
+  <properties/>
+  <testcase name="malformedLinesControlsPunctuationAndExcessiveNamesAreRejectedAsAWhole" classname="com.t1doo.aiyou.domain.SourceTagRulesTest" time="0.03"/>
+  <testcase name="twelveDistinctTagsAndFortyCodePointsAreNotTruncatedOrNormalized" classname="com.t1doo.aiyou.domain.SourceTagRulesTest" time="0.003"/>
+  <testcase name="explicitLinesPreserveCodePointQuotesCaseAndCombiningMarks" classname="com.t1doo.aiyou.domain.SourceTagRulesTest" time="0.001"/>
+  <testcase name="ordinaryHashtagsQuestionsAndQuotedPrefixesDoNotBecomeTagLines" classname="com.t1doo.aiyou.domain.SourceTagRulesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

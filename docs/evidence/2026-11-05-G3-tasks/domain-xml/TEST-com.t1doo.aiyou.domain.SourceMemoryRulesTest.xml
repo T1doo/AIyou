@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.domain.SourceMemoryRulesTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:23:19.801Z" hostname="LAPTOP-USISIS19" time="0.029">
+  <properties/>
+  <testcase name="duplicateForgedOldAndPartialSurrogateReferencesCannotBeSaved" classname="com.t1doo.aiyou.domain.SourceMemoryRulesTest" time="0.015"/>
+  <testcase name="onlyExplicitLegalReviewsAdvanceAndCorrectionAlwaysReturnsToProposed" classname="com.t1doo.aiyou.domain.SourceMemoryRulesTest" time="0.009"/>
+  <testcase name="boundariesAreCodePointsAndManualNotesCannotSmuggleControls" classname="com.t1doo.aiyou.domain.SourceMemoryRulesTest" time="0.004"/>
+  <testcase name="uniqueUnicodeExcerptUsesExactCodePointsWithoutChangingNegationOrQuotedContext" classname="com.t1doo.aiyou.domain.SourceMemoryRulesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
