@@ -1,0 +1,16 @@
+...............E.
+======================================================================
+ERROR: test_missing_font_png_foreign_source_nonzero_writes_and_artifact_overflow_fail_closed (test_saved_question_diagnostic.SavedQuestionDiagnosticTests.test_missing_font_png_foreign_source_nonzero_writes_and_artifact_overflow_fail_closed) (kind='symlink')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Github\AIyou\scripts\tests\test_saved_question_diagnostic.py", line 130, in test_missing_font_png_foreign_source_nonzero_writes_and_artifact_overflow_fail_closed
+    path.unlink();path.symlink_to(root / probe.OUTPUT / 'admission.json')
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Lenovo\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\pathlib.py", line 1386, in symlink_to
+    os.symlink(target, self, target_is_directory)
+OSError: [WinError 1314] 客户端没有所需的特权。: 'D:\\AndroidDev\\temp\\tmpzkal5xij\\build\\saved-question-diagnostic\\admission.json' -> 'D:\\AndroidDev\\temp\\tmpzkal5xij\\app\\build\\reports\\tests\\testDebugUnitTest\\saved-questions\\fontscale.json'
+
+----------------------------------------------------------------------
+Ran 17 tests in 1.572s
+
+FAILED (errors=1)

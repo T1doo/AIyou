@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location('heading_probe', ROOT / 'scripts/diagnose-memory-heading.py')
 probe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)
+FROZEN_SOURCE = ROOT / 'scripts/tests/fixtures/memory-heading-diagnostic/LocalOriginalSearchPresentationTest.kt.fixture'
 
 
 class HeadingDiagnosticTests(unittest.TestCase):
@@ -102,7 +103,9 @@ class HeadingDiagnosticTests(unittest.TestCase):
                 if kind == 'original-red': self.assertEqual(1, result['actual']['failures'])
 
     def test_exact_fixed_source_and_workflow_routing_preserve_formal_bodies(self):
-        source = (ROOT / probe.SOURCE).read_bytes()
+        # This one-shot diagnostic owns historical bytes, not the evolving UI test.
+        # Runtime admit() must still reject any current checkout with different bytes.
+        source = FROZEN_SOURCE.read_bytes()
         self.assertEqual(probe.TEST_SHA256, hashlib.sha256(source).hexdigest())
         self.assertIn('heading.hasVisualOverflow', source.decode())
         workflow = (ROOT / '.github/workflows/android.yml').read_text()
@@ -116,6 +119,7 @@ class HeadingDiagnosticTests(unittest.TestCase):
         self.assertIn(new + " && 'DIAGNOSTIC ONLY - memory heading overflow (not D01 acceptance)'", workflow)
         self.assertNotIn('startsWith(', workflow)
         self.assertNotIn('continue-on-error', workflow)
+
         diagnostic = workflow.split('\n  memory-heading-diagnostic:\n', 1)[1]
         self.assertEqual(1, diagnostic.count(':app:testDebugUnitTest --tests'))
         self.assertIn("--tests '" + probe.CLASS + '.' + probe.METHOD + "'", diagnostic)
@@ -130,3 +134,31 @@ class HeadingDiagnosticTests(unittest.TestCase):
         schemas = set(re.findall(r'python3 scripts/verify-([a-z-]+)-schema.py --capture', formal))
         self.assertEqual(2, len(loops))
         self.assertTrue(all(set(loop.split()) == schemas for loop in loops))
+
+    def test_admission_rejects_changed_source_even_when_git_blob_claims_match(self):
+        for changed in (False, True):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                source = root / probe.SOURCE
+                source.parent.mkdir(parents=True)
+                source.write_bytes(FROZEN_SOURCE.read_bytes() + (b'\n// synthetic changed source\n' if changed else b''))
+                event = root / 'event.json'
+                event.write_text(json.dumps(self.event()))
+                env = self.env() | {'GITHUB_EVENT_PATH': str(event)}
+
+                def repository(_root, *args):
+                    if args == ('rev-parse', 'HEAD'): return env['GITHUB_SHA']
+                    if args == ('status', '--porcelain'): return ''
+                    if args[:2] == ('diff', '--name-only'): return probe.SOURCE
+                    if args[0] == 'rev-parse': return '2' * 40
+                    raise AssertionError(args)
+
+                # Isolate the content gate: all synthetic Git proofs deliberately agree.
+                with patch.object(probe, 'git', side_effect=repository), patch.object(probe.subprocess, 'run'):
+                    if changed:
+                        with self.assertRaisesRegex(ValueError, 'Changed fixed test'):
+                            probe.admit(root, env)
+                        self.assertFalse((root / probe.OUTPUT / 'admission.json').exists())
+                    else:
+                        result = probe.admit(root, env)
+                        self.assertEqual(probe.TEST_SHA256, result['test_sha256'])

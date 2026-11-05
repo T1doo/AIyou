@@ -1,0 +1,37 @@
+{
+  "task": "CORE-01 diagnostic CI contracts",
+  "status": "LOCAL_CONTRACT_FIX_LINUX_CI_PENDING",
+  "source_parent": "efeff0d1edc2743502956579aaffe2d107bcc975",
+  "root_causes": [
+    "Historical one-shot diagnostic test froze the evolving production UI test file",
+    "Windows CRLF checkout changed exact hashes of otherwise identical tracked bytes"
+  ],
+  "changes": [
+    "Archive exact test-owner bytes, verified against original pinned SHA-256 and Git blob",
+    "Contract test checks immutable historic fixture; diagnostic runtime admit() remains unchanged",
+    "Add positive and mutated-source admission tests, deliberately holding Git proofs equal",
+    "Pin LF checkout only for files with exact byte contracts"
+  ],
+  "local_tests": {
+    "run": 17,
+    "failures": 0,
+    "errors": 1,
+    "skipped": 0,
+    "environment_error": "WinError1314 when creating a real symlink in the existing negative evidence test; not skipped or counted as PASS"
+  },
+  "runtime_admission_scripts_changed": false,
+  "fixture": {
+    "kind": "Immutable historical diagnostic input, not a current UI golden",
+    "commit": "a3ecad2d565663d8b0ab636c33e1ff42e89ac9e2",
+    "source": "app/src/test/kotlin/com/t1doo/aiyou/LocalOriginalSearchPresentationTest.kt",
+    "git_blob": "3c2c8eec2cc63ccb804b85d4cfbe3a06e879e3fc",
+    "sha256": "e8527848704841f039b9a47896869731af66f8030fb00c738237c2037c36fdd3",
+    "bytes": 55944,
+    "runtime": "The actual diagnostic admission script still checks current checkout, exact branch/message, fixed source hash and production trees; no permission widened."
+  },
+  "android_checks": "NOT RUN: no product code/dependency/SDK/database change in this slice",
+  "pending": [
+    "Run full Linux CI at committed candidate SHA",
+    "Do not infer native UI, device or full product acceptance from diagnostic tests"
+  ]
+}
