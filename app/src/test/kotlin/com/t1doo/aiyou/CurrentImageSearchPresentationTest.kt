@@ -79,15 +79,30 @@ class CurrentImageSearchPresentationTest {
             }}
         }
     }
-    // Searching existing semantics cannot discover an uncomposed lazy item. Scroll the
-    // actual list while retaining the existing bounded asynchronous publication wait.
-    private fun reveal(tag: String) = reveal(hasTestTag(tag))
+    // Fixed search controls and dialog fields are outside the lazy result list.
+    // Try their actual semantics first, then compose a lazy result when needed.
+    private fun reveal(tag: String): SemanticsNodeInteraction {
+        if (tag == "local-evidence-mode") {
+            try {
+                // A scrolled-off control is not evidence that More is collapsed.
+                // Evidence mode uses its own reading layout, without that disclosure.
+                compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag(tag))
+            } catch (_: AssertionError) {
+                reveal(hasTestTag("memory-tools-disclosure")).assertIsEnabled().performClick()
+            }
+        }
+        return reveal(hasTestTag(tag))
+    }
     private fun reveal(matcher: SemanticsMatcher): SemanticsNodeInteraction {
         var missing: AssertionError? = null
         try {
             compose.waitUntil(3_000) {
                 try {
-                    compose.onNode(hasScrollToIndexAction()).performScrollToNode(matcher)
+                    if (compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty()) {
+                        compose.onNode(matcher).performScrollTo().assertIsDisplayed()
+                    } else {
+                        compose.onNode(hasScrollToIndexAction()).performScrollToNode(matcher)
+                    }
                     true
                 } catch (failure: AssertionError) {
                     missing = failure
@@ -111,38 +126,37 @@ class CurrentImageSearchPresentationTest {
     @Test fun imageFilterStartsOffCombinesLiteralAndDatesAndClearResetsEveryCondition(){
         compose.setContent{Screen()};await{it.stage==OriginalSearchStage.BROWSE}
         assertFalse(results.get().input.onlyImages)
-        compose.showOriginalSearchFilters()
-        reveal("original-search-images").performClick()
+        reveal("original-category-images").performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.onlyImages}
         assertEquals(listOf(picture.id),results.get().hits.map{it.entry.id})
         reveal("original-search-query").performTextReplacement("needle")
+        compose.showOriginalSearchFilters()
         reveal("original-search-from").performTextReplacement("1970-01-01")
         reveal("original-search-through").performTextReplacement("1970-01-01")
+        reveal("original-search-filter-done").performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.through=="1970-01-01"}
         assertTrue(results.get().input.onlyImages);assertEquals(listOf(picture.id),results.get().hits.map{it.entry.id})
-        reveal("original-search-clear").performClick()
+        compose.clearOriginalSearchIncludingQuery()
         await{it.stage==OriginalSearchStage.BROWSE}
         assertFalse(results.get().input.onlyImages);assertEquals("",results.get().input.query)
         assertEquals("",results.get().input.from);assertEquals("",results.get().input.through)
     }
     @Test fun narrowDoubleFontFilterIsReachableAndReadFailureCannotBecomeEmptySuccess(){
         compose.setContent{Screen(true)}
-        compose.showOriginalSearchFilters()
-        val control=reveal("original-search-images").assertIsDisplayed().assertIsEnabled()
+        val control=reveal("original-category-images").assertIsDisplayed().assertIsEnabled()
         assertTrue(control.getUnclippedBoundsInRoot().height>=48.dp)
         compose.runOnIdle{failRead=true};control.performClick()
         await{it.stage==OriginalSearchStage.FAILED&&it.input.onlyImages}
         assertTrue(results.get().hits.isEmpty());assertTrue(results.get().message!!.contains("原文已保留"))
         compose.onAllNodesWithText("没有匹配的原文").assertCountEquals(0)
-        reveal("original-search-images").assertIsEnabled().performClick()
+        reveal("original-category-all").assertIsEnabled().performClick()
         await{it.stage==OriginalSearchStage.BROWSE}
         assertFalse(results.get().input.onlyImages)
     }
     @Test fun gridRequiresExplicitToggleKeepsFailureCardAndOpensOriginalSource(){
         compose.setContent{Screen()};await{it.stage==OriginalSearchStage.BROWSE}
         compose.onAllNodesWithTag("original-search-grid").assertCountEquals(0)
-        compose.showOriginalSearchFilters()
-        reveal("original-search-images").performClick()
+        reveal("original-category-images").performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.onlyImages}
         compose.onAllNodesWithTag("image-grid-entry-picture").assertCountEquals(0)
         reveal("original-search-grid").performClick()
@@ -154,17 +168,22 @@ class CurrentImageSearchPresentationTest {
     }
     @Test fun narrowDoubleFontGridToggleAndFailureCardRemainReachableAndClearReturnsToList(){
         compose.setContent{Screen(true)}
-        compose.showOriginalSearchFilters()
-        reveal("original-search-images").performClick()
+        reveal("original-category-images").performClick()
         await{it.stage==OriginalSearchStage.READY&&it.input.onlyImages}
         val toggle=reveal("original-search-grid").assertIsDisplayed().assertIsEnabled()
-        assertTrue(toggle.getUnclippedBoundsInRoot().height>=48.dp);toggle.performClick()
+        assertTrue("Grid touch target: ${toggle.getUnclippedBoundsInRoot()}",
+            toggle.getUnclippedBoundsInRoot().height>=48.dp);toggle.performClick()
         reveal("image-grid-entry-picture").assertIsDisplayed()
-        reveal("original-search-clear").performClick()
+        val filteredOwner = results.get()
+        compose.clearOriginalSearchIncludingQuery()
         await{it.stage==OriginalSearchStage.BROWSE}
         compose.onAllNodesWithTag("original-search-grid").assertCountEquals(0)
         compose.onAllNodesWithTag("image-grid-entry-picture").assertCountEquals(0)
-        assertTrue(grid.state.value.tiles.isEmpty())
+        // The normal list also has bounded thumbnails now. Clearing must retire
+        // the filtered owner; any newly decoded list tile belongs to current browse.
+        assertTrue(grid.visible(filteredOwner).tiles.isEmpty())
+        assertNotSame(filteredOwner, results.get())
+        assertTrue(grid.state.value.tiles.isEmpty() || grid.state.value.owner === results.get())
     }
     @Test fun localEvidenceCardsUseCurrentSourceAndReturnWithoutChangingQuestion(){
         compose.setContent{Screen()}

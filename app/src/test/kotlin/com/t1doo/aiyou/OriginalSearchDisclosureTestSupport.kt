@@ -12,3 +12,12 @@ internal fun ComposeContentTestRule.showOriginalSearchFilters() {
     onNodeWithTag("original-search-filters").performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
     onNodeWithTag("original-search-filter-page").assertIsDisplayed()
 }
+
+/** Full clear is deliberately separate from resetting staged filters. */
+internal fun ComposeContentTestRule.clearOriginalSearchIncludingQuery() {
+    showOriginalSearchFilters()
+    if (onAllNodesWithTag("original-search-clear").fetchSemanticsNodes().isEmpty()) {
+        onNodeWithText("更多查找设置").performScrollTo().assertIsEnabled().performClick()
+    }
+    onNodeWithTag("original-search-clear").performScrollTo().assertIsEnabled().performClick()
+}

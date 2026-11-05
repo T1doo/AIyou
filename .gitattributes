@@ -8,3 +8,4 @@ app/src/main/assets/licenses/*.txt whitespace=-blank-at-eol,-blank-at-eof
 app/src/test/kotlin/com/t1doo/aiyou/SelectedQuestionConsentPresentationTest.kt text eol=lf
 app/src/test/kotlin/com/t1doo/aiyou/SavedQuestionsPresentationTest.kt text eol=lf
 scripts/tests/fixtures/memory-heading-diagnostic/*.fixture -text
+scripts/tests/fixtures/frozen-diagnostic-workflow/*.fixture -text

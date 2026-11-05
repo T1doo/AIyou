@@ -1,0 +1,941 @@
+name: D01 Android and Preview checks
+run-name: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 actual button publication' && 'DIAGNOSTIC ONLY - Lulu motion admission (not D01 acceptance)' || github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-heading-probe] d711 bounded intrinsic disclosure' && 'DIAGNOSTIC ONLY - memory heading overflow (not D01 acceptance)' || '' }}
+
+'on':
+  push:
+    branches: ['codex/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One reviewed validation: 23 + 30 + 17 = at most 70 runner minutes.
+# Android and Preview consume confirmed same-SHA host artifacts in parallel.
+# Dependency/queue/cold-build time means this is NOT a 30-minute wall-clock promise.
+# The exact public-repo/branch/message tuple is push-only. Before its approved push, require
+# no open PR for that branch: PR synchronize retains the normal acceptance path.
+# Every other push retains all three formal jobs; runtime admission also requires attempt1.
+jobs:
+  contracts:
+    if: ${{ !((github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 actual button publication') || (github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-heading-probe] d711 bounded intrinsic disclosure')) }}
+    name: Host contracts and generated Room evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 23
+    outputs:
+      schema_id: ${{ steps.schema_archive.outputs.artifact-id }}
+      schema_digest: ${{ steps.schema_archive.outputs.artifact-digest }}
+      protocol_id: ${{ steps.protocol_archive.outputs.artifact-id }}
+      protocol_digest: ${{ steps.protocol_archive.outputs.artifact-digest }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Require the exact workflow checkout
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Verify wrapper checksum
+        run: |
+          printf '%s  %s\n' \
+            3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 \
+            gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
+      - name: Generate actual Room v17 export with unchanged predecessors and runtime fixtures
+        id: room_schema
+        run: |
+          python3 scripts/check-sdk.py
+          python3 scripts/verify-manual-tag-schema.py --capture
+          python3 scripts/verify-manual-task-schema.py --capture
+          python3 scripts/verify-local-search-schema.py --capture
+          python3 scripts/verify-permanent-erasure-schema.py --capture
+          python3 scripts/verify-record-favorite-schema.py --capture
+          python3 scripts/verify-local-candidate-schema.py --capture
+          python3 scripts/verify-record-event-date-schema.py --capture
+          python3 scripts/verify-manual-people-schema.py --capture
+          python3 scripts/verify-model-configuration-schema.py --capture
+          python3 scripts/verify-model-capability-schema.py --capture
+          python3 scripts/verify-reminder-runtime-schema.py --capture
+          python3 scripts/verify-saved-question-schema.py --capture
+          python3 scripts/verify-chat-message-schema.py --capture
+          scripts/gradle.sh :core:data:kspDebugKotlin
+          python3 scripts/verify-manual-tag-schema.py --verify
+          python3 scripts/verify-manual-task-schema.py --verify
+          python3 scripts/verify-local-search-schema.py --verify
+          python3 scripts/verify-permanent-erasure-schema.py --verify
+          python3 scripts/verify-record-favorite-schema.py --verify
+          python3 scripts/verify-local-candidate-schema.py --verify
+          python3 scripts/verify-record-event-date-schema.py --verify
+          python3 scripts/verify-manual-people-schema.py --verify
+          python3 scripts/verify-model-configuration-schema.py --verify
+          python3 scripts/verify-model-capability-schema.py --verify
+          python3 scripts/verify-reminder-runtime-schema.py --verify
+          python3 scripts/verify-saved-question-schema.py --verify
+          python3 scripts/verify-chat-message-schema.py --verify
+      - name: Preserve exact generated D02 schema and lock bytes
+        if: always()
+        run: python3 scripts/export-d02-generated-state.py
+      - name: Archive schema evidence before the next phase
+        id: schema_archive
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: schema
+          outcome: ${{ steps.room_schema.outcome }}
+          name: d01-stage-schema
+          paths: |
+            core/data/schemas/
+            core/data/src/androidTest/assets/records-schema-v11.json
+            core/data/src/androidTest/assets/records-schema-v12.json
+            core/data/src/androidTest/assets/records-schema-v13.json
+            core/data/src/androidTest/assets/records-schema-v14.json
+            core/data/src/main/assets/reminder-schema-v16.json
+            core/data/src/main/assets/reminder-schema-v17.json
+            .local-evidence/f05-event-date/schema-generation.json
+            .local-evidence/f05-manual-people/schema-generation.json
+            .local-evidence/d04-model-configuration/schema-generation.json
+            .local-evidence/d04-model-capability/schema-generation.json
+            .local-evidence/saved-questions/schema-generation.json
+            .local-evidence/chat-history/schema-generation.json
+            app/gradle.lockfile
+            core/data/gradle.lockfile
+            core/domain/gradle.lockfile
+            core/designsystem/gradle.lockfile
+      - name: Run actual domain and D04 JVM wire contracts
+        id: ai_contracts
+        run: |
+          python3 scripts/jvm-gradle.py -p checks/ai-protocol :core:ai:test :core:domain:test :remote-text:test
+          python3 scripts/verify-ai-http-dependencies.py
+          python3 scripts/verify-ai-protocol-results.py
+          # Preserve this verified round before the queue project reruns shared core tests.
+          python3 - <<'PY'
+          import hashlib, json, shutil
+          from pathlib import Path
+          root = Path.cwd()
+          receipt = root / 'checks/ai-protocol/build/reports/verified-contracts.json'
+          report = json.loads(receipt.read_text())
+          assert report['status'] == 'PASS'
+          inventory = [(module['module'], Path(item['path']).name, item['sha256'])
+                       for module in report['results'] for item in module['xml']]
+          snapshot = hashlib.sha256(json.dumps(inventory, sort_keys=True).encode()).hexdigest()
+          target = receipt.parent / 'xml-snapshots' / snapshot
+          for module in report['results']:
+              for item in module['xml']:
+                  source = root / item['path']
+                  raw = source.read_bytes()
+                  assert hashlib.sha256(raw).hexdigest() == item['sha256'], 'XML changed after verification'
+                  destination = target / module['module'].replace(':', '_') / source.name
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  if destination.exists():
+                      assert destination.read_bytes() == raw, 'Preserved XML must not be overwritten'
+                  else:
+                      shutil.copy2(source, destination)
+                  item['original_path'] = item['path']
+                  item['path'] = str(destination.relative_to(root))
+          report['xml_snapshot_sha256'] = snapshot
+          receipt.write_text(json.dumps(report, indent=2) + '\n')
+          print('AI_PROTOCOL_XML_SNAPSHOT_JSON ' + json.dumps({
+              'status': 'PASS', 'head': report['head'], 'source_sha256': report['source_sha256'],
+              'snapshot_sha256': snapshot, 'tests': {item['module']: item['tests'] for item in report['results']}}))
+          PY
+      - name: Archive protocol evidence before the next phase
+        id: protocol_archive
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: protocol
+          outcome: ${{ steps.ai_contracts.outcome }}
+          name: d01-stage-protocol
+          paths: |
+            core/domain/build/test-results/test/
+            core/domain/build/reports/tests/test/
+            core/domain/build/reports/inputs-at-test.json
+            core/ai/build/test-results/test/
+            core/ai/build/reports/tests/test/
+            core/ai/build/reports/inputs-at-test.json
+            checks/ai-protocol/build/reports/verified-contracts.json
+            checks/ai-protocol/build/reports/xml-snapshots/
+            checks/ai-protocol/remote-text/build/test-results/test/
+            checks/ai-protocol/remote-text/build/reports/tests/test/
+            checks/ai-protocol/remote-text/build/reports/inputs-at-test.json
+            checks/ai-protocol/remote-text/build/reports/erasure-process/
+      - name: Run actual ViewModel queue failure regressions (host boundary)
+        id: queue
+        run: |
+          scripts/gradle.sh --project-dir checks/record-queue test
+          python3 scripts/verify-test-results.py --queue
+      - name: Archive queue evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: queue
+          outcome: ${{ steps.queue.outcome }}
+          name: d01-stage-queue
+          paths: |
+            checks/record-queue/build/test-results/test/
+            checks/record-queue/build/reports/tests/test/
+            checks/record-queue/build/reports/attachment-process/
+      - name: Verify design contracts and generated tokens
+        id: design_contracts
+        shell: bash
+        run: |
+          mkdir -p build/ci-stage-evidence
+          python3 -m unittest discover -s scripts/tests -v 2>&1 | tee build/ci-stage-evidence/script-tests.log
+          python3 scripts/generate-tokens.py --check 2>&1 | tee build/ci-stage-evidence/token-check.log
+      - name: Archive design evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: design
+          outcome: ${{ steps.design_contracts.outcome }}
+          name: d01-stage-design
+          paths: |
+            build/ci-stage-evidence/script-tests.log
+            build/ci-stage-evidence/token-check.log
+      - name: Test actual reminder receiver and JobService chain with controlled platform ports
+        id: reminders
+        run: |
+          python3 scripts/jvm-gradle.py -p checks/reminder-native test
+          python3 scripts/verify-reminder-native-results.py
+      - name: Archive reminder evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: reminder
+          outcome: ${{ steps.reminders.outcome }}
+          name: d01-stage-reminder
+          paths: |
+            checks/reminder-native/build/test-results/test/
+            checks/reminder-native/build/reports/tests/test/
+            checks/reminder-native/build/controlled-native-inputs.json
+            checks/reminder-native/build/controlled-native-results.json
+            checks/reminder-native/build/actual-room-export/
+      - name: Test actual native diagnostic observer on host (no device claim)
+        id: trace
+        run: |
+          scripts/gradle.sh --project-dir checks/native-trace test
+          python3 scripts/verify-test-results.py --trace
+      - name: Archive trace evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: trace
+          outcome: ${{ steps.trace.outcome }}
+          name: d01-stage-trace
+          paths: |
+            checks/native-trace/build/test-results/test/
+            checks/native-trace/build/reports/tests/test/
+      - name: Require nonempty passing tests
+        run: python3 scripts/verify-test-results.py
+      - name: Require host sources to remain unchanged
+        run: git diff --exit-code
+  d01:
+    if: ${{ !((github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 actual button publication') || (github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-heading-probe] d711 bounded intrinsic disclosure')) }}
+    name: Android APK Compose lint and compiled native evidence
+    needs: [contracts]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Require the exact workflow checkout
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Verify d01 wrapper checksum
+        run: |
+          printf '%s  %s\n' \
+            3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 \
+            gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
+      - name: Download the confirmed schema artifact from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.contracts.outputs.schema_id }}
+          path: build/ci-inputs/schema
+          merge-multiple: true
+      - name: Download same-run host domain evidence without rerunning it
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.contracts.outputs.protocol_id }}
+          path: build/ci-inputs/protocol
+          merge-multiple: true
+      - name: Authenticate schema and required host evidence against this checkout
+        id: transferred_inputs
+        run: python3 scripts/verify-ci-stage-inputs.py --schema-dir build/ci-inputs/schema --domain-dir build/ci-inputs/protocol
+      - name: Preserve the exact input transfer receipt
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: schema-inputs
+          outcome: ${{ steps.transferred_inputs.outcome }}
+          name: d01-android-inputs
+          paths: build/ci-stage-evidence/transferred-inputs/result.json
+      - name: Verify already installed and licensed SDK
+        run: python3 scripts/check-sdk.py
+      - name: Inspect existing device test environment without installation
+        run: python3 scripts/inspect-device-test-environment.py
+      - name: Verify Android dependency requirements
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: |
+          scripts/gradle.sh :app:checkDebugAarMetadata :core:designsystem:checkDebugAarMetadata :core:data:checkDebugAarMetadata
+      - name: Run actual component clipping and empty-state regression tests
+        id: components
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: |
+          scripts/gradle.sh :core:designsystem:testDebugUnitTest
+          python3 scripts/verify-test-results.py --component
+      - name: Archive component evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: component
+          outcome: ${{ steps.components.outcome }}
+          name: d01-stage-component
+          paths: |
+            core/designsystem/build/test-results/testDebugUnitTest/
+            core/designsystem/build/reports/tests/testDebugUnitTest/
+      - name: Run production pre-open ciphertext evidence regressions
+        id: preopen
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: |
+          scripts/gradle.sh :core:data:testDebugUnitTest
+          python3 scripts/verify-test-results.py --evidence
+      - name: Archive preopen evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: preopen
+          outcome: ${{ steps.preopen.outcome }}
+          name: d01-stage-preopen
+          paths: |
+            core/data/build/test-results/testDebugUnitTest/
+            core/data/build/reports/tests/testDebugUnitTest/
+      - name: Build debug APK
+        id: assemble
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: |
+          scripts/gradle.sh :app:assembleDebug
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
+      - name: Preserve debug APK
+        if: always() && steps.assemble.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: aiyou-d01-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Inspect actual merged APK for absent INTERNET permission (device NOT RUN)
+        run: python3 scripts/inspect-record-ai-permissions.py
+      - name: Compile and verify the platform-only recovery probe (all device execution NOT RUN)
+        id: sdk_probe
+        if: github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.run_attempt == 1
+        run: timeout --signal=KILL 180s python3 scripts/d08_sdk_probe.py --ci-compile-only
+      - name: Preserve SDK-only probe compilation and failure evidence
+        if: always() && steps.sdk_probe.outcome != 'skipped'
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: recovery-probe
+          outcome: ${{ steps.sdk_probe.outcome }}
+          name: d01-stage-recovery-probe
+          paths: |
+            checks/device-recovery/android/build/reports/sdk-probe-build.json
+            checks/device-recovery/android/build/outputs/apk/debug/recovery-probe-debug.apk
+      - name: Independently reproduce the original lazy-node failure and verify the corrected method
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[ui-lazy-repro]')
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: python3 scripts/reproduce-ui-lazy-source.py --expected-head "$GITHUB_SHA"
+      - name: Run actual Compose disabled-control and storage-wiring regressions (JVM simulation)
+        id: compose
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: |
+          # Keep the new settings callback regression's exact targeted XML before the full suite.
+          scripts/gradle.sh :app:testDebugUnitTest --tests com.t1doo.aiyou.StorageUsagePresentationTest
+          mkdir -p app/build/reports/storage-usage-targeted
+          cp app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.StorageUsagePresentationTest.xml app/build/reports/storage-usage-targeted/
+          scripts/gradle.sh :app:testDebugUnitTest --tests com.t1doo.aiyou.MixedCapturePresentationTest
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, shutil, xml.etree.ElementTree as ET
+          source = Path('app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.MixedCapturePresentationTest.xml')
+          raw = source.read_bytes()
+          suite = ET.fromstring(raw)
+          cases = list(suite.iter('testcase'))
+          assert int(suite.get('tests', '-1')) == len(cases) == 9
+          assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
+          assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
+          assert len({(case.get('classname'), case.get('name')) for case in cases}) == 9
+          target = Path('app/build/reports/capture-policy-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(source, target / source.name)
+          receipt = {'tests': 9, 'failures': 0, 'errors': 0, 'skipped': 0,
+                     'sha256': hashlib.sha256(raw).hexdigest(), 'path': str(target / source.name)}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('CAPTURE_POLICY_TARGETED_XML_JSON ' + json.dumps(receipt))
+          PY
+          scripts/gradle.sh :app:testDebugUnitTest --tests 'com.t1doo.aiyou.LocalOriginalSearchPresentationTest.searchCardsHighlightVerifiedOriginalUnicodeKeepOrderAndClearWithoutTouchingSource' --tests 'com.t1doo.aiyou.LocalOriginalSearchPresentationTest.searchCardFirstHitIsVisibleAtDoubleFontAndRevisionDeletionRetireItsHighlightAndAction'
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, shutil, xml.etree.ElementTree as ET
+          source = Path('app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.LocalOriginalSearchPresentationTest.xml')
+          raw = source.read_bytes()
+          suite = ET.fromstring(raw)
+          cases = list(suite.iter('testcase'))
+          expected = {'searchCardsHighlightVerifiedOriginalUnicodeKeepOrderAndClearWithoutTouchingSource',
+                      'searchCardFirstHitIsVisibleAtDoubleFontAndRevisionDeletionRetireItsHighlightAndAction'}
+          assert int(suite.get('tests', '-1')) == len(cases) == 2
+          assert {case.get('name') for case in cases} == expected
+          assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
+          assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
+          target = Path('app/build/reports/search-highlight-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(source, target / source.name)
+          receipt = {'tests': 2, 'failures': 0, 'errors': 0, 'skipped': 0,
+                     'sha256': hashlib.sha256(raw).hexdigest(), 'path': str(target / source.name)}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('SEARCH_HIGHLIGHT_TARGETED_XML_JSON ' + json.dumps(receipt))
+          PY
+          scripts/gradle.sh :app:testDebugUnitTest --tests 'com.t1doo.aiyou.AppAccess*'
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, shutil, xml.etree.ElementTree as ET
+          expected = {
+              'com.t1doo.aiyou.AppAccessPreferenceTest': {
+                  'replacementOwnerReadsCommittedRealFileAfterRetiredBlockingEnableCompletes',
+                  'confirmedSettingSurvivesNewInstancesAndStaleWriterCannotDisableIt',
+                  'malformedOversizedAndIncompleteSettingFailClosedAndPreserveTheirBytes',
+                  'atomicRecoveryKeepsConfirmedEnabledBackupAndVersionOverflowCannotOverwriteIt'},
+              'com.t1doo.aiyou.AppAccessPresentationTest': {
+                  'lockedDoubleFontGateKeepsOriginalAbsentUntilCurrentSystemResultAndRejectsEarlierResult',
+                  'actualSettingsRequireVerificationRespectBusyBoundaryAndRetireCallbacksAcrossPageAndLock',
+                  'uncertainPreferenceWriteKeepsActualProtectedTreeAbsentUntilExplicitReadAndNewVerification'},
+              'com.t1doo.aiyou.AppAccessStartupPresentationTest': {
+                  'productionLockedStartupAndRecreationNeverOpenRecordsOrExposeTheirSurface'}}
+          target = Path('app/build/reports/app-access-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          observed, receipts = [], []
+          for source in sorted(Path('app/build/test-results/testDebugUnitTest').glob('TEST-com.t1doo.aiyou.AppAccess*.xml')):
+              raw = source.read_bytes()
+              suite = ET.fromstring(raw)
+              cases = list(suite.iter('testcase'))
+              assert int(suite.get('tests', '-1')) == len(cases)
+              assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
+              assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
+              observed.extend((case.get('classname'), case.get('name')) for case in cases)
+              shutil.copy2(source, target / source.name)
+              receipts.append({'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+          wanted = {(name, method) for name, methods in expected.items() for method in methods}
+          assert len(observed) == len(set(observed)) == len(wanted) == 8 and set(observed) == wanted
+          receipt = {'tests': 8, 'failures': 0, 'errors': 0, 'skipped': 0, 'xml': receipts}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('APP_ACCESS_TARGETED_XML_JSON ' + json.dumps(receipt))
+          PY
+          scripts/gradle.sh :app:testDebugUnitTest
+          python3 scripts/verify-test-results.py --ui
+          # Preserve the affected classes from this actual full-suite execution; do not rerun them.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, shutil, xml.etree.ElementTree as ET
+          required = {
+              'com.t1doo.aiyou.UiPreferencesTest': {
+                  'legacyDefaultsStayLocalAndExplicitNoneSurvivesNewFileAndViewModelOwners',
+                  'unreadableDefaultRestrictsOnlyNewDraftsAndPreservesEveryUnknownPreferenceByte',
+                  'lostDefaultWriteAcknowledgementShowsUnconfirmedAndRetriesOnlyTheSamePreference',
+                  'confirmedRecapWeekSurvivesNewStorageAndViewModelAndKeepsDisplayChoices',
+                  'legacyDisplayBytesDefaultToDayAndAreUntouchedUntilExplicitPreferenceSave',
+                  'failedRecapSaveKeepsConfirmedPeriodAndRetryConfirmsOnlyRequestedChoice',
+                  'unknownOrIncompleteRecapPreferenceIsPreservedAndCannotBeOverwritten',
+                  'bothDisplayChoicesSurviveNewStorageAndViewModelInstances',
+                  'failedWriteKeepsConfirmedValuesAndRetryPersistsTheRequestedChoice',
+                  'corruptPreferencesArePreservedAndNeverFlashTheCompanion'},
+              'com.t1doo.aiyou.FactRecapPresentationTest': {
+                  'actualSettingsPersistWeekAndOpenedRangeKeepsItsOwnChoiceBeforeExplicitGeneration',
+                  'latePreferenceReadDoesNotRewriteOpenDayAndRetainedOpenUsesLatestConfirmedDefault',
+                  'actualNarrowDoubleFontRouteShowsOriginalExcerptThenFullTextAndReturnsToSameCard',
+                  'pureImageCardOpensExactVersionAttachmentAndReturnsWithoutInventingText',
+                  'failedReadRetryCancelAndChangedSourceHidePrivateResultsAndRejectRetainedClick',
+                  'explicitWeekZoneEmptyResultPrivateSavedStateAndAccurateBackupSettings',
+                  'recapExactAudioOpensManualEditorAndReturnsToSameWeekWithoutChangingOriginal',
+                  'restoredRecapAudioProofRetiresRealFocusedPanelAndOldEditorBeforeAnotherSource'}}
+          target = Path('app/build/reports/recap-preferences-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          observed, receipts = [], []
+          for name, methods in required.items():
+              source = Path('app/build/test-results/testDebugUnitTest') / ('TEST-' + name + '.xml')
+              raw = source.read_bytes()
+              suite = ET.fromstring(raw)
+              cases = list(suite.iter('testcase'))
+              assert int(suite.get('tests', '-1')) == len(cases)
+              assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
+              assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
+              assert all(case.get('classname') == name for case in cases)
+              assert len(cases) == len(methods)
+              assert {case.get('name') for case in cases} == methods
+              observed.extend((case.get('classname'), case.get('name')) for case in cases)
+              shutil.copy2(source, target / source.name)
+              receipts.append({'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+          assert len(observed) == len(set(observed)) == 18
+          receipt = {'tests': 18, 'required_cases': 18, 'failures': 0, 'errors': 0, 'skipped': 0,
+                     'source': 'subset of actual full app suite, no second execution', 'xml': receipts}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('RECAP_PREFERENCES_TARGETED_XML_JSON ' + json.dumps(receipt))
+          PY
+          # Extract the affected migration class from the same full execution, without rerunning it.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, shutil, xml.etree.ElementTree as ET
+          source = Path('app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.RecordHistoryPackagePresentationTest.xml')
+          raw = source.read_bytes()
+          suite = ET.fromstring(raw)
+          cases = list(suite.iter('testcase'))
+          expected = {
+              'explicitHistoryAtDoubleFontPreviewsEveryVersionAndDeletedTextWarningBeforeScopeConfirmation',
+              'authenticatedHistoryShowsAllVersionsBeforeSeparateRestoreConfirmationCreatesNewCopy',
+              'originalEditScopeDefaultsOffRequiresFullHistoryAndShowsFullDraftBeforeConsentAtDoubleFont',
+              'authenticatedOriginalEditsRequireSeparateConfirmationAndPublishRecoveryEntryWithoutSavingOriginal'}
+          assert int(suite.get('tests', '-1')) == len(cases) == len(expected) == 4
+          assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
+          assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
+          assert {case.get('name') for case in cases} == expected
+          assert all(case.get('classname') == 'com.t1doo.aiyou.RecordHistoryPackagePresentationTest' for case in cases)
+          target = Path('app/build/reports/original-edit-migration-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(source, target / source.name)
+          receipt = {'head_sha': os.environ['GITHUB_SHA'], 'tests': 4, 'new_cases': 2,
+                     'failures': 0, 'errors': 0, 'skipped': 0,
+                     'source': 'subset of actual full app suite, no second execution',
+                     'xml': [{'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}]}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('ORIGINAL_EDIT_MIGRATION_TARGETED_XML_JSON ' + json.dumps(receipt))
+          PY
+      - name: Preserve selected-excerpt and local protocol question UI evidence from same full suite
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, shutil
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          source = Path('app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.CurrentImageSearchPresentationTest.xml')
+          raw = source.read_bytes()
+          suite = ET.fromstring(raw)
+          cases = list(suite.iter('testcase'))
+          new_cases = {
+              'productionSelectedExcerptTimelineIsExplicitAndOpensExactOriginalWithFreshConfirmationOnReturn',
+              'narrowDoubleFontProductionTimelineKeepsChronologyAndClearsOnSelectionOrInputChange'}
+          assert int(suite.get('tests', '-1')) == len(cases) == 16
+          assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
+          assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
+          assert new_cases <= {case.get('name') for case in cases}
+          assert all(case.get('classname') == 'com.t1doo.aiyou.CurrentImageSearchPresentationTest' for case in cases)
+          target = Path('app/build/reports/local-evidence-timeline-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(source, target / source.name)
+          receipt = {'head_sha': os.environ['GITHUB_SHA'], 'tests': len(cases), 'new_cases': len(new_cases),
+                     'failures': 0, 'errors': 0, 'skipped': 0,
+                     'source': 'subset of actual full app suite, no second execution',
+                     'xml': [{'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}]}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('LOCAL_EVIDENCE_TIMELINE_TARGETED_XML_JSON ' + json.dumps(receipt))
+          question_cases = {
+              'narrowDoubleFontProtocolQuestionRequiresSeparateScopeConfirmationAndJumpsToCurrentOriginal',
+              'protocolQuestionStopAndServiceReplacementRejectNonCooperativeLateAnswer'}
+          assert question_cases <= {case.get('name') for case in cases}
+          target = Path('app/build/reports/selected-evidence-question-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(source, target / source.name)
+          receipt = {'head_sha': os.environ['GITHUB_SHA'], 'tests': len(cases), 'new_cases': len(question_cases),
+                     'failures': 0, 'errors': 0, 'skipped': 0, 'mode': 'LOCAL_PROTOCOL_FIXTURE',
+                     'external_model_calls': 0, 'source': 'subset of same full app suite, no second execution',
+                     'xml': [{'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}]}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('SELECTED_EVIDENCE_QUESTION_TARGETED_XML_JSON ' + json.dumps(receipt))
+          source = Path('app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.SelectedQuestionConsentPresentationTest.xml')
+          raw = source.read_bytes()
+          suite = ET.fromstring(raw)
+          cases = list(suite.iter('testcase'))
+          expected = {
+              'narrowDoubleFontSeparateMultiSourceReviewAndExactOriginalJump',
+              'withdrawUnknownAckHidesResultAndExplicitRetryNeverExecutesAgain',
+              'serviceReplacementRetiresOpenReviewAndDefaultCapabilityNeverOffersSend',
+              'actualProductionQuestionInputAndConnectionAreSeparateFromRecordSavingAndPackageGateCannotBeBypassed'}
+          assert {case.get('name') for case in cases} == expected
+          assert int(suite.get('tests', '-1')) == len(cases) == 4
+          assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
+          assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
+          assert all(case.get('classname') == 'com.t1doo.aiyou.SelectedQuestionConsentPresentationTest' for case in cases)
+          target = Path('app/build/reports/selected-question-consent-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(source, target / source.name)
+          receipt = {'head_sha': os.environ['GITHUB_SHA'], 'tests': len(cases),
+                     'failures': 0, 'errors': 0, 'skipped': 0, 'mode': 'PRODUCTION_BLOCKED_AND_LOCAL_PROTOCOL_FIXTURE',
+                     'authority': 'synthetic UI port; persistent authority covered by host SQLite controller tests',
+                     'external_model_calls': 0, 'source': 'subset of same full app suite, no second execution',
+                     'xml': [{'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}]}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('CONSENT_UI_TARGETED_XML_JSON ' + json.dumps(receipt))
+          PY
+      - name: Preserve full offline backup XML from the same completed suites
+        run: |
+          python3 - <<'PYCODE'
+          import hashlib, json, os, shutil
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          inventories = [
+              ('app/build/test-results/testDebugUnitTest/TEST-com.t1doo.aiyou.FullBackupPresentationTest.xml', 7),
+              ('checks/ai-protocol/remote-text/build/test-results/test/TEST-com.t1doo.aiyou.data.FullBackupTest.xml', 18),
+              ('checks/ai-protocol/remote-text/build/test-results/test/TEST-com.t1doo.aiyou.records.FullBackupControllerTest.xml', 9),
+          ]
+          target = Path('app/build/reports/full-offline-backup-targeted')
+          target.mkdir(parents=True, exist_ok=True)
+          receipts = []
+          for path, expected in inventories:
+              source = Path(path)
+              raw = source.read_bytes()
+              suite = ET.fromstring(raw)
+              cases = list(suite.iter('testcase'))
+              assert int(suite.get('tests', '-1')) == len(cases) == expected
+              assert all(int(suite.get(key, '0')) == 0 for key in ('failures', 'errors', 'skipped'))
+              assert all(case.find(key) is None for case in cases for key in ('failure', 'error', 'skipped'))
+              shutil.copy2(source, target / source.name)
+              receipts.append({'path': str(source), 'tests': expected, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+          receipt = {'head_sha': os.environ['GITHUB_SHA'], 'xml': receipts,
+                     'source': 'subsets of the same full suites; no duplicate execution or counting',
+                     'device_saf_room_sqlcipher': 'NOT RUN', 'external_model_calls': 0}
+          (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print('FULL_OFFLINE_BACKUP_TARGETED_XML_JSON ' + json.dumps(receipt))
+          PYCODE
+      - name: Archive compose evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: compose
+          outcome: ${{ steps.compose.outcome }}
+          name: d01-reports
+          paths: |
+            app/build/test-results/testDebugUnitTest/
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/reports/companion-motion/
+            app/build/reports/storage-usage-targeted/
+            app/build/reports/capture-policy-targeted/
+            app/build/reports/search-highlight-targeted/
+            app/build/reports/app-access-targeted/
+            app/build/reports/recap-preferences-targeted/
+            app/build/reports/original-edit-migration-targeted/
+            app/build/reports/local-evidence-timeline-targeted/
+            app/build/reports/selected-evidence-question-targeted/
+            app/build/reports/selected-question-consent-targeted/
+            app/build/reports/ui-lazy-repro/
+            app/build/reports/full-offline-backup-targeted/
+      - name: Compile actual D02 native-storage instrumentation APK without claiming execution
+        id: instrumentation
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: scripts/gradle.sh :core:data:assembleDebugAndroidTest :app:assembleDebugAndroidTest
+      - name: Preserve D02 instrumentation APK (compiled, execution NOT RUN)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d02-storage-test-apk
+          path: core/data/build/outputs/apk/androidTest/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Preserve production Activity cold-start instrumentation APK (compiled, execution NOT RUN)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d02-production-test-apk
+          path: app/build/outputs/apk/androidTest/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Collect exact native methods and external probes from actual compiled APK DEX (device NOT RUN)
+        run: python3 scripts/inspect-d02-device-test-apks.py
+      - name: Verify actual license assets and APK ZIP alignment (native execution NOT RUN)
+        id: native_audit
+        run: python3 scripts/inspect-d02-apks.py
+      - name: Archive native evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: native
+          outcome: ${{ steps.native_audit.outcome }}
+          name: d01-stage-native
+          paths: |
+            app/build/reports/d02-apk-audit.json
+            app/build/reports/device-apk-manifest.json
+            app/build/reports/record-ai-permissions.json
+            app/build/outputs/apk/debug/*.zipalign.txt
+            core/data/build/outputs/apk/androidTest/debug/*.zipalign.txt
+      - name: Run Android lint
+        id: lint
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: |
+          scripts/gradle.sh :app:lintDebug :core:designsystem:lintDebug :core:data:lintDebug
+          git diff --exit-code
+      - name: Print complete lint findings
+        if: always()
+        run: |
+          for module in app core/designsystem core/data; do
+            report=$module/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            if [ -f "$report" ]; then
+              cat "$report"
+            else
+              echo "Lint text report unavailable for $module; see preceding task result."
+            fi
+          done
+      - name: Archive lint evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: lint
+          outcome: ${{ steps.lint.outcome }}
+          name: d01-stage-lint
+          paths: |
+            app/build/reports/lint-results-debug.*
+            app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            core/designsystem/build/reports/lint-results-debug.*
+            core/data/build/reports/lint-results-debug.*
+            core/designsystem/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+  preview:
+    if: ${{ !((github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 actual button publication') || (github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-heading-probe] d711 bounded intrinsic disclosure')) }}
+    name: Complete 430 Preview validation and original PNG evidence
+    needs: [contracts]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 17
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Require the exact workflow checkout
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Verify preview wrapper checksum
+        run: |
+          printf '%s  %s\n' \
+            3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 \
+            gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
+      - name: Download the confirmed schema artifact from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.contracts.outputs.schema_id }}
+          path: build/ci-inputs/schema
+          merge-multiple: true
+      - name: Authenticate schema and required host evidence against this checkout
+        id: transferred_inputs
+        run: python3 scripts/verify-ci-stage-inputs.py --schema-dir build/ci-inputs/schema
+      - name: Preserve the exact input transfer receipt
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: schema-inputs
+          outcome: ${{ steps.transferred_inputs.outcome }}
+          name: d01-preview-inputs
+          paths: build/ci-stage-evidence/transferred-inputs/result.json
+      - name: Verify the renderer existing licensed SDK
+        run: python3 scripts/check-sdk.py
+      - name: Generate initial Preview render smoke references
+        id: preview_generate
+        if: success()
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: |
+          scripts/gradle.sh :app:updateDebugScreenshotTest
+          git diff --exit-code
+      - name: Preserve initial Preview render smoke images
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d01-preview-render-smoke
+          path: |
+            app/src/screenshotTestDebug/reference/
+            app/build/outputs/screenshotTest-results/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Validate Preview render smoke
+        id: preview_validate
+        if: always() && steps.preview_generate.outcome == 'success'
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: scripts/gradle.sh :app:validateDebugScreenshotTest
+      - name: Require actual complete Preview render results
+        id: preview_guard
+        if: always() && steps.preview_validate.outcome == 'success'
+        run: python3 scripts/verify-preview-results.py
+      - name: Archive preview evidence before the next phase
+        if: always()
+        uses: ./.github/actions/preserve-stage
+        with:
+          stage: preview
+          outcome: ${{ steps.preview_guard.outcome }}
+          name: d01-preview-reports
+          paths: |
+            app/build/reports/screenshotTest/
+            app/build/test-results/validateDebugScreenshotTest/
+            app/build/reports/d01-preview-manifest.json
+      - name: Package unchanged PNGs for attachment-sized visual review
+        id: visual_packs
+        if: always() && steps.preview_guard.outcome == 'success'
+        run: python3 scripts/package-visual-previews.py
+      - name: Preserve visual delivery manifest
+        id: visual_index
+        if: always() && steps.visual_packs.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d01-visual-index
+          path: app/build/outputs/d01-visual-packs/INDEX.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload each unchanged bounded PNG ZIP independently
+        if: always() && steps.visual_packs.outcome == 'success' && steps.visual_index.outcome == 'success'
+        uses: ./.github/actions/upload-visual-packs
+
+  companion-motion-diagnostic:
+    name: DIAGNOSTIC ONLY - one Lulu method; not D01 acceptance
+    if: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-companion-probe] b438 actual button publication' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    concurrency:
+      group: aiyou-fixed-companion-motion-diagnostic
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Require the fixed request and exact reviewed source
+        run: python3 scripts/diagnose-companion-motion.py --admit
+      - name: Verify unchanged wrapper and existing accepted SDK; no installation
+        run: |
+          printf '%s  %s\n' 3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
+          python3 scripts/check-sdk.py
+      - name: Capture all current schema guards
+        id: schema_capture
+        run: |
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question chat-message; do
+            python3 "scripts/verify-$kind-schema.py" --capture
+          done
+      - name: Run only the fixed actual companion method
+        id: method
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: |
+          set -o pipefail
+          timeout --signal=TERM --kill-after=10s 540s scripts/gradle.sh :app:testDebugUnitTest --tests 'com.t1doo.aiyou.CompanionSettingsPresentationTest.finiteInteractionMotionStopsOnReductionAndBackgroundWithoutAutomaticReplay' 2>&1 | tee build/companion-motion-diagnostic/gradle.log
+      - name: Verify schema and tracked source even when the method fails
+        id: schema_verify
+        if: always() && steps.schema_capture.outcome == 'success' && steps.method.outcome != 'skipped'
+        run: |
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question chat-message; do
+            python3 "scripts/verify-$kind-schema.py" --verify
+          done
+          git diff --exit-code
+      - name: Record the actual single-case result; failures remain failures
+        if: always()
+        env:
+          TARGET_OUTCOME: ${{ steps.method.outcome }}
+          SCHEMA_OUTCOME: ${{ steps.schema_verify.outcome }}
+        run: python3 scripts/diagnose-companion-motion.py --collect
+      - name: Preserve raw diagnostic XML and log, not acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: companion-motion-DIAGNOSTIC-ONLY
+          path: |
+            build/companion-motion-diagnostic/
+            app/build/test-results/testDebugUnitTest/
+            app/build/reports/companion-motion/
+          if-no-files-found: error
+          retention-days: 14
+
+  memory-heading-diagnostic:
+    name: DIAGNOSTIC ONLY - one memory heading method; not D01 acceptance
+    if: ${{ github.event_name == 'push' && github.repository == 'T1doo/AIyou' && github.event.repository.private == false && github.ref == 'refs/heads/codex/d03-short-audio-design-20261020' && github.event.head_commit.message == '[ui-heading-probe] d711 bounded intrinsic disclosure' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    concurrency:
+      group: aiyou-fixed-memory-heading-diagnostic
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+        with:
+          distribution: temurin
+          java-version: '17.0.17+10'
+          check-latest: false
+      - name: Require the fixed request and exact reviewed source
+        run: python3 scripts/diagnose-memory-heading.py --admit
+      - name: Verify unchanged wrapper and existing accepted SDK; no installation
+        run: |
+          printf '%s  %s\n' 3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98 gradle/wrapper/gradle-wrapper.jar | sha256sum --check -
+          python3 scripts/check-sdk.py
+      - name: Capture all current schema guards
+        id: schema_capture
+        run: |
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question chat-message; do
+            python3 "scripts/verify-$kind-schema.py" --capture
+          done
+      - name: Run only the fixed actual memory heading method
+        id: method
+        env:
+          AIYOU_CI_ANDROID_DAEMON: 'true'
+        run: |
+          set -o pipefail
+          timeout --signal=TERM --kill-after=10s 540s scripts/gradle.sh :app:testDebugUnitTest --tests 'com.t1doo.aiyou.LocalOriginalSearchPresentationTest.emptyAdvancedFiltersUseRealKeyboardDisclosureWithoutQueryOrInputReplacement' 2>&1 | tee build/memory-heading-diagnostic/gradle.log
+      - name: Verify schema and tracked source even when the method fails
+        id: schema_verify
+        if: always() && steps.schema_capture.outcome == 'success' && steps.method.outcome != 'skipped'
+        run: |
+          for kind in manual-tag manual-task local-search permanent-erasure record-favorite local-candidate record-event-date manual-people model-configuration model-capability reminder-runtime saved-question chat-message; do
+            python3 "scripts/verify-$kind-schema.py" --verify
+          done
+          git diff --exit-code
+      - name: Record the actual single-case result; failures remain failures
+        if: always()
+        env:
+          TARGET_OUTCOME: ${{ steps.method.outcome }}
+          SCHEMA_OUTCOME: ${{ steps.schema_verify.outcome }}
+        run: python3 scripts/diagnose-memory-heading.py --collect
+      - name: Preserve raw diagnostic XML and log, not acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: memory-heading-DIAGNOSTIC-ONLY
+          path: |
+            build/memory-heading-diagnostic/
+            app/build/test-results/testDebugUnitTest/
+            app/build/reports/tests/testDebugUnitTest/original-search-disclosure/
+          if-no-files-found: error
+          retention-days: 14

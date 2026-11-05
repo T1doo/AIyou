@@ -14,9 +14,12 @@ probe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)
 
 
+FROZEN_WORKFLOW = ROOT / 'scripts/tests/fixtures/frozen-diagnostic-workflow/android.yml.fixture'
+
+
 class CompanionDiagnosticTests(unittest.TestCase):
-    def formal_workflow(self):
-        workflow = (ROOT / '.github/workflows/android.yml').read_text()
+    def formal_workflow(self, workflow=None):
+        if workflow is None: workflow = (ROOT / '.github/workflows/android.yml').read_text()
         formal = workflow.split('\n  companion-motion-diagnostic:\n')[0]
         lines = formal.splitlines(keepends=True)
         lines = [line for line in lines if not line.startswith('run-name:') and not line.startswith('    if: ${{ !(')]
@@ -182,7 +185,8 @@ class CompanionDiagnosticTests(unittest.TestCase):
         sdk_compile = importlib.util.module_from_spec(sdk_spec); sdk_spec.loader.exec_module(sdk_compile)
         COMPILE_ONLY_WORKFLOW_STEPS = sdk_compile.COMPILE_ONLY_WORKFLOW_STEPS
         self.assertEqual('1ff608e73ba75e9fb640c9bad472e63e53ac71438d3f054489a74b501138fad6', hashlib.sha256(COMPILE_ONLY_WORKFLOW_STEPS.encode()).hexdigest())
-        formal = self.formal_workflow()
+        # Authenticate the historical one-shot definition, not a forever-frozen CI inventory.
+        formal = self.formal_workflow(FROZEN_WORKFLOW.read_text())
         self.assertEqual(1, formal.count(COMPILE_ONLY_WORKFLOW_STEPS))
         original = formal.replace(COMPILE_ONLY_WORKFLOW_STEPS, '')
         self.assertEqual('a5f081b9d191f51385b4184ad0f3c0ed59451740242c0ad1d14a0236cc243036',
@@ -214,3 +218,19 @@ class CompanionDiagnosticTests(unittest.TestCase):
         self.assertIn('app/build/reports/companion-motion/', diagnostic)
         self.assertNotIn('needs:', diagnostic)
         self.assertNotIn('ScreenshotTest', diagnostic)
+
+    def test_current_formal_jobs_keep_budgets_dependencies_and_required_checks(self):
+        current = self.formal_workflow()
+        self.assertIn('contents: read', current)
+        self.assertNotIn('continue-on-error', current)
+        self.assertNotIn('secrets.', current)
+        self.assertNotIn('sdkmanager', current)
+        self.assertNotIn('--licenses', current)
+        self.assertEqual(1, current.count('timeout-minutes: 23'))
+        self.assertEqual(1, current.count('timeout-minutes: 30'))
+        self.assertEqual(1, current.count('timeout-minutes: 17'))
+        self.assertEqual(2, current.count('needs: [contracts]'))
+        for required in (':app:assembleDebug', ':app:lintDebug', ':core:domain:test',
+                         'scripts/verify-preview-results.py', 'scripts/verify-test-results.py --ui',
+                         'scripts/check-sdk.py', 'scripts/verify-ai-protocol-results.py'):
+            self.assertIn(required, current)

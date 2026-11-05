@@ -80,7 +80,7 @@ class SavedQuestionDiagnosticTests(unittest.TestCase):
         for forbidden in ('continue-on-error', 'sdkmanager', 'sudo', 'secrets.', 'needs:', ':app:assembleDebug', 'ScreenshotTest'):
             self.assertNotIn(forbidden, workflow)
         self.assertEqual('296d16beb5b3275e0fe604d1d4a93e0e5cffe721c7c9dcd0ebb863093ca3b094',
-                         hashlib.sha256((ROOT / '.github/workflows/android.yml').read_bytes()).hexdigest())
+                         hashlib.sha256((ROOT / 'scripts/tests/fixtures/frozen-diagnostic-workflow/android.yml.fixture').read_bytes()).hexdigest())
         self.assertFalse(probe.REF.removeprefix('refs/heads/').startswith('codex/'))
         self.assertEqual(8 * 1024 * 1024, probe.MAX_ARTIFACT)
         for path, digest in probe.SOURCES.items():

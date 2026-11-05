@@ -1,0 +1,8 @@
+{
+  "kind": "Historical one-shot diagnostic workflow, not current CI inventory",
+  "commit": "867f86ed3eef4452a1b61b5190820457fb48bc31",
+  "path": ".github/workflows/android.yml",
+  "sha256": "296d16beb5b3275e0fe604d1d4a93e0e5cffe721c7c9dcd0ebb863093ca3b094",
+  "bytes": 54976,
+  "runtime_admission": "Unchanged; archived fixture does not authorize any diagnostic execution"
+}

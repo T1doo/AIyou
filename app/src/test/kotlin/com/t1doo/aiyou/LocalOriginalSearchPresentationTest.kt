@@ -149,7 +149,7 @@ class LocalOriginalSearchPresentationTest {
         compose.onNodeWithText("称呼需为1–40个字符，不可包含控制字符。").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("original-search-filters").performScrollTo().assertIsNotEnabled()
         compose.showOriginalSearchFilters()
-        compose.onNodeWithTag("original-search-clear").performScrollTo().performClick()
+        compose.clearOriginalSearchIncludingQuery()
         observation { it.state.stage == OriginalSearchStage.BROWSE }
         compose.onAllNodes(hasTestTag("original-search-person-input")).assertCountEquals(0)
         for ((changed, target) in listOf(
@@ -281,7 +281,7 @@ class LocalOriginalSearchPresentationTest {
         openCard("one"); assertEquals(full, fullText())
         compose.onNodeWithText("返回列表").performClick(); ready("i𐐨🙂mixed")
         compose.showOriginalSearchFilters()
-        compose.onNodeWithTag("original-search-clear").performScrollTo().performClick()
+        compose.clearOriginalSearchIncludingQuery()
         observation { it.state.stage == OriginalSearchStage.BROWSE }
         assertTrue(searchCardText("one").fetchSemanticsNode().config[SemanticsProperties.Text].single().spanStyles.isEmpty())
         assertEquals(full, state.value.entries.first().originalText)
@@ -492,7 +492,7 @@ class LocalOriginalSearchPresentationTest {
         assertEquals(listOf("one"), beforeClear.state.hits.map { it.entry.id })
         val beforeClearInputs = compose.runOnIdle { checkNotNull(actualInputs.get()) }
         compose.showOriginalSearchFilters()
-        compose.onNodeWithTag("original-search-clear").performScrollTo().performClick(); observation { it.state.stage == OriginalSearchStage.BROWSE }
+        compose.clearOriginalSearchIncludingQuery(); observation { it.state.stage == OriginalSearchStage.BROWSE }
         compose.showOriginalSearchFilters()
         for (tag in listOf("original-search-query", "original-search-from", "original-search-through")) {
             compose.runOnIdle {

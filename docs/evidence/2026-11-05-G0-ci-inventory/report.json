@@ -1,0 +1,133 @@
+{
+  "batch": "G0 remaining CI recovery; not G0-G7 acceptance",
+  "base_sha": "ed4893dfefbc000057e52992fe9fa2a002b9b4a9",
+  "source_scope": "Working tree based on base_sha; delivered commit binds listed source hashes",
+  "source_sha256_lf_normalized": {
+    ".gitattributes": "477572f8eea10ac9c5280083615377a0cd32a0dc0a25843c9cf4d11fefb67222",
+    ".github/workflows/android.yml": "6dffd59891dafd8c373cf50b9cc19b5369c147c374f5cc22d9d6336630dc5a39",
+    "app/src/test/kotlin/com/t1doo/aiyou/CurrentImageSearchPresentationTest.kt": "78a9ee4e34239e9f3ecc95da215c191524666c18abc04097755eee5f7b934f05",
+    "app/src/test/kotlin/com/t1doo/aiyou/LocalOriginalSearchPresentationTest.kt": "ad47ebb4a48617df000ab2c0b934317992c7a8d576dddd2d76d27db84f817cbb",
+    "app/src/test/kotlin/com/t1doo/aiyou/OriginalSearchDisclosureTestSupport.kt": "cddf08f0539997a7832ec9501a9572f69fcea71b31212b1aa6a8abd4602b499c",
+    "scripts/tests/test_companion_motion_diagnostic.py": "4dacc5041da78ae0649de3caa6707bba45405a5989562427cfca5aef692a7c53",
+    "scripts/tests/test_saved_question_diagnostic.py": "af8232f254811d024d7421a3b884d4ec87f1350b35627d4ecf61504e2b0f8faa",
+    "scripts/tests/test_capture_ci_inventory.py": "3fb5914dae70deac4cbaf164fca2d0f0673e3e6166f848e571c1b126e7456a20"
+  },
+  "native_targeted": [
+    {
+      "file": "TEST-com.t1doo.aiyou.LocalOriginalSearchPresentationTest.xml",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "fc92273b19aca191ec5d916b7118e4437733002f9b04e6b7cd09ecead36b4965"
+    },
+    {
+      "file": "TEST-com.t1doo.aiyou.MixedCapturePresentationTest.xml",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "609b34f7beb46615f1811ea62caf864173f7bf7b456494acba6dec48495df9d2"
+    }
+  ],
+  "current_image_search": {
+    "initial_after_scroll_category_fix": [
+      {
+        "file": "TEST-com.t1doo.aiyou.CurrentImageSearchPresentationTest.xml",
+        "tests": 16,
+        "failures": 13,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "b843fe634aba0aaca745f837f41aa5b720093971e808a0e65178b049c3bcb925"
+      }
+    ],
+    "after_disclosure_fix": [
+      {
+        "file": "TEST-com.t1doo.aiyou.CurrentImageSearchPresentationTest.xml",
+        "tests": 16,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "77eb86b9022ce47d1d283d56129fb58adb3100d89441d847ed1142dccf1d3c63"
+      }
+    ],
+    "after_owner_assertion_fix": [
+      {
+        "file": "TEST-com.t1doo.aiyou.CurrentImageSearchPresentationTest.xml",
+        "tests": 16,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "39b906df5ba234384fda5bd861a145d473e809e1935fec0dde93fa5515744c5a"
+      }
+    ],
+    "verified": [
+      {
+        "file": "TEST-com.t1doo.aiyou.CurrentImageSearchPresentationTest.xml",
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "c49ebe09f5c0194996e0db67a6e87eff27cdbbcf752635eee00156c22f1fc495"
+      }
+    ],
+    "test_method_inventory_unchanged": true,
+    "cache_assertion_change": "Normal lists also show bounded thumbnails. Require former filtered owner to expose no tiles, a distinct current search owner, and every remaining tile to belong to current browse. Do not remove list thumbnails."
+  },
+  "required_checks": {
+    "status": "PASS",
+    "exit_code": 0,
+    "command": "./gradlew.bat --no-daemon --offline :app:checkDebugAarMetadata :app:assembleDebug :core:domain:test :app:lintDebug --console=plain",
+    "note": "AAR, assemble and domain test UP-TO-DATE; lint executed. No claim of fresh domain testcase execution."
+  },
+  "host_scripts": {
+    "capture_inventory_mutation_tests": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "status": "PASS"
+    },
+    "diagnostic_suite": {
+      "tests": 18,
+      "failures": 0,
+      "errors": 1,
+      "status": "FAIL",
+      "limitation": "Windows symlink creation WinError 1314; unchanged test not skipped"
+    },
+    "all_scripts": {
+      "tests": 254,
+      "failures": 51,
+      "errors": 24,
+      "status": "FAIL",
+      "limitation": "Actual Windows execution; includes python3 Store alias exit 9009, required Linux process APIs, os.getuid, symlink privilege, SQLite open-file cleanup. Full failures retained; not all independently classified."
+    }
+  },
+  "frozen_workflow": {
+    "source_commit": "867f86ed3eef4452a1b61b5190820457fb48bc31",
+    "sha256": "296d16beb5b3275e0fe604d1d4a93e0e5cffe721c7c9dcd0ebb863093ca3b094",
+    "git_blob_bytes_verified": true,
+    "runtime_admission_scripts_changed": false
+  },
+  "actual_capture_xml_passes_current_workflow_guard": true,
+  "apk": {
+    "path": "app/build/outputs/apk/debug/app-debug.apk",
+    "sha256": "208affeef82e4d57b294b83b3c5e23db14b46d56e11367028a549bc1847b74b0",
+    "bytes": 32059279
+  },
+  "last_full_ui_baseline": {
+    "source_sha": "b3023343ad78190c76d56e3896bfd795e0d0e068",
+    "tests": 409,
+    "failures": 106,
+    "errors": 0,
+    "skipped": 0,
+    "current_full_rerun": "NOT RUN"
+  },
+  "device_preview_visual_acceptance": "NOT RUN this batch; no emulator started",
+  "production_ui_and_data_code_changed": false,
+  "archive_sha256": "d000865de10afdfebda6596c018a53886ae6f286c0238ac62f46dda05ab7f3ea",
+  "remaining": [
+    "Linux CI at delivered SHA",
+    "Remaining full UI failures",
+    "G1-G7 native, data and device acceptance"
+  ]
+}
