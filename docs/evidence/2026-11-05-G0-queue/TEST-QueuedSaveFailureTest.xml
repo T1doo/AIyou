@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="QueuedSaveFailureTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-05T07:52:40.105Z" hostname="LAPTOP-USISIS19" time="0.215">
+  <properties/>
+  <testcase name="committedSaveWithFailedReadbackRetriesOriginalIdWithoutCreatingAnotherDraft" classname="QueuedSaveFailureTest" time="0.186"/>
+  <testcase name="failedEarlierEditCannotDuplicateQueuedSaveAndLaterInputHasItsOwnIntent" classname="QueuedSaveFailureTest" time="0.005"/>
+  <testcase name="genuineSaveFailureRetriesSameIntentAndRejectsInterveningInput" classname="QueuedSaveFailureTest" time="0.003"/>
+  <testcase name="supplementaryCharactersKeepTheExistingUtf16LimitWithoutPartialTruncation" classname="QueuedSaveFailureTest" time="0.007"/>
+  <testcase name="oversizedPasteIntoEmptyDraftDoesNotPersistOrClaimSuccessAndEditingRecovers" classname="QueuedSaveFailureTest" time="0.006"/>
+  <testcase name="oversizedEditPreservesDraftAndValidBoundaryEditClearsNotice" classname="QueuedSaveFailureTest" time="0.006"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

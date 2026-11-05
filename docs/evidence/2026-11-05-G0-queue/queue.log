@@ -1,0 +1,17 @@
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :syncProduction
+> Task :core:ai:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:domain:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:model:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:model:processResources NO-SOURCE
+> Task :core:domain:processResources NO-SOURCE
+> Task :core:ai:processResources NO-SOURCE
+> Task :processResources NO-SOURCE
+> Task :syncJpegFixture
+> Task :processTestResources NO-SOURCE
+> Task :core:ai:processTestResources NO-SOURCE
+> Task :core:domain:processTestResources NO-SOURCE
+> Task :core:model:processTestResources NO-SOURCE

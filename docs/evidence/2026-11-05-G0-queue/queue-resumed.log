@@ -1,0 +1,50 @@
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :syncProduction UP-TO-DATE
+> Task :core:ai:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:domain:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:model:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:model:processResources NO-SOURCE
+> Task :core:domain:processResources NO-SOURCE
+> Task :core:ai:processResources NO-SOURCE
+> Task :processResources NO-SOURCE
+> Task :syncJpegFixture UP-TO-DATE
+> Task :processTestResources NO-SOURCE
+> Task :core:ai:processTestResources NO-SOURCE
+> Task :core:domain:processTestResources NO-SOURCE
+> Task :core:model:processTestResources NO-SOURCE
+> Task :core:model:compileKotlin
+> Task :core:model:compileJava NO-SOURCE
+> Task :core:model:classes UP-TO-DATE
+> Task :core:model:jar
+> Task :core:model:compileTestKotlin NO-SOURCE
+> Task :core:model:compileTestJava NO-SOURCE
+> Task :core:model:testClasses UP-TO-DATE
+> Task :core:model:test NO-SOURCE
+> Task :core:domain:compileKotlin
+> Task :core:domain:compileJava NO-SOURCE
+> Task :core:domain:classes UP-TO-DATE
+> Task :core:domain:jar
+> Task :core:domain:compileTestKotlin
+> Task :core:domain:compileTestJava NO-SOURCE
+> Task :core:domain:testClasses UP-TO-DATE
+
+> Task :core:domain:test FAILED
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+
+> Task :core:ai:compileKotlin
+
+w: Detected multiple Kotlin daemon sessions at 
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':core:domain:test'.
+> No tests found for given includes: [*ReminderClickNavigationTest, *AppAccessRetirementBarrierTest, *QueuedSaveFailureTest](--tests filter)
+
+* Try:
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+
+BUILD FAILED in 36s
+9 actionable tasks: 7 executed, 2 up-to-date

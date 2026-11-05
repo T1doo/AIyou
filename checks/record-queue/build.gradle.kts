@@ -6,9 +6,10 @@ dependencyLocking { lockAllConfigurations() }
 // Compile the actual product sources, never an independently copied ViewModel.
 val production = layout.buildDirectory.dir("production-sources")
 val syncProduction = tasks.register<Sync>("syncProduction") {
-    listOf("ChatMessageSqlSchema.kt","ChatMessageCipher.kt","SqlChatHistoryRepository.kt","ChatHistoryPortable.kt").forEach {
-        from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/$it")
-    }
+    // FullBackupCodec needs the schema columns, while this queue harness uses a
+    // controlled EntryRepository (no SQL adapter). The actual chat SQL/cipher/
+    // portable implementation is compiled and exercised in checks/ai-protocol.
+    from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/ChatMessageSqlSchema.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/SavedQuestionsController.kt")
     from("../../app/src/main/java/com/t1doo/aiyou/records/ChatHistoryController.kt")
     from("../../core/data/src/main/kotlin/com/t1doo/aiyou/data/SavedQuestionSqlSchema.kt")

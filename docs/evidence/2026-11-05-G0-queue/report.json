@@ -1,0 +1,31 @@
+{
+  "task": "CORE-01 follow-up",
+  "scope": "Queue host compilation and three targeted regression classes; not complete queue suite or device execution",
+  "cause": "Queue harness copied unused chat SQL implementation without its SQL dependency graph; queue uses controlled EntryRepository. Keep schema required by backup codec; full SQL and cipher tests remain in checks/ai-protocol.",
+  "tests": [
+    {
+      "name": "com.t1doo.aiyou.records.ReminderClickNavigationTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.t1doo.aiyou.ui.AppAccessRetirementBarrierTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "QueuedSaveFailureTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "status": "PASS targeted",
+  "full_ci": "FAIL prior run 41986956370 in queue compilation; needs new candidate run",
+  "original_interrupted_run": "queue.log incomplete due user pause; no pass claimed"
+}

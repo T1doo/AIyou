@@ -1,0 +1,62 @@
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :syncProduction UP-TO-DATE
+> Task :core:ai:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:domain:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:model:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:model:compileKotlin UP-TO-DATE
+> Task :core:model:compileJava NO-SOURCE
+> Task :core:model:processResources NO-SOURCE
+> Task :core:model:classes UP-TO-DATE
+> Task :core:model:jar UP-TO-DATE
+> Task :core:domain:compileKotlin UP-TO-DATE
+> Task :core:domain:compileJava NO-SOURCE
+> Task :core:domain:processResources NO-SOURCE
+> Task :core:domain:classes UP-TO-DATE
+> Task :core:domain:jar UP-TO-DATE
+> Task :core:ai:compileKotlin UP-TO-DATE
+> Task :core:ai:compileJava NO-SOURCE
+> Task :core:ai:processResources NO-SOURCE
+> Task :core:ai:classes UP-TO-DATE
+> Task :core:ai:jar
+> Task :processResources NO-SOURCE
+> Task :syncJpegFixture UP-TO-DATE
+> Task :processTestResources NO-SOURCE
+> Task :compileKotlin
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/AppAccessController.kt:92:125 Return in function with expression body and without explicit return type. Use block body '{...}' or add an explicit return type. This will become an error in language version 2.5. See https://youtrack.jetbrains.com/issue/KTLC-288.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/AppAccessController.kt:98:48 Return in function with expression body and without explicit return type. Use block body '{...}' or add an explicit return type. This will become an error in language version 2.5. See https://youtrack.jetbrains.com/issue/KTLC-288.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/AppAccessController.kt:99:113 Return in function with expression body and without explicit return type. Use block body '{...}' or add an explicit return type. This will become an error in language version 2.5. See https://youtrack.jetbrains.com/issue/KTLC-288.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/AppAccessController.kt:103:13 Return in function with expression body and without explicit return type. Use block body '{...}' or add an explicit return type. This will become an error in language version 2.5. See https://youtrack.jetbrains.com/issue/KTLC-288.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/AppAccessController.kt:107:13 Return in function with expression body and without explicit return type. Use block body '{...}' or add an explicit return type. This will become an error in language version 2.5. See https://youtrack.jetbrains.com/issue/KTLC-288.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/AppAccessController.kt:188:119 Return in function with expression body and without explicit return type. Use block body '{...}' or add an explicit return type. This will become an error in language version 2.5. See https://youtrack.jetbrains.com/issue/KTLC-288.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/AppAccessController.kt:192:13 Return in function with expression body and without explicit return type. Use block body '{...}' or add an explicit return type. This will become an error in language version 2.5. See https://youtrack.jetbrains.com/issue/KTLC-288.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/AppAccessController.kt:196:13 Return in function with expression body and without explicit return type. Use block body '{...}' or add an explicit return type. This will become an error in language version 2.5. See https://youtrack.jetbrains.com/issue/KTLC-288.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/AppAccessController.kt:218:23 Return in function with expression body and without explicit return type. Use block body '{...}' or add an explicit return type. This will become an error in language version 2.5. See https://youtrack.jetbrains.com/issue/KTLC-288.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/EncryptedAttachmentStore.kt:58:39 This class is not recommended for use in Kotlin. Use 'kotlin.Any' instead.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/EncryptedOriginalEditStore.kt:47:39 This class is not recommended for use in Kotlin. Use 'kotlin.Any' instead.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/ManualPeopleController.kt:178:66 Unnecessary safe call on a non-null receiver of type 'ManualPeopleEditor'.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/ManualTagController.kt:96:60 Unnecessary safe call on a non-null receiver of type 'ManualTagEditor'.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/RecordEventDateController.kt:127:24 Unnecessary safe call on a non-null receiver of type 'RecordEventDatePreview'.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/RecordEventDateController.kt:134:77 Unnecessary safe call on a non-null receiver of type 'RecordEventDateEditor'.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/RecordEventDateController.kt:137:53 Unnecessary safe call on a non-null receiver of type 'RecordEventDateEditor'.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/RecordEventDateController.kt:216:81 Unnecessary safe call on a non-null receiver of type 'RecordEventDateEditor'.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/ReminderProcessOwner.kt:60:9 Expression is unused.
+w: file:///E:/Github/AIyou/checks/record-queue/build/production-sources/SourceFactController.kt:271:59 The corresponding parameter in the supertype 'FactNavigationProof' is named 'location'. This may cause problems when calling this function with named arguments.
+
+> Task :compileJava NO-SOURCE
+> Task :classes UP-TO-DATE
+> Task :jar
+> Task :compileTestKotlin
+> Task :compileTestJava NO-SOURCE
+> Task :testClasses UP-TO-DATE
+
+> Task :test
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+
+[Incubating] Problems report is available at: file:///E:/Github/AIyou/checks/record-queue/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 1m 24s
+12 actionable tasks: 5 executed, 7 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.8.2/userguide/configuration_cache_enabling.html
