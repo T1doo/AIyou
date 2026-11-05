@@ -1,0 +1,42 @@
+{
+  "batch": "G2",
+  "status": "IN_PROGRESS_NOT_VISUALLY_ACCEPTED",
+  "source_parent": "3601d06",
+  "changes": [
+    "V5 persisted appearance/background mode with strict v1-v4 legacy readers",
+    "Native settings options through serialized confirmed preference owner",
+    "Native Now landscape, reading cards and emphasized save; real existing controller retained",
+    "Lifecycle/edit/list-scroll reduced-motion gating; no background service",
+    "Update UI test navigation for actual separate composer and detail scroll owners"
+  ],
+  "checks": {
+    "now_ui": {
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lint": "PASS final route-final.log; prior lint internal exception retained",
+    "apk": "assembleDebug PASS in integration-apk.log before lint failed; product sources unchanged since",
+    "preferences": "FAIL on Windows Robolectric: 2 of 3 new tests failed; independent AtomicFile writes first then second but rereads first, while invalid-v5 rejection passed. Linux/Android required; no readback bypass",
+    "previews": "NOT RENDERED this batch",
+    "emulator_device": "NOT RUN"
+  },
+  "apk": {
+    "path": "E:\\Github\\AIyou\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "sha256": "a6ec8c4c41770b9e1d729d3f232aba2d1e297bde4388331a4aebf41650fe511f"
+  },
+  "limitations": [
+    "Main app bar/navigation and other routes still legacy; this is incremental Now migration",
+    "Native theme persistence not accepted until Linux or device run",
+    "Full CI still not accepted; queue source fix needs new full run",
+    "No new-install Android recovery or real IME/TalkBack/performance evidence"
+  ],
+  "asset_source": "Existing approved nature theme WebP files in design/assets/nature-themes; see its provenance.json",
+  "next": [
+    "Verify new candidate CI",
+    "Render and inspect native Now in all themes",
+    "Integrate app chrome and persistent theme across remaining routes",
+    "Verify actual keyboard and save/detail/back on emulator"
+  ]
+}

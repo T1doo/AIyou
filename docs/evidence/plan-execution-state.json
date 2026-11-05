@@ -1,7 +1,7 @@
 {
   "plan": "docs/plans/AIyou-Codex-Plan-20261105/backlog.json",
   "goal": "G0–G7 native migration and evidence-based acceptance",
-  "current_batch": "G2 UI-01 in progress; opt-in native foundation compiled and tested",
+  "current_batch": "G2 UI-01/UI-02 in progress: real Now theme integration; visual/device checks and preferences validation pending",
   "tasks": [
     {
       "id": "AUD-01",
@@ -120,14 +120,16 @@
     }
   ],
   "holds": [
-    "G0 full CI 41986956370 still in progress at last check",
+    "G0 CI 41986956370 failed at queue compilation after protocol PASS. Queue source-boundary correction 3601d06 passed 11 targeted tests; full CI rerun required.",
     "Windows directory fsync limitation remains locally; same cross-key backup test PASS on Linux CI 41986956370, XML verified. Android new-install recovery still NOT RUN.",
-    "No device/IME/TalkBack/performance acceptance inferred from design or JVM tests"
+    "No device/IME/TalkBack/performance acceptance inferred from design or JVM tests",
+    "Windows Robolectric AtomicFile replacement primitive fails; theme persistence needs Linux/Android evidence, without changing production durability."
   ],
   "evidence": [
     "docs/evidence/2026-11-05-G0/report.json",
     "docs/evidence/2026-11-05-G1/review.json",
-    "docs/evidence/2026-11-05-G2-foundation/report.json"
+    "docs/evidence/2026-11-05-G2-foundation/report.json",
+    "docs/evidence/2026-11-05-G2-now/report.json"
   ],
   "stop_after_each_batch": "Commit and report evidence; continue next dependent batch under active user-requested goal unless an explicit approval or hard blocker applies"
 }

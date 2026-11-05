@@ -64,7 +64,11 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
     listState: LazyListState = rememberLazyListState(), onOpenEntry: (String) -> Unit = {}, selectedEntryId: String? = null,
     defaultPolicyUnavailable: Boolean = false,audio:OriginalAudioController?=null,canImportAudio:()->Boolean={true},
     companion: (@Composable () -> Unit)? = null,motionAllowed:Boolean=false,compactHeader:Boolean=false,
-    onAskQuestion:(()->Unit)?=null) {
+    onAskQuestion:(()->Unit)?=null,
+    appearance: com.t1doo.aiyou.designsystem.SkyglassAppearance = com.t1doo.aiyou.designsystem.SkyglassAppearance.BLUE,
+    backgroundMotion: com.t1doo.aiyou.designsystem.SkyglassMotion = com.t1doo.aiyou.designsystem.SkyglassMotion.DRIFT) {
+    com.t1doo.aiyou.designsystem.SkyglassTheme(appearance) {
+    val colors = com.t1doo.aiyou.designsystem.LocalSkyglassPalette.current
     val ui=local.mixedCapture ?: MixedCaptureUiState()
     val editor by controller.editor.state.collectAsState()
     val frame=editor.frame
@@ -120,7 +124,8 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
             else "将清理这份草稿的文字、图片和原音。已保存的记录保持不变。")},
         confirmButton={TextButton(onClick=controller::confirmDiscard,enabled=!ui.busy,modifier=Modifier.heightIn(min=48.dp).testTag("mixed-discard-confirm")){Text(if(ui.discardPending) "核对同一次清空" else "确认清空草稿")}},
         dismissButton={TextButton(onClick=controller::cancelDiscard,enabled=!ui.busy){Text(if(ui.discardPending) "稍后核对" else "继续编辑")}})
-    BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.surface)) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+      com.t1doo.aiyou.ui.SkyglassScene(appearance, backgroundMotion, motionAllowed && !focusEditor && !listState.isScrollInProgress, Modifier.matchParentSize())
       val availableHeight=maxHeight
       Column(Modifier.widthIn(max=AIyouDimensions.contentMaxWidth).fillMaxSize().align(Alignment.TopCenter)) {
         if(!focusEditor && recentIds.any {it !in seenIds}) TextButton(
@@ -130,7 +135,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
             contentPadding=PaddingValues(horizontal=16.dp,vertical=8.dp)) {
             item("heading") {
                 Row(Modifier.fillMaxWidth().testTag("mixed-notebook-heading"),verticalAlignment=Alignment.CenterVertically) {
-                    Text("${day.date.monthValue}月${day.date.dayOfMonth}日",Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
+                    Text("${day.date.monthValue}月${day.date.dayOfMonth}日",Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,color=colors.secondaryText)
                     companion?.invoke()
                 }
                 if(defaultPolicyUnavailable) CaptureFeedback("设置暂不可读取；新草稿暂用不参与 AI。当前草稿范围不变。",isError=true,
@@ -139,28 +144,29 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
             item("recent") {
                 Row(Modifier.fillMaxWidth().padding(top=16.dp,bottom=8.dp),verticalAlignment=Alignment.CenterVertically) {
                     Text("今天",Modifier.weight(1f).semantics {heading()},style=MaterialTheme.typography.titleMedium)
-                    Text("${recent.size} 条最近记录",style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
+
                 }
             }
             if(local.ready && !local.opening && local.error==null && recent.isEmpty()) item("recent-empty") {
-                Text("今天还没有记录。直接在下方写下第一句。",Modifier.padding(vertical=16.dp),style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
+                Text("今天还没有记录。直接在下方写下第一句。",Modifier.padding(vertical=16.dp),style=MaterialTheme.typography.bodySmall,color=colors.secondaryText)
             }
             items(recent,key={"record:"+it.id}) {entry ->
                 Column(Modifier.fillMaxWidth().testTag("entry-${entry.id}").semantics {selected=entry.id==selectedEntryId}
                     .clickable(enabled=enabled && !ui.busy && ui.selection==null,onClickLabel="阅读全文") {onOpenEntry(entry.id)}
-                    .padding(vertical=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                    .padding(vertical=6.dp).background(Brush.linearGradient(listOf(colors.readingStart, colors.readingEnd)), RoundedCornerShape(14.dp))
+                    .padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                     Text(originalPreview(entry.originalText),style=MaterialTheme.typography.bodyLarge,maxLines=3,overflow=TextOverflow.Ellipsis)
-                    Text(originalMetadata(entry),style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
+                    Text(originalMetadata(entry),style=MaterialTheme.typography.bodySmall,color=colors.secondaryText)
                     if(entry.policy!=com.t1doo.aiyou.model.ProcessingPolicy.LOCAL_ONLY) PrivacyChip(entry.policy)
-                    HorizontalDivider(color=AIyouColors.outlineDecorative)
+
                 }
             }
         }
-        HorizontalDivider(color=AIyouColors.outlineDecorative)
+        HorizontalDivider(color=colors.secondaryText.copy(alpha=.16f))
         // Scrolling belongs to the constrained composer, not an extra IME inset. At large text
         // every action remains reachable; focus editing can use the complete available height.
         Column(Modifier.fillMaxWidth().heightIn(max=if(focusEditor) availableHeight else availableHeight*.65f)
-            .verticalScroll(inputScroll).padding(horizontal=16.dp,vertical=4.dp).testTag("mixed-composer"),
+            .verticalScroll(inputScroll).background(colors.input).padding(horizontal=16.dp,vertical=4.dp).testTag("mixed-composer"),
             verticalArrangement=Arrangement.spacedBy(4.dp)) {
             if(!enabled) {
                 CaptureFeedback(local.error ?: ui.error ?: "正在读取加密草稿。",isError=local.error!=null || ui.error!=null)
@@ -168,26 +174,26 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
             }
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 Text("记下来",Modifier.heightIn(min=48.dp).wrapContentHeight().drawBehind {
-                    drawLine(AIyouColors.primary,Offset(0f,size.height),Offset(size.width,size.height),2.dp.toPx())
-                },style=MaterialTheme.typography.labelLarge,color=AIyouColors.textPrimary)
+                    drawLine(colors.primary,Offset(0f,size.height),Offset(size.width,size.height),2.dp.toPx())
+                },style=MaterialTheme.typography.labelLarge,color=colors.text)
                 if(onAskQuestion!=null) TextButton(onClick=onAskQuestion,enabled=editable&&!ui.confirmDiscard,
                     modifier=Modifier.heightIn(min=48.dp).testTag("mixed-ask-question")){Text("问一问")}
                 Spacer(Modifier.weight(1f))
-                Text(if(ui.draft?.policy==com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE) "不参与 AI" else "仅本机",style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
+                Text(if(ui.draft?.policy==com.t1doo.aiyou.model.ProcessingPolicy.AI_NONE) "不参与 AI" else "仅本机",style=MaterialTheme.typography.bodySmall,color=colors.secondaryText)
             }
             BasicTextField(value=fieldValue,onValueChange={ value ->
                     ui.draft?.id?.let {id -> controller.editValue(id,CaptureEditorFrame(value.text,value.selection.start,value.selection.end,
                         value.composition?.min,value.composition?.max))}
                 },enabled=editable,
                 minLines=if(focusEditor) 5 else 2,maxLines=if(focusEditor) 16 else 3,
-                textStyle=MaterialTheme.typography.bodyLarge.copy(color=AIyouColors.textPrimary),cursorBrush=SolidColor(AIyouColors.primary),
+                textStyle=MaterialTheme.typography.bodyLarge.copy(color=colors.text),cursorBrush=SolidColor(colors.primary),
                 modifier=Modifier.fillMaxWidth().padding(vertical=8.dp).testTag("mixed-text").onPreviewKeyEvent { event ->
                         val shortcut=(event.isCtrlPressed || event.isMetaPressed) && (event.key==Key.Z || event.key==Key.Y)
                         if(shortcut && event.type==KeyEventType.KeyDown) ui.draft?.id?.let {controller.undoInput(it,event.key==Key.Y || event.isShiftPressed)}
                         shortcut
                     }
                     .semantics {contentDescription="写下此刻，也可以只添加附件"},
-                decorationBox={field->Box {if(ui.text.isEmpty()) Text("想到什么，先记下来…",style=MaterialTheme.typography.bodyLarge,color=AIyouColors.textSecondary);field()}})
+                decorationBox={field->Box {if(ui.text.isEmpty()) Text("想到什么，先记下来…",style=MaterialTheme.typography.bodyLarge,color=colors.secondaryText);field()}})
             if(ui.draft?.let {it.images.isNotEmpty() || it.audio!=null}==true) TextButton(onClick={reveal("audio")},modifier=Modifier.heightIn(min=48.dp)) {
                 Text("${ui.draft!!.images.size} 张图片"+if(ui.draft.audio!=null) " · 原音附件" else " · 查看附件")
             }
@@ -208,7 +214,7 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                 TextButton(onClick={detailsOpen=true},contentPadding=PaddingValues(horizontal=8.dp),modifier=Modifier.heightIn(min=48.dp).focusRequester(moreFocus).testTag("mixed-more")){Text("更多")}
                 TextButton(onClick={focusEditor=!focusEditor},contentPadding=PaddingValues(horizontal=8.dp),modifier=Modifier.heightIn(min=48.dp).testTag("mixed-focus-editor")
                     .semantics {contentDescription=if(focusEditor)"收起编辑区域" else "展开编辑区域"}){Text(if(focusEditor)"收起" else "展开")}
-                TextButton(onClick=controller::save,
+                Button(onClick=controller::save,
                     enabled=enabled&&!ui.busy&&!controller.audioCapture.busy&&!playback.busy&&ui.selection==null&&ui.pendingEdits==0&&!ui.discardPending&&ui.policyChange==null,
                     modifier=Modifier.widthIn(min=96.dp).heightIn(min=48.dp).testTag("mixed-save")) {
                     Text(if(ui.uncertainSave) "核对保存" else if(ui.busy) "保存中" else "保存",style=MaterialTheme.typography.labelLarge)
@@ -237,12 +243,12 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                 if(ui.supportsProcessingChoice) item("processing-policy") { CaptureProcessingChoice(ui,controller) }
                 if(!ui.discardPending) {
                     item("count") {
-                        HorizontalDivider(Modifier.padding(vertical=8.dp),color=AIyouColors.outlineDecorative)
+                        HorizontalDivider(Modifier.padding(vertical=8.dp),color=colors.secondaryText.copy(alpha=.16f))
                         Text("图片与原音",style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
                         Text("已选 ${ui.draft!!.images.size+(if(ui.draft.audio==null)0 else 1)} / 20 个附件 · ${ui.draft.images.sumOf { it.intent.byteSize }+(ui.draft.audio?.intent?.byteSize ?: 0)} 字节",modifier=Modifier.padding(top=8.dp).testTag("mixed-count"),style=MaterialTheme.typography.bodySmall)
                         Text("JPEG / PNG；单张最多 16 MiB，合计最多 64 MiB。原图可能含拍摄资料。无 OCR，仅按文字与手工标签查找。",
-                            style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
-                        Text("保留 JPEG 拍摄资料；取消勾选将移除拍摄资料与注释。",style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary) }
+                            style=MaterialTheme.typography.bodySmall,color=colors.secondaryText)
+                        Text("保留 JPEG 拍摄资料；取消勾选将移除拍摄资料与注释。",style=MaterialTheme.typography.bodySmall,color=colors.secondaryText) }
                     items(ui.draft!!.images,key={"draft-image:"+it.intent.id}) { item ->
                         Column(Modifier.fillMaxWidth()) {
                             val picture=ui.pictures[item.intent.id] as? PlatformAttachmentPicture
@@ -312,16 +318,18 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
         }
     }
     if(detailsOpen) {
-        if(motionAllowed) ModalBottomSheet(onDismissRequest={detailsTarget=null;dismissDetails()},containerColor=AIyouColors.surface) {detailContent()}
+        if(motionAllowed) ModalBottomSheet(onDismissRequest={detailsTarget=null;dismissDetails()},containerColor=colors.input) {detailContent()}
         else Dialog(onDismissRequest={detailsTarget=null;dismissDetails()}) {
-            Surface(color=AIyouColors.surface) {Box(Modifier.fillMaxWidth().heightIn(max=560.dp)){detailContent()}}
+            Surface(color=colors.input) {Box(Modifier.fillMaxWidth().heightIn(max=560.dp)){detailContent()}}
         }
+    }
     }
 }
 
 /** State remains tied to its actual operation; no optimistic success or invented progress. */
 @Composable
 private fun CaptureFeedback(text:String,modifier:Modifier=Modifier,isError:Boolean=false) {
+    val colors = com.t1doo.aiyou.designsystem.LocalSkyglassPalette.current
     Text(text,modifier.fillMaxWidth().padding(vertical=4.dp).semantics {liveRegion=LiveRegionMode.Polite},
-        style=MaterialTheme.typography.bodySmall,color=if(isError)AIyouColors.error else AIyouColors.textSecondary)
+        style=MaterialTheme.typography.bodySmall,color=if(isError)colors.error else colors.secondaryText)
 }

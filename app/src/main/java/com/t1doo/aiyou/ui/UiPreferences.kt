@@ -6,6 +6,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.t1doo.aiyou.model.FactRecapPeriod
 import com.t1doo.aiyou.model.ProcessingPolicy
+import com.t1doo.aiyou.designsystem.SkyglassAppearance
+import com.t1doo.aiyou.designsystem.SkyglassMotion
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -21,7 +23,9 @@ import kotlinx.coroutines.withContext
 data class UiPreferences(val showCompanion: Boolean = true, val reduceMotion: Boolean = false,
     val defaultRecapPeriod: FactRecapPeriod = FactRecapPeriod.DAY,
     val defaultCapturePolicy: ProcessingPolicy = ProcessingPolicy.LOCAL_ONLY,
-    val showCompanionScene: Boolean = true) {
+    val showCompanionScene: Boolean = true,
+    val appearance: SkyglassAppearance = SkyglassAppearance.BLUE,
+    val backgroundMotion: SkyglassMotion = SkyglassMotion.DRIFT) {
     init { require(defaultCapturePolicy in setOf(ProcessingPolicy.LOCAL_ONLY, ProcessingPolicy.AI_NONE)) }
 }
 
@@ -59,7 +63,11 @@ internal class FileUiPreferences(private val file: File) : UiPreferencesStorage 
                     if (value == encodeV3(configured)) return@synchronized configured
                     for (scene in listOf(false, true)) {
                         val display = configured.copy(showCompanionScene = scene)
-                        if (value == encode(display)) return@synchronized display
+                        if (value == encodeV4(display)) return@synchronized display
+                        for (theme in SkyglassAppearance.entries) for (background in SkyglassMotion.entries) {
+                            val themed = display.copy(appearance = theme, backgroundMotion = background)
+                            if (value == encode(themed)) return@synchronized themed
+                        }
                     }
                 }
             }
@@ -90,7 +98,9 @@ internal class FileUiPreferences(private val file: File) : UiPreferencesStorage 
 
     private fun encodeV3(value: UiPreferences) = "AIyou display v3\n${value.showCompanion}\n${value.reduceMotion}\n${value.defaultRecapPeriod.name}\n${value.defaultCapturePolicy.name}\n"
 
-    private fun encode(value: UiPreferences) = "AIyou display v4\n${value.showCompanion}\n${value.reduceMotion}\n${value.defaultRecapPeriod.name}\n${value.defaultCapturePolicy.name}\n${value.showCompanionScene}\n"
+    private fun encodeV4(value: UiPreferences) = "AIyou display v4\n${value.showCompanion}\n${value.reduceMotion}\n${value.defaultRecapPeriod.name}\n${value.defaultCapturePolicy.name}\n${value.showCompanionScene}\n"
+
+    private fun encode(value: UiPreferences) = "AIyou display v5\n${value.showCompanion}\n${value.reduceMotion}\n${value.defaultRecapPeriod.name}\n${value.defaultCapturePolicy.name}\n${value.showCompanionScene}\n${value.appearance.name}\n${value.backgroundMotion.name}\n"
 
     // AtomicFile readers may recover .bak, so they share the complete write/readback boundary.
     // No SQL or UI callbacks run while this lock is held.

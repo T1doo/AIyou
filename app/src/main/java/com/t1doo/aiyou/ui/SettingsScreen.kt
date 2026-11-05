@@ -109,6 +109,36 @@ fun SettingsScreen(
                     }
                 }
                 savedQuestionsSection?.invoke()
+                SettingsGroup("外观") {
+                    Text("应用主题", style = MaterialTheme.typography.titleMedium)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                        com.t1doo.aiyou.designsystem.SkyglassAppearance.entries.forEach { theme ->
+                            androidx.compose.material3.FilterChip(
+                                selected = display.preferences.appearance == theme,
+                                onClick = { change { it.copy(appearance = theme) } },
+                                enabled = display.ready && !display.busy && !display.saveUnconfirmed,
+                                label = { Text(when(theme) {
+                                    com.t1doo.aiyou.designsystem.SkyglassAppearance.BLUE -> "晴空蓝"
+                                    com.t1doo.aiyou.designsystem.SkyglassAppearance.SUNSET -> "桃色晚霞"
+                                    com.t1doo.aiyou.designsystem.SkyglassAppearance.NIGHT -> "星夜紫"
+                                }) }, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("theme-${theme.name}"))
+                        }
+                    }
+                    Text("背景动态", style = MaterialTheme.typography.titleMedium)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                        com.t1doo.aiyou.designsystem.SkyglassMotion.entries.forEach { mode ->
+                            androidx.compose.material3.FilterChip(
+                                selected = display.preferences.backgroundMotion == mode,
+                                onClick = { change { it.copy(backgroundMotion = mode) } },
+                                enabled = display.ready && !display.busy && !display.saveUnconfirmed,
+                                label = { Text(when(mode) {
+                                    com.t1doo.aiyou.designsystem.SkyglassMotion.STILL -> "静态"
+                                    com.t1doo.aiyou.designsystem.SkyglassMotion.DRIFT -> "轻柔移动"
+                                    com.t1doo.aiyou.designsystem.SkyglassMotion.GLOW -> "流光"
+                                }) }, modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("background-${mode.name}"))
+                        }
+                    }
+                }
                 SettingsGroup("陪伴与显示") {
             Text("一只安静的水豚，陪你记下一点生活。", modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyMedium.copy(lineBreak = LineBreak.Heading), color = AIyouColors.textSecondary)

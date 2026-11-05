@@ -53,7 +53,24 @@ class MixedCapturePresentationTest {
             }
         }
     }
-    private fun click(tag:String) { compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag(tag));compose.onNodeWithTag(tag).assertIsDisplayed().assertIsEnabled().performClick() }
+    // The docked composer and explicit detail sheet are separate scroll owners.
+    // Preserve the business assertions while navigating the actual product route.
+    private fun reveal(tag: String) {
+        val detail = listOf("mixed-policy", "mixed-thumb:", "mixed-count", "mixed-remove:",
+            "mixed-clear", "mixed-cancel-picture", "mixed-refresh").any { tag.startsWith(it) }
+        val opened = compose.onAllNodesWithTag("mixed-details").fetchSemanticsNodes().isNotEmpty()
+        if (detail) {
+            if (!opened) compose.onNodeWithTag("mixed-more").performScrollTo().performClick()
+            compose.onNodeWithTag("mixed-details").performScrollToNode(hasTestTag(tag))
+        } else {
+            if (opened) {
+                compose.onNodeWithTag("mixed-details").performScrollToNode(hasText("回到输入"))
+                compose.onNodeWithText("回到输入").performClick()
+            }
+            compose.onNodeWithTag(tag).performScrollTo()
+        }
+    }
+    private fun click(tag:String) { reveal(tag);compose.onNodeWithTag(tag).assertIsDisplayed().assertIsEnabled().performClick() }
     private fun openRecent(id:String) {
         compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("entry-$id"))
         compose.onNodeWithTag("entry-$id")
@@ -62,8 +79,8 @@ class MixedCapturePresentationTest {
     private fun drain(){compose.runOnIdle { runBlocking { while(f.queue.isNotEmpty())f.queue.removeFirst()(f.store) } }}
     private fun add() { click("mixed-add");compose.runOnIdle { val s=f.ui.selection!!;if(!s.launched)f.c.claimPicker(s.requestId);f.c.selected(s.requestId,Source()) };drain() }
     private fun policyNode(tag:String):SemanticsNodeInteraction {
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag(tag))
-        return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
+        reveal(tag)
+        return compose.onNodeWithTag(tag).assertIsDisplayed()
     }
     @Test @Config(qualifiers="w360dp-h800dp")
     fun ordinaryPhoneKeepsSaveBesideAttachmentToolsInBothEditorModes() {
@@ -104,7 +121,7 @@ class MixedCapturePresentationTest {
     @Test fun narrowPreSaveRangeDefaultsLocalAndRetiredActualChoiceCannotAffectReturnedDraft() {
         content()
         f.failTextWrite=true
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        reveal("mixed-text")
         compose.onNodeWithTag("mixed-text").performTextInput("合成保存前选择范围");drain()
         val textError=f.ui.error;assertNotNull(textError)
         policyNode("mixed-policy-LOCAL_ONLY").assertIsSelected().assertHeightIsAtLeast(48.dp)
@@ -116,7 +133,7 @@ class MixedCapturePresentationTest {
         policyNode("mixed-policy-AI_NONE").performClick()
         compose.runOnIdle { assertTrue(f.ui.busy);assertEquals(0,f.saves);assertEquals(ProcessingPolicy.LOCAL_ONLY,f.ui.draft!!.policy) }
         policyNode("mixed-policy-AI_NONE").assertIsNotSelected().assertIsNotEnabled()
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-save"))
+        reveal("mixed-save")
         compose.onNodeWithTag("mixed-save").assertIsNotEnabled()
         drain()
         policyNode("mixed-policy-AI_NONE").assertIsSelected()
@@ -131,7 +148,7 @@ class MixedCapturePresentationTest {
     }
     @Test fun narrowLostRangeAckKeepsPendingChoiceDisablesSaveAndRetriesExactTransition() {
         content()
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        reveal("mixed-text")
         compose.onNodeWithTag("mixed-text").performTextInput("合成范围确认失败仍保留");drain()
         val before=f.ui.draft!!;f.failPolicyAck=true
         policyNode("mixed-policy-AI_NONE").performClick();drain()
@@ -142,7 +159,7 @@ class MixedCapturePresentationTest {
         f.failPolicyRead=true
         policyNode("mixed-policy-read").assertIsEnabled().performClick();drain()
         compose.runOnIdle { assertNotNull(f.ui.policyChange);assertEquals(1,f.policyCalls) }
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-save"))
+        reveal("mixed-save")
         compose.onNodeWithTag("mixed-save").assertIsNotEnabled()
         f.failPolicyRead=false
         policyNode("mixed-policy-retry").assertHeightIsAtLeast(48.dp).performClick();drain()
@@ -154,7 +171,7 @@ class MixedCapturePresentationTest {
     }
     @Test fun explicitReadAfterFailedRangeWriteDoesNotResendAndRetiresOldRetryHandler() {
         content();f.failPolicyBefore=true
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        reveal("mixed-text")
         compose.onNodeWithTag("mixed-text").performTextInput("合成只读取当前范围");drain()
         policyNode("mixed-policy-AI_NONE").performClick();drain()
         policyNode("mixed-policy-retry").assertIsEnabled()
@@ -170,10 +187,10 @@ class MixedCapturePresentationTest {
     }
     @Test fun actualNowPurePictureHasThumbnailCountRemovalAndSeparateDurableSaveAtLargeFont() {
         content();add();val id=f.ui.draft!!.images.single().intent.id
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-thumb:"+id));compose.onNodeWithTag("mixed-thumb:"+id).assertIsDisplayed()
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-count"));compose.onNodeWithTag("mixed-count").assertTextContains("1 / 20",substring=true)
+        reveal("mixed-thumb:"+id);compose.onNodeWithTag("mixed-thumb:"+id).assertIsDisplayed()
+        reveal("mixed-count");compose.onNodeWithTag("mixed-count").assertTextContains("1 / 20",substring=true)
         compose.runOnIdle { assertEquals(0,f.saves);assertEquals("",f.ui.text) }
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-save"));compose.onNodeWithTag("mixed-save").assertHeightIsAtLeast(48.dp)
+        reveal("mixed-save");compose.onNodeWithTag("mixed-save").assertHeightIsAtLeast(48.dp)
         click("mixed-save");compose.runOnIdle { assertEquals(0,f.saves) };drain()
         compose.runOnIdle { assertEquals(1,f.saves);assertEquals("",f.local.value.entries.single().originalText);assertTrue(f.ui.draft!!.images.isEmpty()) }
         val saved=f.local.value.entries.single().id
@@ -193,7 +210,7 @@ class MixedCapturePresentationTest {
         compose.runOnIdle { assertFalse(f.ui.confirmDiscard);assertEquals(0,f.saves) }
     }
     @Test fun failedSaveRetainsTextAndImagesAndPrivateComposerNeverEntersSavedState() {
-        content();compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        content();reveal("mixed-text")
         compose.onNodeWithTag("mixed-text").performTextInput("合成私密图文输入");drain();add()
         f.failSave=true;click("mixed-save");drain()
         compose.runOnIdle { assertEquals("合成私密图文输入",f.ui.text);assertEquals(1,f.ui.draft!!.images.size);assertTrue(f.ui.uncertainSave)
@@ -202,39 +219,42 @@ class MixedCapturePresentationTest {
         f.failSave=false;click("mixed-save");drain();compose.runOnIdle { assertEquals(1,f.saves);assertEquals("合成私密图文输入",f.local.value.entries.single().originalText) }
     }
     @Test fun newSaveWhileComposerIsScrolledOnlyOffersExplicitJumpAndReaderReturnKeepsNextDraft() {
-        content();compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        content();reveal("mixed-text")
         compose.onNodeWithTag("mixed-text").performTextInput("合成今天可直接阅读的原文");drain()
+        reveal("mixed-save")
+        val beforeSave=compose.onNodeWithTag("mixed-composer").fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
         click("mixed-save");drain()
-        val scroll=compose.onNodeWithTag("mixed-list").fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
-        assertTrue("Saving must not jump the scrolled composer to the top",scroll.value()>0f)
+        val scroll=compose.onNodeWithTag("mixed-composer").fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        assertEquals("Save may clamp after input clears, but must not reset an otherwise valid scroll offset",
+            minOf(beforeSave,scroll.maxValue()),scroll.value(),1f)
         compose.onNodeWithTag("mixed-list").performScrollToIndex(0)
         compose.waitForIdle()
         compose.onNodeWithTag("mixed-new-records").assertIsDisplayed().performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("今天最近记录").assertIsDisplayed()
+        compose.onNodeWithText("今天").assertIsDisplayed()
         compose.onNodeWithTag("mixed-new-records").assertDoesNotExist()
-        compose.onNodeWithTag("mixed-jump-composer").assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithTag("mixed-focus-editor").performScrollTo().assertHeightIsAtLeast(48.dp)
         compose.onNodeWithTag("mixed-text").performScrollTo().assertIsDisplayed().performTextInput("下一份合成草稿");drain()
         val id=f.local.value.entries.single().id;openRecent(id)
         compose.onNodeWithTag("original-text").assertTextContains("合成今天可直接阅读的原文")
         compose.onNodeWithText("返回列表").performClick()
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        reveal("mixed-text")
         compose.onNodeWithTag("mixed-text").assertTextContains("下一份合成草稿")
     }
     @Test fun lostClearAckHasReachableSameClearRetryAndCannotPromiseContinuedEditingBeforeVerification() {
-        content();compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        content();reveal("mixed-text")
         compose.onNodeWithTag("mixed-text").performTextInput("合成清空前图文");drain();add()
         val old=f.ui.draft!!.id;f.failDiscardAck=true
         click("mixed-clear");compose.onNodeWithTag("mixed-discard-confirm").performClick();drain()
         compose.onNodeWithText("清空结果待核对").assertIsDisplayed()
         compose.onNodeWithText("稍后核对").performClick()
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        reveal("mixed-text")
         compose.onNodeWithTag("mixed-text").assertIsNotEnabled().assertTextContains("合成清空前图文")
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-save"))
+        reveal("mixed-save")
         compose.onNodeWithTag("mixed-save").assertIsNotEnabled()
         click("mixed-clear");drain()
         compose.runOnIdle { assertNotEquals(old,f.ui.draft!!.id);assertFalse(f.ui.discardPending);assertNull(f.ui.error);assertEquals(0,f.saves) }
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        reveal("mixed-text")
         compose.onNodeWithTag("mixed-text").assertIsEnabled().performTextInput("合成核对后新输入");drain()
         click("mixed-save");drain()
         compose.runOnIdle { assertEquals("合成核对后新输入",f.local.value.entries.single().originalText) }
@@ -244,9 +264,10 @@ class MixedCapturePresentationTest {
         val viewport=mutableStateOf(DpSize(800.dp,360.dp))
         val fontScale=mutableStateOf(1f)
         content(viewport,fontScale)
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        reveal("mixed-text")
         compose.onNodeWithTag("mixed-text").performTextInput("合成尺寸切换仍保留图文草稿");drain();add()
         val expected=f.ui.draft!!
+        reveal("mixed-text")
         fun checkLayout(width:Int,height:Int,scale:Float,compact:Boolean) {
             compose.runOnIdle { checkNotNull(focusManager).clearFocus(force=true)
                 viewport.value=DpSize(width.dp,height.dp);fontScale.value=scale }
@@ -255,7 +276,7 @@ class MixedCapturePresentationTest {
                 compose.onNodeWithText("生活的小片刻").assertDoesNotExist()
                 val heading=compose.onNodeWithTag("mixed-notebook-heading").assertIsDisplayed().getUnclippedBoundsInRoot()
                 assertTrue(heading.bottom-heading.top<=88.dp)
-            } else compose.onNodeWithText("生活的小片刻").assertIsDisplayed()
+            } else compose.onNodeWithTag("mixed-notebook-heading").assertIsDisplayed()
             compose.runOnIdle { assertSame(expected,f.ui.draft);assertEquals(0,f.saves);assertTrue(f.queue.isEmpty()) }
         }
         checkLayout(360,800,1f,false)

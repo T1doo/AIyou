@@ -1480,6 +1480,7 @@ fun AIyouApp(
             com.t1doo.aiyou.records.MixedCaptureScreen(local,mixedCapture,modifier,
                 listState=nowList,onOpenEntry=openEntry,selectedEntryId=selectedNowId,
                 defaultPolicyUnavailable=!display.ready && display.error!=null,audio=audioPlayback,companion=companion,motionAllowed=motionAllowed,
+                appearance=display.preferences.appearance,backgroundMotion=display.preferences.backgroundMotion,
                 compactHeader=compactNotebookHeader,
                 onAskQuestion=beginQuestion,
                 canImportAudio={ownsNavigation() && selectedName==Destination.NOW.name && !showSettings && !demo && !reading})

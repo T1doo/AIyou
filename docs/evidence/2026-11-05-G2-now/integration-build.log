@@ -1,0 +1,411 @@
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :app
+WARNING: The option setting 'android.experimental.enableScreenshotTest=true' is experimental.
+The current default is 'false'.
+Add android.sync.suppressAgpWarnings=UNSUPPORTED_PROJECT_OPTION_USE to the gradle.properties file to suppress this warning.
+
+> Task :core:ai:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:domain:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:model:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:model:processResources NO-SOURCE
+> Task :core:domain:processResources NO-SOURCE
+> Task :core:ai:processResources NO-SOURCE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :core:data:preBuild UP-TO-DATE
+> Task :core:data:preDebugBuild UP-TO-DATE
+> Task :core:data:processDebugNavigationResources UP-TO-DATE
+> Task :core:designsystem:preBuild UP-TO-DATE
+> Task :core:designsystem:preDebugBuild UP-TO-DATE
+> Task :core:designsystem:processDebugNavigationResources UP-TO-DATE
+> Task :app:processDebugNavigationResources
+> Task :app:parseDebugLocalResources
+> Task :app:generateDebugRFile
+> Task :core:data:generateDebugResources UP-TO-DATE
+> Task :core:data:packageDebugResources UP-TO-DATE
+> Task :core:data:parseDebugLocalResources UP-TO-DATE
+> Task :core:data:generateDebugRFile UP-TO-DATE
+> Task :core:data:javaPreCompileDebug UP-TO-DATE
+> Task :core:designsystem:generateDebugResources UP-TO-DATE
+> Task :core:designsystem:packageDebugResources UP-TO-DATE
+> Task :core:designsystem:parseDebugLocalResources UP-TO-DATE
+> Task :core:designsystem:generateDebugRFile UP-TO-DATE
+> Task :core:designsystem:javaPreCompileDebug UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :core:data:writeDebugAarMetadata UP-TO-DATE
+> Task :core:designsystem:writeDebugAarMetadata UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:mergeDebugResources
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :core:data:extractDeepLinksDebug UP-TO-DATE
+> Task :core:data:processDebugManifest UP-TO-DATE
+> Task :core:designsystem:extractDeepLinksDebug UP-TO-DATE
+> Task :core:designsystem:processDebugManifest UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :core:data:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:data:compileDebugLibraryResources UP-TO-DATE
+> Task :core:designsystem:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:designsystem:compileDebugLibraryResources UP-TO-DATE
+> Task :app:processDebugResources
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :core:data:generateDebugAssets UP-TO-DATE
+> Task :core:data:mergeDebugAssets UP-TO-DATE
+> Task :core:designsystem:generateDebugAssets UP-TO-DATE
+> Task :core:designsystem:mergeDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:packageDebugUnitTestForUnitTest
+> Task :app:mergeDebugUnitTestManifest UP-TO-DATE
+> Task :app:processDebugUnitTestManifest UP-TO-DATE
+> Task :app:generateDebugUnitTestConfig
+> Task :app:prepareRobolectricSdk UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:generateDebugGlobalSynthetics UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :core:data:mergeDebugJniLibFolders UP-TO-DATE
+> Task :core:data:mergeDebugNativeLibs NO-SOURCE
+> Task :core:data:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :core:designsystem:mergeDebugJniLibFolders UP-TO-DATE
+> Task :core:designsystem:mergeDebugNativeLibs NO-SOURCE
+> Task :core:designsystem:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :core:domain:processTestResources NO-SOURCE
+> Task :core:data:checkDebugAarMetadata UP-TO-DATE
+> Task :core:data:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :core:data:prepareDebugArtProfile UP-TO-DATE
+> Task :core:data:prepareLintJarForPublish UP-TO-DATE
+> Task :core:designsystem:checkDebugAarMetadata UP-TO-DATE
+> Task :core:designsystem:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :core:designsystem:prepareDebugArtProfile UP-TO-DATE
+> Task :core:designsystem:prepareLintJarForPublish UP-TO-DATE
+> Task :app:preDebugAndroidTestBuild SKIPPED
+> Task :core:data:writeDebugLintModelMetadata UP-TO-DATE
+> Task :core:designsystem:writeDebugLintModelMetadata UP-TO-DATE
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :core:data:extractProguardFiles UP-TO-DATE
+> Task :core:designsystem:extractProguardFiles UP-TO-DATE
+> Task :core:data:preDebugAndroidTestBuild UP-TO-DATE
+> Task :core:data:preDebugUnitTestBuild UP-TO-DATE
+> Task :core:designsystem:preDebugAndroidTestBuild UP-TO-DATE
+> Task :core:designsystem:preDebugUnitTestBuild UP-TO-DATE
+> Task :core:model:compileKotlin
+> Task :core:model:compileJava NO-SOURCE
+> Task :core:model:classes UP-TO-DATE
+> Task :core:model:jar
+> Task :core:designsystem:compileDebugKotlin
+> Task :core:designsystem:compileDebugJavaWithJavac NO-SOURCE
+> Task :core:designsystem:bundleLibCompileToJarDebug
+> Task :core:designsystem:bundleLibRuntimeToJarDebug
+> Task :core:designsystem:processDebugJavaRes UP-TO-DATE
+> Task :core:designsystem:bundleLibRuntimeToDirDebug
+> Task :core:designsystem:extractDebugAnnotations
+> Task :core:designsystem:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :core:designsystem:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :core:designsystem:mergeDebugJavaResource UP-TO-DATE
+> Task :core:designsystem:syncDebugLibJars
+> Task :core:designsystem:bundleDebugLocalLintAar
+> Task :core:designsystem:createFullJarDebug
+> Task :core:designsystem:generateDebugLintModel
+> Task :core:domain:compileKotlin
+> Task :core:domain:compileJava NO-SOURCE
+> Task :core:domain:classes UP-TO-DATE
+> Task :core:domain:jar
+> Task :core:ai:compileKotlin
+> Task :core:ai:compileJava NO-SOURCE
+> Task :core:ai:classes UP-TO-DATE
+> Task :core:ai:jar
+> Task :core:data:kspDebugKotlin UP-TO-DATE
+> Task :core:data:compileDebugKotlin UP-TO-DATE
+> Task :core:data:compileDebugJavaWithJavac NO-SOURCE
+> Task :core:data:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:designsystem:lintAnalyzeDebug
+> Task :core:data:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:data:processDebugJavaRes UP-TO-DATE
+> Task :core:data:bundleLibRuntimeToDirDebug UP-TO-DATE
+
+> Task :app:compileDebugKotlin
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:240:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:550:81 Unnecessary safe call on a non-null receiver of type 'RecordPackageUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:569:87 Unnecessary safe call on a non-null receiver of type 'LocalAttachmentController'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:701:105 Unnecessary safe call on a non-null receiver of type 'LocalRecordUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:702:105 Unnecessary safe call on a non-null receiver of type 'LocalRecordUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:705:146 Unnecessary safe call on a non-null receiver of type 'LocalAttachmentController'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:707:37 Unnecessary safe call on a non-null receiver of type 'LocalRecordUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:708:37 Unnecessary safe call on a non-null receiver of type 'LocalRecordUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:773:84 Unnecessary safe call on a non-null receiver of type 'LocalAttachmentController'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:774:37 Unnecessary safe call on a non-null receiver of type 'LocalAttachmentController'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:803:22 Condition is always 'true'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:811:79 Unnecessary safe call on a non-null receiver of type 'LocalRecordUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:829:72 Unnecessary safe call on a non-null receiver of type 'LocalRecordUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:830:114 Unnecessary safe call on a non-null receiver of type 'LocalRecordUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:848:119 Unnecessary safe call on a non-null receiver of type 'LocalRecordUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:849:211 Unnecessary safe call on a non-null receiver of type 'AttachmentUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:849:269 Unnecessary safe call on a non-null receiver of type 'AttachmentUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:849:322 Unnecessary safe call on a non-null receiver of type 'AttachmentUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:868:34 Unnecessary safe call on a non-null receiver of type 'LocalRecordUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:895:73 Unnecessary safe call on a non-null receiver of type 'LocalRecordUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1119:24 Unnecessary safe call on a non-null receiver of type 'LocalAttachmentController'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1208:55 Unnecessary safe call on a non-null receiver of type 'RecycleBinUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1240:42 Unnecessary safe call on a non-null receiver of type 'RecordPackageController'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1260:30 Unnecessary safe call on a non-null receiver of type 'LocalRecordUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1283:52 Unnecessary safe call on a non-null receiver of type 'RecordPackageUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1284:131 Unnecessary safe call on a non-null receiver of type 'AttachmentUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1345:39 Condition is always 'true'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1345:82 Condition is always 'true'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1347:39 Condition is always 'true'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1347:78 Condition is always 'true'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1349:47 Condition is always 'true'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1349:81 Condition is always 'true'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1371:31 Condition is always 'true'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/MainActivity.kt:1562:55 Unnecessary safe call on a non-null receiver of type 'LocalRecordUiState'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/records/MixedCaptureScreen.kt:80:190 Unnecessary safe call on a non-null receiver of type 'CaptureDraft'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/records/MixedCaptureScreen.kt:105:41 Unnecessary non-null assertion (!!) on a non-null receiver of type 'CaptureDraft'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/records/MixedCaptureScreen.kt:198:33 Unnecessary non-null assertion (!!) on a non-null receiver of type 'CaptureDraft'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/records/MixedCaptureScreen.kt:212:60 Unnecessary safe call on a non-null receiver of type 'CaptureDraft'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/records/MixedCaptureScreen.kt:212:84 Unnecessary safe call on a non-null receiver of type 'CaptureDraft'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/records/MixedCaptureScreen.kt:248:44 Unnecessary non-null assertion (!!) on a non-null receiver of type 'CaptureDraft'.
+w: file:///E:/Github/AIyou/app/src/main/java/com/t1doo/aiyou/records/MixedCaptureScreen.kt:252:35 Unnecessary non-null assertion (!!) on a non-null receiver of type 'CaptureDraft'.
+
+> Task :app:compileDebugJavaWithJavac NO-SOURCE
+> Task :app:mergeLibDexDebug
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:processDebugJavaRes
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:mergeDebugJavaResource
+
+> Task :app:compileDebugUnitTestKotlin
+w: file:///E:/Github/AIyou/app/src/test/kotlin/com/t1doo/aiyou/CompanionSettingsPresentationTest.kt:39:29 'fun createComposeRule(effectContext: CoroutineContext = ...): ComposeContentTestRule' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///E:/Github/AIyou/app/src/test/kotlin/com/t1doo/aiyou/FullBackupPresentationTest.kt:44:27 'fun createComposeRule(effectContext: CoroutineContext = ...): ComposeContentTestRule' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///E:/Github/AIyou/app/src/test/kotlin/com/t1doo/aiyou/ManualTaskPresentationTest.kt:42:29 'fun createComposeRule(effectContext: CoroutineContext = ...): ComposeContentTestRule' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///E:/Github/AIyou/app/src/test/kotlin/com/t1doo/aiyou/ProductionTasksPresentationTest.kt:33:29 'fun createComposeRule(effectContext: CoroutineContext = ...): ComposeContentTestRule' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+
+> Task :app:dexBuilderDebug
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes UP-TO-DATE
+
+> Task :app:testDebugUnitTest
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+
+MixedCapturePresentationTest > failedSaveRetainsTextAndImagesAndPrivateComposerNeverEntersSavedState FAILED
+    java.lang.AssertionError: No node found that matches TestTag = 'mixed-text' in scrollable container
+    Semantics of the node:
+    Node #48 at (l=0.0, t=56.0, r=320.0, b=301.0)px, Tag: 'mixed-list'
+    CollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'
+    IsTraversalGroup = 'true'
+    Shape = 'androidx.compose.foundation.VerticalScrollableClipShape@275a0b98'
+    VerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'
+    Actions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]
+    Has 3 children, 4 siblings
+    Selector used: (TestTag = 'mixed-list')
+        at androidx.compose.ui.test.ActionsKt.performScrollToNode(Actions.kt:258)
+        at com.t1doo.aiyou.MixedCapturePresentationTest.failedSaveRetainsTextAndImagesAndPrivateComposerNeverEntersSavedState(MixedCapturePresentationTest.kt:196)
+
+MixedCapturePresentationTest > newSaveWhileComposerIsScrolledOnlyOffersExplicitJumpAndReaderReturnKeepsNextDraft FAILED
+    java.lang.AssertionError: No node found that matches TestTag = 'mixed-text' in scrollable container
+    Semantics of the node:
+    Node #236 at (l=0.0, t=56.0, r=320.0, b=301.0)px, Tag: 'mixed-list'
+    CollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'
+    IsTraversalGroup = 'true'
+    Shape = 'androidx.compose.foundation.VerticalScrollableClipShape@275a0b98'
+    VerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'
+    Actions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]
+    Has 3 children, 4 siblings
+    Selector used: (TestTag = 'mixed-list')
+        at androidx.compose.ui.test.ActionsKt.performScrollToNode(Actions.kt:258)
+        at com.t1doo.aiyou.MixedCapturePresentationTest.newSaveWhileComposerIsScrolledOnlyOffersExplicitJumpAndReaderReturnKeepsNextDraft(MixedCapturePresentationTest.kt:205)
+
+MixedCapturePresentationTest > removingLastImageRejectsEmptyRecordAndCancelKeepsDraftAndRetiresPicker FAILED
+    java.lang.AssertionError: No node found that matches TestTag = 'mixed-add' in scrollable container
+    Semantics of the node:
+    Node #402 at (l=0.0, t=56.0, r=320.0, b=301.0)px, Tag: 'mixed-list'
+    CollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'
+    IsTraversalGroup = 'true'
+    Shape = 'androidx.compose.foundation.VerticalScrollableClipShape@275a0b98'
+    VerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'
+    Actions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]
+    Has 3 children, 4 siblings
+    Selector used: (TestTag = 'mixed-list')
+        at androidx.compose.ui.test.ActionsKt.performScrollToNode(Actions.kt:258)
+        at com.t1doo.aiyou.MixedCapturePresentationTest.click(MixedCapturePresentationTest.kt:56)
+        at com.t1doo.aiyou.MixedCapturePresentationTest.add(MixedCapturePresentationTest.kt:63)
+        at com.t1doo.aiyou.MixedCapturePresentationTest.removingLastImageRejectsEmptyRecordAndCancelKeepsDraftAndRetiresPicker(MixedCapturePresentationTest.kt:187)
+
+MixedCapturePresentationTest > viewportAndFontChangesPreserveDraftAndRangeThenSaveOnlyOnExplicitAction FAILED
+    java.lang.AssertionError: No node found that matches TestTag = 'mixed-text' in scrollable container
+    Semantics of the node:
+    Node #486 at (l=40.0, t=56.0, r=760.0, b=141.0)px, Tag: 'mixed-list'
+    CollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'
+    IsTraversalGroup = 'true'
+    Shape = 'androidx.compose.foundation.VerticalScrollableClipShape@275a0b98'
+    VerticalScrollAxisRange = 'ScrollAxisRange(value=530.0, maxValue=530.0, reverseScrolling=false)'
+    Actions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]
+    Has 2 children, 4 siblings
+    Selector used: (TestTag = 'mixed-list')
+        at androidx.compose.ui.test.ActionsKt.performScrollToNode(Actions.kt:258)
+        at com.t1doo.aiyou.MixedCapturePresentationTest.viewportAndFontChangesPreserveDraftAndRangeThenSaveOnlyOnExplicitAction(MixedCapturePresentationTest.kt:247)
+
+MixedCapturePresentationTest > narrowLostRangeAckKeepsPendingChoiceDisablesSaveAndRetriesExactTransition FAILED
+    java.lang.AssertionError: No node found that matches TestTag = 'mixed-text' in scrollable container
+    Semantics of the node:
+    Node #569 at (l=0.0, t=56.0, r=320.0, b=301.0)px, Tag: 'mixed-list'
+    CollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'
+    IsTraversalGroup = 'true'
+    Shape = 'androidx.compose.foundation.VerticalScrollableClipShape@275a0b98'
+    VerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'
+    Actions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]
+    Has 3 children, 4 siblings
+    Selector used: (TestTag = 'mixed-list')
+        at androidx.compose.ui.test.ActionsKt.performScrollToNode(Actions.kt:258)
+        at com.t1doo.aiyou.MixedCapturePresentationTest.narrowLostRangeAckKeepsPendingChoiceDisablesSaveAndRetriesExactTransition(MixedCapturePresentationTest.kt:134)
+
+MixedCapturePresentationTest > narrowPreSaveRangeDefaultsLocalAndRetiredActualChoiceCannotAffectReturnedDraft FAILED
+    java.lang.AssertionError: No node found that matches TestTag = 'mixed-text' in scrollable container
+    Semantics of the node:
+    Node #652 at (l=0.0, t=56.0, r=320.0, b=301.0)px, Tag: 'mixed-list'
+    CollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'
+    IsTraversalGroup = 'true'
+    Shape = 'androidx.compose.foundation.VerticalScrollableClipShape@275a0b98'
+    VerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'
+    Actions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]
+    Has 3 children, 4 siblings
+    Selector used: (TestTag = 'mixed-list')
+        at androidx.compose.ui.test.ActionsKt.performScrollToNode(Actions.kt:258)
+        at com.t1doo.aiyou.MixedCapturePresentationTest.narrowPreSaveRangeDefaultsLocalAndRetiredActualChoiceCannotAffectReturnedDraft(MixedCapturePresentationTest.kt:107)
+
+MixedCapturePresentationTest > lostClearAckHasReachableSameClearRetryAndCannotPromiseContinuedEditingBeforeVerification FAILED
+    java.lang.AssertionError: No node found that matches TestTag = 'mixed-text' in scrollable container
+    Semantics of the node:
+    Node #735 at (l=0.0, t=56.0, r=320.0, b=301.0)px, Tag: 'mixed-list'
+    CollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'
+    IsTraversalGroup = 'true'
+    Shape = 'androidx.compose.foundation.VerticalScrollableClipShape@275a0b98'
+    VerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'
+    Actions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]
+    Has 3 children, 4 siblings
+    Selector used: (TestTag = 'mixed-list')
+        at androidx.compose.ui.test.ActionsKt.performScrollToNode(Actions.kt:258)
+        at com.t1doo.aiyou.MixedCapturePresentationTest.lostClearAckHasReachableSameClearRetryAndCannotPromiseContinuedEditingBeforeVerification(MixedCapturePresentationTest.kt:225)
+
+MixedCapturePresentationTest > actualNowPurePictureHasThumbnailCountRemovalAndSeparateDurableSaveAtLargeFont FAILED
+    java.lang.AssertionError: No node found that matches TestTag = 'mixed-add' in scrollable container
+    Semantics of the node:
+    Node #818 at (l=0.0, t=56.0, r=320.0, b=301.0)px, Tag: 'mixed-list'
+    CollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'
+    IsTraversalGroup = 'true'
+    Shape = 'androidx.compose.foundation.VerticalScrollableClipShape@275a0b98'
+    VerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'
+    Actions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]
+    Has 3 children, 4 siblings
+    Selector used: (TestTag = 'mixed-list')
+        at androidx.compose.ui.test.ActionsKt.performScrollToNode(Actions.kt:258)
+        at com.t1doo.aiyou.MixedCapturePresentationTest.click(MixedCapturePresentationTest.kt:56)
+        at com.t1doo.aiyou.MixedCapturePresentationTest.add(MixedCapturePresentationTest.kt:63)
+        at com.t1doo.aiyou.MixedCapturePresentationTest.actualNowPurePictureHasThumbnailCountRemovalAndSeparateDurableSaveAtLargeFont(MixedCapturePresentationTest.kt:172)
+
+MixedCapturePresentationTest > explicitReadAfterFailedRangeWriteDoesNotResendAndRetiresOldRetryHandler FAILED
+    java.lang.AssertionError: No node found that matches TestTag = 'mixed-text' in scrollable container
+    Semantics of the node:
+    Node #901 at (l=0.0, t=56.0, r=320.0, b=301.0)px, Tag: 'mixed-list'
+    CollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'
+    IsTraversalGroup = 'true'
+    Shape = 'androidx.compose.foundation.VerticalScrollableClipShape@275a0b98'
+    VerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'
+    Actions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]
+    Has 3 children, 4 siblings
+    Selector used: (TestTag = 'mixed-list')
+        at androidx.compose.ui.test.ActionsKt.performScrollToNode(Actions.kt:258)
+        at com.t1doo.aiyou.MixedCapturePresentationTest.explicitReadAfterFailedRangeWriteDoesNotResendAndRetiresOldRetryHandler(MixedCapturePresentationTest.kt:157)
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+
+UiPreferencesTest > legacyDefaultsStayLocalAndExplicitNoneSurvivesNewFileAndViewModelOwners FAILED
+    java.io.IOException: UI preferences not confirmed
+        at com.t1doo.aiyou.ui.FileUiPreferences.write(UiPreferences.kt:96)
+        at com.t1doo.aiyou.UiPreferencesTest.legacyDefaultsStayLocalAndExplicitNoneSurvivesNewFileAndViewModelOwners(UiPreferencesTest.kt:89)
+
+UiPreferencesTest > confirmedRecapWeekSurvivesNewStorageAndViewModelAndKeepsDisplayChoices FAILED
+    java.lang.AssertionError: expected:<UiPreferences(showCompanion=true, reduceMotion=true, defaultRecapPeriod=WEEK, defaultCapturePolicy=LOCAL_ONLY, showCompanionScene=true, appearance=BLUE, backgroundMotion=DRIFT)> but was:<UiPreferences(showCompanion=false, reduceMotion=true, defaultRecapPeriod=WEEK, defaultCapturePolicy=LOCAL_ONLY, showCompanionScene=true, appearance=BLUE, backgroundMotion=DRIFT)>
+        at org.junit.Assert.fail(Assert.java:89)
+        at org.junit.Assert.failNotEquals(Assert.java:835)
+        at org.junit.Assert.assertEquals(Assert.java:120)
+        at org.junit.Assert.assertEquals(Assert.java:146)
+        at com.t1doo.aiyou.UiPreferencesTest.confirmedRecapWeekSurvivesNewStorageAndViewModelAndKeepsDisplayChoices(UiPreferencesTest.kt:154)
+
+UiPreferencesTest > lostDefaultWriteAcknowledgementShowsUnconfirmedAndRetriesOnlyTheSamePreference FAILED
+    java.lang.AssertionError: expected:<LOCAL_ONLY> but was:<AI_NONE>
+        at org.junit.Assert.fail(Assert.java:89)
+        at org.junit.Assert.failNotEquals(Assert.java:835)
+        at org.junit.Assert.assertEquals(Assert.java:120)
+        at org.junit.Assert.assertEquals(Assert.java:146)
+        at com.t1doo.aiyou.UiPreferencesTest.lostDefaultWriteAcknowledgementShowsUnconfirmedAndRetriesOnlyTheSamePreference(UiPreferencesTest.kt:133)
+
+UiPreferencesTest > legacyDisplayBytesDefaultToDayAndAreUntouchedUntilExplicitPreferenceSave FAILED
+    java.io.IOException: UI preferences not confirmed
+        at com.t1doo.aiyou.ui.FileUiPreferences.write(UiPreferences.kt:96)
+        at com.t1doo.aiyou.UiPreferencesTest.legacyDisplayBytesDefaultToDayAndAreUntouchedUntilExplicitPreferenceSave(UiPreferencesTest.kt:166)
+
+UiPreferencesTest > legacyV4ReadIsUntouchedAndEveryThemeMotionPairSurvivesColdRead FAILED
+    java.io.IOException: UI preferences not confirmed
+        at com.t1doo.aiyou.ui.FileUiPreferences.write(UiPreferences.kt:96)
+        at com.t1doo.aiyou.UiPreferencesTest.legacyV4ReadIsUntouchedAndEveryThemeMotionPairSurvivesColdRead(UiPreferencesTest.kt:38)
+
+UiPreferencesTest > scenePreferenceMigratesV3WithoutChangingCapturePolicyOrWritingOnRead FAILED
+    java.io.IOException: UI preferences not confirmed
+        at com.t1doo.aiyou.ui.FileUiPreferences.write(UiPreferences.kt:96)
+        at com.t1doo.aiyou.UiPreferencesTest.scenePreferenceMigratesV3WithoutChangingCapturePolicyOrWritingOnRead(UiPreferencesTest.kt:69)
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+
+24 tests completed, 15 failed
+
+> Task :app:testDebugUnitTest FAILED
+
+
+[Incubating] Problems report is available at: file:///E:/Github/AIyou/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:testDebugUnitTest'.
+> There were failing tests. See the report at: file:///E:/Github/AIyou/app/build/reports/tests/testDebugUnitTest/index.html
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+* Try:
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+
+BUILD FAILED in 1m 56s
+109 actionable tasks: 35 executed, 74 up-to-date

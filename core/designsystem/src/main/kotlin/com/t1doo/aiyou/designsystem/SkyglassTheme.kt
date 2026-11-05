@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.material3.Button
 import androidx.compose.material3.darkColorScheme
@@ -65,7 +66,7 @@ fun SkyglassTheme(appearance: SkyglassAppearance, content: @Composable () -> Uni
     val base = if (appearance == SkyglassAppearance.NIGHT) darkColorScheme() else lightColorScheme()
     AIyouTheme {
         val typography = MaterialTheme.typography
-        CompositionLocalProvider(LocalSkyglassPalette provides p) {
+        CompositionLocalProvider(LocalSkyglassPalette provides p, LocalContentColor provides p.text) {
             MaterialTheme(
                 colorScheme = base.copy(primary=p.primary, onPrimary=Color.White,
                     primaryContainer=p.tint, onPrimaryContainer=p.text,
