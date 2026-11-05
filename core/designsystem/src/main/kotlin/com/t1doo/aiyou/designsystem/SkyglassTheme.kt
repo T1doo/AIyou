@@ -127,10 +127,10 @@ private fun SkyglassSurfaceSample(appearance: SkyglassAppearance) {
 }
 
 @Preview(name="Skyglass blue",widthDp=360) @Composable
-private fun SkyglassBluePreview() = SkyglassSurfaceSample(SkyglassAppearance.BLUE)
+fun SkyglassBluePreview() = SkyglassSurfaceSample(SkyglassAppearance.BLUE)
 @Preview(name="Skyglass sunset",widthDp=360) @Composable
-private fun SkyglassSunsetPreview() = SkyglassSurfaceSample(SkyglassAppearance.SUNSET)
+fun SkyglassSunsetPreview() = SkyglassSurfaceSample(SkyglassAppearance.SUNSET)
 @Preview(name="Skyglass night",widthDp=360) @Composable
-private fun SkyglassNightPreview() = SkyglassSurfaceSample(SkyglassAppearance.NIGHT)
+fun SkyglassNightPreview() = SkyglassSurfaceSample(SkyglassAppearance.NIGHT)
 @Preview(name="Skyglass large text",widthDp=320,fontScale=2f) @Composable
-private fun SkyglassLargeTextPreview() = SkyglassSurfaceSample(SkyglassAppearance.BLUE)
+fun SkyglassLargeTextPreview() = SkyglassSurfaceSample(SkyglassAppearance.BLUE)

@@ -14,22 +14,30 @@ mode.add_argument("--production-tasks-only", action="store_true",
                     help="verify only the four actual production task renders; never claim a full-suite pass")
 mode.add_argument("--capture-discard-only", action="store_true", help="verify only four capture recovery renders; never claim a full-suite pass")
 mode.add_argument("--original-edit-only", action="store_true", help="verify only 32 affected original/history editor renders; never claim a full-suite pass")
+mode.add_argument("--skyglass-only", action="store_true", help="verify four native Skyglass component renders only")
 args = parser.parse_args()
+skyglass_methods = ("SkyglassBlueRender", "SkyglassSunsetRender", "SkyglassNightRender", "SkyglassLargeTextRender")
 target_method = "LocalCaptureDiscardRender" if args.capture_discard_only else "LocalTasksRender" if args.production_tasks_only else None
 target_methods = ("LocalOriginalEditRender", "LocalOriginalEditSavingRender", "LocalOriginalEditFailedRender",
                   "LocalOriginalEditConflictRender", "LocalOriginalEditStorageFailedRender", "LocalHistoryEditorRender",
                   "LocalHistoryEditorFailedRender", "LocalHistoryEditorUnchangedRender") if args.original_edit_only else ((target_method,) if target_method else ())
+if args.skyglass_only:
+    target_methods = skyglass_methods
 targeted = bool(target_methods)
 reports = list((root / "app/build/test-results/validateDebugScreenshotTest").rglob("*.xml"))
 cases = []
 for report in reports:
     cases.extend(ET.parse(report).getroot().iter("testcase"))
-expected = 4 * len(target_methods) if targeted else 430  # Existing426 plus4 actual full-backup HOME renders.
+expected = (len(target_methods) if args.skyglass_only else 4 * len(target_methods)) if targeted else 444  # Original 430 + ten existing FrontendDay renders + four Skyglass components.
 if len(cases) != expected:
     raise SystemExit(f"FAIL: expected {expected} actual Preview smoke tests, found {len(cases)}")
 if any(any(case.find(tag) is not None for tag in ("failure", "error", "skipped")) for case in cases):
     raise SystemExit("FAIL: Preview smoke contains failing/error/skipped cases")
-if targeted and any(not case.get("name", "").startswith(tuple(method + "_" for method in target_methods)) for case in cases):
+def case_method(case):
+    property_value = case.find("./properties/property[@name='PreviewScreenshot.methodName']")
+    return property_value.get("value") if property_value is not None else case.get("name", "").split("_")[0]
+
+if targeted and any(case_method(case) not in target_methods for case in cases):
     raise SystemExit("FAIL: targeted render proof includes a different render method")
 references = root / "app/src/screenshotTestDebug/reference"
 files = sorted(references.rglob("*.png"))
@@ -44,7 +52,7 @@ for path in files:
         width, height = verified_dimensions(data)
     except ValueError as error:
         raise SystemExit(f"FAIL: invalid PNG {path.name}: {error}") from error
-    manifest.append({"file": str(path.relative_to(references)), "width": width, "height": height,
+    manifest.append({"file": path.relative_to(references).as_posix(), "width": width, "height": height,
                      "sha256": hashlib.sha256(data).hexdigest()})
 complete = [item for item in manifest if "CompleteRender_" in item["file"]]
 if not targeted and (len(complete) != 14 or any(item["height"] <= 2400 for item in complete)):
@@ -64,15 +72,18 @@ attachment_methods = ("LocalAttachmentEmptyRender", "LocalAttachmentLoadingRende
                       "LocalHistoricalAttachmentEntryRender", "LocalAttachmentJpegReadyRender", "LocalAttachmentJpegStrippedRender")
 for method in (target_methods if targeted else local_methods + attachment_methods):
     production = [item for item in manifest if "/" + method + "_" in item["file"]]
-    if len(production) != 4:
+    if len(production) != (1 if args.skyglass_only else 4):
         raise SystemExit(f"FAIL: require all four actual production sizes for {method}, found {len(production)}")
 if not targeted:
-    for method in ("UnifiedKeywordHeaderRender", "UnifiedKeywordResultsRender", "UnifiedKeywordAcceptedMemoryRender", "UnifiedKeywordCaptureDateRender", "UnifiedKeywordManualTagsRender", "UnifiedKeywordManualPeopleRender", "UnifiedKeywordFavoritesRender", "UnifiedKeywordReadyImagesRender", "QuestionKeywordInputRender", "QuestionKeywordReviewRender", "KeywordReductionInputRender", "KeywordReductionConfirmRender"):
-        actual = [case for case in cases if case.get("name", "").startswith(method + "_")]
+    for method in skyglass_methods:
+        assert sum(case_method(case) == method for case in cases) == 1
+        assert sum("/" + method + "_" in item["file"] for item in manifest) == 1
+    for method in ("FrontendDayNow", "FrontendDayMemories", "FrontendDayTasks", "FrontendDayAudioPlaying", "FrontendDayReminderPending", "UnifiedKeywordHeaderRender", "UnifiedKeywordResultsRender", "UnifiedKeywordAcceptedMemoryRender", "UnifiedKeywordCaptureDateRender", "UnifiedKeywordManualTagsRender", "UnifiedKeywordManualPeopleRender", "UnifiedKeywordFavoritesRender", "UnifiedKeywordReadyImagesRender", "QuestionKeywordInputRender", "QuestionKeywordReviewRender", "KeywordReductionInputRender", "KeywordReductionConfirmRender"):
+        actual = [case for case in cases if case_method(case) == method]
         images = [item for item in manifest if "/" + method + "_" in item["file"]]
         if len(actual) != 2 or len(images) != 2:
             raise SystemExit(f"FAIL: require both200% portrait/landscape production lookup renders for {method}")
-target = root / ("app/build/reports/d02-original-edit-preview-manifest.json" if args.original_edit_only else "app/build/reports/d02-capture-recovery-preview-manifest.json" if args.capture_discard_only else "app/build/reports/d02-production-tasks-preview-manifest.json" if args.production_tasks_only
+target = root / ("app/build/reports/skyglass-preview-manifest.json" if args.skyglass_only else "app/build/reports/d02-original-edit-preview-manifest.json" if args.original_edit_only else "app/build/reports/d02-capture-recovery-preview-manifest.json" if args.capture_discard_only else "app/build/reports/d02-production-tasks-preview-manifest.json" if args.production_tasks_only
                  else "app/build/reports/d01-preview-manifest.json")
 target.parent.mkdir(parents=True, exist_ok=True)
 target.write_text(json.dumps({"kind": "targeted production render smoke, not full-suite evidence" if targeted

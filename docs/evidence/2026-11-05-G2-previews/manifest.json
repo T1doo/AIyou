@@ -1,0 +1,30 @@
+{
+  "kind": "targeted production render smoke, not full-suite evidence",
+  "count": 4,
+  "pngs": [
+    {
+      "file": "com/t1doo/aiyou/SkyglassPreviewsKt/SkyglassBlueRender_6a639217_0.png",
+      "width": 945,
+      "height": 746,
+      "sha256": "3a5f39779977ff559a73748125ddaf0f56c630997844c0ef03129935f7e8b6e4"
+    },
+    {
+      "file": "com/t1doo/aiyou/SkyglassPreviewsKt/SkyglassLargeTextRender_302d374f_0.png",
+      "width": 840,
+      "height": 1195,
+      "sha256": "e7880f511010b7b3e54ab76546cd3db573fa1acc17cda891529ccd148c481ea5"
+    },
+    {
+      "file": "com/t1doo/aiyou/SkyglassPreviewsKt/SkyglassNightRender_6a639217_0.png",
+      "width": 945,
+      "height": 746,
+      "sha256": "17c5afbcc6e06d0467b862118e731bbeb1a7961c3b4b77930aeb3d98a7c654cc"
+    },
+    {
+      "file": "com/t1doo/aiyou/SkyglassPreviewsKt/SkyglassSunsetRender_6a639217_0.png",
+      "width": 945,
+      "height": 746,
+      "sha256": "cb121bbe4955b4a64fecfd306158923b2eef70ac2e98b28c7485457ac13053be"
+    }
+  ]
+}

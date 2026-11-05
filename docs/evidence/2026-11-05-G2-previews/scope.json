@@ -1,0 +1,10 @@
+{
+  "status": "PASS_RENDER_SMOKE_ONLY",
+  "rendered": 4,
+  "visual_inspection": "All four component specimens inspected; not the approved full-page design and not user visual acceptance",
+  "user_feedback": "User rejected plain component image as a page design. Full prototype remains the visual target; do not present specimens as new app design.",
+  "packaging_tests": 15,
+  "device_ime_talkback": "NOT RUN for these component previews",
+  "full_suite_count": 444,
+  "full_suite_status": "NOT RUN on this candidate; exact inventory adds ten already tracked FrontendDay cases and four new Skyglass cases to original430"
+}

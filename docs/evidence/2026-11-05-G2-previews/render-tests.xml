@@ -1,0 +1,67 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuite name="Preview Screenshot Test Engine" tests="4" skipped="0" failures="0" errors="0" time="5.345" hostname="LAPTOP-USISIS19" timestamp="2026-11-05T16:25:54">
+<properties>
+<property name="deviceId" value="Preview"/>
+<property name="deviceDisplayName" value="Preview"/>
+</properties>
+<testcase name="SkyglassLargeTextRender" classname="com.t1doo.aiyou.SkyglassPreviewsKt" time="0.051">
+<properties>
+<property name="PreviewScreenshot.diffPercent" value="0.0"/>
+<property name="PreviewScreenshot.previewName" value="SkyglassLargeTextRender"/>
+<property name="PreviewScreenshot.methodName" value="SkyglassLargeTextRender"/>
+<property name="PreviewScreenshot.refImagePath" value="app/src/screenshotTestDebug/reference/com/t1doo/aiyou/SkyglassPreviewsKt/SkyglassLargeTextRender_302d374f_0.png"/>
+<property name="PreviewScreenshot.newImagePath" value="app/build/outputs/screenshotTest-results/preview/debug/rendered/com/t1doo/aiyou/SkyglassPreviewsKt/SkyglassLargeTextRender_302d374f_0.png"/>
+</properties>
+
+<system-out><![CDATA[
+unique-id: [engine:preview-screenshot-test-engine]/[class:com.t1doo.aiyou.SkyglassPreviewsKt]/[method:SkyglassLargeTextRender]/[previewAnnotation:com.t1doo.aiyou.SkyglassPreviewsKt.SkyglassLargeTextRender_302d374f]/[previewId:com.t1doo.aiyou.SkyglassPreviewsKt.SkyglassLargeTextRender_302d374f_0]
+display-name: SkyglassLargeTextRender
+]]></system-out>
+</testcase>
+<testcase name="SkyglassSunsetRender" classname="com.t1doo.aiyou.SkyglassPreviewsKt" time="0.038">
+<properties>
+<property name="PreviewScreenshot.diffPercent" value="0.0"/>
+<property name="PreviewScreenshot.previewName" value="SkyglassSunsetRender"/>
+<property name="PreviewScreenshot.methodName" value="SkyglassSunsetRender"/>
+<property name="PreviewScreenshot.refImagePath" value="app/src/screenshotTestDebug/reference/com/t1doo/aiyou/SkyglassPreviewsKt/SkyglassSunsetRender_6a639217_0.png"/>
+<property name="PreviewScreenshot.newImagePath" value="app/build/outputs/screenshotTest-results/preview/debug/rendered/com/t1doo/aiyou/SkyglassPreviewsKt/SkyglassSunsetRender_6a639217_0.png"/>
+</properties>
+
+<system-out><![CDATA[
+unique-id: [engine:preview-screenshot-test-engine]/[class:com.t1doo.aiyou.SkyglassPreviewsKt]/[method:SkyglassSunsetRender]/[previewAnnotation:com.t1doo.aiyou.SkyglassPreviewsKt.SkyglassSunsetRender_6a639217]/[previewId:com.t1doo.aiyou.SkyglassPreviewsKt.SkyglassSunsetRender_6a639217_0]
+display-name: SkyglassSunsetRender
+]]></system-out>
+</testcase>
+<testcase name="SkyglassBlueRender" classname="com.t1doo.aiyou.SkyglassPreviewsKt" time="0.074">
+<properties>
+<property name="PreviewScreenshot.diffPercent" value="0.0"/>
+<property name="PreviewScreenshot.previewName" value="SkyglassBlueRender"/>
+<property name="PreviewScreenshot.methodName" value="SkyglassBlueRender"/>
+<property name="PreviewScreenshot.refImagePath" value="app/src/screenshotTestDebug/reference/com/t1doo/aiyou/SkyglassPreviewsKt/SkyglassBlueRender_6a639217_0.png"/>
+<property name="PreviewScreenshot.newImagePath" value="app/build/outputs/screenshotTest-results/preview/debug/rendered/com/t1doo/aiyou/SkyglassPreviewsKt/SkyglassBlueRender_6a639217_0.png"/>
+</properties>
+
+<system-out><![CDATA[
+unique-id: [engine:preview-screenshot-test-engine]/[class:com.t1doo.aiyou.SkyglassPreviewsKt]/[method:SkyglassBlueRender]/[previewAnnotation:com.t1doo.aiyou.SkyglassPreviewsKt.SkyglassBlueRender_6a639217]/[previewId:com.t1doo.aiyou.SkyglassPreviewsKt.SkyglassBlueRender_6a639217_0]
+display-name: SkyglassBlueRender
+]]></system-out>
+</testcase>
+<testcase name="SkyglassNightRender" classname="com.t1doo.aiyou.SkyglassPreviewsKt" time="0.038">
+<properties>
+<property name="PreviewScreenshot.diffPercent" value="0.0"/>
+<property name="PreviewScreenshot.previewName" value="SkyglassNightRender"/>
+<property name="PreviewScreenshot.methodName" value="SkyglassNightRender"/>
+<property name="PreviewScreenshot.refImagePath" value="app/src/screenshotTestDebug/reference/com/t1doo/aiyou/SkyglassPreviewsKt/SkyglassNightRender_6a639217_0.png"/>
+<property name="PreviewScreenshot.newImagePath" value="app/build/outputs/screenshotTest-results/preview/debug/rendered/com/t1doo/aiyou/SkyglassPreviewsKt/SkyglassNightRender_6a639217_0.png"/>
+</properties>
+
+<system-out><![CDATA[
+unique-id: [engine:preview-screenshot-test-engine]/[class:com.t1doo.aiyou.SkyglassPreviewsKt]/[method:SkyglassNightRender]/[previewAnnotation:com.t1doo.aiyou.SkyglassPreviewsKt.SkyglassNightRender_6a639217]/[previewId:com.t1doo.aiyou.SkyglassPreviewsKt.SkyglassNightRender_6a639217_0]
+display-name: SkyglassNightRender
+]]></system-out>
+</testcase>
+<system-out><![CDATA[
+unique-id: [engine:preview-screenshot-test-engine]
+display-name: Preview Screenshot Test Engine
+]]></system-out>
+</testsuite>
