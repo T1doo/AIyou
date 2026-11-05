@@ -1,0 +1,804 @@
+{
+  "schema_version": "1.0",
+  "project": "AIyou",
+  "review_date": "2026-11-05",
+  "baseline_sha": "867f86ed3eef4452a1b61b5190820457fb48bc31",
+  "purpose": "计划任务，不是执行结果",
+  "execution_policy": "一次一个可验收切片；G0开始；不直接改main或发布",
+  "status_vocabulary": [
+    "PLANNED_NOT_EXECUTED",
+    "IN_PROGRESS",
+    "PASS",
+    "FAIL",
+    "NOT_RUN",
+    "BLOCKED",
+    "DEFERRED_WITH_APPROVAL"
+  ],
+  "release_gates": {
+    "native_frontend": "UI-01至06与QA适用项；UI-07允许明确的中性回退，不要求未批准美术",
+    "local_preview": "现有本地功能保全，CORE-01至05的关键风险闭合，未启用能力准确披露",
+    "full_v0_1": "原始F01–F10全部适用承诺达到，含CORE-06至08；否则需用户明确范围决定；不能仅通过REL-01就宣称完整产品"
+  },
+  "tasks": [
+    {
+      "id": "AUD-01",
+      "priority": "P0",
+      "batch": "G0",
+      "title": "核对当前基线与需求／页面／能力保全矩阵",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [],
+      "scope": [
+        "确认HEAD和工作区，不清理用户改动",
+        "读取两份原始设计书、AGENTS、BUILD及最新差异",
+        "逐入口建立需求、实现、控制器、可用能力、测试对应关系"
+      ],
+      "acceptance_criteria": [
+        "原型与原生分开",
+        "已启用、未启用、未验证各自标记",
+        "原有功能不因新设计静默消失"
+      ],
+      "required_evidence": [
+        "基线SHA与status记录",
+        "需求与页面对应表",
+        "本轮执行范围"
+      ],
+      "source_refs": [
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S10"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "CORE-01",
+      "priority": "P0",
+      "batch": "G0",
+      "title": "复现引用编译阻塞并恢复原生构建基线",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "AUD-01"
+      ],
+      "scope": [
+        "按符号定位allCitations与SelectedSourceQuestions",
+        "复现当前版本，不假设历史失败必然仍存在",
+        "最小修复并补来源引用回归"
+      ],
+      "acceptance_criteria": [
+        "不删来源／版本／授权校验",
+        "领域测试非零且结果可复查",
+        "Android检查通过或明确环境阻塞，不能继承旧CI"
+      ],
+      "required_evidence": [
+        "复现日志",
+        "修复差异",
+        "JUnit XML",
+        "实际构建与lint报告"
+      ],
+      "source_refs": [
+        "S01",
+        "S03",
+        "S06",
+        "S07",
+        "S11"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "UX-01",
+      "priority": "P1",
+      "batch": "G1",
+      "title": "核对最新图并冻结视觉增补规范",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "AUD-01"
+      ],
+      "scope": [
+        "实际打开最新7图和旧三主页面、窄屏图",
+        "将原型已修复项列为保留",
+        "保存原设计书，新增视觉增补与来源优先级"
+      ],
+      "acceptance_criteria": [
+        "不回退纯白模板",
+        "未看到的画面不当作已签收",
+        "Figma访问受阻不阻断源码／截图规范"
+      ],
+      "required_evidence": [
+        "图片查看清单",
+        "设计增补",
+        "已修复与待验证表"
+      ],
+      "source_refs": [
+        "S02",
+        "S04",
+        "S05",
+        "S08",
+        "S09"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "UX-02",
+      "priority": "P1",
+      "batch": "G1",
+      "title": "语义Token、中文排版与玻璃降级规格",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "UX-01"
+      ],
+      "scope": [
+        "三主题同组件结构",
+        "欢迎／阅读／输入／弹层表面分层",
+        "文字、状态、触区与API26–30回退"
+      ],
+      "acceptance_criteria": [
+        "16sp正文等为起点而非裁切约束",
+        "合成对比检查计划明确",
+        "不直接模糊含文字的整张卡"
+      ],
+      "required_evidence": [
+        "Token映射",
+        "主题与组件状态样表",
+        "低版本回退对照"
+      ],
+      "source_refs": [
+        "S04",
+        "R01",
+        "R03",
+        "R04",
+        "R05"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "UX-03",
+      "priority": "P0",
+      "batch": "G1",
+      "title": "编辑、搜索、完成与返回状态契约",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "UX-01"
+      ],
+      "scope": [
+        "草稿与已提交数据分离",
+        "筛选draft/applied分离",
+        "来源跳转、焦点、IME与系统返回契约"
+      ],
+      "acceptance_criteria": [
+        "关闭不静默丢输入",
+        "保存与安排提醒状态真实",
+        "私密内容不随意落入Bundle或日志"
+      ],
+      "required_evidence": [
+        "状态转移表",
+        "交互验收场景"
+      ],
+      "source_refs": [
+        "S02",
+        "S03",
+        "S04",
+        "R02"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "UI-01",
+      "priority": "P1",
+      "batch": "G2",
+      "title": "原生主题、组件、导航和系统边界",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "CORE-01",
+        "UX-02",
+        "UX-03"
+      ],
+      "scope": [
+        "实现原生主题与共享表面",
+        "基础按钮、图标、导航语义",
+        "Insets、背景和玻璃能力回退"
+      ],
+      "acceptance_criteria": [
+        "非WebView包壳",
+        "不复制手机外框／假状态栏",
+        "旧控制器接口不回退",
+        "API回退保持主题关系"
+      ],
+      "required_evidence": [
+        "Compose组件测试",
+        "三主题截图",
+        "Insets与低版本回退结果"
+      ],
+      "source_refs": [
+        "S02",
+        "S03",
+        "R01",
+        "R02",
+        "R03"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "UI-02",
+      "priority": "P1",
+      "batch": "G2",
+      "title": "此刻原生记录纵向闭环",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "UI-01"
+      ],
+      "scope": [
+        "欢迎、列表、输入与编辑",
+        "文字／图片／音频合法提交",
+        "真实保存后详情与返回"
+      ],
+      "acceptance_criteria": [
+        "纯附件记录不因空正文被禁用",
+        "失败保留输入，重复提交不重复保存",
+        "阅读旧记录不强拉滚动位置"
+      ],
+      "required_evidence": [
+        "真实记录流程测试",
+        "成功／失败截图",
+        "中文IME待验或实测记录"
+      ],
+      "source_refs": [
+        "S01",
+        "S02",
+        "S04"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "UI-03",
+      "priority": "P1",
+      "batch": "G3",
+      "title": "回忆搜索、组合筛选与来源回跳",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "UI-02"
+      ],
+      "scope": [
+        "真实人物、标签、日期，非固定演示数据",
+        "收藏与媒体维度独立",
+        "本地搜索与AI回答区分"
+      ],
+      "acceptance_criteria": [
+        "重置不清搜索，取消不应用",
+        "混合媒体筛选语义明确",
+        "返回恢复状态，失效来源不泄露旧内容"
+      ],
+      "required_evidence": [
+        "组合筛选回归",
+        "无结果／失效引用截图",
+        "返回状态断言"
+      ],
+      "source_refs": [
+        "S01",
+        "S02",
+        "S04"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "UI-04",
+      "priority": "P1",
+      "batch": "G3",
+      "title": "待办、候选确认与提醒状态原生化",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "UI-02"
+      ],
+      "scope": [
+        "真实日历与草稿",
+        "完成区和编辑区分开",
+        "确认前后任务／提醒状态"
+      ],
+      "acceptance_criteria": [
+        "候选不算正式任务",
+        "取消／改期／完成对应真实调度变更",
+        "失败不吞条目，不显示已送达"
+      ],
+      "required_evidence": [
+        "任务状态回归",
+        "确认／异常界面",
+        "调度接口断言与设备待验表"
+      ],
+      "source_refs": [
+        "S01",
+        "S02",
+        "S04"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "UI-05",
+      "priority": "P1",
+      "batch": "G3",
+      "title": "详情、附件、版本、来源与数据管理流程保全",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "UI-03",
+        "UI-04"
+      ],
+      "scope": [
+        "逐项迁移详情、版本、图片、音频、转写和纠正",
+        "导出、备份、恢复、回收站、隐私与模型页",
+        "长内容、失败、撤权与返回"
+      ],
+      "acceptance_criteria": [
+        "保全矩阵无未解释缺项",
+        "不隐藏需要保留的风险与状态",
+        "原文优先，候选／派生内容明确区分"
+      ],
+      "required_evidence": [
+        "二级页面截图索引",
+        "入口可达测试",
+        "功能保全差异表"
+      ],
+      "source_refs": [
+        "S01",
+        "S02",
+        "S10"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "UI-06",
+      "priority": "P1",
+      "batch": "G3",
+      "title": "外观、可打断动效与减少动态",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "UI-01"
+      ],
+      "scope": [
+        "主题与动态偏好原生持久化",
+        "系统／应用减少动态共同生效",
+        "暂停恢复连续，快速切换可取消"
+      ],
+      "acceptance_criteria": [
+        "降低动态不抹掉原模式",
+        "不因主题切换丢草稿／焦点",
+        "后台与阅读无持续无效动画"
+      ],
+      "required_evidence": [
+        "偏好恢复用例",
+        "切换／拖动录屏",
+        "减少动态对照"
+      ],
+      "source_refs": [
+        "S04",
+        "S05",
+        "R02",
+        "R06"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "UI-07",
+      "priority": "P2",
+      "batch": "G6",
+      "title": "噜噜入口与正式资产／回退状态",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "UI-01",
+        "UX-01"
+      ],
+      "scope": [
+        "小型角色入口，主动轻互动",
+        "减少动态静态回应",
+        "素材未批准时中性回退"
+      ],
+      "acceptance_criteria": [
+        "不新增巨大欢迎卡",
+        "不读取记录或自动创建行动",
+        "正式素材未批准仍可完成其余前端"
+      ],
+      "required_evidence": [
+        "角色状态规格",
+        "已批准素材记录或回退截图"
+      ],
+      "source_refs": [
+        "S02",
+        "S03",
+        "S09"
+      ],
+      "approval_gates": [
+        "正式角色素材／角色演绎授权"
+      ],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "CORE-02",
+      "priority": "P0",
+      "batch": "G4",
+      "title": "保存、附件、草稿、迁移与加密存储可靠性",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "CORE-01"
+      ],
+      "scope": [
+        "完整持久化成功语义",
+        "空间不足／权限撤回／进程终止",
+        "实际数据库迁移与SQLCipher设备执行"
+      ],
+      "acceptance_criteria": [
+        "至少100次原方案终止／重启场景并报告覆盖",
+        "成功记录与附件不丢",
+        "原文版本改变使旧派生结果失效"
+      ],
+      "required_evidence": [
+        "故障注入记录",
+        "附件完整性校验",
+        "迁移与设备测试结果"
+      ],
+      "source_refs": [
+        "S01",
+        "S02"
+      ],
+      "approval_gates": [
+        "已授权的可丢弃合成数据测试环境"
+      ],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "CORE-03",
+      "priority": "P0",
+      "batch": "G4",
+      "title": "新装恢复、删除传播与环境清理闭环",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "CORE-02"
+      ],
+      "scope": [
+        "定位D08 admission阻塞",
+        "真实SAF备份到全新安装恢复",
+        "错误口令、损坏、空间不足、中断及旧备份复现策略"
+      ],
+      "acceptance_criteria": [
+        "确实执行到恢复而非仅探针",
+        "删除传播覆盖派生／索引／提醒／缓存",
+        "失败不损坏未选中数据，KVM变更精确恢复可核验"
+      ],
+      "required_evidence": [
+        "恢复演练完整步骤",
+        "失败与回滚证据",
+        "删除传播断言",
+        "环境清理记录"
+      ],
+      "source_refs": [
+        "S01",
+        "S02"
+      ],
+      "approval_gates": [
+        "隔离恢复／新装演练授权",
+        "任何KVM权限变更需既有明确批准"
+      ],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "CORE-04",
+      "priority": "P0",
+      "batch": "G4",
+      "title": "隐私、应用锁、授权与会话失效边界",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "CORE-01"
+      ],
+      "scope": [
+        "LOCAL_ONLY与最终APK权限核对",
+        "锁屏、后台、日志与状态恢复",
+        "撤权／删除／旧会话异步结果拒收"
+      ],
+      "acceptance_criteria": [
+        "禁止内容不进入测试请求／日志",
+        "不使用真实私人库验证",
+        "新版UI不绕过既有隐私控制"
+      ],
+      "required_evidence": [
+        "权限与包检查",
+        "隐私回归",
+        "设备生命周期证据"
+      ],
+      "source_refs": [
+        "S01",
+        "S02",
+        "S03"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "CORE-05",
+      "priority": "P0",
+      "batch": "G4",
+      "title": "实际提醒、权限、重启与时间变化",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "CORE-01"
+      ],
+      "scope": [
+        "确认后调度和取消／改期／完成撤销",
+        "Doze、重启、时区、权限变化",
+        "代表性OEM运行"
+      ],
+      "acceptance_criteria": [
+        "已安排与已送达分开",
+        "恢复不重复／未经确认触发行动",
+        "受限制时UI真实显示"
+      ],
+      "required_evidence": [
+        "设备与权限矩阵",
+        "调度／通知／回跳日志",
+        "未执行OEM清单"
+      ],
+      "source_refs": [
+        "S01",
+        "S02"
+      ],
+      "approval_gates": [
+        "对应测试设备／模拟器执行授权"
+      ],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "CORE-06",
+      "priority": "P1",
+      "batch": "G5",
+      "title": "原始媒体与OCR／ASR可用能力闭环",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "CORE-02",
+        "CORE-04"
+      ],
+      "scope": [
+        "盘点PCM和实际格式／采集／播放范围",
+        "新图OCR与既有纠正链区分",
+        "ASR按真实能力接入，失败保留原音"
+      ],
+      "acceptance_criteria": [
+        "人工转写不冒充自动识别",
+        "不支持／未配置／失败明确",
+        "来源版本和时间范围正确"
+      ],
+      "required_evidence": [
+        "能力支持表",
+        "合成素材设备结果",
+        "识别质量与降级测试"
+      ],
+      "source_refs": [
+        "S01",
+        "S02"
+      ],
+      "approval_gates": [
+        "新增SDK／服务／联网处理独立核验和授权"
+      ],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "CORE-07",
+      "priority": "P1",
+      "batch": "G5",
+      "title": "两类模型协议、整理与有出处问答",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "CORE-01",
+        "CORE-04"
+      ],
+      "scope": [
+        "离线契约、SSE、取消、错误、秘密保护",
+        "获准连接与合成数据的真实调用",
+        "候选／原文／事实分离，旧结果拒收"
+      ],
+      "acceptance_criteria": [
+        "无授权不真实调用",
+        "引用存在与支持论断分别评估",
+        "达到原方案质量目标或如实报告差距"
+      ],
+      "required_evidence": [
+        "Mock契约结果",
+        "真实调用授权与脱敏证据",
+        "质量数据集和统计"
+      ],
+      "source_refs": [
+        "S01",
+        "S02",
+        "S03"
+      ],
+      "approval_gates": [
+        "真实模型、密钥配置及可能付费调用需明确批准"
+      ],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "CORE-08",
+      "priority": "P1",
+      "batch": "G5",
+      "title": "回顾与其他原始需求缺项收口",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "AUD-01",
+        "CORE-01"
+      ],
+      "scope": [
+        "盘点事实汇总与AI回顾的区别",
+        "日／周范围、来源、空状态、取消",
+        "配置、能力、存储、用量和许可入口缺项"
+      ],
+      "acceptance_criteria": [
+        "不按类名认定完成",
+        "AI回顾如需模型则依赖CORE-07验收",
+        "延期事项有明确范围决定"
+      ],
+      "required_evidence": [
+        "需求差距表",
+        "回顾流程测试",
+        "范围决策记录"
+      ],
+      "source_refs": [
+        "S01",
+        "S02"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "QA-01",
+      "priority": "P1",
+      "batch": "G6",
+      "title": "主题／大字／窄屏／错误态与可访问自动化",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "UI-02",
+        "UI-03",
+        "UI-04",
+        "UI-05",
+        "UI-06"
+      ],
+      "scope": [
+        "三主题核心流程",
+        "320–412dp和1.0–2.0字体风险组合",
+        "48dp目标、合成对比、状态语义"
+      ],
+      "acceptance_criteria": [
+        "不以单一scrollWidth断言代表全体验",
+        "无固定高度截断主操作",
+        "golden变更逐项审查"
+      ],
+      "required_evidence": [
+        "截图矩阵",
+        "对比采样",
+        "组件语义测试",
+        "差异审阅记录"
+      ],
+      "source_refs": [
+        "S02",
+        "R01",
+        "R04",
+        "R05"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "QA-02",
+      "priority": "P1",
+      "batch": "G6",
+      "title": "原生中文IME、TalkBack与设备关键路径",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "QA-01",
+        "CORE-02",
+        "CORE-03",
+        "CORE-04",
+        "CORE-05"
+      ],
+      "scope": [
+        "真实中文组合输入与系统返回",
+        "TalkBack完成记录／任务确认",
+        "生命周期、恢复和权限流程"
+      ],
+      "acceptance_criteria": [
+        "写明设备、版本、APK哈希",
+        "未具备环境标BLOCKED",
+        "不以旧B图或英文输入代替中文验收"
+      ],
+      "required_evidence": [
+        "设备测试报告",
+        "录屏与步骤",
+        "失败原件及复验"
+      ],
+      "source_refs": [
+        "S02",
+        "S08",
+        "R01",
+        "R02"
+      ],
+      "approval_gates": [
+        "真实设备或已授权测试环境"
+      ],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "QA-03",
+      "priority": "P1",
+      "batch": "G6",
+      "title": "性能与16KB兼容实测",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "UI-01",
+        "CORE-02"
+      ],
+      "scope": [
+        "持久化保存p95与10k中文检索p95",
+        "60/120Hz帧时间与Trace",
+        "原生依赖静态检查和16KB环境执行"
+      ],
+      "acceptance_criteria": [
+        "明确设备、数据与冷／热条件",
+        "不拿UI插入时间替代保存",
+        "静态对齐和实际运行分别报告"
+      ],
+      "required_evidence": [
+        "基准数据与Trace",
+        "性能回归对照",
+        "16KB运行证据"
+      ],
+      "source_refs": [
+        "S02",
+        "R06",
+        "R07"
+      ],
+      "approval_gates": [
+        "设备与基准测试环境"
+      ],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    },
+    {
+      "id": "REL-01",
+      "priority": "P1",
+      "batch": "G7",
+      "title": "文档、交付与分范围验收",
+      "status": "PLANNED_NOT_EXECUTED",
+      "depends_on": [
+        "QA-01",
+        "QA-02",
+        "QA-03"
+      ],
+      "scope": [
+        "更新需求证据矩阵与README",
+        "交付精确SHA／APK与未验清单",
+        "分别判断原生前端、本地预览、完整v0.1"
+      ],
+      "acceptance_criteria": [
+        "本地预览不宣称全部AI能力完成",
+        "完整v0.1还需CORE-06/07/08适用项或用户批准范围调整",
+        "不自动发布或改变签名"
+      ],
+      "required_evidence": [
+        "验收结论与范围表",
+        "最终交付清单",
+        "未提交／未推送说明"
+      ],
+      "source_refs": [
+        "S01",
+        "S02",
+        "S03"
+      ],
+      "approval_gates": [],
+      "completion_rule": "仅实际执行并满足验收标准后更新；缺权限或环境标记BLOCKED，不算PASS。"
+    }
+  ]
+}

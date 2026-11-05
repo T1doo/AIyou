@@ -113,7 +113,11 @@ class ReminderRuntimeCipherTest {
             for((id,v,m) in listOf(Triple("other",100L,"physical-ack"),Triple(sample.task.id,101L,"physical-ack"),Triple(sample.task.id,100L,"other")))
                 assertThrows(Exception::class.java){c.open(id,v,m,raw)}
             assertThrows(IllegalArgumentException::class.java){c.open(sample.task.id,100,"physical-ack",ByteArray(65537).also{it[0]=6})}
-            assertThrows(IllegalArgumentException::class.java){c.open(sample.task.id,100,"physical-ack",ByteArray(29).also{it[0]=7})}
+            // Recognized v7 still needs a valid AEAD tag; unsupported formats fail before decryption.
+            assertThrows(javax.crypto.AEADBadTagException::class.java){c.open(sample.task.id,100,"physical-ack",ByteArray(29).also{it[0]=7})}
+            for(unsupported in listOf(0,8,127)) {
+                assertThrows(IllegalArgumentException::class.java){c.open(sample.task.id,100,"physical-ack",ByteArray(29).also{it[0]=unsupported.toByte()})}
+            }
         } finally {c.wipe()}
     }
 

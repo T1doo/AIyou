@@ -1,0 +1,989 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AIyou｜前端完善与产品验收计划</title><style>
+:root{--ink:#233b61;--muted:#52647d;--line:#d8e2f0;--paper:#ffffff;--wash:#f3f6fc;--accent:#465eaa}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:system-ui,-apple-system,"Noto Sans CJK SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--wash);font-size:16px;line-height:1.85}
+header{background:#263b62;color:white;padding:30px max(24px,calc((100vw - 1220px)/2));}header b{font-size:26px}header p{color:#dce5f7;margin:4px 0;font-size:14px}.layout{max-width:1280px;margin:28px auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:26px;padding:0 24px}nav{position:sticky;top:18px;align-self:start;max-height:92vh;overflow:auto;font-size:13px}nav a{display:block;padding:8px 10px;color:var(--muted);text-decoration:none;border-left:2px solid transparent}nav a:hover{border-color:var(--accent);background:#e7edf8}main{min-width:0;background:var(--paper);padding:38px 42px;border:1px solid var(--line);border-radius:16px}h1{font-size:28px;line-height:1.5}h2{font-size:23px;border-top:1px solid var(--line);padding-top:26px;margin-top:36px;scroll-margin-top:18px}h3{font-size:18px;scroll-margin-top:18px}p,li{overflow-wrap:anywhere}a{color:var(--accent)}blockquote{margin:22px 0;padding:4px 20px;border-left:4px solid #7d8fc4;background:#f0f4fb}table{border-collapse:collapse;width:100%;font-size:13px;line-height:1.7;margin:20px 0;display:block;overflow-x:auto}th{background:#eaf0f9;font-weight:600}th,td{border:1px solid var(--line);padding:10px 12px;vertical-align:top;min-width:95px}code{font-family:ui-monospace,monospace;font-size:.87em;background:#edf1f7;padding:2px 4px;overflow-wrap:anywhere}pre{background:#edf1f7;padding:16px;overflow:auto;line-height:1.6;white-space:pre-wrap}pre code{padding:0}hr{border:0;border-top:1px solid var(--line);margin:28px 0}li{margin:6px 0}footer{text-align:center;color:var(--muted);font-size:13px;padding:20px}
+@media(max-width:900px){.layout{display:block;padding:0 14px}nav{position:static;max-height:none;margin-bottom:20px;columns:2}main{padding:24px 20px;border-radius:12px}h1{font-size:24px}h2{font-size:21px}table{font-size:12px}}
+@media print{body{background:white;font-size:10pt}header,nav,footer{display:none}.layout{display:block;margin:0;padding:0}main{border:0;padding:0}h2,h3{break-after:avoid}table{display:table;font-size:8pt;overflow:visible}th,td{min-width:0}tr{break-inside:avoid}a{color:inherit}pre{font-size:8pt}}
+</style></head><body><header><b>AIyou · 前端完善与产品验收</b><p>执行计划 v1.0 · 2026-11-05 · 审阅基线 867f86ed · 非已执行验收报告</p></header><div class="layout"><nav aria-label="文档目录"><a href="#section-1">阅读与执行导航</a><a href="#section-2">1. 总体判断：不是从零开发，也不能称为完整正式版</a><a href="#section-5">2. 本轮证据边界与已知问题</a><a href="#section-10">3. 原始设计书对照：功能完成度与未闭合项</a><a href="#section-14">4. 前端方向与设计系统：明确保留项和改动边界</a><a href="#section-20">5. 三主页面与二级页面的具体方案</a><a href="#section-26">6. 核心状态与返回契约</a><a href="#section-27">7. 组件、动效与噜噜的精修标准</a><a href="#section-31">8. 原生迁移策略：复用业务，替换表现，逐条保全</a><a href="#section-35">9. 底层功能与产品闭环的未完成清单</a><a href="#section-45">10. 测试矩阵与证据格式</a><a href="#section-51">11. 全面完成的定义</a><a href="#section-55">12. 分批实施计划与依赖</a><a href="#section-58">13. Codex 操作规则与启动命令</a><a href="#section-59">14. 每轮报告模板</a><a href="#section-60">15. 来源与采用方式</a></nav><main><h1>AIyou（爱忆）前端完善与产品验收计划</h1>
+<p><strong>交付对象：Codex 与项目负责人</strong><br />
+<strong>审阅日期：2026-11-05｜计划版本：1.0</strong><br />
+<strong>审阅源码基线：<code>867f86ed3eef4452a1b61b5190820457fb48bc31</code></strong><br />
+<strong>交付性质：只读审阅后的实施计划，不是本轮已完成的代码修改或验收报告。</strong></p>
+<blockquote>
+<p>核心决定：保留自然景观、晴空蓝／桃色晚霞／星夜紫、分层磨砂玻璃与适度动态。下一阶段的主要产物必须是接入真实业务的 Kotlin／Compose 原生界面，而不是又一轮仅 HTML 原型美化。</p>
+<p>“前端完成”“原有功能保全”“关键底层可靠性通过”“原始 v0.1 承诺完成”分别验收。任何一项通过都不能自动代表另外三项通过。</p>
+</blockquote>
+<h2 id="section-1">阅读与执行导航</h2>
+<ol>
+<li>第 1–3 节：审阅结论、证据边界、原始设计书与当前阶段。</li>
+<li>第 4–8 节：前端设计决策、逐页面交互、组件与动效、原生迁移。</li>
+<li>第 9–11 节：未启用能力、底层缺口、测试矩阵与完成定义。</li>
+<li>第 12–14 节：分批实施、Codex 工作约束、交付模板。</li>
+<li>第 15 节：可追溯来源。</li>
+</ol>
+<p>配套文件：<code>CODEX_START_HERE.md</code> 是首轮执行指令；<code>backlog.json</code> 是任务与依赖清单；<code>evidence-register.json</code> 记录证据等级和未验证项。它们均不代表仓库中已有这些新文件。</p>
+<hr />
+<h2 id="section-2">1. 总体判断：不是从零开发，也不能称为完整正式版</h2>
+<h3 id="section-3">1.1 当前真正处于什么阶段</h3>
+<p>AIyou 已有安卓开发预览版、本地记录及附件、检索、来源处理、待办提醒和备份恢复等接线；同时有一套持续完善的 Skyglass 浏览器交互原型。原型在 <code>867f86ed</code> 已针对按钮主次、编辑面板、组合筛选、草稿和减少动态进行了修正。[S01][S04][S05]</p>
+<p>准确的阶段描述是：<strong>本地产品链路已有实现，新视觉方案已有交互验证，原生迁移和完整产品验收尚未闭合。</strong> 不能把它简单称为“做到 D02”，也不能因为某些后期模块存在就称为“D00–D09 已完成”。版本名 <code>0.0.4-d02-ui</code> 不能代替功能与验收状态。[S01][S02]</p>
+<p>原始设计的两类模型协议、AI 整理、有来源问答，以及图片／语音能力，和当前默认离线预览的实际能力之间仍有差距。真实模型与自动 ASR 未启用，新图片 OCR 提取器不可用。这些属于能力未启用／未接通，不能全部改写为“只差真机测试”。[S01]</p>
+<h3 id="section-4">1.2 最高优先级的五件事</h3>
+<table>
+<thead>
+<tr>
+  <th>顺序</th>
+  <th>必须解决的事项</th>
+  <th>为什么现在做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>1</td>
+  <td>恢复可复查的当前原生构建与测试基线</td>
+  <td>最近查询到的原生 CI 在领域代码编译阶段失败；当前 SHA 未查到关联 Actions 运行，不能继承旧的绿色结果</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>将已认可的 Skyglass 设计落实到原生组件与真实页面</td>
+  <td>原型修好不等于 APK 已有同样的界面、状态和交互</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>建立页面／功能保全清单，覆盖详情与二级流程</td>
+  <td>不能只搬三张首页，把原文、附件、版本、来源、回收站、隐私和恢复操作丢掉</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td>关闭保存、删除、恢复、提醒等高风险验收缺口</td>
+  <td>私人记忆产品的精致感不能以数据丢失、误提醒或隐私状态失真为代价</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td>明确本地预览与完整 v0.1 的交付边界</td>
+  <td>避免没有真实 AI／OCR／ASR 却使用暗示可用的入口与文案，也避免擅自扩大到云同步等后续版本</td>
+</tr>
+</tbody>
+</table>
+<p>这是实施顺序建议，不是对所有现有功能都存在故障的断言。[S01][S06][S07]</p>
+<h2 id="section-5">2. 本轮证据边界与已知问题</h2>
+<h3 id="section-6">2.1 证据等级</h3>
+<table>
+<thead>
+<tr>
+  <th>标记</th>
+  <th>含义</th>
+  <th>能证明什么／不能证明什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>文档承诺</td>
+  <td>原始方案的需求、目标或验收标准</td>
+  <td>说明应当做什么，不说明已经实现</td>
+</tr>
+<tr>
+  <td>代码／接线证据</td>
+  <td>当前或已核对源码中存在相应路径</td>
+  <td>不自动证明运行正确、设备可用或体验合格</td>
+</tr>
+<tr>
+  <td>原型检查</td>
+  <td>HTML 演示的浏览器测试与截图记录</td>
+  <td>不代表原生持久化、真实音频、安卓输入法或 TalkBack</td>
+</tr>
+<tr>
+  <td>历史自动化</td>
+  <td>绑定旧 SHA 的脚本、JVM、Preview、构建结果</td>
+  <td>只覆盖该版本与该运行范围，不是当前版本的验收</td>
+</tr>
+<tr>
+  <td>设备证据</td>
+  <td>绑定明确 APK、设备和步骤的实际运行</td>
+  <td>仅覆盖所执行设备和场景，不能泛化所有 OEM</td>
+</tr>
+<tr>
+  <td>未验证／被阻塞</td>
+  <td>没有相应可复查执行结果，或环境／权限不具备</td>
+  <td>不算通过；也不等于已经证明功能有缺陷</td>
+</tr>
+</tbody>
+</table>
+<p>本轮没有重新运行 Android 构建、模拟器、真机、恢复演练或真实模型调用，也没有修改 GitHub 仓库。</p>
+<h3 id="section-7">2.2 当前构建风险：必须先复现，不能猜修</h3>
+<p>查询到的最近原生工作流为 <code>41849164235</code>，对应提交 <code>3f3c7c8cf0ea5f2c9116730b2a85948daec924c1</code>。作业 <code>126640494796</code> 的日志在 <code>:core:domain:compileKotlin</code> 阶段报告 <code>allCitations</code> 未解析，日志指向 <code>SelectedSourceQuestions.kt</code> 的 167、168 行；该轮后续 Android／Preview 作业没有形成通过证据。[S06]</p>
+<p>按 <code>head_sha=867f86ed3eef4452a1b61b5190820457fb48bc31</code> 查询工作流，返回 <code>total_count: 0</code>。这意味着本轮查询没有找到该 SHA 的 Actions 运行，不意味着已经证明该 SHA 不能构建，也不排除仓库外的执行。[S07]</p>
+<p><strong>Codex 的处理要求：</strong> 在实际 checkout 中按文件名／符号定位，再用现有 Wrapper 复现。日志中的路径不是可直接假设存在的当前源码路径；本轮按日志路径读取当前文件未成功，因此本计划不提供未经确认的修复补丁。确定引用集合的类型、生命周期、来源和版本校验要求后做最小修复，补回归；禁止用空集合、删断言、绕过来源校验或关闭检查来“恢复绿色”。</p>
+<p>README 的旧绿色结果对应 <code>338aa5f…</code>、CI <code>40475693696</code>：239 项脚本合同、386 项 Compose JVM、430 项 Preview 等。这些是历史证据，<strong>不能相加包装成当前版本的综合覆盖率，也不能覆盖上述失败</strong>。[S01]</p>
+<h3 id="section-8">2.3 最新原型已经修过的内容：保留，不重复报错</h3>
+<table>
+<thead>
+<tr>
+  <th>位置</th>
+  <th><code>867f86ed</code> 已有的修正</th>
+  <th>下一步仍要验证</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>编辑／筛选／新增</td>
+  <td>完成操作强调；附件工具轻量化；重置降级</td>
+  <td>原生按钮语义、禁用、重复提交与失败恢复</td>
+</tr>
+<tr>
+  <td>新增待办</td>
+  <td>标题自适应；日期邻近；取消保留草稿，成功清空</td>
+  <td>原生会话、重启、进程终止与持久化策略</td>
+</tr>
+<tr>
+  <td>回忆筛选</td>
+  <td>暂存条件与应用条件分离；重置保留搜索；收藏与媒体可组合</td>
+  <td>真实数据、时间范围、人物／标签、多媒体记录、返回恢复</td>
+</tr>
+<tr>
+  <td>内容排版与材质</td>
+  <td>欢迎／输入缩小；正文增强；表面分层</td>
+  <td>三主题、中文大字体、窄屏、长内容下的原生效果</td>
+</tr>
+<tr>
+  <td>外观</td>
+  <td>当前动态模式可识别；减少动态覆盖但不丢偏好</td>
+  <td>系统动态设置、应用重启、后台恢复与性能</td>
+</tr>
+<tr>
+  <td>搜索工具栏</td>
+  <td>展开后保持位置，避免失焦导致按钮移位漏点</td>
+  <td>键盘出现／收起、快速连点和手势返回</td>
+</tr>
+</tbody>
+</table>
+<p>依据是当前改动与 <code>review.json</code>，不是本轮重新执行浏览器得到的结果。[S04][S05]</p>
+<p><code>review.json</code> 的窄屏证据是宿主视口 352／407 px 下 <code>.content</code> 不横向溢出；不能改写为“所有面板、字体缩放和原生 320 dp 已验收”。原型数据是内存样例，播放器是 UI 状态演示，不能作为重启不丢草稿或真实音频可播的证据。[S05]</p>
+<h3 id="section-9">2.4 视觉资料与 Figma 的审阅限制</h3>
+<p>旧图包 A 组提供了自然景观、玻璃、三主题和各面板的视觉基准；B 组是旧原生模拟器对照，不能作为新版 APK 的截图。本计划保留前轮已经实际看图所得的方向判断，并把当前代码已修复的旧问题关闭为“原型层修复”。[S08]</p>
+<p>最新 7 张图的路径、改动和检查清单已核对，但本轮未成功将这 7 张全部渲染为可视图片，<strong>不把它们写成已经逐张视觉签收</strong>。Figma 文件 <code>TbjrVEh0GLxs97p6zZYTuO</code> 的读取尝试受到 Starter 工具调用额度限制，本轮未取得新的画布截图；Figma 不作为本轮新结论的视觉证据，也不要求付费升级后才能继续实施。[S09]</p>
+<p>开始原生视觉实现前，Codex 须实际打开最新 7 张图和旧三主页／窄屏图，记录查看清单。无法获取的图片标注缺失，不从文件名猜测画面。Figma 后续仅用于组件、变量与状态对齐，不得用旧画布覆盖更新的设计决策。</p>
+<h2 id="section-10">3. 原始设计书对照：功能完成度与未闭合项</h2>
+<h3 id="section-11">3.1 F01–F10 当前状态矩阵</h3>
+<p>下表是基于原始设计书、README、原生入口接线和已取得的测试资料的判断，不是全仓逐行审计。称“已有路径”不等于该功能所有子项都通过；缺证据处必须继续核查，不应直接删除或重写。[S01][S02][S03]</p>
+<table>
+<thead>
+<tr>
+  <th>需求</th>
+  <th>已有或可确认的基础</th>
+  <th>未完成／尚待核实</th>
+  <th>当前结论与收口标准</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>F01 随手记录</td>
+  <td>文字、图片、受控 PCM 原音、草稿及附件链路</td>
+  <td>真实麦克风、常见音频输入范围、混合输入中断、中文输入法、进程终止恢复</td>
+  <td>本地路径已有；以持久化与附件完整性证明“已保存”，不能以 UI 插入证明</td>
+</tr>
+<tr>
+  <td>F02 原始记录</td>
+  <td>原文查看、版本、附件、纠正、回收站等路径</td>
+  <td>新界面中的详情／历史／收藏／标签／附件入口保全；删除后返回；长记录体验</td>
+  <td>不应重做数据模型；逐路由确认功能可达、内容与版本准确</td>
+</tr>
+<tr>
+  <td>F03 模型配置</td>
+  <td>模型协议与连接相关代码／自动化基础</td>
+  <td>真实模型未启用；两类协议、连接测试、能力、密钥与授权的产品闭环未验收</td>
+  <td>不是“只差 UI”；先保留离线能力，再单独授权接通和验收</td>
+</tr>
+<tr>
+  <td>F04 AI 整理</td>
+  <td>候选、来源、版本处理与手工确认基础</td>
+  <td>真实整理输出及质量、取消／重试／撤权／旧结果拒收尚无完整端到端证据</td>
+  <td>手工事实或偏好录入不能冒充 AI 自动整理完成</td>
+</tr>
+<tr>
+  <td>F05 找回记忆</td>
+  <td>中文关键词检索、组合条件、来源回跳、版本校验</td>
+  <td>真实有证据问答未启用／未验收；引用编译阻塞；检索质量与真实规模性能</td>
+  <td>本地检索与 AI 问答分开验收；无证据不得制造答案</td>
+</tr>
+<tr>
+  <td>F06 待办提醒</td>
+  <td>正式任务、待确认草稿、显式操作后的计划与调度状态</td>
+  <td>OEM 送达、重启、时区／时间变化、权限撤回、完成／取消后的调度撤销</td>
+  <td>“已安排”不能改成“已送达”；默认不能自动确认候选</td>
+</tr>
+<tr>
+  <td>F07 隐私控制</td>
+  <td>LOCAL_ONLY、应用访问与授权相关控制接线、受限处理原则</td>
+  <td>锁屏／后台／任务切换遮盖、密钥生命周期、撤权、日志、删除传播的设备证据</td>
+  <td>有入口不算安全验收；逐边界验证，无授权不外发</td>
+</tr>
+<tr>
+  <td>F08 备份迁移</td>
+  <td>用户主动开放导出、口令加密备份／恢复入口</td>
+  <td>新装恢复在 admission 阶段曾失败；真实 SAF、删除传播、错误／中断恢复未闭合</td>
+  <td>高优先级未闭合；新装恢复全链路必须实际演练</td>
+</tr>
+<tr>
+  <td>F09 回顾</td>
+  <td>有事实回顾相关入口／控制器线索</td>
+  <td>日／周回顾的完整用户闭环、来源质量、空内容和过期来源表现未充分核实</td>
+  <td>标记待核实／部分实现，不按控制器名称认定完成</td>
+</tr>
+<tr>
+  <td>F10 视觉与体验</td>
+  <td>三页与多主题交互原型、历史原生 Preview 与部分模拟器证据</td>
+  <td>新版 Compose 落地、全状态、真实中文 IME、TalkBack、大字、16 KB 与性能</td>
+  <td>当前主要实施工作；最终按原生 APK 验收</td>
+</tr>
+</tbody>
+</table>
+<h3 id="section-12">3.2 D00–D09 不能按最高编号宣称完成</h3>
+<table>
+<thead>
+<tr>
+  <th>原里程碑</th>
+  <th>原始验收关注点</th>
+  <th>本轮判断</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>D00</td>
+  <td>工具链、最小 CI、可构建 APK</td>
+  <td>有历史产物；当前候选构建基线需恢复／重验</td>
+</tr>
+<tr>
+  <td>D01</td>
+  <td>Token、组件、三页与状态 Preview</td>
+  <td>原生旧版基础 + 新版原型；新视觉尚未完成原生落地</td>
+</tr>
+<tr>
+  <td>D02</td>
+  <td>加密记录、草稿、版本、附件状态机</td>
+  <td>已有实现基础；迁移、重启、SQLCipher 等设备验收未闭合</td>
+</tr>
+<tr>
+  <td>D03</td>
+  <td>图片和短录音存档、能力降级</td>
+  <td>受控素材路径已有；真实采集与能力降级须验收</td>
+</tr>
+<tr>
+  <td>D04</td>
+  <td>两类协议、SSE、连接配置</td>
+  <td>有契约基础，但当前领域编译失败；真实模型未启用</td>
+</tr>
+<tr>
+  <td>D05</td>
+  <td>结构化整理、来源与候选</td>
+  <td>有规则／候选基础；不等于真实 AI 整理闭环完成</td>
+</tr>
+<tr>
+  <td>D06</td>
+  <td>中文检索、出处问答、用户修正</td>
+  <td>本地检索已有；真实问答与质量验收未闭合</td>
+</tr>
+<tr>
+  <td>D07</td>
+  <td>候选确认、正式任务、提醒</td>
+  <td>本地链路已有；OEM 与时钟／重启／权限链路待验收</td>
+</tr>
+<tr>
+  <td>D08</td>
+  <td>回收站、永久删除、备份恢复</td>
+  <td>有入口，关键恢复演练未通过；不能关单</td>
+</tr>
+<tr>
+  <td>D09</td>
+  <td>全流程、性能、可访问性、发布检查</td>
+  <td>尚不能签收；新版原生与设备矩阵均未闭合</td>
+</tr>
+</tbody>
+</table>
+<p>阶段定义依据原始方案第 17 节；以上状态是证据支持的分层判断，不是新增里程碑取代原计划。[S02]</p>
+<h3 id="section-13">3.3 设计书需要补充什么，而不是推翻什么</h3>
+<p>新增一份视觉与验收增补文档，说明原第 6 节的奶油白／暖橙初始方案已被当前批准的自然景观＋三主题玻璃方向取代；不要覆盖原始方案和 Word 原件。原文版本、授权、候选确认、离线保存和删除传播等产品规则继续有效。</p>
+<p>补充四张可持续维护的表：<strong>需求—当前实现—可达入口—验证证据</strong>；<strong>页面—状态—返回位置—草稿策略</strong>；<strong>能力—可用／未配置／不支持／失败—对应文案</strong>；<strong>发布范围—阻塞项—明确延期项</strong>。这样后续不再靠 README 的旧计数或截图数量判断完成度。</p>
+<p>v0.2／v0.3 的 embedding、桌面小组件、系统分享接收、复杂重复任务、同步、官方 AI 服务等，不应被本次“彻底完善前端”自动纳入 v0.1；仍按原方案和单独授权推进。[S02]</p>
+<hr />
+<h2 id="section-14">4. 前端方向与设计系统：明确保留项和改动边界</h2>
+<h3 id="section-15">4.1 保留项</h3>
+<p>保留天空、云、海面和远山，背景不加入玻璃摆件、无意义气泡或悬浮装饰。保留晴空蓝／桃色晚霞／星夜紫的整体色彩关系，玻璃用于 UI 表面。保留可关闭、可减少的适度动态，以及小型噜噜入口。保持“此刻／回忆／待办”三入口，不新增功能来填满留白。</p>
+<p>目标不是让每屏更满，而是让记录与任务更容易读、输入更直接、状态更可信。天空留白是允许的，重复日期、默认正常状态和过大的固定容器不是必需的。</p>
+<h3 id="section-16">4.2 单一设计来源与 Token</h3>
+<p>建议在现有 <code>design/</code> 结构内建立 Skyglass 语义 Token 和状态说明；路径由 Codex 在盘点后确定，不假设下列文件已经存在。旧 Token 的业务语义保留，避免所有调用点一次性改名。</p>
+<table>
+<thead>
+<tr>
+  <th>语义层</th>
+  <th>建议 Token 范围</th>
+  <th>用法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>场景</td>
+  <td>landscape、scrim、environmentTint</td>
+  <td>三主题背景及必要的局部可读性覆盖</td>
+</tr>
+<tr>
+  <td>表面</td>
+  <td>welcome、reading、input、sheet、navigation</td>
+  <td>分别控制填色／透色／边缘，不共用一个透明度</td>
+</tr>
+<tr>
+  <td>文字</td>
+  <td>textPrimary、textBody、textSecondary、onPrimary</td>
+  <td>正文不能因“轻盈”而过浅；禁用与辅助文字不同</td>
+</tr>
+<tr>
+  <td>操作</td>
+  <td>primary、secondary、tertiary、selected、pressed、focus</td>
+  <td>完成动作只有一个主强调；选择态不等于提交态</td>
+</tr>
+<tr>
+  <td>状态</td>
+  <td>success、warning、error、pending、unavailable</td>
+  <td>带图标／文案，不只靠颜色</td>
+</tr>
+<tr>
+  <td>几何与动态</td>
+  <td>spacing、radius、icon、touchTarget、duration、easing</td>
+  <td>三主题共用组件几何，只替换视觉语义</td>
+</tr>
+</tbody>
+</table>
+<p>当前 <code>skyglass-polish.css</code> 的三主题正文色和阅读表面渐变可以作为迁移起点；<strong>这些取值不等于已经测过合成对比度，不应作为永远不可调整的硬值</strong>。不要将多层 CSS 覆盖按顺序逐条翻译成 Compose 硬编码。[S04]</p>
+<h3 id="section-17">4.3 文字与空间建议值</h3>
+<p>以下是排版起点，不是强制固定高度；在长内容、中文大字和小屏中必须允许重排。</p>
+<table>
+<thead>
+<tr>
+  <th>元素</th>
+  <th>建议字号／行高</th>
+  <th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>页面标题</td>
+  <td>22／28 sp</td>
+  <td>半粗；不与欢迎语重复制造主标题</td>
+</tr>
+<tr>
+  <td>记录／任务标题</td>
+  <td>16／24 sp</td>
+  <td>中等至半粗，避免每条均过重</td>
+</tr>
+<tr>
+  <td>记录／编辑正文</td>
+  <td>16／24–26 sp</td>
+  <td>常规字重；正文是主内容，不当作灰色注释</td>
+</tr>
+<tr>
+  <td>区块／日期分组</td>
+  <td>14–15／20–22 sp</td>
+  <td>用组间距区分，不靠巨大粗标题</td>
+</tr>
+<tr>
+  <td>时间／必要辅助</td>
+  <td>12–13／18 sp</td>
+  <td>足够对比，重要异常可以更醒目</td>
+</tr>
+<tr>
+  <td>底栏文字</td>
+  <td>12／16 sp</td>
+  <td>不隐藏未选中标签，不用全大写英文替代</td>
+</tr>
+</tbody>
+</table>
+<p>使用系统中文无衬线字体与稳定回退；不为视觉效果额外引入未经审查的字体资源。sp 跟随字体缩放，dp 用于布局，不将字号统一锁成像素。边距从 20 dp 起，窄屏可用 16 dp；间距基于 4／8 dp 节奏。建议卡片圆角以 16–20 dp 为基础、面板上角 24 dp 左右，最终应以已有认可画面比较，不再无条件增大圆角。</p>
+<p>视觉图标约 20–24 dp，交互目标至少 48×48 dp；可见图标与触区分开设计，避免隐形触区相互重叠。Compose 的部分组件有默认最小目标与语义，迁移时仍需检查自定义控件。[R01]</p>
+<h3 id="section-18">4.4 玻璃的三层用途</h3>
+<p><strong>欢迎与轻工具层：</strong> 透出较多环境色，少阴影，避免欢迎区比正文更厚。<br />
+<strong>阅读层：</strong> 稳定的磨砂底与轻边缘；允许低频景观色穿透，但不能让云纹或流光干扰正文。<br />
+<strong>输入与面板层：</strong> 最稳定，必要时接近不透明；编辑可靠性优先于“更透明”。</p>
+<p>晴空避免整片亮白厚边；晚霞保留暖灰／桃色环境透色，不继续加粉色装饰；星夜避免所有表面变成同一种厚重深蓝，允许紫色低频透色，同时保持主操作可见。这些是视觉打磨方向；最终须看最新原型和原生截图，不沿用已修复画面的缺陷描述。</p>
+<p>对比检查用最终合成像素和实际状态：常规正文以 4.5:1 为验收基线，必要的非文字控件与状态识别以 3:1 为基线。装饰性描边不必都强到 3:1；但控件不能仅靠低对比装饰边缘辨认。WCAG 的“大字号”判定来自 Web 单位，不直接等同安卓 sp。[R04][R05]</p>
+<h3 id="section-19">4.5 安卓玻璃实现不能照搬 CSS backdrop-filter</h3>
+<p>Compose <code>Modifier.blur</code> 的官方支持范围是 Android 12 及以上；不能把它当作 API 26 全范围可用的自动背景毛玻璃，也不能对整个含文字的卡片直接 blur。[R03]</p>
+<p>优先方案是：共享景观层 + 有限的环境色／预处理模糊素材 + 清晰的语义表面。需要实时背景采样时先验证实现与成本，避免每张滚动卡重复采样／模糊全屏。API 26–30 或性能降级时，使用同主题的稳定透色渐变和轻边缘，保持色彩与空间关系，不退化成纯白模板。</p>
+<p>记录降级前后截图、长列表滚动与内存表现。不要为追求毛玻璃临时引入未经核验的大型渲染依赖或升级整套工具链。</p>
+<h2 id="section-20">5. 三主页面与二级页面的具体方案</h2>
+<h3 id="section-21">5.1 此刻：让输入简单，让原文先被看见</h3>
+<p><strong>保留已改内容：</strong> 紧凑欢迎区、底部输入停靠、较强正文、附件轻量工具。不要重新扩大欢迎卡或恢复默认说明小字。</p>
+<p><strong>原生完成要求：</strong> 欢迎区按内容自适应，不在大字时用固定 72 dp 裁切；噜噜入口保持小型。输入未聚焦时紧凑，聚焦后随内容与键盘扩展；不同时保留一个占高度的假输入卡和另一个完整编辑器。展开铅笔只表示展开编辑，保存使用明确完成动作，两个语义不能静默互换。</p>
+<p>文字、图片和音频单独或混合时都应有可提交判定；不能仅因正文为空就禁用一个合法的图片／音频记录。没有任何可保存内容时禁用。保存中防重复；成功以实际持久化为准；失败保留正文与附件，并允许重试／取消。</p>
+<p>用户在查看旧记录时，不因保存反馈或新内容强行跳回顶部／底部。关闭详情返回原来的记录位置。成功提示短暂、局部且不过度重复，不常驻“本地记录共几条”等填充信息。</p>
+<h3 id="section-22">5.2 回忆：搜索条件可理解，出处可回去</h3>
+<p>媒体类型与收藏维度分开；筛选草稿与已应用条件分开，关闭不应用；重置筛选不清搜索词。界面应根据实际人物／标签／日期生成选项，不移植原型固定的 11 月日期和样例人物。[S04][S05]</p>
+<p>已有“创建时间／事件时间”等日期语义如在原生支持，应通过适度展开保留，不能美化时强行合并。图片与音频并存的混合记录如何匹配类型必须有明确定义和测试，而非简单给每条记录一个演示 <code>kind</code>。</p>
+<p>搜索工具栏稳定，焦点变化不移动用户正在点的按钮。筛选生效后只显示有用条件反馈；清空结果时提供保留搜索、调整筛选的路径。日期分组无可见记录时隐藏空组；返回后搜索词、筛选、滚动和选中记录保持一致。</p>
+<p>原文摘要与 AI 回答在视觉、标签和来源结构上区分。没有可用模型时不得让“问一问”看似已具备语义答案能力；可保留配置／说明入口，但不生成演示答案冒充用户数据。</p>
+<h3 id="section-23">5.3 待办：日期、确认、完成、提醒各有语义</h3>
+<p>保留已改的今天标记／选中日区分与紧凑行高。周历之外有清楚的年月日上下文；跨月／跨年选择使用真实日历。单行任务紧凑，带时间／提醒／来源时自适应增高，不靠固定高度压字。</p>
+<p>完成按钮只负责完成；标题区域进入详情／编辑。完成操作立即可感知，但只有实际提交成功才显示稳定完成态；失败回滚或明确提示，不能把失败任务从列表吞掉。需要撤销时使用可靠的状态操作，不靠延迟动画偷偷撤销真实提醒。</p>
+<p>待确认草稿不计入正式待办，也不通过一次列表点击自动批准。确认页必须清楚展示任务标题、日期时间、来源和提醒选项。取消、完成、删除或改期后，相应系统调度应正确撤销／更新。</p>
+<p>提醒信息保留“未安排／已安排／受权限限制／失败”等必要差异；铃铛仅作辅助，不承担所有状态。已安排不能写成已送达。</p>
+<h3 id="section-24">5.4 编辑面板：记录、任务和筛选不共享僵硬高度</h3>
+<p>记录编辑可有宽松正文区；任务标题默认较短并随内容增长，日期紧接内容；筛选按选项自然排列。三者共享顶部栏和操作等级，不共享一个巨大的固定文本框。</p>
+<p>键盘、导航栏和系统手势区由实际 WindowInsets 驱动；不能复制原型手机框、模拟状态栏或底部横条。Compose Insets 消费规则需避免重复加底部 padding，输入区与面板实际验证 <code>imePadding</code>／安全区域行为。[R02]</p>
+<p>面板拖动不是唯一关闭方式；长文本滚动不得误触为关闭。返回、关闭、点遮罩、拖动和系统手势的保存／取消语义保持一致，详见第 6 节。</p>
+<h3 id="section-25">5.5 不能遗漏的二级流程清单</h3>
+<p>每项先盘点当前入口、控制器和测试，再做样式迁移，不能按名称推定所有功能已经可用。</p>
+<table>
+<thead>
+<tr>
+  <th>流程组</th>
+  <th>需保全的界面与状态</th>
+  <th>验收重点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>原文</td>
+  <td>详情、长文本、编辑、历史版本、回退来源</td>
+  <td>原文优先；编辑生成新版本，旧分析过期不能悄悄继续有效</td>
+</tr>
+<tr>
+  <td>附件</td>
+  <td>图片查看／网格、原音播放、加载／损坏／缺失</td>
+  <td>可返回原位置；无附件不伪造缩略图或播放时长</td>
+</tr>
+<tr>
+  <td>来源内容</td>
+  <td>人工转写、图片文字纠正、人物／标签／偏好／事实</td>
+  <td>清楚区分用户确认、自动候选和原始素材；能查看出处与撤回</td>
+</tr>
+<tr>
+  <td>任务</td>
+  <td>待确认、确认、详情、日期／提醒设置、已完成</td>
+  <td>操作边界明确；不丢当前列表与来源上下文</td>
+</tr>
+<tr>
+  <td>查找与回顾</td>
+  <td>本地结果、引用跳转、无证据、模型不可用、日／周回顾</td>
+  <td>不把未配置模型误说成无记录；失效引用有反馈</td>
+</tr>
+<tr>
+  <td>隐私与设置</td>
+  <td>外观、减少动态、角色显示、应用锁、处理范围、模型连接</td>
+  <td>实际能力驱动；授权变更与失败状态不能被“温柔文案”遮住</td>
+</tr>
+<tr>
+  <td>数据与恢复</td>
+  <td>导出、备份、恢复、回收站、永久删除、存储占用</td>
+  <td>明文风险与破坏性确认保留；进度／失败／取消可信</td>
+</tr>
+<tr>
+  <td>辅助</td>
+  <td>初次使用、权限解释、关于、许可证</td>
+  <td>不集中索权，不把开发诊断堆到主页面</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="section-26">6. 核心状态与返回契约</h2>
+<p>以下是必须实现／验证的行为契约；已存在的正确实现应复用。不要把原型内存变量直接当作原生持久化策略。</p>
+<table>
+<thead>
+<tr>
+  <th>场景</th>
+  <th>进入／变更</th>
+  <th>退出／返回</th>
+  <th>失败／中断</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>新记录</td>
+  <td>创建独立草稿；附件复制与正文状态可追踪</td>
+  <td>关闭编辑保留约定的草稿，成功提交才清空</td>
+  <td>写入失败保留输入；进程恢复不得把未保存误报已保存</td>
+</tr>
+<tr>
+  <td>编辑已有记录</td>
+  <td>以原记录 ID 与版本为基础形成修改草稿</td>
+  <td>未提交修改与已保存原文分开；放弃需明确</td>
+  <td>并发版本冲突提示；不无痕覆盖原文</td>
+</tr>
+<tr>
+  <td>新任务</td>
+  <td>标题、日期、时间、提醒属于同一草稿</td>
+  <td>取消后保留草稿与“清空草稿”行为可区分</td>
+  <td>重复点提交只生成一次；失败保留所有字段</td>
+</tr>
+<tr>
+  <td>筛选</td>
+  <td>applied 与 draft 分离</td>
+  <td>应用后更新；取消恢复原 applied；重置只改 draft</td>
+  <td>返回后搜索词与滚动不丢；筛选变化不会生成虚假结果</td>
+</tr>
+<tr>
+  <td>原音播放</td>
+  <td>UI 订阅实际播放位置、时长与可用性</td>
+  <td>按现有隐私／生命周期约束停止或继续，不擅自改变策略</td>
+  <td>音频焦点、来电、耳机变化、文件丢失可处理</td>
+</tr>
+<tr>
+  <td>来源跳转</td>
+  <td>绑定记录、版本与导航会话</td>
+  <td>回到触发的结果／任务／问答位置</td>
+  <td>删除、撤权或版本失效后不能继续暴露旧内容</td>
+</tr>
+<tr>
+  <td>主题与动态</td>
+  <td>主题、偏好模式与减少动态分别存储</td>
+  <td>关闭面板立即保留已选外观</td>
+  <td>系统减少动态覆盖播放，不覆盖用户原偏好</td>
+</tr>
+<tr>
+  <td>任务完成</td>
+  <td>提交完成意图，并同步相应提醒变更</td>
+  <td>成功后稳定更新列表，支持约定撤销</td>
+  <td>失败可恢复且可见；不能只用动画模拟成功</td>
+</tr>
+<tr>
+  <td>备份／恢复</td>
+  <td>用户明确选择文件与必要确认</td>
+  <td>结束显示实际结果，不以选择文件当作成功</td>
+  <td>密码错、损坏、空间不足、进程终止有明确恢复边界</td>
+</tr>
+</tbody>
+</table>
+<p>系统返回应优先按平台与当前输入状态处理 IME，再返回面板／详情／主页面；不要拦截所有返回实现自定义动画。关闭时恢复到仍存在、仍属于当前导航会话的触发控件；源控件已删除时回到合理的稳定位置，不重放旧焦点或旧内容。</p>
+<p>私密正文、搜索词、密钥和引用证明不能为方便状态恢复就随意放入 Bundle、日志或截图附件；复用既有安全状态容器和会话所有权。草稿跨进程恢复需有明确的安全持久化设计，不用 <code>rememberSaveable</code> 无差别保存所有内容。[S02][S03]</p>
+<h2 id="section-27">7. 组件、动效与噜噜的精修标准</h2>
+<h3 id="section-28">7.1 统一性不等于所有容器长得一样</h3>
+<p>按钮分主操作、次操作、工具操作、破坏性操作；全局同语义同等级。每个面板通常一个完成性主操作。选中日期、选中主题和已完成任务使用各自明确的状态，不靠“都变成主色”混在一起。</p>
+<p>图标使用同一网格与笔画体系，但允许光学校正；不要为大小一致把复杂图标压得看不清。导航标签始终可辨，选中底形可以小，点击区域不能随之缩小。状态图标应有可访问名称；装饰图标不重复朗读。</p>
+<p>播放器减少“记录卡—内层卡—圆按钮”的层层厚底。波形只有确实来自素材或播放进度时才表达相应含义；没有提取波形时使用明确的进度条，不制造看似真实的波形证据。播放时长与记录时刻分开排，暂停／停止／重播的状态真实可辨，保留音频筛选。</p>
+<h3 id="section-29">7.2 动效建议：动作快，环境慢</h3>
+<p>下面是设计起点，<strong>不是已经测出的最优值或现有帧率结论</strong>。动画应可打断、可反向，不按每次点按排队播放。</p>
+<table>
+<thead>
+<tr>
+  <th>场景</th>
+  <th>起点建议</th>
+  <th>验收方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>按压</td>
+  <td>按下 80–100 ms；释放 120–160 ms；小幅明暗或不超过约 2% 缩放</td>
+  <td>快速连点不延迟提交、不移动邻近布局</td>
+</tr>
+<tr>
+  <td>底栏切页</td>
+  <td>160–220 ms 淡变；小位移；选中底形连续移动</td>
+  <td>连续切换以最后操作为准；保留各页滚动状态</td>
+</tr>
+<tr>
+  <td>面板</td>
+  <td>进入 260–320 ms；退出 180–220 ms；拖动跟手</td>
+  <td>方向反转／中途取消不跳跃，内部滚动不误关闭</td>
+</tr>
+<tr>
+  <td>完成反馈</td>
+  <td>先显示提交／成功状态，再平滑调整条目</td>
+  <td>回滚、撤销和提醒状态与真实结果一致</td>
+</tr>
+<tr>
+  <td>主题切换</td>
+  <td>短交叉渐变；主内容位置不变</td>
+  <td>不出现白闪，不重置输入、不改变阅读位置</td>
+</tr>
+<tr>
+  <td>背景</td>
+  <td>长周期、低幅度；不让地平线明显移动</td>
+  <td>编辑／滚动／后台时暂停或降低；恢复连续而非从头闪动</td>
+</tr>
+</tbody>
+</table>
+<p>减少动态开启时取消明显位移、弹性缩放、漂移和持续光效；必要反馈使用短淡变或立即切换。系统减少动态与应用设置共同决定实际播放状态，但不抹掉用户之前选择的背景模式。</p>
+<p>三页切换不让每条记录单独依次飞入。避免边滚动边实时大面积模糊、闪烁高光或多层缩放。性能结果以实际可测构建和帧时间记录为准，不以视频观感或“平均 60 FPS”一句话代替。[R06]</p>
+<h3 id="section-30">7.3 噜噜：在内容边缘自然陪伴</h3>
+<p>正式美术仍未批准，不把现有文字占位、拒绝过的候选或网上素材当作授权成品。先通过 <code>MascotAssetProvider</code> 一类既有资源接口保留槽位与静态回退，不让角色资源影响记录主流程。[S02][S03][S09]</p>
+<p>主页面只需小型入口，约 40–48 dp 可见形象配充分触区；不新增大型角色欢迎卡。主动点击时可做短暂眨眼、歪头或轻晃，记录实际保存成功后可短暂点头，不对每条记录弹陪聊气泡。</p>
+<p>回忆与待办无需重复常驻一只。三主题通过接触阴影与轻微环境光协调，不把角色本色强行染成三套颜色。减少动态提供静态回应。角色不能读取记录、推断事实或触发任务，除非另有明确的功能设计和授权；本轮不新增这类能力。</p>
+<h2 id="section-31">8. 原生迁移策略：复用业务，替换表现，逐条保全</h2>
+<h3 id="section-32">8.1 先建立路由与能力清单</h3>
+<p>Codex 在实际仓库中确认所有 Composable、导航、ViewModel、控制器、权限入口及测试路径。现有入口接线涉及记录、附件、原音、版本、来源、关键词、候选、正式待办、提醒、导出、回收站、记录包、回顾与应用访问等；接线只能证明存在，具体可用性逐项验收。[S01][S10]</p>
+<p>输出 <code>frontend-parity-map</code>：每个旧入口对应新入口、当前状态、控制器、回归用例与截图。缺失项必须有“未迁移”标识，不能悄悄隐藏。高级功能可以渐进展开，但不能以简化 UI 为由删除仍在原始范围内的能力。</p>
+<h3 id="section-33">8.2 建议的最小迁移切片</h3>
+<p>先实现主题／表面／文字／按钮／图标／导航等原生基础，再迁移“此刻—打开编辑—保存—查看原文—返回”一条真实链路。该链路通过后迁移回忆，再迁移待办与二级流程。</p>
+<p>所有组件从现有真实状态派生，事件交回既有业务接口。不要在新 Composable 中新建另一套永久记录列表、另一份提醒状态或另一套来源判定；不要把 HTML 的 <code>state.added</code>、固定日期、演示播放器等移入产品。</p>
+<p>长篇入口文件可以做边界明确的组件提取，但不要把“全文件重构、数据库迁移、工具链升级、新主题接入”塞进一个提交。每次改变标明对应 D 阶段；跨阶段业务变更独立评审，遵守一批一验收。</p>
+<h3 id="section-34">8.3 实现参考而不是页面照抄</h3>
+<p>Android Compose 的可访问默认值用于触区、角色与语义；Insets 用于键盘和系统边界；WCAG 用于合成对比；Macrobenchmark 用于启动、滚动与交互性能验证。[R01][R02][R04][R05][R06]</p>
+<p>这些参考解决交互和质量问题，不要求把 AIyou 改成标准白色 Material 模板。借鉴组件规则，不复制第三方品牌画面；Figma 可用于变量、组件变体、长文与错误态的对照板，不作为缺少原生验收的替代品。</p>
+<hr />
+<h2 id="section-35">9. 底层功能与产品闭环的未完成清单</h2>
+<p>这里区分“明确未启用”“已接线但未验收”和“仍需盘点”。除已取得日志的编译错误与恢复演练失败外，下面的风险场景不是已经复现的所有缺陷。</p>
+<h3 id="section-36">9.1 P0｜构建与来源引用基线（CORE-01）</h3>
+<p>复现第 2.2 节失败，定位当前实际文件和 <code>allCitations</code> 的定义／引用。最小修复后跑领域与引用相关测试，再按仓库规定执行实际 Android 检查。引用 ID、版本、来源撤回、删除与权限校验都不得被弱化。</p>
+<p><strong>退出标准：</strong> 新候选 SHA 的实际命令、非零测试 XML、失败／跳过数、日志与构建结果可复查。无法取得 SDK 或工具环境时分别标记阻塞，继续可执行的纯 Kotlin／静态任务，但不能把整批标成通过。</p>
+<h3 id="section-37">9.2 P0｜记录、附件与加密存储可靠性（CORE-02）</h3>
+<p>已有本地记录链路并不免除以下验收：保存事务与附件复制的先后边界，磁盘满／撤权／进程终止，草稿恢复，原文新版本与派生内容失效，数据库版本迁移及 SQLCipher 原生执行。</p>
+<p>普通文本保存、图片复制、音频存档分开记录成功条件；部分附件失败时不应丢掉已写正文，也不应误报完整保存。明确错误恢复路径，不通过一直转圈掩盖失败。采用合成数据，不用用户真实库做破坏性试验。</p>
+<p><strong>退出标准：</strong> 原始方案要求至少 100 次模拟进程终止／重启场景，已显示成功的记录不丢失、附件完整性可验证；仍需声明这些场景覆盖范围，不能据此宣称绝对不丢数据。[S02]</p>
+<h3 id="section-38">9.3 P0｜备份恢复与删除传播（CORE-03）</h3>
+<p>README 保留的 D08 演练 <code>40473284135</code> 在探针 admission 阶段失败，未进入实际备份恢复；首因未定位，临时 KVM ACL 的精确恢复也未确认。新诊断“编译过”不能改写为“演练成功”。[S01]</p>
+<p>先定位 admission 与环境边界，不自动更改未知 KVM 权限、不清未知锁、不终止未知进程。在明确授权的可丢弃测试环境中执行：保存合成原文和附件→导出／备份→全新安装→恢复→查到原文／附件／版本→重新配置不应随包导出的秘密→检查提醒处置。</p>
+<p>加入错误口令、损坏包、版本不兼容、可用空间不足、用户取消、进程终止、重复恢复、选择文件权限变化。确认失败恢复的回滚／保留规则，不要求所有失败都“自动重试”。删除传播需覆盖索引、来源片段、派生事实、候选、提醒、缓存和恢复旧备份后的策略，防止已删除内容无提示复现。</p>
+<p><strong>退出标准：</strong> 新装恢复有实际设备执行证据；明文导出风险清楚；删除／恢复不破坏未选中数据；环境清理有精确记录。未跑到恢复步骤必须报告未跑到，而不是记录恢复失败或成功。</p>
+<h3 id="section-39">9.4 P0｜隐私、锁与授权所有权（CORE-04）</h3>
+<p>默认 <code>LOCAL_ONLY</code> 保持。新主题、搜索、详情和预览缓存不能绕过应用锁、来源授权、导航会话和删除失效边界。验证后台／锁屏／最近任务画面、崩溃日志与报告附件是否暴露私密内容；UI 状态恢复不能泄露搜索词或密钥。</p>
+<p>外发策略、供应商、用途、记录版本或可用来源变化后，旧的授权／异步回调不能继续写入或展示不该显示的内容。媒体权限只在需要时申请，拒绝权限仍能做纯文字记录。</p>
+<p><strong>退出标准：</strong> 禁止外发内容、秘密、已删除／已撤权材料不出现在测试请求和日志；锁与生命周期的关键设备路径通过。对“已构建 APK 无 INTERNET”的历史事实在新 APK 上重新核验，不能凭源 Manifest 片段断言最终包权限。[S01][S02]</p>
+<h3 id="section-40">9.5 P0｜真实提醒闭环（CORE-05）</h3>
+<p>待办与提醒有本地路径，尚不能据此证明不同厂商按时送达。测试通知与精确闹钟相关能力／权限、拒绝与撤销、Doze、重启、时区和时间改变，以及任务改期／取消／完成／删除。</p>
+<p>时间含义和“精确／大约”应如实表达；提醒送达与调度登记分开。恢复备份后如何处置过期与未来提醒须明确，避免重复或未经确认新建系统行动。</p>
+<p><strong>退出标准：</strong> 选定设备矩阵中按步骤记录实际调度、通知与导航结果；对于系统限制说明可见，未送达不显示已送达。不得仅以调用调度 API 成功验收。</p>
+<h3 id="section-41">9.6 P1｜媒体采集、OCR 与 ASR（CORE-06）</h3>
+<p>三项分别验收，不能把人工录入等同自动识别：</p>
+<ul>
+<li><strong>原始媒体：</strong> 现有受控 PCM 路径不代表已支持任意音频格式或所有麦克风。盘点实际编码／容器、导入、录音、播放、音频焦点、路线切换、权限与中断；不支持的格式给明确反馈，不能静默失败。</li>
+<li><strong>OCR：</strong> 现有图片文字来源纠正／检索不等于能对新图提取。确认本地或用户授权远端的提取方案、语言与限制，接入前呈现“不可用／未配置”；图片本身始终可保存、查看。[S01]</li>
+<li><strong>ASR：</strong> 原音保存与人工转写是可用的降级路径；自动 ASR 未启用。按运行时实际能力决定是否提供识别，不能承诺每台机器都有离线中文服务。服务不可用、无权限、转写失败时保留原音。[S01][S02]</li>
+</ul>
+<p><strong>退出标准：</strong> 每种能力有真实支持范围、成功／不可用／失败／取消状态；来源时间段与修改版本可追溯。新增供应商、SDK、网络能力或相关协议需要独立核验和已有明确授权，不能借 UI 迁移偷偷引入。</p>
+<h3 id="section-42">9.7 P1｜模型配置、真实整理与出处问答（CORE-07）</h3>
+<p>两类兼容协议、模型 ID、SSE、连接配置和来源规则的代码／Mock 契约，不代表真实模型链路已启用。保持现有协议抽象，不擅自新建 AIyou 服务端。[S01][S02]</p>
+<p>先离线补足契约：正确端点与错误响应、流中断、取消、超时、结构化输出无效、能力不支持、秘密不入日志、旧版本／旧授权结果拒收、重复响应去重。随后仅在有明确批准的连接与合成数据上做真实调用；无授权时完成离线工作并保留阻塞，不自行设置密钥或开启网络。</p>
+<p>AI 输出与原文分离；模型建议只生成候选，用户确认前不能写入正式任务或稳定事实。问答逐条论断核验引用来源与版本；没有证据时明确无法回答，不用检索分数当事实置信度。</p>
+<p><strong>退出标准：</strong> 两协议契约恢复绿色；真实链路及质量记录单独存在。原方案的至少 100 条质量样本、引用 ID／版本有效率 100%、人工支持率目标 ≥95%、Recall@5 调优目标 ≥85%均按实际样本量与统计口径报告，不把这些数字写成目前已达到的结果。[S02]</p>
+<h3 id="section-43">9.8 P1｜回顾与其他待盘点路径（CORE-08）</h3>
+<p>核查日／周回顾当前是否仅有确定性事实汇总、是否有真实 AI 回顾，以及入口、日期范围、引用、空状态、取消和保存结果。不得仅因 <code>FactRecap</code> 一类命名出现就勾选“AI 回顾完成”。</p>
+<p>同样盘点原始设计书中的模型用途分配、能力限制、存储与用量、应用锁、处理范围、许可证等页面：已有的保留与完善，缺失的单列，不用一页“更多”文字清单代替真实入口。</p>
+<p><strong>退出标准：</strong> 需求—实现—入口—证据矩阵不再有未解释空白；确实不在当前发行范围的项有明确范围决策，而不是笼统 TODO。</p>
+<h3 id="section-44">9.9 本地预览与完整 v0.1 的两道门</h3>
+<p><strong>新版原生本地预览可先交付：</strong> 前提是现有核心本地能力不回退，关键保存／隐私／恢复风险有明确处置，界面不暗示尚未启用的模型、OCR、ASR已经可用，并完整披露设备未验范围。</p>
+<p><strong>完整原始 v0.1 不可仅靠前端签收：</strong> 原方案要求的模型配置、整理、出处问答等必须完成相应验收，或由用户明确批准重新定义发行范围。不能由 Codex自行把原始功能删掉后宣称“全部完成”。ASR的“有可用能力时转写”与无服务时保留原音，应按原始条件式承诺验收，而不是强求所有设备都具备离线识别。[S02]</p>
+<hr />
+<h2 id="section-45">10. 测试矩阵与证据格式</h2>
+<h3 id="section-46">10.1 五层证据不能互相代替</h3>
+<table>
+<thead>
+<tr>
+  <th>层级</th>
+  <th>执行内容</th>
+  <th>不能替代</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>静态／契约</td>
+  <td>Token、依赖锁、Manifest、协议、来源和权限规则</td>
+  <td>真实显示、设备持久化、OEM通知</td>
+</tr>
+<tr>
+  <td>JVM／组件</td>
+  <td>状态归约、ViewModel、失败／重试／取消、导航所有权</td>
+  <td>中文输入法、触感、真实SQLCipher执行</td>
+</tr>
+<tr>
+  <td>Compose Preview／截图</td>
+  <td>三主题、组件状态、长文、大字和小屏</td>
+  <td>实时动画、键盘避让、可访问操作流程</td>
+</tr>
+<tr>
+  <td>Instrumentation／模拟器</td>
+  <td>原生路由、数据库、权限、录音等可执行链路</td>
+  <td>全部厂商、实机性能、真实中文输入体验</td>
+</tr>
+<tr>
+  <td>真机／性能／人工辅助</td>
+  <td>TalkBack、中文IME、60/120Hz、OEM提醒、16KB等</td>
+  <td>其他未执行设备和场景；不泛化结论</td>
+</tr>
+</tbody>
+</table>
+<h3 id="section-47">10.2 必须覆盖的 UI 场景</h3>
+<p>建议测试宽度 320／360／390／412 dp，字体缩放 1.0／1.3／1.5／2.0；不强求所有组合全量执行，采用风险组合：三主题主流程全覆盖，最窄屏＋最大字＋最长内容做交叉压力，关键面板与错误态单独覆盖。</p>
+<table>
+<thead>
+<tr>
+  <th>场景</th>
+  <th>关键检查</th>
+  <th>证据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>三主页面与二级面板</td>
+  <td>无横向意外溢出、中文无裁切、主动作可达、没有重复系统栏</td>
+  <td>绑定新APK的截图，注明尺寸与fontScale</td>
+</tr>
+<tr>
+  <td>长记录／长任务／多附件</td>
+  <td>标题换行不挤掉时间／勾选；滚动和输入合理</td>
+  <td>截图＋交互回放</td>
+</tr>
+<tr>
+  <td>空白／加载／失败／无权限</td>
+  <td>有内容与无内容分开；失败不冒充空列表或成功</td>
+  <td>失败注入步骤＋断言</td>
+</tr>
+<tr>
+  <td>键盘与返回</td>
+  <td>中文组合输入、候选词、换行、语音键盘、关闭再开、系统返回</td>
+  <td>真实中文IME名称／版本＋录屏</td>
+</tr>
+<tr>
+  <td>连续操作</td>
+  <td>快速切页、重复提交、拖动取消、搜索后点筛选、主题切换中返回</td>
+  <td>自动化断言＋关键录屏</td>
+</tr>
+<tr>
+  <td>无障碍</td>
+  <td>标题层级、控件标签、选择／禁用／错误播报、焦点恢复、装饰不重复朗读</td>
+  <td>TalkBack版本与完整流程记录</td>
+</tr>
+<tr>
+  <td>景观和玻璃</td>
+  <td>三主题、动态明暗极端、弹层、低性能回退下的合成对比</td>
+  <td>对比采样报告＋对应截图</td>
+</tr>
+<tr>
+  <td>生命周期</td>
+  <td>后台、锁屏、横竖屏／窗口变化、进程终止、来源删除后返回</td>
+  <td>设备测试与状态断言</td>
+</tr>
+<tr>
+  <td>播放与采集</td>
+  <td>实际进度、暂停／停止、音频焦点、耳机变动、录音中断</td>
+  <td>合成素材与设备路径记录</td>
+</tr>
+</tbody>
+</table>
+<p>背景、玻璃与控件应随可用宽度布局，不按“390 CSS px”的原型比例整体缩放。截图生成和 golden 更新必须审查原因，不能直接更新基准让测试变绿。</p>
+<h3 id="section-48">10.3 设备与平台组合</h3>
+<p>至少覆盖最低支持范围的回退路径、Android 12+ 的视觉实现路径、项目当前目标平台的系统行为，以及单独的 16 KB 页面尺寸环境。实际设备/API由已批准可用环境确定；未具备就明确阻塞，不伪造机型测试。</p>
+<p>普通模拟器可跑原生功能用例，但真实中文 IME、TalkBack、麦克风、至少一台 120 Hz 真机、代表性 OEM 提醒仍需对应实际执行。旧 B 组的 Android 35 模拟器截图是有限的历史运行证据，不等于这些场景都完成，也不应被抹去说成“项目从未在模拟器运行”。[S08]</p>
+<p>SQLCipher 等原生依赖的 16 KB 检查需要静态打包／对齐与真实 16 KB 环境运行两部分，不能仅靠 ZIP 对齐输出或 APK 编译通过。[R07]</p>
+<h3 id="section-49">10.4 原设计中的质量目标，正确继承</h3>
+<table>
+<thead>
+<tr>
+  <th>指标</th>
+  <th>原始目标或建议口径</th>
+  <th>报告方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>保存可靠性</td>
+  <td>至少100次模拟进程终止／重启；已确认成功的记录不丢；附件校验通过</td>
+  <td>每类终止点、执行数、失败数、恢复结果</td>
+</tr>
+<tr>
+  <td>文本保存</td>
+  <td>不含大附件复制，完整持久化到可见确认 p95 &lt;200 ms</td>
+  <td>固定设备、构建、数据规模；不测“先插UI”的假快</td>
+</tr>
+<tr>
+  <td>本地检索</td>
+  <td>10,000条混合中文记录，词法查询 p95 &lt;300 ms</td>
+  <td>冷／热缓存分开，记录查询集和设备</td>
+</tr>
+<tr>
+  <td>流畅度</td>
+  <td>发布／可测基准构建；60Hz和至少一台120Hz实机</td>
+  <td>帧耗时分布、卡顿事件与Trace，不只平均FPS</td>
+</tr>
+<tr>
+  <td>行动安全</td>
+  <td>回归集中未经确认创建／修改／取消任务次数为0</td>
+  <td>报告样本与覆盖，不能宣传为数学保证</td>
+</tr>
+<tr>
+  <td>检索／问答质量</td>
+  <td>Recall@5≥85%为调优目标；引用ID／版本有效率100%；人工支持率目标≥95%</td>
+  <td>样本规模、困难样例、评分方法、模型／配置</td>
+</tr>
+<tr>
+  <td>可访问性</td>
+  <td>TalkBack完成记录与任务确认；200%字体不截主操作</td>
+  <td>实际路径、版本、录屏与失败记录</td>
+</tr>
+</tbody>
+</table>
+<p>这些来自原始设计书第15节，是目标，不是本轮测量值。冷启动、内存与耗电也要建立基线并报告回归，但本计划不编造原书中不存在的已定冷启动指标。[S02][R06]</p>
+<h3 id="section-50">10.5 每轮统一证据目录</h3>
+<p>建议由 Codex 创建独立批次目录，例如 <code>docs/evidence/&lt;日期&gt;-&lt;任务ID&gt;/</code>，路径需遵守仓库现有结构。日志不得包含真实密钥、私密正文或用户库。</p>
+<p>每轮至少记录：候选完整SHA、是否有未提交修改、APK实际路径／SHA-256／包名／versionCode／签名类型、执行命令与退出码、测试用例数／失败数／跳过数、设备／API／页面尺寸／刷新率／字体／IME／TalkBack、输入样本、截图或录屏、已知限制、下一阻塞项。</p>
+<p>“PASS”只用于实际执行成功；“FAIL”保留失败原件；“NOT RUN”说明未执行；“BLOCKED”必须说明所缺权限／依赖／环境和可继续推进的工作。禁止把 <code>NO-SOURCE</code>、零用例、只编译测试APK或只有脚本无异常写成测试通过。</p>
+<h2 id="section-51">11. 全面完成的定义</h2>
+<h3 id="section-52">11.1 前端完成门槛</h3>
+<p>三主页、核心二级页面和设置使用同一套原生主题／组件；最新原型认可的改进都已落地；无演示数据或假播放器进入真实路径；原有功能入口完整保全；正常／空／加载／失败／拒权／禁用／成功等状态可辨；中文大字与窄屏可用；对比、触区、TalkBack、键盘和返回流程有证据；背景可关闭／减少且性能可接受。</p>
+<p>“把三张首页变好看”不是前端全部完成。没有真机或必要辅助技术验证时，只能称原生实现与相应自动化完成，不能称整体体验验收完成。</p>
+<h3 id="section-53">11.2 产品与底层完成门槛</h3>
+<p>当前候选构建与测试通过；保存和附件可靠性达标；数据库迁移与原生加密执行有证据；新装恢复、删除传播、隐私与提醒关键路径闭合；原始 v0.1 承诺的模型／整理／检索问答等完成或由用户明确批准范围调整。任何依赖授权或能力条件的项都如实披露。</p>
+<h3 id="section-54">11.3 发布前仍需独立关口</h3>
+<p>本计划不授权发布、替换签名、自动安装SDK或接受协议、使用真实密钥、开启付费模型、迁移真实用户库、修改生产云服务。预览APK与正式发布资格分开；正式签名、素材许可、商店要求等保留人工审批，不用本计划充当许可文件。[S03]</p>
+<hr />
+<h2 id="section-55">12. 分批实施计划与依赖</h2>
+<p>G0–G7 是这次收口工作的执行批次，不替代原始 D00–D09 的里程碑定义。每批限制范围、标注对应 D 阶段；不要把全部工作塞进一次 Codex 任务，也不把原先已实现的阶段从零重做。</p>
+<table>
+<thead>
+<tr>
+  <th>批次</th>
+  <th>任务ID</th>
+  <th>主要交付</th>
+  <th>进入条件／退出门槛</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>G0 基线和阻塞</td>
+  <td>AUD-01、CORE-01</td>
+  <td>当前SHA、页面能力矩阵、最小构建修复、实际测试结果</td>
+  <td>只读盘点开始；原生修改合并前有可复查构建基线。设计分析可并行，不以环境受阻为由虚报绿色</td>
+</tr>
+<tr>
+  <td>G1 设计规范冻结</td>
+  <td>UX-01、UX-02、UX-03</td>
+  <td>最新图逐张核对、语义Token、全状态与返回契约</td>
+  <td>认可方向不变；原型修复项确认保留；新视觉建议与事实分开</td>
+</tr>
+<tr>
+  <td>G2 原生基础＋此刻</td>
+  <td>UI-01、UI-02</td>
+  <td>原生主题／玻璃回退、导航、记录纵向闭环</td>
+  <td>G0核心编译通过、G1明确；真实保存、查看、返回不回退</td>
+</tr>
+<tr>
+  <td>G3 回忆／待办／二级</td>
+  <td>UI-03、UI-04、UI-05、UI-06</td>
+  <td>搜索、筛选、确认、详情、附件、设置、备份等迁移</td>
+  <td>逐页真实数据与状态验收；入口保全表无静默缺失</td>
+</tr>
+<tr>
+  <td>G4 关键底层验收</td>
+  <td>CORE-02–CORE-05</td>
+  <td>保存／迁移、恢复／删除、隐私、提醒证据</td>
+  <td>在已授权合成数据环境；可与G2/G3分支并行，不能在假状态上验UI</td>
+</tr>
+<tr>
+  <td>G5 能力缺口补齐</td>
+  <td>CORE-06–CORE-08</td>
+  <td>媒体能力、OCR／ASR、模型闭环、回顾盘点与实现</td>
+  <td>不擅自联网；本地预览可先交付，完整v0.1需本批相应门槛或明确范围决策</td>
+</tr>
+<tr>
+  <td>G6 体验与设备矩阵</td>
+  <td>QA-01、QA-02、QA-03、UI-07</td>
+  <td>全主题／大字／窄屏／TalkBack／IME／性能／16KB、角色回退</td>
+  <td>依赖真实候选APK；无码测项不能关单；无正式角色素材则明确回退</td>
+</tr>
+<tr>
+  <td>G7 文档与交付收口</td>
+  <td>REL-01</td>
+  <td>需求证据矩阵、准确README、最终差异与产物清单</td>
+  <td>分别签收原生前端／本地预览／完整v0.1，不混用结论</td>
+</tr>
+</tbody>
+</table>
+<h3 id="section-56">12.1 优先级定义</h3>
+<p><strong>P0：</strong> 阻塞构建，可能丢数据／泄露／误执行，或阻塞核心记录／查找／确认流程。<br />
+<strong>P1：</strong> 完成原生体验、补齐既定 v0.1 能力、关闭设备与质量验收缺口。<br />
+<strong>P2：</strong> 不影响可靠性的精修、Figma同步、角色细节；不能挤占P0／P1资源。</p>
+<p>优先级不是“未启用能力可永久不做”。例如真实模型属于完整 v0.1 的范围门槛，但不应抢在数据可靠性与原生核心路径之前擅自启用。</p>
+<h3 id="section-57">12.2 每批交付的最小粒度</h3>
+<p>一个提交／PR聚焦一条纵向闭环或一组基础组件，包含相应测试与证据。建议首次只执行 G0：盘点＋构建最小修复，不顺手全面改 UI；第二次再执行 G1。后续按依赖推进，每次保留明确回退点。</p>
+<p>UI 修改涉及新数据库行为或权限策略时拆出底层任务，不将其混进视觉PR。失败项先记录并定位，不以删除用例、放宽校验、更新全部截图基线或大规模升级依赖掩盖。</p>
+<h2 id="section-58">13. Codex 操作规则与启动命令</h2>
+<p>先读根目录及作用目录的 <code>AGENTS.md</code>、原始两份设计书、<code>docs/BUILD.md</code>、当前计划及证据表。实际 checkout 若不等于本计划SHA，先输出差异并重新核对受影响结论，不执行会丢掉用户改动的 reset／clean。[S03]</p>
+<p>工作在开发分支；未经明确授权不直接写 <code>main</code>、不强推、不发布Release、不上传商店。保留 <code>.codex-attachments/</code>、<code>debug.log</code>、<code>output/</code> 等原有未跟踪内容；不读取或分发其中的秘密／私密资料。</p>
+<p>建议只读核对命令：</p>
+<pre><code class="language-bash">git status --short
+git rev-parse HEAD
+git log -5 --oneline
+git ls-files 'AGENTS.md' '**/AGENTS.md'
+git ls-files '*SelectedSourceQuestion*' '*SelectedSourceQuestions*'
+git grep -n 'allCitations' -- core app
+</code></pre>
+<p>构建入口使用项目已有 Wrapper／<code>scripts/gradle.sh</code>，遵守现有工具链和SDK许可检查，不临时下载升级。下列是原项目规定的核心检查，不保证所有环境都具备运行条件：[S03][S11]</p>
+<pre><code class="language-bash">scripts/gradle.sh :core:domain:test
+python3 scripts/verify-test-results.py
+python3 scripts/check-sdk.py
+scripts/gradle.sh :app:checkDebugAarMetadata
+scripts/gradle.sh :app:assembleDebug
+scripts/gradle.sh :app:lintDebug
+</code></pre>
+<p>执行前确认脚本在实际 checkout 中存在且适用；单独的 Compose JVM、截图、instrumentation 与设备命令从现有工作流发现，写出实际命令，不臆造 Gradle 任务。若标准运行失败，保存日志并做有界、可解释的修复；不删除未知锁、不结束未知进程、不自动接受SDK协议。</p>
+<p>涉及恢复、KVM、真实模型或收费服务时，检查既有明确授权；没有授权则做离线分析／Mock／普通单测并记录阻塞，不把“请完成前端”的请求解释为无限操作许可。</p>
+<h2 id="section-59">14. 每轮报告模板</h2>
+<pre><code class="language-text">任务ID／对应D阶段：
+起始SHA／交付SHA：
+本轮范围：
+实际修改文件：
+保留的既有功能与状态：
+新增或改变的用户行为：
+执行命令与结果：PASS / FAIL / NOT RUN / BLOCKED
+测试数／失败数／跳过数及XML路径：
+APK路径／SHA-256／包名／versionCode／签名类型：
+设备／API／字体／尺寸／刷新率／IME／TalkBack：
+截图／录屏／日志／复现样本：
+已确认解决的问题：
+仍未启用的能力：
+仍未验收的设备／场景：
+是否修改权限／依赖／数据库／授权边界：
+未提交／未推送／原有未跟踪项：
+最小剩余阻塞与下一批任务：
+</code></pre>
+<p>最终总结必须明确分别回答：“浏览器原型完成到哪里？”“原生APK完成到哪里？”“哪些底层已实际验收？”“哪些能力仍未启用？”“原始v0.1是否已达成？”不只输出“前端全面完善，测试全部通过”。</p>
+<hr />
+<h2 id="section-60">15. 来源与采用方式</h2>
+<p>所有仓库静态来源固定到审阅SHA；工作流查询是审阅时状态。后续应按新候选更新证据，不能永久沿用本表。</p>
+<h3 id="section-61">项目来源</h3>
+<ul>
+<li><strong>[S01] 当前 README</strong>：本地路径、预览范围、历史CI、未启用能力和D08缺口。<br />
+<a href="https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/README.md">https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/README.md</a></li>
+<li><strong>[S02] 原始产品主方案与产品架构Word</strong>：F01–F10、D00–D09、核心语义、验收目标；是规范而非实现证明。<br />
+<a href="https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/AIyou_Master_Plan.md">https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/AIyou_Master_Plan.md</a><br />
+<a href="https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/AIyou_Product_Architecture.docx">https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/AIyou_Product_Architecture.docx</a></li>
+<li><strong>[S03] AGENTS.md</strong>：分阶段、隐私、授权、构建与交付限制。<br />
+<a href="https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/AGENTS.md">https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/AGENTS.md</a></li>
+<li><strong>[S04] 当前提交与原型修改</strong>：已修复的按钮、编辑、筛选、排版与动态状态；仅原型实现。<br />
+<a href="https://github.com/T1doo/AIyou/commit/867f86ed3eef4452a1b61b5190820457fb48bc31">https://github.com/T1doo/AIyou/commit/867f86ed3eef4452a1b61b5190820457fb48bc31</a><br />
+<a href="https://github.com/T1doo/AIyou/tree/867f86ed3eef4452a1b61b5190820457fb48bc31/design/prototypes">https://github.com/T1doo/AIyou/tree/867f86ed3eef4452a1b61b5190820457fb48bc31/design/prototypes</a></li>
+<li><strong>[S05] 2026-11-05检查记录与七图目录</strong>：浏览器检查报告；本轮未重跑，不作为新版安卓验收。<br />
+<a href="https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/ui-review/2026-11-05/review.json">https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/ui-review/2026-11-05/review.json</a><br />
+<a href="https://github.com/T1doo/AIyou/tree/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/ui-review/2026-11-05">https://github.com/T1doo/AIyou/tree/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/ui-review/2026-11-05</a></li>
+<li><strong>[S06] 最近查询到的原生工作流与失败作业</strong>：<code>allCitations</code>未解析；精确失败版本不是当前HEAD。<br />
+<a href="https://github.com/T1doo/AIyou/actions/runs/41849164235">https://github.com/T1doo/AIyou/actions/runs/41849164235</a><br />
+<a href="https://github.com/T1doo/AIyou/actions/runs/41849164235/job/126640494796">https://github.com/T1doo/AIyou/actions/runs/41849164235/job/126640494796</a></li>
+<li><strong>[S07] 当前SHA工作流查询</strong>：审阅时返回0个运行；仅表示该查询没有记录。<br />
+<a href="https://api.github.com/repos/T1doo/AIyou/actions/runs?head_sha=867f86ed3eef4452a1b61b5190820457fb48bc31&amp;per_page=100">https://api.github.com/repos/T1doo/AIyou/actions/runs?head_sha=867f86ed3eef4452a1b61b5190820457fb48bc31&amp;per_page=100</a></li>
+<li><strong>[S08] 2026-11-04图包说明</strong>：区分A原型与B历史安卓截图、合成数据、截图尺寸和局限。<br />
+<a href="https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/ui-review/2026-11-04/README.md">https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/ui-review/2026-11-04/README.md</a></li>
+<li><strong>[S09] 早期Skyglass评审与Figma线索</strong>：Figma未完整收口、角色未批准；本轮Figma读取另受调用限额阻挡。<br />
+<a href="https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/design/prototypes/skyglass-review.json">https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/design/prototypes/skyglass-review.json</a><br />
+<a href="https://www.figma.com/design/TbjrVEh0GLxs97p6zZYTuO">https://www.figma.com/design/TbjrVEh0GLxs97p6zZYTuO</a></li>
+<li><strong>[S10] 原生入口与既有接线</strong>：前轮入口审阅及当前README支持存在多条业务路径；不构成全仓逐行运行审计。实际文件路径与调用关系由AUD-01在checkout重新定位。</li>
+<li><strong>[S11] 构建与测试说明</strong>：工具链、许可边界、执行命令；历史结果不能当作当前结果。<br />
+<a href="https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/BUILD.md">https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/BUILD.md</a><br />
+<a href="https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/TEST_PLAN.md">https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/TEST_PLAN.md</a></li>
+</ul>
+<h3 id="section-62">外部一手参考（本轮查阅：2026-11-05）</h3>
+<ul>
+<li><strong>[R01] Android：Accessibility API defaults</strong>。采用48dp交互目标、默认语义与自定义控件检查原则，不照搬视觉主题。<br />
+<a href="https://developer.android.com/develop/ui/compose/accessibility/api-defaults">https://developer.android.com/develop/ui/compose/accessibility/api-defaults</a></li>
+<li><strong>[R02] Android：Window insets in Compose</strong>。采用安全区／IME Insets与消费规则；具体效果仍需设备验证。<br />
+<a href="https://developer.android.com/develop/ui/compose/system/insets-ui">https://developer.android.com/develop/ui/compose/system/insets-ui</a></li>
+<li><strong>[R03] Android：Customize an image／Blur</strong>。核实Compose blur的平台限制；不把节点模糊误当全版本背景采样。<br />
+<a href="https://developer.android.com/develop/ui/compose/graphics/images/customize">https://developer.android.com/develop/ui/compose/graphics/images/customize</a></li>
+<li><strong>[R04] W3C：Understanding Contrast (Minimum)</strong>。采用文字对比基线，并在景观合成画面上检查。<br />
+<a href="https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html">https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html</a></li>
+<li><strong>[R05] W3C：Understanding Non-text Contrast</strong>。采用必要控件／状态的非文字对比规则，不要求所有装饰线同样醒目。<br />
+<a href="https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html">https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html</a></li>
+<li><strong>[R06] Android：Macrobenchmark overview</strong>。采用实际启动／滚动／交互测量与Trace证据，不据静态图判断流畅度。<br />
+<a href="https://developer.android.com/topic/performance/benchmarking/macrobenchmark-overview">https://developer.android.com/topic/performance/benchmarking/macrobenchmark-overview</a></li>
+<li><strong>[R07] Android：Support 16 KB page sizes</strong>。区分静态打包检查与真实环境执行，不将构建通过当作兼容验收。<br />
+<a href="https://developer.android.com/guide/practices/page-sizes">https://developer.android.com/guide/practices/page-sizes</a></li>
+</ul>
+<p><strong>本计划完成的是证据整理与执行规划。计划中的任务、设计数值、测试组合和文件组织建议均须在后续执行中验证；未执行的项仍是未执行。</strong></p>
+</main></div><footer>同包 Markdown 为 Codex 执行文本。所有未执行项保持未执行，不继承旧版测试结论。</footer></body></html>

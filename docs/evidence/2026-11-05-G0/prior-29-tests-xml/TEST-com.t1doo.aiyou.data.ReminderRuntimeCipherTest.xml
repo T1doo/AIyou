@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.data.ReminderRuntimeCipherTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-05T07:20:35.137Z" hostname="LAPTOP-USISIS19" time="0.413">
+  <properties/>
+  <testcase name="independentFrozenV1ThroughV5CellsReadWithoutRewritingAndV4ConfirmationStillReplays" classname="com.t1doo.aiyou.data.ReminderRuntimeCipherTest" time="0.167"/>
+  <testcase name="crossKeyPortableRestoreClearsAllRuntimeAndUserExecutionReceipts" classname="com.t1doo.aiyou.data.ReminderRuntimeCipherTest" time="0.027"/>
+  <testcase name="impossibleChildVersionsAndHistoricalCausesCannotBeAuthenticatedAsValidRuntimeState" classname="com.t1doo.aiyou.data.ReminderRuntimeCipherTest" time="0.003"/>
+  <testcase name="independentR1DigestsAndR2IdsBindTheirFrozenNamespacesAndFieldOrder" classname="com.t1doo.aiyou.data.ReminderRuntimeCipherTest" time="0.002"/>
+  <testcase name="authenticatedV6ReaderRejectsEofOversizeInvalidCountsReferencesAndMalformedUtf8" classname="com.t1doo.aiyou.data.ReminderRuntimeCipherTest" time="0.029"/>
+  <testcase name="actualMaximumWriterReaderWithFourSlotsAndThirtyTwoCommandsStillAllowsSqlCompletion" classname="com.t1doo.aiyou.data.ReminderRuntimeCipherTest" time="0.18"/>
+  <testcase name="sameRuntimeIdentityCannotChangeAnyPersistentInputEvenWithoutAStoredSlot" classname="com.t1doo.aiyou.data.ReminderRuntimeCipherTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

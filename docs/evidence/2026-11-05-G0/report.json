@@ -1,0 +1,136 @@
+{
+  "batch": "G0",
+  "tasks": [
+    "AUD-01",
+    "CORE-01"
+  ],
+  "milestones": [
+    "D00 baseline",
+    "D07 task codec regression"
+  ],
+  "baseline_sha": "867f86ed3eef4452a1b61b5190820457fb48bc31",
+  "branch": "codex/g0-native-baseline-20261105",
+  "product_source_changed": false,
+  "plan_package": "docs/plans/AIyou-Codex-Plan-20261105",
+  "package_checksums": "PASS all five manifest entries; originals preserved",
+  "audit_status": "Static inventory completed; nested interactions and device acceptance remain unverified",
+  "build_status": "PASS local required checks; not full CI acceptance",
+  "ci_correction": {
+    "run": 41849164235,
+    "job": 126640494796,
+    "sha": "3f3c7c8cf0ea5f2c9116730b2a85948daec924c1",
+    "actual_failure": "1559 tests, two failures: v7 expected IllegalArgumentException but actual AEADBadTagException",
+    "allCitations": "Absent in tracked current source and fetched job log; do not patch a nonexistent symbol",
+    "baseline_runs": 0
+  },
+  "changes": [
+    "Allow AIYOU_PYTHON override in mandatory input capture and SQLite test bridge; default remains python3",
+    "Assert precise AEAD rejection of tampered supported v7; additionally reject unknown formats 0,8,127; no production decoder change"
+  ],
+  "commands": [
+    {
+      "command": "scripts/check-sdk.py",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "command": "gradlew.bat --no-daemon --offline :app:checkDebugAarMetadata :app:assembleDebug :core:domain:test :app:lintDebug --console=plain",
+      "status": "PASS",
+      "exit": 0,
+      "note": "Incremental build, domain initially UP-TO-DATE; fresh domain run below"
+    },
+    {
+      "command": "gradlew.bat --no-daemon --offline -p checks/ai-protocol :core:domain:test --rerun :remote-text:test --tests *ManualTaskDateSqlTest --tests *ReminderRuntimeCipherTest --tests *TaskUserReceiptSqlTest --console=plain",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "command": "scripts/verify-test-results.py",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "command": "Additional TaskUndoFullBackupTest",
+      "status": "FAIL",
+      "exit": 1,
+      "note": "Windows FileChannel.open(directory) AccessDeniedException in syncDirectory during capture, before restore; keep production fsync requirement"
+    }
+  ],
+  "domain": {
+    "tests": 78,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "targeted_protocol": {
+    "tests": 28,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "prior_extended_run": {
+    "tests": 29,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 0,
+    "hints": 1
+  },
+  "apk": {
+    "path": "E:\\Github\\AIyou\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "sha256": "8b5b780a16db9474c0915704a93bd8d16818e43de8d3cebbf80987cd66234f74",
+    "package": "com.t1doo.aiyou",
+    "versionCode": 2,
+    "versionName": "0.0.4-d02-ui",
+    "variant": "debug",
+    "build": "incremental unchanged native product sources",
+    "internet_permission": false
+  },
+  "toolchain": {
+    "jdk": "D:/AndroidDev/jdk-17",
+    "sdk": "D:/AndroidDev/sdk",
+    "gradle_home": "D:/AndroidDev/gradle-home",
+    "temp": "D:/AndroidDev/temp",
+    "new_sdk_installs": false
+  },
+  "visual_review": {
+    "viewed": [
+      "appearance.png",
+      "filters.png",
+      "now-blue.png",
+      "now-night.png",
+      "now-sunset.png",
+      "record-editor.png",
+      "task-editor.png"
+    ],
+    "finding": "Three landscape themes, differentiated glass, compact task panel and completion-action hierarchy observed; Lulu placeholder; static prototype only",
+    "device_acceptance": false
+  },
+  "capabilities": {
+    "model": "Network send disabled in current APK; production ports exist",
+    "ocr": "UnavailableImageTextRecognizer is default",
+    "asr": "Automatic ASR not enabled; manual transcript is distinct",
+    "backup": "RecordsDatabase v17; logical backup v8-v16 depending on content; audio included since v9; 256 entries and 256 combined media, combined media <=64 MiB enforced",
+    "recap": "Local day/week source browsing; not AI summary"
+  },
+  "not_run": [
+    "Full protocol suite on current candidate",
+    "New Compose Preview/render run",
+    "New emulator/device execution",
+    "Chinese IME, TalkBack, OEM delivery, 16KB runtime, performance",
+    "New-install recovery; no user data accessed"
+  ],
+  "blockers": [
+    "Cross-key full-backup execution needs compatible directory fsync environment (Linux/Android); no persistence check bypass",
+    "Current candidate full CI pending after push; historical results not inherited"
+  ],
+  "next_batch": "G1 UX-01/02/03 only: compare old home/narrow screenshots, freeze native semantic tokens, states/return contracts and migration parity; no broad UI/data rewrite",
+  "untouched_untracked": [
+    ".codex-attachments/",
+    "debug.log",
+    "output/"
+  ]
+}

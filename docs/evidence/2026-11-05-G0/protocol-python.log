@@ -1,0 +1,97 @@
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :remote-text:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :remote-text:syncProduction UP-TO-DATE
+> Task :core:ai:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:domain:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:model:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:model:compileKotlin UP-TO-DATE
+> Task :core:model:compileJava NO-SOURCE
+> Task :core:model:processResources NO-SOURCE
+> Task :core:model:classes UP-TO-DATE
+> Task :core:model:jar UP-TO-DATE
+> Task :core:domain:compileKotlin UP-TO-DATE
+> Task :core:domain:compileJava NO-SOURCE
+> Task :core:domain:processResources NO-SOURCE
+> Task :core:domain:classes UP-TO-DATE
+> Task :core:domain:jar UP-TO-DATE
+> Task :core:ai:compileKotlin UP-TO-DATE
+> Task :core:ai:compileJava NO-SOURCE
+> Task :core:ai:processResources NO-SOURCE
+> Task :core:ai:classes UP-TO-DATE
+> Task :core:ai:jar UP-TO-DATE
+> Task :remote-text:compileKotlin UP-TO-DATE
+> Task :remote-text:compileJava NO-SOURCE
+> Task :remote-text:processResources NO-SOURCE
+> Task :remote-text:classes UP-TO-DATE
+> Task :remote-text:jar UP-TO-DATE
+> Task :remote-text:syncVmProduction UP-TO-DATE
+> Task :remote-text:compileTestKotlin UP-TO-DATE
+> Task :remote-text:compileTestJava NO-SOURCE
+> Task :remote-text:processTestResources UP-TO-DATE
+> Task :remote-text:testClasses UP-TO-DATE
+
+> Task :remote-text:test
+
+ManualTaskDateSqlTest > setModifyPostponeClearAndStatusKeepExactReceiptsAndMonotoneAudit FAILED
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+    java.lang.IllegalStateException at ManualTaskDateSqlTest.kt:93
+
+ManualTaskDateSqlTest > independentScheduleAndTerminalCasHaveOnlyOneWinnerAndNeverReopen FAILED
+    java.lang.IllegalStateException at ManualTaskDateSqlTest.kt:144
+
+ManualTaskDateSqlTest > sameMutationWithChangedDateOperationOrTimestampCannotReplay FAILED
+    java.lang.IllegalStateException at ManualTaskDateSqlTest.kt:110
+
+ManualTaskDateSqlTest > authenticatedTrailingBytesRemainRejectedForBothWireVersions FAILED
+    java.lang.IllegalStateException at ManualTaskDateSqlTest.kt:42
+
+ManualTaskDateSqlTest > actualSqlAbortAndLostCommitAckPreserveAtomicityAndOneStableVersion FAILED
+    java.lang.IllegalStateException at ManualTaskDateSqlTest.kt:132
+
+ManualTaskDateSqlTest > postponementIsStrictlyLaterAndCannotSilentlyChangePrecisionOrZone FAILED
+    java.lang.IllegalStateException at ManualTaskDateSqlTest.kt:123
+
+ManualTaskDateSqlTest > explicitDstOverlapChoicesHaveDifferentAuthenticatedOffsetsAcrossReopen FAILED
+    java.lang.IllegalStateException at ManualTaskDateSqlTest.kt:84
+
+ManualTaskDateSqlTest > explicitDateOnlyAndTimedCreationKeepPrecisionZoneAndColdReopen FAILED
+    java.lang.IllegalStateException at ManualTaskDateSqlTest.kt:63
+
+ManualTaskDateSqlTest > frozenIndependentV1BytesReadWithoutRewriteThenExplicitlyUpgrade FAILED
+    java.lang.IllegalStateException at ManualTaskDateSqlTest.kt:21
+
+ReminderRuntimeCipherTest > independentFrozenV1ThroughV5CellsReadWithoutRewritingAndV4ConfirmationStillReplays FAILED
+    java.lang.IllegalStateException at ReminderRuntimeCipherTest.kt:13
+
+ReminderRuntimeCipherTest > authenticatedV6ReaderRejectsEofOversizeInvalidCountsReferencesAndMalformedUtf8 FAILED
+    java.lang.AssertionError at ReminderRuntimeCipherTest.kt:116
+        Caused by: javax.crypto.AEADBadTagException at ReminderRuntimeCipherTest.kt:116
+
+ReminderRuntimeCipherTest > actualMaximumWriterReaderWithFourSlotsAndThirtyTwoCommandsStillAllowsSqlCompletion FAILED
+    java.lang.IllegalStateException at ReminderRuntimeCipherTest.kt:72
+
+18 tests completed, 12 failed
+
+> Task :remote-text:test FAILED
+
+[Incubating] Problems report is available at: file:///E:/Github/AIyou/checks/ai-protocol/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':remote-text:test'.
+> There were failing tests. See the report at: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/build/reports/tests/test/index.html
+
+* Try:
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+13 actionable tasks: 1 executed, 12 up-to-date
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+
+BUILD FAILED in 14s

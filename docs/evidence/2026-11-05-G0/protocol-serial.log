@@ -1,0 +1,140 @@
+Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=D:\AndroidDev\temp
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :remote-text:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :remote-text:syncProduction UP-TO-DATE
+> Task :core:ai:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:domain:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:model:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:model:compileKotlin UP-TO-DATE
+> Task :core:model:compileJava NO-SOURCE
+> Task :core:model:processResources NO-SOURCE
+> Task :core:model:classes UP-TO-DATE
+> Task :core:model:jar
+> Task :core:domain:processResources NO-SOURCE
+> Task :core:ai:processResources NO-SOURCE
+> Task :remote-text:processResources NO-SOURCE
+> Task :remote-text:syncVmProduction UP-TO-DATE
+> Task :remote-text:processTestResources UP-TO-DATE
+> Task :core:domain:compileKotlin
+> Task :core:domain:compileJava NO-SOURCE
+> Task :core:domain:classes UP-TO-DATE
+> Task :core:domain:jar
+> Task :core:ai:compileKotlin
+> Task :core:ai:compileJava NO-SOURCE
+> Task :core:ai:classes UP-TO-DATE
+> Task :core:ai:jar
+
+> Task :remote-text:compileKotlin
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/build/production-sources/EncryptedAttachmentStore.kt:58:39 This class is not recommended for use in Kotlin. Use 'kotlin.Any' instead.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/build/production-sources/EncryptedOriginalEditStore.kt:47:39 This class is not recommended for use in Kotlin. Use 'kotlin.Any' instead.
+
+> Task :remote-text:compileJava NO-SOURCE
+> Task :remote-text:classes UP-TO-DATE
+> Task :remote-text:jar
+> Task :remote-text:compileTestKotlin
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/build/vm-production-test-sources/ManualPeopleController.kt:178:66 Unnecessary safe call on a non-null receiver of type 'ManualPeopleEditor'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/build/vm-production-test-sources/ManualTagController.kt:96:60 Unnecessary safe call on a non-null receiver of type 'ManualTagEditor'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/build/vm-production-test-sources/RecordEventDateController.kt:127:24 Unnecessary safe call on a non-null receiver of type 'RecordEventDatePreview'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/build/vm-production-test-sources/RecordEventDateController.kt:134:77 Unnecessary safe call on a non-null receiver of type 'RecordEventDateEditor'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/build/vm-production-test-sources/RecordEventDateController.kt:137:53 Unnecessary safe call on a non-null receiver of type 'RecordEventDateEditor'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/build/vm-production-test-sources/RecordEventDateController.kt:216:81 Unnecessary safe call on a non-null receiver of type 'RecordEventDateEditor'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/build/vm-production-test-sources/ReminderProcessOwner.kt:60:9 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/build/vm-production-test-sources/SourceFactController.kt:271:59 The corresponding parameter in the supertype 'FactNavigationProof' is named 'location'. This may cause problems when calling this function with named arguments.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/AudioFilterSqlTest.kt:23:61 Unnecessary non-null assertion (!!) on a non-null receiver of type 'LocalSearchSnapshot'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ChatHistoryControllerTest.kt:136:64 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ChatHistoryJump'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/LocalProcessingSqlTest.kt:21:45 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/LocalProcessingSqlTest.kt:29:45 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ManualAliasSqlTest.kt:74:62 Unnecessary non-null assertion (!!) on a non-null receiver of type 'LocalSearchSnapshot'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ManualTagRecallSqlTest.kt:54:61 Unnecessary non-null assertion (!!) on a non-null receiver of type 'LocalSearchSnapshot'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ManualTagRecallSqlTest.kt:63:57 Unnecessary non-null assertion (!!) on a non-null receiver of type 'LocalSearchSnapshot'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ManualTaskDateSqlTest.kt:151:113 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ManualTaskDateSqlTest.kt:152:78 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ManualTaskRenameSqlTest.kt:125:77 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ManualTaskRenameSqlTest.kt:130:24 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/PermanentErasureFixture.kt:18:5 'lateinit' is unnecessary: definitely initialized in constructors.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/PythonSqliteDatabase.kt:51:49 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/RecordEventDateSqlTest.kt:185:5 'lateinit' is unnecessary: definitely initialized in constructors.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ReminderRuntimeGateTest.kt:208:76 The corresponding parameter in the supertype 'ReminderRuntimeRepository' is named 'authority'. This may cause problems when calling this function with named arguments.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ReminderRuntimeGateTest.kt:214:87 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ReminderResultRequest'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ReminderRuntimeGateTest.kt:214:99 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ReminderResultAuthority'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ReminderRuntimeSqlTest.kt:51:78 The corresponding parameter in the supertype 'ReminderRuntimeRepository' is named 'authority'. This may cause problems when calling this function with named arguments.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ReminderRuntimeSqlTest.kt:61:115 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ReminderResultRequest'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ReminderRuntimeSqlTest.kt:61:128 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ReminderResultAuthority'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ReminderRuntimeSqlTest.kt:64:67 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ReminderResultRequest'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ReminderRuntimeSqlTest.kt:64:100 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ReminderResultRequest'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/SelectedQuestionAuthorizationTest.kt:276:36 The corresponding parameter in the supertype 'SelectedQuestionAuthorizationRepository' is named 'permit'. This may cause problems when calling this function with named arguments.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/SelectedQuestionAuthorizationTest.kt:278:33 The corresponding parameter in the supertype 'SelectedQuestionAuthorizationRepository' is named 'permit'. This may cause problems when calling this function with named arguments.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/SourceMemorySqlTest.kt:60:70 Unnecessary non-null assertion (!!) on a non-null receiver of type 'SourceMemoryCreate'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/SourceMemorySqlTest.kt:60:114 Unnecessary non-null assertion (!!) on a non-null receiver of type 'SourceMemoryCreate'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/SourceMemorySqlTest.kt:63:103 Unnecessary non-null assertion (!!) on a non-null receiver of type 'SourceMemoryCreate'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/TaskReminderSqlTest.kt:228:43 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/TaskReminderSqlTest.kt:228:96 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/TaskReminderSqlTest.kt:229:87 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/TaskReminderSqlTest.kt:230:84 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/AudioTranscriptViewModelTest.kt:74:135 Unnecessary non-null assertion (!!) on a non-null receiver of type 'AudioTranscriptSnapshot'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/AudioTranscriptViewModelTest.kt:83:114 Unnecessary safe call on a non-null receiver of type 'UnifiedKeywordUi'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/AudioTranscriptViewModelTest.kt:130:32 The corresponding parameter in the supertype 'OriginalAudioOutput' is named 'samples'. This may cause problems when calling this function with named arguments.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/AudioTranscriptViewModelTest.kt:147:118 Unnecessary safe call on a non-null receiver of type 'UnifiedKeywordUi'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/AudioTranscriptViewModelTest.kt:186:95 Unnecessary non-null assertion (!!) on a non-null receiver of type 'AudioTranscriptSnapshot'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/AudioTranscriptViewModelTest.kt:221:50 Unnecessary non-null assertion (!!) on a non-null receiver of type 'UnifiedKeywordHandoff'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/FullBackupControllerTest.kt:205:66 Unnecessary non-null assertion (!!) on a non-null receiver of type 'FullBackupSummary'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/FullBackupControllerTest.kt:205:96 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/LocalIndexedSearchControllerTest.kt:264:9 This class or interface requires opt-in to be implemented: Inheriting from this kotlinx.coroutines API is unstable. Either new methods may be added in the future, which would break the inheritance, or correctly inheriting from it requires fulfilling contracts that may change in the future.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/LocalRecordsAiContractTest.kt:99:115 Unnecessary non-null assertion (!!) on a non-null receiver of type 'StoredTextAnnotation'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/LocalRecordsAiContractTest.kt:101:121 Unnecessary non-null assertion (!!) on a non-null receiver of type 'StoredTextAnnotation'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/LocalRecordsAiContractTest.kt:240:87 Unnecessary non-null assertion (!!) on a non-null receiver of type 'StoredTextAnnotation'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/LocalRecordsAiContractTest.kt:266:42 Unnecessary non-null assertion (!!) on a non-null receiver of type 'RecordAiUiState'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/LocalRecordsAiContractTest.kt:267:42 Unnecessary non-null assertion (!!) on a non-null receiver of type 'RecordAiUiState'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/LocalRecordsAiContractTest.kt:401:57 Unnecessary non-null assertion (!!) on a non-null receiver of type 'RecordAiUiState'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/ProductionRecordAiWiringTest.kt:44:48 Unnecessary non-null assertion (!!) on a non-null receiver of type 'StoredTextAnnotation'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/RecapAudioSourceTest.kt:18:75 Unnecessary non-null assertion (!!) on a non-null receiver of type 'AudioTranscriptSource'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/RecapAudioSourceTest.kt:19:44 Unnecessary non-null assertion (!!) on a non-null receiver of type 'AudioTranscriptSource'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/RecordEventDateControllerTest.kt:203:129 Unnecessary safe call on a non-null receiver of type 'RecordEventDateEditor'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/RecordEventDateControllerTest.kt:214:74 Unnecessary non-null assertion (!!) on a non-null receiver of type 'RecordEventDateEditor'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/RecordEventDateControllerTest.kt:215:74 Unnecessary non-null assertion (!!) on a non-null receiver of type 'RecordEventDateEditor'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/RecordEventDateControllerTest.kt:216:58 Unnecessary non-null assertion (!!) on a non-null receiver of type 'RecordEventDateEditor'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/RecordEventDateIntegrationControllerTest.kt:131:115 Unnecessary safe call on a non-null receiver of type 'RecordEventDateEditor'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/RecordEventDateIntegrationControllerTest.kt:141:115 Unnecessary safe call on a non-null receiver of type 'RecordEventDateEditor'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceFactControllerTest.kt:94:106 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceFactControllerTest.kt:103:24 Unnecessary non-null assertion (!!) on a non-null receiver of type 'UnifiedKeywordHandoff'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceFactControllerTest.kt:103:51 Unnecessary non-null assertion (!!) on a non-null receiver of type 'UnifiedKeywordHandoff'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceFactControllerTest.kt:105:88 Unnecessary non-null assertion (!!) on a non-null receiver of type 'OriginalReadingLocation'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceFactControllerTest.kt:130:118 Expression is unused.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceFactControllerTest.kt:165:48 Unnecessary non-null assertion (!!) on a non-null receiver of type 'OriginalReadingLocation'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceFactControllerTest.kt:165:104 Unnecessary non-null assertion (!!) on a non-null receiver of type 'OriginalReadingLocation'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceFactControllerTest.kt:183:41 Unnecessary non-null assertion (!!) on a non-null receiver of type 'UnifiedKeywordHandoff'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceFactControllerTest.kt:183:70 Unnecessary non-null assertion (!!) on a non-null receiver of type 'OriginalReadingLocation'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceFactControllerTest.kt:188:63 Unnecessary non-null assertion (!!) on a non-null receiver of type 'UnifiedKeywordHandoff'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceFactControllerTest.kt:188:94 Unnecessary non-null assertion (!!) on a non-null receiver of type 'OriginalReadingLocation'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceFactControllerTest.kt:195:58 Unnecessary non-null assertion (!!) on a non-null receiver of type 'UnifiedKeywordHandoff'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceFactControllerTest.kt:195:93 Unnecessary non-null assertion (!!) on a non-null receiver of type 'OriginalReadingLocation'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/SourceMemoryInboxControllerTest.kt:49:70 Unnecessary non-null assertion (!!) on a non-null receiver of type 'SourceMemoryInboxSnapshot'.
+w: file:///E:/Github/AIyou/checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/UnifiedKeywordViewModelTest.kt:636:49 Unnecessary non-null assertion (!!) on a non-null receiver of type 'UnifiedTagPage'.
+
+> Task :remote-text:compileTestJava NO-SOURCE
+> Task :remote-text:testClasses UP-TO-DATE
+> Task :remote-text:test FAILED
+
+[Incubating] Problems report is available at: file:///E:/Github/AIyou/checks/ai-protocol/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':remote-text:test' (registered by plugin 'org.gradle.jvm-test-suite').
+> Cannot capture contract-test inputs
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 2m 56s
+13 actionable tasks: 9 executed, 4 up-to-date

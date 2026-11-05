@@ -1,0 +1,2 @@
+# Keep the supplied package bytes stable for manifest verification on Windows.
+* -text

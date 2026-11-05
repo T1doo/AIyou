@@ -1,0 +1,15 @@
+2026-11-04T14:37:40.4022873Z > Task :core:model:compileKotlin
+2026-11-04T14:37:47.2027806Z > Task :core:domain:compileKotlin
+2026-11-04T14:40:05.8736157Z > Task :core:model:compileKotlin
+2026-11-04T14:40:12.7747884Z > Task :core:domain:compileKotlin
+2026-11-04T14:40:19.2739998Z > Task :core:ai:compileKotlin
+2026-11-04T14:40:46.6770768Z > Task :remote-text:compileKotlin
+2026-11-04T14:44:36.1737184Z ManualTaskDateSqlTest > authenticatedTrailingBytesRemainRejectedForBothWireVersions FAILED
+2026-11-04T14:44:36.1738753Z     java.lang.AssertionError at ManualTaskDateSqlTest.kt:56
+2026-11-04T14:44:36.1740138Z         Caused by: javax.crypto.AEADBadTagException at ManualTaskDateSqlTest.kt:56
+2026-11-04T14:46:17.7742197Z ReminderRuntimeCipherTest > authenticatedV6ReaderRejectsEofOversizeInvalidCountsReferencesAndMalformedUtf8 FAILED
+2026-11-04T14:46:17.7743884Z     java.lang.AssertionError at ReminderRuntimeCipherTest.kt:116
+2026-11-04T14:46:17.7745105Z         Caused by: javax.crypto.AEADBadTagException at ReminderRuntimeCipherTest.kt:116
+2026-11-04T14:49:25.0917696Z 1559 tests completed, 2 failed
+2026-11-04T14:49:25.3767928Z > Task :remote-text:test FAILED
+2026-11-04T14:49:25.4058400Z BUILD FAILED in 10m 1s

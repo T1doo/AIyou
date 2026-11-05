@@ -1,0 +1,452 @@
+{
+  "source_sha": "867f86ed3eef4452a1b61b5190820457fb48bc31",
+  "scope": "Static entry and test index, not runtime acceptance; nested routes require follow-up trace",
+  "groups": [
+    {
+      "requirement": "F01",
+      "entry": "此刻／混合输入",
+      "screen": "MixedCaptureScreen",
+      "controller": "MixedCaptureController",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/records/MixedCaptureController.kt",
+        "app/src/main/java/com/t1doo/aiyou/records/MixedCaptureScreen.kt"
+      ],
+      "main_activity_call_lines": [
+        1480
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/MixedCapturePresentationTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/MixedCaptureSqlTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/MixedCaptureControllerTest.kt"
+      ],
+      "states_to_preserve": "保存中、失败保留草稿、附件待完成",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F02",
+      "entry": "回忆列表／搜索",
+      "screen": "LocalRecordsScreen",
+      "controller": "LocalOriginalSearchController",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchController.kt",
+        "app/src/main/java/com/t1doo/aiyou/records/LocalRecordsScreen.kt"
+      ],
+      "main_activity_call_lines": [
+        1490
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/LocalOriginalSearchPresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/LocalRecordsPresentationTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/LocalRecordsAiContractTest.kt",
+        "checks/record-queue/src/test/kotlin/com/t1doo/aiyou/records/LocalOriginalSearchTest.kt"
+      ],
+      "states_to_preserve": "加载、空结果、条件与滚动恢复",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F02",
+      "entry": "原文详情",
+      "screen": "OriginalReadingScreen",
+      "controller": "LocalRecordsViewModel",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/records/LocalRecordsViewModel.kt",
+        "app/src/main/java/com/t1doo/aiyou/records/OriginalReadingScreen.kt"
+      ],
+      "main_activity_call_lines": [
+        1372
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/LocalRecordsPresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/OriginalReadingPresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/OriginalReadingPriorityPresentationTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/LocalRecordsAiContractTest.kt"
+      ],
+      "states_to_preserve": "来源版本变化、撤权、删除",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F02",
+      "entry": "编辑／历史",
+      "screen": "OriginalEditScreen",
+      "controller": "LocalRecordsViewModel",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/records/LocalRecordsViewModel.kt",
+        "app/src/main/java/com/t1doo/aiyou/records/OriginalEditScreen.kt"
+      ],
+      "main_activity_call_lines": [
+        1370
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/LocalRecordsPresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/OriginalEditPresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/OriginalEditRecoveryPresentationTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/AiNoneOriginalEditTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/LocalRecordsAiContractTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/RestoredOriginalEditViewModelTest.kt",
+        "checks/record-queue/src/test/kotlin/OriginalEditIndexIsolationTest.kt",
+        "checks/record-queue/src/test/kotlin/OriginalEditQueueTest.kt",
+        "checks/record-queue/src/test/kotlin/OriginalEditRecoveryTest.kt",
+        "checks/record-queue/src/test/kotlin/OriginalEditStorageTest.kt",
+        "core/data/src/androidTest/kotlin/com/t1doo/aiyou/data/OriginalEditRecordsIntegrationTest.kt"
+      ],
+      "states_to_preserve": "未提交草稿、版本冲突、返回",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F02",
+      "entry": "历史版本",
+      "screen": "OriginalHistoryScreen",
+      "controller": "LocalRecordsViewModel",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/records/LocalRecordsViewModel.kt",
+        "app/src/main/java/com/t1doo/aiyou/records/OriginalHistoryScreen.kt"
+      ],
+      "main_activity_call_lines": [
+        1366
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/LocalRecordsPresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/OriginalHistoryPresentationTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/LocalRecordsAiContractTest.kt",
+        "checks/record-queue/src/test/kotlin/OriginalHistoryQueueTest.kt"
+      ],
+      "states_to_preserve": "旧版本与当前版本分离",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F01",
+      "entry": "图片／原音／人工转写",
+      "screen": "LocalAttachmentScreen",
+      "controller": "LocalAttachmentController",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/records/LocalAttachmentController.kt",
+        "app/src/main/java/com/t1doo/aiyou/records/LocalAttachmentScreen.kt"
+      ],
+      "main_activity_call_lines": [
+        1355
+      ],
+      "test_candidates": [],
+      "states_to_preserve": "拒权、损坏、播放停止、人工纠正",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F06",
+      "entry": "待办／待确认／提醒",
+      "screen": "ManualTasksScreen",
+      "controller": "ManualTaskController",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/records/ManualTaskController.kt",
+        "app/src/main/java/com/t1doo/aiyou/records/ManualTasksScreen.kt"
+      ],
+      "main_activity_call_lines": [
+        1445
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/ManualTaskPresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/ManualTaskTitlePresentationTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ManualTaskDateSqlTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ManualTaskRenameSqlTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/ManualTaskSqlTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/ManualTaskTitleControllerTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/ManualTaskViewModelTest.kt",
+        "core/data/src/androidTest/kotlin/com/t1doo/aiyou/data/ManualTaskRecordsIntegrationTest.kt"
+      ],
+      "states_to_preserve": "提交、撤销、权限受限、调度不等于送达",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F08",
+      "entry": "导出／记录包／备份恢复",
+      "screen": "RecordPackageScreen",
+      "controller": "RecordPackageController",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/records/RecordPackageController.kt",
+        "app/src/main/java/com/t1doo/aiyou/records/RecordPackageScreen.kt"
+      ],
+      "main_activity_call_lines": [
+        1346
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/RecordPackageActivityPresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/RecordPackageDocumentTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/RecordPackagePickerTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/RecordPackagePresentationTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/RecordPackageActivitiesTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/RecordPackageCipherTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/RecordPackageSqlTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/RecordPackageControllerTest.kt"
+      ],
+      "states_to_preserve": "选择文件、取消、损坏、恢复准入",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F08",
+      "entry": "回收站",
+      "screen": "RecycleBinScreen",
+      "controller": "RecycleBinController",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/records/RecycleBinController.kt",
+        "app/src/main/java/com/t1doo/aiyou/records/RecycleBinScreen.kt"
+      ],
+      "main_activity_call_lines": [
+        1348
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/RecycleBinPresentationTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/RecycleBinSqlTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/RecycleBinControllerTest.kt"
+      ],
+      "states_to_preserve": "删除、恢复、永久删除确认",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F09",
+      "entry": "本地日周回顾",
+      "screen": "FactRecapScreen",
+      "controller": "FactRecapController",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/records/FactRecapController.kt",
+        "app/src/main/java/com/t1doo/aiyou/records/FactRecapScreen.kt"
+      ],
+      "main_activity_call_lines": [
+        1409
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/FactRecapPresentationTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/FactRecapSqlTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/FactRecapControllerTest.kt",
+        "core/domain/src/test/kotlin/com/t1doo/aiyou/domain/FactRecapRangeTest.kt"
+      ],
+      "states_to_preserve": "日期时区、来源失效、返回",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F07",
+      "entry": "设置／访问锁",
+      "screen": "SettingsScreen",
+      "controller": "AppAccessController",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/ui/AppAccessController.kt",
+        "app/src/main/java/com/t1doo/aiyou/ui/SettingsScreen.kt"
+      ],
+      "main_activity_call_lines": [
+        1322
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/AppAccessPreferenceTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/AppAccessPresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/AppAccessStartupPresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/CompanionSettingsPresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/ModelConnectionSettingsPresentationTest.kt",
+        "checks/record-queue/src/test/kotlin/AppAccessRecordsBoundaryTest.kt",
+        "checks/record-queue/src/test/kotlin/com/t1doo/aiyou/ui/AppAccessControllerTest.kt",
+        "checks/record-queue/src/test/kotlin/com/t1doo/aiyou/ui/AppAccessPreferenceOperationTest.kt",
+        "checks/record-queue/src/test/kotlin/com/t1doo/aiyou/ui/AppAccessPreferenceOwnerTest.kt",
+        "checks/record-queue/src/test/kotlin/com/t1doo/aiyou/ui/AppAccessRetirementBarrierTest.kt"
+      ],
+      "states_to_preserve": "锁定、授权变化、加载失败",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F03",
+      "entry": "模型连接设置",
+      "screen": "ModelConnectionSettings",
+      "controller": "ModelConnectionsController",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/records/ModelConnectionsController.kt",
+        "app/src/main/java/com/t1doo/aiyou/ui/ModelConnectionSettings.kt"
+      ],
+      "main_activity_call_lines": [
+        1342
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/ModelConnectionSettingsPresentationTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/ModelConnectionsControllerTest.kt"
+      ],
+      "states_to_preserve": "未配置、不支持、未开放网络",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F04",
+      "entry": "原文候选／手工确认",
+      "screen": "OriginalReadingScreen",
+      "controller": "LocalCandidateController",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/records/LocalCandidateController.kt",
+        "app/src/main/java/com/t1doo/aiyou/records/OriginalReadingScreen.kt"
+      ],
+      "main_activity_call_lines": [
+        1372
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/LocalCandidatePresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/OriginalReadingPresentationTest.kt",
+        "app/src/test/kotlin/com/t1doo/aiyou/OriginalReadingPriorityPresentationTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/LocalCandidateCipherCompatibilityTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/LocalCandidateFixture.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/LocalCandidateResumeSqlTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/LocalCandidateSqlTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/LocalCandidateResumeControllerTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/records/LocalCandidateViewModelTest.kt",
+        "core/data/src/androidTest/kotlin/com/t1doo/aiyou/data/LocalCandidateRecordsIntegrationTest.kt"
+      ],
+      "states_to_preserve": "候选与正式事实、任务分离",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F05",
+      "entry": "问题与来源",
+      "screen": "LocalEvidenceQuestionSection",
+      "controller": "SelectedQuestionConsentController",
+      "source_files": [
+        "app/src/main/java/com/t1doo/aiyou/records/LocalEvidenceQuestionSection.kt",
+        "app/src/main/java/com/t1doo/aiyou/records/SelectedQuestionConsentController.kt"
+      ],
+      "main_activity_call_lines": [
+        1571
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/SelectedQuestionConsentPresentationTest.kt",
+        "checks/ai-protocol/remote-text/src/test/kotlin/com/t1doo/aiyou/data/SelectedQuestionConsentControllerTest.kt"
+      ],
+      "states_to_preserve": "无证据、旧授权拒收、网络不可用",
+      "code_status": "CODE_PRESENT",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    },
+    {
+      "requirement": "F10",
+      "entry": "导航／主题／角色",
+      "screen": "NotebookNavigation",
+      "controller": "UiPreferencesViewModel",
+      "source_files": [],
+      "main_activity_call_lines": [
+        1310
+      ],
+      "test_candidates": [
+        "app/src/test/kotlin/com/t1doo/aiyou/UiPreferencesTest.kt"
+      ],
+      "states_to_preserve": "减少动态、角色回退、页面焦点",
+      "code_status": "NEEDS_FURTHER_LOCATION",
+      "wiring_status": "DIRECT_MAIN_CALL",
+      "native_runtime": "NOT_RUN_THIS_BATCH",
+      "skyglass_migration": "NOT_MIGRATED",
+      "test_status": "INDEX_ONLY_NOT_A_PASS"
+    }
+  ],
+  "complete_screen_controller_index": [
+    "app/src/main/java/com/t1doo/aiyou/records/AudioTranscriptController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/ChatHistoryController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/CurrentImageGridController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/FactRecapController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/FactRecapScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/ImageTextController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/KeywordReductionScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/LocalAttachmentController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/LocalAttachmentScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/LocalCandidateController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/LocalEvidenceController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/LocalOriginalSearchController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/LocalProcessingController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/LocalRecordAiController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/LocalRecordsScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/LocalRecordsViewModel.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/ManualPeopleController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/ManualTagController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/ManualTaskController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/ManualTasksScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/MixedCaptureController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/MixedCaptureScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/ModelConnectionsController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/OriginalAudioController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/OriginalAudioScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/OriginalEditScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/OriginalExportController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/OriginalExportScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/OriginalHistoryScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/OriginalReadingScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/QuestionKeywordController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/QuestionKeywordScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/RecordEventDateController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/RecordFavoriteController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/RecordPackageController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/RecordPackageScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/RecycleBinController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/RecycleBinScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/SavedQuestionsController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/SelectedQuestionConsentController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/SourceFactController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/SourceMemoryController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/SourceMemoryInboxController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/SourcePreferenceController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/SourceTagController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/SourceTaskController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/TaskProposalController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/TaskReminderController.kt",
+    "app/src/main/java/com/t1doo/aiyou/records/UnifiedKeywordController.kt",
+    "app/src/main/java/com/t1doo/aiyou/ui/AIyouScreens.kt",
+    "app/src/main/java/com/t1doo/aiyou/ui/AppAccessController.kt",
+    "app/src/main/java/com/t1doo/aiyou/ui/AppAccessScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/ui/AppAccessViewModel.kt",
+    "app/src/main/java/com/t1doo/aiyou/ui/ScreenPreviews.kt",
+    "app/src/main/java/com/t1doo/aiyou/ui/ScreenSamples.kt",
+    "app/src/main/java/com/t1doo/aiyou/ui/SettingsScreen.kt",
+    "app/src/main/java/com/t1doo/aiyou/ui/StorageUsageController.kt",
+    "app/src/main/java/com/t1doo/aiyou/ui/StorageUsageViewModel.kt",
+    "checks/record-queue/src/main/kotlin/androidx/lifecycle/AndroidViewModel.kt"
+  ]
+}

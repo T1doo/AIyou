@@ -1,0 +1,125 @@
+{
+  "review_date": "2026-11-05",
+  "baseline_sha": "867f86ed3eef4452a1b61b5190820457fb48bc31",
+  "audit_type": "只读文档、源码差异与远端证据审阅",
+  "observations": [
+    {
+      "id": "E01",
+      "kind": "current_repository",
+      "claim": "main核对为审阅SHA",
+      "source": "GitHub branches/main",
+      "limit": "仅审阅时点，执行前重新核对"
+    },
+    {
+      "id": "E02",
+      "kind": "reported_browser_qa",
+      "claim": "最新review.json报告浏览器PASS，三个主题与草稿/筛选/动态检查",
+      "source": "https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/ui-review/2026-11-05/review.json",
+      "limit": "本轮未重跑；内存演示不等于原生持久化"
+    },
+    {
+      "id": "E03",
+      "kind": "historical_failure",
+      "claim": "运行41849164235的领域compileKotlin日志报告allCitations未解析",
+      "source": "https://github.com/T1doo/AIyou/actions/runs/41849164235/job/126640494796",
+      "commit_sha": "3f3c7c8cf0ea5f2c9116730b2a85948daec924c1",
+      "limit": "当前SHA未复现；按日志路径读取当前文件未成功，需实际checkout定位"
+    },
+    {
+      "id": "E04",
+      "kind": "current_ci_query",
+      "claim": "按当前head_sha查询返回total_count=0",
+      "source": "https://api.github.com/repos/T1doo/AIyou/actions/runs?head_sha=867f86ed3eef4452a1b61b5190820457fb48bc31&per_page=100",
+      "limit": "没有该查询记录不等于证明无法构建，亦不排除仓库外运行"
+    },
+    {
+      "id": "E05",
+      "kind": "historical_success",
+      "claim": "README记录338aa5f…/40475693696的239脚本、386Compose JVM、430Preview等",
+      "source": "https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/README.md",
+      "limit": "旧版本自动化／构建，不是当前或设备验收"
+    },
+    {
+      "id": "E06",
+      "kind": "capability_status",
+      "claim": "真实模型与自动ASR未启用，新图OCR提取器不可用",
+      "source": "https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/README.md",
+      "limit": "应分别核实接入与效果，不可一律归为设备待测"
+    },
+    {
+      "id": "E07",
+      "kind": "restore_gap",
+      "claim": "README记录D08 admission失败，未进入新装恢复；KVM ACL恢复未确认",
+      "source": "https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/README.md",
+      "limit": "不得覆盖原失败或自动执行环境修复"
+    },
+    {
+      "id": "E08",
+      "kind": "original_spec",
+      "claim": "原始设计书F01–F10、D00–D09及质量目标用于对照",
+      "source": "https://github.com/T1doo/AIyou/blob/867f86ed3eef4452a1b61b5190820457fb48bc31/docs/AIyou_Product_Architecture.docx",
+      "limit": "规范是需求，不是实现证明"
+    },
+    {
+      "id": "E09",
+      "kind": "visual_coverage",
+      "claim": "旧图包可用且有前轮实际看图；当前七图仅核对路径与代码/检查记录",
+      "limit": "本轮未把最新七图全部直接渲染，不声称新画面逐张视觉验收"
+    },
+    {
+      "id": "E10",
+      "kind": "figma_blocked",
+      "claim": "Figma截图读取受Starter工具调用限额阻挡",
+      "source": "https://www.figma.com/design/TbjrVEh0GLxs97p6zZYTuO",
+      "limit": "本轮没有新画布视觉结论；不是要求用户付费的前提"
+    }
+  ],
+  "not_run_in_this_audit": [
+    "Android构建",
+    "新一轮浏览器交互回归",
+    "模拟器运行",
+    "真机中文IME",
+    "TalkBack",
+    "性能基准",
+    "16KB设备执行",
+    "真实备份恢复",
+    "真实模型/OCR/ASR调用"
+  ],
+  "external_sources": [
+    {
+      "id": "R01",
+      "url": "https://developer.android.com/develop/ui/compose/accessibility/api-defaults",
+      "use": "触区与可访问语义"
+    },
+    {
+      "id": "R02",
+      "url": "https://developer.android.com/develop/ui/compose/system/insets-ui",
+      "use": "IME与系统安全边界"
+    },
+    {
+      "id": "R03",
+      "url": "https://developer.android.com/develop/ui/compose/graphics/images/customize",
+      "use": "blur平台限制"
+    },
+    {
+      "id": "R04",
+      "url": "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html",
+      "use": "文字对比"
+    },
+    {
+      "id": "R05",
+      "url": "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "use": "必要控件和状态对比"
+    },
+    {
+      "id": "R06",
+      "url": "https://developer.android.com/topic/performance/benchmarking/macrobenchmark-overview",
+      "use": "性能测量"
+    },
+    {
+      "id": "R07",
+      "url": "https://developer.android.com/guide/practices/page-sizes",
+      "use": "16KB验证边界"
+    }
+  ]
+}

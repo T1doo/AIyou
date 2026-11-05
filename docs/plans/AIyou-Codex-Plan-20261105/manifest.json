@@ -1,0 +1,26 @@
+{
+  "package_version": "1.0",
+  "baseline_sha": "867f86ed3eef4452a1b61b5190820457fb48bc31",
+  "files": {
+    "AIyou_前端完善与产品验收计划.md": {
+      "bytes": 58767,
+      "sha256": "155fdda3ac5e06065c13fe8aeb02ea8d9d6e7703567b3cb41501c5e439a194a1"
+    },
+    "AIyou_计划书_阅读版.html": {
+      "bytes": 73694,
+      "sha256": "b29e3d41149e8af1cf2a66d6a6471f6233c093bcee836f08e8dde926c161683b"
+    },
+    "CODEX_START_HERE.md": {
+      "bytes": 4333,
+      "sha256": "60125aedd7a37d9733ef3805b5c58dff9e00e452d06538deafe7354c405fbf36"
+    },
+    "backlog.json": {
+      "bytes": 23959,
+      "sha256": "fbcb7df7f817538eb36ddbec06bd74c51ede83e5fb8d591301797b27d2ada633"
+    },
+    "evidence-register.json": {
+      "bytes": 4818,
+      "sha256": "a1861a06ef1d58f1f981abda2632dfa0de059fe54938722c301df2f44038f0c2"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.domain.TaskRemindersTest" tests="22" skipped="0" failures="0" errors="0" timestamp="2026-11-05T07:21:36.468Z" hostname="LAPTOP-USISIS19" time="0.049">
+  <properties/>
+  <testcase name="unknownScheduleOutcomeIsNotAcknowledgedButExplicitFailureIs" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.004"/>
+  <testcase name="dispatcherObsoleteScheduleIsRetiredWithoutDriverAndObsoleteCancelIsUntouched" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.002"/>
+  <testcase name="blockedOldCancellationsCannotStarveTheCapabilityResultForANewConfirmation" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.002"/>
+  <testcase name="permissionStatesAreExplicitAndExactDenialNeverDowngradesTheMode" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.001"/>
+  <testcase name="currentCommandMustStillBelongToTheTaskOutboxAndMatchingSchedule" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.001"/>
+  <testcase name="confirmationRequiresOpenTaskAndExplicitDateTime" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.001"/>
+  <testcase name="explicitMutationValidatesIdentityExpectedVersionAndMonotonicRequestTime" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.002"/>
+  <testcase name="revokeAndReconfirmPreservePendingCancellationsWithoutInventingAnotherActiveVersion" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.001"/>
+  <testcase name="dispatcherRecordsExplicitCapabilityFailuresWithoutCallingSchedule" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.001"/>
+  <testcase name="stableAnonymousIdentityAndRedactedValuesNeverExposeTaskTitleOrIdentity" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.003"/>
+  <testcase name="aPendingScheduleIsReplacedWithItsExactCancellationForAnInFlightDispatch" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.001"/>
+  <testcase name="failedCancellationAndUnknownDriverExceptionPreserveExactCommandUntilRetry" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.0"/>
+  <testcase name="outboxOverflowRefusesTheWholeMutationAndNeverDropsCancellationHistory" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.003"/>
+  <testcase name="dispatcherPropagatesCancellationAndKeepsTheExactCommand" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.001"/>
+  <testcase name="editedDateAndTerminalTaskRemainInvalidUntilASeparateConfirmation" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.001"/>
+  <testcase name="triggerAcceptanceRequiresCurrentScheduledOpenTaskAndActualDueInstant" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.006"/>
+  <testcase name="oldCancellationAcknowledgedAfterNewScheduleCannotInvalidateTheNewToken" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.002"/>
+  <testcase name="snapshotCopiesOwnTheirImmutableCommandListAndRejectDuplicateOrForeignTokens" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.006"/>
+  <testcase name="dispatcherKeepsExplicitApproximateModeAndAcknowledgesSuccessfulScheduleOnce" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.001"/>
+  <testcase name="drainHonorsItsBoundAndPreservesCommandWhenAcknowledgementFails" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.003"/>
+  <testcase name="reconfirmationKeepsStableIdentityAndCancelsTheExactPreviousGeneration" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.001"/>
+  <testcase name="snapshotRejectsUnreachablePhasesAndReservesCapacityForTerminalRevocation" classname="com.t1doo.aiyou.domain.TaskRemindersTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

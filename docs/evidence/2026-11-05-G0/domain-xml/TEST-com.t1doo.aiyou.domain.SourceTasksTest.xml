@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.domain.SourceTasksTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-05T07:21:36.442Z" hostname="LAPTOP-USISIS19" time="0.008">
+  <properties/>
+  <testcase name="sourceBoundsForeignTaskIdentityAndPrivateRepresentationsCannotBeConfused" classname="com.t1doo.aiyou.domain.SourceTasksTest" time="0.005"/>
+  <testcase name="stableFragmentIdentityAndImmutableReceiptDistinguishEveryExplicitChoice" classname="com.t1doo.aiyou.domain.SourceTasksTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

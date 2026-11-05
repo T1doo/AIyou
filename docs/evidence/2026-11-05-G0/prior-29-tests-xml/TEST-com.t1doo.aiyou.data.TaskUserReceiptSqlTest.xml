@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.data.TaskUserReceiptSqlTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-05T07:20:36.303Z" hostname="LAPTOP-USISIS19" time="7.278">
+  <properties/>
+  <testcase name="legacyV4DateStatusRenameAndRevokeReceiptsSurviveTheirFirstSystemAck" classname="com.t1doo.aiyou.data.TaskUserReceiptSqlTest" time="2.794"/>
+  <testcase name="normalizedProofsBindEveryAvailableInputAndSeparateOperations" classname="com.t1doo.aiyou.data.TaskUserReceiptSqlTest" time="0.128"/>
+  <testcase name="legacyV2AndV3ReadWithoutRewriteAndUpgradeOnlyOnAnExplicitUserOperation" classname="com.t1doo.aiyou.data.TaskUserReceiptSqlTest" time="0.784"/>
+  <testcase name="lostConfirmationSurvivesControlledSystemAckTriggerAndColdReopenWithoutAnotherWrite" classname="com.t1doo.aiyou.data.TaskUserReceiptSqlTest" time="0.377"/>
+  <testcase name="changedRequestFieldsAndANewerUserDecisionCannotReplayOrRewriteSystemProgress" classname="com.t1doo.aiyou.data.TaskUserReceiptSqlTest" time="0.376"/>
+  <testcase name="completionUndoHasIndependentReplayRevokesRemindersAndSurvivesPortableRestore" classname="com.t1doo.aiyou.data.TaskUserReceiptSqlTest" time="0.364"/>
+  <testcase name="reminderProofBindsCompleteOldSnapshotAndEveryNestedInputAfterSystemProgress" classname="com.t1doo.aiyou.data.TaskUserReceiptSqlTest" time="0.301"/>
+  <testcase name="legacyV4ConfirmationCanAcquireReceiptOnlyBeforeItsFirstSystemWrite" classname="com.t1doo.aiyou.data.TaskUserReceiptSqlTest" time="0.232"/>
+  <testcase name="statusDateRenameAndRevocationRetainOnlyTheirOwnExactReceiptAcrossSystemWrites" classname="com.t1doo.aiyou.data.TaskUserReceiptSqlTest" time="1.776"/>
+  <testcase name="authenticatedReceiptBindsUserDecisionAndV5RemainsBoundedStrictAndPortable" classname="com.t1doo.aiyou.data.TaskUserReceiptSqlTest" time="0.145"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

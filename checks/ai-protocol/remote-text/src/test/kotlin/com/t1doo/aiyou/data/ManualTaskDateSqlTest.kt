@@ -53,7 +53,11 @@ class ManualTaskDateSqlTest {
             assertThrows(javax.crypto.AEADBadTagException::class.java) { cipher.open("one", 1, "create-one", blob.copyOf().also { it[0] = 4 }) }
             assertThrows(javax.crypto.AEADBadTagException::class.java) { cipher.open("one", 1, "create-one", blob.copyOf().also { it[0] = 2 }) }
             assertThrows(javax.crypto.AEADBadTagException::class.java) { cipher.open("one", 1, "create-one", blob.copyOf().also { it[0] = 6 }) }
-            assertThrows(IllegalArgumentException::class.java) { cipher.open("one", 1, "create-one", blob.copyOf().also { it[0] = 7 }) }
+            // v7 is supported for REOPEN; changing an authenticated header must fail authentication.
+            assertThrows(javax.crypto.AEADBadTagException::class.java) { cipher.open("one", 1, "create-one", blob.copyOf().also { it[0] = 7 }) }
+            for (unsupported in listOf(0, 8, 127)) {
+                assertThrows(IllegalArgumentException::class.java) { cipher.open("one", 1, "create-one", blob.copyOf().also { it[0] = unsupported.toByte() }) }
+            }
             assertThrows(Exception::class.java) { cipher.open("one", 1, "create-one", blob.copyOf().also { it[0] = 1 }) }
             f.db.write("UPDATE manual_tasks SET version=version+1,ciphertext=? WHERE id=?", forgedV2, created.id)
             assertThrows(ManualTaskStorageFailure::class.java) { f.store.snapshots() }

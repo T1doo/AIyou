@@ -33,7 +33,7 @@ internal class PythonSqliteDatabase(
 
     init {
         val schema = schemaFile ?: repositoryRoot().resolve("core/data/schemas/com.t1doo.aiyou.data.RecordsDatabase/$schemaVersion.json")
-        process = ProcessBuilder("python3", "-u", bridgePath.toString(), databasePath.toString(), schema.toString(),
+        process = ProcessBuilder(System.getenv("AIYOU_PYTHON") ?: "python3", "-u", bridgePath.toString(), databasePath.toString(), schema.toString(),
             if (initialize) "initialize" else "open").start()
         writer = process.outputStream.bufferedWriter(Charsets.UTF_8)
         Thread({
