@@ -1,0 +1,62 @@
+{
+  "serial": "emulator-5556",
+  "api": 35,
+  "android": "15",
+  "density_dpi": 480,
+  "font_scale_large": 2.0,
+  "title_bounds": [
+    48,
+    155,
+    624,
+    285
+  ],
+  "return_bounds": [
+    696,
+    166,
+    996,
+    275
+  ],
+  "capacity_top_bounds": [
+    48,
+    449,
+    1032,
+    1988
+  ],
+  "viewport": [
+    48,
+    352,
+    1032,
+    1988
+  ],
+  "no_backup_preview_picker_password_or_restore_clicked": true,
+  "original_settings": {
+    "font_scale": "1.0",
+    "accelerometer_rotation": "1",
+    "user_rotation": "0"
+  },
+  "driver_corrections": [
+    "First intermediate two captures showed same scroll tail; reversed scroll to capture genuine paragraph beginning",
+    "At 2x new install starts HOME; disclosure below viewport found with bounded scroll rather than clicking missing node",
+    "Initial normal node bounds were clipped to one line; scrolled further and recaptured full paragraph before accepting"
+  ],
+  "normal_capacity_bounds": [
+    48,
+    1455,
+    1032,
+    2001
+  ],
+  "normal_viewport": [
+    48,
+    352,
+    1032,
+    2037
+  ],
+  "density_query": "Physical density: 480",
+  "android_api": "35",
+  "android_release": "15",
+  "restored_settings": {
+    "font_scale": "1.0",
+    "accelerometer_rotation": "1",
+    "user_rotation": "0"
+  }
+}

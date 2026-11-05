@@ -61,7 +61,7 @@ internal fun FullBackupContent(ui:RecordPackageUiState,controller:RecordPackageC
             }
             Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
                 Text("容量上限",Modifier.semantics { heading() },style=MaterialTheme.typography.titleMedium)
-                Text("上限：256 条记录、4096 个修订、256 张 JPEG/PNG 原图；单图16 MiB、原图共64 MiB、资料清单16 MiB，任务／提案与记忆／确认各4096行；本机问答历史全部状态和删除标记合计最多128行／4 MiB。超限、损坏或未完成操作会整体拒绝。")
+                Text("上限：256 条记录、4096 个修订；图片与原音合计最多256个附件、64 MiB（含历史版本和草稿）。单张 JPEG/PNG 最多16 MiB；资料清单16 MiB，任务／提案与记忆／确认各4096行；本机问答历史全部状态和删除标记合计最多128行／4 MiB。超限、损坏或未完成操作会整体拒绝。")
             }
             }
         } }

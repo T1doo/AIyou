@@ -1,0 +1,6 @@
+2026-11-05T17:04:12.5707614Z TRANSCRIPT_FONT_SCALE_JSON {"source_sha": "4eab72e49ed519ed35a8c32db7327df125b5b060", "kind": "Paired production Dialog measurements on JVM; not device evidence", "normal": {"configurationFontScale": 1, "layoutFontScale": 1, "density": 1, "firstLineHeightPx": 26, "layoutWidthPx": 224, "layoutHeightPx": 26, "lineCount": 1, "hasVisualOverflow": false, "text_sha256": "e228cbaab03bf1282e3ab500c6762b31558631bedd68efd8d745a72a9f7f4987"}, "double": {"configurationFontScale": 2, "layoutFontScale": 2, "density": 1, "firstLineHeightPx": 46, "layoutWidthPx": 224, "layoutHeightPx": 92, "lineCount": 2, "hasVisualOverflow": false, "text_sha256": "e228cbaab03bf1282e3ab500c6762b31558631bedd68efd8d745a72a9f7f4987"}, "input_files": [{"path": "editor-fontscale-normal.json", "bytes": 508, "sha256": "384b14c53f15df23f7e97938a0c55a82a816651d91043c6431cb2b468a5024d7"}, {"path": "editor-fontscale-double.json", "bytes": 508, "sha256": "5f3a6320b88c8b027679db3a9989f273a52da548d525665c50f30b558a21ca7f"}]}
+2026-11-05T17:04:12.6281368Z Traceback (most recent call last):
+2026-11-05T17:04:12.6282041Z   File "<stdin>", line 36, in <module>
+2026-11-05T17:04:12.6285636Z AssertionError
+2026-11-05T17:04:12.6478088Z ##[error]Process completed with exit code 1.
+2026-11-05T17:04:12.6576036Z Prepare all required actions

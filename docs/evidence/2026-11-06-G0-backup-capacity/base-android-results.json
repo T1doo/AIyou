@@ -1,0 +1,13 @@
+{
+  "sha": "4eab72e49ed519ed35a8c32db7327df125b5b060",
+  "run_id": 42065337675,
+  "artifact_id": 13435318259,
+  "artifact_sha256": "56fa107b184ebbe9936a76d026a7cf6e55d191faa6c74ebfaa052ff35753e291",
+  "counts": {
+    "tests": 413,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "failures": []
+}

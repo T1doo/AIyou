@@ -478,7 +478,8 @@ jobs:
                   'unknownOrIncompleteRecapPreferenceIsPreservedAndCannotBeOverwritten',
                   'bothDisplayChoicesSurviveNewStorageAndViewModelInstances',
                   'failedWriteKeepsConfirmedValuesAndRetryPersistsTheRequestedChoice',
-                  'corruptPreferencesArePreservedAndNeverFlashTheCompanion'},
+                  'corruptPreferencesArePreservedAndNeverFlashTheCompanion',
+                  'scenePreferenceMigratesV3WithoutChangingCapturePolicyOrWritingOnRead'},
               'com.t1doo.aiyou.FactRecapPresentationTest': {
                   'actualSettingsPersistWeekAndOpenedRangeKeepsItsOwnChoiceBeforeExplicitGeneration',
                   'latePreferenceReadDoesNotRewriteOpenDayAndRetainedOpenUsesLatestConfirmedDefault',
@@ -505,8 +506,8 @@ jobs:
               observed.extend((case.get('classname'), case.get('name')) for case in cases)
               shutil.copy2(source, target / source.name)
               receipts.append({'path': str(target / source.name), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
-          assert len(observed) == len(set(observed)) == 18
-          receipt = {'tests': 18, 'required_cases': 18, 'failures': 0, 'errors': 0, 'skipped': 0,
+          assert len(observed) == len(set(observed)) == 19
+          receipt = {'tests': 19, 'required_cases': 19, 'failures': 0, 'errors': 0, 'skipped': 0,
                      'source': 'subset of actual full app suite, no second execution', 'xml': receipts}
           (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
           print('RECAP_PREFERENCES_TARGETED_XML_JSON ' + json.dumps(receipt))

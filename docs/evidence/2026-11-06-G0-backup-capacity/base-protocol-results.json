@@ -1,0 +1,71 @@
+{
+  "sha": "4eab72e49ed519ed35a8c32db7327df125b5b060",
+  "run_id": 42065337675,
+  "artifact_id": 13434793345,
+  "artifact_sha256": "d95319be65b877f7d31638c526a381e8f3fae4bc515ca0d9ef072f80dea42968",
+  "modules": {
+    "core/domain": {
+      "tests": 78,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "core/ai": {
+      "tests": 178,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "checks/ai-protocol/remote-text": {
+      "tests": 1559,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "backup_related_suites": [
+    {
+      "suite": "com.t1doo.aiyou.data.AudioTranscriptRangeBackupTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.ChatHistoryBackupTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.FullBackupTest",
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.SavedQuestionFullBackupTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.t1doo.aiyou.data.TaskUndoFullBackupTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.t1doo.aiyou.records.FullBackupControllerTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "scope": "Protocol stage only; not full CI, device restore, or changed capacity UI acceptance"
+}

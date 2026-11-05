@@ -1,0 +1,12 @@
+{
+  "owned_pids": [
+    82776,
+    93716,
+    92512
+  ],
+  "owned_remaining": [],
+  "devices_after": [],
+  "adb_processes_after": [],
+  "settings_restoration": "confirmed in device-observation.json",
+  "followup": "Delayed helper exited naturally; no force termination or unknown-process kill"
+}

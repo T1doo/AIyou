@@ -1,0 +1,154 @@
+{
+  "task_ids": [
+    "CORE-01",
+    "AUD-01",
+    "UI-05"
+  ],
+  "status": "IN_PROGRESS_CURRENT_CANDIDATE_CI_PENDING",
+  "base_sha": "4eab72e49ed519ed35a8c32db7327df125b5b060",
+  "branch": "codex/g2-native-skyglass-20261105",
+  "source_sha256_lf_normalized": {
+    ".github/workflows/android.yml": "96a1432d05c4c839ef79608b79d5d6c9fefe23293124b19da230a7ec15152c44",
+    "app/src/main/java/com/t1doo/aiyou/MainActivity.kt": "4d0efa29c0e932b149e296611f39d9431bba9095d8f40ccfc4c5b2fbbb60edaf",
+    "app/src/main/java/com/t1doo/aiyou/records/FullBackupContent.kt": "d56e38123a6d6619df141ca66fdd4a977cb1a5101786fa89d770d31e03aca9c1"
+  },
+  "product_changes": [
+    "Capacity text names combined images+audio budget including history/draft",
+    "Full backup app-bar shortened to five-character meaningful label at 200% font"
+  ],
+  "storage_schema_and_limits_changed": false,
+  "workflow_changes": "Add existing scenePreferenceMigratesV3WithoutChangingCapturePolicyOrWritingOnRead to explicit exact set and change exact count/receipt18 to19; no guards or assertions removed",
+  "local_required_checks": {
+    "status": "PASS",
+    "exit_code": 0,
+    "command": "./gradlew.bat --no-daemon --offline :app:checkDebugAarMetadata :app:assembleDebug :core:domain:test :app:lintDebug :app:testDebugUnitTest --tests '*FullBackupPresentationTest' --console=plain",
+    "actual_ui": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "domain": "UP-TO-DATE; 78 cached XML cases checked, not reexecuted",
+    "lint_severities": [
+      "Hint"
+    ]
+  },
+  "local_verifier_replay": {
+    "old_exit_code": 1,
+    "corrected_exit_code": 0,
+    "cases": 19,
+    "input": "Same real Linux XML; no new test execution"
+  },
+  "local_script_checks": {
+    "ci_stage": {
+      "tests": 13,
+      "errors": 1,
+      "exit_code": 1
+    },
+    "diagnostic_contracts": {
+      "tests": 18,
+      "errors": 1,
+      "exit_code": 1
+    },
+    "reason": "Windows WinError1314 symlink privileges; do not mark whole sets PASS or skip those cases"
+  },
+  "base_ci": {
+    "sha": "4eab72e49ed519ed35a8c32db7327df125b5b060",
+    "run_id": 42065337675,
+    "overall": "failure",
+    "host": "success",
+    "android": "failure in stale 18-case archival assertion after all413 UI tests passed",
+    "actual_full_ui": {
+      "tests": 413,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "preview": {
+      "tests": 444,
+      "png_manifest_count": 444,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "native_audit_and_lint": "NOT_RUN due earlier failed archival step"
+  },
+  "apk": {
+    "path": "app/build/outputs/apk/debug/app-debug.apk",
+    "bytes": 32066468,
+    "sha256": "7f6fb6ecc643b405149b3cf28913b399a5a494ca604622a194cc38b6bd89dff5"
+  },
+  "device": "API35 emulator, font1/2, read-only backup detail/title/back; no real IME/TalkBack/SAF restore claim",
+  "device_cleanup": {
+    "owned_pids": [
+      82776,
+      93716,
+      92512
+    ],
+    "owned_remaining": [],
+    "devices_after": [],
+    "adb_processes_after": [],
+    "settings_restoration": "confirmed in device-observation.json",
+    "followup": "Delayed helper exited naturally; no force termination or unknown-process kill"
+  },
+  "full_product_and_visual_acceptance": false,
+  "remaining": [
+    "Current candidate complete CI",
+    "Secondary Skyglass UI and full state matrix",
+    "Real model/OCR/ASR, data restore and device/OEM/IME/TalkBack/16KB/performance acceptance"
+  ],
+  "archives": {
+    "base-android-artifact.zip": "56fa107b184ebbe9936a76d026a7cf6e55d191faa6c74ebfaa052ff35753e291",
+    "base-preview-xml.zip": "caad4989f3083569a3c1c96e3d0f65feb2ad8d66c5f0f163bb69cbb068811a65",
+    "base-protocol-artifact.zip": "d95319be65b877f7d31638c526a381e8f3fae4bc515ca0d9ef072f80dea42968",
+    "final-local-checks.zip": "9a2d1139315cb981870eefb646a4a9e4b109190095c223f81819da07e0aa2079",
+    "local-checks.zip": "4d74bc030365a6fa1d61b5a9bb06c49425f691299124013c5ac2700cb33678de",
+    "script-checks.zip": "af214d3c05624e50123c43added032d3e9ff8869c417aa39944205fc70b42dc0"
+  },
+  "images": {
+    "backup-home-large.png": {
+      "bytes": 287270,
+      "sha256": "9a037793e1bed0857918b84f528f024b7cbc2bd1d82cd4179eb26ac9b396baa2"
+    },
+    "before-title-capacity-large-bottom.png": {
+      "bytes": 307838,
+      "sha256": "366a51401cd0d23264a3ba939cab64e1565ecb43625b2a412a2a46e74c486555"
+    },
+    "before-title-capacity-large-top.png": {
+      "bytes": 285086,
+      "sha256": "f4dfa9cc177d9c7306f9393087f824422493598c800ef5a204adbb40659ed9f6"
+    },
+    "before-title-capacity-normal.png": {
+      "bytes": 448647,
+      "sha256": "9a8e38a0e500c6f72d18beb22f325c7e271b943fb10deaaa58bbda9d8ae22a0d"
+    },
+    "capacity-large-bottom.png": {
+      "bytes": 323629,
+      "sha256": "277a9519fdf919dfb20d9a7f1d464c0073d5df8500d38fd4048bbdd1703f0f78"
+    },
+    "capacity-large-top.png": {
+      "bytes": 319420,
+      "sha256": "c437f27b64149b44afc3509fcc43fe312124f879399c12d4063b8bd1e127f7ee"
+    },
+    "capacity-normal.png": {
+      "bytes": 439727,
+      "sha256": "4bb08a1d4fd71d733bc82e0ccdfde490aa6661e07a6a1fb75e55fa7930d9eb3e"
+    },
+    "base-previews/SkyglassBlueRender_6a639217_0.png": {
+      "bytes": 58626,
+      "sha256": "3a5f39779977ff559a73748125ddaf0f56c630997844c0ef03129935f7e8b6e4"
+    },
+    "base-previews/SkyglassLargeTextRender_302d374f_0.png": {
+      "bytes": 103529,
+      "sha256": "e7880f511010b7b3e54ab76546cd3db573fa1acc17cda891529ccd148c481ea5"
+    },
+    "base-previews/SkyglassNightRender_6a639217_0.png": {
+      "bytes": 68121,
+      "sha256": "17c5afbcc6e06d0467b862118e731bbeb1a7961c3b4b77930aeb3d98a7c654cc"
+    },
+    "base-previews/SkyglassSunsetRender_6a639217_0.png": {
+      "bytes": 65420,
+      "sha256": "cb121bbe4955b4a64fecfd306158923b2eef70ac2e98b28c7485457ac13053be"
+    }
+  }
+}

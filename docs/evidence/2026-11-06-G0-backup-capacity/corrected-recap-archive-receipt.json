@@ -1,0 +1,20 @@
+{
+  "tests": 19,
+  "required_cases": 19,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "source": "subset of actual full app suite, no second execution",
+  "xml": [
+    {
+      "path": "app\\build\\reports\\recap-preferences-targeted\\TEST-com.t1doo.aiyou.UiPreferencesTest.xml",
+      "bytes": 1963,
+      "sha256": "28af2d5ada03b93bd943a434dd96960f7fd4b1108c559d3d95ff62af6d9ff401"
+    },
+    {
+      "path": "app\\build\\reports\\recap-preferences-targeted\\TEST-com.t1doo.aiyou.FactRecapPresentationTest.xml",
+      "bytes": 1648,
+      "sha256": "4824cc88682cf4aef845d917971b3ebaf89cf8e225090747308cb85e57cfb9c7"
+    }
+  ]
+}
