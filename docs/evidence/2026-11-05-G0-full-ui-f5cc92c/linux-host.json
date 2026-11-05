@@ -1,0 +1,15 @@
+{
+  "source_sha": "f5cc92c4529f53574977205518b382e5b0a883d4",
+  "run_id": 42022908343,
+  "job_id": 127229844732,
+  "conclusion": "success",
+  "url": "https://github.com/T1doo/AIyou/actions/runs/42022908343/job/127229844732",
+  "script_test_excerpt": [
+    "2026-11-05T12:06:09.7045200Z ----------------------------------------------------------------------",
+    "2026-11-05T12:06:09.7045464Z Ran 254 tests in 17.410s",
+    "2026-11-05T12:06:09.7045563Z ",
+    "2026-11-05T12:06:09.7045613Z OK",
+    "2026-11-05T12:06:09.7045820Z D08 fixed SDK probe and production APK authenticated; device execution not performed"
+  ],
+  "scope": "Linux Host contracts only; Android and Preview jobs separate; predates scene/header patch"
+}

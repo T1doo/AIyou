@@ -1,6 +1,7 @@
 package com.t1doo.aiyou.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.background
@@ -34,8 +35,8 @@ fun SkyglassScene(appearance: SkyglassAppearance, motion: SkyglassMotion, motion
     val playing = foreground && motionAllowed && motion != SkyglassMotion.STILL
     LaunchedEffect(playing) {
         if (playing) {
-            var previous = withFrameNanos { it }
-            while (true) withFrameNanos { now ->
+            var previous = withInfiniteAnimationFrameNanos { it }
+            while (true) withInfiniteAnimationFrameNanos { now ->
                 phase = (phase + (now - previous).coerceAtMost(100_000_000L) / 36_000_000_000f) % 1f
                 previous = now
             }

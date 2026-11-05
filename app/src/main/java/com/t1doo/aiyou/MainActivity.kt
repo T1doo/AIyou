@@ -1279,7 +1279,7 @@ fun AIyouApp(
             CompanionEntry(if (companionSaved) MascotState.Saved else MascotState.Idle,
                 companionPulse, motionAllowed, onOpen = { companionPanel = true },
                 artworkSize = 48.dp,
-                containerColor = if(selected==Destination.NOW && local?.supportsMixedCapture==true)
+                containerColor = if(skyglassHome)
                     androidx.compose.ui.graphics.Color.Transparent else com.t1doo.aiyou.designsystem.AIyouColors.surface)
         }) else null
     Scaffold(
@@ -1295,6 +1295,7 @@ fun AIyouApp(
                 actionEnabled = recycleUi?.busy != true && attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
                 containerColor = if(skyglassHome) androidx.compose.ui.graphics.Color.Transparent else com.t1doo.aiyou.designsystem.AIyouColors.surface,
                 contentColor = if(skyglassHome && display.preferences.appearance != com.t1doo.aiyou.designsystem.SkyglassAppearance.SUNSET) androidx.compose.ui.graphics.Color.White else if(skyglassHome) com.t1doo.aiyou.designsystem.skyglassPalette(display.preferences.appearance).text else com.t1doo.aiyou.designsystem.AIyouColors.textPrimary,
+                companion = if(skyglassHome && selected != Destination.NOW) companion else null,
             ) {
                 if (browsingPackage && ownsPackageRoute()) {
                     closePackageRoute()

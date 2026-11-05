@@ -1,0 +1,624 @@
+{
+  "source_sha": "f5cc92c4529f53574977205518b382e5b0a883d4",
+  "command": "./gradlew.bat --no-daemon --offline :app:testDebugUnitTest --console=plain",
+  "exit_code": 1,
+  "before_source_sha": "b3023343ad78190c76d56e3896bfd795e0d0e068",
+  "before": {
+    "tests": 409,
+    "failures": 106,
+    "errors": 0,
+    "skipped": 0
+  },
+  "after": {
+    "tests": 409,
+    "failures": 71,
+    "errors": 0,
+    "skipped": 0
+  },
+  "method_inventory_unchanged": true,
+  "recovered": [
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "evidenceModeStartsAfterReadySearchWithoutAnyTestObserver"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "gridRequiresExplicitToggleKeepsFailureCardAndOpensOriginalSource"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "imageFilterStartsOffCombinesLiteralAndDatesAndClearResetsEveryCondition"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "localEvidenceCardsUseCurrentSourceAndReturnWithoutChangingQuestion"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "localEvidenceRequiresExplicitSelectionAndReconfirmationAfterExclusion"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontEvidenceShowsExplicitNoEvidenceAndKeepsManualListReachable"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontFilterIsReachableAndReadFailureCannotBecomeEmptySuccess"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontGridToggleAndFailureCardRemainReachableAndClearReturnsToList"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontLocalEvidenceSelectionAndConfirmationRemainReachable"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontProductionTimelineKeepsChronologyAndClearsOnSelectionOrInputChange"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontProtocolQuestionRequiresSeparateScopeConfirmationAndJumpsToCurrentOriginal"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontSyntheticNoEvidenceKeepsOriginalCardsAndNeverInventsAnswer"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "productionSelectedExcerptTimelineIsExplicitAndOpensExactOriginalWithFreshConfirmationOnReturn"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "protocolQuestionStopAndServiceReplacementRejectNonCooperativeLateAnswer"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "syntheticAnswerStopCancelsRequestAndSuppressesLateText"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "syntheticSelectedAnswerCitationsOpenOriginalAndReturningRequiresNewConfirmation"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "searchCardsHighlightVerifiedOriginalUnicodeKeepOrderAndClearWithoutTouchingSource"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "capturedDateErrorCorrectionKeyboardAndClearRangeRemainReachableAtDoubleFont"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "capturedDateRangeIsPrivateAndRestorationOrOldClickCannotReviveIt"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "currentReadyImageCheckboxFreshReturnRestoreAndClearDoNotWriteAnySource"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "currentReadyImageDoubleFontCheckboxKeyboardAndExactOriginalStayReachable"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "doubleFontFourTypedResultsOpenExactOriginalAndPreferenceThenRequeryWithoutChangingSources"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "landscapeDoubleFontScrollsToFocusedQuerySearchAndExactSourceWithoutHiddenActions"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "literalNoResultClearAndRestoreNeverSaveQueryOrRetainOldSession"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "manualPersonPagedLongMarkerKeyboardIntersectionAndExactOriginalStayReachableAtDoubleFont"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "manualPersonTagDateIntersectionFreshReturnAndRestorationKeepOriginalAndPrivateIdentity"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "manualTagChooserPaginationLongValuesAndKeyboardSourceRemainReachableAtDoubleFont"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "manualTagDateIntersectionReturnAndClearUseExactOriginalAndNeverSavePrivateFilter"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "memoryScopeOverflowShowsNoPartialResultsThenNarrowQueryRemainsUsable"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "noteOnlyAcceptedEmotionKeepsSeparateHighlightAndKeyboardReturnsExactQuoteInsteadOfNote"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "originalFavoriteCheckboxFreshReturnRestoreAndClearDoNotWriteAnySource"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "originalFavoriteDoubleFontCheckboxKeyboardAndExactOriginalStayReachable"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "quoteAndNoteCorrectionNeedsSeparateReacceptanceThenWithdrawalRemovesOnlyMemoryHit"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "restoredAcceptedNoteQueryAndRetainedClickCannotRecoverPrivateProof"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "restoredExactImageProofRetiresAPanelBeforeBLookupAndRejectsRetainedAAction"
+    }
+  ],
+  "newly_failing": [],
+  "failure_classes": {
+    "AppAccessPreferenceTest": 1,
+    "CompanionSettingsPresentationTest": 1,
+    "FactRecapPresentationTest": 1,
+    "FullBackupPresentationTest": 3,
+    "KeywordReductionPresentationTest": 1,
+    "LocalOriginalSearchPresentationTest": 7,
+    "LocalRecordsPresentationTest": 1,
+    "ManualAliasRecallPresentationTest": 1,
+    "ManualPeoplePresentationTest": 1,
+    "ManualTagPresentationTest": 4,
+    "ManualTagRecallPresentationTest": 1,
+    "ManualTaskPresentationTest": 8,
+    "ManualTaskTitlePresentationTest": 3,
+    "MixedNotebookPresentationTest": 3,
+    "MobileNavigationPresentationTest": 1,
+    "OriginalEditRecoveryPresentationTest": 10,
+    "QuestionKeywordPresentationTest": 3,
+    "RecordEventDatePresentationTest": 1,
+    "SelectedQuestionConsentPresentationTest": 4,
+    "SkyglassPreferencesTest": 2,
+    "SourceFactPresentationTest": 1,
+    "SourceTaskPresentationTest": 1,
+    "TaskProposalPresentationTest": 2,
+    "TaskReminderPresentationTest": 4,
+    "UiPreferencesTest": 5,
+    "UnavailableControlsInteractionTest": 1
+  },
+  "failures": [
+    {
+      "class": "com.t1doo.aiyou.AppAccessPreferenceTest",
+      "method": "confirmedSettingSurvivesNewInstancesAndStaleWriterCannotDisableIt",
+      "kind": "failure",
+      "message": "java.io.IOException: App access preference not confirmed"
+    },
+    {
+      "class": "com.t1doo.aiyou.CompanionSettingsPresentationTest",
+      "method": "eachProductionDestinationReturnsFromSettingsWithoutChangingSelection",
+      "kind": "failure",
+      "message": "androidx.test.espresso.AppNotIdleException: Compose did not get idle after 84119 attempts in 60 SECONDS.\n\n1. Check your measure/layout lambdas for infinite composition loops.\n2. Verify that the 'busy' resources listed above are not deadlocked.\n3. Increase Espresso's master idling policy if a longer timeout is required.\n The following Idle Conditions failed ."
+    },
+    {
+      "class": "com.t1doo.aiyou.FactRecapPresentationTest",
+      "method": "actualSettingsPersistWeekAndOpenedRangeKeepsItsOwnChoiceBeforeExplicitGeneration",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Assert failed: The component with TestTag = 'notebook-review-tools' is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.FullBackupPresentationTest",
+      "method": "settingsNormalBackupEntryReturnsWithExactDraftAndNoImplicitIo",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'mixed-text' in scrollable container\nSemantics of the node:\nNode #8678 at (l=0.0, t=56.0, r=360.0, b=598.0)px, Tag: 'mixed-list'\nCollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@2222e88d'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 3 children, 3 siblings\nSelector used: (TestTag = 'mixed-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FullBackupPresentationTest",
+      "method": "settingsNarrowDoubleFontBackupEntryIsFullyVisibleBeforeAnyScroll",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'mixed-text' in scrollable container\nSemantics of the node:\nNode #9522 at (l=0.0, t=56.0, r=320.0, b=386.0)px, Tag: 'mixed-list'\nCollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@2222e88d'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 3 children, 3 siblings\nSelector used: (TestTag = 'mixed-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FullBackupPresentationTest",
+      "method": "settingsShortLandscapeBackupEntryIsFullyVisibleBeforeAnyScroll",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'mixed-text' in scrollable container\nSemantics of the node:\nNode #9928 at (l=40.0, t=56.0, r=760.0, b=158.0)px, Tag: 'mixed-list'\nCollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@2222e88d'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=540.0, maxValue=540.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 2 children, 3 siblings\nSelector used: (TestTag = 'mixed-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.KeywordReductionPresentationTest",
+      "method": "realAppRequiresRemovalAndConfirmationPreservesDatesThenOpensExactOriginal",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'original-search-from' in scrollable container\nSemantics of the node:\nNode #2934 at (l=0.0, t=56.0, r=360.0, b=928.0)px\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@7f062432'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 9 children\nSelector used: (ScrollToIndex is defined)\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "editableKeywordExactAndSavedZoneDateFieldsOpenEveryOriginalCharacterWithoutTouchingDraft",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-from')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "pendingPersonInputAndReadErrorsKeepAdvancedFiltersVisibleUntilExplicitClear",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Failed to assert the following: (is not enabled)\nSemantics of the node:\nNode #2526 at (l=286.0, t=76.0, r=344.0, b=128.0)px, Tag: 'original-search-filters'\nFocused = 'false'\nRole = 'Button'\nShape = 'RoundedCornerShape(topStart = CornerSize(size = 50.0%), topEnd = CornerSize(size = 50.0%), bottomEnd = CornerSize(size = 50.0%), bottomStart = CornerSize(size = 50.0%))'\nStateDescription = '打开独立筛选页'\nText = '[筛选]'\nActions = [ClearTextSubstitution, GetTextLayoutResult, OnClick, RequestFocus, SetTextSubstitution, ShowTextSubstitution]\nMergeDescendants = 'true'\nSelector used: (TestTag = 'original-search-filters')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "indexPendingAndFailureKeepLiteralResultsAndExplicitRebuildControlHonest",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-rebuild')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "narrowLargeFontSeparatesNoHitsInvalidAndFailedDatesAndKeepsCorrectionAndClearReachable",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-from')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "readerReturnKeepsActualMemoriesListIndexAndOffsetWhenPaddingShowsPreviousItem",
+      "kind": "failure",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 2000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "compositionRestorationDropsSensitiveQueryDatesAndResultsAndRevokesOldActions",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-from')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "emptyAdvancedFiltersUseRealKeyboardDisclosureWithoutQueryOrInputReplacement",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Assert failed: The component with Text + InputText + EditableText contains '筛选与范围' (ignoreCase: false) is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalRecordsPresentationTest",
+      "method": "productionCaptureAndMemoriesStayCenteredAndBoundedOnWideScreens",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Failed to retrieve bounds of the node.\nReason: Expected exactly '1' node but could not find any node that satisfies: (Text + InputText + EditableText contains '0 条本机记录' (ignoreCase: false))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualAliasRecallPresentationTest",
+      "method": "keywordAliasRecallShowsLabelWithoutBodyHighlightKeepsNavigationAndExactOriginalMode",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-mode')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualPeoplePresentationTest",
+      "method": "explicitPersonAndKeywordSavedZoneDateOpenOriginalAndRetireStalePersonResult",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-person-apply')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTagPresentationTest",
+      "method": "changedTagVersionRevokesOldResultBeforeCompositionAndReadFailureIsDistinctFromEmpty",
+      "kind": "failure",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 2000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTagPresentationTest",
+      "method": "tagOnlyAndKeywordSavedZoneDateCombinationOpenFullOriginalAndReturnActualListPosition",
+      "kind": "failure",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 2000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTagPresentationTest",
+      "method": "tagSearchReturnKeepsExactPositionWithExportControlVisible",
+      "kind": "failure",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 2000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTagPresentationTest",
+      "method": "rawSavedStateAndRestorationExcludeTagConditionsInputsAndClearedFieldUndoHistory",
+      "kind": "failure",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 2000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTagRecallPresentationTest",
+      "method": "keywordTagRecallShowsLabelWithoutBodyHighlightKeepsNavigationAndExactOriginalMode",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-mode')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "landscapeDashboardKeepsCreateCancelAndConfirmedCompletionReachable",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Assert failed: The component with TestTag = 'companion-entry' is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "lostReadbackAckReinitializationPreservesOneIdentityAndNeverPublishesFalseEmpty",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'manual-task-refresh' in scrollable container\nSemantics of the node:\nNode #411 at (l=0.0, t=56.0, r=360.0, b=928.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@35636966'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 5 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "rawSavedStateExcludesTitlesAndEditorUndoAndRestorationRevokesOldNavigation",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Assert failed: The component with TestTag = 'manual-task-discard' is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "explicitDateOnlyCreateModifyPostponeAndClearWaitForAcknowledgement",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'manual-task-date-input')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "dashboardSeparatesDraftCountAndCreatingTaskNeverAddsAReminder",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Assert failed: The component with TestTag = 'companion-entry' is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "narrowDoubleFontKeepsCreateCloseAndNavigationReachableAndRevokesOldPageCallbacks",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Assert failed: The component with TestTag = 'companion-entry' is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "nonexistentAndRepeatedLocalTimesRequireExplicitCorrectionsAndOffsetChoice",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'manual-task-date-one' in scrollable container\nSemantics of the node:\nNode #2164 at (l=0.0, t=56.0, r=360.0, b=928.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@35636966'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 5 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "dateGroupsUseChosenZoneAndTerminalStateRetainsItsPlan",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Failed to assert the following: (Text + EditableText = [未设时间 · 待办 1])\nSemantics of the node:\nNode #2751 at (l=16.0, t=639.0, r=344.0, b=674.0)px, Tag: 'manual-task-heading-UNDATED'\nText = '[未设时间 · 待办]'\n[Heading]\nActions = [ClearTextSubstitution, GetTextLayoutResult, SetTextSubstitution, ShowTextSubstitution]\nSelector used: (TestTag = 'manual-task-heading-UNDATED')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskTitlePresentationTest",
+      "method": "unconfirmedTitleCanBeCancelledAndUnknownCommitHasNoSuccessUntilExactRetry",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'manual-task-title-open-synthetic-private-title-two' in scrollable container\nSemantics of the node:\nNode #2821 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@35636966'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 4 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskTitlePresentationTest",
+      "method": "explicitTitleCorrectionRequiresReviewAndConfirmationWithoutSavingPrivateInput",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'manual-task-title-open-synthetic-private-title-one' in scrollable container\nSemantics of the node:\nNode #2903 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@35636966'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 4 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskTitlePresentationTest",
+      "method": "sameTitleTasksRejectRetiredDialogAndRouteCallbacks",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'manual-task-title-open-synthetic-same-title-one' in scrollable container\nSemantics of the node:\nNode #2986 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=6, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@35636966'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=1000.0, maxValue=1000.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 5 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.MixedNotebookPresentationTest",
+      "method": "emptyLandscapeDoubleFontHasReachableStartAndFocusedComposerWithoutWriting",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'mixed-policy-details' in scrollable container\nSemantics of the node:\nNode #2228 at (l=0.0, t=56.0, r=640.0, b=108.0)px, Tag: 'mixed-list'\nCollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@62dcaa7d'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=1033.0, maxValue=1033.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 1 child, 3 siblings\nSelector used: (TestTag = 'mixed-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.MixedNotebookPresentationTest",
+      "method": "coldRegularFontLandscapeStartsCompactAndRetainsDraftAcrossReadOnlyActions",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: expected:<56.0> but was:<48.0>"
+    },
+    {
+      "class": "com.t1doo.aiyou.MixedNotebookPresentationTest",
+      "method": "realNotebookUsesBundledLuluOnlyWhenPreferenceIsReadyAndVisibleWithoutWritingRecords",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Assert failed: The component with Text + InputText + EditableText contains '生活的小片刻' (ignoreCase: false) is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.MobileNavigationPresentationTest",
+      "method": "productionTabsSwipeOnceAtEdgesAndReturnToUnchangedUnsavedDraftWithoutWrites",
+      "kind": "failure",
+      "message": "androidx.test.espresso.AppNotIdleException: Compose did not get idle after 50820 attempts in 60 SECONDS.\n\n1. Check your measure/layout lambdas for infinite composition loops.\n2. Verify that the 'busy' resources listed above are not deadlocked.\n3. Increase Espresso's master idling policy if a longer timeout is required.\n The following Idle Conditions failed ."
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "aiNoneHistoryRouteCreatesOnlyAnExplicitNewVersionAndKeepsNoInferencePolicy",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: (Text + InputText + EditableText contains '阅读全文' (ignoreCase: false))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "wrongKeyIndexHasExplicitVisibleErrorAndNoRecoveryButtons",
+      "kind": "failure",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "globalIndexFailureDisablesExistingButtonsAndVisibleRetryRestoresHealthyRecovery",
+      "kind": "failure",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "aiNoneColdDraftRecoveryAllowsExplicitManualSaveWithoutChangingPolicy",
+      "kind": "failure",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "narrowLargeFontColdRecoveryCorrectionAndSaveKeepCaptureAndImmutableOriginals",
+      "kind": "failure",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "explicitKeepConfirmationFailureStaysInEditorAndVisibleRetryThenReturns",
+      "kind": "failure",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "narrowLargeFontExplicitKeepReturnsToOriginalAndResumesWithoutFormalWrite",
+      "kind": "failure",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "missingSourceRecoveryRetainsTextAndExplicitDiscardCannotResurrectIt",
+      "kind": "failure",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "actualCipherWriteFailureRemainsVisibleAndCorrectedRetryPreservesCompleteInput",
+      "kind": "failure",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "partialIndexWarningIsVisibleAndHealthyRecoveryRemainsUsableWithoutShowingDamagedText",
+      "kind": "failure",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.QuestionKeywordPresentationTest",
+      "method": "landscapeDoubleFontScrollFocusAndEnterConfirmOnlyAfterValidWholeDateTuple",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'question-keyword-open' in scrollable container\nSemantics of the node:\nNode #753 at (l=0.0, t=56.0, r=640.0, b=248.0)px\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@2a8bedaa'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=1674.0, maxValue=1674.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 2 children\nSelector used: (ScrollToIndex is defined)\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.QuestionKeywordPresentationTest",
+      "method": "realAppRequiresExplicitDateAndQueriesOnceThenOpensUnchangedNegativeOriginal",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'question-keyword-open' in scrollable container\nSemantics of the node:\nNode #870 at (l=0.0, t=56.0, r=360.0, b=928.0)px\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@2a8bedaa'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 9 children\nSelector used: (ScrollToIndex is defined)\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.QuestionKeywordPresentationTest",
+      "method": "restorationAndActualActivityPauseRetireQuestionWithoutSavingOrQuerying",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'question-keyword-open' in scrollable container\nSemantics of the node:\nNode #989 at (l=0.0, t=56.0, r=360.0, b=928.0)px\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@2a8bedaa'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 9 children\nSelector used: (ScrollToIndex is defined)\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordEventDatePresentationTest",
+      "method": "eventDateBasisCombinesKeywordTagFavoriteAndNeverMatchesUnknownCaptureDate",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Failed: assertExists.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-date-basis')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SelectedQuestionConsentPresentationTest",
+      "method": "narrowDoubleFontSeparateMultiSourceReviewAndExactOriginalJump",
+      "kind": "failure",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 5000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.SelectedQuestionConsentPresentationTest",
+      "method": "withdrawUnknownAckHidesResultAndExplicitRetryNeverExecutesAgain",
+      "kind": "failure",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 5000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.SelectedQuestionConsentPresentationTest",
+      "method": "actualProductionQuestionInputAndConnectionAreSeparateFromRecordSavingAndPackageGateCannotBeBypassed",
+      "kind": "failure",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 5000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.SelectedQuestionConsentPresentationTest",
+      "method": "serviceReplacementRetiresOpenReviewAndDefaultCapabilityNeverOffersSend",
+      "kind": "failure",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 5000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.SkyglassPreferencesTest",
+      "method": "platformAtomicFileReplacementIsVisibleToReadback",
+      "kind": "failure",
+      "message": "org.junit.ComparisonFailure: Platform AtomicFile replacement must be confirmed expected:<synthetic-[second]> but was:<synthetic-[first]>"
+    },
+    {
+      "class": "com.t1doo.aiyou.SkyglassPreferencesTest",
+      "method": "legacyV4ReadIsUntouchedAndEveryThemeMotionPairSurvivesColdRead",
+      "kind": "failure",
+      "message": "java.io.IOException: UI preferences not confirmed"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceFactPresentationTest",
+      "method": "explicitCandidateSeparateAcceptanceCorrectionAndRevocationReachExactOriginalAndUnifiedFact",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceTaskPresentationTest",
+      "method": "narrowDoubleFontLiteralFlowRequiresSeparateConfirmationAndJumpsToExactOriginal",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'manual-task-source-SOURCE_TASK:4ea7ab4235b43c29793bf9d1ce79563b0641336c44eea7509e6bcaad35251499' in scrollable container\nSemantics of the node:\nNode #1685 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@6955113c'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 4 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskProposalPresentationTest",
+      "method": "failedRefreshQueueHidesUnverifiedEmptyAndRetainedDraftBodyUntilReadback",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'task-proposal-heading' in scrollable container\nSemantics of the node:\nNode #3944 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@6955113c'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 2 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskProposalPresentationTest",
+      "method": "narrowDraftColdRestoresInPendingGroupThenActualButtonRequiresSeparateConfirmation",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'task-proposal-heading' in scrollable container\nSemantics of the node:\nNode #4256 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=4, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@6955113c'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 3 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskReminderPresentationTest",
+      "method": "explicitReminderAndRevocationRequireRealConfirmationWithoutSavingPrivatePlan",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'reminder-open-synthetic-private-task-one' in scrollable container\nSemantics of the node:\nNode #50 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@59ae5e78'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 4 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskReminderPresentationTest",
+      "method": "dashboardShowsActualDeniedUnknownAndScheduledStatesWithoutPromisingDelivery",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'reminder-detail-status-synthetic-notification_denied' in scrollable container\nSemantics of the node:\nNode #132 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=7, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@59ae5e78'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=2015.0, maxValue=2015.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 3 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskReminderPresentationTest",
+      "method": "dateOnlyAndGlobalReadFailureDisableReminderWithoutChangingOriginalInput",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'reminder-open-synthetic-date-only' in scrollable container\nSemantics of the node:\nNode #252 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=6, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@59ae5e78'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=1000.0, maxValue=1000.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 5 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskReminderPresentationTest",
+      "method": "staleDialogAndRouteCallbacksCannotWriteAnotherTaskWithTheSameTitle",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'reminder-open-synthetic-same-title-one' in scrollable container\nSemantics of the node:\nNode #442 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=6, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@59ae5e78'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=1000.0, maxValue=1000.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 5 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UiPreferencesTest",
+      "method": "legacyDefaultsStayLocalAndExplicitNoneSurvivesNewFileAndViewModelOwners",
+      "kind": "failure",
+      "message": "java.io.IOException: UI preferences not confirmed"
+    },
+    {
+      "class": "com.t1doo.aiyou.UiPreferencesTest",
+      "method": "confirmedRecapWeekSurvivesNewStorageAndViewModelAndKeepsDisplayChoices",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: expected:<UiPreferences(showCompanion=true, reduceMotion=true, defaultRecapPeriod=WEEK, defaultCapturePolicy=LOCAL_ONLY, showCompanionScene=true, appearance=BLUE, backgroundMotion=DRIFT)> but was:<UiPreferences(showCompanion=false, reduceMotion=true, defaultRecapPeriod=WEEK, defaultCapturePolicy=LOCAL_ONLY, showCompanionScene=true, appearance=BLUE, backgroundMotion=DRIFT)>"
+    },
+    {
+      "class": "com.t1doo.aiyou.UiPreferencesTest",
+      "method": "lostDefaultWriteAcknowledgementShowsUnconfirmedAndRetriesOnlyTheSamePreference",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: expected:<LOCAL_ONLY> but was:<AI_NONE>"
+    },
+    {
+      "class": "com.t1doo.aiyou.UiPreferencesTest",
+      "method": "legacyDisplayBytesDefaultToDayAndAreUntouchedUntilExplicitPreferenceSave",
+      "kind": "failure",
+      "message": "java.io.IOException: UI preferences not confirmed"
+    },
+    {
+      "class": "com.t1doo.aiyou.UiPreferencesTest",
+      "method": "scenePreferenceMigratesV3WithoutChangingCapturePolicyOrWritingOnRead",
+      "kind": "failure",
+      "message": "java.io.IOException: UI preferences not confirmed"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnavailableControlsInteractionTest",
+      "method": "offlineLicenseRouteAndReturnToLocalMemoriesSurviveIntegration",
+      "kind": "failure",
+      "message": "java.lang.AssertionError: Assert failed: The component with Text + InputText + EditableText contains '0 条本机记录' (ignoreCase: false) is not displayed!"
+    }
+  ],
+  "archive_sha256": "9a21909ad9eead6c0cf905f45af2beb0a144d30704203670a0689cd2d7e45254",
+  "limitations": [
+    "Windows Robolectric, not emulator or device acceptance",
+    "No current full-suite PASS claim; retain every failure",
+    "Linux CI at same SHA is separate evidence"
+  ]
+}

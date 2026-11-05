@@ -54,7 +54,8 @@ import com.t1doo.aiyou.designsystem.aiyouFocusOutline
 /** Natural height at large font scales; system insets remain part of the chrome. */
 @Composable
 fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = true,
-    containerColor: Color = AIyouColors.surface, contentColor: Color = AIyouColors.textPrimary, onAction: () -> Unit) {
+    containerColor: Color = AIyouColors.surface, contentColor: Color = AIyouColors.textPrimary,
+    companion: (@Composable () -> Unit)? = null, onAction: () -> Unit) {
     Surface(color = containerColor, contentColor = contentColor) {
         Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
             .heightIn(min = 56.dp).padding(horizontal = AIyouDimensions.pageNarrow),
@@ -64,6 +65,7 @@ fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = 
                 Text("爱忆", Modifier.alignByBaseline().semantics { heading() }, style = MaterialTheme.typography.titleLarge)
                 Text("AIyou", Modifier.alignByBaseline(), style = MaterialTheme.typography.labelSmall, color = AIyouColors.textSecondary)
             } else Text(title, Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+            companion?.invoke()
             TextButton(onClick = onAction, enabled = actionEnabled,
                 shape = MaterialTheme.shapes.medium,
                 colors = ButtonDefaults.textButtonColors(containerColor = Color.Transparent, contentColor = contentColor),

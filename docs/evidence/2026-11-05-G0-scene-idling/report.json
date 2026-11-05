@@ -1,0 +1,127 @@
+{
+  "batch": "G0 animation idling recovery plus lost native companion entry",
+  "base_sha": "f5cc92c4529f53574977205518b382e5b0a883d4",
+  "source_sha256_lf_normalized": {
+    "app/src/main/java/com/t1doo/aiyou/MainActivity.kt": "4ae161d6208661e64ae5f3f0af17618443f33b2eab72319e2c3babadb1a5906d",
+    "app/src/main/java/com/t1doo/aiyou/ui/NotebookChrome.kt": "7151e77e9b0fc68ccc87cd3ea3676058a80cfe4d56ab49feaa227953f8bb0ed5",
+    "app/src/main/java/com/t1doo/aiyou/ui/SkyglassScene.kt": "3ac3af89933de73083b002aa3a9a6c2e8870d8f233be26666fb226ce1e24bc51"
+  },
+  "required_checks": {
+    "status": "PASS",
+    "exit_code": 0,
+    "command": "./gradlew.bat --no-daemon --offline :app:checkDebugAarMetadata :app:assembleDebug :core:domain:test :app:lintDebug :app:testDebugUnitTest --tests '*CompanionSettingsPresentationTest.eachProductionDestinationReturnsFromSettingsWithoutChangingSelection' --console=plain",
+    "cache_note": "AAR and domain tests UP-TO-DATE; assemble, lint and targeted UI test executed"
+  },
+  "targeted_ui": {
+    "tests": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "test_source_changed": false,
+  "animation_api": "androidx.compose.animation.core.withInfiniteAnimationFrameNanos",
+  "official_api": "https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/InfiniteAnimationPolicy",
+  "device": {
+    "serial": "emulator-5556",
+    "api": "35",
+    "release": "15",
+    "model": "Android SDK built for x86_64",
+    "size": "Physical size: 1080x2400",
+    "density": "Physical density: 480",
+    "input_method": "com.android.inputmethod.latin/.LatinIME",
+    "apk_sha256": "f322225b6bb0e68927ab46aea00f2592b168b6f337547c495efec51b49c5dc50",
+    "apk_bytes": 32059279,
+    "source": "f5cc92c + SkyglassScene/NotebookChrome/MainActivity working-tree patch; committed delivery binds source digests",
+    "limitations": [
+      "Emulator API35 only",
+      "No Chinese IME or TalkBack validation",
+      "No fps/frame-time or OEM reminder/16KB acceptance"
+    ],
+    "reduced_motion_restored": true
+  },
+  "motion": {
+    "reduced": {
+      "roi": [
+        80,
+        1300,
+        1000,
+        1750
+      ],
+      "difference_bbox": null,
+      "mean_absolute_rgb_difference": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "capture_gap_seconds": 25.92509174346924
+    },
+    "allowed": {
+      "roi": [
+        80,
+        1300,
+        1000,
+        1750
+      ],
+      "difference_bbox": [
+        0,
+        0,
+        920,
+        450
+      ],
+      "mean_absolute_rgb_difference": [
+        1.1731980676328502,
+        1.1922125603864735,
+        0.7187391304347827
+      ],
+      "capture_gap_seconds": 6.042658090591431
+    },
+    "before_reduce_motion_checked": "true",
+    "off_reduce_motion_checked": "false",
+    "roi_has_no_labeled_ui_in_actual_task_hierarchy": true
+  },
+  "companion_bounds_px": [
+    678,
+    148,
+    822,
+    292
+  ],
+  "companion_size_dp": 48,
+  "ui_actions": [
+    "Installed current APK after boot_completed=1",
+    "Opened Memories and Tasks through actual bottom navigation",
+    "Opened companion panel via actual entry and closed it",
+    "Read original NIGHT/GLOW/reduce-motion=true preferences",
+    "Temporarily disabled reduce motion, captured same task page twice, restored original preference and read back true"
+  ],
+  "screenshots": {
+    "memories-entry.png": {
+      "sha256": "d47dad4d9a9debe74524398ae71a94fceee6db92c74d0266bf2eba45b13ddaed",
+      "bytes": 964128
+    },
+    "tasks-entry-a.png": {
+      "sha256": "a8eaba4bc1d15b98eb6ca43b0229879b34af1be305f2143b20a2872a508cf811",
+      "bytes": 866340
+    },
+    "tasks-entry-b.png": {
+      "sha256": "d6015a329e999b726334493d52c09aaabfd4ef302d6560f339170354967d5301",
+      "bytes": 866391
+    },
+    "motion-a.png": {
+      "sha256": "364513ac7c0a0acba83b9e817b28b1749d8186177418b768c6d3d6cc9c619dbe",
+      "bytes": 900911
+    },
+    "motion-b.png": {
+      "sha256": "47e9fc4d07945ac91168dd292f7193e97ab54fe3403aa90bbdc253977160e72a",
+      "bytes": 894212
+    }
+  },
+  "shutdown": "Owned emulator exited; no devices remained; adb server started by this run stopped.",
+  "remaining": [
+    "Latest full UI result is f5cc92c: 409 tests,71 failures; no full rerun after this patch",
+    "Current delivery CI pending",
+    "Full three-theme/large-font/secondary-route visual comparison",
+    "System status-bar clipping visible in this AVD, not signed off",
+    "Real Chinese IME/TalkBack/OEM reminders/16KB/performance not verified"
+  ],
+  "archive_sha256": "54d6fd84e7096b8076d85b8a0fed9df13f04b14eb89f8abd42c5d9426dfba6aa"
+}
