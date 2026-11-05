@@ -314,32 +314,52 @@ class RecordEventDatePresentationTest {
         state.value=state.value.copy(eventDates=durable.toMap())
         compose.setContent{Screen()}
         compose.showOriginalSearchFilters()
-        control("original-search-date-basis").performClick()
+        control("original-search-date-basis-EVENT").performClick()
+        compose.applyOriginalSearchFilters()
         compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.dateBasis==RecordDateBasis.EVENT}==true}
         assertEquals(listOf("one"),results.get().hits.map{it.entry.id})
+        // A failure after a filter was already applied is distinct from the
+        // rejected staged submission below: hide results until explicit recovery.
+        compose.runOnIdle{state.value=state.value.copy(eventDatesAvailable=false,eventDatesError="合成已应用来源读取失败")}
+        compose.waitForIdle()
+        compose.waitUntil(2_000){results.get()?.stage==OriginalSearchStage.FAILED}
+        assertTrue(results.get().hits.isEmpty())
+        compose.showOriginalSearchFilters()
+        control("original-search-event-date-retry").assertIsEnabled().performClick()
+        compose.waitForIdle()
+        compose.waitUntil(2_000){results.get()?.stage==OriginalSearchStage.READY}
+        assertEquals(listOf("one"),results.get().hits.map{it.entry.id})
+        control("original-filter-cancel").performClick()
         control("original-search-query").performTextReplacement("coffee")
+        compose.showOriginalSearchFilters()
         control("original-search-from").performTextReplacement("2024-03-10")
         control("original-search-through").performTextReplacement("2024-03-10")
         control("original-search-tag").performClick()
         compose.onNodeWithTag("original-search-tag-option-0").performClick()
-        control("original-search-favorites").performClick()
+        compose.applyOriginalSearchFilters()
+        control("original-category-favorites").performClick()
         compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.onlyFavorites&&it.input.tag=="手工"&&it.input.through=="2024-03-10"}==true}
         assertEquals(listOf("one"),results.get().hits.map{it.entry.id})
-        control("original-search-date-basis").performClick()
+        compose.showOriginalSearchFilters()
+        control("original-search-date-basis-CAPTURED").performClick()
+        compose.applyOriginalSearchFilters()
         compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.dateBasis==RecordDateBasis.CAPTURED}==true}
         assertTrue(results.get().hits.isEmpty())
-        control("original-search-clear").performClick()
+        compose.clearOriginalSearchIncludingQuery()
         compose.waitUntil(2_000){results.get()?.stage==OriginalSearchStage.BROWSE}
         assertEquals(RecordDateBasis.CAPTURED,results.get().input.dateBasis)
         compose.runOnIdle{state.value=state.value.copy(eventDatesAvailable=false,eventDatesError="合成读取失败")}
         compose.showOriginalSearchFilters()
-        control("original-search-date-basis").performClick()
-        compose.waitUntil(2_000){results.get()?.stage==OriginalSearchStage.FAILED}
+        control("original-search-date-basis-EVENT").performClick()
+        control("original-search-filter-done").performClick()
+        control("original-filter-error").assertIsDisplayed()
+        compose.runOnIdle {assertEquals(OriginalSearchStage.BROWSE,results.get().stage);assertEquals(RecordDateBasis.CAPTURED,results.get().input.dateBasis)}
         control("original-search-event-date-retry").assertIsEnabled().performClick()
         // The synthetic repository publishes Compose State directly. Apply its
         // queued UI update before polling the separate search controller result;
         // mainClock/waitUntil alone does not flush Android's pending UI work.
         compose.waitForIdle()
+        compose.applyOriginalSearchFilters()
         try {
             compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.dateBasis==RecordDateBasis.EVENT}==true}
         } catch (failure:ComposeTimeoutException) {

@@ -375,6 +375,15 @@ for label, folder, minimum in targets:
             "lostClearAckHasReachableSameClearRetryAndCannotPromiseContinuedEditingBeforeVerification",
             "viewportAndFontChangesPreserveDraftAndRangeThenSaveOnlyOnExplicitAction",
         )
+        additional["com.t1doo.aiyou.OriginalFilterDraftTest"] = (
+            "cancelDoesNotApplyAndResetOnlyChangesPanelDraftUntilConfirmed",
+            "invalidDateAndRejectedOwnerKeepPanelAndDoNotClaimApply",
+            "rawFiltersStayOutOfDiagnosticTextAndDatesAreValidated",
+        )
+        additional["com.t1doo.aiyou.OriginalFilterRecoveryPresentationTest"] = (
+            "metadataRetriesRemainReachableWithoutApplyingDraftAndLoadingDisablesDuplicateFavoriteRetry",
+            "recoveryPreservesPrivatePersonAndDateDraftAndNeverAppliesUnavailableEventSource",
+        )
         additional["com.t1doo.aiyou.MemoryToolsReturnPresentationTest"] = (
             "returnFromRecapKeepsCallerToolsVisibleAndPanelClosed",
             "readinessChangeAndRecreationDropDisclosureAndNeverReopenOldPanel",

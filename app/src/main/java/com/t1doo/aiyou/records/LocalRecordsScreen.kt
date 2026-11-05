@@ -162,6 +162,7 @@ fun LocalRecordsScreen(
     appearance: com.t1doo.aiyou.designsystem.SkyglassAppearance? = null,
     onApplyFilters: ((OriginalFilterDraft) -> Boolean)? = null,
     memoryToolsExpandedState: androidx.compose.runtime.MutableState<Boolean>? = null,
+    onRefreshTags:(()->Unit)?=null,
 ) {
     com.t1doo.aiyou.designsystem.OptionalSkyglassTheme(appearance) {
     // Presentation only. Never retain a source, query proof or controller in disclosure state.
@@ -325,7 +326,7 @@ fun LocalRecordsScreen(
     val currentEntries by rememberUpdatedState(displayedEntries)
     val returnObserver = LocalOriginalReadingObserver.current
     val contentKeys = buildList {
-        add("summary")
+        if(appearance==null) add("summary")
         if (destination == Destination.NOW) add("composer")
         if (local.opening) add("loading")
         if (local.error != null) add("error")
@@ -333,6 +334,7 @@ fun LocalRecordsScreen(
         if (local.editDraftError != null) add("edit-draft-error")
         addAll(visiblePendingEdits.map { "edit-draft-${it.id}" })
         if (destination == Destination.MEMORIES) add("search")
+        if(appearance!=null && memoryToolsExpanded) add("summary")
         if (filtered) add("search-status")
         if (destination == Destination.NOW) add("recent")
         if (local.ready && local.entries.isEmpty()) add("empty")
@@ -522,6 +524,7 @@ fun LocalRecordsScreen(
                             onRefreshEventDates = onRefreshEventDates,onQuestionKeywords=onQuestionKeywords,
                             onTools=if(appearance!=null)({memoryToolsExpanded=!memoryToolsExpanded})else null,
                             toolsOwner=toolsOwner,
+                            onRefreshTags=onRefreshTags,
                             onApplyFilters=onApplyFilters,
                             searchNeedsAttention = searchState.stage == OriginalSearchStage.WAITING ||
                                 searchState.stage == OriginalSearchStage.RUNNING || searchState.stage == OriginalSearchStage.INVALID ||

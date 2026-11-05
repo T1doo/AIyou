@@ -39,7 +39,9 @@ internal fun OriginalFiltersDialog(initial: OriginalFilterDraft, enabled: Boolea
     tagsAvailable: Boolean, peopleSupported: Boolean, peopleAvailable: Boolean,
     eventDatesAvailable: Boolean, onDismiss: () -> Unit, onApply: (OriginalFilterDraft) -> Boolean,
     onRefreshPeople: () -> Unit, onRefreshEventDates: () -> Unit,
-    indexSupported: Boolean, indexBusy: Boolean, onRebuild: () -> Unit, onClearAll: () -> Unit) {
+    indexSupported: Boolean, indexBusy: Boolean, onRebuild: () -> Unit, onClearAll: () -> Unit,
+    favoritesSupported:Boolean=false,favoritesAvailable:Boolean=true,favoritesLoading:Boolean=false,
+    onRefreshFavorites:()->Unit={},issues:List<String> = emptyList(),onRefreshTags:(()->Unit)?=null) {
     var draft by remember { mutableStateOf(initial) }
     var error by remember { mutableStateOf<String?>(null) }
     var choosingTag by remember { mutableStateOf(false) }
@@ -67,7 +69,8 @@ internal fun OriginalFiltersDialog(initial: OriginalFilterDraft, enabled: Boolea
                         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                             RecordDateBasis.entries.forEach { basis ->
                                 FilterChip(selected=draft.basis==basis,onClick={draft=draft.copy(basis=basis)},enabled=enabled,
-                                    label={Text(if(basis==RecordDateBasis.CAPTURED)"记录日期" else "事件日期")})
+                                    label={Text(if(basis==RecordDateBasis.CAPTURED)"记录日期" else "事件日期")},
+                                    modifier=Modifier.testTag("original-search-date-basis-"+basis.name))
                             }
                         }
                         OutlinedTextField(value=draft.from,onValueChange={if(it.length<=10)draft=draft.copy(from=it)},enabled=enabled,
@@ -88,8 +91,19 @@ internal fun OriginalFiltersDialog(initial: OriginalFilterDraft, enabled: Boolea
                         if(peopleSupported) OutlinedTextField(value=draft.person.orEmpty(),onValueChange={if(it.length<=160)draft=draft.copy(person=it)},
                             enabled=enabled&&peopleAvailable,label={Text("人物称呼")},singleLine=true,shape=MaterialTheme.shapes.medium,
                             modifier=Modifier.fillMaxWidth().testTag("original-search-person-input"))
-                        if(peopleSupported&&!peopleAvailable) TextButton(onRefreshPeople,enabled=enabled){Text("重试读取人物")}
-                        if(draft.basis==RecordDateBasis.EVENT&&!eventDatesAvailable) TextButton(onRefreshEventDates,enabled=enabled){Text("重试读取事件日期")}
+                        issues.forEachIndexed { index,message -> Text(message,color=MaterialTheme.colorScheme.error,
+                            modifier=Modifier.testTag("original-filter-recovery-error-$index")) }
+                        if(peopleSupported&&!peopleAvailable) TextButton(onRefreshPeople,enabled=enabled,
+                            modifier=Modifier.heightIn(min=48.dp).testTag("original-search-person-retry")){Text("重试读取人物")}
+                        if(draft.basis==RecordDateBasis.EVENT&&!eventDatesAvailable) TextButton(onRefreshEventDates,enabled=enabled,
+                            modifier=Modifier.heightIn(min=48.dp).testTag("original-search-event-date-retry")){Text("重试读取事件日期")}
+                        if(!tagsAvailable && onRefreshTags!=null) TextButton(onRefreshTags,enabled=enabled,
+                            modifier=Modifier.heightIn(min=48.dp).testTag("original-search-tag-retry")){Text("重试读取标签")}
+                        if(favoritesSupported) {
+                            if(favoritesLoading) Text("正在读取收藏状态…",modifier=Modifier.testTag("original-search-favorites-loading"))
+                            if(!favoritesAvailable) TextButton(onRefreshFavorites,enabled=enabled&&!favoritesLoading,
+                                modifier=Modifier.heightIn(min=48.dp).testTag("original-search-favorites-retry")){Text("重试读取收藏")}
+                        }
                         error?.let { Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("original-filter-error")) }
                         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
                             TextButton(onClick={draft=OriginalFilterDraft();error=null},enabled=enabled,
@@ -97,6 +111,7 @@ internal fun OriginalFiltersDialog(initial: OriginalFilterDraft, enabled: Boolea
                             TextButton(onClick={maintenance=!maintenance},modifier=Modifier.heightIn(min=48.dp)){Text("更多查找设置")}
                         }
                         if(maintenance) {
+                            if(indexBusy) Text("正在整理本机查找，原文仍可查找。")
                             TextButton(onClick={onClearAll();onDismiss()},enabled=enabled,
                                 modifier=Modifier.heightIn(min=48.dp).testTag("original-search-clear")){Text("清空全部查找，包括搜索词")}
                             if(indexSupported) TextButton(onRebuild,enabled=enabled&&!indexBusy,

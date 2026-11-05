@@ -1,0 +1,41 @@
+{
+  "base_sha": "f5f9f4bc89c6f2379990bc76b6f4cde1832d72e1",
+  "run_id": 42033865090,
+  "url": "https://github.com/T1doo/AIyou/actions/runs/42033865090",
+  "host": {
+    "job_id": 127266825188,
+    "conclusion": "success",
+    "excerpt": [
+      "2026-11-05T13:27:11.5358390Z PASS: domain tests=78 actual=78 failures=0 errors=0 skipped=0",
+      "2026-11-05T13:27:35.6009472Z Ran 254 tests in 22.086s",
+      "2026-11-05T13:27:35.6009684Z OK",
+      "2026-11-05T13:29:44.5735609Z PASS: domain tests=78 actual=78 failures=0 errors=0 skipped=0",
+      "2026-11-05T13:29:45.8734248Z PASS: domain tests=78 actual=78 failures=0 errors=0 skipped=0"
+    ]
+  },
+  "android": {
+    "job_id": 127275101993,
+    "conclusion": "failure",
+    "xml": {
+      "tests": 411,
+      "failures": 36,
+      "errors": 0,
+      "skipped": 0,
+      "files_opened": 74
+    },
+    "artifact": {
+      "id": 13418763990,
+      "digest": "sha256:4844319c2a68028e8f2f7329371101513f7e2ae75ba1872a5da478f5e2cf5259",
+      "size": 1346486
+    }
+  },
+  "preview": {
+    "job_id": 127275101888,
+    "conclusion": "success",
+    "excerpt": [
+      "2026-11-05T13:39:31.8979983Z PASS: Preview render smoke tests=444 PNGs=444 failures/errors/skipped=0"
+    ],
+    "visual_acceptance": false
+  },
+  "scope": "Base commit only. Current filter patch full CI not yet executed; no signed download URL retained."
+}

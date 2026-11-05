@@ -114,6 +114,7 @@ class ManualTagPresentationTest {
         chooseTag(); val only = result { it.stage == OriginalSearchStage.READY && it.input.tag == TAG }
         assertEquals(listOf("one", "two"), only.state.hits.map { it.entry.id })
         field("original-search-query", "咖啡"); field("original-search-from", "2026-10-14"); field("original-search-through", "2026-10-14")
+        compose.applyOriginalSearchFilters()
         val found = result { it.stage == OriginalSearchStage.READY && it.input.from == "2026-10-14" && it.input.through == "2026-10-14" }
         assertEquals(listOf("one"), found.state.hits.map { it.entry.id })
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"))
@@ -146,7 +147,7 @@ class ManualTagPresentationTest {
         assertTrue(result { it.stage == OriginalSearchStage.READY && it !== old.state }.state.hits.isEmpty())
         compose.runOnIdle { state.value = state.value.copy(manualTagsAvailable = false, manualTags = emptyMap(), manualTagsError = "手工标签暂不可读取，请重试。") }
         assertTrue(result { it.stage == OriginalSearchStage.FAILED }.state.hits.isEmpty())
-        compose.onNodeWithTag("original-search-clear").performScrollTo().performClick()
+        compose.clearOriginalSearchIncludingQuery()
         result { it.stage == OriginalSearchStage.BROWSE && it.input.tag == null }
     }
     @Test fun narrowLargeFontEditorKeepsActionsReachableAndHidesPersistedLabelsWhenSourceFails() {
@@ -172,10 +173,11 @@ class ManualTagPresentationTest {
         chooseTag(); val old = result { it.stage == OriginalSearchStage.READY && it.input.tag == TAG }
         assertEquals(2, old.state.hits.size)
         field("original-search-query", "合成敏感查询"); field("original-search-from", "2026-10-14")
+        compose.applyOriginalSearchFilters()
         result { it.stage == OriginalSearchStage.READY && it.input.query == "合成敏感查询" }
         compose.runOnIdle { assertPrivate(registry!!.performSave(), listOf(TAG, "合成敏感查询", "2026-10-14")) }
         val oldField = inputs.get().first
-        compose.onNodeWithTag("original-search-clear").performScrollTo().performClick(); result { it.stage == OriginalSearchStage.BROWSE }
+        compose.clearOriginalSearchIncludingQuery(); result { it.stage == OriginalSearchStage.BROWSE }
         compose.runOnIdle { assertNotSame(oldField, inputs.get().first); assertFalse(inputs.get().first.undoState.canUndo); assertFalse(inputs.get().first.undoState.canRedo) }
         chooseTag(); restoration.emulateSavedInstanceStateRestore()
         result { it.stage == OriginalSearchStage.BROWSE && it.input.tag == null && it.input.query.isEmpty() }
@@ -210,8 +212,12 @@ class ManualTagPresentationTest {
         compose.onNodeWithTag("original-search-tag").performScrollTo().performClick(); compose.waitForIdle()
         val index = persisted.values.flatMap { it.names }.distinct().sorted().indexOf(TAG)
         compose.onNodeWithTag("original-search-tag-option-$index").performClick()
+        compose.applyOriginalSearchFilters()
     }
-    private fun field(tag: String, text: String) = compose.onNodeWithTag(tag).performScrollTo().assertIsEnabled().performTextReplacement(text)
+    private fun field(tag: String, text: String) {
+        if(tag in setOf("original-search-from","original-search-through")) compose.showOriginalSearchFilters()
+        compose.onNodeWithTag(tag).performScrollTo().assertIsEnabled().performTextReplacement(text)
+    }
     private fun editable(tag: String) = compose.onNodeWithTag(tag).performScrollTo().fetchSemanticsNode().config[SemanticsProperties.EditableText].text
     private fun result(predicate: (OriginalSearchState) -> Boolean): Result {
         compose.waitForIdle(); compose.waitUntil(2_000) { results.get()?.state?.let(predicate) == true }; compose.waitForIdle()

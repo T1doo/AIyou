@@ -1509,6 +1509,7 @@ fun AIyouApp(
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
                 memoryToolsExpandedState = memoryToolsExpandedState,
+                onRefreshTags={navigation.gate.inputAction(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){onRefreshLocalSearch()}},
                 appearance=if(skyglassHome)display.preferences.appearance else null,
                 onApplyFilters={draft->
                     var applied=false

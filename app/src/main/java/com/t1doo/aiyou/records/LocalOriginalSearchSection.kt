@@ -100,7 +100,8 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     peopleAvailable: Boolean = false, peopleError: String? = null, onPerson: (String?) -> Unit = {},
     onRefreshPeople: () -> Unit = {},onQuestionKeywords:(()->Unit)?=null,
     searchNeedsAttention: Boolean = false, onTools: (() -> Unit)? = null,
-    onApplyFilters: ((OriginalFilterDraft) -> Boolean)? = null, toolsOwner: Any? = null) {
+    onApplyFilters: ((OriginalFilterDraft) -> Boolean)? = null, toolsOwner: Any? = null,
+    onRefreshTags:(()->Unit)?=null) {
     // These owners live outside the disclosure, never in SavedState. Collapsing an
     // empty filter must not replace its actual editable/Undo object or hide errors.
     val glass = com.t1doo.aiyou.designsystem.LocalSkyglassActive.current
@@ -176,7 +177,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 if(indexSupported)onQuestionKeywords?.let{open->TextButton(onClick=open,enabled=enabled,
                     modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).aiyouFocusOutline().testTag("question-keyword-open")){Text("从问题里选词")}}
             }
-            if(!glass || searchToolsOpen || mode==OriginalSearchMode.EXACT) TextButton(onClick = onMode, enabled = enabled,
+            if(!glass || searchToolsOpen || query.text.isNotEmpty() || mode==OriginalSearchMode.EXACT) TextButton(onClick = onMode, enabled = enabled,
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-mode")) {
                 Text(if(glass) {if(mode==OriginalSearchMode.EXACT) "精确片段" else "关键词"} else if (mode == OriginalSearchMode.EXACT) "精确片段 · 区分大小写和空白" else "关键词 · 全部包含，忽略大小写")
             }
@@ -205,13 +206,15 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
         }
         if(activeFilters.isNotEmpty()) Text(activeFilters.joinToString(" · "),Modifier.fillMaxWidth().testTag("original-search-active-filters"),
             style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        for(error in filterErrors) Text(error,Modifier.fillMaxWidth(),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
+        if(!filtersExpanded) for(error in filterErrors) Text(error,Modifier.fillMaxWidth(),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
         if(indexBusy||favoritesLoading) Text("正在核对筛选资料…",style=MaterialTheme.typography.bodySmall)
         if(searchNeedsAttention) Text("查找条件或本机索引待核对；可打开筛选调整，或在结果提示处重试。",style=MaterialTheme.typography.bodySmall)
         if(filtersExpanded && onApplyFilters!=null) OriginalFiltersDialog(
             OriginalFilterDraft(from.text.toString(),through.text.toString(),dateBasis,tag,person),enabled,
             tags.values.flatMap {it.names}.distinct().sorted(),tagsAvailable,peopleSupported,peopleAvailable,eventDatesAvailable,
-            ::closeFilters,onApplyFilters,onRefreshPeople,onRefreshEventDates,indexSupported,indexBusy,onRebuild,onClear)
+            ::closeFilters,onApplyFilters,onRefreshPeople,onRefreshEventDates,indexSupported,indexBusy,onRebuild,onClear,
+            favoritesSupported=favoritesSupported,favoritesAvailable=favoritesAvailable,favoritesLoading=favoritesLoading,
+            onRefreshFavorites=onRefreshFavorites,issues=filterErrors,onRefreshTags=onRefreshTags?.takeIf {tagsError!=null})
         if(filtersExpanded && onApplyFilters==null) Dialog(onDismissRequest=::closeFilters,properties=DialogProperties(usePlatformDefaultWidth=false)) {
             Surface(color=MaterialTheme.colorScheme.surface) {
                 Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(16.dp)

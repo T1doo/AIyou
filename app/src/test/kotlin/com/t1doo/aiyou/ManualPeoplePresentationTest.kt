@@ -95,9 +95,10 @@ class ManualPeoplePresentationTest {
     }
     @Test fun explicitPersonAndKeywordSavedZoneDateOpenOriginalAndRetireStalePersonResult(){
         content();compose.showOriginalSearchFilters();field("original-search-person-input","小林")
-        compose.onNodeWithTag("original-search-person-apply").performScrollTo().performClick()
+        compose.applyOriginalSearchFilters()
         await{it.stage==OriginalSearchStage.READY&&it.input.person=="小林"};assertEquals(2,result!!.hits.size)
         field("original-search-query","咖啡");field("original-search-from","2026-10-14");field("original-search-through","2026-10-14")
+        compose.applyOriginalSearchFilters()
         await{it.stage==OriginalSearchStage.READY&&it.input.through=="2026-10-14"};assertEquals(listOf("one"),result!!.hits.map{it.entry.id})
         val stale=result!!;val staleOpen=open!!
         compose.runOnIdle{state.value=state.value.copy(manualPeople=emptyMap());staleOpen(stale.hits.single())}
@@ -131,7 +132,10 @@ class ManualPeoplePresentationTest {
     private fun openEditor(){compose.runOnIdle{navigation.openEntry("one")};compose.waitForIdle()
         compose.originalTool("original-manual-people").performScrollTo().performClick();pump()}
     private fun pump(){compose.runOnIdle{runBlocking{queue.removeFirst()(store)}};compose.waitForIdle()}
-    private fun field(tag:String,text:String)=compose.onNodeWithTag(tag).performScrollTo().performTextReplacement(text)
+    private fun field(tag:String,text:String) {
+        if(tag in setOf("original-search-from","original-search-through")) compose.showOriginalSearchFilters()
+        compose.onNodeWithTag(tag).performScrollTo().performTextReplacement(text)
+    }
     private fun assertInputEquals(value:String)=compose.onNodeWithTag("manual-people-input").assert(
         SemanticsMatcher.expectValue(SemanticsProperties.EditableText,AnnotatedString(value)))
     private fun await(predicate:(OriginalSearchState)->Boolean){compose.waitForIdle();compose.waitUntil(2_000){result?.let(predicate)==true};compose.waitForIdle()}

@@ -21,3 +21,9 @@ internal fun ComposeContentTestRule.clearOriginalSearchIncludingQuery() {
     }
     onNodeWithTag("original-search-clear").performScrollTo().assertIsEnabled().performClick()
 }
+
+/** Advanced inputs are staged; only the actual Apply action changes the query. */
+internal fun ComposeContentTestRule.applyOriginalSearchFilters() {
+    onNodeWithTag("original-search-filter-done").performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
+    onAllNodesWithTag("original-search-filter-page").assertCountEquals(0)
+}
