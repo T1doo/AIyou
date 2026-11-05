@@ -530,7 +530,7 @@ fun LocalRecordsScreen(
                                 searchState.stage == OriginalSearchStage.RUNNING || searchState.stage == OriginalSearchStage.INVALID ||
                                 searchState.stage == OriginalSearchStage.FAILED)
                     else SearchSection(demo = false)
-                    if (local.localSearch != null && (appearance==null || memoryToolsExpanded || evidenceMode)) TextButton(onClick = { onEvidenceMode(!evidenceMode) },
+                    if (local.localSearch != null && (appearance==null || memoryToolsExpanded || evidenceMode || searchQuery?.text?.isNotBlank()==true)) TextButton(onClick = { onEvidenceMode(!evidenceMode) },
                         enabled = local.ready && !local.opening && local.error == null,
                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("local-evidence-mode")) {
                         Text(if(onEvidenceQuestionChange!=null) {

@@ -53,8 +53,8 @@ class FullBackupPresentationTest {
     private val backupAction=AtomicReference<() -> Unit>()
     private val draft=CaptureDraft("6ffdf464-38bc-43c0-98d7-2c0a29aa2bed",4,"合成设置往返保留的正文",emptyList())
     private var unexpectedWrites=0
-    private val mixed=MixedCaptureController({f.state.value},{f.state.value=it(f.state.value)},
-        {unexpectedWrites++;false},{error("No media operation")},Clock.systemUTC())
+    private val mixed by lazy {MixedCaptureController({f.state.value},{f.state.value=it(f.state.value)},
+        {unexpectedWrites++;false},{error("No media operation")},Clock.systemUTC())}
     private fun settingsState()=f.state.value.copy(text=draft.text,supportsMixedCapture=true,
         mixedCapture=MixedCaptureUiState(draft=draft,text=draft.text,supportsProcessingChoice=true))
     @Composable private fun SettingsContent(fontScale:Float) {
@@ -93,7 +93,7 @@ class FullBackupPresentationTest {
         compose.onNodeWithText("返回设置").performClick()
         compose.onNodeWithTag("settings-full-backup").assertIsDisplayed().assertIsEnabled()
         compose.onNodeWithText("返回").performClick()
-        compose.onNodeWithTag("mixed-list").performScrollToNode(hasTestTag("mixed-text"))
+        compose.onNodeWithTag("mixed-text").assertIsDisplayed().assertIsEnabled()
         assertEquals(draft.text,compose.onNodeWithTag("mixed-text").fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         compose.runOnIdle { assertNull(f.state.value.recordPackage);assertNoSettingsIo() }
     }

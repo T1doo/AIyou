@@ -84,7 +84,9 @@ class SavedQuestionDiagnosticTests(unittest.TestCase):
         self.assertFalse(probe.REF.removeprefix('refs/heads/').startswith('codex/'))
         self.assertEqual(8 * 1024 * 1024, probe.MAX_ARTIFACT)
         for path, digest in probe.SOURCES.items():
-            self.assertEqual(digest, hashlib.sha256((ROOT / path).read_bytes()).hexdigest())
+            historical = ROOT / 'scripts/tests/fixtures/saved-question-diagnostic/SelectedQuestionConsentPresentationTest.kt.fixture'
+            source = historical if path.endswith('/SelectedQuestionConsentPresentationTest.kt') else ROOT / path
+            self.assertEqual(digest, hashlib.sha256(source.read_bytes()).hexdigest())
         form = (ROOT / next(p for p in probe.SOURCES if p.endswith('/SavedQuestionsPresentationTest.kt'))).read_text()
         self.assertIn('@GraphicsMode(GraphicsMode.Mode.NATIVE)', form)
         self.assertIn('pixels.firstOrNull {(it ushr 24)!=0}', form)

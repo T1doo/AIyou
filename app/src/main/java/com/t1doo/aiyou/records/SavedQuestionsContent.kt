@@ -2,6 +2,10 @@ package com.t1doo.aiyou.records
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -17,18 +21,22 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.t1doo.aiyou.designsystem.AIyouDimensions
 
 /** No model placeholder answer, source excerpt, credential, SavedState or automatic record write. */
 @Composable internal fun SavedQuestionsContent(u:SavedQuestionsUi,c:SavedQuestionsController,onUse:(()->Unit)?=null) {
-    Dialog(onDismissRequest={c.close(u)}) {
+    Dialog(onDismissRequest={c.close(u)},properties=DialogProperties(usePlatformDefaultWidth=false)) {
+        BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(16.dp),contentAlignment=Alignment.Center) {
+        val availableHeight=maxHeight
         Surface(shape=MaterialTheme.shapes.large) {
-            Column(Modifier.widthIn(max=560.dp).fillMaxWidth().verticalScroll(rememberScrollState())
+            Column(Modifier.widthIn(max=560.dp).fillMaxWidth().heightIn(max=availableHeight).verticalScroll(rememberScrollState())
                 .testTag("saved-questions-scroll").padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 Text("问题收藏",Modifier.semantics { heading() },style=MaterialTheme.typography.titleLarge)
                 Text("只保存你写的问题，不含回答、出处选择或发送授权；不会自动成为原文、稳定事实或待办。")
@@ -92,6 +100,7 @@ import com.t1doo.aiyou.designsystem.AIyouDimensions
                         .testTag("saved-question-close")) {Text("关闭")}
                 }
             }
+        }
         }
     }
 }

@@ -1,0 +1,8 @@
+{
+  "kind": "Historical disabled saved-question diagnostic source, not live test inventory",
+  "source_commit": "89575f44299e0937c0960878591ea934f9b8ec6b",
+  "source_path": "app/src/test/kotlin/com/t1doo/aiyou/SelectedQuestionConsentPresentationTest.kt",
+  "sha256": "2a39d75ea46545aade4678340ae3d98960fccc87d400bc83b4457322f6f939f7",
+  "bytes": 22787,
+  "runtime_admission": "Unchanged and disabled; this archive does not authorize execution"
+}

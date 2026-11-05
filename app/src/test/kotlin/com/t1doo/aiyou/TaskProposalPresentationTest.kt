@@ -104,11 +104,20 @@ class TaskProposalPresentationTest {
     }
     private fun click(tag:String) { compose.showOriginalToolsFor(tag);compose.onNodeWithTag(tag).performScrollTo().performClick()}
     private fun taskNode(tag:String):SemanticsNodeInteraction {
+        if(tag=="manual-task-draft-summary" || tag.startsWith("task-proposal-")) {
+            compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag("manual-task-details"))
+            val more=compose.onNodeWithTag("manual-task-details").performScrollTo().assertIsDisplayed().assertIsEnabled()
+            if(more.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.StateDescription]=="已收起") more.performClick()
+        }
         // Find and compose offscreen LazyColumn items before looking up their child nodes.
         compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(tag))
         return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
     }
     private fun drain() {compose.runOnIdle {runBlocking {while(true) (queue.poll()?:break)(owner)}};compose.waitForIdle()}
+    private fun taskText(text:String) {
+        compose.onNodeWithTag("manual-task-list").performScrollToNode(hasText(text))
+        compose.onNodeWithText(text).performScrollTo().assertIsDisplayed()
+    }
     private fun reader() {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"))
         compose.onNodeWithTag("entry-one").performClick()
@@ -148,7 +157,7 @@ class TaskProposalPresentationTest {
         compose.runOnIdle {proposals.initialize(owner)}
         compose.onNodeWithText("待办").assertIsDisplayed().performClick()
         taskNode("task-proposal-heading").assertTextEquals("待确认草稿 0")
-        compose.onNodeWithText("没有待确认草稿；可从原文摘录主动发起。").performScrollTo().assertIsDisplayed()
+        taskText("没有待确认草稿；可从原文摘录主动发起。")
         compose.runOnIdle {rejectProposalQueue=true}
         taskNode("task-proposal-refresh").assertIsEnabled().performClick()
         compose.runOnIdle {
@@ -166,7 +175,7 @@ class TaskProposalPresentationTest {
         compose.runOnIdle {rejectProposalQueue=false}
         taskNode("task-proposal-refresh").performClick();drain()
         taskNode("task-proposal-heading").assertTextEquals("待确认草稿 0")
-        compose.onNodeWithText("没有待确认草稿；可从原文摘录主动发起。").performScrollTo().assertIsDisplayed()
+        taskText("没有待确认草稿；可从原文摘录主动发起。")
 
         val retained=TaskProposal("retained",1,binding,"合成保留草稿",ManualTaskDateInput(),100,"UTC",100)
         compose.runOnIdle {drafts[retained.id]=retained;proposals.refresh()};drain()

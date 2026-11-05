@@ -86,7 +86,13 @@ class QuestionKeywordPresentationTest {
         }
         if(restoration==null)compose.setContent(body)else restoration.setContent(body)
     }
-    private fun open(){compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("question-keyword-open"));compose.onNodeWithTag("question-keyword-open").performScrollTo().performClick();compose.onNodeWithTag("question-keyword-question").assertExists()}
+    private fun open(){
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("original-search-query"))
+        compose.onNodeWithTag("original-search-query").performScrollTo().performClick().assertIsFocused()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("question-keyword-open"))
+        compose.onNodeWithTag("question-keyword-open").performScrollTo().assertIsEnabled().performClick()
+        compose.onNodeWithTag("question-keyword-question").assertExists()
+    }
     private fun field(tag:String,value:String){compose.onNodeWithTag(tag).performScrollTo().performTextReplacement(value)}
     private fun click(tag:String){compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick()}
     private fun ready(){compose.waitUntil(10000){observed.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.query=="薄荷"}==true}}

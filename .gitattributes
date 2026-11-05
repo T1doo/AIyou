@@ -9,3 +9,4 @@ app/src/test/kotlin/com/t1doo/aiyou/SelectedQuestionConsentPresentationTest.kt t
 app/src/test/kotlin/com/t1doo/aiyou/SavedQuestionsPresentationTest.kt text eol=lf
 scripts/tests/fixtures/memory-heading-diagnostic/*.fixture -text
 scripts/tests/fixtures/frozen-diagnostic-workflow/*.fixture -text
+scripts/tests/fixtures/saved-question-diagnostic/*.fixture -text

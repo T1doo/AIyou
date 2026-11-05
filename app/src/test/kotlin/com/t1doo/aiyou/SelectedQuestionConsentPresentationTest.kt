@@ -67,8 +67,11 @@ class SelectedQuestionConsentPresentationTest {
     private fun reveal(tag: String): SemanticsNodeInteraction {
         System.err.println("QUESTION_UI_REVEAL before tag=$tag")
         compose.waitUntil(5_000) {
-            try { compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag(tag)); true }
-            catch (_: AssertionError) { false }
+            try { compose.onNodeWithTag(tag).assertIsDisplayed(); true }
+            catch (_: AssertionError) {
+                try { compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag(tag)); true }
+                catch (_: AssertionError) { false }
+            }
         }
         return compose.onNodeWithTag(tag).assertIsDisplayed().also {
             System.err.println("QUESTION_UI_REVEAL after tag=$tag")
