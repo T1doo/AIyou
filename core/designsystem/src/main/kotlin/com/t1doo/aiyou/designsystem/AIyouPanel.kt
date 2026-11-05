@@ -19,11 +19,12 @@ fun AIyouPanel(
     contentPadding: Dp = AIyouDimensions.spaceLg,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val glass = if (LocalSkyglassActive.current) LocalSkyglassPalette.current else null
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = androidx.compose.ui.graphics.RectangleShape,
-        color = AIyouColors.surface,
-        contentColor = AIyouColors.textPrimary,
+        shape = if (glass != null) MaterialTheme.shapes.medium else androidx.compose.ui.graphics.RectangleShape,
+        color = glass?.input ?: AIyouColors.surface,
+        contentColor = glass?.text ?: AIyouColors.textPrimary,
         tonalElevation = AIyouDimensions.panelElevation,
         shadowElevation = AIyouDimensions.panelElevation,
     ) {
@@ -32,7 +33,7 @@ fun AIyouPanel(
             verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm),
         ) {
             content()
-            androidx.compose.material3.HorizontalDivider(color = AIyouColors.outlineDecorative)
+            if (glass == null) androidx.compose.material3.HorizontalDivider(color = AIyouColors.outlineDecorative)
         }
     }
 }

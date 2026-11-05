@@ -26,6 +26,7 @@ import com.t1doo.aiyou.designsystem.AIyouColors
 @Composable
 internal fun RecordRowActions(id:String,expanded:Boolean,enabled:Boolean,favorite:Boolean?,favoriteBusy:Boolean,
     onReveal:()->Unit,onClose:()->Unit,returnFocus:Boolean,onAction:(String)->Unit,content:@Composable ()->Unit) {
+    val glass = if(com.t1doo.aiyou.designsystem.LocalSkyglassActive.current) com.t1doo.aiyou.designsystem.LocalSkyglassPalette.current else null
     val threshold=with(LocalDensity.current) {56.dp.toPx()}
     val band=112.dp
     val bandPx=with(LocalDensity.current) {band.toPx()}
@@ -46,7 +47,7 @@ internal fun RecordRowActions(id:String,expanded:Boolean,enabled:Boolean,favorit
             }) {change,delta->change.consume();drag=(drag+delta).coerceIn(-bandPx,bandPx)}
         }) {
         if(expanded||drag<0f) Row(Modifier.matchParentSize(),horizontalArrangement=Arrangement.End) {
-            Column(Modifier.width(band).fillMaxHeight().background(AIyouColors.surfaceMuted).verticalScroll(rememberScrollState())
+            Column(Modifier.width(band).fillMaxHeight().background(glass?.input ?: AIyouColors.surfaceMuted).verticalScroll(rememberScrollState())
                 .testTag("record-action-band-"+id),horizontalAlignment=Alignment.CenterHorizontally) {
                 if(favorite!=null) TextButton(onClick={onAction("favorite")},enabled=expanded&&enabled&&!favoriteBusy,
                     modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("record-favorite-"+id)) {Text(if(favoriteBusy)"待确认" else if(favorite)"取消收藏" else "收藏")}
@@ -58,7 +59,7 @@ internal fun RecordRowActions(id:String,expanded:Boolean,enabled:Boolean,favorit
             }
         }
         Column(Modifier.fillMaxWidth().graphicsLayer {translationX=((if(expanded)-bandPx else 0f)+drag).coerceIn(-bandPx,0f)}
-            .background(AIyouColors.surface)) {
+            .background(if(glass!=null) androidx.compose.ui.graphics.Color.Transparent else AIyouColors.surface)) {
             content()
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
                 TextButton(onClick={if(expanded)onClose() else onReveal()},enabled=enabled,

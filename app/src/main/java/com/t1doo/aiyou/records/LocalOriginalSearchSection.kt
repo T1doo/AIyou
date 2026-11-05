@@ -15,6 +15,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +36,9 @@ import com.t1doo.aiyou.model.ManualTagSnapshot
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -94,9 +99,11 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     onCategory:((String)->Unit)?=null,onImages: (Boolean) -> Unit = {}, onlyAudio:Boolean=false,onAudio:(Boolean)->Unit={}, person: String? = null, peopleSupported: Boolean = false,
     peopleAvailable: Boolean = false, peopleError: String? = null, onPerson: (String?) -> Unit = {},
     onRefreshPeople: () -> Unit = {},onQuestionKeywords:(()->Unit)?=null,
-    searchNeedsAttention: Boolean = false) {
+    searchNeedsAttention: Boolean = false, onTools: (() -> Unit)? = null) {
     // These owners live outside the disclosure, never in SavedState. Collapsing an
     // empty filter must not replace its actual editable/Undo object or hide errors.
+    val glass = com.t1doo.aiyou.designsystem.LocalSkyglassActive.current
+    var searchToolsOpen by remember(query) { mutableStateOf(false) }
     var filtersExpanded by remember(query, from, through) { mutableStateOf(false) }
     val personInput = remember(query, person) { TextFieldState(person.orEmpty()) }
     val personInvalid = remember(query, person) { mutableStateOf(false) }
@@ -139,57 +146,67 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 // a platform legacy fallback cannot insert a literal z/y.
                 history
             }
-        Surface(color = AIyouColors.surface) {
-          Column(Modifier.fillMaxWidth(),
-              verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-            FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                Text("本机原文查找", style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.heightIn(min=AIyouDimensions.minTouchTarget).wrapContentHeight().semantics { heading() })
-                if(indexSupported)onQuestionKeywords?.let{open->TextButton(onClick=open,enabled=enabled,
-                    modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).aiyouFocusOutline().testTag("question-keyword-open")){Text("从问题里选词")}}
-            }
-            // The actual editable/Undo object is the caller's memory-only state.
+        Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
             key(query) { CompositionLocalProvider(LocalSaveableStateRegistry provides null) {
-            OutlinedTextField(state = query,
-                enabled = enabled, label = { Text("关键词或精确片段") },
+            TextField(state = query,
+                enabled = enabled,
+                label = if(glass) null else ({Text("关键词或精确片段")}),
+                placeholder = { Text("搜索回忆") },
+                trailingIcon = if(glass) ({ TextButton(onClick={filtersExpanded=true},
+                    modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).focusRequester(filterFocus)
+                        .testTag("original-search-filters").semantics {stateDescription="打开独立筛选页"}) {Text("筛选")} }) else null,
                 shape = MaterialTheme.shapes.medium,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = AIyouColors.surfaceMuted,
-                    unfocusedContainerColor = AIyouColors.background,
-                    disabledContainerColor = AIyouColors.surfaceMuted),
-                modifier = Modifier.fillMaxWidth().then(historyKeys(query)).testTag("original-search-query"),
+                colors = TextFieldDefaults.colors(
+                    focusedIndicatorColor=if(glass) Color.Transparent else MaterialTheme.colorScheme.primary,
+                    unfocusedIndicatorColor=if(glass) Color.Transparent else MaterialTheme.colorScheme.outline,
+                    disabledIndicatorColor=Color.Transparent,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth().onFocusChanged { if(it.hasFocus) searchToolsOpen=true }.then(historyKeys(query)).testTag("original-search-query"),
                 lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 3),
                 inputTransformation = transform(query, 100_000),
                 keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, capitalization = KeyboardCapitalization.None))
             } }
-            TextButton(onClick = onMode, enabled = enabled,
-                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-mode")) {
-                Text(if (mode == OriginalSearchMode.EXACT) "精确片段 · 区分大小写和空白" else "关键词 · 全部包含，忽略大小写")
-            }
-          }
         }
+            if(!glass || ((searchToolsOpen || query.text.isNotEmpty()) && indexSupported && onQuestionKeywords!=null)) FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+                if(!glass) Text("本机原文查找", style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.heightIn(min=AIyouDimensions.minTouchTarget).wrapContentHeight().semantics { heading() })
+                if(indexSupported)onQuestionKeywords?.let{open->TextButton(onClick=open,enabled=enabled,
+                    modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).aiyouFocusOutline().testTag("question-keyword-open")){Text("从问题里选词")}}
+            }
+            if(!glass || searchToolsOpen || mode==OriginalSearchMode.EXACT) TextButton(onClick = onMode, enabled = enabled,
+                modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("original-search-mode")) {
+                Text(if(glass) {if(mode==OriginalSearchMode.EXACT) "精确片段" else "关键词"} else if (mode == OriginalSearchMode.EXACT) "精确片段 · 区分大小写和空白" else "关键词 · 全部包含，忽略大小写")
+            }
         onCategory?.let { choose ->
-            FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                for((key,label) in listOf("all" to "全部","favorites" to "收藏","images" to "图片","audio" to "音频")) {
-                    val selectedCategory=when(key) {"favorites"->onlyFavorites;"images"->onlyImages;"audio"->onlyAudio;else->!onlyFavorites&&!onlyImages&&!onlyAudio}
-                    TextButton(onClick={choose(key)},enabled=enabled&&(key!="favorites"||onlyFavorites||favoritesAvailable&&!favoritesLoading),
-                        modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("original-category-"+key)
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(2.dp)) {
+                for((key,label) in listOf("all" to "全部","images" to "图片","audio" to "音频")) {
+                    val selectedCategory=when(key) {"favorites"->onlyFavorites;"images"->onlyImages;"audio"->onlyAudio;else->!onlyImages&&!onlyAudio}
+                    TextButton(onClick={choose(key)},contentPadding=androidx.compose.foundation.layout.PaddingValues(horizontal=4.dp),enabled=enabled&&(key!="favorites"||onlyFavorites||favoritesAvailable&&!favoritesLoading),
+                        modifier=Modifier.weight(1f).heightIn(min=AIyouDimensions.minTouchTarget).testTag("original-category-"+key)
                             .semantics {selected=selectedCategory}.drawBehind {if(selectedCategory) drawLine(AIyouColors.primary,Offset(0f,size.height),Offset(size.width,size.height),2.dp.toPx())}) {Text(label)}
                 }
+                if(favoritesSupported) TextButton(onClick={onFavorites(!onlyFavorites)},contentPadding=PaddingValues(horizontal=4.dp),
+                    enabled=enabled&&(onlyFavorites||favoritesAvailable&&!favoritesLoading),
+                    modifier=Modifier.weight(1f).heightIn(min=AIyouDimensions.minTouchTarget).testTag("original-category-favorites")
+                        .semantics {selected=onlyFavorites}) {Text(if(onlyFavorites) "✓ 收藏" else "收藏")}
+                onTools?.let { open -> TextButton(onClick=open,contentPadding=PaddingValues(horizontal=4.dp),
+                    modifier=Modifier.weight(1f).heightIn(min=AIyouDimensions.minTouchTarget).testTag("memory-tools-disclosure")) {Text("更多")} }
             }
         }
-        TextButton(onClick={filtersExpanded=true},
+        if(!glass) TextButton(onClick={filtersExpanded=true},
             modifier=Modifier.fillMaxWidth().heightIn(min=AIyouDimensions.minTouchTarget).focusRequester(filterFocus)
                 .testTag("original-search-filters").semantics {stateDescription="打开独立筛选页"}) {
             Text(if(activeFilters.isEmpty()) "筛选：日期 · 人物 · 标签" else "已选筛选 · ${activeFilters.size} 项",style=MaterialTheme.typography.titleMedium)
         }
         if(activeFilters.isNotEmpty()) Text(activeFilters.joinToString(" · "),Modifier.fillMaxWidth().testTag("original-search-active-filters"),
-            style=MaterialTheme.typography.bodySmall,color=AIyouColors.textSecondary)
+            style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         for(error in filterErrors) Text(error,Modifier.fillMaxWidth(),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
         if(indexBusy||favoritesLoading) Text("正在核对筛选资料…",style=MaterialTheme.typography.bodySmall)
         if(searchNeedsAttention) Text("查找条件或本机索引待核对；可打开筛选调整，或在结果提示处重试。",style=MaterialTheme.typography.bodySmall)
         if(filtersExpanded) Dialog(onDismissRequest=::closeFilters,properties=DialogProperties(usePlatformDefaultWidth=false)) {
-            Surface(color=AIyouColors.surface) {
+            Surface(color=MaterialTheme.colorScheme.surface) {
                 Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(16.dp)
                     .testTag("original-search-filter-page"),verticalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                     Text("筛选与范围",Modifier.semantics {heading()},style=MaterialTheme.typography.titleLarge)

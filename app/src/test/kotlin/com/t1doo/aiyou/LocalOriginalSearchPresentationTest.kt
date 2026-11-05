@@ -148,6 +148,7 @@ class LocalOriginalSearchPresentationTest {
         compose.onNodeWithTag("original-search-person-apply").performScrollTo().performClick()
         compose.onNodeWithText("称呼需为1–40个字符，不可包含控制字符。").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("original-search-filters").performScrollTo().assertIsNotEnabled()
+        compose.showOriginalSearchFilters()
         compose.onNodeWithTag("original-search-clear").performScrollTo().performClick()
         observation { it.state.stage == OriginalSearchStage.BROWSE }
         compose.onAllNodes(hasTestTag("original-search-person-input")).assertCountEquals(0)
@@ -257,6 +258,7 @@ class LocalOriginalSearchPresentationTest {
         assertTrue(actual.text.startsWith("…" + matched + " 咖啡e\u0301\t后文\n")); assertSearchMark(actual, matched)
         openCard("one"); assertEquals(full, fullText())
         compose.onNodeWithText("返回列表").performClick(); ready("i𐐨🙂mixed")
+        compose.showOriginalSearchFilters()
         compose.onNodeWithTag("original-search-clear").performScrollTo().performClick()
         observation { it.state.stage == OriginalSearchStage.BROWSE }
         assertTrue(searchCardText("one").fetchSemanticsNode().config[SemanticsProperties.Text].single().spanStyles.isEmpty())
@@ -301,13 +303,11 @@ class LocalOriginalSearchPresentationTest {
     }
 
     private fun searchCardText(id: String): androidx.compose.ui.test.SemanticsNodeInteraction {
+        if(compose.onAllNodesWithTag("original-search-filter-page").fetchSemanticsNodes().isNotEmpty())
+            compose.onNodeWithTag("original-search-filter-done").performScrollTo().performClick()
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))
-        return compose.onNode(hasAnyAncestor(hasTestTag("entry-$id")) and SemanticsMatcher("original preview text") {
-            it.config.getOrNull(SemanticsProperties.Text)?.singleOrNull()?.text?.let { value ->
-                value != "原文预览" && value != "阅读全文" && !value.startsWith("记录日期：") &&
-                    value != "原文 · 仅本机"
-            } == true
-        }).performScrollTo().assertIsDisplayed()
+        return compose.onNode(hasAnyAncestor(hasTestTag("entry-$id")) and hasTestTag("original-preview-text"),
+            useUnmergedTree = true).performScrollTo().assertIsDisplayed()
     }
 
     private fun assertSearchMark(actual: AnnotatedString, matched: String) {
@@ -469,6 +469,7 @@ class LocalOriginalSearchPresentationTest {
             it.state.input.mode == OriginalSearchMode.EXACT && it.state.input.from == "2026-10-13" && it.state.input.through == "2026-10-13" }
         assertEquals(listOf("one"), beforeClear.state.hits.map { it.entry.id })
         val beforeClearInputs = compose.runOnIdle { checkNotNull(actualInputs.get()) }
+        compose.showOriginalSearchFilters()
         compose.onNodeWithTag("original-search-clear").performScrollTo().performClick(); observation { it.state.stage == OriginalSearchStage.BROWSE }
         compose.showOriginalSearchFilters()
         for (tag in listOf("original-search-query", "original-search-from", "original-search-through")) {
@@ -719,7 +720,7 @@ class LocalOriginalSearchPresentationTest {
     private fun editable(tag: String): String = compose.onNodeWithTag(tag).performScrollTo().fetchSemanticsNode().config[SemanticsProperties.EditableText].text
     private fun openCard(id: String) {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-$id"))).performClick()
+        compose.onNodeWithTag("entry-$id").performClick()
     }
     private fun fullText() = compose.onNodeWithTag("original-text").fetchSemanticsNode().config[SemanticsProperties.Text].single().text
     private fun assertNoReader() {

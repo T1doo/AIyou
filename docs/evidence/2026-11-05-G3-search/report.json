@@ -1,0 +1,48 @@
+{
+  "batch": "G3 UI-03",
+  "status": "IN_PROGRESS_NOT_FULL_ACCEPTANCE",
+  "source_parent": "ee2d436b406c7a24013ee5af3f3b2ff4d557a875",
+  "design_reference": "Approved full-page Skyglass prototype, not component test specimens",
+  "changes": [
+    "Actual memories route uses shared natural scenery and three themes",
+    "Search field is one filled surface without floating-label/outline duplication",
+    "Auxiliary tools expand below search without shifting field origin",
+    "Dates and record times aligned; verbose source metadata kept in detail",
+    "Favorites independent from media category",
+    "Advanced tools remain reachable through More; no repository/controller replaced"
+  ],
+  "checks": {
+    "gradle": "PASS :app:testDebugUnitTest targeted, :app:checkDebugAarMetadata, :app:assembleDebug, :core:domain:test, :app:lintDebug",
+    "tests": [
+      {
+        "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "com.t1doo.aiyou.SkyglassSearchControlsTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "device": "API35 emulator; actual keyword entry Keyboard, filter page open/close retains query; blue/night screenshots inspected",
+    "search_geometry": "Compose test asserts unchanged top/left/right after focus and input; top and text retained after filter close",
+    "ime": "LatinIME only; Chinese IME/TalkBack/performance NOT RUN"
+  },
+  "remaining": [
+    "Staged filter draft/apply/cancel semantics still require implementation",
+    "Full sensitive query restoration regression still needs separate-dialog navigation adaptation; prior failure retained, not counted as pass",
+    "Record action controls and typography still need final reference review",
+    "Full CI 41997279366 failed at frozen diagnostic source/workflow hashes; title-only change reverted but additional diagnostics remain unresolved",
+    "Other native pages and G4-G7 acceptance still open"
+  ],
+  "apk": {
+    "path": "E:\\Github\\AIyou\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "sha256": "ab3f66fb45e4c6f20205980b206ee67028e4cdebffcf857fb4cbd23b79b91758"
+  },
+  "cleanup": "Owned emulator and adb closed"
+}

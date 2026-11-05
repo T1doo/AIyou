@@ -159,10 +159,13 @@ fun LocalRecordsScreen(
     onQuestionKeywords:(()->Unit)?=null,
     onReduceSearchKeywords:((OriginalSearchState)->Boolean)?=null,
     onAskQuestion:(()->Unit)?=null,
+    appearance: com.t1doo.aiyou.designsystem.SkyglassAppearance? = null,
 ) {
+    com.t1doo.aiyou.designsystem.OptionalSkyglassTheme(appearance) {
     // Presentation only. Never retain a source, query proof or controller in disclosure state.
     val toolsOwner = remember(destination, local.localSearch, local.unifiedKeywordOwner,
         local.recordAuthorizationOwner, local.ready, local.opening, local.error) { Any() }
+    var memoryToolsExpanded by remember(toolsOwner) { mutableStateOf(false) }
     var reviewToolsExpanded by remember(toolsOwner) { mutableStateOf(false) }
     var manageToolsExpanded by remember(toolsOwner) { mutableStateOf(false) }
     val reviewFocus = remember(toolsOwner) { FocusRequester() }
@@ -394,15 +397,13 @@ fun LocalRecordsScreen(
         }
         // A changed dataset/viewport can re-evaluate a still-pending request; never busy-retry.
     }
-    BoxWithConstraints(modifier.fillMaxSize().background(AIyouColors.surface)) {
+    BoxWithConstraints(modifier.fillMaxSize().background(if(appearance!=null) androidx.compose.ui.graphics.Color.Transparent else AIyouColors.surface)) {
         val margin = if (maxWidth <= AIyouDimensions.narrowBreakpoint) AIyouDimensions.pageNarrow else AIyouDimensions.pageWide
         val stackSummary = maxWidth <= AIyouDimensions.narrowBreakpoint && LocalDensity.current.fontScale > 1.3f
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            LazyColumn(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize()
-                .onSizeChanged { attachedViewport = it }, state = listState,
-                contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
-                verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
-                item("summary") {
+            val summaryItems: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
+                if(appearance==null || memoryToolsExpanded) item("summary") {
+                    if(appearance==null || memoryToolsExpanded) {
                     if (destination == Destination.MEMORIES && ((onBeginExport != null && local.supportsOriginalExport) ||
                         (onOpenRecycleBin != null && local.supportsRecycleBin) ||
                         (onBeginRecordPackage != null && local.supportsRecordPackages) ||
@@ -416,11 +417,11 @@ fun LocalRecordsScreen(
                         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
-                                Column(Modifier.weight(1f)) {
+                                if(appearance==null) Column(Modifier.weight(1f)) {
                                     Text("${local.entries.size} 条本机记录", style = MaterialTheme.typography.titleMedium)
                                     com.t1doo.aiyou.ui.LocalProcessingStatus()
                                 }
-                                companion?.invoke()
+                                if(appearance==null) companion?.invoke()
                             }
                             FlowRow(horizontalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
                                 if(onOpenUnified!=null && local.unifiedKeywordOwner!=null)TextButton(onOpenUnified,enabled=!imageTextBusy&&local.ready&&!local.opening&&local.error==null,contentPadding=PaddingValues(horizontal=8.dp),shape=MaterialTheme.shapes.small,modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).testTag("unified-open")){Text("统一关键词找回")}
@@ -446,10 +447,17 @@ fun LocalRecordsScreen(
                             if(imageTextBusy)Text("上一图片提取仍在结束，文字入口等待资源释放。")
                             local.recycleNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                         }
-                    } else NotebookPageHeader(destination.label,
+                    } else if(appearance==null) NotebookPageHeader(destination.label,
                         if (destination == Destination.MEMORIES) "${local.entries.size} 条本机记录" else "随手记下一点生活",
                         stackSummary, companion, showTitle = false)
+                    }
                 }
+            }
+            LazyColumn(Modifier.widthIn(max = AIyouDimensions.contentMaxWidth).fillMaxSize()
+                .onSizeChanged { attachedViewport = it }, state = listState,
+                contentPadding = PaddingValues(horizontal = margin, vertical = AIyouDimensions.spaceMd),
+                verticalArrangement = Arrangement.spacedBy(AIyouDimensions.sectionGap)) {
+                if(appearance==null) summaryItems()
                 if (destination == Destination.NOW) item("composer") {
                     CaptureComposer(
                         text = local.text, onTextChange = onDraftChange,
@@ -509,11 +517,12 @@ fun LocalRecordsScreen(
                             dateBasis = searchDateBasis, onDateBasis = onSearchDateBasis,
                             eventDatesAvailable = local.eventDatesAvailable, eventDatesError = local.eventDatesError,
                             onRefreshEventDates = onRefreshEventDates,onQuestionKeywords=onQuestionKeywords,
+                            onTools=if(appearance!=null)({memoryToolsExpanded=!memoryToolsExpanded})else null,
                             searchNeedsAttention = searchState.stage == OriginalSearchStage.WAITING ||
                                 searchState.stage == OriginalSearchStage.RUNNING || searchState.stage == OriginalSearchStage.INVALID ||
                                 searchState.stage == OriginalSearchStage.FAILED)
                     else SearchSection(demo = false)
-                    if (local.localSearch != null) TextButton(onClick = { onEvidenceMode(!evidenceMode) },
+                    if (local.localSearch != null && (appearance==null || memoryToolsExpanded || evidenceMode)) TextButton(onClick = { onEvidenceMode(!evidenceMode) },
                         enabled = local.ready && !local.opening && local.error == null,
                         modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).testTag("local-evidence-mode")) {
                         Text(if(onEvidenceQuestionChange!=null) {
@@ -526,6 +535,7 @@ fun LocalRecordsScreen(
                         Text(if (imageGridMode) "图片网格 · 切换列表" else "切换图片网格")
                     }
                 }
+                if(appearance!=null) summaryItems()
                 if (filtered) item("search-status") {
                     when (searchState?.stage) {
                         OriginalSearchStage.RUNNING -> StatusNotice("正在查找本机原文", "查找在后台进行。", state = ComponentState.LOADING)
@@ -585,14 +595,14 @@ fun LocalRecordsScreen(
                     }
                 } else for (entry in displayedEntries) {
                   if (destination == Destination.MEMORIES && entry.id in recordGroups) item("record-group:"+entry.id) {
-                    Text(checkNotNull(recordGroups[entry.id]),Modifier.padding(top=AIyouDimensions.spaceLg).semantics {heading()},style=MaterialTheme.typography.titleMedium)
+                    Text(checkNotNull(recordGroups[entry.id]),Modifier.padding(top=AIyouDimensions.spaceSm).semantics {heading()},style=MaterialTheme.typography.bodyLarge)
                   }
                   item(entry.id) {
                     val hit = if (filtered) searchHits[entry.id] else null
                     val preview = remember(entry, hit) { hit?.let { originalSearchPreview(entry, it) } }
                     Column {
                     hit?.let { OriginalSearchTagMatch(it) }
-                    val rowContent:@Composable ()->Unit = { MemoryCard(preview?.text ?: originalPreview(entry.originalText), originalMetadata(entry), policy = entry.policy,
+                    val rowContent:@Composable ()->Unit = { MemoryCard(preview?.text ?: originalPreview(entry.originalText), (if(appearance==null) originalMetadata(entry) else java.time.Instant.ofEpochMilli(entry.capturedAtMillis).atZone(java.time.ZoneId.of(entry.captureTimeZone)).format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))), policy = entry.policy,
                         modifier = Modifier.testTag("entry-${entry.id}").semantics { selected = entry.id == selectedEntryId }
                             .then(if (entry.id == selectedEntryId) Modifier.border(AIyouDimensions.iconStroke,
                                 AIyouColors.primary, MaterialTheme.shapes.medium) else Modifier),
@@ -614,6 +624,7 @@ fun LocalRecordsScreen(
             }
         }
     }
+    }
 }
 
 /** One temporary tool surface, never another copy of the private records route. */
@@ -624,7 +635,7 @@ private fun NotebookToolsPanel(title: String, motionAllowed: Boolean, onDismiss:
     if (motionAllowed) {
         ModalBottomSheet(onDismissRequest = onDismiss,
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AIyouColors.surface) {
+            containerColor = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxWidth().testTag("notebook-tools-panel").verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(title, Modifier.testTag("notebook-tools-title"), style = MaterialTheme.typography.titleLarge)

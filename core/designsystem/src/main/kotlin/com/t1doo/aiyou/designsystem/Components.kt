@@ -1,5 +1,9 @@
 package com.t1doo.aiyou.designsystem
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.HorizontalDivider
@@ -35,6 +39,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.SpanStyle
@@ -57,6 +62,7 @@ private fun ComponentCard(modifier: Modifier = Modifier, padding: Dp = AIyouDime
 
 @Composable
 private fun StateFeedback(state: ComponentState) {
+    val glass = if (LocalSkyglassActive.current) LocalSkyglassPalette.current else null
     when (state) {
         ComponentState.NORMAL, ComponentState.LONG_TEXT -> Unit
         ComponentState.LOADING -> {
@@ -65,7 +71,7 @@ private fun StateFeedback(state: ComponentState) {
         }
         else -> Text(
             state.description,
-            color = if (state == ComponentState.ERROR) AIyouColors.error else AIyouColors.textSecondary,
+            color = if (state == ComponentState.ERROR) glass?.error ?: AIyouColors.error else glass?.secondaryText ?: AIyouColors.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
     }
@@ -78,9 +84,11 @@ fun PrivacyChip(
     state: ComponentState = ComponentState.NORMAL,
     description: String? = null,
 ) {
+    val glass = if (LocalSkyglassActive.current) LocalSkyglassPalette.current else null
     Surface(
         modifier = modifier,
-        color = AIyouColors.surfaceMuted,
+        color = glass?.tint ?: AIyouColors.surfaceMuted,
+        contentColor = glass?.text ?: AIyouColors.textPrimary,
         shape = RectangleShape,
     ) {
         Column(Modifier.padding(vertical = AIyouDimensions.spaceXs)) {
@@ -111,7 +119,9 @@ fun MemoryCard(
     highlight: TextRange? = null,
     thumbnail: (@Composable () -> Unit)? = null,
 ) {
-    val preview = remember(originalText, highlight) {
+    val glass = if (LocalSkyglassActive.current) LocalSkyglassPalette.current else null
+    val secondary = glass?.secondaryText ?: AIyouColors.textSecondary
+    val preview = remember(originalText, highlight, glass) {
         buildAnnotatedString {
             append(originalText)
             fun boundary(index: Int) = index == 0 || index == originalText.length ||
@@ -124,27 +134,27 @@ fun MemoryCard(
         }
     }
     Column(modifier.fillMaxWidth().then(if (onOpen != null) Modifier.clickable(onClickLabel = "阅读全文", onClick = onOpen) else Modifier)
-        .padding(vertical = AIyouDimensions.spaceMd), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
+        .then(if (glass != null) Modifier.background(Brush.linearGradient(listOf(glass.readingStart,glass.readingEnd)),RoundedCornerShape(14.dp)).padding(16.dp) else Modifier.padding(vertical = AIyouDimensions.spaceMd)), verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceSm)) {
         if (state == ComponentState.EMPTY) {
             Text("还没有记录", style = MaterialTheme.typography.titleMedium)
             Text("直接在下方写下第一句。", style = MaterialTheme.typography.bodySmall)
             return@Column
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd), verticalAlignment = Alignment.Top) {
-            Text(preview, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
+            Text(preview, modifier = Modifier.weight(1f).testTag("original-preview-text"), style = MaterialTheme.typography.bodyLarge,
                 maxLines = if (onOpen != null) 3 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
             thumbnail?.invoke()
         }
-        attachmentLabel?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary) }
-        Text(capturedAt, style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+        attachmentLabel?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = secondary) }
+        Text(capturedAt, style = MaterialTheme.typography.bodySmall, color = secondary)
         if (policy != ProcessingPolicy.LOCAL_ONLY) PrivacyChip(policy)
         annotation?.let {
             Text("AI 派生 · $it", Modifier.fillMaxWidth().drawBehind {
                 drawLine(AIyouColors.outlineFunctional, Offset.Zero, Offset(0f, size.height), AIyouDimensions.iconStroke.toPx())
-            }.padding(start = AIyouDimensions.spaceMd), style = MaterialTheme.typography.bodySmall, color = AIyouColors.textSecondary)
+            }.padding(start = AIyouDimensions.spaceMd), style = MaterialTheme.typography.bodySmall, color = secondary)
         }
         StateFeedback(state)
-        HorizontalDivider(color = AIyouColors.outlineDecorative)
+        if (glass == null) HorizontalDivider(color = AIyouColors.outlineDecorative)
     }
 }
 
@@ -368,7 +378,8 @@ fun StatusNotice(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
-    val color = if (state == ComponentState.ERROR) AIyouColors.error else AIyouColors.textPrimary
+    val glass = if (LocalSkyglassActive.current) LocalSkyglassPalette.current else null
+    val color = if (state == ComponentState.ERROR) glass?.error ?: AIyouColors.error else glass?.text ?: AIyouColors.textPrimary
     ComponentCard(modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
         Text(title, color = color, style = MaterialTheme.typography.titleMedium)
         Text(message, style = MaterialTheme.typography.bodyMedium)

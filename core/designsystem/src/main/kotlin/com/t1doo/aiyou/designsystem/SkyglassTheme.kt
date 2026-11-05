@@ -57,6 +57,13 @@ fun skyglassPalette(appearance: SkyglassAppearance): SkyglassPalette = when (app
         Color(0xE027324E), Color(0xD9302B50), Color(0xED202644), Color(0xFFFFB4AB), Color(0xFF98D9B4))
 }
 
+val LocalSkyglassActive = staticCompositionLocalOf { false }
+
+@Composable
+fun OptionalSkyglassTheme(appearance: SkyglassAppearance?, content: @Composable () -> Unit) {
+    if (appearance == null) content() else SkyglassTheme(appearance, content)
+}
+
 val LocalSkyglassPalette = staticCompositionLocalOf { skyglassPalette(SkyglassAppearance.BLUE) }
 
 /** Opt-in migration boundary: legacy routes keep AIyouTheme until their parity is checked. */
@@ -66,7 +73,7 @@ fun SkyglassTheme(appearance: SkyglassAppearance, content: @Composable () -> Uni
     val base = if (appearance == SkyglassAppearance.NIGHT) darkColorScheme() else lightColorScheme()
     AIyouTheme {
         val typography = MaterialTheme.typography
-        CompositionLocalProvider(LocalSkyglassPalette provides p, LocalContentColor provides p.text) {
+        CompositionLocalProvider(LocalSkyglassActive provides true, LocalSkyglassPalette provides p, LocalContentColor provides p.text) {
             MaterialTheme(
                 colorScheme = base.copy(primary=if (appearance == SkyglassAppearance.NIGHT) Color(0xFFBFCBFF) else p.primary,
                     onPrimary=if (appearance == SkyglassAppearance.NIGHT) p.input else Color.White,

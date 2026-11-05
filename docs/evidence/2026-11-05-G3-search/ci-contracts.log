@@ -1,0 +1,38 @@
+........F....FE.
+======================================================================
+ERROR: test_missing_font_png_foreign_source_nonzero_writes_and_artifact_overflow_fail_closed (test_saved_question_diagnostic.SavedQuestionDiagnosticTests.test_missing_font_png_foreign_source_nonzero_writes_and_artifact_overflow_fail_closed) (kind='symlink')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Github\AIyou\scripts\tests\test_saved_question_diagnostic.py", line 130, in test_missing_font_png_foreign_source_nonzero_writes_and_artifact_overflow_fail_closed
+    path.unlink();path.symlink_to(root / probe.OUTPUT / 'admission.json')
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Lenovo\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\pathlib.py", line 1386, in symlink_to
+    os.symlink(target, self, target_is_directory)
+OSError: [WinError 1314] 客户端没有所需的特权。: 'D:\\AndroidDev\\temp\\tmpltjlv7e6\\build\\saved-question-diagnostic\\admission.json' -> 'D:\\AndroidDev\\temp\\tmpltjlv7e6\\app\\build\\reports\\tests\\testDebugUnitTest\\saved-questions\\fontscale.json'
+
+======================================================================
+FAIL: test_exact_fixed_source_and_workflow_routing_preserve_formal_bodies (test_memory_heading_diagnostic.HeadingDiagnosticTests.test_exact_fixed_source_and_workflow_routing_preserve_formal_bodies)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Github\AIyou\scripts\tests\test_memory_heading_diagnostic.py", line 106, in test_exact_fixed_source_and_workflow_routing_preserve_formal_bodies
+    self.assertEqual(probe.TEST_SHA256, hashlib.sha256(source).hexdigest())
+AssertionError: 'e8527848704841f039b9a47896869731af66f8030fb00c738237c2037c36fdd3' != '7c9fed5d32abed0864b29583c771b9443628353eec117a6a669afc5ea2ff6bb6'
+- e8527848704841f039b9a47896869731af66f8030fb00c738237c2037c36fdd3
++ 7c9fed5d32abed0864b29583c771b9443628353eec117a6a669afc5ea2ff6bb6
+
+
+======================================================================
+FAIL: test_fixed_three_filters_budgets_and_existing_workflow_unchanged (test_saved_question_diagnostic.SavedQuestionDiagnosticTests.test_fixed_three_filters_budgets_and_existing_workflow_unchanged)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Github\AIyou\scripts\tests\test_saved_question_diagnostic.py", line 82, in test_fixed_three_filters_budgets_and_existing_workflow_unchanged
+    self.assertEqual('296d16beb5b3275e0fe604d1d4a93e0e5cffe721c7c9dcd0ebb863093ca3b094',
+AssertionError: '296d16beb5b3275e0fe604d1d4a93e0e5cffe721c7c9dcd0ebb863093ca3b094' != '1b1b3b9d7bc137e92d518865627f7c4d136e0e81a4473ffeb8d0ae39a722a58c'
+- 296d16beb5b3275e0fe604d1d4a93e0e5cffe721c7c9dcd0ebb863093ca3b094
++ 1b1b3b9d7bc137e92d518865627f7c4d136e0e81a4473ffeb8d0ae39a722a58c
+
+
+----------------------------------------------------------------------
+Ran 16 tests in 2.040s
+
+FAILED (failures=2, errors=1)

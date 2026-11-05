@@ -7,12 +7,8 @@ import org.junit.Assert.assertEquals
 
 /** Follow the real disclosure before an existing advanced-filter interaction. */
 internal fun ComposeContentTestRule.showOriginalSearchFilters() {
+    if (onAllNodesWithTag("original-search-filter-page").fetchSemanticsNodes().isNotEmpty()) return
     onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("original-search-filters"))
-    val control = onNodeWithTag("original-search-filters").performScrollTo().assertIsDisplayed()
-    when (control.fetchSemanticsNode().config[SemanticsProperties.StateDescription]) {
-        "已收起" -> control.assertIsEnabled().performClick()
-        "已展开" -> Unit
-        else -> error("Unknown disclosure state")
-    }
-    assertEquals("已展开", control.fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+    onNodeWithTag("original-search-filters").performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
+    onNodeWithTag("original-search-filter-page").assertIsDisplayed()
 }
