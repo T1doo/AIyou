@@ -160,6 +160,7 @@ fun LocalRecordsScreen(
     onReduceSearchKeywords:((OriginalSearchState)->Boolean)?=null,
     onAskQuestion:(()->Unit)?=null,
     appearance: com.t1doo.aiyou.designsystem.SkyglassAppearance? = null,
+    onApplyFilters: ((OriginalFilterDraft) -> Boolean)? = null,
 ) {
     com.t1doo.aiyou.designsystem.OptionalSkyglassTheme(appearance) {
     // Presentation only. Never retain a source, query proof or controller in disclosure state.
@@ -518,6 +519,7 @@ fun LocalRecordsScreen(
                             eventDatesAvailable = local.eventDatesAvailable, eventDatesError = local.eventDatesError,
                             onRefreshEventDates = onRefreshEventDates,onQuestionKeywords=onQuestionKeywords,
                             onTools=if(appearance!=null)({memoryToolsExpanded=!memoryToolsExpanded})else null,
+                            onApplyFilters=onApplyFilters,
                             searchNeedsAttention = searchState.stage == OriginalSearchStage.WAITING ||
                                 searchState.stage == OriginalSearchStage.RUNNING || searchState.stage == OriginalSearchStage.INVALID ||
                                 searchState.stage == OriginalSearchStage.FAILED)

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.OriginalFilterDraftTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-05T09:53:51.203Z" hostname="LAPTOP-USISIS19" time="8.252">
+  <properties/>
+  <testcase name="rawFiltersStayOutOfDiagnosticTextAndDatesAreValidated" classname="com.t1doo.aiyou.OriginalFilterDraftTest" time="6.352"/>
+  <testcase name="invalidDateAndRejectedOwnerKeepPanelAndDoNotClaimApply" classname="com.t1doo.aiyou.OriginalFilterDraftTest" time="1.223"/>
+  <testcase name="cancelDoesNotApplyAndResetOnlyChangesPanelDraftUntilConfirmed" classname="com.t1doo.aiyou.OriginalFilterDraftTest" time="0.223"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

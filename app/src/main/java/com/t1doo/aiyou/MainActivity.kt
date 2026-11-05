@@ -1501,6 +1501,16 @@ fun AIyouApp(
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
                 appearance=if(skyglassHome)display.preferences.appearance else null,
+                onApplyFilters={draft->
+                    var applied=false
+                    changeSearchInput {
+                        val value=draft.validated()
+                        searchFrom=TextFieldState(value.from);searchThrough=TextFieldState(value.through)
+                        searchDateBasis=value.basis;searchTag=value.tag;searchPerson=value.person
+                        searchModeGeneration++;applied=true
+                    }
+                    applied
+                },
                 onAskQuestion=beginQuestion,
                 onRowAction={entry,action->
                     val live=currentLocal

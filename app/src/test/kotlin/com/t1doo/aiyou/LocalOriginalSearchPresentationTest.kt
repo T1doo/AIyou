@@ -242,6 +242,28 @@ class LocalOriginalSearchPresentationTest {
         }
     }
 
+    @Test fun stagedFiltersCancelAndResetPreserveActualQueryAndOriginalRecords() {
+        val state=local(entry("one","合成目标原文"))
+        val originals=state.value.entries
+        content(state);field("original-search-query","目标");ready("目标")
+        compose.showOriginalSearchFilters()
+        compose.onNodeWithTag("original-search-from").performTextReplacement("2026-10-13")
+        compose.runOnIdle { assertEquals("",checkNotNull(actualInputs.get()).from.text.toString()) }
+        compose.onNodeWithTag("original-filter-cancel").performClick()
+        assertEquals("目标",editable("original-search-query"))
+        compose.showOriginalSearchFilters()
+        compose.onNodeWithTag("original-search-from").performTextReplacement("2026-10-13")
+        compose.onNodeWithTag("original-search-filter-done").performScrollTo().performClick()
+        observation {it.state.input.query=="目标" && it.state.input.from=="2026-10-13"}
+        compose.showOriginalSearchFilters()
+        compose.onNodeWithTag("original-filter-reset").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals("2026-10-13",checkNotNull(actualInputs.get()).from.text.toString()) }
+        compose.onNodeWithTag("original-search-filter-done").performScrollTo().performClick()
+        observation {it.state.input.query=="目标" && it.state.input.from.isEmpty()}
+        assertEquals("目标",editable("original-search-query"))
+        compose.runOnIdle { assertSame(originals,state.value.entries);assertEquals(0,draftChanges);assertEquals(0,saves) }
+    }
+
     @Test fun searchCardsHighlightVerifiedOriginalUnicodeKeepOrderAndClearWithoutTouchingSource() {
         val matched = "İ𐐀🙂MiXeD"
         val full = "前🙂".repeat(150) + matched + " 咖啡e\u0301\t后文\n" + "叶".repeat(100)

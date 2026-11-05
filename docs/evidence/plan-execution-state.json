@@ -1,7 +1,7 @@
 {
   "plan": "docs/plans/AIyou-Codex-Plan-20261105/backlog.json",
   "goal": "G0–G7 native migration and evidence-based acceptance",
-  "current_batch": "G3 memories appearance and search positioning corrected; staged filters and remaining parity still in progress",
+  "current_batch": "G3: staged advanced filters implemented with native App query-preservation regression; remaining page parity/full regression still in progress",
   "tasks": [
     {
       "id": "AUD-01",
@@ -132,7 +132,8 @@
     "docs/evidence/2026-11-05-G2-now/report.json",
     "docs/evidence/2026-11-05-G2-device/report.json",
     "docs/evidence/2026-11-05-G2-fidelity/report.json",
-    "docs/evidence/2026-11-05-G3-search/report.json"
+    "docs/evidence/2026-11-05-G3-search/report.json",
+    "docs/evidence/2026-11-05-G3-filters/report.json"
   ],
   "stop_after_each_batch": "Commit and report evidence; continue next dependent batch under active user-requested goal unless an explicit approval or hard blocker applies"
 }

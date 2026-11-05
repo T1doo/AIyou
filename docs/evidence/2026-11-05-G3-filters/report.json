@@ -1,0 +1,54 @@
+{
+  "task": "G3 UI-03 staged native filters",
+  "status": "TARGETED_BEHAVIOR_PASS_NOT_FULL_G3_ACCEPTANCE",
+  "source_parent": "140aed5ffbc5c5b47ca171c48cee961b6f2e888b",
+  "behavior": [
+    "Panel draft separate from applied date/person/tag filters",
+    "Cancel closes without applying draft",
+    "Reset changes only draft advanced filters; query and media/favorites unchanged",
+    "Apply uses existing navigation gate and search owner once",
+    "Invalid dates, unavailable selected metadata or rejected owner keep panel and show error",
+    "Explicit full-clear and index maintenance retained under More settings",
+    "No private filter content in diagnostic toString or saveable state"
+  ],
+  "tests": [
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalFilterDraftTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "com.t1doo.aiyou.SkyglassSearchControlsTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "commands": {
+    "required_android_checks": "PASS build.log",
+    "final_ui_assemble_lint": "PASS panel-polish.log",
+    "final_targeted_tests": "PASS final-tests.log"
+  },
+  "device": "API35 emulator: entered temporary 2026-11-01, cancelled, reopened date empty; reset/applied and Keyboard query remained. Final panel screenshot inspected. LatinIME only.",
+  "limitations": [
+    "Other existing search tests still need adaptation from live date editing to explicit apply; full suite not claimed",
+    "Frozen diagnostic CI contracts remain open",
+    "No physical Chinese IME/TalkBack or performance acceptance",
+    "Visual fidelity of all routes still in progress"
+  ],
+  "apk": {
+    "path": "E:\\Github\\AIyou\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "sha256": "976b2c9465d7afc1c7fac7c82faa6498057d12257fb7a9f23448f086aa689801"
+  },
+  "cleanup": "Owned emulator and adb closed"
+}
