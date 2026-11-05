@@ -1,10 +1,13 @@
 # AIyou · 爱忆
 
-Android 原生、中文优先、本地优先的私人记忆工具。界面采用暖橙分区与噜噜陪伴，
+Android 原生、中文优先、本地优先的私人记忆工具。界面正逐步采用自然景观、三主题玻璃与可减少的动态，
 记录、回忆、待办有独立入口。原始设计保留于
 [主方案](docs/AIyou_Master_Plan.md) 与 [产品架构](docs/AIyou_Product_Architecture.docx)。
 
 ## 当前交付：开发预览版
+
+开发分支的最新功能盘点见 [2026-11-05 功能现状](docs/evidence/2026-11-05-G0-search-focus/FEATURE_STATUS.md)。
+它区分已有路径、未启用能力与待验收场景；整体产品完成百分比尚未核定。
 
 本仓库当前提供可构建的 Android 开发预览，**不是 D00–D09 全部验收完成的正式版本**。
 下载入口为 [GitHub Releases](https://github.com/T1doo/AIyou/releases)。预发布包使用
@@ -27,7 +30,7 @@ Release 标签只标识预发布交付批次，不改变 APK 内部版本，也�
 但本预览没有真实模型效果验收。图片文字的既有来源纠正／检索链保留；当前提取器不可用，
 不能对新图生成文字。真实模型和自动语音识别也未启用，不能包装成仅等设备测试。
 
-## 当前可复查证据
+## 历史预览版可复查证据
 
 构建源码：`338aa5f817aaa89884bf63bfca091a4311a9e7d8`。
 [CI 40475693696 / attempt 1](https://github.com/T1doo/AIyou/actions/runs/40475693696) 三正式作业成功：

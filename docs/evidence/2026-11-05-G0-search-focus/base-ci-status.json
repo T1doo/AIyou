@@ -1,0 +1,39 @@
+{
+  "base_sha": "2e47826190a4da6071b31021e9924af9291fc943",
+  "run_id": 42040362972,
+  "url": "https://github.com/T1doo/AIyou/actions/runs/42040362972",
+  "host": {
+    "job_id": 127289270250,
+    "conclusion": "success",
+    "excerpt": [
+      "2026-11-05T14:11:42.6696323Z PASS: domain tests=78 actual=78 failures=0 errors=0 skipped=0",
+      "2026-11-05T14:12:08.7713334Z Ran 254 tests in 23.333s",
+      "2026-11-05T14:12:08.7713629Z OK",
+      "2026-11-05T14:14:13.2861066Z PASS: domain tests=78 actual=78 failures=0 errors=0 skipped=0",
+      "2026-11-05T14:14:14.9543719Z PASS: domain tests=78 actual=78 failures=0 errors=0 skipped=0"
+    ]
+  },
+  "android": {
+    "job_id": 127298603927,
+    "conclusion": "failure",
+    "xml": {
+      "tests": 413,
+      "failures": 27,
+      "errors": 0,
+      "skipped": 0
+    },
+    "artifact": {
+      "id": 13425385189,
+      "digest": "sha256:6f9268f27bd512e9facd239776e8abe0bd6563cd4a7c026986636b08645c4aed"
+    }
+  },
+  "preview": {
+    "job_id": 127298603977,
+    "conclusion": "success",
+    "excerpt": [
+      "2026-11-05T14:22:22.3360344Z PASS: Preview render smoke tests=444 PNGs=444 failures/errors/skipped=0"
+    ],
+    "visual_acceptance": false
+  },
+  "scope": "Base revision only. Final patch CI is separate; no signed download reference retained."
+}

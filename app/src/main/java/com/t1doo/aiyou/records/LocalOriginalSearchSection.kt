@@ -73,6 +73,7 @@ interface OriginalSearchObserver {
     fun onResults(state: OriginalSearchState, open: (OriginalSearchHit) -> Unit)
     fun onDiagnostics(value: String) = Unit
     fun onInputs(query: TextFieldState, from: TextFieldState, through: TextFieldState) = Unit
+    fun onFilterInputs(from: TextFieldState, through: TextFieldState) = Unit
 }
 val LocalOriginalSearchObserver = staticCompositionLocalOf<OriginalSearchObserver?> { null }
 
@@ -154,7 +155,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 enabled = enabled,
                 label = if(glass) null else ({Text("关键词或精确片段")}),
                 placeholder = { Text("搜索回忆") },
-                trailingIcon = if(glass) ({ TextButton(onClick={filtersExpanded=true},
+                trailingIcon = if(glass) ({ TextButton(onClick={filtersExpanded=true},enabled=!filtersExpanded,
                     modifier=Modifier.heightIn(min=AIyouDimensions.minTouchTarget).focusRequester(filterFocus)
                         .testTag("original-search-filters").semantics {stateDescription="打开独立筛选页"}) {Text("筛选")} }) else null,
                 shape = MaterialTheme.shapes.medium,
@@ -199,7 +200,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                 } }
             }
         }
-        if(!glass) TextButton(onClick={filtersExpanded=true},
+        if(!glass) TextButton(onClick={filtersExpanded=true},enabled=!filtersExpanded,
             modifier=Modifier.fillMaxWidth().heightIn(min=AIyouDimensions.minTouchTarget).focusRequester(filterFocus)
                 .testTag("original-search-filters").semantics {stateDescription="打开独立筛选页"}) {
             Text(if(activeFilters.isEmpty()) "筛选：日期 · 人物 · 标签" else "已选筛选 · ${activeFilters.size} 项",style=MaterialTheme.typography.titleMedium)

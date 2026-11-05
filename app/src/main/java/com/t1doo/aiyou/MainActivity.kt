@@ -1512,14 +1512,20 @@ fun AIyouApp(
                 onRefreshTags={navigation.gate.inputAction(generation,search,{searchRouteAvailable()&&questionHelper.state.value==null}){onRefreshLocalSearch()}},
                 appearance=if(skyglassHome)display.preferences.appearance else null,
                 onApplyFilters={draft->
-                    var applied=false
-                    changeSearchInput {
+                    navigation.gate.inputDecision(generation,search,
+                        {searchRouteAvailable()&&questionHelper.state.value==null}) {
                         val value=draft.validated()
-                        searchFrom=TextFieldState(value.from);searchThrough=TextFieldState(value.through)
-                        searchDateBasis=value.basis;searchTag=value.tag;searchPerson=value.person
-                        searchModeGeneration++;applied=true
+                        val unchanged=value==com.t1doo.aiyou.records.OriginalFilterDraft(searchFrom.text.toString(),
+                            searchThrough.text.toString(),searchDateBasis,searchTag,searchPerson)
+                        if(unchanged) search.acceptsInput() else {
+                            consentControllerRef.get()?.retireUiScope()
+                            search.tryChangeInput {
+                                searchFrom=TextFieldState(value.from);searchThrough=TextFieldState(value.through)
+                                searchDateBasis=value.basis;searchTag=value.tag;searchPerson=value.person
+                                searchModeGeneration++
+                            }
+                        }
                     }
-                    applied
                 },
                 onAskQuestion=beginQuestion,
                 onRowAction={entry,action->

@@ -32,6 +32,8 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.ViewRootForTest
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -115,7 +117,7 @@ class LocalOriginalSearchPresentationTest {
         disclosure.performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
         disclosure.assertIsFocused().performKeyInput { pressKey(Key.Enter) }
         compose.onNodeWithTag("original-search-filter-page").assertIsDisplayed()
-        compose.onNodeWithText("筛选与范围").assertIsDisplayed()
+        compose.onNodeWithText("筛选回忆").assertIsDisplayed()
         compose.onNodeWithTag("original-search-from").assertExists()
         compose.onNodeWithTag("original-search-filter-done").performScrollTo().performClick()
         compose.onAllNodesWithTag("original-search-filter-page").assertCountEquals(0)
@@ -142,12 +144,14 @@ class LocalOriginalSearchPresentationTest {
         content(state); observation { it.state.stage == OriginalSearchStage.BROWSE }
         compose.showOriginalSearchFilters()
         compose.onNodeWithTag("original-search-person-input").performScrollTo().performClick().performTextReplacement("未应用称呼🙂")
-        compose.onNodeWithTag("original-search-filters").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("original-search-filters").assertIsNotEnabled()
         assertEquals("未应用称呼🙂", editable("original-search-person-input"))
-        field("original-search-person-input", "")
-        compose.onNodeWithTag("original-search-person-apply").performScrollTo().performClick()
-        compose.onNodeWithText("称呼需为1–40个字符，不可包含控制字符。").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("original-search-filters").performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle {assertNull(observations.get().state.input.person);assertEquals(0,port.queries.get())}
+        field("original-search-person-input", "名".repeat(41))
+        compose.onNodeWithTag("original-search-filter-done").performScrollTo().performClick()
+        compose.onNodeWithTag("original-filter-error").performScrollTo().assertIsDisplayed()
+        assertEquals("名".repeat(41),editable("original-search-person-input"))
+        compose.onNodeWithTag("original-search-filters").assertIsNotEnabled()
         compose.showOriginalSearchFilters()
         compose.clearOriginalSearchIncludingQuery()
         observation { it.state.stage == OriginalSearchStage.BROWSE }
@@ -159,8 +163,11 @@ class LocalOriginalSearchPresentationTest {
             baseline.copy(supportsFavorites = true, favoritesLoading = true, favoritesAvailable = false) to "original-search-favorites-retry",
             baseline.copy(manualPeopleAvailable = false, manualPeopleError = "合成人物读取失败") to "original-search-person-retry")) {
             compose.runOnIdle { state.value = changed }
-            compose.onNodeWithTag("original-search-filters").performScrollTo().assertIsNotEnabled()
+            compose.showOriginalSearchFilters()
+            if(target=="original-search-rebuild") compose.onNodeWithText("更多查找设置").performScrollTo().performClick()
+            compose.onNodeWithTag("original-search-filters").assertIsNotEnabled()
             compose.onNodeWithTag(target).performScrollTo().assertIsDisplayed()
+            compose.onNodeWithTag("original-filter-cancel").performScrollTo().performClick()
             compose.runOnIdle { state.value = baseline }
             compose.onAllNodes(hasTestTag("original-search-from")).assertCountEquals(0)
         }
@@ -189,6 +196,7 @@ class LocalOriginalSearchPresentationTest {
         override fun toString() = "ActualInputs(redacted)"
     }
     private val actualInputs = AtomicReference<ActualInputs>()
+    private val filterInputs = AtomicReference<Pair<TextFieldState,TextFieldState>>()
     private val actualView = AtomicReference<android.view.View>()
     private var draftChanges = 0
     private var saves = 0
@@ -203,6 +211,7 @@ class LocalOriginalSearchPresentationTest {
         override fun onInputs(query: TextFieldState, from: TextFieldState, through: TextFieldState) {
             actualInputs.set(ActualInputs(query, from, through))
         }
+        override fun onFilterInputs(from:TextFieldState,through:TextFieldState) {filterInputs.set(from to through)}
     }
     private val readingObserver = object : OriginalReadingObserver {
         override fun onNavigation(callbacks: OriginalReadingCallbacks) = Unit
@@ -220,6 +229,7 @@ class LocalOriginalSearchPresentationTest {
         field("original-search-query", "mixed 咖啡")
         assertEquals(listOf("one", "utc"), ready("mixed 咖啡").state.hits.map { it.entry.id })
         field("original-search-from", "2026-10-14"); field("original-search-through", "2026-10-14")
+        compose.applyOriginalSearchFilters()
         val dates = observation { it.state.stage == OriginalSearchStage.READY && it.state.input.query == "mixed 咖啡" &&
             it.state.input.from == "2026-10-14" && it.state.input.through == "2026-10-14" }
         assertEquals(listOf("one"), dates.state.hits.map { it.entry.id })
@@ -397,25 +407,33 @@ class LocalOriginalSearchPresentationTest {
         content(state, largeFont = true); field("original-search-query", "未命中合成词")
         assertTrue(ready("未命中合成词").state.hits.isEmpty())
         shownStatus("没有匹配的原文")
-        field("original-search-from", "2026-02-30"); observation { it.state.stage == OriginalSearchStage.INVALID }
-        shownStatus("请检查查找条件")
-        compose.onAllNodes(hasText("没有匹配的原文")).assertCountEquals(0); compose.onAllNodes(hasTestTag("entry-one")).assertCountEquals(0)
+        field("original-search-from", "2026-02-30")
+        compose.onNodeWithTag("original-search-filter-done").performScrollTo().performClick()
+        compose.onNodeWithTag("original-filter-error").performScrollTo().assertIsDisplayed()
+        compose.runOnIdle {assertEquals(OriginalSearchStage.READY,observations.get().state.stage);assertEquals("",observations.get().state.input.from)}
+        compose.onAllNodes(hasTestTag("entry-one")).assertCountEquals(0)
         field("original-search-from", "2026-10-13"); field("original-search-through", "2026-10-12")
-        observation { it.state.stage == OriginalSearchStage.INVALID && it.state.input.through == "2026-10-12" }
-        field("original-search-through", "2026-10-13"); field("original-search-query", "needle")
+        compose.onNodeWithTag("original-search-filter-done").performScrollTo().performClick()
+        compose.onNodeWithTag("original-filter-error").performScrollTo().assertIsDisplayed()
+        assertEquals("2026-10-12",editable("original-search-through"))
+        compose.runOnIdle {assertEquals("",observations.get().state.input.through)}
+        field("original-search-through", "2026-10-13"); compose.applyOriginalSearchFilters();field("original-search-query", "needle")
         assertEquals(listOf("one"), ready("needle").state.hits.map { it.entry.id })
         compose.runOnIdle { state.value = state.value.copy(entries = listOf(original.copy(captureTimeZone = "Invalid/Synthetic"))) }
         observation { it.state.stage == OriginalSearchStage.FAILED }
         shownStatus("本机查找需要处理")
         compose.onAllNodes(hasText("没有匹配的原文")).assertCountEquals(0)
         compose.runOnIdle { state.value = state.value.copy(entries = listOf(original)) }; ready("needle")
+        compose.showOriginalSearchFilters();compose.onNodeWithText("更多查找设置").performScrollTo().performClick()
         val clear = compose.onNodeWithTag("original-search-clear").performScrollTo().assertIsDisplayed().assertIsEnabled()
-        val bounds = clear.getUnclippedBoundsInRoot(); val viewport = compose.onNode(hasScrollToIndexAction()).getUnclippedBoundsInRoot()
+        val bounds = clear.getUnclippedBoundsInRoot(); val viewport = compose.onNode(isDialog()).getUnclippedBoundsInRoot()
         assertTrue(bounds.height >= AIyouDimensions.minTouchTarget)
         assertTrue(bounds.left >= viewport.left && bounds.right <= viewport.right); assertTrue(bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
         clear.performClick(); observation { it.state.stage == OriginalSearchStage.BROWSE }
         compose.showOriginalSearchFilters()
         assertEquals("", editable("original-search-query")); assertEquals("", editable("original-search-from")); assertEquals("", editable("original-search-through"))
+        compose.onNodeWithTag("original-filter-cancel").performScrollTo().performClick()
+        focusedField("original-search-query")
         compose.onNodeWithTag("original-search-mode").performScrollTo().assertIsEnabled()
         assertEquals(OriginalSearchMode.KEYWORDS, observations.get().state.input.mode); assertNull(state.value.error)
         assertEquals("synthetic-private-untouched-draft", state.value.text); assertEquals(0, draftChanges); assertEquals(0, saves)
@@ -461,6 +479,7 @@ class LocalOriginalSearchPresentationTest {
         val sourceSnapshot = state.value.entries; val show = mutableStateOf(true); val restoration = StateRestorationTester(compose)
         restoration.setContent { if (show.value) LookupTestScreen(state, source = { state.value }) else Text("合成查找已销毁") }
         field("original-search-query", marker); field("original-search-from", "2026-10-13"); field("original-search-through", "2026-10-13")
+        compose.applyOriginalSearchFilters()
         compose.onNodeWithTag("original-search-mode").performScrollTo().performClick()
         compose.runOnIdle {
             // Semantics replacement is fixture setup; isolate the following actual user edit.
@@ -487,6 +506,14 @@ class LocalOriginalSearchPresentationTest {
         assertEquals("Actual Redo must restore the real typed edit", typed, editable("original-search-query"))
         nativeHistory("original-search-query")
         assertEquals("Actual Undo must remain available after Redo", beforeTyping, editable("original-search-query"))
+        focusedField("original-search-from").performKeyInput {pressKey(Key.Backspace)}
+        assertEquals("2026-10-1",editable("original-search-from"))
+        compose.runOnIdle {assertEquals("2026-10-13",actualInputs.get().from.text.toString())}
+        nativeHistory("original-search-from")
+        assertEquals("2026-10-13",editable("original-search-from"))
+        nativeHistory("original-search-from",redo=true)
+        assertEquals("2026-10-1",editable("original-search-from"))
+        compose.onNodeWithTag("original-filter-cancel").performScrollTo().performClick()
         val beforeClear = observation { it.state.stage == OriginalSearchStage.READY && it.state.input.query == marker &&
             it.state.input.mode == OriginalSearchMode.EXACT && it.state.input.from == "2026-10-13" && it.state.input.through == "2026-10-13" }
         assertEquals(listOf("one"), beforeClear.state.hits.map { it.entry.id })
@@ -513,6 +540,7 @@ class LocalOriginalSearchPresentationTest {
         }
         compose.runOnIdle { beforeClear.open(beforeClear.state.hits.single()) }; assertNoReader()
         field("original-search-query", marker); field("original-search-from", "2026-10-13"); field("original-search-through", "2026-10-13")
+        compose.applyOriginalSearchFilters()
         compose.onNodeWithTag("original-search-mode").performScrollTo().performClick()
         val retained = observation { it.state.stage == OriginalSearchStage.READY && it.state.input.query == marker &&
             it.state.input.mode == OriginalSearchMode.EXACT && it.state.input.from == "2026-10-13" && it.state.input.through == "2026-10-13" }
@@ -600,6 +628,7 @@ class LocalOriginalSearchPresentationTest {
         state.value = state.value.copy(localSearch = port, localSearchEpoch = 7, localIndexBusy = true)
         content(state); field("original-search-query", "咖啡")
         assertEquals(listOf("one"), ready("咖啡").state.hits.map { it.entry.id })
+        compose.showOriginalSearchFilters();compose.onNodeWithText("更多查找设置").performScrollTo().performClick()
         compose.onNodeWithTag("original-search-rebuild").performScrollTo().assertIsNotEnabled()
         compose.runOnIdle { state.value = state.value.copy(localIndexBusy = false, localIndexError = "合成查找整理暂停") }
         compose.onNodeWithTag("original-search-rebuild").performScrollTo().assertIsEnabled().performClick()
@@ -703,20 +732,30 @@ class LocalOriginalSearchPresentationTest {
             onDraftChange = { draftChanges++ }, onSave = { saves++ }, onRebuildLocalSearch = { rebuilds++ },
             onRefreshLocalSearch = { refreshCallbacks.incrementAndGet() }) }
     }
-    private fun field(tag: String, text: String) { compose.onNodeWithTag(tag).performScrollTo().assertIsEnabled().performTextReplacement(text) }
+    private fun ensureFieldWindow(tag:String) {
+        if(tag=="original-search-query") {
+            if(compose.onAllNodesWithTag("original-filter-cancel").fetchSemanticsNodes().isNotEmpty())
+                compose.onNodeWithTag("original-filter-cancel").performScrollTo().performClick()
+        } else if(tag in setOf("original-search-from","original-search-through","original-search-person-input")) compose.showOriginalSearchFilters()
+    }
+    private fun field(tag: String, text: String) {ensureFieldWindow(tag);compose.onNodeWithTag(tag).performScrollTo().assertIsEnabled().performTextReplacement(text) }
     private fun shownStatus(text: String) {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(text))
         compose.onNodeWithText(text).assertIsDisplayed()
     }
-    private fun focusedField(tag: String) = compose.onNodeWithTag(tag)
-        .performScrollTo().assertIsEnabled().performClick().assertIsFocused()
+    private fun focusedField(tag: String):androidx.compose.ui.test.SemanticsNodeInteraction {
+        ensureFieldWindow(tag)
+        return compose.onNodeWithTag(tag).performScrollTo().assertIsEnabled().performClick().assertIsFocused()
+    }
     @OptIn(ExperimentalFoundationApi::class)
     private fun nativeHistory(tag: String, redo: Boolean = false) {
-        focusedField(tag)
+        val focused=focusedField(tag)
+        val focusedView=(focused.fetchSemanticsNode().root as ViewRootForTest).view
         val stable = observation { it.state.stage == OriginalSearchStage.READY ||
             it.state.stage == OriginalSearchStage.BROWSE }
         val before = compose.runOnIdle {
-            val field = checkNotNull(actualInputs.get()).field(tag)
+            val field = if(tag=="original-search-query") checkNotNull(actualInputs.get()).query
+                else if(tag=="original-search-from") checkNotNull(filterInputs.get()).first else checkNotNull(filterInputs.get()).second
             (if (redo) field.undoState.canRedo else field.undoState.canUndo) to
                 stable.state.inputEpoch
         }
@@ -729,17 +768,22 @@ class LocalOriginalSearchPresentationTest {
                 (if (redo) android.view.KeyEvent.META_SHIFT_ON else 0)
             for (action in listOf(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.ACTION_UP)) {
                 assertTrue("Actual focused history handler must consume the native chord",
-                    checkNotNull(actualView.get()).dispatchKeyEvent(android.view.KeyEvent(now, now,
+                    focusedView.dispatchKeyEvent(android.view.KeyEvent(now, now,
                         action, android.view.KeyEvent.KEYCODE_Z, 0, meta)))
             }
         }
-        if (before.first) {
+        if (before.first && tag=="original-search-query") {
             // Foundation can consume the same chord itself. Require the real
             // production ownership fence, not only successful text history.
             observation { it.state.inputEpoch > before.second }
+        } else if(tag!="original-search-query") {
+            observation {it.state.inputEpoch==before.second && it.state.input==stable.state.input}
         }
     }
-    private fun editable(tag: String): String = compose.onNodeWithTag(tag).performScrollTo().fetchSemanticsNode().config[SemanticsProperties.EditableText].text
+    private fun editable(tag: String): String {
+        if(tag!="original-search-query") ensureFieldWindow(tag)
+        return compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.EditableText].text
+    }
     private fun openCard(id: String) {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))
         compose.onNodeWithTag("entry-$id").performClick()
