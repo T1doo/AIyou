@@ -1,0 +1,53 @@
+{
+  "batch": "G2",
+  "status": "IN_PROGRESS",
+  "source_parent": "da62a00ba2760e7fcf5db4474b6a6c5abf0519d9",
+  "device": {
+    "serial": "emulator-5556",
+    "avd": "AIyou_API35",
+    "api": 35,
+    "pixels": "1080x2400",
+    "fontScale": 1.0,
+    "ime": "com.android.inputmethod.latin/.LatinIME",
+    "physical_device": false
+  },
+  "performed": [
+    "Installed debug APK without clearing prior synthetic data",
+    "Selected SUNSET then NIGHT through settings; actual v5 preference file reflected both writes",
+    "Force-stopped and reopened app: NIGHT persisted",
+    "Saved inherited synthetic Keyboard_return_sample draft, opened original, returned to Now",
+    "Set GLOW then enabled reduceMotion; persisted NIGHT/GLOW/reduceMotion=true",
+    "Reinstalled chrome/system-bar update; saved record and preferences retained",
+    "Selected final sunset and blue themes and captured screenshots"
+  ],
+  "checks": {
+    "android_build_and_lint": "PASS",
+    "navigation_tests": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "preferences_api35": "PASS selected changes and app restart; Windows Robolectric AtomicFile failure remains separate",
+    "chinese_ime_talkback_performance": "NOT RUN",
+    "four_new_previews": "Compiled previously, rendering still NOT RUN"
+  },
+  "fixes": [
+    "Now top and bottom app chrome use selected theme",
+    "Night text buttons use brighter semantic primary; completion button retains clear fill",
+    "Compact save button shape",
+    "Status bar icon appearance follows current Now theme"
+  ],
+  "remaining": [
+    "System three-button navigation icons still need final contrast verification in night screenshot",
+    "Other routes still use legacy palette",
+    "Composer compactness, reading metadata verbosity and all native states still require refinement",
+    "Existing companion asset is not newly approved art",
+    "Full current CI not accepted"
+  ],
+  "apk": {
+    "path": "E:\\Github\\AIyou\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "sha256": "9f954985479d40e375702318c588714b305c29d6f1000b0d4f6d310b7b2002ec"
+  },
+  "cleanup": "Owned emulator closed via adb emu kill; no new service installed"
+}

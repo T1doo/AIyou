@@ -215,6 +215,8 @@ fun MixedCaptureScreen(local: LocalRecordUiState,controller: MixedCaptureControl
                 TextButton(onClick={focusEditor=!focusEditor},contentPadding=PaddingValues(horizontal=8.dp),modifier=Modifier.heightIn(min=48.dp).testTag("mixed-focus-editor")
                     .semantics {contentDescription=if(focusEditor)"收起编辑区域" else "展开编辑区域"}){Text(if(focusEditor)"收起" else "展开")}
                 Button(onClick=controller::save,
+                    colors=ButtonDefaults.buttonColors(containerColor=colors.primary,contentColor=Color.White),
+                    shape=RoundedCornerShape(10.dp),
                     enabled=enabled&&!ui.busy&&!controller.audioCapture.busy&&!playback.busy&&ui.selection==null&&ui.pendingEdits==0&&!ui.discardPending&&ui.policyChange==null,
                     modifier=Modifier.widthIn(min=96.dp).heightIn(min=48.dp).testTag("mixed-save")) {
                     Text(if(ui.uncertainSave) "核对保存" else if(ui.busy) "保存中" else "保存",style=MaterialTheme.typography.labelLarge)

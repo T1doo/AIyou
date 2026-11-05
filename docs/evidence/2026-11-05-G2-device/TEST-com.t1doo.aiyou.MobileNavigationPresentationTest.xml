@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.t1doo.aiyou.MobileNavigationPresentationTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-05T08:19:03.996Z" hostname="LAPTOP-USISIS19" time="9.363">
+  <properties/>
+  <testcase name="productionTabsSwipeOnceAtEdgesAndReturnToUnchangedUnsavedDraftWithoutWrites" classname="com.t1doo.aiyou.MobileNavigationPresentationTest" time="8.717"/>
+  <testcase name="doubleFontTabsKeepRealLabelsTouchTargetsAndCancelRetiredGesture" classname="com.t1doo.aiyou.MobileNavigationPresentationTest" time="0.174"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

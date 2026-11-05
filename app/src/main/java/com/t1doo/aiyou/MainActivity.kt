@@ -1264,6 +1264,7 @@ fun AIyouApp(
     val notebookHome=selected==Destination.NOW && local?.supportsMixedCapture==true && !showSettings && !showLicenses &&
         !reading && !recapRoute && !browsingPackage && !browsingRecycle && history==null && editing==null && attachmentPanel==null
     // maxHeight is the IME-padded whole Scaffold allocation, including its top/bottom bars.
+    com.t1doo.aiyou.ui.SkyglassSystemBars(notebookHome && display.preferences.appearance == com.t1doo.aiyou.designsystem.SkyglassAppearance.NIGHT)
     // Decide during this first constrained composition; reader measurement remains separate.
     BoxWithConstraints(Modifier.imePadding().fillMaxSize(),propagateMinConstraints=true) {
         val compactNotebookHeader = LocalDensity.current.fontScale >= 1.5f ||
@@ -1285,7 +1286,8 @@ fun AIyouApp(
                 else if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
                 else if (editing != null) "取消编辑" else if(reading && recapRoute) "返回回顾" else if (reading || browsingRecycle) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else if(recapRoute) "返回回忆" else "设置",
                 actionEnabled = recycleUi?.busy != true && attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
-                containerColor = if(notebookHome) com.t1doo.aiyou.designsystem.AIyouColors.notebookSky else com.t1doo.aiyou.designsystem.AIyouColors.surface,
+                containerColor = if(notebookHome) com.t1doo.aiyou.designsystem.skyglassPalette(display.preferences.appearance).input else com.t1doo.aiyou.designsystem.AIyouColors.surface,
+                contentColor = if(notebookHome) com.t1doo.aiyou.designsystem.skyglassPalette(display.preferences.appearance).text else com.t1doo.aiyou.designsystem.AIyouColors.textPrimary,
             ) {
                 if (browsingPackage && ownsPackageRoute()) {
                     closePackageRoute()
@@ -1308,7 +1310,8 @@ fun AIyouApp(
                 DisposableEffect(Unit) { onDispose { navigationHeightPx = 0 } }
                 Box(Modifier.onSizeChanged { navigationHeightPx = it.height }) {
                     NotebookNavigation(if (showSettings) null else selected, onSelect = selectDestination,
-                        containerColor = if(notebookHome) com.t1doo.aiyou.designsystem.AIyouColors.notebookMist else com.t1doo.aiyou.designsystem.AIyouColors.surface,
+                        containerColor = if(notebookHome) com.t1doo.aiyou.designsystem.skyglassPalette(display.preferences.appearance).input else com.t1doo.aiyou.designsystem.AIyouColors.surface,
+                        skyglass = if(notebookHome) com.t1doo.aiyou.designsystem.skyglassPalette(display.preferences.appearance) else null,
                         motionAllowed = motionAllowed,
                         allowReselect = recapRoute || browsingPackage || browsingRecycle)
                 }

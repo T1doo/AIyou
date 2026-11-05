@@ -51,8 +51,8 @@ import com.t1doo.aiyou.designsystem.aiyouFocusOutline
 /** Natural height at large font scales; system insets remain part of the chrome. */
 @Composable
 fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = true,
-    containerColor: Color = AIyouColors.surface, onAction: () -> Unit) {
-    Surface(color = containerColor) {
+    containerColor: Color = AIyouColors.surface, contentColor: Color = AIyouColors.textPrimary, onAction: () -> Unit) {
+    Surface(color = containerColor, contentColor = contentColor) {
         Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars)
             .heightIn(min = 56.dp).padding(horizontal = AIyouDimensions.pageNarrow),
             verticalAlignment = Alignment.CenterVertically,
@@ -63,7 +63,7 @@ fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = 
             } else Text(title, Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
             TextButton(onClick = onAction, enabled = actionEnabled,
                 shape = MaterialTheme.shapes.medium,
-                colors = ButtonDefaults.textButtonColors(containerColor = Color.Transparent),
+                colors = ButtonDefaults.textButtonColors(containerColor = Color.Transparent, contentColor = contentColor),
                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget).aiyouFocusOutline()) {
                 Text(actionLabel, style = MaterialTheme.typography.labelLarge)
             }
@@ -74,11 +74,11 @@ fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = 
 @Composable
 fun NotebookNavigation(selected: Destination?, onSelect: (Destination) -> Unit,
     containerColor: Color = AIyouColors.surface, motionAllowed: Boolean = false,
-    allowReselect: Boolean = true) {
+    allowReselect: Boolean = true, skyglass: com.t1doo.aiyou.designsystem.SkyglassPalette? = null) {
     val direction = LocalLayoutDirection.current
     Surface(color = containerColor) {
       Column {
-        HorizontalDivider(color = AIyouColors.outlineDecorative)
+        HorizontalDivider(color = skyglass?.secondaryText?.copy(alpha=.12f) ?: AIyouColors.outlineDecorative)
         Row(Modifier.fillMaxWidth().testTag("notebook-navigation").selectableGroup()
             .windowInsetsPadding(WindowInsets.navigationBars)
             // Restrict page gestures to navigation: never steal a text-selection/list drag.
@@ -98,12 +98,12 @@ fun NotebookNavigation(selected: Destination?, onSelect: (Destination) -> Unit,
             verticalAlignment = Alignment.CenterVertically) {
             Destination.entries.forEach { destination ->
                 val active = selected == destination
-                val color = if (active) AIyouColors.primary else AIyouColors.textSecondary
+                val color = if (active) skyglass?.text ?: AIyouColors.primary else skyglass?.secondaryText ?: AIyouColors.textSecondary
                 val interaction = remember(destination) { MutableInteractionSource() }
                 val pressed by interaction.collectIsPressedAsState()
-                val scale by animateFloatAsState(1f,
+                val scale by animateFloatAsState(if (pressed && motionAllowed) .985f else 1f,
                     animationSpec = tween(if (motionAllowed) 110 else 0), label = "navigation-press")
-                val indicator by animateColorAsState(containerColor,
+                val indicator by animateColorAsState(if (active && skyglass != null) skyglass.tint else containerColor,
                     animationSpec = tween(if (motionAllowed) 160 else 0), label = "navigation-selection")
                 Column(Modifier.weight(1f).aiyouFocusOutline()
                     .testTag("notebook-tab-${destination.name}")

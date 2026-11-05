@@ -68,7 +68,8 @@ fun SkyglassTheme(appearance: SkyglassAppearance, content: @Composable () -> Uni
         val typography = MaterialTheme.typography
         CompositionLocalProvider(LocalSkyglassPalette provides p, LocalContentColor provides p.text) {
             MaterialTheme(
-                colorScheme = base.copy(primary=p.primary, onPrimary=Color.White,
+                colorScheme = base.copy(primary=if (appearance == SkyglassAppearance.NIGHT) Color(0xFFBFCBFF) else p.primary,
+                    onPrimary=if (appearance == SkyglassAppearance.NIGHT) p.input else Color.White,
                     primaryContainer=p.tint, onPrimaryContainer=p.text,
                     background=p.input, onBackground=p.text, surface=p.input, onSurface=p.text,
                     surfaceVariant=p.tint, onSurfaceVariant=p.secondaryText,
