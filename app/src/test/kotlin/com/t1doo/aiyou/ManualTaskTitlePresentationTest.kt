@@ -236,6 +236,7 @@ class ManualTaskTitlePresentationTest {
         compose.runOnIdle { assertTrue(state.value.tasks.available) }
     }
     private fun taskNode(tag: String): SemanticsNodeInteraction {
+        if(tag.startsWith("manual-task-title-open-")) compose.showManualTaskDetails(tag.removePrefix("manual-task-title-open-"))
         compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(tag))
         return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
     }

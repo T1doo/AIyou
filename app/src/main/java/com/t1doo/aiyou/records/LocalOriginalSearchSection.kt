@@ -100,7 +100,7 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
     peopleAvailable: Boolean = false, peopleError: String? = null, onPerson: (String?) -> Unit = {},
     onRefreshPeople: () -> Unit = {},onQuestionKeywords:(()->Unit)?=null,
     searchNeedsAttention: Boolean = false, onTools: (() -> Unit)? = null,
-    onApplyFilters: ((OriginalFilterDraft) -> Boolean)? = null) {
+    onApplyFilters: ((OriginalFilterDraft) -> Boolean)? = null, toolsOwner: Any? = null) {
     // These owners live outside the disclosure, never in SavedState. Collapsing an
     // empty filter must not replace its actual editable/Undo object or hide errors.
     val glass = com.t1doo.aiyou.designsystem.LocalSkyglassActive.current
@@ -192,8 +192,10 @@ internal fun LocalOriginalSearchSection(query: TextFieldState, from: TextFieldSt
                     enabled=enabled&&(onlyFavorites||favoritesAvailable&&!favoritesLoading),
                     modifier=Modifier.weight(1f).heightIn(min=AIyouDimensions.minTouchTarget).testTag("original-category-favorites")
                         .semantics {selected=onlyFavorites}) {Text(if(onlyFavorites) "✓ 收藏" else "收藏")}
-                onTools?.let { open -> TextButton(onClick=open,contentPadding=PaddingValues(horizontal=4.dp),
-                    modifier=Modifier.weight(1f).heightIn(min=AIyouDimensions.minTouchTarget).testTag("memory-tools-disclosure")) {Text("更多")} }
+                onTools?.let { open -> key(toolsOwner) {
+                    TextButton(onClick=open,contentPadding=PaddingValues(horizontal=4.dp),
+                        modifier=Modifier.weight(1f).heightIn(min=AIyouDimensions.minTouchTarget).testTag("memory-tools-disclosure")) {Text("更多")}
+                } }
             }
         }
         if(!glass) TextButton(onClick={filtersExpanded=true},

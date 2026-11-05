@@ -399,6 +399,9 @@ fun AIyouApp(
     val nowList = rememberLazyListState()
     val memoriesList = rememberLazyListState()
     val tasksList = rememberLazyListState()
+    // Only the top-level disclosure survives secondary routes. No query, source or callback is retained.
+    val memoryToolsExpandedState = remember(local?.localSearch, local?.unifiedKeywordOwner,
+        local?.recordAuthorizationOwner, local?.ready, local?.opening, local?.error) { mutableStateOf(false) }
     val recapList = remember { LazyListState() }
     var recapRoute by remember { mutableStateOf(false) }
     var taskSourceRoute by remember { mutableStateOf(false) }
@@ -1505,6 +1508,7 @@ fun AIyouApp(
             val topPaddingPx = with(density) { contentPadding.calculateTopPadding().roundToPx() }
             val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
             LocalRecordsScreen(selected, local, onDraftChange, onSave, onRetry, modifier, companion = companion,
+                memoryToolsExpandedState = memoryToolsExpandedState,
                 appearance=if(skyglassHome)display.preferences.appearance else null,
                 onApplyFilters={draft->
                     var applied=false

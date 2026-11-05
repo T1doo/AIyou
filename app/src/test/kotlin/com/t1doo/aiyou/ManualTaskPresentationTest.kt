@@ -245,15 +245,15 @@ class ManualTaskPresentationTest {
     fun narrowDoubleFontKeepsCreateCloseAndNavigationReachableAndRevokesOldPageCallbacks() {
         content(large = true, withCompanion = true)
         assertInitialCreateFullyVisible()
-        compose.onNodeWithTag("manual-task-compact-header").assertIsDisplayed()
+        compose.onNode(hasText("待办") and isHeading()).assertIsDisplayed()
         taskNode("manual-task-reminder-boundary").assertTextEquals("创建不会自动设置提醒")
         assertTrue(taskNode("manual-task-begin").getUnclippedBoundsInRoot().height >= 48.dp)
         begin("合成私密输入")
         compose.onNodeWithTag("manual-task-create").performScrollTo().assertIsDisplayed().assertIsEnabled()
-        compose.onNodeWithTag("manual-task-close").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithTag("manual-task-discard-request").performScrollTo().assertIsDisplayed().performClick()
         compose.onNodeWithTag("manual-task-continue").assertIsDisplayed().assertIsEnabled().performClick()
         compose.onNodeWithTag("manual-task-input").performScrollTo().assertTextEquals("待办标题", "合成私密输入")
-        compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
+        compose.onNodeWithTag("manual-task-discard-request").performScrollTo().performClick()
         compose.onNodeWithTag("manual-task-discard").assertIsDisplayed().assertIsEnabled().performClick()
         assertNull(state.value.tasks.editor); assertTrue(queued.isEmpty()); assertTrue(persisted.isEmpty())
         val old = callbacks.get()
@@ -272,7 +272,7 @@ class ManualTaskPresentationTest {
         begin("合成未确认私密标题")
         val oldActions = callbacks.get(); val oldInput = input.get()
         compose.runOnIdle { assertPrivate(registry!!.performSave(), listOf("合成未确认私密标题", capture, "合成原文")) }
-        compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
+        compose.onNodeWithTag("manual-task-discard-request").performScrollTo().performClick()
         compose.onNodeWithTag("manual-task-discard").assertIsDisplayed().performClick(); begin("")
         compose.runOnIdle { assertNotSame(oldInput, input.get()); assertFalse(input.get().undoState.canUndo); assertFalse(input.get().undoState.canRedo) }
         compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
@@ -296,7 +296,7 @@ class ManualTaskPresentationTest {
         compose.onNodeWithTag("manual-task-create").performScrollTo().performClick()
         assertTrue(persisted.isEmpty()); assertNull(state.value.tasks.notice); pump()
         val id = persisted.keys.single(); assertNull(persisted.getValue(id).schedule!!.time)
-        taskNode("manual-task-date-" + id).assertTextContains("仅日期", substring = true)
+        taskNode("manual-task-detail-date-" + id).assertTextContains("仅日期", substring = true)
         openDate(id); dateFields("2042-11-20", "09:30", "Europe/Paris"); saveDate()
         assertEquals("2042-11-19", persisted.getValue(id).schedule!!.date.toString()); pump()
         assertEquals("Europe/Paris", persisted.getValue(id).schedule!!.timeZone)
@@ -321,7 +321,7 @@ class ManualTaskPresentationTest {
         compose.onNodeWithTag("manual-task-offset-SECOND").performScrollTo().performClick()
         saveDate(); assertEquals(1L, persisted.getValue("one").version); pump()
         assertEquals(-18_000, persisted.getValue("one").schedule!!.offsetSeconds)
-        taskNode("manual-task-date-one").assertTextContains("偏移 -05:00", substring = true)
+        taskNode("manual-task-detail-date-one").assertTextContains("偏移 -05:00", substring = true)
     }
     @Test fun lostDateReadbackKeepsStableRequestAfterCloseAndNeverShowsFalseEmpty() {
         persisted["one"] = snapshot("one", "合成日期待确认"); content(); openDate("one")
@@ -349,10 +349,11 @@ class ManualTaskPresentationTest {
         for ((group, title) in listOf(ManualTaskGroup.UNDATED to "未设时间 · 待办", ManualTaskGroup.TODAY to "今天",
             ManualTaskGroup.UPCOMING to "接下来", ManualTaskGroup.PAST to "过去 · 未完成",
             ManualTaskGroup.COMPLETED to "已完成", ManualTaskGroup.CANCELLED to "已取消")) {
-            taskNode("manual-task-heading-" + group).assertTextEquals(title + " 1")
+            taskNode("manual-task-heading-" + group).assertTextEquals(title)
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,"1项"))
         }
-        taskNode("manual-task-date-today").assertTextContains("仅日期", substring = true).assertTextContains("Asia/Shanghai", substring = true)
-        taskNode("manual-task-date-done").assertTextContains("2026-10-13", substring = true)
+        taskNode("manual-task-detail-date-today").assertTextContains("仅日期", substring = true).assertTextContains("Asia/Shanghai", substring = true)
+        taskNode("manual-task-detail-date-done").assertTextContains("2026-10-13", substring = true)
         compose.onAllNodesWithTag("manual-task-date-open-done").assertCountEquals(0)
         compose.onAllNodesWithTag("manual-task-complete-cancel").assertCountEquals(0)
         assertNull(persisted.getValue("none").schedule)
@@ -403,6 +404,8 @@ class ManualTaskPresentationTest {
         }
     }
     private fun dateFields(date: String, time: String, zone: String) {
+        if(compose.onAllNodesWithTag("manual-task-date-input").fetchSemanticsNodes().isEmpty())
+            compose.onNodeWithTag("manual-task-date-disclosure").performScrollTo().assertIsEnabled().performClick()
         compose.onNodeWithTag("manual-task-date-input").performScrollTo().performTextReplacement(date)
         compose.onNodeWithTag("manual-task-time-input").performScrollTo().performTextReplacement(time)
         compose.onNodeWithTag("manual-task-zone-input").performScrollTo().performTextReplacement(zone)
@@ -420,7 +423,7 @@ class ManualTaskPresentationTest {
         content(withCompanion = true)
         assertInitialCreateFullyVisible()
         taskNode("manual-task-total").assertTextEquals("正式待办 2")
-        taskNode("manual-task-date-open").assertTextEquals("手工创建 · 未设时间 · 未设置提醒计划")
+        taskNode("manual-task-detail-date-open").assertTextEquals("手工创建 · 未设时间 · 未设置提醒计划")
         taskNode("manual-task-draft-summary").assertTextEquals("待确认草稿 1 · 单独计数")
         taskNode("task-proposal-heading").assertTextEquals("待确认草稿 1")
         begin("合成新建待办")
@@ -439,11 +442,11 @@ class ManualTaskPresentationTest {
         persisted["landscape"] = snapshot("landscape", "合成横屏待办")
         content(withCompanion = true)
         assertInitialCreateFullyVisible()
-        compose.onNodeWithTag("manual-task-compact-header").assertIsDisplayed()
+        compose.onNode(hasText("待办") and isHeading()).assertIsDisplayed()
         compose.onNodeWithTag("manual-task-begin").assertIsEnabled().performClick()
         compose.onNodeWithTag("manual-task-input").performScrollTo().performTextReplacement("合成未提交标题")
         compose.onNodeWithTag("manual-task-create").performScrollTo().assertIsDisplayed().assertIsEnabled()
-        compose.onNodeWithTag("manual-task-close").performScrollTo().performClick()
+        compose.onNodeWithTag("manual-task-discard-request").performScrollTo().performClick()
         compose.onNodeWithTag("manual-task-discard").assertIsDisplayed().assertIsEnabled().performClick()
         assertNull(state.value.tasks.editor)
         assertEquals(1, persisted.size); assertTrue(queued.isEmpty())
@@ -456,7 +459,8 @@ class ManualTaskPresentationTest {
         taskNode("manual-task-complete-landscape").assertIsEnabled().performClick()
         assertEquals(ManualTaskStatus.OPEN, persisted.getValue("landscape").status)
         pump(); assertEquals(ManualTaskStatus.COMPLETED, persisted.getValue("landscape").status)
-        taskNode("manual-task-heading-COMPLETED").assertTextEquals("已完成 1")
+        taskNode("manual-task-heading-COMPLETED").assertTextEquals("已完成")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,"1项"))
         taskNode("manual-task-total").assertTextEquals("正式待办 1")
         assertNull(persisted.getValue("landscape").reminder); assertEquals(capture, state.value.text)
     }
@@ -470,22 +474,33 @@ class ManualTaskPresentationTest {
         val bounds = create.getUnclippedBoundsInRoot()
         val viewport = list.getUnclippedBoundsInRoot()
         assertTrue(bounds.height >= 48.dp)
-        assertTrue(bounds.left >= viewport.left && bounds.right <= viewport.right)
-        assertTrue(bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
-        compose.onNodeWithTag("manual-task-reminder-boundary").assertIsDisplayed().assertTextEquals("创建不会自动设置提醒")
-        compose.onNodeWithTag("manual-task-reminder-policy").assertIsDisplayed().assertTextEquals("提醒需逐条确认，安排不等于送达。")
+        assertTrue("Create $bounds must stay in content width $viewport",bounds.left >= viewport.left && bounds.right <= viewport.right)
+        assertTrue("Create $bounds must stay in content height $viewport",bounds.top >= viewport.top && bounds.bottom <= viewport.bottom)
+        for(id in persisted.keys) {
+            val tag="manual-task-row-"+id
+            if(compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty()) continue
+            val row=compose.onNodeWithTag(tag).getUnclippedBoundsInRoot()
+            assertFalse("Create $bounds overlaps task row $tag at $row",
+                minOf(bounds.right,row.right)>maxOf(bounds.left,row.left) &&
+                    minOf(bounds.bottom,row.bottom)>maxOf(bounds.top,row.top))
+        }
+        compose.onAllNodesWithTag("manual-task-details-copy").assertCountEquals(0)
+        taskNode("manual-task-reminder-boundary").assertTextEquals("创建不会自动设置提醒")
+        taskNode("manual-task-reminder-policy").assertTextEquals("提醒需逐条确认，安排不等于送达。")
+        compose.onNodeWithTag("manual-task-details").performScrollTo().assertIsEnabled().performClick()
+        list.performScrollToIndex(0)
         compose.onAllNodesWithTag("manual-task-details-copy").assertCountEquals(0)
     }
 
     private fun taskNode(tag: String): SemanticsNodeInteraction {
         if(tag=="manual-task-begin") return compose.onNodeWithTag(tag).assertIsDisplayed()
         val list=compose.onNodeWithTag("manual-task-list")
-        if(tag in setOf("manual-task-total","manual-task-draft-summary","manual-task-reminder-boundary","manual-task-reminder-policy","manual-task-details-copy")) {
+        if(tag in setOf("manual-task-total","manual-task-draft-summary","manual-task-reminder-boundary","manual-task-reminder-policy","manual-task-details-copy","manual-task-refresh")) {
             list.performScrollToNode(hasTestTag("manual-task-details"))
             val disclosure=compose.onNodeWithTag("manual-task-details")
             if(disclosure.fetchSemanticsNode().config[SemanticsProperties.StateDescription]=="已收起") disclosure.performClick()
         }
-        val prefix=listOf("manual-task-complete-","manual-task-cancel-","manual-task-date-open-","manual-task-postpone-","manual-task-clear-").firstOrNull {tag.startsWith(it)}
+        val prefix=listOf("manual-task-complete-","manual-task-cancel-","manual-task-date-open-","manual-task-postpone-","manual-task-clear-","manual-task-detail-date-").firstOrNull {tag.startsWith(it)}
         if(prefix!=null) {
             val row="manual-task-row-"+tag.removePrefix(prefix)
             list.performScrollToNode(hasTestTag(row))

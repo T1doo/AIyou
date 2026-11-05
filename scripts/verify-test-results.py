@@ -375,6 +375,10 @@ for label, folder, minimum in targets:
             "lostClearAckHasReachableSameClearRetryAndCannotPromiseContinuedEditingBeforeVerification",
             "viewportAndFontChangesPreserveDraftAndRangeThenSaveOnlyOnExplicitAction",
         )
+        additional["com.t1doo.aiyou.MemoryToolsReturnPresentationTest"] = (
+            "returnFromRecapKeepsCallerToolsVisibleAndPanelClosed",
+            "readinessChangeAndRecreationDropDisclosureAndNeverReopenOldPanel",
+        )
         additional["com.t1doo.aiyou.FactRecapPresentationTest"] = (
             "recapExactAudioOpensManualEditorAndReturnsToSameWeekWithoutChangingOriginal",
             "restoredRecapAudioProofRetiresRealFocusedPanelAndOldEditorBeforeAnotherSource",

@@ -126,7 +126,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                 state = listState,
                 contentPadding = PaddingValues(start=margin,end=margin,
                     top=if(compactHeader) AIyouDimensions.spaceSm else AIyouDimensions.spaceMd,
-                    bottom=if(glass!=null) 84.dp else AIyouDimensions.spaceMd),
+                    bottom=if(glass!=null && !compactHeader) 84.dp else AIyouDimensions.spaceMd),
                 verticalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
                 if(appearance==null) item("header") {
                     if (compactHeader) Row(Modifier.fillMaxWidth().testTag("manual-task-compact-header"),
@@ -149,6 +149,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                             if(glass==null) TextButton(onClick = onBegin, enabled = canChoose,
                                 modifier = Modifier.heightIn(min = AIyouDimensions.minTouchTarget)
                                     .testTag("manual-task-begin")) { Text("创建待办") }
+                            if(glass!=null && compactHeader) TaskCreateAction(canChoose,tasks.creationDraft!=null,onBegin)
                             if(glass==null || detailsExpanded) Text(if (countsReady) "正式待办 ${tasks.items.size}" else "正式待办 · 待核对",
                                 style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("manual-task-total").align(Alignment.CenterVertically))
                             if (proposals.supported && (glass==null || detailsExpanded)) Text(if (proposalsReady)
@@ -219,7 +220,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                             Surface(color = androidx.compose.ui.graphics.Color.Transparent) {
                                 Text(if(glass!=null) title else title + " " + group.size, style = MaterialTheme.typography.titleMedium,
                                     modifier = Modifier.fillMaxWidth().padding(top=AIyouDimensions.spaceLg,bottom=AIyouDimensions.spaceSm)
-                                        .testTag("manual-task-heading-" + bucket).semantics { heading() })
+                                        .testTag("manual-task-heading-" + bucket).semantics { heading(); stateDescription = "${group.size}项" })
                             }
                         }
                         items(group, key = { "task-" + it.id }) { task ->
@@ -235,6 +236,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                                             modifier=Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp)
                                                 .testTag("manual-task-check-"+task.id).semantics {contentDescription=task.title})
                                         Column(Modifier.weight(1f).clickable(onClickLabel="待办详情") {rowExpanded=!rowExpanded}
+                                            .testTag("manual-task-disclosure-"+task.id).semantics {stateDescription=if(rowExpanded)"已展开" else "已收起"}
                                             .heightIn(min=48.dp).padding(vertical=AIyouDimensions.spaceXs),verticalArrangement=Arrangement.spacedBy(AIyouDimensions.spaceXs)) {
                                             Text(task.title, style = MaterialTheme.typography.bodyLarge,
                                                 color=if(task.status==ManualTaskStatus.COMPLETED)(glass?.secondaryText ?: AIyouColors.textSecondary) else (glass?.text ?: AIyouColors.textPrimary))
@@ -247,7 +249,7 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                                         if(glass!=null && !rowExpanded) Text("›",Modifier.padding(12.dp).clearAndSetSemantics {},color=glass.secondaryText)
                                     }
                                     if(rowExpanded) {
-                                    Text(manualTaskDateLabel(task),style=MaterialTheme.typography.bodySmall)
+                                    Text(manualTaskDateLabel(task),Modifier.testTag("manual-task-detail-date-"+task.id),style=MaterialTheme.typography.bodySmall)
                                     task.reminder?.let { Text(taskReminderLabel(it),Modifier.testTag("reminder-detail-status-"+task.id),style=MaterialTheme.typography.bodySmall) }
                                     task.sourceReceipt?.let { receipt ->
                                         Text("由原文摘录创建 · 人工确认 · 原文版本 " + receipt.binding.source.revision)
@@ -318,9 +320,9 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
                 }
                 if(!local.taskProposals.supported) item("proposals") { StatusNotice("没有待确认建议", if(local.supportsSourceTasks) "可从原文摘录手工创建待办；语义 AI 建议尚未开放，原文和草稿不会自动变成待办。" else "AI 候选确认尚未开放；原文与草稿不会自动变成正式待办。", state = ComponentState.EMPTY) }
             }
-            if(glass!=null) Button(onClick=onBegin,enabled=canChoose,shape=RoundedCornerShape(10.dp),
-                colors=ButtonDefaults.buttonColors(containerColor=glass.primary,contentColor=androidx.compose.ui.graphics.Color.White),
-                modifier=Modifier.align(Alignment.BottomEnd).padding(margin).heightIn(min=48.dp).testTag("manual-task-begin")) {Text(if(tasks.creationDraft!=null) "继续编辑" else "添加待办")}
+            if(glass!=null && !compactHeader) Box(Modifier.widthIn(max=AIyouDimensions.contentMaxWidth).fillMaxSize(),contentAlignment=Alignment.BottomEnd) {
+                TaskCreateAction(canChoose,tasks.creationDraft!=null,onBegin,Modifier.padding(margin))
+            }
         }
     }
     tasks.editor?.let { editor ->
@@ -330,6 +332,13 @@ fun ManualTasksScreen(local: LocalRecordUiState, onBegin: () -> Unit, onEdit: (L
     if (reminders != null) TaskReminderDialog(local, reminders, ownsReminderRoute)
     if (titles != null) ManualTaskTitleDialog(local, titles, ownsTitleRoute)
     }
+}
+
+@Composable
+private fun TaskCreateAction(enabled:Boolean,hasDraft:Boolean,onClick:()->Unit,modifier:Modifier=Modifier) {
+    Button(onClick=onClick,enabled=enabled,shape=RoundedCornerShape(10.dp),
+        colors=ButtonDefaults.buttonColors(containerColor=LocalSkyglassPalette.current.primary,contentColor=androidx.compose.ui.graphics.Color.White),
+        modifier=modifier.heightIn(min=48.dp).testTag("manual-task-begin")) {Text(if(hasDraft) "继续编辑" else "添加待办")}
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

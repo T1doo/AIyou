@@ -161,12 +161,14 @@ fun LocalRecordsScreen(
     onAskQuestion:(()->Unit)?=null,
     appearance: com.t1doo.aiyou.designsystem.SkyglassAppearance? = null,
     onApplyFilters: ((OriginalFilterDraft) -> Boolean)? = null,
+    memoryToolsExpandedState: androidx.compose.runtime.MutableState<Boolean>? = null,
 ) {
     com.t1doo.aiyou.designsystem.OptionalSkyglassTheme(appearance) {
     // Presentation only. Never retain a source, query proof or controller in disclosure state.
     val toolsOwner = remember(destination, local.localSearch, local.unifiedKeywordOwner,
         local.recordAuthorizationOwner, local.ready, local.opening, local.error) { Any() }
-    var memoryToolsExpanded by remember(toolsOwner) { mutableStateOf(false) }
+    val topLevelTools = memoryToolsExpandedState ?: remember(toolsOwner) { mutableStateOf(false) }
+    var memoryToolsExpanded by topLevelTools
     var reviewToolsExpanded by remember(toolsOwner) { mutableStateOf(false) }
     var manageToolsExpanded by remember(toolsOwner) { mutableStateOf(false) }
     val reviewFocus = remember(toolsOwner) { FocusRequester() }
@@ -519,6 +521,7 @@ fun LocalRecordsScreen(
                             eventDatesAvailable = local.eventDatesAvailable, eventDatesError = local.eventDatesError,
                             onRefreshEventDates = onRefreshEventDates,onQuestionKeywords=onQuestionKeywords,
                             onTools=if(appearance!=null)({memoryToolsExpanded=!memoryToolsExpanded})else null,
+                            toolsOwner=toolsOwner,
                             onApplyFilters=onApplyFilters,
                             searchNeedsAttention = searchState.stage == OriginalSearchStage.WAITING ||
                                 searchState.stage == OriginalSearchStage.RUNNING || searchState.stage == OriginalSearchStage.INVALID ||

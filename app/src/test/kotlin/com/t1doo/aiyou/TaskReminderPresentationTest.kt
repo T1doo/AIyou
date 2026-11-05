@@ -312,11 +312,7 @@ class TaskReminderPresentationTest {
         val detailPrefix=listOf("reminder-open-","reminder-cancel-","reminder-status-").firstOrNull {tag.startsWith(it)}
         if(detailPrefix!=null) {
             val id=tag.removePrefix(detailPrefix)
-            val row="manual-task-row-"+id
-            compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(row))
-            val expand=hasText("详情与操作") and hasAnyAncestor(hasTestTag(row))
-            if(compose.onAllNodes(expand).fetchSemanticsNodes().isNotEmpty())
-                compose.onNode(expand).performScrollTo().performClick()
+            compose.showManualTaskDetails(id)
         }
         val actualTag=if(tag.startsWith("reminder-status-"))tag.replaceFirst("reminder-status-","reminder-detail-status-") else tag
         compose.onNodeWithTag("manual-task-list").performScrollToNode(hasTestTag(actualTag))
