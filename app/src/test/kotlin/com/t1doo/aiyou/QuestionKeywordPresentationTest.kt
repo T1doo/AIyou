@@ -100,7 +100,7 @@ class QuestionKeywordPresentationTest {
         val oldProofState=observed.get()
         assertEquals(setOf("positive","negative","quotation"),observed.get().hits.map{it.entry.id}.toSet())
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-negative"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-negative"))).performScrollTo().performClick()
+        compose.onNodeWithTag("entry-negative").performScrollTo().performClick()
         compose.waitUntil(5000){compose.onAllNodesWithTag("original-text",useUnmergedTree=true).fetchSemanticsNodes().size==1}
         compose.onNodeWithTag("original-text",useUnmergedTree=true).assertTextEquals("我没有种薄荷。")
         val beforeReturn=reads.get();compose.onNodeWithText("返回列表").assertIsDisplayed().performClick()

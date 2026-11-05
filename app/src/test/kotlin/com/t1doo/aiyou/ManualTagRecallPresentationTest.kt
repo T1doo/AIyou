@@ -59,7 +59,7 @@ class ManualTagRecallPresentationTest {
         card()
         assertTrue(compose.onNodeWithText(original.originalText, useUnmergedTree = true).fetchSemanticsNode()
             .config[SemanticsProperties.Text].single().spanStyles.isEmpty())
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-tag"))).performClick()
+        compose.onNodeWithTag("entry-tag").performClick()
         compose.onNodeWithTag("original-text").assertTextEquals(original.originalText)
         assertTrue(compose.onNodeWithTag("original-text").fetchSemanticsNode().config[SemanticsProperties.Text].single().spanStyles.isEmpty())
         compose.onNodeWithText("返回列表").performClick(); ready("旅行")

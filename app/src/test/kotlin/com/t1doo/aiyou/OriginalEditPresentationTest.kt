@@ -130,7 +130,7 @@ class OriginalEditPresentationTest {
     }
     private fun open() {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-original"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-original"))).performClick()
+        compose.onNodeWithTag("entry-original").performClick()
     }
     private fun edit() = compose.originalToolText("编辑原文").performClick()
     private fun replace(text: String) = compose.onNodeWithTag("original-edit-text").performTextReplacement(text)
@@ -220,7 +220,7 @@ class OriginalEditPresentationTest {
             initialCard.left >= initialViewport.left && initialCard.right <= initialViewport.right &&
                 initialCard.top >= initialViewport.top && initialCard.bottom <= initialViewport.bottom)
         println(listTrace("PREVIEW_GROWTH_BEFORE"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-original"))).performClick()
+        compose.onNodeWithTag("entry-original").performClick()
         edit()
         val text = "合成第一行改写\n合成第二行改写\n合成第三行改写"
         replace(text)
@@ -255,7 +255,7 @@ class OriginalEditPresentationTest {
         list.performScrollToIndex(measuredListState.layoutInfo.totalItemsCount - 1)
         assertFalse(listTrace("VIEWPORT_SHRINK_INITIAL"), measuredListState.canScrollForward)
         println(listTrace("VIEWPORT_SHRINK_BEFORE"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-original"))).performClick()
+        compose.onNodeWithTag("entry-original").performClick()
         assertEquals("合成原文", original())
         // One measured layout change; no IO, revision, delay-until-visible or repeated retry.
         compose.runOnIdle { callbacks.returnToList(); height.value = 360.dp }

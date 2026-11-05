@@ -93,7 +93,7 @@ class HistoryEditPresentationTest {
         }
         compose.waitUntil(5000) { vm.state.value.ready }; compose.waitForIdle()
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-original"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-original"))).performClick()
+        compose.onNodeWithTag("entry-original").performClick()
         return store
     }
     private fun loaded() { compose.waitUntil(5000) { vm.state.value.originalHistory?.loading == false }; compose.waitForIdle() }

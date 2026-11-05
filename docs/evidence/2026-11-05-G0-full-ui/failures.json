@@ -1,0 +1,1522 @@
+{
+  "counts": {
+    "tests": 409,
+    "failures": 252,
+    "errors": 0,
+    "skipped": 0
+  },
+  "failures": [
+    {
+      "class": "com.t1doo.aiyou.AppAccessPreferenceTest",
+      "method": "confirmedSettingSurvivesNewInstancesAndStaleWriterCannotDisableIt",
+      "type": "java.io.IOException",
+      "message": "java.io.IOException: App access preference not confirmed"
+    },
+    {
+      "class": "com.t1doo.aiyou.AudioTranscriptPresentationTest",
+      "method": "explicitCloseStillCancelsAnUnstartedFocusedCorrectionAfterPanelRetirement",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-audio-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.AudioTranscriptPresentationTest",
+      "method": "focusedWithdrawalSurvivesPanelRemovalAndRecompositionBeforeActorRelease",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-audio-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.AudioTranscriptPresentationTest",
+      "method": "invalidCustomEndpointRemainsVisibleThroughTextEditAndRefreshUntilExplicitCorrection",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-audio-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.AudioTranscriptPresentationTest",
+      "method": "explicitHumanRangeAtNormalAndDoubleFontReachesExactFocusedSourceWithoutAutoplay",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-audio-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.AudioTranscriptPresentationTest",
+      "method": "recreatedPrivateAudioRouteRetiresRetainedFocusBeforeOpeningOrLocatingAnotherRecord",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-audio-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.AudioTranscriptPresentationTest",
+      "method": "doubleFontManualCorrectionWithdrawalAndKeywordJumpReachExactAudioWithoutChangingOriginal",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-audio-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.AudioTranscriptPresentationTest",
+      "method": "normalPlatformFontRecordsActualRangeEditorLayoutWithoutSavingPrivateInput",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-audio-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.AudioTranscriptPresentationTest",
+      "method": "actualLandscapeWindowKeepsRangeInputAndSaveReachableWithoutChangingTextOrSource",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-audio-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.AudioTranscriptPresentationTest",
+      "method": "focusedRangeSaveSurvivesPanelRemovalAndRecompositionBeforeActorRelease",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-audio-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.AudioTranscriptPresentationTest",
+      "method": "unsavedManualTextAndRetiredSessionDoNotSurviveRestorationAsWriteAuthority",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-audio-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.AudioTranscriptPresentationTest",
+      "method": "ownerReplacementStillRetiresPendingFocusedWithdrawalWithoutPublishingIntoNewOwner",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-audio-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.CompanionSettingsPresentationTest",
+      "method": "eachProductionDestinationReturnsFromSettingsWithoutChangingSelection",
+      "type": "androidx.test.espresso.AppNotIdleException",
+      "message": "androidx.test.espresso.AppNotIdleException: Compose did not get idle after 88837 attempts in 60 SECONDS.\n\n1. Check your measure/layout lambdas for infinite composition loops.\n2. Verify that the 'busy' resources listed above are not deadlocked.\n3. Increase Espresso's master idling policy if a longer timeout is required.\n The following Idle Conditions failed ."
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontFilterIsReachableAndReadFailureCannotBecomeEmptySuccess",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "localEvidenceCardsUseCurrentSourceAndReturnWithoutChangingQuestion",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontProductionTimelineKeepsChronologyAndClearsOnSelectionOrInputChange",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "productionSelectedExcerptTimelineIsExplicitAndOpensExactOriginalWithFreshConfirmationOnReturn",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "protocolQuestionStopAndServiceReplacementRejectNonCooperativeLateAnswer",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "imageFilterStartsOffCombinesLiteralAndDatesAndClearResetsEveryCondition",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontLocalEvidenceSelectionAndConfirmationRemainReachable",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontSyntheticNoEvidenceKeepsOriginalCardsAndNeverInventsAnswer",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontGridToggleAndFailureCardRemainReachableAndClearReturnsToList",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "gridRequiresExplicitToggleKeepsFailureCardAndOpensOriginalSource",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "evidenceModeStartsAfterReadySearchWithoutAnyTestObserver",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "syntheticAnswerStopCancelsRequestAndSuppressesLateText",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontEvidenceShowsExplicitNoEvidenceAndKeepsManualListReachable",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "localEvidenceRequiresExplicitSelectionAndReconfirmationAfterExclusion",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "syntheticSelectedAnswerCitationsOpenOriginalAndReturningRequiresNewConfirmation",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.CurrentImageSearchPresentationTest",
+      "method": "narrowDoubleFontProtocolQuestionRequiresSeparateScopeConfirmationAndJumpsToCurrentOriginal",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 3000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.FactRecapPresentationTest",
+      "method": "restoredRecapAudioProofRetiresRealFocusedPanelAndOldEditorBeforeAnotherSource",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-review-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FactRecapPresentationTest",
+      "method": "pureImageCardOpensExactVersionAttachmentAndReturnsWithoutInventingText",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-review-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FactRecapPresentationTest",
+      "method": "explicitWeekZoneEmptyResultPrivateSavedStateAndAccurateBackupSettings",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-review-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FactRecapPresentationTest",
+      "method": "actualNarrowDoubleFontRouteShowsOriginalExcerptThenFullTextAndReturnsToSameCard",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-review-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FactRecapPresentationTest",
+      "method": "recapExactAudioOpensManualEditorAndReturnsToSameWeekWithoutChangingOriginal",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-review-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FactRecapPresentationTest",
+      "method": "failedReadRetryCancelAndChangedSourceHidePrivateResultsAndRejectRetainedClick",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-review-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FactRecapPresentationTest",
+      "method": "actualSettingsPersistWeekAndOpenedRangeKeepsItsOwnChoiceBeforeExplicitGeneration",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-review-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FactRecapPresentationTest",
+      "method": "latePreferenceReadDoesNotRewriteOpenDayAndRetainedOpenUsesLatestConfirmedDefault",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-review-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FullBackupPresentationTest",
+      "method": "narrowDoubleFontRecreationDropsPasswordsAndNavigationRetiresPickerBeforeRecomposition",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FullBackupPresentationTest",
+      "method": "settingsNormalBackupEntryReturnsWithExactDraftAndNoImplicitIo",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'mixed-text' in scrollable container\nSemantics of the node:\nNode #14829 at (l=0.0, t=56.0, r=360.0, b=598.0)px, Tag: 'mixed-list'\nCollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@3177dca7'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 3 children, 3 siblings\nSelector used: (TestTag = 'mixed-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FullBackupPresentationTest",
+      "method": "actualRootFullScopeRequiresExplicitAcceptanceAndMatchingIndependentPasswords",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FullBackupPresentationTest",
+      "method": "fullRestoreAuthenticatesManifestThenRequiresSeparateEmptyTargetConfirmation",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FullBackupPresentationTest",
+      "method": "settingsNarrowDoubleFontBackupEntryIsFullyVisibleBeforeAnyScroll",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'mixed-text' in scrollable container\nSemantics of the node:\nNode #15405 at (l=0.0, t=56.0, r=320.0, b=386.0)px, Tag: 'mixed-list'\nCollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@3177dca7'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 3 children, 3 siblings\nSelector used: (TestTag = 'mixed-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.FullBackupPresentationTest",
+      "method": "settingsShortLandscapeBackupEntryIsFullyVisibleBeforeAnyScroll",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'mixed-text' in scrollable container\nSemantics of the node:\nNode #15811 at (l=40.0, t=56.0, r=760.0, b=158.0)px, Tag: 'mixed-list'\nCollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@3177dca7'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=540.0, maxValue=540.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 2 children, 3 siblings\nSelector used: (TestTag = 'mixed-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.HistoryEditPresentationTest",
+      "method": "committedHistorySaveReadbackFailureRetriesReadingWithoutAnotherWrite",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.HistoryEditPresentationTest",
+      "method": "retainedHistoryActionsRejectChangedSelectionClosedReopenedAndDisposedNavigation",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.HistoryEditPresentationTest",
+      "method": "concurrentNewVersionShowsConflictAndRetainsHistorySourceAndUserInput",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.HistoryEditPresentationTest",
+      "method": "narrowLargeFontFullUnicodeSourceAndReplacementPrimaryActionsRemainReachable",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.HistoryEditPresentationTest",
+      "method": "textMatchingCurrentOriginalDisablesSaveAndCreatesNoRevision",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.HistoryEditPresentationTest",
+      "method": "replacementCancelBackAndExplicitConfirmationPreserveIndependentDraft",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.HistoryEditPresentationTest",
+      "method": "failedSaveRetainsLoadedHistoryAndUserCorrectionCanRetry",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.HistoryEditPresentationTest",
+      "method": "historicalTextLoadsWithoutWritesAndSaveAppendsOneImmutableVersion",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ImageTextPresentationTest",
+      "method": "unavailableModelAndAiNoneNeverInferCreateManualReplacementOrChangeOriginal",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-image-a')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ImageTextPresentationTest",
+      "method": "restoredPrivateImageSourceRetiresRetainedAThenBViewerAndLookupCannotDisplayA",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-image-a')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ImageTextPresentationTest",
+      "method": "doubleFontControlledExtractionCorrectionKeywordJumpAndConfirmedDeletionReachExactOriginal",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-synthetic-image-a')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.KeywordReductionPresentationTest",
+      "method": "realAppRequiresRemovalAndConfirmationPreservesDatesThenOpensExactOriginal",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'original-search-from' in scrollable container\nSemantics of the node:\nNode #1317 at (l=0.0, t=56.0, r=360.0, b=928.0)px\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@65ab08b5'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 9 children\nSelector used: (ScrollToIndex is defined)\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalCandidatePresentationTest",
+      "method": "correctionConfirmationRestorationAndReopenedTokensCannotExecuteRetainedActions",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalCandidatePresentationTest",
+      "method": "narrowCorrectionFlowPreviewsCancelsReopensAndRequiresASeparateNewAcceptance",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalCandidatePresentationTest",
+      "method": "lostReadbackShowsUncertainStateAndRetriesTheSameExplicitReviewWithoutFalseEmptyOrSuccess",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalCandidatePresentationTest",
+      "method": "narrowDoubleFontKeepsReviewCancelSourceAndCloseReachableWithTouchTargets",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalCandidatePresentationTest",
+      "method": "actualReaderGeneratesPreviewsConfirmsAndReturnsToExactOriginalWithoutTaskSideEffects",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalCandidatePresentationTest",
+      "method": "restorationDropsPrivateCandidateAndConfirmationStateAndRetiresOldCallbacks",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalCandidatePresentationTest",
+      "method": "narrowInterruptedBatchWaitsForExplicitSameBatchResumeAndSeparateAcceptance",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalCandidatePresentationTest",
+      "method": "reopenedSameItemAndRetainedNavigationCallbacksCannotReuseOldConfirmation",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalCandidatePresentationTest",
+      "method": "retainedResumeActionsCannotRestartReopenedOrCancelledBatches",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "editableKeywordExactAndSavedZoneDateFieldsOpenEveryOriginalCharacterWithoutTouchingDraft",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-from')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "pendingPersonInputAndReadErrorsKeepAdvancedFiltersVisibleUntilExplicitClear",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to assert the following: (is not enabled)\nSemantics of the node:\nNode #1181 at (l=286.0, t=76.0, r=344.0, b=128.0)px, Tag: 'original-search-filters'\nFocused = 'false'\nRole = 'Button'\nShape = 'RoundedCornerShape(topStart = CornerSize(size = 50.0%), topEnd = CornerSize(size = 50.0%), bottomEnd = CornerSize(size = 50.0%), bottomStart = CornerSize(size = 50.0%))'\nStateDescription = '打开独立筛选页'\nText = '[筛选]'\nActions = [ClearTextSubstitution, GetTextLayoutResult, OnClick, RequestFocus, SetTextSubstitution, ShowTextSubstitution]\nMergeDescendants = 'true'\nSelector used: (TestTag = 'original-search-filters')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "indexPendingAndFailureKeepLiteralResultsAndExplicitRebuildControlHonest",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-rebuild')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "narrowLargeFontSeparatesNoHitsInvalidAndFailedDatesAndKeepsCorrectionAndClearReachable",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-from')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "searchCardsHighlightVerifiedOriginalUnicodeKeepOrderAndClearWithoutTouchingSource",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-clear')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "readerReturnKeepsActualMemoriesListIndexAndOffsetWhenPaddingShowsPreviousItem",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 2000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "compositionRestorationDropsSensitiveQueryDatesAndResultsAndRevokesOldActions",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-from')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalOriginalSearchPresentationTest",
+      "method": "emptyAdvancedFiltersUseRealKeyboardDisclosureWithoutQueryOrInputReplacement",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Assert failed: The component with Text + InputText + EditableText contains '筛选与范围' (ignoreCase: false) is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalProcessingPresentationTest",
+      "method": "pictureOnlyOriginalCanChooseNoInferenceWithoutInventingTextOrRemoteOption",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalProcessingPresentationTest",
+      "method": "unknownReadbackHasNoSuccessAndRetryUsesTheIdenticalRequestWithoutAnotherGeneration",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalProcessingPresentationTest",
+      "method": "cancelRestorationAndNavigationRetirePrivateConfirmationsAndSavedStateContainsNoSource",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalProcessingPresentationTest",
+      "method": "actualNarrowDoubleFontDetailRequiresSeparateChoiceAndConfirmationForBothLocalScopes",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.LocalRecordsPresentationTest",
+      "method": "productionCaptureAndMemoriesStayCenteredAndBoundedOnWideScreens",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to retrieve bounds of the node.\nReason: Expected exactly '1' node but could not find any node that satisfies: (Text + InputText + EditableText contains '0 条本机记录' (ignoreCase: false))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualAliasRecallPresentationTest",
+      "method": "keywordAliasRecallShowsLabelWithoutBodyHighlightKeepsNavigationAndExactOriginalMode",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-tag')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualPeoplePresentationTest",
+      "method": "explicitPersonAndKeywordSavedZoneDateOpenOriginalAndRetireStalePersonResult",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-person-apply')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTagPresentationTest",
+      "method": "changedTagVersionRevokesOldResultBeforeCompositionAndReadFailureIsDistinctFromEmpty",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 2000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTagPresentationTest",
+      "method": "tagOnlyAndKeywordSavedZoneDateCombinationOpenFullOriginalAndReturnActualListPosition",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 2000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTagPresentationTest",
+      "method": "tagSearchReturnKeepsExactPositionWithExportControlVisible",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTagPresentationTest",
+      "method": "rawSavedStateAndRestorationExcludeTagConditionsInputsAndClearedFieldUndoHistory",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 2000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTagRecallPresentationTest",
+      "method": "keywordTagRecallShowsLabelWithoutBodyHighlightKeepsNavigationAndExactOriginalMode",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-tag')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "landscapeDashboardKeepsCreateCancelAndConfirmedCompletionReachable",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Assert failed: The component with TestTag = 'companion-entry' is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "lostReadbackAckReinitializationPreservesOneIdentityAndNeverPublishesFalseEmpty",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'manual-task-refresh' in scrollable container\nSemantics of the node:\nNode #411 at (l=0.0, t=56.0, r=360.0, b=928.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@35636966'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 5 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "rawSavedStateExcludesTitlesAndEditorUndoAndRestorationRevokesOldNavigation",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Assert failed: The component with TestTag = 'manual-task-discard' is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "explicitDateOnlyCreateModifyPostponeAndClearWaitForAcknowledgement",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'manual-task-date-input')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "dashboardSeparatesDraftCountAndCreatingTaskNeverAddsAReminder",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Assert failed: The component with TestTag = 'companion-entry' is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "narrowDoubleFontKeepsCreateCloseAndNavigationReachableAndRevokesOldPageCallbacks",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Assert failed: The component with TestTag = 'companion-entry' is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "nonexistentAndRepeatedLocalTimesRequireExplicitCorrectionsAndOffsetChoice",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'manual-task-date-one' in scrollable container\nSemantics of the node:\nNode #2164 at (l=0.0, t=56.0, r=360.0, b=928.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@35636966'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 5 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskPresentationTest",
+      "method": "dateGroupsUseChosenZoneAndTerminalStateRetainsItsPlan",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to assert the following: (Text + EditableText = [未设时间 · 待办 1])\nSemantics of the node:\nNode #2751 at (l=16.0, t=639.0, r=344.0, b=674.0)px, Tag: 'manual-task-heading-UNDATED'\nText = '[未设时间 · 待办]'\n[Heading]\nActions = [ClearTextSubstitution, GetTextLayoutResult, SetTextSubstitution, ShowTextSubstitution]\nSelector used: (TestTag = 'manual-task-heading-UNDATED')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskTitlePresentationTest",
+      "method": "unconfirmedTitleCanBeCancelledAndUnknownCommitHasNoSuccessUntilExactRetry",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'manual-task-title-open-synthetic-private-title-two' in scrollable container\nSemantics of the node:\nNode #2821 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@35636966'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 4 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskTitlePresentationTest",
+      "method": "explicitTitleCorrectionRequiresReviewAndConfirmationWithoutSavingPrivateInput",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'manual-task-title-open-synthetic-private-title-one' in scrollable container\nSemantics of the node:\nNode #2903 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@35636966'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 4 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.ManualTaskTitlePresentationTest",
+      "method": "sameTitleTasksRejectRetiredDialogAndRouteCallbacks",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'manual-task-title-open-synthetic-same-title-one' in scrollable container\nSemantics of the node:\nNode #2986 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=6, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@35636966'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=1000.0, maxValue=1000.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 5 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.MixedNotebookPresentationTest",
+      "method": "emptyLandscapeDoubleFontHasReachableStartAndFocusedComposerWithoutWriting",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'mixed-policy-details' in scrollable container\nSemantics of the node:\nNode #2228 at (l=0.0, t=56.0, r=640.0, b=108.0)px, Tag: 'mixed-list'\nCollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@6e6a4514'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=1033.0, maxValue=1033.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 1 child, 3 siblings\nSelector used: (TestTag = 'mixed-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.MixedNotebookPresentationTest",
+      "method": "coldRegularFontLandscapeStartsCompactAndRetainsDraftAcrossReadOnlyActions",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: expected:<56.0> but was:<48.0>"
+    },
+    {
+      "class": "com.t1doo.aiyou.MixedNotebookPresentationTest",
+      "method": "realNotebookUsesBundledLuluOnlyWhenPreferenceIsReadyAndVisibleWithoutWritingRecords",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Assert failed: The component with Text + InputText + EditableText contains '生活的小片刻' (ignoreCase: false) is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.MobileNavigationPresentationTest",
+      "method": "productionTabsSwipeOnceAtEdgesAndReturnToUnchangedUnsavedDraftWithoutWrites",
+      "type": "androidx.test.espresso.AppNotIdleException",
+      "message": "androidx.test.espresso.AppNotIdleException: Compose did not get idle after 53347 attempts in 60 SECONDS.\n\n1. Check your measure/layout lambdas for infinite composition loops.\n2. Verify that the 'busy' resources listed above are not deadlocked.\n3. Increase Espresso's master idling policy if a longer timeout is required.\n The following Idle Conditions failed ."
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalActivityExportPresentationTest",
+      "method": "activitySafCancelReselectRetiresOldUuidAndDuplicateResultWritesAndReadsOnlyOnce",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalActivityExportPresentationTest",
+      "method": "taskOnlyDoubleFontPreviewSeparatesKindsAndRequiresPlaintextConsentBeforeSafWithoutSavingPrivateState",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalActivityExportPresentationTest",
+      "method": "formatScopeChangesRetireConsentAndChangedActivitiesNeverLaunchDestinationOrPromoteDraft",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditPresentationTest",
+      "method": "newerOrDeletedSourceNeverReplacesUserInputOrCreatesReplacement",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditPresentationTest",
+      "method": "tailReturnKeepsExpandedSavedPreviewFullyVisible",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditPresentationTest",
+      "method": "readingEditSaveReturnsToNewOriginalAndPreservesCaptureDraftAndListAnchor",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditPresentationTest",
+      "method": "committedReadbackFailureRetriesReadOnlyWithoutAnotherRevision",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditPresentationTest",
+      "method": "narrowLargeFontBoundaryInputAndPrimaryActionsRemainReachable",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditPresentationTest",
+      "method": "failedSaveKeepsEditsAndUserCorrectionRetriesWithoutFalseSuccess",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditPresentationTest",
+      "method": "reopenedAndDisposedEditorRejectsRetainedSessionCallbacks",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditPresentationTest",
+      "method": "lateCaptureWriteFailureRetriesStorageWithoutLosingEitherInput",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditPresentationTest",
+      "method": "endOfListSaveReturnsToVisibleSelectedCurrentOriginal",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditPresentationTest",
+      "method": "cancelAndSystemBackRequireDiscardAndKeepOriginalWithoutWrites",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditPresentationTest",
+      "method": "tailReturnKeepsSelectedOriginalVisibleAfterControlledViewportShrink",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditPresentationTest",
+      "method": "busySaveRejectsCancelInputAndRetainedReaderCopyUntilCommit",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "aiNoneHistoryRouteCreatesOnlyAnExplicitNewVersionAndKeepsNoInferencePolicy",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: (Text + InputText + EditableText contains '阅读全文' (ignoreCase: false))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "wrongKeyIndexHasExplicitVisibleErrorAndNoRecoveryButtons",
+      "type": "java.nio.file.AccessDeniedException",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "globalIndexFailureDisablesExistingButtonsAndVisibleRetryRestoresHealthyRecovery",
+      "type": "java.nio.file.AccessDeniedException",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "aiNoneColdDraftRecoveryAllowsExplicitManualSaveWithoutChangingPolicy",
+      "type": "java.nio.file.AccessDeniedException",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "narrowLargeFontColdRecoveryCorrectionAndSaveKeepCaptureAndImmutableOriginals",
+      "type": "java.nio.file.AccessDeniedException",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "explicitKeepConfirmationFailureStaysInEditorAndVisibleRetryThenReturns",
+      "type": "java.nio.file.AccessDeniedException",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "narrowLargeFontExplicitKeepReturnsToOriginalAndResumesWithoutFormalWrite",
+      "type": "java.nio.file.AccessDeniedException",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "missingSourceRecoveryRetainsTextAndExplicitDiscardCannotResurrectIt",
+      "type": "java.nio.file.AccessDeniedException",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "actualCipherWriteFailureRemainsVisibleAndCorrectedRetryPreservesCompleteInput",
+      "type": "java.nio.file.AccessDeniedException",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditRecoveryPresentationTest",
+      "method": "partialIndexWarningIsVisibleAndHealthyRecoveryRemainsUsableWithoutShowingDamagedText",
+      "type": "java.nio.file.AccessDeniedException",
+      "message": "java.nio.file.AccessDeniedException: D:\\AndroidDev\\temp"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalExportPresentationTest",
+      "method": "legacyAndCurrentNullRangeUiNeverClaimsWholeAudioCoverage",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalExportPresentationTest",
+      "method": "actualDialogRequiresSelectionPreviewAndFreshPlaintextConsentBeforeSystemDocumentIntent",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalExportPresentationTest",
+      "method": "sourceChangeShowsConflictAndRequiresExplicitNewPreviewWithoutWritingAnyFile",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalExportPresentationTest",
+      "method": "mixedZipMalformedAuthenticatedOriginalFailsBeforePreviewOrSystemPicker",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalExportPresentationTest",
+      "method": "rawSavedStateExcludesSnapshotOriginalTagsConsentAndDestinationAndNavigationRetiresPendingWork",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalExportPresentationTest",
+      "method": "imageOnlyZipShowsActualAuthenticatedPictureAndRequiresConsentBeforeZipIntent",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalExportPresentationTest",
+      "method": "explicitHumanTranscriptScopeAtActualDoubleFontRequiresFreshPlaintextConsentAndStaysOutOfSavedState",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalExportPresentationTest",
+      "method": "narrowAudioZipShowsExactSourceAndSeparatePlaintextConsentWithoutOpeningMedia",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalExportPresentationTest",
+      "method": "narrowDoubleFontKeepsRiskDestinationAndCloseReachableAndHidesPreviewOnReadFailure",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalHistoryPresentationTest",
+      "method": "knownVersionChangeReturningWithoutRetryShowsCurrentAndRejectsOldCopy",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalHistoryPresentationTest",
+      "method": "currentAndOldVersionsOpenFullUnicodeAndNativeCopyOnlySelectedHistory",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalHistoryPresentationTest",
+      "method": "lateCaptureFailureCanRecoverWhileViewingHistoryWithoutLosingEitherInput",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalHistoryPresentationTest",
+      "method": "wideHistoryListAndReadFailureKeepCenteredMaximumContentWidth",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalHistoryPresentationTest",
+      "method": "versionChangeAndDeletionDuringReadsNeverReplaceUserInputOrShowStaleHistory",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalHistoryPresentationTest",
+      "method": "narrowLargeFontHistoryListReturnsToAnchorAndFullMultilineOriginalReachesEnd",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalHistoryPresentationTest",
+      "method": "missingSelectedRevisionAndBusySaveNeverOfferWrongOriginalOrHistory",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalHistoryPresentationTest",
+      "method": "failedListAndSelectedOriginalReadsHidePlaintextAndRetryWithoutDiscardingEdits",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalHistoryPresentationTest",
+      "method": "historyReturnPreservesEditorInputCaptureDraftAndRecordListAnchorThenSaveShowsVersions",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalHistoryPresentationTest",
+      "method": "closedReopenedAndDisposedHistoryRejectsRetainedReadsCopiesAndNavigation",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-original')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalReadingPresentationTest",
+      "method": "closeAndSystemBackPreserveEachListPositionAndSelectedRecord",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-record-20')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalReadingPresentationTest",
+      "method": "restoredNavigationResolvesLatestOriginalAndRestoresListAnchor",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-record-20')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalReadingPresentationTest",
+      "method": "stableIdTracksReorderAndRevisionAndShowsDeletedRecordFallback",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalReadingPresentationTest",
+      "method": "retainedNavigationCallbacksRejectOtherRecordAndReopenedSameId",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalReadingPresentationTest",
+      "method": "nativeSelectionCopiesOnlySelectedTextWithSensitiveFlagAndRejectsStaleCopy",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalReadingPresentationTest",
+      "method": "openingAndReadFailureHidePlaintextAndRetryPreservesDraft",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalReadingPresentationTest",
+      "method": "boundedUnicodePreviewOpensAndCopiesEveryOriginalCharacter",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalReadingPresentationTest",
+      "method": "retainedOpenAndFullCopyCallbacksRejectNavigationRevisionAndReadFailure",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-record')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalReadingPriorityPresentationTest",
+      "method": "toolsRetireAcrossCloseReopenEntryOwnerFailureAndObservedAba",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-two')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.QuestionKeywordPresentationTest",
+      "method": "landscapeDoubleFontScrollFocusAndEnterConfirmOnlyAfterValidWholeDateTuple",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'question-keyword-open' in scrollable container\nSemantics of the node:\nNode #753 at (l=0.0, t=56.0, r=640.0, b=248.0)px\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@2cd48755'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=1674.0, maxValue=1674.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 2 children\nSelector used: (ScrollToIndex is defined)\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.QuestionKeywordPresentationTest",
+      "method": "realAppRequiresExplicitDateAndQueriesOnceThenOpensUnchangedNegativeOriginal",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'question-keyword-open' in scrollable container\nSemantics of the node:\nNode #870 at (l=0.0, t=56.0, r=360.0, b=928.0)px\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@2cd48755'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 9 children\nSelector used: (ScrollToIndex is defined)\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.QuestionKeywordPresentationTest",
+      "method": "restorationAndActualActivityPauseRetireQuestionWithoutSavingOrQuerying",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'question-keyword-open' in scrollable container\nSemantics of the node:\nNode #989 at (l=0.0, t=56.0, r=360.0, b=928.0)px\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@2cd48755'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 9 children\nSelector used: (ScrollToIndex is defined)\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordConnectionReviewPresentationTest",
+      "method": "cancelledRetainedReviewAndChangedConfigurationCannotGrantAnOldConnection",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordConnectionReviewPresentationTest",
+      "method": "uncertainDecisionRetryOnlyReadsReceiptAndNeverRefreshesIntervalOrSends",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordConnectionReviewPresentationTest",
+      "method": "narrowDoubleFontDirectoryChoiceShowsDestinationVersionReferenceBoundaryAndSeparateConfirmation",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordEventDatePresentationTest",
+      "method": "narrowDoubleFontManualSetCorrectionAndClearEachRequireVisiblePreview",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordEventDatePresentationTest",
+      "method": "eventDateBasisCombinesKeywordTagFavoriteAndNeverMatchesUnknownCaptureDate",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed: assertExists.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-date-basis')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordEventDatePresentationTest",
+      "method": "uncertainSaveRetainsSameIntentAndStaleConfirmCannotWriteAfterNavigation",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordEventDatePresentationTest",
+      "method": "rejectedDateAndZoneAtActualDoubleFontRetireConfirmationUntilExplicitCorrection",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordFavoritePresentationTest",
+      "method": "uncertainChoiceHasReachableStableRetryAndNoCrossRecordSuccessNotice",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordFavoritePresentationTest",
+      "method": "restorationKeepsPublicFilterAndDropsPrivateQueryWhileReadFailureCannotShowEmptyFavorites",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'original-search-favorites')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordFavoritePresentationTest",
+      "method": "actualReaderChoiceFavoriteTimelineCombinedLookupAndUnfavoriteReturn",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordFavoritePresentationTest",
+      "method": "narrowDoubleFontControlIsReachableAndRetainedReaderActionCannotWriteAfterNavigation",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordHistoryPackagePresentationTest",
+      "method": "originalEditScopeDefaultsOffRequiresFullHistoryAndShowsFullDraftBeforeConsentAtDoubleFont",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordHistoryPackagePresentationTest",
+      "method": "explicitHistoryAtDoubleFontPreviewsEveryVersionAndDeletedTextWarningBeforeScopeConfirmation",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordHistoryPackagePresentationTest",
+      "method": "authenticatedOriginalEditsRequireSeparateConfirmationAndPublishRecoveryEntryWithoutSavingOriginal",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordHistoryPackagePresentationTest",
+      "method": "authenticatedHistoryShowsAllVersionsBeforeSeparateRestoreConfirmationCreatesNewCopy",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordPackageActivityPresentationTest",
+      "method": "taskRestoreRequiresActualSeparateConfirmationThenUnknownReadbackRetriesWithoutPromotingDraft",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordPackageActivityPresentationTest",
+      "method": "taskOnlySelectionAtDoubleFontPreviewsEveryKindAndKeepsExplicitScopeGateAndPrivateState",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordPackagePresentationTest",
+      "method": "actualNavigationRetiresRetainedPickerAndConfirmBeforeRecompositionWithoutOpeningOrImporting",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordPackagePresentationTest",
+      "method": "rawSavedStateAndRecreationNeverContainPassphrasesOriginalsTagsManifestOrPickerIdentity",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordPackagePresentationTest",
+      "method": "wrongPassphraseShowsFiniteFailureWithoutPreviewOrImport",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordPackagePresentationTest",
+      "method": "restoreAuthenticatesAndPreviewsBeforeDistinctConfirmationAndNoImplicitWrite",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordPackagePresentationTest",
+      "method": "actualFullPreviewRequiresScopeAndTwoMatchingSecretInputsBeforeExportPicker",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordPackagePresentationTest",
+      "method": "imageCountBytesAndConfirmationRemainReachableAtTwoHundredPercentFont",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordPackagePresentationTest",
+      "method": "imageRestorePreviewRequiresSeparateExplicitConfirmationAtLargeFont",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordPackagePresentationTest",
+      "method": "narrowDoubleFontKeepsConfirmationReachableAndReadFailureHidesOriginalAndSecrets",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecycleBinPresentationTest",
+      "method": "failedOrLostAcknowledgementKeepsExactTargetForStableRetryWithoutClaimingSuccess",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecycleBinPresentationTest",
+      "method": "loadingEmptyAndFailedReadsAreDistinctAndNeverExposeStaleTrashBody",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecycleBinPresentationTest",
+      "method": "permanentEraseRequiresExplicitConfirmationAndCancelKeepsPrivateStateOutOfSavedStateAtDoubleFont",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecycleBinPresentationTest",
+      "method": "rawSavedStateExcludesRecycleOriginalTagsOperationAndConfirmationAndQueuedCloseDoesNotWrite",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecycleBinPresentationTest",
+      "method": "actualMoveAndExplicitRestoreKeepFullOriginalTagsAndRequireEachConfirmation",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecycleBinPresentationTest",
+      "method": "rereadPendingErasureDisablesRestoreAndContinuesTheDurableConfirmation",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecycleBinPresentationTest",
+      "method": "retainedRestoreButtonForBRejectsAfterSelectingAAndConfirmationNamesTheCurrentTarget",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecycleBinPresentationTest",
+      "method": "permanentEraseLostReceiptOffersExplicitRetryWithTheSameIntentAndNoFalseSuccess",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecycleBinPresentationTest",
+      "method": "retainedReaderAndConfirmationCallbacksRejectNavigationAndNewSessionBeforeRecomposition",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecycleBinPresentationTest",
+      "method": "narrowDoubleFontKeepsConfirmCancelAndRestoreReachableAndHidesContentOnReadFailure",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.RecycleBinPresentationTest",
+      "method": "retainedPermanentEraseButtonCannotRetargetAfterSelectionChangesBeforeRecomposition",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-manage-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SelectedQuestionConsentPresentationTest",
+      "method": "narrowDoubleFontSeparateMultiSourceReviewAndExactOriginalJump",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 5000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.SelectedQuestionConsentPresentationTest",
+      "method": "withdrawUnknownAckHidesResultAndExplicitRetryNeverExecutesAgain",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 5000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.SelectedQuestionConsentPresentationTest",
+      "method": "actualProductionQuestionInputAndConnectionAreSeparateFromRecordSavingAndPackageGateCannotBeBypassed",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 5000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.SelectedQuestionConsentPresentationTest",
+      "method": "serviceReplacementRetiresOpenReviewAndDefaultCapabilityNeverOffersSend",
+      "type": "androidx.compose.ui.test.ComposeTimeoutException",
+      "message": "androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 5000 ms"
+    },
+    {
+      "class": "com.t1doo.aiyou.SkyglassPreferencesTest",
+      "method": "platformAtomicFileReplacementIsVisibleToReadback",
+      "type": "org.junit.ComparisonFailure",
+      "message": "org.junit.ComparisonFailure: Platform AtomicFile replacement must be confirmed expected:<synthetic-[second]> but was:<synthetic-[first]>"
+    },
+    {
+      "class": "com.t1doo.aiyou.SkyglassPreferencesTest",
+      "method": "legacyV4ReadIsUntouchedAndEveryThemeMotionPairSurvivesColdRead",
+      "type": "java.io.IOException",
+      "message": "java.io.IOException: UI preferences not confirmed"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceFactPresentationTest",
+      "method": "realCloseAndOwnerReplacementRejectQueuedOldConfirmationWithoutNewOwnerPublication",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceFactPresentationTest",
+      "method": "acceptedWriteSurvivesQueryRetirementAndActualRootRecompositionWhileActorIsBlocked",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceFactPresentationTest",
+      "method": "actualPlatformDoubleFontKeepsEndpointRejectionStickyAndUnknownSameIntentFrozen",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceFactPresentationTest",
+      "method": "explicitCandidateSeparateAcceptanceCorrectionAndRevocationReachExactOriginalAndUnifiedFact",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceMemoryInboxPresentationTest",
+      "method": "narrowInboxReachesExactOriginalAndRequiresSeparateExistingAcceptanceAtDoubleFont",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-review-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceMemoryInboxPresentationTest",
+      "method": "failedReadAndRestorationHidePrivateResultsAndRetireRetainedPageCallbacks",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-review-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceMemoryInboxPresentationTest",
+      "method": "acceptedMemoriesAreReachableAtDoubleFontAndDisappearOnlyAfterSeparateRevocationConfirmation",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-review-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceMemoryPresentationTest",
+      "method": "rejectionCorrectionHistoryAndRevocationSurviveReopeningWithoutAutomaticAcceptance",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceMemoryPresentationTest",
+      "method": "unknownAckAndRestorationNavigationCannotReusePrivateConfirmationAuthority",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceMemoryPresentationTest",
+      "method": "explicitPendingAndAcceptanceAreReachableAtDoubleFontAndSourceJumpPreservesOriginal",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourcePreferencePresentationTest",
+      "method": "failedGlobalReadHidesCountAndNeverPresentsAnUnverifiedEmptyPage",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'notebook-review-tools')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourcePreferencePresentationTest",
+      "method": "doubleFontKeywordLookupClearsOldResultsAndOpensHighlightedOriginalWithoutSavingQuery",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourcePreferencePresentationTest",
+      "method": "privateFormRestorationAndClosedConfirmationHaveNoRetainedWriteAuthority",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourcePreferencePresentationTest",
+      "method": "doubleFontPendingSeparateAcceptanceCorrectionSourceJumpAndRevokeCancellationReachProductionRoutes",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceTagPresentationTest",
+      "method": "lostReadbackHasNoFalseSuccessAndRetriesTheSameMemoryOnlyRequest",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceTagPresentationTest",
+      "method": "explicitPreviewConfirmAndManageRemovalAreReachableAtDoubleFontWithoutChangingOriginal",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceTagPresentationTest",
+      "method": "cancelledAndRestoredOrNavigatedConfirmationsCannotReusePrivatePreviewAuthority",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceTaskPresentationTest",
+      "method": "cancelledRestoredAndNavigatedConfirmationsCannotReusePrivateSourceOrInput",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceTaskPresentationTest",
+      "method": "narrowDoubleFontLiteralFlowRequiresSeparateConfirmationAndJumpsToExactOriginal",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceTaskPresentationTest",
+      "method": "sourceReadFailureAndRevisionRefreshHideQuoteAndConfirmationButRetainInput",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.SourceTaskPresentationTest",
+      "method": "unknownReadbackHasNoSuccessAndRetriesSameRequestWithoutDuplicatingTask",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskProposalPresentationTest",
+      "method": "uncertainReadbackRetainsExactConfirmationAndNeverShowsPrematureSuccess",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskProposalPresentationTest",
+      "method": "otherOwnerConfirmationAndSourceRemovalWithdrawRecoveryReceiptInActualDialogWithoutReplacingInput",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskProposalPresentationTest",
+      "method": "refreshedSourceReadFailureAndOtherOwnerVersionChangeKeepInputsButRevokeUnqualifiedRecoveryReceipt",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskProposalPresentationTest",
+      "method": "failedRefreshQueueHidesUnverifiedEmptyAndRetainedDraftBodyUntilReadback",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'task-proposal-heading' in scrollable container\nSemantics of the node:\nNode #1718 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=3, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@7c3f25d5'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 2 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskProposalPresentationTest",
+      "method": "narrowDraftColdRestoresInPendingGroupThenActualButtonRequiresSeparateConfirmation",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskProposalPresentationTest",
+      "method": "changedSourceHidesQuoteAndOldConfirmationThenAllowsExplicitRejectionWithoutBundleInput",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: ((Text + InputText + EditableText contains '阅读全文' (ignoreCase: false)) && (hasAnyAncestorThat(TestTag = 'entry-one')))\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskReminderPresentationTest",
+      "method": "explicitReminderAndRevocationRequireRealConfirmationWithoutSavingPrivatePlan",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'reminder-open-synthetic-private-task-one' in scrollable container\nSemantics of the node:\nNode #50 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=5, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@59ae5e78'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=0.0, maxValue=0.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 4 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskReminderPresentationTest",
+      "method": "dashboardShowsActualDeniedUnknownAndScheduledStatesWithoutPromisingDelivery",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'reminder-detail-status-synthetic-notification_denied' in scrollable container\nSemantics of the node:\nNode #132 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=7, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@59ae5e78'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=2015.0, maxValue=2015.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 3 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskReminderPresentationTest",
+      "method": "dateOnlyAndGlobalReadFailureDisableReminderWithoutChangingOriginalInput",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'reminder-open-synthetic-date-only' in scrollable container\nSemantics of the node:\nNode #252 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=6, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@59ae5e78'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=1000.0, maxValue=1000.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 5 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.TaskReminderPresentationTest",
+      "method": "staleDialogAndRouteCallbacksCannotWriteAnotherTaskWithTheSameTitle",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: No node found that matches TestTag = 'reminder-open-synthetic-same-title-one' in scrollable container\nSemantics of the node:\nNode #442 at (l=0.0, t=56.0, r=320.0, b=568.0)px, Tag: 'manual-task-list'\nCollectionInfo = 'CollectionInfo(rowCount=6, columnCount=1)'\nIsTraversalGroup = 'true'\nShape = 'androidx.compose.foundation.VerticalScrollableClipShape@59ae5e78'\nVerticalScrollAxisRange = 'ScrollAxisRange(value=1000.0, maxValue=1000.0, reverseScrolling=false)'\nActions = [GetScrollViewportLength, IndexForKey, ScrollBy, ScrollByOffset, ScrollToIndex]\nHas 5 children, 3 siblings\nSelector used: (TestTag = 'manual-task-list')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UiPreferencesTest",
+      "method": "legacyDefaultsStayLocalAndExplicitNoneSurvivesNewFileAndViewModelOwners",
+      "type": "java.io.IOException",
+      "message": "java.io.IOException: UI preferences not confirmed"
+    },
+    {
+      "class": "com.t1doo.aiyou.UiPreferencesTest",
+      "method": "confirmedRecapWeekSurvivesNewStorageAndViewModelAndKeepsDisplayChoices",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: expected:<UiPreferences(showCompanion=true, reduceMotion=true, defaultRecapPeriod=WEEK, defaultCapturePolicy=LOCAL_ONLY, showCompanionScene=true, appearance=BLUE, backgroundMotion=DRIFT)> but was:<UiPreferences(showCompanion=false, reduceMotion=true, defaultRecapPeriod=WEEK, defaultCapturePolicy=LOCAL_ONLY, showCompanionScene=true, appearance=BLUE, backgroundMotion=DRIFT)>"
+    },
+    {
+      "class": "com.t1doo.aiyou.UiPreferencesTest",
+      "method": "lostDefaultWriteAcknowledgementShowsUnconfirmedAndRetriesOnlyTheSamePreference",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: expected:<LOCAL_ONLY> but was:<AI_NONE>"
+    },
+    {
+      "class": "com.t1doo.aiyou.UiPreferencesTest",
+      "method": "legacyDisplayBytesDefaultToDayAndAreUntouchedUntilExplicitPreferenceSave",
+      "type": "java.io.IOException",
+      "message": "java.io.IOException: UI preferences not confirmed"
+    },
+    {
+      "class": "com.t1doo.aiyou.UiPreferencesTest",
+      "method": "scenePreferenceMigratesV3WithoutChangingCapturePolicyOrWritingOnRead",
+      "type": "java.io.IOException",
+      "message": "java.io.IOException: UI preferences not confirmed"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnavailableControlsInteractionTest",
+      "method": "offlineLicenseRouteAndReturnToLocalMemoriesSurviveIntegration",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Assert failed: The component with Text + InputText + EditableText contains '0 条本机记录' (ignoreCase: false) is not displayed!"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "manualPersonTagDateIntersectionFreshReturnAndRestorationKeepOriginalAndPrivateIdentity",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "manualPersonPagedLongMarkerKeyboardIntersectionAndExactOriginalStayReachableAtDoubleFont",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "currentReadyImageCheckboxFreshReturnRestoreAndClearDoNotWriteAnySource",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "currentReadyImageDoubleFontCheckboxKeyboardAndExactOriginalStayReachable",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "doubleFontFourTypedResultsOpenExactOriginalAndPreferenceThenRequeryWithoutChangingSources",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "originalFavoriteCheckboxFreshReturnRestoreAndClearDoNotWriteAnySource",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "literalNoResultClearAndRestoreNeverSaveQueryOrRetainOldSession",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "originalFavoriteDoubleFontCheckboxKeyboardAndExactOriginalStayReachable",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "manualTagDateIntersectionReturnAndClearUseExactOriginalAndNeverSavePrivateFilter",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "memoryScopeOverflowShowsNoPartialResultsThenNarrowQueryRemainsUsable",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "landscapeDoubleFontScrollsToFocusedQuerySearchAndExactSourceWithoutHiddenActions",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "manualTagChooserPaginationLongValuesAndKeyboardSourceRemainReachableAtDoubleFont",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "noteOnlyAcceptedEmotionKeepsSeparateHighlightAndKeyboardReturnsExactQuoteInsteadOfNote",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "restoredAcceptedNoteQueryAndRetainedClickCannotRecoverPrivateProof",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "quoteAndNoteCorrectionNeedsSeparateReacceptanceThenWithdrawalRemovesOnlyMemoryHit",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "capturedDateErrorCorrectionKeyboardAndClearRangeRemainReachableAtDoubleFont",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "capturedDateRangeIsPrivateAndRestorationOrOldClickCannotReviveIt",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    },
+    {
+      "class": "com.t1doo.aiyou.UnifiedKeywordPresentationTest",
+      "method": "restoredExactImageProofRetiresAPanelBeforeBLookupAndRejectsRetainedAAction",
+      "type": "java.lang.AssertionError",
+      "message": "java.lang.AssertionError: Action performScrollTo() failed.\nReason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'unified-open')\n"
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+[
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/AudioTranscriptPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/HistoryEditPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/ImageTextPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/KeywordReductionPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/LocalCandidatePresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/LocalProcessingPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/ManualAliasRecallPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/ManualTagRecallPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/OriginalEditPresentationTest.kt",
+    "replacements": 3
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/OriginalHistoryPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/OriginalReadingPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/OriginalReadingPriorityPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/QuestionKeywordPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/RecordConnectionReviewPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/RecordEventDatePresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/RecordFavoritePresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/RecycleBinPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/SourceFactPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/SourceMemoryPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/SourcePreferencePresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/SourceTagPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/SourceTaskPresentationTest.kt",
+    "replacements": 1
+  },
+  {
+    "file": "app/src/test/kotlin/com/t1doo/aiyou/TaskProposalPresentationTest.kt",
+    "replacements": 1
+  }
+]

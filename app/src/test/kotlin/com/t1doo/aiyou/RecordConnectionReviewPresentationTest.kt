@@ -74,7 +74,7 @@ class RecordConnectionReviewPresentationTest {
     }
     private fun click(tag:String){ compose.showOriginalToolsFor(tag);compose.onNodeWithTag(tag).performScrollTo().performClick()}
     private fun drain(h:Harness){compose.runOnIdle {runBlocking {while(true)(h.queue.poll()?:break)(h.store)}};compose.waitForIdle()}
-    private fun open(){compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"));compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-one"))).performClick();click("original-local-processing");drain(active)}
+    private fun open(){compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"));compose.onNodeWithTag("entry-one").performClick();click("original-local-processing");drain(active)}
     private lateinit var active:Harness
     private fun show(h:Harness){active=h;compose.setContent {
         val density=LocalDensity.current

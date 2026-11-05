@@ -101,7 +101,7 @@ class KeywordReductionPresentationTest {
         click("keyword-reduction-confirm");ready("蓝绳");assertEquals(before+1,reads.get())
         assertEquals("2026-10-10",inputs.get()[1].text.toString());assertEquals("2026-10-10",inputs.get()[2].text.toString())
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-negative"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-negative"))).performScrollTo().performClick()
+        compose.onNodeWithTag("entry-negative").performScrollTo().performClick()
         compose.waitUntil(5000){compose.onAllNodesWithTag("original-text",useUnmergedTree=true).fetchSemanticsNodes().size==1}
         compose.onNodeWithTag("original-text",useUnmergedTree=true).assertTextEquals("我没有把蓝绳系在树上。")
         assertEquals(0,writes);assertEquals("合成未提交草稿",source.value.text)

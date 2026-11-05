@@ -134,7 +134,7 @@ class SourceFactPresentationTest {
     }
     private fun click(tag:String) { compose.showOriginalToolsFor(tag);compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertIsEnabled().performClick();compose.waitForIdle()}
     private fun drain() {compose.runOnIdle {runBlocking {while(true)(queue.poll()?:break)(owner)}};compose.waitForIdle()}
-    private fun reader() {compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"));compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-one"))).performClick()}
+    private fun reader() {compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"));compose.onNodeWithTag("entry-one").performClick()}
     private fun open() {click("original-source-facts");drain()}
     private fun form() {
         compose.onNodeWithTag("fact-quote").performScrollTo().performTextReplacement("我的合成杯子是绿色")

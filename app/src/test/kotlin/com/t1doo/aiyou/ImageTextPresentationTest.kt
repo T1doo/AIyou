@@ -99,7 +99,7 @@ class ImageTextPresentationTest {
     @Composable private fun Screen(){val d=LocalDensity.current;CompositionLocalProvider(LocalDensity provides Density(d.density,2f)){AIyouTheme{Box(Modifier.size(320.dp,640.dp)){AIyouApp(previewDestination=Destination.MEMORIES,local=state.value,currentRecords={state.value},attachments=attachments,imageTexts=controller)}}}}
     private fun click(tag:String){compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick()}
     private fun drain(){compose.runOnIdle{runBlocking{while(true)(queue.poll()?:break)(owner)}};compose.waitForIdle()}
-    private fun record(e:StoredEntry){compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-"+e.id));compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-"+e.id))).performClick();compose.waitForIdle()}
+    private fun record(e:StoredEntry){compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0);compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-"+e.id));compose.onNodeWithTag("entry-"+e.id).performClick();compose.waitForIdle()}
     private fun viewImage(i:AttachmentIntent){
         compose.onNodeWithText("查看附件").assertIsDisplayed().assertIsEnabled().performClick();drain()
         compose.onNodeWithTag("attachment-"+i.id).performScrollTo();compose.onNode(hasText("查看图片") and hasAnyAncestor(hasTestTag("attachment-"+i.id))).performClick();drain()

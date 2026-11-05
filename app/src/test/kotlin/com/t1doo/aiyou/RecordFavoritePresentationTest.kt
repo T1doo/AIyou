@@ -86,10 +86,10 @@ class RecordFavoritePresentationTest {
     }
     private fun open(id:String){
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-$id"))).performClick()
+        compose.onNodeWithTag("entry-$id").performClick()
     }
     private fun drain(){compose.runOnIdle{runBlocking{while(queue.isNotEmpty())queue.removeFirst()(store)}};compose.waitForIdle()}
-    private fun onlyFavorites(){compose.showOriginalSearchFilters();compose.onNodeWithTag("original-search-favorites").performScrollTo().performClick();readyFavorites()}
+    private fun onlyFavorites(){compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("original-category-favorites"));compose.onNodeWithTag("original-category-favorites").performScrollTo().performClick();readyFavorites()}
     private fun readyFavorites(){compose.waitForIdle();compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.onlyFavorites}==true}}
 
     @Test fun actualReaderChoiceFavoriteTimelineCombinedLookupAndUnfavoriteReturn(){
@@ -99,8 +99,10 @@ class RecordFavoritePresentationTest {
         compose.onNodeWithText("取消收藏").assertIsDisplayed();compose.onNodeWithText("返回列表").performClick()
         onlyFavorites();assertEquals(listOf("one"),results.get().hits.map{it.entry.id})
         compose.onNodeWithTag("original-search-query").performScrollTo().performTextReplacement("needle")
+        compose.showOriginalSearchFilters()
         compose.onNodeWithTag("original-search-from").performScrollTo().performTextReplacement("1970-01-01")
         compose.onNodeWithTag("original-search-through").performScrollTo().performTextReplacement("1970-01-01")
+        compose.onNodeWithTag("original-search-filter-done").performScrollTo().performClick()
         compose.waitForIdle();compose.waitUntil(2_000){results.get()?.let{it.stage==OriginalSearchStage.READY&&it.input.through=="1970-01-01"}==true}
         assertEquals(listOf("one"),results.get().hits.map{it.entry.id});open("one")
         compose.onNodeWithTag("original-favorite-set").performClick();drain()
@@ -156,7 +158,7 @@ class RecordFavoritePresentationTest {
         compose.waitForIdle();compose.waitUntil(2_000){results.get()?.stage==OriginalSearchStage.FAILED}
         assertTrue(results.get().hits.isEmpty())
         compose.onAllNodesWithText("还没有收藏记录").assertCountEquals(0)
-        compose.onNodeWithTag("original-search-favorites").performScrollTo().assertIsEnabled().performClick()
+        compose.onNodeWithTag("original-category-favorites").performScrollTo().assertIsEnabled().performClick()
         compose.waitForIdle();compose.waitUntil(2_000){results.get()?.stage==OriginalSearchStage.BROWSE}
     }
 }

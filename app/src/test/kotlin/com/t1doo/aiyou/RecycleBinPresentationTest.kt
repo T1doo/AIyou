@@ -51,7 +51,7 @@ class RecycleBinPresentationTest {
     private fun pump() = compose.runOnIdle { f.drain() }
     private fun openOriginal() {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-one"))).performScrollTo().performClick()
+        compose.onNodeWithTag("entry-one").performScrollTo().performClick()
     }
     private fun moveDialog() {
         openOriginal()

@@ -103,7 +103,7 @@ class OriginalReadingPresentationTest {
     }
     private fun open(id: String = "record") {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-$id"))).performClick()
+        compose.onNodeWithTag("entry-$id").performClick()
     }
     private fun tab(label: String) = compose.onNode(hasText(label) and
         SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab))

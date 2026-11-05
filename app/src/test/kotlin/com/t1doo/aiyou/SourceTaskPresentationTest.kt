@@ -95,7 +95,7 @@ class SourceTaskPresentationTest {
     private fun drain() {compose.runOnIdle {runBlocking {while(true) (queue.poll()?:break)(owner)}};compose.waitForIdle()}
     private fun reader() {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-one"))).performClick()
+        compose.onNodeWithTag("entry-one").performClick()
     }
     private fun open() {click("original-source-task");drain()}
     private fun title() {compose.onNodeWithTag("source-task-title").performScrollTo().performTextReplacement("合成人工确认的标题")}

@@ -138,7 +138,7 @@ class OriginalReadingPriorityPresentationTest {
         compose.onNodeWithText("回忆").performClick()
         fun openRecord(id: String) {
             compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))
-            compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-$id"))).performClick()
+            compose.onNodeWithTag("entry-$id").performClick()
         }
         openRecord("two")
         compose.runOnIdle { priorOpening(); assertTrue(edits.isEmpty()) }

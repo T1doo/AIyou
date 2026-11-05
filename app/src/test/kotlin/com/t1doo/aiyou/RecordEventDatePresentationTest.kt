@@ -105,7 +105,7 @@ class RecordEventDatePresentationTest {
     }
     private fun open(){
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-one"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-one"))).performClick()
+        compose.onNodeWithTag("entry-one").performClick()
         val dateOpen = control("original-event-date-open")
         System.err.println("DATE_PHASE before-open-click")
         dateOpen.performClick()

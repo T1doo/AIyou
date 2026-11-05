@@ -1,7 +1,7 @@
 {
   "plan": "docs/plans/AIyou-Codex-Plan-20261105/backlog.json",
   "goal": "G0–G7 native migration and evidence-based acceptance",
-  "current_batch": "G3 task creation draft close/reopen implemented in admitted memory owner; cross-process persistence and complete UI regression still pending",
+  "current_batch": "Full UI baseline409/252fail recorded; 37 real-record group tests now PASS after locator adaptation; full rerun next",
   "tasks": [
     {
       "id": "AUD-01",
@@ -120,7 +120,7 @@
     }
   ],
   "holds": [
-    "Historical diagnostic fixture separated from evolving UI source; exact runtime gates unchanged. Local17 tests have only real Windows symlink privilege error; full Linux candidate CI pending.",
+    "Linux CI42014671336 host contracts passed; Android/Preview still running at last query. Local full UI recovery ongoing.",
     "Windows directory fsync limitation remains locally; same cross-key backup test PASS on Linux CI 41986956370, XML verified. Android new-install recovery still NOT RUN.",
     "No device/IME/TalkBack/performance acceptance inferred from design or JVM tests",
     "Theme replacement and restart PASS on API35 emulator; Windows Robolectric AtomicFile failure retained as host-specific evidence."
@@ -136,7 +136,8 @@
     "docs/evidence/2026-11-05-G3-filters/report.json",
     "docs/evidence/2026-11-05-G3-tasks/report.json",
     "docs/evidence/2026-11-05-G3-task-drafts/report.json",
-    "docs/evidence/2026-11-05-G0-diagnostics/report.json"
+    "docs/evidence/2026-11-05-G0-diagnostics/report.json",
+    "docs/evidence/2026-11-05-G0-full-ui/report.json"
   ],
   "stop_after_each_batch": "Commit and report evidence; continue next dependent batch under active user-requested goal unless an explicit approval or hard blocker applies"
 }

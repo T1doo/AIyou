@@ -159,7 +159,7 @@ class LocalCandidatePresentationTest {
     }
     private fun openReader(id: String = "one") {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-" + id))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-" + id))).performClick()
+        compose.onNodeWithTag("entry-" + id).performClick()
     }
     private fun openCandidates() {
         compose.originalTool("original-local-candidates").performScrollTo().performClick()

@@ -18,6 +18,12 @@ internal fun ComposeTestRule.showNotebookToolsFor(tag: String) {
         onNodeWithTag("notebook-tools-close").performClick(); waitForIdle()
     }
     onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+    if (onAllNodesWithTag(group).fetchSemanticsNodes().isEmpty()) {
+        onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("memory-tools-disclosure"))
+        onNodeWithTag("memory-tools-disclosure").performScrollTo().assertIsEnabled().performClick()
+        waitForIdle()
+    }
+    onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag(group))
     val toggle = onNodeWithTag(group).performScrollTo().assertIsDisplayed().assertIsEnabled()
     if (toggle.fetchSemanticsNode().config[SemanticsProperties.StateDescription] == "已收起") toggle.performClick()
     onNodeWithTag(tag).assertExists()

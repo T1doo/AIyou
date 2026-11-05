@@ -114,7 +114,7 @@ class OriginalHistoryPresentationTest {
     }
     private fun open() {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-original"))
-        compose.onNode(hasText("阅读全文") and hasAnyAncestor(hasTestTag("entry-original"))).performClick()
+        compose.onNodeWithTag("entry-original").performClick()
     }
     private fun history() { compose.originalToolText("历史版本").performClick(); loaded() }
     private fun loaded() { compose.waitUntil(5000) { vm.state.value.originalHistory?.loading == false }; compose.waitForIdle() }

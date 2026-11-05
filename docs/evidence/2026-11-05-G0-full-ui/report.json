@@ -1,0 +1,224 @@
+{
+  "scope": "G0/G3 full regression baseline and real navigation adaptation",
+  "status": "PARTIAL_RECOVERY_FULL_RERUN_REQUIRED",
+  "source_parent": "bb4dedf419859421fb0b37877400f538508243bd",
+  "full_baseline": {
+    "tests": 409,
+    "failures": 252,
+    "errors": 0,
+    "skipped": 0
+  },
+  "record_group_results": [
+    {
+      "class": "com.t1doo.aiyou.AudioTranscriptPresentationTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalEditPresentationTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "com.t1doo.aiyou.OriginalReadingPresentationTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "com.t1doo.aiyou.RecordFavoritePresentationTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "changes": "Tests operate real clickable record cards and More/tool/filter surfaces. No production code, test methods or business assertions removed.",
+  "audit": [
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/AudioTranscriptPresentationTest.kt",
+      "old_sha256": "d80d1e0fb1724d8d6054f5b7a09f1c58ac660a3d3b2c11140128db3abcbb9304",
+      "new_sha256": "b52e5c84f0a2236857ea541d516f893fe07d0c52f4bde1dd38064006254321bf",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/HistoryEditPresentationTest.kt",
+      "old_sha256": "6037634315111d744d635228c2361b82675d68406648338ff7aa699d05a94843",
+      "new_sha256": "2834e740314540c35347a05fdb6bf074d05a4d57656bd6781c5a7408ff07cd3a",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/ImageTextPresentationTest.kt",
+      "old_sha256": "53fc6011ed20e3c88fbdeca4493b3ad796c0ff83f4192d5582a32a6cb3217a8f",
+      "new_sha256": "085a4625fa93919dfebd0317ea3d0fcb97e478bb8fef5f3886e4ff7e4a83fb3d",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/KeywordReductionPresentationTest.kt",
+      "old_sha256": "2cd634b9182cb99f787e8ad147be6da6fe3a1da1b9695d81fcc80c12fa3a56dd",
+      "new_sha256": "21e306b7043ecbb0ab60c4eb1311064060585fa253a04e92859cb2e9914b4b0e",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/LocalCandidatePresentationTest.kt",
+      "old_sha256": "27cc2e9babc6223b0c8bf9431a709be562d87b7d907c3cfc26a914583db4bf17",
+      "new_sha256": "a9bd2b742ece987b94297c7d9066c0ec1c252c1ee90f85ad9ee7a1e9f571070a",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/LocalProcessingPresentationTest.kt",
+      "old_sha256": "740744cd71557f15200459f701e8729075580353d0bcfd9349d4eae0048e5564",
+      "new_sha256": "04cb61da8f821216537193d8484011cfb92c740b474071daf07e7e2a1512863b",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/ManualAliasRecallPresentationTest.kt",
+      "old_sha256": "f6e45cf7a591ce6f82f86b39d0e667a5f02393f9387df4f4c673576721c81092",
+      "new_sha256": "b4ca911d8167c44c09a4df889bee3dd84faf11ce8bb8890a35eae3c9285006bc",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/ManualTagRecallPresentationTest.kt",
+      "old_sha256": "fd99368632ae95531ce78f5c43aaba5f40f0450f39ecd9c14dbe60f8c8c42785",
+      "new_sha256": "4754de42c2832c865d6fb450f3aa8a4cc3eb70d3f967671fac624aedb7ce3c79",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/NotebookToolActions.kt",
+      "old_sha256": "3433d7d3fa1ddf7310972eb0579445afd7b0c6a6c206879c87eeada29cee1eaa",
+      "new_sha256": "c033218578a6aa8e78c2a8766ca0242b3ef5531b8fa5f3fffe8b6454abb069f8",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/OriginalEditPresentationTest.kt",
+      "old_sha256": "0c8ea66bfcb9e6bb25e1fcb49544db4e202740347e4206d80de1a29d47c1bfcc",
+      "new_sha256": "57be91f0f90275bca7e8547bed57fd5bf67b2080b0bb041453db1a3800ac17cb",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/OriginalHistoryPresentationTest.kt",
+      "old_sha256": "622e5c7cf3c8dfbbadede24f0021a6ab1fa692253e3851bc9f4a74adb2ac2e59",
+      "new_sha256": "f22baead424e9a4a7f6236b8887c6bc59f3ccff554a3eaff0f7af20c1c927620",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/OriginalReadingPresentationTest.kt",
+      "old_sha256": "7c885adc349e7bb51b98583e71dcf510b9d8de7cc8da74656d4d803d2200c2e9",
+      "new_sha256": "ee78f864dfdad9edd9a9a50bd1e2bc2a659b315d87de9e4a62d81bf84818fa3d",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/OriginalReadingPriorityPresentationTest.kt",
+      "old_sha256": "b51bacc25e75d98d5f5ca091c4970b7a0411977869b9aec4f13b942d13495039",
+      "new_sha256": "b4dc9d3f3468d84be34d26f2fe7d11bb1153e0d2eee452aa92bf80b5fd987f2d",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/QuestionKeywordPresentationTest.kt",
+      "old_sha256": "3299287d204af9629e27ba24d2f391cd70d3422f4a2c8afb81d642862e2d12f0",
+      "new_sha256": "42ee717bc65c7fbbd770ffcdc4d6873e14bde6e2007a595d09df780be70741ad",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/RecordConnectionReviewPresentationTest.kt",
+      "old_sha256": "0cc3654bdbda73f87a473017e9c3d031dfc238e859b1ea1944b564e5170143c4",
+      "new_sha256": "963ae9e141c42e70e055f7c153aefbd05f0e67c2ce40b6ba0729f30da3a7d304",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/RecordEventDatePresentationTest.kt",
+      "old_sha256": "9ee10fd0d0056da71b817548c73de2f8793103a4162382c5b338803b9180071e",
+      "new_sha256": "c0edf9b1f32b22d7961ac715bf8f91e14b2eab126f5ad3382beb79fe79d6ae90",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/RecordFavoritePresentationTest.kt",
+      "old_sha256": "926911e1175676f1c09313dd641e1ebbbea024d21e452999a83774cd8f7f7b39",
+      "new_sha256": "609920cd25659a39e0b140e5a375002a72c1af3c57fc6754d10a72876e5fdeac",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/RecycleBinPresentationTest.kt",
+      "old_sha256": "37eed7d96daef6074e61e1776f956c9a16de1a58bc7ca18ca25e920a04f3f6a0",
+      "new_sha256": "65cd1f1aaa8082563f2ca62eb0c23017d3abf04fe89fbada2ef0b564477c5b10",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/SourceFactPresentationTest.kt",
+      "old_sha256": "7b6fac52af13e75e168efb5ca560f7c3ba825fc792f1419a45677463e81b6476",
+      "new_sha256": "b0f5ec2c137cbbaf7a8a6149988f9e321acf4731ed4431c0a2cf56c001492a4c",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/SourceMemoryPresentationTest.kt",
+      "old_sha256": "6883138e3a7d7c180ea954336125f35023dff0f5d13e055f22192966ab5bab5c",
+      "new_sha256": "b5b1166133c74aa2130a03e2fee70337b39c19e90a7962f7ee40226f299169c1",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/SourcePreferencePresentationTest.kt",
+      "old_sha256": "bfe309e05c9bd85bf579361b8b0acda180d10c4558a60b31edbf06bb4a3bae35",
+      "new_sha256": "1273e19202bc372ab0770d28afec2dc8d449fc1c4578dcb9869f57bdecb9e9db",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/SourceTagPresentationTest.kt",
+      "old_sha256": "ea3b39f750ca3cb23726ed55e92b5080a080abb0685414e5a829ff6ca28b547a",
+      "new_sha256": "ed0e5f5f7e8f13c1e065aee706ec5f74242d816742cce8f9af1c133f7c68a6bb",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/SourceTaskPresentationTest.kt",
+      "old_sha256": "388f47f8770ea54dd723a5c43d518d04b2df9f250647b0a680d785b8199483c0",
+      "new_sha256": "6b9d82534e875e6df0e82c4c05daa4c670cb1d8fe9332e840a04a3cd9394a9cb",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    },
+    {
+      "file": "app/src/test/kotlin/com/t1doo/aiyou/TaskProposalPresentationTest.kt",
+      "old_sha256": "637af037e2f3c79e0c26122dcf35720de71c997157d53bd4aeb3e24f6ae494b0",
+      "new_sha256": "072aaaba5a0e3585694759a2d0acf3fd903c8f18cba85dbb4f7a86753c91a9ec",
+      "assertions_not_removed": true,
+      "method_names_unchanged": true
+    }
+  ],
+  "linux_ci": {
+    "run": 42014671336,
+    "source": "bb4dedf419859421fb0b37877400f538508243bd",
+    "host_job": "success observed",
+    "android_preview_jobs": "in_progress last queried; no whole-CI pass claim"
+  },
+  "limitations": [
+    "37 passing cases do not establish all409 pass",
+    "Baseline252 failures include locator changes, host filesystem limitations and cases still requiring inspection",
+    "Native APK/visual/device checks NOT RUN in this test-only slice"
+  ],
+  "archive_sha256": "b6a5bfab5d9476bcc88ee612b3219eed73ce3f3cd80232e89be477418e4d9c56"
+}
