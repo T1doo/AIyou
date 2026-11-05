@@ -1,7 +1,7 @@
 {
   "plan": "docs/plans/AIyou-Codex-Plan-20261105/backlog.json",
   "goal": "G0–G7 native migration and evidence-based acceptance",
-  "current_batch": "G2 Now/theme verified on API35 emulator; navigation/chrome refined; full parity/Preview/accessibility still pending",
+  "current_batch": "G2 visual fidelity correction in progress; approved full-page prototype is binding reference, not component specimens",
   "tasks": [
     {
       "id": "AUD-01",
@@ -130,7 +130,8 @@
     "docs/evidence/2026-11-05-G1/review.json",
     "docs/evidence/2026-11-05-G2-foundation/report.json",
     "docs/evidence/2026-11-05-G2-now/report.json",
-    "docs/evidence/2026-11-05-G2-device/report.json"
+    "docs/evidence/2026-11-05-G2-device/report.json",
+    "docs/evidence/2026-11-05-G2-fidelity/report.json"
   ],
   "stop_after_each_batch": "Commit and report evidence; continue next dependent batch under active user-requested goal unless an explicit approval or hard blocker applies"
 }

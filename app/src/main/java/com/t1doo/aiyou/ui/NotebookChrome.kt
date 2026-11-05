@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -53,7 +56,7 @@ import com.t1doo.aiyou.designsystem.aiyouFocusOutline
 fun NotebookAppBar(title: String, actionLabel: String, actionEnabled: Boolean = true,
     containerColor: Color = AIyouColors.surface, contentColor: Color = AIyouColors.textPrimary, onAction: () -> Unit) {
     Surface(color = containerColor, contentColor = contentColor) {
-        Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars)
+        Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
             .heightIn(min = 56.dp).padding(horizontal = AIyouDimensions.pageNarrow),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AIyouDimensions.spaceMd)) {

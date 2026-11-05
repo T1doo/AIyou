@@ -1265,6 +1265,10 @@ fun AIyouApp(
         !reading && !recapRoute && !browsingPackage && !browsingRecycle && history==null && editing==null && attachmentPanel==null
     // maxHeight is the IME-padded whole Scaffold allocation, including its top/bottom bars.
     com.t1doo.aiyou.ui.SkyglassSystemBars(notebookHome && display.preferences.appearance == com.t1doo.aiyou.designsystem.SkyglassAppearance.NIGHT)
+    var captureEditing by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
+    if (notebookHome) com.t1doo.aiyou.ui.SkyglassScene(display.preferences.appearance, display.preferences.backgroundMotion,
+        motionAllowed && !imeVisible && !captureEditing && !nowList.isScrollInProgress, Modifier.fillMaxSize())
     // Decide during this first constrained composition; reader measurement remains separate.
     BoxWithConstraints(Modifier.imePadding().fillMaxSize(),propagateMinConstraints=true) {
         val compactNotebookHeader = LocalDensity.current.fontScale >= 1.5f ||
@@ -1278,16 +1282,17 @@ fun AIyouApp(
         }) else null
     Scaffold(
         modifier = Modifier.onSizeChanged { scaffoldHeightPx = it.height },
+        containerColor = if(notebookHome) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
           Column {
             NotebookAppBar(
-                if (browsingPackage) { if(packageUi?.fullMode==true) "完整备份与恢复" else "加密原文包" } else if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else if(recapRoute) "本机回顾" else if(selected==Destination.MEMORIES) "回忆" else selected.label,
+                if (browsingPackage) { if(packageUi?.fullMode==true) "完整备份与恢复" else "加密原文包" } else if (browsingRecycle) "回收站" else if (viewingPicture) "查看图片" else if (attachmentPanel != null) "记录附件" else if (history != null) "原文版本" else if (editing != null) "编辑原文" else if (reading) "记录原文" else if (showLicenses) "开源许可" else if (showSettings) "设置" else if(recapRoute) "本机回顾" else if(selected==Destination.MEMORIES) "回忆" else if(notebookHome) "爱忆" else selected.label,
                 if (browsingPackage) { if (settingsPackageRoute) "返回设置" else "返回列表" } else if (viewingPicture) {if(attachmentPanel?.focusImage!=null) "返回原文" else "返回附件列表"} else if (attachmentPanel != null) { if (attachmentPanel.readOnly) "返回历史原文" else "返回原文" }
                 else if (history != null) { if (history.selectedRevision != null) "返回版本列表" else if (editing != null) "返回编辑" else "返回原文" }
                 else if (editing != null) "取消编辑" else if(reading && recapRoute) "返回回顾" else if (reading || browsingRecycle) "返回列表" else if (showLicenses) "返回设置" else if (showSettings) "返回" else if(recapRoute) "返回回忆" else "设置",
                 actionEnabled = recycleUi?.busy != true && attachmentPanel?.saving != true && (history != null || editing?.canCancel != false),
-                containerColor = if(notebookHome) com.t1doo.aiyou.designsystem.skyglassPalette(display.preferences.appearance).input else com.t1doo.aiyou.designsystem.AIyouColors.surface,
-                contentColor = if(notebookHome) com.t1doo.aiyou.designsystem.skyglassPalette(display.preferences.appearance).text else com.t1doo.aiyou.designsystem.AIyouColors.textPrimary,
+                containerColor = if(notebookHome) androidx.compose.ui.graphics.Color.Transparent else com.t1doo.aiyou.designsystem.AIyouColors.surface,
+                contentColor = if(notebookHome && display.preferences.appearance != com.t1doo.aiyou.designsystem.SkyglassAppearance.SUNSET) androidx.compose.ui.graphics.Color.White else if(notebookHome) com.t1doo.aiyou.designsystem.skyglassPalette(display.preferences.appearance).text else com.t1doo.aiyou.designsystem.AIyouColors.textPrimary,
             ) {
                 if (browsingPackage && ownsPackageRoute()) {
                     closePackageRoute()
@@ -1310,7 +1315,7 @@ fun AIyouApp(
                 DisposableEffect(Unit) { onDispose { navigationHeightPx = 0 } }
                 Box(Modifier.onSizeChanged { navigationHeightPx = it.height }) {
                     NotebookNavigation(if (showSettings) null else selected, onSelect = selectDestination,
-                        containerColor = if(notebookHome) com.t1doo.aiyou.designsystem.skyglassPalette(display.preferences.appearance).input else com.t1doo.aiyou.designsystem.AIyouColors.surface,
+                        containerColor = if(notebookHome) com.t1doo.aiyou.designsystem.skyglassPalette(display.preferences.appearance).navigation else com.t1doo.aiyou.designsystem.AIyouColors.surface,
                         skyglass = if(notebookHome) com.t1doo.aiyou.designsystem.skyglassPalette(display.preferences.appearance) else null,
                         motionAllowed = motionAllowed,
                         allowReselect = recapRoute || browsingPackage || browsingRecycle)
@@ -1484,6 +1489,7 @@ fun AIyouApp(
                 listState=nowList,onOpenEntry=openEntry,selectedEntryId=selectedNowId,
                 defaultPolicyUnavailable=!display.ready && display.error!=null,audio=audioPlayback,companion=companion,motionAllowed=motionAllowed,
                 appearance=display.preferences.appearance,backgroundMotion=display.preferences.backgroundMotion,
+                drawScene=false,onEditingChanged={captureEditing=it},
                 compactHeader=compactNotebookHeader,
                 onAskQuestion=beginQuestion,
                 canImportAudio={ownsNavigation() && selectedName==Destination.NOW.name && !showSettings && !demo && !reading})
@@ -1663,6 +1669,7 @@ fun AIyouApp(
                 state = if (demo) ComponentState.valueOf(stateName) else ComponentState.NORMAL,
             )
         }
+    }
     }
     }
     if(!demo&&!showSettings&&local?.taskProposals?.editor!=null&&taskProposals!=null) {

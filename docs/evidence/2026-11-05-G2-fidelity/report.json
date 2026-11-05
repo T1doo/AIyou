@@ -1,0 +1,32 @@
+{
+  "status": "IN_PROGRESS_VISUAL_NOT_ACCEPTED",
+  "reference": "docs/ui-review/2026-11-05/now-blue.png",
+  "user_correction": "Approved complete landscape/glass prototype is the visual target. Isolated component specimens are not a page redesign.",
+  "changes": [
+    "One full-window landscape behind transparent chrome",
+    "Welcome card restored with compact large-font fallback",
+    "Separate floating compact input card; real draft owner unchanged",
+    "Short capture time on list; full metadata remains in detail",
+    "Query action kept directly reachable beside input",
+    "App bar top safeDrawing includes display cutout"
+  ],
+  "evidence": {
+    "record_ui_build_lint": "PASS build.log",
+    "navigation_assemble_lint": "PASS insets-build.log",
+    "packaging_contracts": "PASS 15 tests",
+    "components": "Four Layoutlib component previews rendered and inspected in separate G2-previews record, not page acceptance",
+    "runtime": "API35 emulator actual APK installed; full Now screenshot inspected"
+  },
+  "environment_limit": "System status icons clipped on emulator launcher as well as App; displayCutout top136px vs statusBars72px observed. App safe inset corrected; system issue not claimed fixed.",
+  "remaining": [
+    "Settings icon/appearance entry and exact control rhythm still differ from approved prototype",
+    "Only Now migrated; memories/tasks/secondary routes remain",
+    "No Chinese IME/TalkBack/performance acceptance",
+    "Full current CI not accepted"
+  ],
+  "apk": {
+    "path": "E:\\Github\\AIyou\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "sha256": "0958b411573e49671165341d7a7c40297adec8bd337055010d62779d77653ddc"
+  },
+  "cleanup": "Owned emulator and adb stopped"
+}
